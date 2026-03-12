@@ -1,2 +1,20 @@
-# studyhub
-A student-built, open-source study platform for CS students. Features in-browser study sheets, practice tests, course announcements, personal notes, and an AI assistant — all hosted locally with Docker. Built with React, Node.js, and PostgreSQL. Contributions welcome.
+# StudyHub 📚
+
+A student-powered study platform for CS students.
+
+## What It Does
+- View study sheets directly in the browser — no downloads
+- Take practice tests and see your score instantly
+- Read real-time course announcements
+- Add personal notes
+- Contribute your own study guides
+- Get help from an AI assistant
+
+## Status
+🚧 Currently in development — prototype expected April 2026
+
+## Tech Stack
+React · Node.js · Express · PostgreSQL · Docker · Anthropic AI
+
+## Contributing
+Contributions welcome! See CONTRIBUTING.md (coming soon)
