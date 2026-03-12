@@ -1,7 +1,9 @@
+import Navbar from '../components/Navbar'
 function LoginPage() {
     return (
         <div>
-            <h1>Login Page</h1>
+            <Navbar />
+            <h1 style={{ padding: '40px' }}>Login Page</h1>
         </div>
     )
 }

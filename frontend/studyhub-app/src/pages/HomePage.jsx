@@ -1,7 +1,9 @@
+import Navbar from '../components/Navbar'
 function HomePage() {
   return (
     <div>
-      <h1>Home Page</h1>
+      <Navbar />
+      <h1 style={{ padding: '40px' }}>Home Page</h1>
     </div>
   )
 }

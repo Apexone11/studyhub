@@ -1,7 +1,9 @@
+import Navbar from '../components/Navbar'
 function DashboardPage() {
   return (
     <div>
-      <h1>Dashboard — Coming Soon</h1>
+      <Navbar />
+      <h1 style={{ padding: '40px' }}>Dashboard — Coming Soon</h1>
     </div>
   )
 }

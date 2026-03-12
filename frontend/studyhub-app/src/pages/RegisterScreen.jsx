@@ -1,7 +1,9 @@
+import Navbar from '../components/Navbar'
 function RegisterPage() {
   return (
     <div>
-      <h1>Register Page</h1>
+        <Navbar />
+      <h1 style={{ padding: '40px' }}>Register Page</h1>
     </div>
   )
 }
