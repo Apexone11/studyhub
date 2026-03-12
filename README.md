@@ -10,6 +10,14 @@ A student-powered study platform for CS students.
 - Contribute your own study guides
 - Get help from an AI assistant
 
+## Screenshots
+
+### Homepage
+![StudyHub Homepage](docs/screenshots/homepage.png)
+
+### Login Page
+![StudyHub Login](docs/screenshots/login.png)
+
 ## Status
 🚧 Currently in development — prototype expected April 2026
 
