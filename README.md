@@ -1,6 +1,6 @@
 # StudyHub 📚
 
-A student-powered study platform for CS students.
+A student-powered study platform for Collage students.
 
 ## What It Does
 - View study sheets directly in the browser — no downloads
