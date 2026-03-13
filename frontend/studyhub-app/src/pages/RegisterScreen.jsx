@@ -368,7 +368,7 @@ function RegisterScreen() {
 
       setError('')
       setSuccess(true)
-      setTimeout(() => { window.location.href = '/dashboard' }, 2000)
+      setTimeout(() => { window.location.href = '/feed' }, 2000)
     } catch {
       setError('Could not connect to server. Make sure the backend is running.')
     }

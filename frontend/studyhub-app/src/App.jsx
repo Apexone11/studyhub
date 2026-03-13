@@ -1,58 +1,62 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import HomePage from './pages/HomePage'
-import LoginPage from './pages/LoginPage'
-import RegisterPage from './pages/RegisterScreen'
-import DashboardPage from './pages/DashboardPage'
-import TermsPage from './pages/TermsPage'
-import PrivacyPage from './pages/PrivacyPage'
-import GuidelinesPage from './pages/GuidelinesPage'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 
-const StudySheetsPage = () => (
-  <div>
-    <h1>Study Sheets</h1>
-    <p>Study sheets content will be available here.</p>
-  </div>
-)
+// ── existing pages ────────────────────────────────────────────────
+import HomePage        from './pages/HomePage'
+import LoginPage       from './pages/LoginPage'
+import RegisterScreen  from './pages/RegisterScreen'
+import DashboardPage   from './pages/DashboardPage'
+import TermsPage       from './pages/TermsPage'
+import PrivacyPage     from './pages/PrivacyPage'
+import GuidelinesPage  from './pages/GuidelinesPage'
 
-const PracticeTestsPage = () => (
-  <div>
-    <h1>Practice Tests</h1>
-    <p>Practice tests content will be available here.</p>
-  </div>
-)
+// ── new pages ─────────────────────────────────────────────────────
+import FeedPage         from './pages/FeedPage'
+import SheetsPage       from './pages/SheetsPage'
+import SheetViewerPage  from './pages/SheetViewerPage'
+import {
+  TestsPage,
+  TestTakerPage,
+  NotesPage,
+  AnnouncementsPage,
+  SubmitPage,
+  AdminPage,
+  UploadSheetPage,
+} from './pages/PlaceholderPages'
 
-const SyllabusPage = () => (
-  <div>
-    <h1>Syllabus</h1>
-    <p>Syllabus content will be available here.</p>
-  </div>
-)
+// ── simple auth guard ─────────────────────────────────────────────
+function PrivateRoute({ children }) {
+  const token = localStorage.getItem('token')
+  return token ? children : <Navigate to="/login" replace />
+}
 
-const NotFoundPage = () => (
-  <div>
-    <h1>Page Not Found</h1>
-    <p>The page you are looking for does not exist.</p>
-  </div>
-)
-
-function App() {
+export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/"              element={<HomePage />} />
-        <Route path="/login"         element={<LoginPage />} />
-        <Route path="/register"      element={<RegisterPage />} />
-        <Route path="/dashboard"     element={<DashboardPage />} />
-        <Route path="/study-sheets"  element={<StudySheetsPage />} />
-        <Route path="/practice-tests" element={<PracticeTestsPage />} />
-        <Route path="/syllabus"      element={<SyllabusPage />} />
-        <Route path="/terms"         element={<TermsPage />} />
-        <Route path="/privacy"       element={<PrivacyPage />} />
-        <Route path="/guidelines"    element={<GuidelinesPage />} />
-        <Route path="*"              element={<NotFoundPage />} />
+        {/* ── public (unauthenticated) ─────────────────────────── */}
+        <Route path="/"           element={<HomePage />} />
+        <Route path="/login"      element={<LoginPage />} />
+        <Route path="/register"   element={<RegisterScreen />} />
+        <Route path="/terms"      element={<TermsPage />} />
+        <Route path="/privacy"    element={<PrivacyPage />} />
+        <Route path="/guidelines" element={<GuidelinesPage />} />
+
+        {/* ── authenticated ────────────────────────────────────── */}
+        <Route path="/feed"          element={<PrivateRoute><FeedPage /></PrivateRoute>} />
+        <Route path="/sheets"        element={<PrivateRoute><SheetsPage /></PrivateRoute>} />
+        <Route path="/sheets/upload" element={<PrivateRoute><UploadSheetPage /></PrivateRoute>} />
+        <Route path="/sheets/:id"    element={<PrivateRoute><SheetViewerPage /></PrivateRoute>} />
+        <Route path="/tests"         element={<PrivateRoute><TestsPage /></PrivateRoute>} />
+        <Route path="/tests/:id"     element={<PrivateRoute><TestTakerPage /></PrivateRoute>} />
+        <Route path="/notes"         element={<PrivateRoute><NotesPage /></PrivateRoute>} />
+        <Route path="/announcements" element={<PrivateRoute><AnnouncementsPage /></PrivateRoute>} />
+        <Route path="/submit"        element={<PrivateRoute><SubmitPage /></PrivateRoute>} />
+        <Route path="/admin"         element={<PrivateRoute><AdminPage /></PrivateRoute>} />
+        <Route path="/dashboard"     element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
+
+        {/* ── catch-all ────────────────────────────────────────── */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   )
 }
-
-export default App

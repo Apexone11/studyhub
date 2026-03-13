@@ -38,6 +38,24 @@
   --sh-brand-dark: var(--navy-2);
   --sh-brand: var(--blue);
   --sh-brand-soft: #60a5fa;
+  --sh-heading: #1e293b;
+  --sh-subtext: #475569;
+  --sh-soft: #f8fafc;
+  --sh-pill-bg: #eff6ff;
+  --sh-pill-text: #1d4ed8;
+}
+
+[data-theme='dark'] {
+  --sh-bg: #0f172a;
+  --sh-surface: #111827;
+  --sh-text: #e2e8f0;
+  --sh-muted: #94a3b8;
+  --sh-border: #334155;
+  --sh-heading: #f8fafc;
+  --sh-subtext: #cbd5e1;
+  --sh-soft: #1e293b;
+  --sh-pill-bg: #1e3a8a;
+  --sh-pill-text: #bfdbfe;
 }
 
 html,
@@ -167,6 +185,7 @@ textarea {
   color: #dbeafe;
 }
 
+.dashboard-banner-cta,
 .dashboard-banner-logout {
   border: 1px solid rgba(255, 255, 255, 0.35);
   background: rgba(255, 255, 255, 0.12);
@@ -175,8 +194,12 @@ textarea {
   padding: 10px 18px;
   font-weight: 700;
   cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
 }
 
+.dashboard-banner-cta:hover,
 .dashboard-banner-logout:hover {
   background: rgba(255, 255, 255, 0.2);
 }
@@ -187,7 +210,7 @@ textarea {
 
 .dashboard-title {
   font-size: 20px;
-  color: #1e293b;
+  color: var(--sh-heading);
   margin-bottom: 14px;
 }
 
@@ -259,8 +282,25 @@ textarea {
 }
 
 .dashboard-action-label {
-  color: #1e293b;
+  color: var(--sh-heading);
   font-weight: 700;
+}
+
+.dashboard-pill {
+  background: var(--sh-pill-bg);
+  color: var(--sh-pill-text);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.dashboard-muted-note {
+  color: var(--sh-muted);
+  font-size: 13px;
+  margin-bottom: 12px;
 }
 
 .dashboard-section-head {
@@ -335,13 +375,13 @@ textarea {
 
 .dashboard-course-name {
   font-size: 16px;
-  color: #1e293b;
+  color: var(--sh-heading);
   font-weight: 700;
 }
 
 .dashboard-course-code {
   font-size: 12px;
-  color: #475569;
+  color: var(--sh-subtext);
   margin-top: 4px;
   margin-bottom: 12px;
 }
@@ -371,6 +411,10 @@ textarea {
   color: #16a34a;
 }
 
+.dashboard-chip-link-static {
+  cursor: default;
+}
+
 .dashboard-account-card {
   margin-top: 32px;
   background: var(--sh-surface);
@@ -381,14 +425,14 @@ textarea {
 
 .dashboard-account-title {
   font-size: 16px;
-  color: #1e293b;
+  color: var(--sh-heading);
   margin-bottom: 14px;
 }
 
 .dashboard-account-grid {
-  display: flex;
-  gap: 28px;
-  flex-wrap: wrap;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 }
 
 .dashboard-label {
@@ -399,7 +443,7 @@ textarea {
 
 .dashboard-value {
   font-size: 15px;
-  color: #1e293b;
+  color: var(--sh-heading);
   font-weight: 700;
 }
 

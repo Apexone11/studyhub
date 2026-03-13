@@ -53,11 +53,14 @@ model StudySheet {
   courseId  Int
   userId    Int
   forkOf    Int?
+  stars     Int      @default(0)
+  downloads Int      @default(0)
+  forks     Int      @default(0)
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   course    Course   @relation(fields: [courseId], references: [id])
   author    User     @relation(fields: [userId], references: [id])
 }
-
 model RequestedCourse {
   id        Int      @id @default(autoincrement())
   name      String

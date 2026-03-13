@@ -1,4 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import LogoDark from '../assets/logo-dark.svg'
 
 const NAV_LINKS = [
   { label: 'Home', to: '/' },
@@ -36,12 +37,7 @@ export default function Navbar({ user, onLogout }) {
       <div style={styles.navInner}>
 
         <Link to="/" style={styles.logo}>
-          <div style={styles.logoIconWrap} aria-hidden="true">
-            <i className="fa-solid fa-book-open" style={styles.logoIcon} />
-          </div>
-          <span style={styles.logoText}>
-            Study<span style={styles.logoAccent}>Hub</span>
-          </span>
+          <img src={LogoDark} height="36" alt="StudyHub" style={styles.logoImage} />
         </Link>
 
         <div style={styles.linksWrap}>
@@ -58,13 +54,13 @@ export default function Navbar({ user, onLogout }) {
                 }}
                 onMouseEnter={(event) => {
                   if (!active) {
-                    event.currentTarget.style.color = 'var(--navy)'
-                    event.currentTarget.style.background = 'var(--slate-light)'
+                    event.currentTarget.style.color = '#ffffff'
+                    event.currentTarget.style.background = 'rgba(148, 163, 184, 0.2)'
                   }
                 }}
                 onMouseLeave={(event) => {
                   if (!active) {
-                    event.currentTarget.style.color = 'var(--slate)'
+                    event.currentTarget.style.color = 'rgba(255, 255, 255, 0.86)'
                     event.currentTarget.style.background = 'transparent'
                   }
                 }}
@@ -82,12 +78,12 @@ export default function Navbar({ user, onLogout }) {
                 to="/dashboard"
                 style={styles.userChip}
                 onMouseEnter={(event) => {
-                  event.currentTarget.style.background = 'var(--border)'
-                  event.currentTarget.style.color = 'var(--navy)'
+                  event.currentTarget.style.background = '#1f2937'
+                  event.currentTarget.style.color = '#ffffff'
                 }}
                 onMouseLeave={(event) => {
-                  event.currentTarget.style.background = 'var(--slate-light)'
-                  event.currentTarget.style.color = 'var(--slate)'
+                  event.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
+                  event.currentTarget.style.color = '#ffffff'
                 }}
               >
                 <div style={styles.userAvatar}>
@@ -100,13 +96,13 @@ export default function Navbar({ user, onLogout }) {
                 onClick={handleLogout}
                 style={styles.logoutBtn}
                 onMouseEnter={(event) => {
-                  event.currentTarget.style.borderColor = 'var(--red)'
-                  event.currentTarget.style.color = 'var(--red)'
-                  event.currentTarget.style.background = '#fff5f5'
+                  event.currentTarget.style.borderColor = '#f87171'
+                  event.currentTarget.style.color = '#fecaca'
+                  event.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'
                 }}
                 onMouseLeave={(event) => {
-                  event.currentTarget.style.borderColor = 'var(--border)'
-                  event.currentTarget.style.color = 'var(--slate)'
+                  event.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.25)'
+                  event.currentTarget.style.color = '#ffffff'
                   event.currentTarget.style.background = 'transparent'
                 }}
               >
@@ -119,13 +115,13 @@ export default function Navbar({ user, onLogout }) {
                 to="/login"
                 style={styles.loginBtn}
                 onMouseEnter={(event) => {
-                  event.currentTarget.style.borderColor = '#cbd5e1'
-                  event.currentTarget.style.color = 'var(--navy)'
-                  event.currentTarget.style.background = '#f8fafc'
+                  event.currentTarget.style.borderColor = '#93c5fd'
+                  event.currentTarget.style.color = '#ffffff'
+                  event.currentTarget.style.background = 'rgba(59, 130, 246, 0.18)'
                 }}
                 onMouseLeave={(event) => {
-                  event.currentTarget.style.borderColor = 'var(--border)'
-                  event.currentTarget.style.color = 'var(--slate)'
+                  event.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.25)'
+                  event.currentTarget.style.color = '#ffffff'
                   event.currentTarget.style.background = 'transparent'
                 }}
               >
@@ -158,11 +154,11 @@ const styles = {
     position: 'sticky',
     top: 0,
     zIndex: 200,
-    background: 'rgba(255,255,255,0.85)',
+    background: '#000000',
     backdropFilter: 'blur(12px)',
     WebkitBackdropFilter: 'blur(12px)',
-    borderBottom: '1px solid rgba(226,232,240,0.8)',
-    boxShadow: '0 1px 12px rgba(0,0,0,0.06)',
+    borderBottom: '1px solid #1f2937',
+    boxShadow: '0 1px 12px rgba(0,0,0,0.45)',
     fontFamily: 'var(--font)'
   },
   navInner: {
@@ -178,32 +174,12 @@ const styles = {
   logo: {
     display: 'flex',
     alignItems: 'center',
-    gap: 10,
+    gap: 0,
     textDecoration: 'none',
     flexShrink: 0
   },
-  logoIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    background: 'linear-gradient(135deg, var(--blue-dark), var(--blue))',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    boxShadow: '0 4px 10px rgba(59,130,246,0.35)'
-  },
-  logoIcon: {
-    fontSize: 16,
-    color: 'var(--white)'
-  },
-  logoText: {
-    fontSize: 20,
-    fontWeight: 800,
-    color: 'var(--navy)',
-    letterSpacing: '-0.4px'
-  },
-  logoAccent: {
-    color: 'var(--blue)'
+  logoImage: {
+    display: 'block'
   },
   linksWrap: {
     display: 'flex',
@@ -216,14 +192,14 @@ const styles = {
     borderRadius: 8,
     fontSize: 14,
     fontWeight: 500,
-    color: 'var(--slate)',
+    color: 'rgba(255, 255, 255, 0.86)',
     background: 'transparent',
     textDecoration: 'none',
     transition: 'all 0.15s'
   },
   navLinkActive: {
-    color: 'var(--blue-dark)',
-    background: 'var(--blue-light)',
+    color: '#ffffff',
+    background: 'rgba(59, 130, 246, 0.32)',
     fontWeight: 600
   },
   authWrap: {
@@ -240,8 +216,8 @@ const styles = {
     borderRadius: 8,
     fontSize: 14,
     fontWeight: 500,
-    color: 'var(--slate)',
-    background: 'var(--slate-light)',
+    color: '#ffffff',
+    background: 'rgba(255, 255, 255, 0.08)',
     textDecoration: 'none',
     transition: 'all 0.15s',
     maxWidth: 220
@@ -270,8 +246,8 @@ const styles = {
     fontSize: 14,
     fontWeight: 600,
     background: 'transparent',
-    border: '1px solid var(--border)',
-    color: 'var(--slate)',
+    border: '1px solid rgba(255, 255, 255, 0.25)',
+    color: '#ffffff',
     transition: 'all 0.15s'
   },
   loginBtn: {
@@ -279,9 +255,9 @@ const styles = {
     borderRadius: 8,
     fontSize: 14,
     fontWeight: 600,
-    color: 'var(--slate)',
+    color: '#ffffff',
     background: 'transparent',
-    border: '1px solid var(--border)',
+    border: '1px solid rgba(255, 255, 255, 0.25)',
     transition: 'all 0.15s',
     textDecoration: 'none'
   },

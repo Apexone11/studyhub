@@ -37,8 +37,8 @@ function LoginPage() {
       localStorage.setItem('token', data.token)
       localStorage.setItem('user', JSON.stringify(data.user))
 
-      // Redirect to dashboard
-      window.location.href = '/dashboard'
+      // Redirect to feed
+      window.location.href = '/feed'
     } catch {
       setError('Could not connect to server. Make sure the backend is running.')
     }
