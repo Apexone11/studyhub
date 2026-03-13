@@ -1606,7 +1606,7 @@
 
     schoolDropdown.addEventListener('click', (event) => {
       const target = event.target;
-      if (!target) return;
+      if (!(target instanceof Element)) return;
       const item = target.closest('.dropdown-item');
       if (!item) return;
       const id = Number(item.dataset.schoolId);
