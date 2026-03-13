@@ -81,6 +81,8 @@ const RULES = {
   password: /^(?=.*[A-Z])(?=.*\d).{8,}$/,
 }
 
+const COURSE_CODE_REGEX = /^[A-Z0-9-]{2,20}$/
+
 function getStrength(pw) {
   let s = 0
   if (pw.length >= 8)            s++
@@ -120,6 +122,9 @@ function RegisterScreen() {
   const [courseQuery, setCourseQuery]     = useState('')
   const [courseResults, setCourseResults] = useState([])
   const [selectedCourses, setSelectedCourses] = useState([])
+  const [customCode, setCustomCode]       = useState('')
+  const [customName, setCustomName]       = useState('')
+  const [customCourses, setCustomCourses] = useState([])
 
   // UI state
   const [error, setError]                 = useState('')
@@ -192,6 +197,9 @@ function RegisterScreen() {
     setShowSchoolDD(false)
     setCourseQuery('')
     setSelectedCourses([])
+    setCustomCourses([])
+    setCustomCode('')
+    setCustomName('')
     buildCourseResults('', school, [])
     setShowCourseDD(false)
   }
@@ -201,6 +209,9 @@ function RegisterScreen() {
     setSchoolQuery('')
     setShowSchoolDD(false)
     setSelectedCourses([])
+    setCustomCourses([])
+    setCustomCode('')
+    setCustomName('')
     setCourseResults([])
     setShowCourseDD(false)
   }
@@ -224,8 +235,19 @@ function RegisterScreen() {
   }
 
   function addCourse(course) {
-    if (selectedCourses.length >= 10) { setError('Maximum 10 courses.'); return }
+    if (selectedCourses.length + customCourses.length >= 10) {
+      setError('Maximum 10 courses total (selected + custom).')
+      return
+    }
+
     if (selectedCourses.find(c => c.code === course.code)) return
+
+    const normalizedCode = String(course.code || '').toUpperCase()
+
+    if (customCourses.find(c => c.code === normalizedCode)) {
+      setCustomCourses(prev => prev.filter(c => c.code !== normalizedCode))
+    }
+
     const next = [...selectedCourses, course]
     setSelectedCourses(next)
     setCourseQuery('')
@@ -240,15 +262,85 @@ function RegisterScreen() {
     buildCourseResults(courseQuery, selectedSchool, next)
   }
 
+  function addCustomCourse() {
+    const code = customCode.trim().toUpperCase()
+    const name = customName.trim()
+
+    if (!code || !name) {
+      setError('Enter both custom course code and name.')
+      return
+    }
+
+    if (!COURSE_CODE_REGEX.test(code)) {
+      setError('Custom course code must be 2-20 characters (A-Z, 0-9, or -).')
+      return
+    }
+
+    if (name.length < 2 || name.length > 120) {
+      setError('Custom course name must be between 2 and 120 characters.')
+      return
+    }
+
+    if (selectedCourses.length + customCourses.length >= 10) {
+      setError('Maximum 10 courses total (selected + custom).')
+      return
+    }
+
+    if (selectedCourses.some(c => String(c.code).toUpperCase() === code)) {
+      setError('This course is already selected from the list.')
+      return
+    }
+
+    if (customCourses.some(c => c.code === code)) {
+      setError('This custom course was already added.')
+      return
+    }
+
+    setCustomCourses(prev => [...prev, { code, name }])
+    setCustomCode('')
+    setCustomName('')
+    setError('')
+  }
+
+  function removeCustomCourse(code) {
+    setCustomCourses(prev => prev.filter(c => c.code !== code))
+  }
+
   // ── Final submit ──────────────────────────────────────────
   // Register with backend, persist auth data, and move user into the app.
   async function submitForm(skip = false) {
-    if (!skip && selectedCourses.length === 0 && selectedSchool) {
+    if (!skip && selectedCourses.length === 0 && customCourses.length === 0 && selectedSchool) {
       setError('Add at least one course, or skip to do it later.')
       return
     }
 
     setError('')
+
+    const selectedCourseIds = selectedCourses
+      .map(course => Number(course.id))
+      .filter(Number.isInteger)
+
+    const fallbackCustomCourses = selectedCourses
+      .filter(course => !course.id)
+      .map(course => ({
+        code: String(course.code || '').trim().toUpperCase(),
+        name: String(course.name || course.code || 'Custom Course').trim()
+      }))
+      .filter(course => course.code && course.name)
+
+    const customByCode = new Map()
+
+    customCourses.forEach(course => {
+      customByCode.set(course.code, course)
+    })
+
+    fallbackCustomCourses.forEach(course => {
+      if (!customByCode.has(course.code)) {
+        customByCode.set(course.code, course)
+      }
+    })
+
+    const payloadCustomCourses = Array.from(customByCode.values())
 
     try {
       const res = await fetch('http://localhost:4000/api/auth/register', {
@@ -258,7 +350,8 @@ function RegisterScreen() {
           username: username.trim(),
           password,
           schoolId: selectedSchool?.id || null,
-          courseIds: selectedCourses.map(c => c.id).filter(Boolean)
+          courseIds: selectedCourseIds,
+          customCourses: payloadCustomCourses
         })
       })
 
@@ -275,7 +368,7 @@ function RegisterScreen() {
 
       setError('')
       setSuccess(true)
-      setTimeout(() => { window.location.href = '/dashboard' }, 2000)
+      setTimeout(() => { window.location.href = '/feed' }, 2000)
     } catch {
       setError('Could not connect to server. Make sure the backend is running.')
     }
@@ -576,8 +669,45 @@ function RegisterScreen() {
 
                   <span style={s.hint}>
                     <i className="fas fa-info-circle" style={{ marginRight: '4px' }}></i>
-                    Can't find your course? You can add it after signing up.
+                    Can't find your course? Add it below and we will save it.
                   </span>
+
+                  {/* Custom course entry */}
+                  <div style={s.customWrap}>
+                    <label style={s.label}>Add Custom Course</label>
+                    <div style={s.customRow}>
+                      <input
+                        type="text"
+                        placeholder="Code (e.g. CMSC499)"
+                        value={customCode}
+                        onChange={e => setCustomCode(e.target.value.toUpperCase())}
+                        style={s.customCodeInput}
+                      />
+                      <input
+                        type="text"
+                        placeholder="Course name"
+                        value={customName}
+                        onChange={e => setCustomName(e.target.value)}
+                        style={s.customNameInput}
+                      />
+                      <button type="button" onClick={addCustomCourse} style={s.customAddBtn}>
+                        Add
+                      </button>
+                    </div>
+
+                    {customCourses.length > 0 && (
+                      <div style={s.tagsRow}>
+                        {customCourses.map(course => (
+                          <div key={course.code} style={s.customTag} title={course.name}>
+                            {course.code}
+                            <button onClick={() => removeCustomCourse(course.code)} style={s.tagRemove}>
+                              <i className="fas fa-xmark"></i>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -660,6 +790,12 @@ const s = {
   clearBtn:       { background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: '14px', padding: 0, marginLeft: 'auto' },
   tagsRow:        { display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '10px' },
   tag:            { background: '#eff6ff', border: '1px solid #bfdbfe', color: '#1e3a5f', borderRadius: '999px', padding: '4px 12px', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' },
+  customWrap:     { marginTop: '10px', padding: '10px', border: '1px dashed #d1d5db', borderRadius: '8px', background: '#f8fafc' },
+  customRow:      { display: 'grid', gridTemplateColumns: '1fr 2fr auto', gap: '8px', marginBottom: '8px' },
+  customCodeInput:{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none' },
+  customNameInput:{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '13px', outline: 'none' },
+  customAddBtn:   { background: '#1e3a5f', color: 'white', border: 'none', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', fontWeight: 'bold', cursor: 'pointer' },
+  customTag:      { background: '#ecfeff', border: '1px solid #99f6e4', color: '#115e59', borderRadius: '999px', padding: '4px 12px', fontSize: '12px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' },
   tagRemove:      { background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: '11px', padding: 0 },
   footer:         { background: '#1e3a5f', color: '#94a3b8', textAlign: 'center', padding: '20px', fontSize: '13px' },
 }

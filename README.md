@@ -9,20 +9,29 @@ StudyHub is a student-focused web app where users can register, log in, and coll
 - JWT-based authentication for user sessions
 
 ## Main User Flow
-1. Create an account
-2. Log in
-3. Access the dashboard and study features
+1. Create an account and select enrolled courses during registration
+2. Log in — lands on the activity feed (`/feed`)
+3. Browse and search study sheets (`/sheets`)
+4. View a sheet with rendered Markdown, table of contents, and reading progress
+5. Star sheets, fork them with a custom title, or download as `.md`
+6. Upload your own sheets directly through the site (`/sheets/upload`)
 
-## Screenshots
+## Algorithms
 
-### Home Page
-![StudyHub Home Page](docs/screenshots/home-page.png)
+### Course Recommendation Engine
+Collaborative filtering — finds users with similar enrollments and
+recommends courses they take that you don't have yet. Falls back to
+globally popular courses for new users with no enrollments.
 
-### Login Page
-![StudyHub Login Page](docs/screenshots/login-page.png)
+`GET /api/courses/recommendations` — returns top 6 recommendations with scores
 
-### Register Page
-![StudyHub Register Page](docs/screenshots/register-page.png)
+### Missing Course Tracker  
+When a user submits a course not in our database, it gets logged with
+a request count. Once a course hits **3 requests** it is auto-flagged
+for admin review and added to the next seed cycle.
+
+`POST /api/courses/request` — submit an unknown course  
+`GET  /api/courses/requested` — admin view of all requested courses
 
 ## Local Development
 1. Install dependencies:
@@ -36,6 +45,7 @@ npm --prefix frontend/studyhub-app install
 - `PORT`
 - `JWT_SECRET`
 - `DATABASE_URL`
+- `SHADOW_DATABASE_URL` (required by Prisma for migrations)
 
 3. Run database migrations:
 
