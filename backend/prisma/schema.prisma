@@ -1,0 +1,59 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique
+  passwordHash String
+  role         String   @default("student")
+  createdAt    DateTime @default(now())
+
+  studySheets  StudySheet[]
+  enrollments  Enrollment[]
+}
+
+model School {
+  id      Int      @id @default(autoincrement())
+  name    String   @unique
+  short   String
+  courses Course[]
+}
+
+model Course {
+  id           Int          @id @default(autoincrement())
+  schoolId     Int
+  name         String
+  code         String
+  school       School       @relation(fields: [schoolId], references: [id])
+  studySheets  StudySheet[]
+  enrollments  Enrollment[]
+}
+
+model Enrollment {
+  id       Int    @id @default(autoincrement())
+  userId   Int
+  courseId Int
+  user     User   @relation(fields: [userId], references: [id])
+  course   Course @relation(fields: [courseId], references: [id])
+
+  @@unique([userId, courseId])
+}
+
+model StudySheet {
+  id        Int      @id @default(autoincrement())
+  title     String
+  content   String
+  courseId  Int
+  userId    Int
+  forkOf    Int?
+  createdAt DateTime @default(now())
+  course    Course   @relation(fields: [courseId], references: [id])
+  author    User     @relation(fields: [userId], references: [id])
+}
