@@ -1,4 +1,5 @@
 import Navbar from '../components/Navbar'
+import { Link } from 'react-router-dom'
 function HomePage() {
   return (
     <div style={styles.page}>
@@ -7,13 +8,13 @@ function HomePage() {
       <div style={styles.banner}>
         <i className="fas fa-bullhorn" style={{ marginRight: '8px' }}></i>
         <strong>Announcement:</strong>&nbsp;
-        Midterm exam covers Weeks 1–6. Study guide now available!
+        Thank you for supporting my website
       </div>
 
       {/* HERO */}
       <div style={styles.hero}>
         <h1 style={styles.heroTitle}>
-          The GitHub of Studying 🎓
+          The GitHub of Studying 
         </h1>
         <p style={styles.heroSub}>
           Study sheets, practice tests, announcements, and AI help —
