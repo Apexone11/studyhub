@@ -1577,7 +1577,7 @@
         schoolDropdown.innerHTML = '<div class="dropdown-empty">No schools found. You can still continue.</div>';
       } else {
         schoolDropdown.innerHTML = matches.map(s =>
-          `<div class="dropdown-item" onclick="selectSchool(${s.id},'${s.name.replace(/'/g, "\\'")}')"><i class="fas fa-school"></i>${s.name}</div>`
+          `<div class="dropdown-item" onclick="selectSchool(${s.id})"><i class="fas fa-school"></i>${s.name}</div>`
         ).join('');
       }
       schoolDropdown.classList.add('show');
@@ -1585,9 +1585,14 @@
 
     let currentSchoolId = null;
 
-    function selectSchool(id, name) {
+    function selectSchool(id) {
       currentSchoolId = id;
-      selectedSchoolName.textContent = name;
+      const school = SCHOOLS.find(s => s.id === id);
+      if (school) {
+        selectedSchoolName.textContent = school.name;
+      } else {
+        selectedSchoolName.textContent = '';
+      }
       selectedSchool.classList.add('show');
       schoolDropdown.classList.remove('show');
       schoolInput.value = '';
