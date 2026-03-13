@@ -1,497 +1,353 @@
+// src/pages/SheetsPage.jsx  — PATCH v2
+// Changes: 2-col layout, filter sidebar, rich cards with course colors, custom icons
+
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import Navbar from '../components/Navbar'
+import {
+  IconSearch, IconStar, IconStarFilled, IconFork,
+  IconDownload, IconUpload,
+} from '../components/Icons'
 
-const API = 'http://localhost:4000'
+const API    = 'http://localhost:4000'
+const LIMIT  = 10
+const FONT   = "'Plus Jakarta Sans', system-ui, sans-serif"
+const getToken    = () => localStorage.getItem('token')
+const authHeaders = () => ({
+  'Content-Type': 'application/json',
+  ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
+})
 
-function getToken() { return localStorage.getItem('token') }
-function authHeaders() {
-  return {
-    'Content-Type': 'application/json',
-    ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
-  }
+// course prefix → accent color
+const COLORS = {
+  CMSC: { a:'#8b5cf6', bg:'#ede9fe', tx:'#5b21b6', bd:'#c4b5fd' },
+  MATH: { a:'#10b981', bg:'#d1fae5', tx:'#065f46', bd:'#6ee7b7' },
+  ENGL: { a:'#f59e0b', bg:'#fef3c7', tx:'#78350f', bd:'#fcd34d' },
+  PHYS: { a:'#0ea5e9', bg:'#e0f2fe', tx:'#0c4a6e', bd:'#7dd3fc' },
+  BIOL: { a:'#ec4899', bg:'#fce7f3', tx:'#831843', bd:'#f9a8d4' },
+  HIST: { a:'#6366f1', bg:'#e0e7ff', tx:'#312e81', bd:'#a5b4fc' },
+  ECON: { a:'#14b8a6', bg:'#ccfbf1', tx:'#134e4a', bd:'#5eead4' },
+  CHEM: { a:'#f97316', bg:'#ffedd5', tx:'#7c2d12', bd:'#fdba74' },
+}
+const DEF = { a:'#3b82f6', bg:'#eff6ff', tx:'#1e40af', bd:'#bfdbfe' }
+function color(code='') { return COLORS[code.replace(/\d.*/,'').toUpperCase()] || DEF }
+
+function timeAgo(d) {
+  const s = (Date.now() - new Date(d)) / 1000
+  if (s<60) return 'just now'
+  if (s<3600) return `${Math.floor(s/60)}m ago`
+  if (s<86400) return `${Math.floor(s/3600)}h ago`
+  return `${Math.floor(s/86400)}d ago`
 }
 
-// ─── top nav ─────────────────────────────────────────────────────
-function TopNav() {
-  return (
-    <header style={{
-      background: '#0f172a', height: 56,
-      position: 'sticky', top: 0, zIndex: 100,
-      display: 'flex', alignItems: 'center',
-      padding: '0 24px', gap: 16,
-      borderBottom: '1px solid #1e293b',
-      fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
-    }}>
-      <Link to="/feed" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
-        <svg width="26" height="26" viewBox="0 0 80 80" fill="none">
-          <circle cx="40" cy="40" r="38" fill="#1e293b"/>
-          <line x1="40" y1="64" x2="40" y2="45" stroke="#3b82f6" strokeWidth="4" strokeLinecap="round"/>
-          <path d="M40 45 Q40 33 25 23" stroke="#3b82f6" strokeWidth="3.5" fill="none" strokeLinecap="round"/>
-          <path d="M40 45 Q40 33 55 23" stroke="#3b82f6" strokeWidth="3.5" fill="none" strokeLinecap="round"/>
-          <circle cx="40" cy="45" r="4" fill="#3b82f6"/>
-          <circle cx="25" cy="23" r="3.5" fill="#60a5fa"/>
-          <circle cx="55" cy="23" r="3.5" fill="#60a5fa"/>
-          <rect x="30" y="67" width="20" height="4" rx="2" fill="#f59e0b"/>
-        </svg>
-        <span style={{ fontWeight: 800, fontSize: 16, color: '#fff' }}>
-          Study<span style={{ color: '#3b82f6' }}>Hub</span>
-        </span>
-      </Link>
-      <span style={{ color: '#334155', fontSize: 14 }}>/</span>
-      <span style={{ color: '#94a3b8', fontSize: 14, fontWeight: 600 }}>Study Sheets</span>
-      <div style={{ flex: 1 }} />
-      <Link to="/feed" style={{ color: '#94a3b8', fontSize: 13, textDecoration: 'none' }}
-        onMouseEnter={e => e.currentTarget.style.color = '#fff'}
-        onMouseLeave={e => e.currentTarget.style.color = '#94a3b8'}
-      >← Feed</Link>
-      <Link to="/sheets/upload" style={{
-        padding: '7px 16px', background: '#3b82f6', color: '#fff',
-        borderRadius: 8, textDecoration: 'none', fontSize: 13, fontWeight: 700,
-        display: 'flex', alignItems: 'center', gap: 6,
-      }}>
-        <i className="fa-solid fa-upload" style={{ fontSize: 12 }} />Upload Sheet
-      </Link>
-    </header>
-  )
-}
-
-// ─── skeleton card ────────────────────────────────────────────────
+// — Skeleton —————————————————————————————————————————————————
 function SkeletonCard() {
   return (
-    <div style={{
-      background: '#fff', borderRadius: 14, border: '1px solid #e8ecf0',
-      padding: '18px 20px', marginBottom: 12,
-    }}>
-      <style>{`@keyframes shimmer{0%,100%{opacity:1}50%{opacity:.45}}`}</style>
-      <div style={{ display: 'flex', gap: 16, animation: 'shimmer 1.4s ease-in-out infinite' }}>
-        <div style={{ width: 44, height: 44, borderRadius: 12, background: '#f1f5f9', flexShrink: 0 }} />
-        <div style={{ flex: 1 }}>
-          <div style={{ height: 15, width: '52%', background: '#f1f5f9', borderRadius: 6, marginBottom: 10 }} />
-          <div style={{ height: 12, width: '28%', background: '#f8fafc', borderRadius: 6, marginBottom: 10 }} />
-          <div style={{ display: 'flex', gap: 6 }}>
-            <div style={{ height: 20, width: 52, background: '#f8fafc', borderRadius: 99 }} />
-            <div style={{ height: 20, width: 64, background: '#f8fafc', borderRadius: 99 }} />
-          </div>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
-          <div style={{ height: 12, width: 80, background: '#f1f5f9', borderRadius: 6 }} />
-          <div style={{ display: 'flex', gap: 6 }}>
-            <div style={{ height: 30, width: 58, background: '#f1f5f9', borderRadius: 8 }} />
-            <div style={{ height: 30, width: 52, background: '#f1f5f9', borderRadius: 8 }} />
-          </div>
+    <div style={{ background:'#fff', borderRadius:14, border:'1px solid #e2e8f0', padding:'16px 18px', marginBottom:9, animation:'shimmer 1.4s ease-in-out infinite' }}>
+      <div style={{ display:'flex', gap:10, marginBottom:10 }}>
+        <div style={{ width:38, height:38, borderRadius:9, background:'#f1f5f9', flexShrink:0 }}/>
+        <div style={{ flex:1 }}>
+          <div style={{ height:14, background:'#f1f5f9', borderRadius:5, width:'65%', marginBottom:7 }}/>
+          <div style={{ height:11, background:'#f1f5f9', borderRadius:5, width:'40%' }}/>
         </div>
       </div>
+      <div style={{ height:11, background:'#f1f5f9', borderRadius:5, marginBottom:6 }}/>
+      <div style={{ height:11, background:'#f1f5f9', borderRadius:5, width:'75%' }}/>
     </div>
   )
 }
 
-// ─── single sheet card ────────────────────────────────────────────
-function SheetCard({ sheet }) {
-  const [starring,   setStarring]   = useState(false)
-  const [hasStarred, setHasStarred] = useState(false)
-  const [localStars, setLocalStars] = useState(sheet.stars || 0)
-
-  const courseName = sheet.course?.code           || ''
-  const schoolName = sheet.course?.school?.short  || ''
-  const authorName = sheet.author?.username       || 'unknown'
-  const timeAgo    = fmtTime(sheet.createdAt)
-
-  async function handleStar(e) {
-    e.preventDefault(); e.stopPropagation()
-    if (starring || !getToken()) return
-    setStarring(true)
-    // optimistic update
-    setHasStarred(v => !v)
-    setLocalStars(n => n + (hasStarred ? -1 : 1))
-    try {
-      const res = await fetch(`${API}/api/sheets/${sheet.id}/star`, {
-        method: 'POST', headers: authHeaders(),
-      })
-      if (res.ok) {
-        const d = await res.json()
-        setLocalStars(d.stars)
-      }
-    } catch { /* keep optimistic */ }
-    finally { setStarring(false) }
-  }
-
-  function trackDownload() {
-    // fire-and-forget — don't block navigation
-    fetch(`${API}/api/sheets/${sheet.id}/download`, { method: 'POST' }).catch(() => {})
-  }
+// — Sheet Card ————————————————————————————————————————————————
+function SheetCard({ sheet, onStar }) {
+  const c      = color(sheet.course?.code)
+  const code   = sheet.course?.code || ''
+  const school = sheet.course?.school?.short || sheet.course?.school?.name || ''
+  const author = sheet.author?.username || 'unknown'
+  const preview = sheet.content
+    ? sheet.content.replace(/[#*`>_~[\]()]/g,'').replace(/\n/g,' ').trim().slice(0,140)+'…'
+    : null
+  const tags   = [...new Set(sheet.content?.match(/#\w+/g) || [])].slice(0,3)
 
   return (
-    <Link to={`/sheets/${sheet.id}`} onClick={trackDownload} style={{ textDecoration: 'none', display: 'block' }}>
-      <div style={{
-        background: '#fff', borderRadius: 14, border: '1px solid #e8ecf0',
-        boxShadow: '0 2px 10px rgba(15,23,42,0.04)',
-        padding: '18px 20px', marginBottom: 12,
-        transition: 'box-shadow 0.15s, transform 0.15s',
-      }}
-        onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 6px 22px rgba(15,23,42,0.1)'; e.currentTarget.style.transform = 'translateY(-2px)' }}
-        onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 2px 10px rgba(15,23,42,0.04)'; e.currentTarget.style.transform = 'none' }}
-      >
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
-          {/* icon */}
-          <div style={{
-            width: 44, height: 44, borderRadius: 12, background: '#eff6ff',
-            flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <i className="fa-solid fa-file-lines" style={{ color: '#3b82f6', fontSize: 20 }} />
+    <div
+      style={{ background:'#fff', borderRadius:14, border:'1px solid #e2e8f0', borderLeft:`3px solid ${c.a}`, marginBottom:9, overflow:'hidden', transition:'box-shadow .18s' }}
+      onMouseEnter={e=>e.currentTarget.style.boxShadow='0 4px 20px rgba(15,23,42,0.08)'}
+      onMouseLeave={e=>e.currentTarget.style.boxShadow='none'}
+    >
+      <div style={{ padding:'14px 18px 14px 16px' }}>
+        {/* header */}
+        <div style={{ display:'flex', gap:10, marginBottom:8, alignItems:'flex-start' }}>
+          <div style={{ width:38, height:38, borderRadius:9, background:c.bg, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={c.a} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+            </svg>
           </div>
-
-          {/* info */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
-              <span style={{ fontWeight: 700, fontSize: 15, color: '#0f172a' }}>{sheet.title}</span>
-              {courseName && (
-                <span style={{
-                  fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99,
-                  background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', flexShrink: 0,
-                }}>{courseName}</span>
-              )}
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:7, flexWrap:'wrap', marginBottom:3 }}>
+              <Link to={`/sheets/${sheet.id}`} style={{ fontSize:14, fontWeight:700, color:'#0f172a', textDecoration:'none', lineHeight:1.3 }}
+                onMouseEnter={e=>e.currentTarget.style.color='#3b82f6'}
+                onMouseLeave={e=>e.currentTarget.style.color='#0f172a'}
+              >{sheet.title}</Link>
+              {code && <span style={{ fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:99, background:c.bg, color:c.tx, border:`1px solid ${c.bd}`, whiteSpace:'nowrap' }}>{code}</span>}
               {sheet.forkOf && (
-                <span style={{
-                  fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 99,
-                  background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', flexShrink: 0,
-                }}>
-                  <i className="fa-solid fa-code-fork" style={{ marginRight: 3, fontSize: 10 }} />forked
+                <span style={{ fontSize:10, fontWeight:600, padding:'2px 7px', borderRadius:99, background:'#f0fdf4', color:'#166534', border:'1px solid #bbf7d0', display:'flex', alignItems:'center', gap:3 }}>
+                  <IconFork size={9}/>forked
                 </span>
               )}
             </div>
-            <div style={{ fontSize: 12, color: '#94a3b8' }}>
-              by <span style={{ color: '#64748b', fontWeight: 600 }}>{authorName}</span>
-              {schoolName && <>&nbsp;·&nbsp;<span>{schoolName}</span></>}
-              &nbsp;·&nbsp;{timeAgo}
-            </div>
-          </div>
-
-          {/* stats + actions */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, flexShrink: 0 }}>
-            <div style={{ display: 'flex', gap: 14 }}>
-              {[
-                { icon: hasStarred ? 'fa-solid fa-star' : 'fa-regular fa-star', val: localStars,        color: hasStarred ? '#f59e0b' : '#94a3b8' },
-                { icon: 'fa-solid fa-code-fork',                                val: sheet.forks || 0,   color: '#94a3b8' },
-                { icon: 'fa-solid fa-download',                                 val: sheet.downloads || 0, color: '#94a3b8' },
-              ].map((s, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: s.color, fontWeight: 500 }}>
-                  <i className={s.icon} style={{ fontSize: 12 }} />{s.val}
-                </div>
-              ))}
-            </div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button onClick={handleStar} disabled={starring || !getToken()}
-                title={!getToken() ? 'Log in to star' : (hasStarred ? 'Unstar' : 'Star')}
-                style={{
-                  padding: '6px 12px', borderRadius: 8, border: '1px solid',
-                  borderColor: hasStarred ? '#fde68a' : '#e2e8f0',
-                  background:  hasStarred ? '#fef9ec' : '#fff',
-                  color:       hasStarred ? '#92400e' : '#64748b',
-                  fontSize: 12, fontWeight: 600, cursor: starring ? 'wait' : 'pointer',
-                  fontFamily: 'inherit', transition: 'all 0.15s',
-                  opacity: !getToken() ? 0.5 : 1,
-                }}>
-                <i className={hasStarred ? 'fa-solid fa-star' : 'fa-regular fa-star'} style={{ marginRight: 4 }} />
-                {hasStarred ? 'Starred' : 'Star'}
-              </button>
-              <span style={{
-                padding: '6px 12px', borderRadius: 8,
-                background: '#3b82f6', color: '#fff', fontSize: 12, fontWeight: 600,
-              }}>View →</span>
+            <div style={{ fontSize:11, color:'#94a3b8' }}>
+              by <strong style={{ color:'#64748b' }}>{author}</strong>
+              {school && <> · {school}</>}
+              {' · '}{timeAgo(sheet.createdAt)}
             </div>
           </div>
         </div>
-      </div>
-    </Link>
-  )
-}
 
-// ─── main page ────────────────────────────────────────────────────
-const PAGE_SIZE = 10
-
-export default function SheetsPage() {
-  const [searchParams, setSearchParams] = useSearchParams()
-
-  const [search,   setSearch]   = useState(searchParams.get('q')      || '')
-  const [schoolId, setSchoolId] = useState(searchParams.get('school') || '')
-  const [courseId, setCourseId] = useState(searchParams.get('course') || '')
-  const [sort,     setSort]     = useState(searchParams.get('sort')   || 'newest')
-  const [page,     setPage]     = useState(parseInt(searchParams.get('page') || '0'))
-
-  const [sheets,  setSheets]  = useState([])
-  const [total,   setTotal]   = useState(0)
-  const [schools, setSchools] = useState([])
-  const [courses, setCourses] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error,   setError]   = useState(null)
-
-  const debounce = useRef(null)
-
-  // load schools once
-  useEffect(() => {
-    fetch(`${API}/api/courses/schools`, { headers: authHeaders() })
-      .then(r => r.json())
-      .then(d => setSchools(Array.isArray(d) ? d : []))
-      .catch(() => {})
-  }, [])
-
-  // update course list when school changes
-  useEffect(() => {
-    if (!schoolId) { setCourses([]); setCourseId(''); return }
-    const s = schools.find(s => String(s.id) === schoolId)
-    if (s?.courses) setCourses(s.courses)
-  }, [schoolId, schools])
-
-  // fetch sheets
-  const fetchSheets = useCallback(async () => {
-    setLoading(true); setError(null)
-    try {
-      const p = new URLSearchParams()
-      if (search)            p.set('search',   search)
-      if (schoolId)          p.set('schoolId', schoolId)
-      if (courseId)          p.set('courseId', courseId)
-      // pass sort to the backend so ordering applies across all pages, not just the current one
-      if (sort !== 'newest') p.set('orderBy',  sort)
-      p.set('limit',  PAGE_SIZE)
-      p.set('offset', page * PAGE_SIZE)
-
-      const res = await fetch(`${API}/api/sheets?${p}`, { headers: authHeaders() })
-      if (!res.ok) throw new Error(`${res.status} — ${res.statusText}`)
-      const data = await res.json()
-
-      const list = data.sheets || []
-
-      setSheets(list)
-      setTotal(data.total || list.length)
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setLoading(false)
-    }
-  }, [search, schoolId, courseId, sort, page])
-
-  useEffect(() => {
-    clearTimeout(debounce.current)
-    debounce.current = setTimeout(fetchSheets, search ? 350 : 0)
-    return () => clearTimeout(debounce.current)
-  }, [fetchSheets])
-
-  // sync state → URL
-  useEffect(() => {
-    const p = {}
-    if (search)            p.q      = search
-    if (schoolId)          p.school = schoolId
-    if (courseId)          p.course = courseId
-    if (sort !== 'newest') p.sort   = sort
-    if (page > 0)          p.page   = page
-    setSearchParams(p, { replace: true })
-  }, [search, schoolId, courseId, sort, page, setSearchParams])
-
-  const totalPages = Math.ceil(total / PAGE_SIZE)
-
-  return (
-    <div style={{ minHeight: '100vh', background: '#edf0f5', fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
-      <TopNav />
-      <div style={{ maxWidth: 980, margin: '0 auto', padding: '32px 20px' }}>
-
-        {/* header */}
-        <div style={{ marginBottom: 26 }}>
-          <h1 style={{ fontSize: 26, fontWeight: 800, color: '#0f172a', margin: 0 }}>
-            <i className="fa-solid fa-file-lines" style={{ color: '#3b82f6', marginRight: 10 }} />
-            Study Sheets
-          </h1>
-          <p style={{ color: '#64748b', marginTop: 6, fontSize: 14 }}>
-            Browse, star, and fork study sheets from students across your school.
-            {total > 0 && !loading && (
-              <span style={{ color: '#3b82f6', fontWeight: 600 }}> {total} sheet{total !== 1 ? 's' : ''} available.</span>
-            )}
+        {preview && (
+          <p style={{ fontSize:12, color:'#64748b', lineHeight:1.65, margin:'0 0 8px', overflow:'hidden', display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical' }}>
+            {preview}
           </p>
-        </div>
+        )}
 
-        {/* filter bar */}
-        <div style={{
-          background: '#fff', borderRadius: 14, border: '1px solid #e8ecf0',
-          padding: '14px 16px', marginBottom: 18,
-          display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center',
-          boxShadow: '0 2px 10px rgba(15,23,42,0.04)',
-        }}>
-          {/* search */}
-          <div style={{ position: 'relative', flex: '1 1 200px' }}>
-            <i className="fa-solid fa-search" style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: 13 }} />
-            <input value={search} onChange={e => { setSearch(e.target.value); setPage(0) }}
-              placeholder="Search sheets…"
-              style={{
-                width: '100%', padding: '9px 32px 9px 34px',
-                border: '1px solid #e2e8f0', borderRadius: 9,
-                fontSize: 13, fontFamily: 'inherit', outline: 'none',
-                color: '#1e293b', boxSizing: 'border-box', background: '#fafbfc',
-              }}
-              onFocus={e => e.target.style.borderColor = '#93c5fd'}
-              onBlur={e  => e.target.style.borderColor = '#e2e8f0'}
-            />
-            {search && (
-              <button onClick={() => { setSearch(''); setPage(0) }} style={{
-                position: 'absolute', right: 9, top: '50%', transform: 'translateY(-50%)',
-                background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: 16,
-              }}>×</button>
-            )}
-          </div>
-
-          {/* school */}
-          <select value={schoolId} onChange={e => { setSchoolId(e.target.value); setCourseId(''); setPage(0) }} style={SEL}>
-            <option value="">All Schools</option>
-            {schools.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-
-          {/* course — only when school selected */}
-          {schoolId && (
-            <select value={courseId} onChange={e => { setCourseId(e.target.value); setPage(0) }} style={SEL}>
-              <option value="">All Courses</option>
-              {courses.map(c => <option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
-            </select>
-          )}
-
-          {/* sort */}
-          <select value={sort} onChange={e => setSort(e.target.value)} style={SEL}>
-            <option value="newest">Newest first</option>
-            <option value="stars">Most starred</option>
-            <option value="downloads">Most downloaded</option>
-          </select>
-
-          {/* clear */}
-          {(search || schoolId || courseId || sort !== 'newest') && (
-            <button onClick={() => { setSearch(''); setSchoolId(''); setCourseId(''); setSort('newest'); setPage(0) }} style={{
-              padding: '7px 12px', border: '1px solid #fecaca', borderRadius: 9,
-              background: '#fff', color: '#dc2626', fontSize: 12, fontWeight: 600,
-              cursor: 'pointer', fontFamily: 'inherit',
-            }}>Clear</button>
-          )}
-        </div>
-
-        {/* error */}
-        {error && (
-          <div style={{
-            background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12,
-            padding: '16px 20px', marginBottom: 16, display: 'flex', gap: 10,
-          }}>
-            <i className="fa-solid fa-circle-exclamation" style={{ color: '#dc2626', marginTop: 2 }} />
-            <div>
-              <div style={{ fontWeight: 700, color: '#991b1b', fontSize: 14 }}>Could not load sheets</div>
-              <div style={{ fontSize: 13, color: '#b91c1c', marginTop: 2 }}>
-                {error} — make sure the backend is running on port 4000.
-              </div>
-              <button onClick={fetchSheets} style={{
-                marginTop: 8, padding: '5px 12px', background: '#dc2626',
-                border: 'none', borderRadius: 7, color: '#fff',
-                fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
-              }}>Retry</button>
-            </div>
+        {tags.length>0 && (
+          <div style={{ display:'flex', gap:5, marginBottom:10, flexWrap:'wrap' }}>
+            {tags.map(t=><span key={t} style={{ fontSize:10, color:'#64748b', background:'#f1f5f9', padding:'2px 8px', borderRadius:99 }}>{t}</span>)}
           </div>
         )}
 
-        {/* results count */}
-        {!loading && !error && (
-          <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 12, display: 'flex', justifyContent: 'space-between' }}>
-            <span>
-              {total > 0
-                ? `Showing ${page * PAGE_SIZE + 1}–${Math.min((page + 1) * PAGE_SIZE, total)} of ${total}`
-                : 'No results'}
-            </span>
-            {totalPages > 1 && <span>Page {page + 1} of {totalPages}</span>}
-          </div>
-        )}
-
-        {/* skeletons */}
-        {loading && Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} />)}
-
-        {/* cards */}
-        {!loading && !error && sheets.map(s => <SheetCard key={s.id} sheet={s} />)}
-
-        {/* empty */}
-        {!loading && !error && sheets.length === 0 && (
-          <div style={{
-            textAlign: 'center', padding: '60px 20px',
-            background: '#fff', borderRadius: 16, border: '1.5px dashed #cbd5e1',
-          }}>
-            <i className="fa-solid fa-file-circle-question" style={{ fontSize: 44, color: '#cbd5e1', display: 'block', marginBottom: 14 }} />
-            <div style={{ fontWeight: 800, fontSize: 17, color: '#64748b', marginBottom: 6 }}>
-              {search || courseId ? 'No sheets match your filters' : 'No sheets yet'}
-            </div>
-            <div style={{ fontSize: 14, color: '#94a3b8', marginBottom: 20 }}>
-              {search ? `No results for "${search}"` : 'Be the first to upload one!'}
-            </div>
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
-              {(search || courseId || schoolId) && (
-                <button onClick={() => { setSearch(''); setSchoolId(''); setCourseId('') }} style={{
-                  padding: '9px 20px', border: '1px solid #e2e8f0', borderRadius: 9,
-                  background: '#fff', color: '#64748b', fontSize: 13, fontWeight: 600,
-                  cursor: 'pointer', fontFamily: 'inherit',
-                }}>Clear filters</button>
-              )}
-              <Link to="/sheets/upload" style={{
-                padding: '9px 24px', background: '#3b82f6', color: '#fff',
-                borderRadius: 9, textDecoration: 'none', fontWeight: 700, fontSize: 13,
-                display: 'flex', alignItems: 'center', gap: 6,
-              }}>
-                <i className="fa-solid fa-upload" style={{ fontSize: 12 }} />Upload a Sheet
-              </Link>
-            </div>
-          </div>
-        )}
-
-        {/* pagination */}
-        {!loading && totalPages > 1 && (
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 24, flexWrap: 'wrap' }}>
-            <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} style={pageBtn(false, page === 0)}>
-              <i className="fa-solid fa-chevron-left" style={{ fontSize: 11 }} />
+        {/* stats + actions */}
+        <div style={{ display:'flex', alignItems:'center', gap:12, paddingTop:10, borderTop:'1px solid #f8fafc' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:3, fontSize:11, color:'#94a3b8' }}><IconStar size={12}/>{sheet.stars||0}</div>
+          <div style={{ display:'flex', alignItems:'center', gap:3, fontSize:11, color:'#94a3b8' }}><IconFork size={12}/>{sheet.forks||0}</div>
+          <div style={{ display:'flex', alignItems:'center', gap:3, fontSize:11, color:'#94a3b8' }}><IconDownload size={12}/>{sheet.downloads||0}</div>
+          <div style={{ marginLeft:'auto', display:'flex', gap:6 }}>
+            <button onClick={()=>onStar(sheet.id)} style={{
+              display:'flex', alignItems:'center', gap:4, padding:'5px 11px',
+              border:'1px solid #e2e8f0', borderRadius:7,
+              background: sheet._starred?'#fef9ec':'#fff',
+              color: sheet._starred?'#92400e':'#64748b',
+              fontSize:11, fontWeight:600, cursor:'pointer', fontFamily:FONT, transition:'all .15s',
+            }}>
+              {sheet._starred ? <IconStarFilled size={12} style={{ color:'#f59e0b' }}/> : <IconStar size={12}/>}
+              {sheet._starred ? 'Starred' : 'Star'}
             </button>
-            {Array.from({ length: totalPages }).map((_, i) => {
-              if (i !== 0 && i !== totalPages - 1 && Math.abs(i - page) > 2) {
-                if (i === 1 || i === totalPages - 2) return <span key={i} style={{ padding: '0 4px', color: '#94a3b8', alignSelf: 'center' }}>…</span>
-                return null
-              }
-              return <button key={i} onClick={() => setPage(i)} style={pageBtn(i === page, false)}>{i + 1}</button>
-            })}
-            <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} style={pageBtn(false, page >= totalPages - 1)}>
-              <i className="fa-solid fa-chevron-right" style={{ fontSize: 11 }} />
-            </button>
+            <Link to={`/sheets/${sheet.id}`} style={{
+              display:'flex', alignItems:'center', gap:4, padding:'5px 14px',
+              border:'none', borderRadius:7, background:'#3b82f6',
+              color:'#fff', fontSize:11, fontWeight:700, textDecoration:'none',
+            }}>View →</Link>
           </div>
-        )}
+        </div>
       </div>
     </div>
   )
 }
 
-// ─── style helpers ────────────────────────────────────────────────
-const SEL = {
-  padding: '9px 12px', border: '1px solid #e2e8f0', borderRadius: 9,
-  fontSize: 13, fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
-  color: '#475569', background: '#fafbfc', outline: 'none', cursor: 'pointer',
+// — Filter Sidebar ————————————————————————————————————————————
+function Sidebar({ schools, courses, filters, onChange }) {
+  const activeColor = (active) => ({
+    display:'flex', alignItems:'center', gap:7, width:'100%', textAlign:'left',
+    padding:'6px 12px', border:'none',
+    borderLeft:`2px solid ${active?'#3b82f6':'transparent'}`,
+    background: active?'#eff6ff':'transparent',
+    color: active?'#1d4ed8':'#64748b',
+    fontSize:12, fontWeight: active?600:400,
+    cursor:'pointer', fontFamily:FONT, transition:'all .15s',
+  })
+  const sectionLbl = (label) => (
+    <div style={{ fontSize:9, letterSpacing:'.1em', fontWeight:600, color:'#94a3b8', padding:'12px 14px 5px', textTransform:'uppercase' }}>{label}</div>
+  )
+  const visibleCourses = filters.schoolId
+    ? courses.filter(c=>String(c.schoolId)===String(filters.schoolId))
+    : courses
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+      {/* school */}
+      <div style={{ background:'#fff', borderRadius:13, border:'1px solid #e2e8f0', overflow:'hidden' }}>
+        {sectionLbl('School')}
+        <button style={activeColor(!filters.schoolId)} onClick={()=>onChange({ schoolId:null, courseId:null })}>All Schools</button>
+        {schools.map(s=>(
+          <button key={s.id} style={activeColor(String(filters.schoolId)===String(s.id))} onClick={()=>onChange({ schoolId:s.id, courseId:null })}>
+            {s.short||s.name}
+          </button>
+        ))}
+      </div>
+      {/* course */}
+      <div style={{ background:'#fff', borderRadius:13, border:'1px solid #e2e8f0', overflow:'hidden' }}>
+        {sectionLbl('Course')}
+        <button style={activeColor(!filters.courseId)} onClick={()=>onChange({ courseId:null })}>All Courses</button>
+        {visibleCourses.slice(0,20).map(c=>{
+          const col=color(c.code)
+          return (
+            <button key={c.id} style={activeColor(String(filters.courseId)===String(c.id))} onClick={()=>onChange({ courseId:c.id })}>
+              <span style={{ width:8, height:8, borderRadius:'50%', background:String(filters.courseId)===String(c.id)?'#3b82f6':col.a, flexShrink:0 }}/>
+              {c.code}
+            </button>
+          )
+        })}
+      </div>
+      {/* sort */}
+      <div style={{ background:'#fff', borderRadius:13, border:'1px solid #e2e8f0', overflow:'hidden' }}>
+        {sectionLbl('Sort By')}
+        {[['newest','Newest first'],['stars','Most stars'],['downloads','Most downloads']].map(([val,label])=>(
+          <button key={val} style={activeColor(filters.sortBy===val)} onClick={()=>onChange({ sortBy:val })}>{label}</button>
+        ))}
+      </div>
+    </div>
+  )
 }
 
-function pageBtn(active, disabled) {
-  return {
-    minWidth: 36, height: 36, borderRadius: 8, border: '1px solid',
-    borderColor: active ? '#3b82f6' : '#e2e8f0',
-    background:  active ? '#3b82f6' : '#fff',
-    color:       active ? '#fff' : disabled ? '#cbd5e1' : '#64748b',
-    fontWeight:  active ? 700 : 500, fontSize: 13,
-    cursor: disabled ? 'default' : 'pointer',
-    fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
-    opacity: disabled ? 0.5 : 1,
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    transition: 'all 0.15s',
+// — Main Page —————————————————————————————————————————————————
+export default function SheetsPage() {
+  const navigate  = useNavigate()
+  const [sp,setSp]= useSearchParams()
+
+  const [filters, setFilters] = useState({
+    search:   sp.get('q')        || '',
+    schoolId: sp.get('schoolId') || null,
+    courseId: sp.get('courseId') || null,
+    sortBy:   sp.get('sort')     || 'newest',
+  })
+  const [sheets,  setSheets]  = useState([])
+  const [total,   setTotal]   = useState(0)
+  const [page,    setPage]    = useState(1)
+  const [loading, setLoading] = useState(true)
+  const [error,   setError]   = useState(null)
+  const [schools, setSchools] = useState([])
+  const [courses, setCourses] = useState([])
+  const searchTimer = useRef()
+
+  useEffect(()=>{
+    fetch(`${API}/api/courses/schools`, { headers: authHeaders() })
+      .then(r=>r.json())
+      .then(data=>{
+        setSchools(data||[])
+        setCourses((data||[]).flatMap(s=>(s.courses||[]).map(c=>({ ...c, schoolId:s.id }))))
+      }).catch(()=>{})
+  },[])
+
+  const fetchSheets = useCallback((f,pg)=>{
+    setLoading(true); setError(null)
+    const p=new URLSearchParams({ limit:LIMIT, offset:(pg-1)*LIMIT,
+      ...(f.search&&{search:f.search}),
+      ...(f.schoolId&&{schoolId:f.schoolId}),
+      ...(f.courseId&&{courseId:f.courseId}),
+    })
+    fetch(`${API}/api/sheets?${p}`,{ headers:authHeaders() })
+      .then(r=>{ if(!r.ok) throw new Error(r.status); return r.json() })
+      .then(d=>{
+        let list=d.sheets||d||[]
+        if(f.sortBy==='stars')     list=[...list].sort((a,b)=>(b.stars||0)-(a.stars||0))
+        if(f.sortBy==='downloads') list=[...list].sort((a,b)=>(b.downloads||0)-(a.downloads||0))
+        setSheets(list); setTotal(d.total||list.length)
+      })
+      .catch(err=>setError(err.message))
+      .finally(()=>setLoading(false))
+  },[])
+
+  useEffect(()=>{ fetchSheets(filters,page) },[filters,page,fetchSheets])
+
+  useEffect(()=>{
+    const p=new URLSearchParams()
+    if(filters.search)   p.set('q',filters.search)
+    if(filters.schoolId) p.set('schoolId',filters.schoolId)
+    if(filters.courseId) p.set('courseId',filters.courseId)
+    if(filters.sortBy!=='newest') p.set('sort',filters.sortBy)
+    setSp(p,{replace:true})
+  },[filters])
+
+  const update=(patch)=>{ setFilters(f=>({...f,...patch})); setPage(1) }
+
+  const handleStar=async(id)=>{
+    if(!getToken()){ navigate('/login'); return }
+    setSheets(prev=>prev.map(s=>s.id===id?{...s,_starred:!s._starred,stars:(s.stars||0)+(s._starred?-1:1)}:s))
+    fetch(`${API}/api/sheets/${id}/star`,{ method:'POST', headers:authHeaders() }).catch(()=>{})
   }
-}
 
-function fmtTime(iso) {
-  if (!iso) return ''
-  const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
-  if (m < 1)  return 'just now'
-  if (m < 60) return `${m}m ago`
-  const h = Math.floor(m / 60)
-  if (h < 24) return `${h}h ago`
-  const d = Math.floor(h / 24)
-  if (d < 7)  return `${d}d ago`
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  const totalPages=Math.ceil(total/LIMIT)
+
+  const navActions=(
+    <div style={{ display:'flex', gap:7, alignItems:'center' }}>
+      <Link to="/feed" style={{ fontSize:12, color:'#64748b', textDecoration:'none', padding:'5px 10px', border:'1px solid #334155', borderRadius:7 }}>← Feed</Link>
+      <Link to="/sheets/upload" style={{ fontSize:12, fontWeight:700, color:'#fff', padding:'5px 13px', background:'#3b82f6', borderRadius:7, textDecoration:'none', display:'flex', alignItems:'center', gap:5 }}>
+        <IconUpload size={13}/>Upload Sheet
+      </Link>
+    </div>
+  )
+
+  const pBtn=(disabled)=>({
+    padding:'6px 12px', border:'1px solid #e2e8f0', borderRadius:7,
+    background:'#fff', color:disabled?'#cbd5e1':'#64748b',
+    fontSize:12, cursor:disabled?'default':'pointer', fontFamily:FONT,
+  })
+
+  return (
+    <div style={{ minHeight:'100vh', background:'#edf0f5', fontFamily:FONT }}>
+      <style>{`@keyframes shimmer{0%,100%{opacity:1}50%{opacity:.45}} @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}`}</style>
+      <Navbar actions={navActions}/>
+      <div style={{ maxWidth:1140, margin:'0 auto', padding:'24px 20px 60px' }}>
+        <div style={{ display:'grid', gridTemplateColumns:'200px 1fr', gap:16, alignItems:'start' }}>
+          {/* sidebar */}
+          <div style={{ position:'sticky', top:62 }}>
+            <Sidebar schools={schools} courses={courses} filters={filters} onChange={update}/>
+          </div>
+          {/* main */}
+          <main style={{ animation:'fadeIn .3s ease-out' }}>
+            {/* search */}
+            <div style={{ background:'#fff', borderRadius:11, border:'1px solid #e2e8f0', display:'flex', alignItems:'center', gap:10, padding:'0 14px', height:42, marginBottom:12 }}>
+              <IconSearch size={15} style={{ color:'#94a3b8', flexShrink:0 }}/>
+              <input defaultValue={filters.search} placeholder="Search sheets by title, content or author…"
+                onChange={e=>{ clearTimeout(searchTimer.current); searchTimer.current=setTimeout(()=>update({search:e.target.value}),350) }}
+                style={{ flex:1, border:'none', outline:'none', fontSize:13, color:'#334155', fontFamily:FONT, background:'transparent' }}
+              />
+            </div>
+            {/* count */}
+            {!loading&&!error&&(
+              <div style={{ fontSize:12, color:'#94a3b8', marginBottom:10 }}>
+                {total===0?'No sheets found':`Showing ${(page-1)*LIMIT+1}–${Math.min(page*LIMIT,total)} of ${total} sheet${total!==1?'s':''}`}
+                {(filters.courseId||filters.schoolId)&&(
+                  <button onClick={()=>update({schoolId:null,courseId:null})} style={{ marginLeft:10, fontSize:11, color:'#3b82f6', background:'none', border:'none', cursor:'pointer', fontFamily:FONT }}>Clear filters ×</button>
+                )}
+              </div>
+            )}
+            {/* error */}
+            {error&&(
+              <div style={{ background:'#fef2f2', border:'1px solid #fecaca', borderRadius:13, padding:'20px', textAlign:'center' }}>
+                <div style={{ fontWeight:700, color:'#dc2626', marginBottom:8 }}>Failed to load sheets</div>
+                <button onClick={()=>fetchSheets(filters,page)} style={{ padding:'7px 18px', background:'#3b82f6', color:'#fff', border:'none', borderRadius:7, cursor:'pointer', fontFamily:FONT, fontWeight:600 }}>Retry</button>
+              </div>
+            )}
+            {/* skeletons */}
+            {loading&&Array.from({length:5}).map((_,i)=><SkeletonCard key={i}/>)}
+            {/* cards */}
+            {!loading&&!error&&sheets.map(s=><SheetCard key={s.id} sheet={s} onStar={handleStar}/>)}
+            {/* empty */}
+            {!loading&&!error&&sheets.length===0&&(
+              <div style={{ background:'#fff', borderRadius:14, border:'1.5px dashed #cbd5e1', padding:'48px 24px', textAlign:'center' }}>
+                <div style={{ fontSize:32, marginBottom:12 }}>📄</div>
+                <div style={{ fontWeight:700, fontSize:15, color:'#64748b', marginBottom:6 }}>No sheets yet</div>
+                <div style={{ fontSize:12, color:'#94a3b8', marginBottom:20 }}>{filters.search?`No results for "${filters.search}"`:'Be the first to upload!'}</div>
+                <Link to="/sheets/upload" style={{ padding:'8px 20px', background:'#3b82f6', color:'#fff', borderRadius:8, textDecoration:'none', fontSize:13, fontWeight:700, display:'inline-flex', alignItems:'center', gap:6 }}>
+                  <IconUpload size={13}/>Upload first sheet
+                </Link>
+              </div>
+            )}
+            {/* pagination */}
+            {!loading&&totalPages>1&&(
+              <div style={{ display:'flex', justifyContent:'center', gap:6, marginTop:20 }}>
+                <button onClick={()=>setPage(p=>Math.max(1,p-1))} disabled={page===1} style={pBtn(page===1)}>←</button>
+                {Array.from({length:totalPages}).map((_,i)=>(
+                  <button key={i} onClick={()=>setPage(i+1)} style={{ ...pBtn(false), ...(page===i+1?{background:'#3b82f6',color:'#fff',border:'none'}:{}) }}>{i+1}</button>
+                ))}
+                <button onClick={()=>setPage(p=>Math.min(totalPages,p+1))} disabled={page===totalPages} style={pBtn(page===totalPages)}>→</button>
+              </div>
+            )}
+          </main>
+        </div>
+      </div>
+    </div>
+  )
 }

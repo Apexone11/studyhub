@@ -1,4 +1,10 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { useEffect } from 'react'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import {
+  trackPageView,
+  identifyAuthenticatedUser,
+  clearAuthenticatedUser
+} from './lib/telemetry'
 
 // ── existing pages ────────────────────────────────────────────────
 import HomePage        from './pages/HomePage'
@@ -37,9 +43,34 @@ function PrivateRoute({ children }) {
   return token ? children : <Navigate to="/login" replace />
 }
 
+function RouteTelemetry() {
+  const location = useLocation()
+
+  useEffect(() => {
+    const nextPath = `${location.pathname}${location.search}`
+    trackPageView(nextPath)
+
+    const rawUser = localStorage.getItem('user')
+
+    if (!rawUser) {
+      clearAuthenticatedUser()
+      return
+    }
+
+    try {
+      identifyAuthenticatedUser(JSON.parse(rawUser))
+    } catch {
+      clearAuthenticatedUser()
+    }
+  }, [location.pathname, location.search])
+
+  return null
+}
+
 export default function App() {
   return (
     <BrowserRouter>
+      <RouteTelemetry />
       <Routes>
         {/* ── public (unauthenticated) ─────────────────────────── */}
         <Route path="/"         element={<PublicRoute><HomePage /></PublicRoute>} />

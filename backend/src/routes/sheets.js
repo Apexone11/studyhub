@@ -1,6 +1,7 @@
 const express     = require('express')
 const { PrismaClient } = require('@prisma/client')
 const requireAuth = require('../middleware/auth')
+const { captureError } = require('../monitoring/sentry')
 
 const router = express.Router()
 const prisma  = new PrismaClient()
@@ -41,6 +42,11 @@ router.get('/', async (req, res) => {
 
     res.json({ sheets, total, limit: parseInt(limit), offset: parseInt(offset) })
   } catch (err) {
+    captureError(err, {
+      route: req.originalUrl,
+      method: req.method
+    })
+
     console.error(err)
     res.status(500).json({ error: 'Server error.' })
   }
@@ -59,6 +65,11 @@ router.get('/:id', async (req, res) => {
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
     res.json(sheet)
   } catch (err) {
+    captureError(err, {
+      route: req.originalUrl,
+      method: req.method
+    })
+
     res.status(500).json({ error: 'Server error.' })
   }
 })
@@ -87,6 +98,11 @@ router.post('/', requireAuth, async (req, res) => {
     })
     res.status(201).json(sheet)
   } catch (err) {
+    captureError(err, {
+      route: req.originalUrl,
+      method: req.method
+    })
+
     console.error(err)
     res.status(500).json({ error: 'Server error.' })
   }
@@ -127,6 +143,11 @@ router.post('/:id/fork', requireAuth, async (req, res) => {
 
     res.status(201).json(forked)
   } catch (err) {
+    captureError(err, {
+      route: req.originalUrl,
+      method: req.method
+    })
+
     console.error(err)
     res.status(500).json({ error: 'Server error.' })
   }
@@ -143,6 +164,11 @@ router.post('/:id/star', requireAuth, async (req, res) => {
     })
     res.json({ stars: sheet.stars })
   } catch (err) {
+    captureError(err, {
+      route: req.originalUrl,
+      method: req.method
+    })
+
     res.status(500).json({ error: 'Server error.' })
   }
 })
@@ -156,6 +182,11 @@ router.post('/:id/download', async (req, res) => {
     })
     res.json({ downloads: sheet.downloads })
   } catch (err) {
+    captureError(err, {
+      route: req.originalUrl,
+      method: req.method
+    })
+
     res.status(500).json({ error: 'Server error.' })
   }
 })
@@ -173,6 +204,11 @@ router.delete('/:id', requireAuth, async (req, res) => {
     await prisma.studySheet.delete({ where: { id: parseInt(req.params.id) } })
     res.json({ message: 'Sheet deleted.' })
   } catch (err) {
+    captureError(err, {
+      route: req.originalUrl,
+      method: req.method
+    })
+
     res.status(500).json({ error: 'Server error.' })
   }
 })

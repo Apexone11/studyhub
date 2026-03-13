@@ -1,6 +1,7 @@
 import Navbar from '../components/Navbar'
 import { Link } from 'react-router-dom'
 import { useState } from 'react'
+import { identifyAuthenticatedUser } from '../lib/telemetry'
 
 function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
@@ -36,6 +37,7 @@ function LoginPage() {
       // Save token and user to localStorage
       localStorage.setItem('token', data.token)
       localStorage.setItem('user', JSON.stringify(data.user))
+      identifyAuthenticatedUser(data.user)
 
       // Redirect to feed
       window.location.href = '/feed'

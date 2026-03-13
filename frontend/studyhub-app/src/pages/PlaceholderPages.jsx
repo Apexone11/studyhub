@@ -1,458 +1,425 @@
-// ─────────────────────────────────────────────────────────────────
-// PLACEHOLDER PAGES
-// Each page has: correct route, correct layout, real nav,
-// feature sections marked with TODO, and a clear "coming soon" UI.
-// When you're ready to build a page, replace the ComingSoon block
-// with the real component.
-// ─────────────────────────────────────────────────────────────────
+// src/pages/PlaceholderPages.jsx — PATCH v2
+// UploadSheetPage: split-pane editor + live preview, real API
+// TestsPage / NotesPage / AnnouncementsPage: sidebar layout + teasers
+// SubmitPage / AdminPage / TestTakerPage: cleaned shells
 
-import { useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useState, useEffect, useRef } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import Navbar from '../components/Navbar'
+import { IconUpload, IconEye, IconPlus, IconCheck } from '../components/Icons'
 
-const NAV_STYLE = {
-  background: '#0f172a', height: 56, position: 'sticky', top: 0, zIndex: 100,
-  display: 'flex', alignItems: 'center', padding: '0 24px', gap: 16,
-  borderBottom: '1px solid #1e293b',
-  fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
-}
-const PAGE_STYLE = {
-  minHeight: '100vh', background: '#edf0f5',
-  fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
-  color: '#1e293b',
-}
-const CARD = {
-  background: '#fff', borderRadius: 16,
-  border: '1px solid #e8ecf0',
-  boxShadow: '0 2px 10px rgba(15,23,42,0.05)',
-  padding: '32px', marginBottom: 20,
+const API  = 'http://localhost:4000'
+const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
+const getToken    = () => localStorage.getItem('token')
+const authHeaders = () => ({
+  'Content-Type': 'application/json',
+  ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
+})
+
+function timeAgo(d) {
+  const s=(Date.now()-new Date(d))/1000
+  if(s<60) return 'just now'
+  if(s<3600) return `${Math.floor(s/60)}m ago`
+  if(s<86400) return `${Math.floor(s/3600)}h ago`
+  return `${Math.floor(s/86400)}d ago`
 }
 
-const INPUT = {
-  width: '100%', padding: '10px 14px',
-  border: '1px solid #e2e8f0', borderRadius: 10,
-  fontSize: 14, fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
-  color: '#1e293b', outline: 'none', boxSizing: 'border-box',
-  background: '#fafbfc',
-}
-
-function TopNav({ backLabel = '← Feed', backTo = '/feed' }) {
+// — shared 2-col shell —————————————————————————————————————————
+function PageShell({ nav, sidebar, children }) {
   return (
-    <header style={NAV_STYLE}>
-      <Link to="/feed" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
-        <svg width="26" height="26" viewBox="0 0 80 80" fill="none">
-          <circle cx="40" cy="40" r="38" fill="#1e293b"/>
-          <line x1="40" y1="64" x2="40" y2="45" stroke="#3b82f6" strokeWidth="4" strokeLinecap="round"/>
-          <path d="M40 45 Q40 33 25 23" stroke="#3b82f6" strokeWidth="3.5" fill="none" strokeLinecap="round"/>
-          <path d="M40 45 Q40 33 55 23" stroke="#3b82f6" strokeWidth="3.5" fill="none" strokeLinecap="round"/>
-          <circle cx="40" cy="45" r="4" fill="#3b82f6"/>
-          <circle cx="25" cy="23" r="3.5" fill="#60a5fa"/>
-          <circle cx="55" cy="23" r="3.5" fill="#60a5fa"/>
-        </svg>
-        <span style={{ fontWeight: 800, fontSize: 16, color: '#fff' }}>
-          Study<span style={{ color: '#3b82f6' }}>Hub</span>
-        </span>
-      </Link>
-      <div style={{ flex: 1 }} />
-      <Link to={backTo} style={{ color: '#94a3b8', fontSize: 13, textDecoration: 'none' }}>{backLabel}</Link>
-    </header>
+    <div style={{ minHeight:'100vh', background:'#edf0f5', fontFamily:FONT }}>
+      {nav}
+      <div style={{ maxWidth:1140, margin:'0 auto', padding:'24px 20px 60px' }}>
+        <div style={{ display:'grid', gridTemplateColumns:'200px 1fr', gap:16, alignItems:'start' }}>
+          <div style={{ position:'sticky', top:62 }}>{sidebar}</div>
+          <main>{children}</main>
+        </div>
+      </div>
+    </div>
   )
 }
 
-function PlaceholderSection({ icon, title, description, features = [] }) {
+// — sidebar nav card ———————————————————————————————————————————
+function SideCard({ sections }) {
   return (
-    <div style={{
-      ...CARD,
-      borderStyle: 'dashed', borderColor: '#cbd5e1',
-      textAlign: 'center', padding: '40px 32px',
-    }}>
-      <i className={icon} style={{ fontSize: 40, color: '#cbd5e1', display: 'block', marginBottom: 14 }} />
-      <div style={{ fontWeight: 800, fontSize: 18, color: '#475569', marginBottom: 6 }}>{title}</div>
-      <p style={{ color: '#94a3b8', fontSize: 14, maxWidth: 400, margin: '0 auto 20px', lineHeight: 1.65 }}>
-        {description}
-      </p>
-      {features.length > 0 && (
-        <div style={{
-          background: '#f8fafc', borderRadius: 12,
-          padding: '16px 20px', textAlign: 'left',
-          maxWidth: 380, margin: '0 auto',
-          border: '1px solid #e2e8f0',
-        }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.08em', marginBottom: 10 }}>
-            PLANNED FEATURES
-          </div>
-          {features.map((f, i) => (
-            <div key={i} style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              padding: '5px 0', fontSize: 13, color: '#64748b',
+    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+      {sections.map((sec,si)=>(
+        <div key={si} style={{ background:'#fff', borderRadius:13, border:'1px solid #e2e8f0', overflow:'hidden' }}>
+          {sec.label && <div style={{ fontSize:9, letterSpacing:'.1em', fontWeight:600, color:'#94a3b8', padding:'12px 14px 5px', textTransform:'uppercase' }}>{sec.label}</div>}
+          {sec.items.map((item,ii)=>(
+            <div key={ii} style={{
+              display:'flex', alignItems:'center', gap:7, padding:'7px 12px',
+              borderLeft:`2px solid ${item.active?'#3b82f6':'transparent'}`,
+              background: item.active?'#eff6ff':'transparent',
+              color: item.active?'#1d4ed8':'#64748b',
+              fontSize:12, fontWeight:item.active?600:400,
             }}>
-              <i className="fa-regular fa-circle-dot" style={{ color: '#cbd5e1', fontSize: 12 }} />
-              {f}
+              {item.dot && <span style={{ width:8, height:8, borderRadius:'50%', background:item.active?'#3b82f6':item.dot, flexShrink:0 }}/>}
+              {item.label}
             </div>
           ))}
         </div>
-      )}
+      ))}
     </div>
   )
 }
 
-// ── PRACTICE TESTS ────────────────────────────────────────────────
-export function TestsPage() {
+// — locked teaser card —————————————————————————————————————————
+function TeaserCard({ title, sub, chips=[] }) {
   return (
-    <div style={PAGE_STYLE}>
-      <TopNav />
-      <div style={{ maxWidth: 800, margin: '0 auto', padding: '32px 20px' }}>
-        <h1 style={{ fontSize: 26, fontWeight: 800, color: '#0f172a', marginBottom: 6 }}>
-          <i className="fa-solid fa-circle-question" style={{ color: '#3b82f6', marginRight: 10 }} />
-          Practice Tests
-        </h1>
-        <p style={{ color: '#64748b', fontSize: 14, marginBottom: 28 }}>
-          Take course-linked practice tests and see your score immediately.
-        </p>
-        <PlaceholderSection
-          icon="fa-solid fa-circle-question"
-          title="Practice Tests Coming Soon"
-          description="Students will be able to take multiple-choice and short-answer tests linked to any study sheet. Scores are shown instantly."
-          features={[
-            'Multiple choice & short answer formats',
-            'Instant scoring with answer explanations',
-            'AI-generated questions from study sheets',
-            'Track your score history over time',
-            'Share tests with classmates',
-          ]}
-        />
-        {/* TODO: when ready, replace above with:
-          - GET /api/tests → list of available tests
-          - TestCard component (title, course, question count, attempts)
-          - Click → /tests/:id for the test-taking interface
-        */}
-      </div>
-    </div>
-  )
-}
-
-// ── TEST TAKER ────────────────────────────────────────────────────
-export function TestTakerPage() {
-  const { id } = useParams()
-  return (
-    <div style={PAGE_STYLE}>
-      <TopNav backLabel="← Tests" backTo="/tests" />
-      <div style={{ maxWidth: 720, margin: '0 auto', padding: '32px 20px' }}>
-        <PlaceholderSection
-          icon="fa-solid fa-pen-to-square"
-          title={`Test #${id} — Coming Soon`}
-          description="The test-taking interface will render questions one at a time, let you select answers, and submit for immediate scoring."
-          features={[
-            'Question-by-question navigation',
-            'Timer (optional, set by creator)',
-            'Submit and see detailed results',
-            'POST /api/tests/:id/attempt endpoint ready',
-          ]}
-        />
-      </div>
-    </div>
-  )
-}
-
-// ── NOTES ─────────────────────────────────────────────────────────
-export function NotesPage() {
-  return (
-    <div style={PAGE_STYLE}>
-      <TopNav />
-      <div style={{ maxWidth: 800, margin: '0 auto', padding: '32px 20px' }}>
-        <h1 style={{ fontSize: 26, fontWeight: 800, color: '#0f172a', marginBottom: 6 }}>
-          <i className="fa-solid fa-note-sticky" style={{ color: '#f59e0b', marginRight: 10 }} />
-          My Notes
-        </h1>
-        <p style={{ color: '#64748b', fontSize: 14, marginBottom: 28 }}>
-          Personal notes that only you can see. Optionally share with classmates.
-        </p>
-        <PlaceholderSection
-          icon="fa-solid fa-note-sticky"
-          title="Personal Notes Coming Soon"
-          description="Create, edit, and organize personal notes per course. Notes are private by default with an option to share with classmates."
-          features={[
-            'Rich text editor (markdown support)',
-            'Organize by course',
-            'Private by default — opt-in sharing',
-            'GET / POST / DELETE /api/notes endpoints',
-            'Search across all your notes',
-          ]}
-        />
-      </div>
-    </div>
-  )
-}
-
-// ── ANNOUNCEMENTS ─────────────────────────────────────────────────
-export function AnnouncementsPage() {
-  // TODO: fetch from GET /api/announcements
-  const MOCK = [
-    { id: 1, title: 'Welcome to StudyHub Beta!', body: "You're one of the first students using StudyHub. Upload your study sheets and help us build something great.", author: 'StudyHub', time: '2h ago', pinned: true },
-  ]
-  return (
-    <div style={PAGE_STYLE}>
-      <TopNav />
-      <div style={{ maxWidth: 800, margin: '0 auto', padding: '32px 20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-          <div>
-            <h1 style={{ fontSize: 26, fontWeight: 800, color: '#0f172a', margin: 0 }}>
-              <i className="fa-solid fa-bullhorn" style={{ color: '#3b82f6', marginRight: 10 }} />
-              Announcements
-            </h1>
-            <p style={{ color: '#64748b', fontSize: 14, marginTop: 4 }}>
-              Official updates from admins and course staff.
-            </p>
-          </div>
-          {/* TODO: only show if user.role === 'admin' */}
-          <button disabled style={{
-            padding: '9px 18px', background: '#f1f5f9',
-            border: '1px solid #e2e8f0', borderRadius: 10,
-            fontSize: 13, fontWeight: 600, color: '#94a3b8',
-            cursor: 'not-allowed', fontFamily: 'inherit',
-          }}>
-            <i className="fa-solid fa-plus" style={{ marginRight: 6 }} />
-            Post Announcement (Admin)
-          </button>
-        </div>
-
-        {/* live announcements – currently mock */}
-        {MOCK.map(a => (
-          <div key={a.id} style={{
-            ...CARD,
-            borderColor: a.pinned ? '#fde68a' : '#e8ecf0',
-            borderWidth: a.pinned ? 1.5 : 1,
-          }}>
-            {a.pinned && (
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#92400e', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 5 }}>
-                <i className="fa-solid fa-thumbtack" style={{ fontSize: 10 }} />
-                PINNED
-              </div>
-            )}
-            <div style={{ fontWeight: 800, fontSize: 17, color: '#0f172a', marginBottom: 8 }}>{a.title}</div>
-            <p style={{ fontSize: 14, color: '#475569', lineHeight: 1.65, margin: '0 0 12px' }}>{a.body}</p>
-            <div style={{ fontSize: 12, color: '#94a3b8' }}>
-              Posted by <strong>{a.author}</strong> · {a.time}
-            </div>
-          </div>
-        ))}
-
-        <PlaceholderSection
-          icon="fa-solid fa-bullhorn"
-          title="Admin Posting Panel — Coming Soon"
-          description="Admins will be able to post, pin, and manage announcements directly from this page. Students see new posts in real time."
-          features={[
-            'POST /api/announcements (admin only)',
-            'Pin/unpin announcements',
-            'Delete / edit posted announcements',
-            'Real-time display in feed',
-          ]}
-        />
-      </div>
-    </div>
-  )
-}
-
-// ── SUBMIT STUDY GUIDE ────────────────────────────────────────────
-export function SubmitPage() {
-  return (
-    <div style={PAGE_STYLE}>
-      <TopNav backLabel="← Feed" backTo="/feed" />
-      <div style={{ maxWidth: 700, margin: '0 auto', padding: '32px 20px' }}>
-        <h1 style={{ fontSize: 26, fontWeight: 800, color: '#0f172a', marginBottom: 6 }}>
-          <i className="fa-solid fa-paper-plane" style={{ color: '#3b82f6', marginRight: 10 }} />
-          Submit a Study Guide
-        </h1>
-        <p style={{ color: '#64748b', fontSize: 14, marginBottom: 28 }}>
-          Submit your notes or study guide for review. Once approved by an admin, it'll appear for all students in your course.
-        </p>
-        <PlaceholderSection
-          icon="fa-solid fa-paper-plane"
-          title="Submission Review Flow — Coming Soon"
-          description="Students can submit study guides for admin review. Approved guides are published for everyone. This is the community contribution feature."
-          features={[
-            'POST /api/submissions',
-            'Admin review queue in /admin dashboard',
-            'Status tracking: pending → approved → published',
-            'Submitter gets notified when approved',
-            'Approved guide appears in the main feed',
-          ]}
-        />
-      </div>
-    </div>
-  )
-}
-
-// ── ADMIN DASHBOARD ───────────────────────────────────────────────
-export function AdminPage() {
-  // TODO: redirect if user.role !== 'admin'
-  return (
-    <div style={PAGE_STYLE}>
-      <TopNav backLabel="← Feed" backTo="/feed" />
-      <div style={{ maxWidth: 960, margin: '0 auto', padding: '32px 20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 28 }}>
-          <div style={{
-            width: 44, height: 44, borderRadius: 12,
-            background: '#fef9ec', border: '1px solid #fde68a',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <i className="fa-solid fa-shield-halved" style={{ color: '#f59e0b', fontSize: 20 }} />
-          </div>
-          <div>
-            <h1 style={{ fontSize: 24, fontWeight: 800, color: '#0f172a', margin: 0 }}>Admin Dashboard</h1>
-            <p style={{ color: '#64748b', fontSize: 13, margin: 0 }}>Manage content, users, and announcements</p>
-          </div>
-        </div>
-
-        {/* stat cards row – placeholders */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 24 }}>
-          {[
-            { icon: 'fa-solid fa-users',      label: 'Total Students', val: '—', color: '#3b82f6' },
-            { icon: 'fa-solid fa-file-lines', label: 'Study Sheets',   val: '3',  color: '#10b981' },
-            { icon: 'fa-solid fa-star',       label: 'Total Stars',    val: '73', color: '#f59e0b' },
-            { icon: 'fa-solid fa-inbox',      label: 'Pending Review', val: '—', color: '#8b5cf6' },
-          ].map(s => (
-            <div key={s.label} style={{
-              background: '#fff', borderRadius: 14,
-              border: '1px solid #e8ecf0', padding: '18px 16px',
-              boxShadow: '0 2px 8px rgba(15,23,42,0.05)',
-            }}>
-              <i className={s.icon} style={{ color: s.color, fontSize: 20, marginBottom: 10, display: 'block' }} />
-              <div style={{ fontWeight: 800, fontSize: 24, color: '#0f172a' }}>{s.val}</div>
-              <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600 }}>{s.label}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* sections */}
-        {[
-          {
-            title: 'Content Management',
-            icon: 'fa-solid fa-file-lines',
-            desc: 'Add, edit, delete study sheets, tests, and announcements.',
-            features: ['Edit any sheet', 'Delete flagged content', 'Pin announcements', 'Manage test banks'],
-          },
-          {
-            title: 'Submission Review Queue',
-            icon: 'fa-solid fa-inbox',
-            desc: 'Review student-submitted study guides. Approve to publish, reject to return with feedback.',
-            features: ['GET /api/courses/requested (flagged courses)', 'Review submissions queue', 'Approve / reject with message', 'Auto-publish on approval'],
-          },
-          {
-            title: 'User Management',
-            icon: 'fa-solid fa-users',
-            desc: 'View registered students, change roles, and manage accounts.',
-            features: ['List all users', 'Promote to admin', 'Suspend accounts', 'View activity per user'],
-          },
-          {
-            title: 'Analytics',
-            icon: 'fa-solid fa-chart-bar',
-            desc: 'See which sheets and tests are most used. Track engagement over time.',
-            features: ['Most starred sheets', 'Most active students', 'Course coverage gaps', 'Weekly upload trends'],
-          },
-        ].map(s => (
-          <PlaceholderSection
-            key={s.title}
-            icon={s.icon}
-            title={`${s.title} — Coming Soon`}
-            description={s.desc}
-            features={s.features}
-          />
+    <div style={{ background:'#fff', borderRadius:14, border:'1px solid #e2e8f0', padding:'14px 16px', marginBottom:9, position:'relative', overflow:'hidden' }}>
+      <span style={{ position:'absolute', top:0, right:0, background:'#f1f5f9', fontSize:9, fontWeight:600, color:'#64748b', padding:'3px 10px', borderRadius:'0 0 0 8px' }}>Coming V1</span>
+      <div style={{ fontSize:14, fontWeight:700, color:'#334155', marginBottom:5, paddingRight:64 }}>{title}</div>
+      <div style={{ fontSize:12, color:'#94a3b8', lineHeight:1.55, marginBottom:8 }}>{sub}</div>
+      <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+        {chips.map((ch,i)=>(
+          <span key={i} style={{ fontSize:10, padding:'2px 8px', borderRadius:99, background:ch.bg||'#f1f5f9', color:ch.color||'#64748b', border:ch.border?`1px solid ${ch.border}`:'none' }}>{ch.label}</span>
         ))}
       </div>
+      <div style={{ height:4, background:'#f1f5f9', borderRadius:99, marginTop:10 }}/>
     </div>
   )
 }
 
-// ── UPLOAD SHEET ──────────────────────────────────────────────────
+// — mini markdown preview ——————————————————————————————————————
+function MiniPreview({ md }) {
+  if (!md) return <div style={{ fontSize:12, color:'#94a3b8', fontStyle:'italic' }}>Start typing to see a live preview…</div>
+  const esc    = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+  const inline = s => esc(s)
+    .replace(/\*\*\*(.+?)\*\*\*/g,'<strong><em>$1</em></strong>')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g,'<em>$1</em>')
+    .replace(/`(.+?)`/g,'<code style="background:#f1f5f9;border-radius:4px;padding:1px 5px;font-size:.88em;color:#be185d;font-family:monospace">$1</code>')
+  const lines = md.split('\n')
+  const nodes = []; let i=0
+  while (i < lines.length) {
+    const line=lines[i]
+    const hm=line.match(/^(#{1,4})\s+(.+)/)
+    if (hm) {
+      const lvl=hm[1].length; const sz=[20,16,14,13][lvl-1]
+      nodes.push(<div key={i} style={{ fontSize:sz, fontWeight:700, color:'#0f172a', margin:lvl===1?'0 0 10px':'8px 0 4px', borderBottom:lvl<=2?'1px solid #f1f5f9':'none', paddingBottom:lvl<=2?5:0 }} dangerouslySetInnerHTML={{ __html:inline(hm[2]) }}/>)
+      i++; continue
+    }
+    if (line.match(/^```/)) {
+      const lang=line.slice(3).trim(); let code=''; i++
+      while(i<lines.length&&!lines[i].match(/^```/)){code+=esc(lines[i])+'\n';i++}
+      nodes.push(<div key={i} style={{ background:'#0f172a', borderRadius:9, padding:'12px 14px', marginBottom:10 }}>
+        {lang&&<div style={{ fontSize:9, color:'#64748b', letterSpacing:'.08em', marginBottom:6 }}>{lang.toUpperCase()}</div>}
+        <pre style={{ margin:0, fontFamily:'monospace', fontSize:11, color:'#e2e8f0', lineHeight:1.7, overflowX:'auto' }}>{code}</pre>
+      </div>); i++; continue
+    }
+    if (line.startsWith('> ')) {
+      nodes.push(<div key={i} style={{ borderLeft:'3px solid #3b82f6', background:'#eff6ff', padding:'8px 12px', borderRadius:'0 8px 8px 0', marginBottom:8 }}>
+        <div style={{ fontSize:12, color:'#1e40af', fontStyle:'italic' }} dangerouslySetInnerHTML={{ __html:inline(line.slice(2)) }}/>
+      </div>); i++; continue
+    }
+    if (line.match(/^[-*+]\s/)) {
+      const items=[]; while(i<lines.length&&lines[i].match(/^[-*+]\s/)){items.push(lines[i].slice(2));i++}
+      nodes.push(<ul key={`ul${i}`} style={{ margin:'0 0 8px 18px', padding:0 }}>
+        {items.map((it,j)=><li key={j} style={{ fontSize:12, color:'#334155', lineHeight:1.7 }} dangerouslySetInnerHTML={{ __html:inline(it) }}/>)}
+      </ul>); continue
+    }
+    if (line.trim()===''){nodes.push(<div key={i} style={{ height:8 }}/>);i++;continue}
+    nodes.push(<p key={i} style={{ fontSize:12, color:'#334155', lineHeight:1.7, margin:'0 0 6px' }} dangerouslySetInnerHTML={{ __html:inline(line) }}/>)
+    i++
+  }
+  return <>{nodes}</>
+}
+
+// ─────────────────────────────────────────────────────────────────
+// UPLOAD SHEET PAGE
+// ─────────────────────────────────────────────────────────────────
 export function UploadSheetPage() {
-  const navigate = useNavigate()
+  const navigate=useNavigate()
   const [title,   setTitle]   = useState('')
-  const [content, setContent] = useState('')
-  const [course,  setCourse]  = useState('')
-  const [submitting, setSub]  = useState(false)
+  const [courseId,setCourseId]= useState('')
+  const [content, setContent] = useState('# Sheet Title\n\n## Topic 1\n\nYour notes here…\n\n## Topic 2\n\n- Point one\n- Point two\n- Point three\n\n```java\n// Code example\npublic class Hello {\n  public static void main(String[] args) {\n    System.out.println("Hello!");\n  }\n}\n```\n')
+  const [courses, setCourses] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [error,   setError]   = useState('')
+  const [saved,   setSaved]   = useState(false)
+  const autoTimer = useRef()
 
-  // TODO: real implementation
-  // const courses = await fetch('/api/courses/schools') → populate dropdown
-  // const handleSubmit = async () => {
-  //   const res = await fetch('/api/sheets', {
-  //     method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-  //     body: JSON.stringify({ title, content, courseId: course }),
-  //   })
-  //   if (res.ok) navigate('/sheets')
-  // }
+  useEffect(()=>{
+    fetch(`${API}/api/courses/schools`,{headers:authHeaders()})
+      .then(r=>r.json())
+      .then(data=>setCourses((data||[]).flatMap(s=>(s.courses||[]).map(c=>({...c,schoolName:s.name})))))
+      .catch(()=>{})
+  },[])
 
-  const MOCK_COURSES = [
-    { id: 1, code: 'CMSC131', name: 'Introduction to Object Oriented Programming' },
-    { id: 2, code: 'CMSC132', name: 'Object Oriented Programming II' },
-    { id: 3, code: 'MATH140', name: 'Calculus I' },
-  ]
+  useEffect(()=>{
+    setSaved(false); clearTimeout(autoTimer.current)
+    autoTimer.current=setTimeout(()=>setSaved(true),1500)
+    return ()=>clearTimeout(autoTimer.current)
+  },[title,content,courseId])
 
-  const handleSubmit = () => {
-    if (!title || !content || !course) return alert('Fill out all fields!')
-    setSub(true)
-    setTimeout(() => { setSub(false); navigate('/sheets') }, 1200)
+  async function handlePublish() {
+    if(!title.trim()){setError('Please enter a title.');return}
+    if(!courseId){setError('Please select a course.');return}
+    if(!content.trim()){setError('Content cannot be empty.');return}
+    setLoading(true);setError('')
+    try {
+      const res=await fetch(`${API}/api/sheets`,{
+        method:'POST',headers:authHeaders(),
+        body:JSON.stringify({title:title.trim(),courseId:parseInt(courseId),content}),
+      })
+      if(!res.ok) throw new Error((await res.json()).error||'Failed to publish.')
+      const sheet=await res.json()
+      navigate(`/sheets/${sheet.id}`)
+    } catch(err){setError(err.message);setLoading(false)}
   }
 
-  return (
-    <div style={PAGE_STYLE}>
-      <TopNav backLabel="← Sheets" backTo="/sheets" />
-      <div style={{ maxWidth: 720, margin: '0 auto', padding: '32px 20px' }}>
-        <h1 style={{ fontSize: 24, fontWeight: 800, color: '#0f172a', marginBottom: 4 }}>
-          <i className="fa-solid fa-upload" style={{ color: '#3b82f6', marginRight: 10 }} />
-          Upload a Study Sheet
-        </h1>
-        <p style={{ color: '#64748b', fontSize: 14, marginBottom: 28 }}>
-          Share your notes with classmates. All sheets are credited to you.
-        </p>
+  const navActions=(
+    <div style={{ display:'flex', gap:7, alignItems:'center' }}>
+      {saved&&<span style={{ fontSize:11, color:'#10b981', display:'flex', alignItems:'center', gap:4 }}><IconCheck size={12}/>Saved</span>}
+      {!saved&&<span style={{ fontSize:11, color:'#64748b' }}>Saving…</span>}
+      <Link to="/sheets" style={{ fontSize:12, color:'#64748b', textDecoration:'none', padding:'5px 10px', border:'1px solid #334155', borderRadius:7 }}>Cancel</Link>
+      <button onClick={handlePublish} disabled={loading} style={{ fontSize:12, fontWeight:700, color:'#fff', padding:'5px 15px', background:loading?'#93c5fd':'#3b82f6', border:'none', borderRadius:7, cursor:loading?'wait':'pointer', fontFamily:FONT, display:'flex', alignItems:'center', gap:5 }}>
+        {loading?'Publishing…':<><IconUpload size={13}/>Publish Sheet</>}
+      </button>
+    </div>
+  )
 
-        <div style={CARD}>
-          {[
-            { label: 'Title', note: 'e.g. "CMSC131 Final Exam Cheatsheet"',
-              el: <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Sheet title" style={INPUT} /> },
-            { label: 'Course',
-              el: (
-                <select value={course} onChange={e => setCourse(e.target.value)} style={INPUT}>
-                  <option value="">Select a course…</option>
-                  {MOCK_COURSES.map(c => <option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
-                  {/* TODO: populate from GET /api/courses/schools */}
-                </select>
-              )},
-            { label: 'Content', note: 'Markdown supported — # Headings, **bold**, `code`',
-              el: (
-                <textarea
-                  value={content} onChange={e => setContent(e.target.value)}
-                  placeholder={'# Sheet Title\n\n## Topic 1\n\nYour notes here…'}
-                  rows={12}
-                  style={{ ...INPUT, fontFamily: 'monospace', fontSize: 13, resize: 'vertical' }}
-                />
-              )},
-          ].map(f => (
-            <div key={f.label} style={{ marginBottom: 20 }}>
-              <label style={{ display: 'block', fontWeight: 700, fontSize: 13, color: '#374151', marginBottom: 6 }}>
-                {f.label}
-                {f.note && <span style={{ fontWeight: 400, color: '#94a3b8', marginLeft: 8 }}>{f.note}</span>}
-              </label>
-              {f.el}
+  return (
+    <div style={{ minHeight:'100vh', background:'#edf0f5', fontFamily:FONT }}>
+      <Navbar crumbs={[{label:'Study Sheets',to:'/sheets'},{label:'New Sheet',to:null}]} hideTabs actions={navActions} hideSearch/>
+      <div style={{ maxWidth:1140, margin:'0 auto', padding:'20px 20px 60px' }}>
+        {/* meta row */}
+        <div style={{ background:'#fff', borderRadius:14, border:'1px solid #e2e8f0', padding:'14px 20px', marginBottom:12, display:'grid', gridTemplateColumns:'1fr 1fr 180px', gap:12, alignItems:'end' }}>
+          <div>
+            <label style={{ fontSize:10, fontWeight:700, color:'#64748b', letterSpacing:'.06em', display:'block', marginBottom:5 }}>SHEET TITLE</label>
+            <input value={title} onChange={e=>{setTitle(e.target.value);setError('')}} placeholder='e.g. "CMSC131 Final Exam Cheatsheet"'
+              style={{ width:'100%', padding:'8px 12px', border:`1.5px solid ${error&&!title.trim()?'#fca5a5':'#e2e8f0'}`, borderRadius:8, fontSize:13, fontFamily:FONT, outline:'none', color:'#0f172a', boxSizing:'border-box' }}
+            />
+          </div>
+          <div>
+            <label style={{ fontSize:10, fontWeight:700, color:'#64748b', letterSpacing:'.06em', display:'block', marginBottom:5 }}>COURSE</label>
+            <select value={courseId} onChange={e=>{setCourseId(e.target.value);setError('')}}
+              style={{ width:'100%', padding:'8px 12px', border:`1.5px solid ${error&&!courseId?'#fca5a5':'#e2e8f0'}`, borderRadius:8, fontSize:13, fontFamily:FONT, outline:'none', color:courseId?'#0f172a':'#94a3b8', boxSizing:'border-box' }}
+            >
+              <option value="">Select a course…</option>
+              {courses.map(c=><option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{ fontSize:10, fontWeight:700, color:'#64748b', letterSpacing:'.06em', display:'block', marginBottom:5 }}>VISIBILITY</label>
+            <div style={{ padding:'8px 12px', border:'1.5px solid #e2e8f0', borderRadius:8, fontSize:13, color:'#64748b', background:'#f8fafc' }}>Public</div>
+          </div>
+        </div>
+        {error&&<div style={{ background:'#fef2f2', border:'1px solid #fecaca', borderRadius:9, padding:'10px 14px', marginBottom:10, fontSize:13, color:'#dc2626' }}>{error}</div>}
+        {/* split pane */}
+        <div style={{ background:'#fff', borderRadius:14, border:'1px solid #e2e8f0', overflow:'hidden' }}>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', borderBottom:'1px solid #e2e8f0' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:8, padding:'9px 16px', borderRight:'1px solid #e2e8f0' }}>
+              <IconUpload size={13} style={{ color:'#3b82f6' }}/><span style={{ fontSize:12, fontWeight:600, color:'#3b82f6' }}>Markdown Editor</span>
+              <span style={{ fontSize:10, color:'#94a3b8' }}>· {content.length} chars</span>
+            </div>
+            <div style={{ display:'flex', alignItems:'center', gap:8, padding:'9px 16px' }}>
+              <IconEye size={13} style={{ color:'#64748b' }}/><span style={{ fontSize:12, fontWeight:600, color:'#64748b' }}>Live Preview</span>
+              <span style={{ fontSize:10, color:'#10b981' }}>✓ synced</span>
+            </div>
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', minHeight:460 }}>
+            <div style={{ borderRight:'1px solid #1e293b', background:'#0f172a' }}>
+              <textarea value={content} onChange={e=>setContent(e.target.value)} spellCheck={false}
+                style={{ width:'100%', height:'100%', minHeight:460, background:'transparent', border:'none', outline:'none', resize:'none', padding:'16px 18px', fontFamily:"'JetBrains Mono','Fira Code',monospace", fontSize:12.5, lineHeight:1.9, color:'#e2e8f0', boxSizing:'border-box' }}
+              />
+            </div>
+            <div style={{ padding:'16px 20px', overflowY:'auto', maxHeight:600 }}>
+              <MiniPreview md={content}/>
+            </div>
+          </div>
+          <div style={{ background:'#f8fafc', borderTop:'1px solid #f1f5f9', padding:'8px 16px', display:'flex', gap:14, flexWrap:'wrap' }}>
+            {[['# H1','Heading'],['**bold**','Bold'],['*italic*','Italic'],['`code`','Code'],['```','Block'],['- item','List'],['> text','Quote']].map(([ex,lbl])=>(
+              <div key={lbl} style={{ display:'flex', alignItems:'center', gap:4 }}>
+                <code style={{ fontSize:10, background:'#e2e8f0', padding:'1px 5px', borderRadius:4, color:'#334155', fontFamily:'monospace' }}>{ex}</code>
+                <span style={{ fontSize:10, color:'#94a3b8' }}>{lbl}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────
+// TESTS PAGE
+// ─────────────────────────────────────────────────────────────────
+export function TestsPage() {
+  const sidebar=(<SideCard sections={[
+    { label:'Browse', items:[{label:'All Tests',active:true},{label:'My Attempts',active:false},{label:'Leaderboard',active:false}]},
+    { label:'My Courses', items:[{label:'CMSC131',dot:'#8b5cf6',active:false},{label:'MATH140',dot:'#10b981',active:false},{label:'ENGL101',dot:'#f59e0b',active:false}]},
+  ]}/>)
+  return (
+    <PageShell nav={<Navbar crumbs={[{label:'Practice Tests',to:'/tests'}]} hideTabs/>} sidebar={sidebar}>
+      <div style={{ marginBottom:14 }}>
+        <h1 style={{ fontSize:20, fontWeight:800, color:'#0f172a', marginBottom:4 }}>Practice Tests</h1>
+        <p style={{ fontSize:13, color:'#64748b' }}>Course-linked tests with instant scoring. Coming in V1.</p>
+      </div>
+      <TeaserCard title="CMSC131 Final Exam Prep" sub="20 questions · Multiple choice · Based on CMSC131 Complete Study Guide"
+        chips={[{label:'CMSC131',bg:'#ede9fe',color:'#5b21b6',border:'#c4b5fd'},{label:'20 questions'},{label:'~15 min'}]}/>
+      <TeaserCard title="MATH140 Derivatives Quick Quiz" sub="15 questions · Short answer · AI-generated from Limits & Derivatives sheet"
+        chips={[{label:'MATH140',bg:'#d1fae5',color:'#065f46',border:'#6ee7b7'},{label:'15 questions'}]}/>
+      <TeaserCard title="CMSC131 Recursion Drills" sub="10 trace-through problems · Based on Recursion Cheatsheet"
+        chips={[{label:'CMSC131',bg:'#ede9fe',color:'#5b21b6',border:'#c4b5fd'},{label:'10 problems'},{label:'Intermediate'}]}/>
+      <div style={{ background:'linear-gradient(135deg,#0f172a,#1e3a5f)', borderRadius:14, padding:'20px', marginTop:16, textAlign:'center' }}>
+        <div style={{ fontSize:14, fontWeight:700, color:'#fff', marginBottom:6 }}>AI-Generated Tests Coming in V1</div>
+        <div style={{ fontSize:12, color:'#64748b', maxWidth:340, margin:'0 auto' }}>Claude AI will read your study sheets and automatically generate practice questions with instant scoring.</div>
+      </div>
+    </PageShell>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────
+// NOTES PAGE
+// ─────────────────────────────────────────────────────────────────
+export function NotesPage() {
+  const sidebar=(<SideCard sections={[
+    { label:'My Notes', items:[{label:'All Notes',active:true},{label:'Shared by me',active:false},{label:'Recent',active:false}]},
+    { label:'By Course', items:[{label:'CMSC131',dot:'#8b5cf6',active:false},{label:'MATH140',dot:'#10b981',active:false},{label:'ENGL101',dot:'#f59e0b',active:false}]},
+  ]}/>)
+  return (
+    <PageShell nav={<Navbar crumbs={[{label:'My Notes',to:'/notes'}]} hideTabs/>} sidebar={sidebar}>
+      <div style={{ marginBottom:14, display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
+        <div>
+          <h1 style={{ fontSize:20, fontWeight:800, color:'#0f172a', marginBottom:4 }}>My Notes</h1>
+          <p style={{ fontSize:13, color:'#64748b' }}>Private notes per course. Optionally share with classmates.</p>
+        </div>
+        <button disabled style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 14px', background:'#f1f5f9', border:'none', borderRadius:8, fontSize:12, fontWeight:600, color:'#94a3b8', cursor:'not-allowed', fontFamily:FONT }}>
+          <IconPlus size={13}/>New Note
+        </button>
+      </div>
+      <TeaserCard title="CMSC131 — Week 3 OOP Notes" sub="Private · Created by you · 2 pages"
+        chips={[{label:'CMSC131',bg:'#ede9fe',color:'#5b21b6',border:'#c4b5fd'},{label:'Private'},{label:'2 pages'}]}/>
+      <TeaserCard title="MATH140 — Exam Day Formula Sheet" sub="Shared with course · Created by you · 1 page"
+        chips={[{label:'MATH140',bg:'#d1fae5',color:'#065f46',border:'#6ee7b7'},{label:'Shared'}]}/>
+      <TeaserCard title="ENGL101 — Essay Draft Notes" sub="Private · Created by you · 3 pages"
+        chips={[{label:'ENGL101',bg:'#fef3c7',color:'#78350f',border:'#fcd34d'},{label:'Private'}]}/>
+      <div style={{ background:'#fff', borderRadius:14, border:'1.5px dashed #cbd5e1', padding:'28px 24px', textAlign:'center', marginTop:8 }}>
+        <div style={{ fontSize:13, color:'#94a3b8', marginBottom:4 }}>Rich text editor with markdown support</div>
+        <div style={{ fontSize:12, color:'#cbd5e1' }}>GET / POST / DELETE /api/notes — coming in V1</div>
+      </div>
+    </PageShell>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────
+// ANNOUNCEMENTS PAGE
+// ─────────────────────────────────────────────────────────────────
+const MOCK_ANNOUNCEMENTS = [
+  { id:1, pinned:true,  type:'platform', title:'Welcome to StudyHub Beta!', body:"You're one of the first students using StudyHub. Upload your study sheets, earn stars from classmates, and help us build the best study platform.", author:'StudyHub', createdAt:new Date(Date.now()-2*3600*1000).toISOString() },
+  { id:2, pinned:false, type:'platform', title:'Sheet upload limits raised to 50MB', body:'You can now upload larger study sheets including image-rich PDFs. Markdown rendering has been improved with table and code block support.', author:'StudyHub', createdAt:new Date(Date.now()-28*3600*1000).toISOString() },
+  { id:3, pinned:false, type:'CMSC131', title:'Midterm study session this Friday', body:'Join the virtual study group this Friday at 7pm. We will go through recursion and OOP concepts. Link in the sheet comments.', author:'studyhub_seed', createdAt:new Date(Date.now()-48*3600*1000).toISOString() },
+  { id:4, pinned:false, type:'MATH140', title:'New Calculus cheatsheet uploaded', body:'studyhub_seed uploaded a comprehensive limits & derivatives cheatsheet. 31 stars already — great for quick exam review.', author:'studyhub_seed', createdAt:new Date(Date.now()-3*24*3600*1000).toISOString() },
+]
+const TYPE_COL = {
+  platform:{bg:'#eff6ff',color:'#1d4ed8',border:'#bfdbfe'},
+  CMSC131: {bg:'#ede9fe',color:'#5b21b6',border:'#c4b5fd'},
+  MATH140: {bg:'#d1fae5',color:'#065f46',border:'#6ee7b7'},
+  ENGL101: {bg:'#fef3c7',color:'#78350f',border:'#fcd34d'},
+}
+
+export function AnnouncementsPage() {
+  const user=(() => { try { return JSON.parse(localStorage.getItem('user')||'null') } catch { return null } })()
+  const isAdmin=user?.role==='admin'
+
+  const sidebar=(<SideCard sections={[
+    { label:'Filter', items:[{label:'All',active:true},{label:'Pinned',active:false},{label:'Platform',active:false}]},
+    { label:'By Course', items:[{label:'CMSC131',dot:'#8b5cf6',active:false},{label:'MATH140',dot:'#10b981',active:false},{label:'ENGL101',dot:'#f59e0b',active:false}]},
+  ]}/>)
+
+  const navActions=isAdmin?(
+    <button style={{ fontSize:12, fontWeight:700, color:'#fff', padding:'5px 13px', background:'#3b82f6', border:'none', borderRadius:7, cursor:'pointer', fontFamily:FONT, display:'flex', alignItems:'center', gap:5 }}>
+      <IconPlus size={13}/>Post Announcement
+    </button>
+  ):null
+
+  return (
+    <PageShell nav={<Navbar crumbs={[{label:'Announcements',to:'/announcements'}]} hideTabs actions={navActions}/>} sidebar={sidebar}>
+      <div style={{ marginBottom:14 }}>
+        <h1 style={{ fontSize:20, fontWeight:800, color:'#0f172a', marginBottom:4 }}>Announcements</h1>
+        <p style={{ fontSize:13, color:'#64748b' }}>Official updates from admins and course staff.</p>
+      </div>
+      {MOCK_ANNOUNCEMENTS.map(a=>{
+        const tc=TYPE_COL[a.type]||TYPE_COL.platform
+        if(a.pinned) return (
+          <div key={a.id} style={{ background:'#fffbeb', border:'1px solid #fde68a', borderRadius:14, padding:'14px 18px', marginBottom:10 }}>
+            <div style={{ fontSize:9, fontWeight:700, color:'#92400e', letterSpacing:'.08em', marginBottom:8 }}>PINNED</div>
+            <div style={{ fontSize:14, fontWeight:700, color:'#92400e', marginBottom:6 }}>{a.title}</div>
+            <div style={{ fontSize:12, color:'#78350f', lineHeight:1.65, marginBottom:8 }}>{a.body}</div>
+            <div style={{ fontSize:11, color:'#b45309' }}>Posted by <strong>{a.author}</strong> · {timeAgo(a.createdAt)}</div>
+          </div>
+        )
+        return (
+          <div key={a.id} style={{ background:'#fff', borderRadius:14, border:'1px solid #e2e8f0', padding:'14px 18px', marginBottom:8 }}>
+            <div style={{ display:'flex', gap:7, alignItems:'center', marginBottom:7 }}>
+              <span style={{ fontSize:10, fontWeight:600, padding:'2px 8px', borderRadius:99, background:tc.bg, color:tc.color, border:`1px solid ${tc.border}` }}>{a.type}</span>
+              <span style={{ fontSize:11, color:'#94a3b8' }}>{timeAgo(a.createdAt)}</span>
+            </div>
+            <div style={{ fontSize:13, fontWeight:700, color:'#0f172a', marginBottom:5 }}>{a.title}</div>
+            <div style={{ fontSize:12, color:'#64748b', lineHeight:1.65, marginBottom:7 }}>{a.body}</div>
+            <div style={{ fontSize:11, color:'#94a3b8' }}>by <strong style={{ color:'#64748b' }}>{a.author}</strong></div>
+          </div>
+        )
+      })}
+      <div style={{ background:'#fff', borderRadius:14, border:'1.5px dashed #cbd5e1', padding:'24px', textAlign:'center', marginTop:8 }}>
+        <div style={{ fontSize:13, color:'#94a3b8', marginBottom:4 }}>Admin posting panel coming soon</div>
+        <div style={{ fontSize:12, color:'#cbd5e1' }}>POST /api/announcements · Pin/unpin · Real-time feed updates</div>
+      </div>
+    </PageShell>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────
+// SHELLS (submit, admin, test-taker)
+// ─────────────────────────────────────────────────────────────────
+export function SubmitPage() {
+  return (
+    <div style={{ minHeight:'100vh', background:'#edf0f5', fontFamily:FONT }}>
+      <Navbar crumbs={[{label:'Submit Request',to:'/submit'}]} hideTabs/>
+      <div style={{ maxWidth:640, margin:'48px auto', padding:'0 20px' }}>
+        <div style={{ background:'#fff', borderRadius:16, border:'1px solid #e2e8f0', padding:'32px' }}>
+          <h1 style={{ fontSize:20, fontWeight:800, color:'#0f172a', marginBottom:8 }}>Request a Missing Course</h1>
+          <p style={{ fontSize:13, color:'#64748b', marginBottom:24 }}>Can't find your course? Let us know and we'll add it within 24h.</p>
+          <div style={{ fontSize:12, color:'#94a3b8', border:'1.5px dashed #cbd5e1', borderRadius:10, padding:20, textAlign:'center' }}>Form coming soon — POST /api/courses/request</div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export function AdminPage() {
+  return (
+    <div style={{ minHeight:'100vh', background:'#edf0f5', fontFamily:FONT }}>
+      <Navbar crumbs={[{label:'Admin',to:'/admin'}]} hideTabs/>
+      <div style={{ maxWidth:1140, margin:'0 auto', padding:'24px 20px 60px' }}>
+        <h1 style={{ fontSize:20, fontWeight:800, color:'#0f172a', marginBottom:16 }}>Admin Panel</h1>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:20 }}>
+          {[['Total Users','—'],['Total Sheets','—'],['Flagged Courses','—'],['Total Stars','—']].map(([lbl,val])=>(
+            <div key={lbl} style={{ background:'#fff', borderRadius:12, border:'1px solid #e2e8f0', padding:'16px' }}>
+              <div style={{ fontSize:10, fontWeight:600, color:'#94a3b8', letterSpacing:'.06em', marginBottom:6 }}>{lbl.toUpperCase()}</div>
+              <div style={{ fontSize:22, fontWeight:800, color:'#0f172a' }}>{val}</div>
             </div>
           ))}
+        </div>
+        <div style={{ fontSize:12, color:'#94a3b8', border:'1.5px dashed #cbd5e1', borderRadius:12, padding:28, textAlign:'center' }}>
+          Admin dashboard — user management, flagged courses, and moderation tools coming in V1.
+        </div>
+      </div>
+    </div>
+  )
+}
 
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', paddingTop: 8, borderTop: '1px solid #f1f5f9' }}>
-            <button onClick={() => navigate('/sheets')} style={{
-              padding: '10px 20px', border: '1px solid #e2e8f0',
-              borderRadius: 10, background: '#fff', color: '#64748b',
-              fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
-            }}>
-              Cancel
-            </button>
-            <button onClick={handleSubmit} disabled={submitting} style={{
-              padding: '10px 28px', background: submitting ? '#93c5fd' : '#3b82f6',
-              border: 'none', borderRadius: 10, color: '#fff',
-              fontSize: 14, fontWeight: 700, cursor: submitting ? 'wait' : 'pointer',
-              fontFamily: 'inherit', transition: 'background 0.15s',
-            }}>
-              {submitting ? '⏳ Uploading…' : 'Publish Sheet'}
-            </button>
-          </div>
+export function TestTakerPage() {
+  return (
+    <div style={{ minHeight:'100vh', background:'#edf0f5', fontFamily:FONT }}>
+      <Navbar crumbs={[{label:'Practice Tests',to:'/tests'},{label:'Taking test…',to:null}]} hideTabs hideSearch/>
+      <div style={{ maxWidth:720, margin:'48px auto', padding:'0 20px' }}>
+        <div style={{ background:'#fff', borderRadius:16, border:'1px solid #e2e8f0', padding:'32px', textAlign:'center' }}>
+          <div style={{ fontSize:16, fontWeight:700, color:'#0f172a', marginBottom:8 }}>Test interface coming in V1</div>
+          <div style={{ fontSize:13, color:'#64748b', marginBottom:20 }}>Multiple choice + short answer with instant AI scoring.</div>
+          <Link to="/tests" style={{ fontSize:13, color:'#3b82f6', fontWeight:600, textDecoration:'none' }}>← Back to Practice Tests</Link>
         </div>
       </div>
     </div>

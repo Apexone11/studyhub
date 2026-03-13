@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import Navbar from '../components/Navbar'
+import { identifyAuthenticatedUser } from '../lib/telemetry'
 
 // ── SCHOOL DATA ──────────────────────────────────────────────
 const SCHOOLS = [
@@ -365,6 +366,7 @@ function RegisterScreen() {
       // Save token
       localStorage.setItem('token', data.token)
       localStorage.setItem('user', JSON.stringify(data.user))
+      identifyAuthenticatedUser(data.user)
 
       setError('')
       setSuccess(true)

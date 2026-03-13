@@ -66,6 +66,70 @@ npm --prefix backend run dev
 npm --prefix frontend/studyhub-app run dev
 ```
 
+## Docker (Always-On Dev Stack)
+1. Build and start everything in the background:
+
+```bash
+docker compose up -d --build
+```
+
+2. Check running services:
+
+```bash
+docker compose ps
+```
+
+3. Stream logs when needed:
+
+```bash
+docker compose logs -f backend frontend db
+```
+
+4. Stop services:
+
+```bash
+docker compose down
+```
+
+5. All services are configured with `restart: unless-stopped`, so they come back automatically after reboot as long as Docker starts on login.
+6. In Docker Desktop, turn on **Settings > General > Start Docker Desktop when you log in** to keep Docker always running.
+
+## Database Admin UI (pgAdmin)
+StudyHub now includes pgAdmin in Docker for viewing tables, users, and records.
+
+1. Open pgAdmin at `http://localhost:5050`
+2. Sign in with:
+	- Email: `admin@studyhub.com`
+	- Password: `studyhub_admin`
+3. Add a server in pgAdmin:
+	- Host: `db`
+	- Port: `5432`
+	- Username: `studyhub`
+	- Password: `studyhub_dev_password`
+	- Database: `studyhub`
+
+## Analytics and Monitoring
+Telemetry is now wired in the app with optional providers:
+- PostHog (traffic/events)
+- Microsoft Clarity (session replay/heatmaps)
+- Sentry (frontend + backend errors)
+
+To enable them, copy `.env.example` files and set your keys:
+- Root `.env.example` (Docker Compose values)
+- `frontend/studyhub-app/.env.example` (frontend local values)
+- `backend/.env.example` (backend local values)
+
+After setting keys for Docker, restart the stack:
+
+```bash
+docker compose up -d --build
+```
+
+## Password Safety
+- User passwords are never stored in plain text.
+- Passwords are hashed with bcrypt in the backend.
+- You can view usernames and password hashes in the database, but never the original passwords.
+
 ## Notes
 - Keep secrets only in local `.env` files.
 - Do not commit credentials, API keys, or private connection strings.

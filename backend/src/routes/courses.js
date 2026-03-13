@@ -2,6 +2,7 @@ const express = require('express')
 const { PrismaClient } = require('@prisma/client')
 const rateLimit = require('express-rate-limit')
 const requireAuth = require('../middleware/auth')
+const { captureError } = require('../monitoring/sentry')
 
 const router = express.Router()
 const prisma = new PrismaClient()
@@ -113,6 +114,11 @@ router.get('/recommendations', requireAuth, async (req, res) => {
 
     return res.json({ type: 'collaborative', recommendations: withScores })
   } catch (error) {
+    captureError(error, {
+      route: req.originalUrl,
+      method: req.method
+    })
+
     console.error(error)
     return res.status(500).json({ error: 'Server error.' })
   }
@@ -177,6 +183,11 @@ router.post('/request', requireAuth, async (req, res) => {
       threshold: POPULAR_THRESHOLD
     })
   } catch (error) {
+    captureError(error, {
+      route: req.originalUrl,
+      method: req.method
+    })
+
     console.error(error)
     return res.status(500).json({ error: 'Server error.' })
   }
@@ -199,6 +210,11 @@ router.get('/requested', requireAuth, async (req, res) => {
       courses: requested
     })
   } catch (error) {
+    captureError(error, {
+      route: req.originalUrl,
+      method: req.method
+    })
+
     console.error(error)
     return res.status(500).json({ error: 'Server error.' })
   }
@@ -226,6 +242,11 @@ router.get('/schools', schoolsLimiter, async (req, res) => {
 
     return res.json(schools)
   } catch (error) {
+    captureError(error, {
+      route: req.originalUrl,
+      method: req.method
+    })
+
     console.error(error)
     return res.status(500).json({ error: 'Server error.' })
   }

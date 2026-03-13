@@ -2,6 +2,7 @@ const express = require('express')
 const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
 const { PrismaClient } = require('@prisma/client')
+const { captureError } = require('../monitoring/sentry')
 
 const router = express.Router()
 const prisma = new PrismaClient()
@@ -179,7 +180,7 @@ async function validateCourses(courseIds, schoolId) {
   }
 }
 
-function sendError(res, error) {
+function sendError(req, res, error) {
   if (error instanceof AppError) {
     return res.status(error.statusCode).json({ error: error.message })
   }
@@ -187,6 +188,11 @@ function sendError(res, error) {
   if (error && error.code === 'P2002') {
     return res.status(409).json({ error: 'Username already taken.' })
   }
+
+  captureError(error, {
+    route: req.originalUrl,
+    method: req.method
+  })
 
   console.error(error)
   return res.status(500).json({ error: 'Server error. Please try again.' })
@@ -273,7 +279,7 @@ router.post('/register', async (req, res) => {
       }
     })
   } catch (error) {
-    return sendError(res, error)
+    return sendError(req, res, error)
   }
 })
 
@@ -316,7 +322,7 @@ router.post('/login', async (req, res) => {
       }
     })
   } catch (error) {
-    return sendError(res, error)
+    return sendError(req, res, error)
   }
 })
 
@@ -340,6 +346,11 @@ router.get('/me', requireAuth, async (req, res) => {
 
     return res.json(user)
   } catch (error) {
+    captureError(error, {
+      route: req.originalUrl,
+      method: req.method
+    })
+
     return res.status(500).json({ error: 'Server error.' })
   }
 })
