@@ -1618,13 +1618,15 @@
     let currentSchoolId = null;
 
     function selectSchool(id) {
-      currentSchoolId = id;
       const school = SCHOOLS.find(s => s.id === id);
-      if (school) {
-        selectedSchoolName.textContent = school.name;
-      } else {
-        selectedSchoolName.textContent = '';
+      if (!school) {
+        // Treat missing school as invalid selection
+        clearSchool();
+        return;
       }
+
+      currentSchoolId = school.id;
+      selectedSchoolName.textContent = school.name;
       selectedSchool.classList.add('show');
       schoolDropdown.classList.remove('show');
       schoolInput.value = '';
