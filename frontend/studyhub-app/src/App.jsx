@@ -3,6 +3,9 @@ import HomePage from './pages/HomePage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterScreen'
 import DashboardPage from './pages/DashboardPage'
+import TermsPage from './pages/TermsPage'
+import PrivacyPage from './pages/PrivacyPage'
+import GuidelinesPage from './pages/GuidelinesPage'
 
 const StudySheetsPage = () => (
   <div>
