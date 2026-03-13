@@ -46,6 +46,9 @@ function App() {
         <Route path="/study-sheets"  element={<StudySheetsPage />} />
         <Route path="/practice-tests" element={<PracticeTestsPage />} />
         <Route path="/syllabus"      element={<SyllabusPage />} />
+        <Route path="/terms"         element={<TermsPage />} />
+        <Route path="/privacy"       element={<PrivacyPage />} />
+        <Route path="/guidelines"    element={<GuidelinesPage />} />
         <Route path="*"              element={<NotFoundPage />} />
       </Routes>
     </BrowserRouter>

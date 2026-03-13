@@ -57,3 +57,16 @@ model StudySheet {
   course    Course   @relation(fields: [courseId], references: [id])
   author    User     @relation(fields: [userId], references: [id])
 }
+
+model RequestedCourse {
+  id        Int      @id @default(autoincrement())
+  name      String
+  code      String?
+  schoolId  Int?
+  count     Int      @default(1)
+  flagged   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([name, schoolId])
+}
