@@ -7,19 +7,19 @@ const QUICK_ACTIONS = [
   {
     iconClass: 'fa-solid fa-file-lines',
     label: 'Study Sheets',
-    to: '/study-sheets',
+    to: '/sheets',
     toneClass: 'dashboard-action--blue'
   },
   {
     iconClass: 'fa-solid fa-pen-to-square',
     label: 'Practice Tests',
-    to: '/practice-tests',
+    to: '/tests',
     toneClass: 'dashboard-action--green'
   },
   {
-    iconClass: 'fa-solid fa-scroll',
-    label: 'Syllabus',
-    to: '/syllabus',
+    iconClass: 'fa-solid fa-note-sticky',
+    label: 'My Notes',
+    to: '/notes',
     toneClass: 'dashboard-action--amber'
   },
   {
@@ -240,13 +240,13 @@ export default function DashboardPage() {
 
                     <div className="dashboard-course-links">
                       <Link
-                        to={`/study-sheets?courseId=${course.id}`}
+                        to={`/sheets?course=${course.id}`}
                         className="dashboard-chip-link dashboard-chip-link--blue"
                       >
                         Study sheets
                       </Link>
                       <Link
-                        to="/practice-tests"
+                        to="/tests"
                         className="dashboard-chip-link dashboard-chip-link--green"
                       >
                         Practice tests
@@ -292,7 +292,7 @@ export default function DashboardPage() {
 
                   <div className="dashboard-course-links">
                     <Link
-                      to={`/study-sheets?courseId=${course.id}`}
+                      to={`/sheets?course=${course.id}`}
                       className="dashboard-chip-link dashboard-chip-link--blue"
                     >
                       View sheets

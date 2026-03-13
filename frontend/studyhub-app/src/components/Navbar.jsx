@@ -2,10 +2,10 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import LogoDark from '../assets/logo-dark.svg'
 
 const NAV_LINKS = [
-  { label: 'Home', to: '/' },
-  { label: 'Study Sheets', to: '/study-sheets' },
-  { label: 'Practice Tests', to: '/practice-tests' },
-  { label: 'Syllabus', to: '/syllabus' }
+  { label: 'Home',           to: '/'             },
+  { label: 'Study Sheets',   to: '/sheets'        },
+  { label: 'Practice Tests', to: '/tests'         },
+  { label: 'Announcements',  to: '/announcements' },
 ]
 
 export default function Navbar({ user, onLogout }) {

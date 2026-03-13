@@ -110,7 +110,7 @@ export default function HomePage() {
               Get Started Free
               <i className="fa-solid fa-arrow-right" aria-hidden="true" />
             </Link>
-            <Link to="/study-sheets" className="home-btn home-btn-ghost">
+            <Link to="/sheets" className="home-btn home-btn-ghost">
               Browse Study Sheets
             </Link>
           </div>

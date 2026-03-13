@@ -24,6 +24,14 @@ import {
 } from './pages/PlaceholderPages'
 
 // ── simple auth guard ─────────────────────────────────────────────
+// Redirects to /feed if the user is already logged in.
+// Prevents authenticated users from seeing the marketing/auth pages.
+function PublicRoute({ children }) {
+  const token = localStorage.getItem('token')
+  return token ? <Navigate to="/feed" replace /> : children
+}
+
+// Redirects to /login if the user is not logged in.
 function PrivateRoute({ children }) {
   const token = localStorage.getItem('token')
   return token ? children : <Navigate to="/login" replace />
@@ -34,9 +42,9 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         {/* ── public (unauthenticated) ─────────────────────────── */}
-        <Route path="/"           element={<HomePage />} />
-        <Route path="/login"      element={<LoginPage />} />
-        <Route path="/register"   element={<RegisterScreen />} />
+        <Route path="/"         element={<PublicRoute><HomePage /></PublicRoute>} />
+        <Route path="/login"    element={<PublicRoute><LoginPage /></PublicRoute>} />
+        <Route path="/register" element={<PublicRoute><RegisterScreen /></PublicRoute>} />
         <Route path="/terms"      element={<TermsPage />} />
         <Route path="/privacy"    element={<PrivacyPage />} />
         <Route path="/guidelines" element={<GuidelinesPage />} />
