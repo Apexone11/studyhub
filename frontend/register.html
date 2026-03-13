@@ -1640,9 +1640,23 @@
       if (matches.length === 0) {
         courseDropdown.innerHTML = '<div class="dropdown-empty">No courses found.</div>';
       } else {
+        // Build list items without inline onclick handlers
         courseDropdown.innerHTML = matches.map(c =>
-          `<div class="course-item" onclick="addCourse('${c.code}', '${c.name.replace(/'/g, "\\'")}')"><span class="course-code">${c.code}</span>${c.name}</div>`
+          `<div class="course-item"><span class="course-code"></span><span class="course-name"></span></div>`
         ).join('');
+
+        // Attach data and event listeners safely
+        const items = courseDropdown.querySelectorAll('.course-item');
+        items.forEach((item, index) => {
+          const course = matches[index];
+          const codeEl = item.querySelector('.course-code');
+          const nameEl = item.querySelector('.course-name');
+          if (codeEl) codeEl.textContent = course.code;
+          if (nameEl) nameEl.textContent = course.name;
+          item.addEventListener('click', () => {
+            addCourse(course.code, course.name);
+          });
+        });
       }
       courseDropdown.classList.add('show');
     });
@@ -1666,9 +1680,30 @@
     }
 
     function renderCourseTags() {
-      selectedCoursesEl.innerHTML = selectedCourses.map(c =>
-        `<div class="course-tag">${c.code}<button onclick="removeCourse('${c.code}')" aria-label="Remove ${c.code}"><i class="fas fa-times"></i></button></div>`
-      ).join('');
+      // Clear existing tags
+      selectedCoursesEl.innerHTML = '';
+
+      selectedCourses.forEach(c => {
+        const tag = document.createElement('div');
+        tag.className = 'course-tag';
+
+        const codeNode = document.createTextNode(c.code);
+        tag.appendChild(codeNode);
+
+        const btn = document.createElement('button');
+        btn.setAttribute('aria-label', `Remove ${c.code}`);
+
+        const icon = document.createElement('i');
+        icon.className = 'fas fa-times';
+        btn.appendChild(icon);
+
+        btn.addEventListener('click', () => {
+          removeCourse(c.code);
+        });
+
+        tag.appendChild(btn);
+        selectedCoursesEl.appendChild(tag);
+      });
     }
 
     // Close course dropdown when clicking outside
