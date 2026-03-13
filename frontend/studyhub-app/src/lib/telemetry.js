@@ -21,6 +21,15 @@ function initClarity(projectId) {
     return
   }
 
+  const existingClarityScript = document.querySelector(
+    'script[src*="www.clarity.ms/tag/"]'
+  )
+
+  if (existingClarityScript) {
+    clarityInitialized = true
+    return
+  }
+
   window.clarity =
     window.clarity ||
     function clarityQueue() {

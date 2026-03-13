@@ -99,6 +99,88 @@ function Badge({ text, color = '#64748b' }) {
   )
 }
 
+// ─── onboarding banner ───────────────────────────────────────────
+function GettingStartedBanner({ onDismiss }) {
+  const steps = [
+    {
+      num: '1',
+      title: 'Browse Sheets',
+      sub: 'Search for your course and find notes from classmates',
+    },
+    {
+      num: '2',
+      title: 'Upload Notes',
+      sub: 'Share your study sheets with classmates in seconds',
+    },
+    {
+      num: '3',
+      title: 'Star & Fork',
+      sub: 'Save your favorites and remix any sheet to make it your own',
+    },
+  ]
+
+  return (
+    <div style={{
+      background: 'linear-gradient(135deg, #eff6ff 0%, #e0f2fe 100%)',
+      border: '1px solid #bfdbfe',
+      borderRadius: 14,
+      padding: '18px 20px',
+      marginBottom: 16,
+    }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        marginBottom: 14,
+      }}>
+        <div style={{ fontWeight: 700, fontSize: 14, color: '#1e40af' }}>
+          <i className="fa-solid fa-circle-info" style={{ marginRight: 7, color: '#3b82f6' }} />
+          How StudyHub works — get started in 3 steps
+        </div>
+      </div>
+      <div style={{
+        display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 14,
+      }}>
+        {steps.map(step => (
+          <div key={step.num} style={{
+            display: 'flex', alignItems: 'flex-start', gap: 10,
+            background: 'rgba(255,255,255,0.65)',
+            borderRadius: 10, padding: '10px 12px',
+          }}>
+            <div style={{
+              width: 26, height: 26, borderRadius: '50%',
+              background: '#3b82f6', color: '#fff',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 12, fontWeight: 800, flexShrink: 0,
+            }}>
+              {step.num}
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 14, color: '#1e293b', marginBottom: 2 }}>
+                {step.title}
+              </div>
+              <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.5 }}>
+                {step.sub}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <button
+          onClick={onDismiss}
+          style={{
+            padding: '6px 14px', background: '#3b82f6', color: '#fff',
+            border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600,
+            cursor: 'pointer', fontFamily: 'inherit',
+            display: 'flex', alignItems: 'center', gap: 5,
+          }}
+        >
+          Got it, let me explore →
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function FeedCard({ item }) {
   const [starred, setStarred] = useState(false)
 
@@ -166,7 +248,7 @@ function FeedCard({ item }) {
               : item.title
             }
           </div>
-          <p style={{ fontSize: 14, color: '#475569', lineHeight: 1.65, margin: 0 }}>
+          <p style={{ fontSize: 15, color: '#475569', lineHeight: 1.65, margin: 0 }}>
             {item.body}
           </p>
         </div>
@@ -277,6 +359,12 @@ export default function FeedPage() {
 
   const [filter, setFilter] = useState('all')
   const [activeNav, setActiveNav] = useState('/feed')
+  const [showBanner, setShowBanner] = useState(!localStorage.getItem('studyhub_welcomed'))
+
+  function handleDismissBanner() {
+    localStorage.setItem('studyhub_welcomed', '1')
+    setShowBanner(false)
+  }
 
   const filtered = filter === 'all'
     ? FEED_ITEMS
@@ -367,7 +455,7 @@ export default function FeedPage() {
         {/* avatar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
           <Avatar name={user.username} size={32} role={user.role} />
-          <span style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0' }}>{user.username}</span>
+          <span style={{ fontSize: 14, fontWeight: 600, color: '#e2e8f0' }}>{user.username}</span>
           <i className="fa-solid fa-chevron-down" style={{ fontSize: 11, color: '#64748b' }} />
         </div>
       </header>
@@ -527,6 +615,11 @@ export default function FeedPage() {
             </Link>
           </div>
 
+          {/* onboarding banner — shown between compose bar and filter tabs */}
+          {showBanner && (
+            <GettingStartedBanner onDismiss={handleDismissBanner} />
+          )}
+
           {/* filter tabs */}
           <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
             {[
@@ -648,6 +741,7 @@ export default function FeedPage() {
               { icon: 'fa-solid fa-upload',           label: 'Upload a Sheet',       to: '/sheets/upload', ready: true  },
               { icon: 'fa-solid fa-circle-question',  label: 'Take a Practice Test', to: '/tests',         ready: false },
               { icon: 'fa-solid fa-note-sticky',      label: 'My Notes',             to: '/notes',         ready: false },
+              { icon: 'fa-solid fa-circle-question',  label: 'How StudyHub works',   to: '/sheets',        ready: true  },
             ].map(a => (
               <Link key={a.label} to={a.to} style={{
                 display: 'flex', alignItems: 'center', gap: 9,
