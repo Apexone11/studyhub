@@ -40,10 +40,41 @@ router.post('/register', async (req, res) => {
     })
 
     // Enroll in courses if provided
-    if (courseIds && courseIds.length > 0) {
-      await prisma.enrollment.createMany({
-        data: courseIds.map(courseId => ({ userId: user.id, courseId }))
-      })
+    if (courseIds !== undefined && courseIds !== null) {
+      if (!Array.isArray(courseIds)) {
+        return res.status(400).json({ error: 'courseIds must be an array of integers.' })
+      }
+
+      if (courseIds.length > 0) {
+        const parsedCourseIds = courseIds.map((id) => Number(id))
+
+        if (parsedCourseIds.some((id) => !Number.isInteger(id))) {
+          return res.status(400).json({ error: 'courseIds must contain only integer values.' })
+        }
+
+        const uniqueCourseIds = Array.from(new Set(parsedCourseIds))
+
+        const courseWhere = {
+          id: { in: uniqueCourseIds }
+        }
+
+        if (schoolId !== undefined && schoolId !== null) {
+          courseWhere.schoolId = schoolId
+        }
+
+        const existingCourses = await prisma.course.findMany({
+          where: courseWhere
+        })
+
+        if (existingCourses.length !== uniqueCourseIds.length) {
+          return res.status(400).json({ error: 'One or more provided courseIds are invalid for the given school.' })
+        }
+
+        await prisma.enrollment.createMany({
+          data: parsedCourseIds.map((courseId) => ({ userId: user.id, courseId })),
+          skipDuplicates: true
+        })
+      }
     }
 
     // Create JWT token
