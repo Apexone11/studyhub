@@ -6,14 +6,18 @@ const app = express()
 const PORT = process.env.PORT || 4000
 const authRoutes = require('./routes/auth')
 
-// middleware
-app.use(cors({ origin: 'Http://localhost:5173', credentials: true}))
+// Allow the local frontend to call this API with credentials.
+app.use(cors({ origin: 'http://localhost:5173', credentials: true }))
+
+// Parse JSON request bodies for auth and future API routes.
 app.use(express.json())
+
+// Mount authentication endpoints under /api/auth.
 app.use('/api/auth', authRoutes)
 
-//Health check route
+// Basic API health check.
 app.get('/', (req, res) => {
-    res.json({ message: 'StudyHub API is running ✅'})
+    res.json({ message: 'StudyHub API is running ✅' })
 })
 
 // Start server

@@ -5,17 +5,43 @@ import { useState } from 'react'
 function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [username, setUsername] = useState('')
-  const [password, setPassword]         = useState('')
-  const [error, setError]               = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
 
-  function handleLogin(e) {
+  // Validate credentials, call backend login, then persist auth session locally.
+  async function handleLogin(e) {
     e.preventDefault()
 
     if (!username.trim() || !password.trim()) {
       setError('Please fill in both fields.')
       return
     }
-    setError('No backend yet — login coming in Week 3!')
+
+    setError('')
+
+    try {
+      const res = await fetch('http://localhost:4000/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: username.trim(), password })
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error || 'Something went wrong.')
+        return
+      }
+
+      // Save token and user to localStorage
+      localStorage.setItem('token', data.token)
+      localStorage.setItem('user', JSON.stringify(data.user))
+
+      // Redirect to dashboard
+      window.location.href = '/dashboard'
+    } catch {
+      setError('Could not connect to server. Make sure the backend is running.')
+    }
   }
 
   return (

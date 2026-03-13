@@ -1,28 +1,61 @@
-# StudyHub 📚
+# StudyHub
 
-A student-powered study platform for college students.
+StudyHub is a student-focused web app where users can register, log in, and collaborate around course study materials.
 
-## What It Does
-- View study sheets directly in the browser — no downloads
-- Take practice tests and see your score instantly
-- Read real-time course announcements
-- Add personal notes
-- Contribute your own study guides
-- Get help from an AI assistant
+## Project Overview
+- Frontend built with React and Vite
+- Backend API built with Node.js and Express
+- PostgreSQL database managed through Prisma
+- JWT-based authentication for user sessions
+
+## Main User Flow
+1. Create an account
+2. Log in
+3. Access the dashboard and study features
 
 ## Screenshots
 
-### Homepage
-![StudyHub Homepage](docs/screenshots/homepage.png)
+### Home Page
+![StudyHub Home Page](docs/screenshots/home-page.png)
 
 ### Login Page
-![StudyHub Login](docs/screenshots/login.png)
+![StudyHub Login Page](docs/screenshots/login-page.png)
 
-## Status
-🚧 Currently in development — prototype expected April 2026
+### Register Page
+![StudyHub Register Page](docs/screenshots/register-page.png)
 
-## Tech Stack
-React · Node.js · Express · PostgreSQL · Docker · Anthropic AI
+## Local Development
+1. Install dependencies:
 
-## Contributing
-Contributions welcome! See CONTRIBUTING.md (coming soon)
+```bash
+npm --prefix backend install
+npm --prefix frontend/studyhub-app install
+```
+
+2. Create a local backend `.env` with your own values for:
+- `PORT`
+- `JWT_SECRET`
+- `DATABASE_URL`
+
+3. Run database migrations:
+
+```bash
+cd backend
+npx prisma migrate dev --name init
+```
+
+4. Start the backend:
+
+```bash
+npm --prefix backend run dev
+```
+
+5. Start the frontend:
+
+```bash
+npm --prefix frontend/studyhub-app run dev
+```
+
+## Notes
+- Keep secrets only in local `.env` files.
+- Do not commit credentials, API keys, or private connection strings.

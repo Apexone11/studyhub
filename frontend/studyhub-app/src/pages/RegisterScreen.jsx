@@ -241,14 +241,44 @@ function RegisterScreen() {
   }
 
   // ── Final submit ──────────────────────────────────────────
-  function submitForm(skip = false) {
+  // Register with backend, persist auth data, and move user into the app.
+  async function submitForm(skip = false) {
     if (!skip && selectedCourses.length === 0 && selectedSchool) {
       setError('Add at least one course, or skip to do it later.')
       return
     }
+
     setError('')
-    setSuccess(true)
-    setTimeout(() => { window.location.href = '/login' }, 2000)
+
+    try {
+      const res = await fetch('http://localhost:4000/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: username.trim(),
+          password,
+          schoolId: selectedSchool?.id || null,
+          courseIds: selectedCourses.map(c => c.id).filter(Boolean)
+        })
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error || 'Something went wrong.')
+        return
+      }
+
+      // Save token
+      localStorage.setItem('token', data.token)
+      localStorage.setItem('user', JSON.stringify(data.user))
+
+      setError('')
+      setSuccess(true)
+      setTimeout(() => { window.location.href = '/dashboard' }, 2000)
+    } catch {
+      setError('Could not connect to server. Make sure the backend is running.')
+    }
   }
 
   // ── RENDER ────────────────────────────────────────────────
@@ -284,7 +314,7 @@ function RegisterScreen() {
           {success && (
             <div style={s.successBox}>
               <i className="fas fa-circle-check" style={{ marginRight: '8px' }}></i>
-              Account created! Redirecting to login...
+              Account created! Redirecting to dashboard...
             </div>
           )}
 
