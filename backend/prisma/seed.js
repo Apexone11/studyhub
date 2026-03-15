@@ -137,9 +137,10 @@ async function main() {
       }
     })
     console.log('Created sample user: studyhub_seed')
-    console.log('Sample user password:', seedPassword)
-    if (!process.env.SEED_USER_PASSWORD) {
-      console.log('No SEED_USER_PASSWORD env var was provided, so this sample password was generated for local use.')
+    if (process.env.SEED_USER_PASSWORD) {
+      console.log('Sample user password was taken from the SEED_USER_PASSWORD environment variable.')
+    } else {
+      console.log('A random sample password was generated for local use. To use a known password, set the SEED_USER_PASSWORD env var before running the seed script.')
     }
   }
 
