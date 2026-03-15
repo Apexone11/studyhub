@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import Navbar from './Navbar'
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '../config'
 
 const RELATED_LINKS = [
   { label: 'Terms of Use', to: '/terms' },
@@ -24,9 +25,19 @@ export default function LegalPageLayout({
   intro,
   icon,
   asideTitle = 'Related Pages',
-  asideNote = 'Questions or concerns can always be raised through the StudyHub GitHub repository.',
+  asideNote,
   children,
 }) {
+  const resolvedAsideNote = asideNote || (
+    <>
+      Questions or concerns can always be sent to{' '}
+      <a href={SUPPORT_MAILTO} style={{ color: '#2563eb', textDecoration: 'none', fontWeight: 600 }}>
+        {SUPPORT_EMAIL}
+      </a>
+      .
+    </>
+  )
+
   return (
     <div className="legal-page">
       <Navbar variant="landing" hideSearch />
@@ -66,7 +77,7 @@ export default function LegalPageLayout({
 
             <div className="legal-sidecard">
               <div className="legal-sidecard-kicker">Open Source</div>
-              <p className="legal-sidecard-copy">{asideNote}</p>
+              <p className="legal-sidecard-copy">{resolvedAsideNote}</p>
               <a
                 href="https://github.com/Apexone11/studyhub"
                 target="_blank"

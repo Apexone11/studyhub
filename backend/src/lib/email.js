@@ -1,18 +1,34 @@
 const nodemailer = require('nodemailer')
+const DEFAULT_ADMIN_EMAIL = 'abdulrfornah@getstudyhub.org'
 
 function getPublicAppUrl() {
   return process.env.FRONTEND_URL || 'http://localhost:5173'
 }
 
+function getAdminEmail() {
+  return (process.env.ADMIN_EMAIL || process.env.EMAIL_USER || DEFAULT_ADMIN_EMAIL).trim().toLowerCase()
+}
+
 // Create transporter lazily so missing env vars don't crash on startup
 function getTransporter() {
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) return null
+  const auth = {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  }
+
+  if (process.env.EMAIL_HOST) {
+    return nodemailer.createTransport({
+      host: process.env.EMAIL_HOST,
+      port: Number(process.env.EMAIL_PORT || 587),
+      secure: String(process.env.EMAIL_SECURE || 'false').toLowerCase() === 'true',
+      auth,
+    })
+  }
+
   return nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
+    service: process.env.EMAIL_SERVICE || 'gmail',
+    auth,
   })
 }
 
@@ -160,4 +176,73 @@ async function sendTwoFaCode(toEmail, username, code) {
   })
 }
 
-module.exports = { sendPasswordReset, sendEmailVerification, sendTwoFaCode }
+/**
+ * Send a course request notification to the company/admin inbox.
+ * @param {object} params
+ * @param {string} params.courseName
+ * @param {string | null} params.courseCode
+ * @param {string | null} params.schoolName
+ * @param {string} params.requesterUsername
+ * @param {string | null} params.requesterEmail
+ * @param {number} params.requestCount
+ * @param {boolean} params.flagged
+ */
+async function sendCourseRequestNotice({
+  courseName,
+  courseCode,
+  schoolName,
+  requesterUsername,
+  requesterEmail,
+  requestCount,
+  flagged,
+}) {
+  const transporter = getTransporter()
+  if (!transporter) {
+    console.warn('[email] EMAIL_USER/EMAIL_PASS not set — skipping course request notification')
+    return
+  }
+
+  const adminEmail = getAdminEmail()
+  if (!adminEmail) {
+    console.warn('[email] ADMIN_EMAIL not set — skipping course request notification')
+    return
+  }
+
+  const subject = flagged
+    ? `StudyHub request flagged for review: ${courseName}`
+    : `New StudyHub course request: ${courseName}`
+
+  const body = `
+    <h2 style="margin:0 0 8px;color:#1e3a5f;font-size:22px;">Course Request Notification</h2>
+    <p style="margin:0 0 24px;color:#6b7280;font-size:15px;">
+      A student submitted a new course request on StudyHub.
+    </p>
+    <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px;padding:18px 20px;margin:0 0 24px;">
+      <p style="margin:0 0 10px;color:#334155;font-size:14px;"><strong>Course:</strong> ${courseName}</p>
+      <p style="margin:0 0 10px;color:#334155;font-size:14px;"><strong>Code:</strong> ${courseCode || 'Not provided'}</p>
+      <p style="margin:0 0 10px;color:#334155;font-size:14px;"><strong>School:</strong> ${schoolName || 'Not specified'}</p>
+      <p style="margin:0 0 10px;color:#334155;font-size:14px;"><strong>Requested by:</strong> ${requesterUsername}</p>
+      <p style="margin:0 0 10px;color:#334155;font-size:14px;"><strong>Requester email:</strong> ${requesterEmail || 'Not provided'}</p>
+      <p style="margin:0 0 10px;color:#334155;font-size:14px;"><strong>Total requests:</strong> ${requestCount}</p>
+      <p style="margin:0;color:#334155;font-size:14px;"><strong>Status:</strong> ${flagged ? 'Flagged for review' : 'Below review threshold'}</p>
+    </div>
+    <p style="margin:0;color:#9ca3af;font-size:13px;">
+      Review this request from the admin dashboard when you are ready.
+    </p>
+  `
+
+  const mailOptions = {
+    from: `"StudyHub" <${process.env.EMAIL_USER}>`,
+    to: adminEmail,
+    subject,
+    html: htmlWrap('StudyHub Course Request', body),
+  }
+
+  if (requesterEmail) {
+    mailOptions.replyTo = requesterEmail
+  }
+
+  await transporter.sendMail(mailOptions)
+}
+
+module.exports = { sendPasswordReset, sendEmailVerification, sendTwoFaCode, sendCourseRequestNotice }

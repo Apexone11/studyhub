@@ -1,5 +1,6 @@
 import LegalPageLayout, { LegalSection } from '../components/LegalPageLayout'
 import { IconShield } from '../components/Icons'
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '../config'
 
 function PrivacyPage() {
   return (
@@ -61,7 +62,9 @@ function PrivacyPage() {
       <LegalSection title="5. Data Retention">
         <p>
           Your data is kept as long as your account is active. You can request deletion of your account and its associated data at any
-          time by opening a GitHub Issue tagged with your username.
+          time by emailing{' '}
+          <a href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>
+          {' '}from the address linked to your account.
         </p>
       </LegalSection>
 
@@ -80,7 +83,10 @@ function PrivacyPage() {
           <li>Request deletion of your account and all associated data.</li>
           <li>Opt out of public display of your contributions where possible.</li>
         </ul>
-        <p>To exercise these rights, open a GitHub Issue or contact the maintainer through GitHub.</p>
+        <p>
+          To exercise these rights, email{' '}
+          <a href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>.
+        </p>
       </LegalSection>
 
       <LegalSection title="8. Changes to This Policy">

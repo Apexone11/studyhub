@@ -1,5 +1,6 @@
 import LegalPageLayout, { LegalSection } from '../components/LegalPageLayout'
 import { IconInfoCircle } from '../components/Icons'
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '../config'
 
 function TermsPage() {
   return (
@@ -22,7 +23,8 @@ function TermsPage() {
         <p>
           You are responsible for keeping your username and password secure. Do not share your credentials. You are
           responsible for all activity that happens under your account. If you believe your account has been compromised,
-          contact an administrator immediately through GitHub Issues.
+          contact an administrator immediately at{' '}
+          <a href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>.
         </p>
       </LegalSection>
 
@@ -90,7 +92,8 @@ function TermsPage() {
 
       <LegalSection title="10. Contact">
         <p>
-          For questions about these terms, open a GitHub Issue on the StudyHub repository or contact the maintainer directly through GitHub.
+          For questions about these terms, email{' '}
+          <a href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>.
         </p>
       </LegalSection>
     </LegalPageLayout>

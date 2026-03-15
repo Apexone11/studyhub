@@ -95,8 +95,9 @@ function SettingsPage() {
 
   function handleEmailSubmit(e) {
     e.preventDefault()
-    handlePatch('email', emForm, setEmMsg, () => {
-      setUser(u => ({ ...u, email: emForm.email }))
+    handlePatch('email', emForm, setEmMsg, (data) => {
+      if (data.user) setStoredUser(data.user)
+      setUser(u => ({ ...u, email: data.user?.email || emForm.email, emailVerified: data.user?.emailVerified ?? false }))
       setEmForm({ email: '', password: '' })
     })
   }
