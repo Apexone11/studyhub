@@ -34,10 +34,13 @@ process.on('unhandledRejection', (reason) => {
     console.error(error)
 })
 
-// Dynamic CORS: dev allows Vite dev/preview servers; production allows the Railway frontend URL.
+// Dynamic CORS: dev allows Vite dev/preview servers; production allows primary and alternate frontend URLs.
 const isProd = process.env.NODE_ENV === 'production'
 const allowedOrigins = isProd
-  ? [process.env.FRONTEND_URL].filter(Boolean)
+  ? [
+      process.env.FRONTEND_URL,
+      process.env.FRONTEND_URL_ALT,
+    ].filter(Boolean)
   : ['http://localhost:5173', 'http://localhost:4173']
 
 if (isProd) {
