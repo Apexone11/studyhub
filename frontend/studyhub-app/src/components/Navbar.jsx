@@ -259,7 +259,7 @@ export default function Navbar({
     }
     setShowBell(false)
     if (notif.sheetId) navigate(`/sheets/${notif.sheetId}`)
-    else if (notif.actorId) navigate(`/users/${notif.actor?.username || ''}`)
+    else if (notif.actor?.username) navigate(`/users/${notif.actor.username}`)
   }
 
   function timeAgo(iso) {

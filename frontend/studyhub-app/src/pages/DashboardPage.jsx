@@ -84,6 +84,7 @@ export default function DashboardPage() {
   const [user, setUser] = useState(() => getStoredUser())
   const [loading, setLoading] = useState(true)
   const [sheets, setSheets] = useState([])
+  const [mySheetCount, setMySheetCount] = useState(0)
   const [avatarUploading, setAvatarUploading] = useState(false)
   const [avatarError, setAvatarError] = useState('')
   const avatarInputRef = useRef(null)
@@ -152,11 +153,18 @@ export default function DashboardPage() {
         setUser(meData)
         localStorage.setItem('user', JSON.stringify(meData))
 
-        const sheetsResponse = await fetch(`${API}/api/sheets?limit=10`, { headers: authHeaders() })
+        const [sheetsResponse, mineResponse] = await Promise.all([
+          fetch(`${API}/api/sheets?limit=10`, { headers: authHeaders() }),
+          fetch(`${API}/api/sheets?mine=1&limit=1`, { headers: authHeaders() }),
+        ])
         if (!isMounted) return
         if (sheetsResponse.ok) {
           const sheetsData = await sheetsResponse.json()
           setSheets(sheetsData.sheets || sheetsData || [])
+        }
+        if (mineResponse.ok) {
+          const mineData = await mineResponse.json()
+          setMySheetCount(mineData.total || 0)
         }
       } catch {
         // silently fail — user data from localStorage still shown
@@ -297,7 +305,7 @@ export default function DashboardPage() {
               <div style={{ position: 'relative' }}>
                 {user?.avatarUrl ? (
                   <img
-                    src={`${API}${user.avatarUrl}`}
+                    src={user.avatarUrl?.startsWith('http') ? user.avatarUrl : `${API}${user.avatarUrl}`}
                     alt={user.username}
                     style={{ width: 64, height: 64, borderRadius: '50%', objectFit: 'cover', border: '2px solid #e2e8f0' }}
                   />
@@ -346,7 +354,7 @@ export default function DashboardPage() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, width: '100%', marginTop: 4 }}>
                 {[
                   { label: 'Courses', val: courseCount },
-                  { label: 'Sheets', val: sheets.filter((s) => s.author?.username === user?.username).length },
+                  { label: 'Sheets', val: mySheetCount },
                   { label: 'Stars', val: 0 },
                 ].map((stat) => (
                   <div key={stat.label} style={{ textAlign: 'center', background: '#f8fafc', borderRadius: 10, padding: '8px 4px' }}>

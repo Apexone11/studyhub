@@ -109,7 +109,7 @@ export default function UserProfilePage() {
             {/* Avatar */}
             <div style={styles.avatar}>
               {profile.avatarUrl
-                ? <img src={profile.avatarUrl} alt={profile.username} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                ? <img src={profile.avatarUrl.startsWith('http') ? profile.avatarUrl : `${API}${profile.avatarUrl}`} alt={profile.username} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
                 : <span style={styles.avatarInitials}>{initials}</span>
               }
             </div>

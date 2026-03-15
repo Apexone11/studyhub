@@ -63,7 +63,7 @@ router.get('/me', async (req, res) => {
 })
 
 // ── PATCH /api/settings/password ────────────────────────────
-router.patch('/password', async (req, res) => {
+router.patch('/password', twoFaLimiter, async (req, res) => {
   const { currentPassword, newPassword } = req.body || {}
 
   if (!currentPassword || !newPassword) {

@@ -212,7 +212,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
 
 // ── CREATE a sheet ────────────────────────────────────────────
 router.post('/', requireAuth, async (req, res) => {
-  const { title, content, courseId, forkOf } = req.body
+  const { title, content, courseId, forkOf, description } = req.body
 
   if (!title?.trim())   return res.status(400).json({ error: 'Title is required.' })
   if (!content?.trim()) return res.status(400).json({ error: 'Content is required.' })
@@ -221,11 +221,12 @@ router.post('/', requireAuth, async (req, res) => {
   try {
     const sheet = await prisma.studySheet.create({
       data: {
-        title:    title.trim(),
-        content:  content.trim(),
-        courseId: parseInt(courseId),
-        userId:   req.user.userId,
-        forkOf:   forkOf ? parseInt(forkOf) : null,
+        title:       title.trim(),
+        description: description?.trim().slice(0, 300) || '',
+        content:     content.trim(),
+        courseId:    parseInt(courseId),
+        userId:      req.user.userId,
+        forkOf:      forkOf ? parseInt(forkOf) : null,
       },
       include: {
         author: { select: { id: true, username: true } },
@@ -254,11 +255,12 @@ router.post('/:id/fork', requireAuth, async (req, res) => {
 
     const forked = await prisma.studySheet.create({
       data: {
-        title:    forkTitle,
-        content:  original.content,
-        courseId: original.courseId,
-        userId:   req.user.userId,
-        forkOf:   original.id,
+        title:       forkTitle,
+        description: original.description || '',
+        content:     original.content,
+        courseId:    original.courseId,
+        userId:      req.user.userId,
+        forkOf:      original.id,
       },
       include: {
         author: { select: { id: true, username: true } },
