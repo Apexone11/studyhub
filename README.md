@@ -94,19 +94,7 @@ docker compose down
 5. All services are configured with `restart: unless-stopped`, so they come back automatically after reboot as long as Docker starts on login.
 6. In Docker Desktop, turn on **Settings > General > Start Docker Desktop when you log in** to keep Docker always running.
 
-## Database Admin UI (pgAdmin)
-StudyHub now includes pgAdmin in Docker for viewing tables, users, and records.
 
-1. Open pgAdmin at `http://localhost:5050`
-2. Sign in with:
-	- Email: `admin@studyhub.com`
-	- Password: `studyhub_admin`
-3. Add a server in pgAdmin:
-	- Host: `db`
-	- Port: `5432`
-	- Username: `studyhub`
-	- Password: `studyhub_dev_password`
-	- Database: `studyhub`
 
 ## Analytics and Monitoring
 Telemetry is now wired in the app with optional providers:
