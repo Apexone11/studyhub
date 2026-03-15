@@ -10,6 +10,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@sentry/react": "^10.43.0",
+    "dompurify": "^3.3.3",
+    "posthog-js": "^1.360.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.13.1"
@@ -27,5 +30,8 @@
   },
   "overrides": {
     "vite": "^8.0.0-beta.13"
+  },
+  "engines": {
+    "node": ">=20.0.0"
   }
 }

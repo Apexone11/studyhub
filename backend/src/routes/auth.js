@@ -1,138 +1,433 @@
-const express  = require('express')
-const bcrypt   = require('bcryptjs')
-const jwt      = require('jsonwebtoken')
+const express = require('express')
+const bcrypt = require('bcryptjs')
+const jwt = require('jsonwebtoken')
+const crypto = require('crypto')
+const rateLimit = require('express-rate-limit')
 const { PrismaClient } = require('@prisma/client')
+const { captureError } = require('../monitoring/sentry')
+const { sendPasswordReset, sendTwoFaCode } = require('../lib/email')
 
 const router = express.Router()
 const prisma = new PrismaClient()
 
+const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,20}$/
+const PASSWORD_MIN_LENGTH = 8
+const TOKEN_EXPIRES_IN = '24h'
+const COURSE_CODE_REGEX = /^[A-Z0-9-]{2,20}$/
+
+// ── Rate limiters ──────────────────────────────────────────────
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: 'Too many login attempts. Please try again in 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: { error: 'Too many registration attempts. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
+const forgotLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 3,
+  message: { error: 'Too many requests. Please try again in 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
+class AppError extends Error {
+  constructor(statusCode, message) {
+    super(message)
+    this.statusCode = statusCode
+  }
+}
+
+function getJwtSecret() {
+  if (!process.env.JWT_SECRET) {
+    throw new Error('JWT_SECRET is not configured.')
+  }
+  return process.env.JWT_SECRET
+}
+
+function createToken(user, jwtSecret) {
+  return jwt.sign(
+    { userId: user.id, username: user.username, role: user.role },
+    jwtSecret,
+    { expiresIn: TOKEN_EXPIRES_IN }
+  )
+}
+
+function parseOptionalInteger(value, fieldName) {
+  if (value === undefined || value === null || value === '') return null
+  const parsedValue = Number(value)
+  if (!Number.isInteger(parsedValue)) throw new AppError(400, `${fieldName} must be an integer.`)
+  return parsedValue
+}
+
+function parseCourseIds(courseIds) {
+  if (courseIds === undefined || courseIds === null) return []
+  if (!Array.isArray(courseIds)) throw new AppError(400, 'courseIds must be an array of integers.')
+  const parsedCourseIds = courseIds.map((courseId) => Number(courseId))
+  if (parsedCourseIds.some((courseId) => !Number.isInteger(courseId))) {
+    throw new AppError(400, 'courseIds must contain only integer values.')
+  }
+  return [...new Set(parsedCourseIds)]
+}
+
+function parseCustomCourses(customCourses) {
+  if (customCourses === undefined || customCourses === null) return []
+  if (!Array.isArray(customCourses)) throw new AppError(400, 'customCourses must be an array.')
+  if (customCourses.length > 10) throw new AppError(400, 'You can add up to 10 custom courses.')
+
+  const parsedCourses = customCourses.map((course, index) => {
+    if (!course || typeof course !== 'object') {
+      throw new AppError(400, `customCourses[${index}] must be an object.`)
+    }
+    const code = typeof course.code === 'string' ? course.code.trim().toUpperCase() : ''
+    const name = typeof course.name === 'string' ? course.name.trim() : ''
+    if (!code || !name) throw new AppError(400, 'Each custom course must include both code and name.')
+    if (!COURSE_CODE_REGEX.test(code)) throw new AppError(400, 'Custom course code must be 2-20 characters (A-Z, 0-9, or -).')
+    if (name.length < 2 || name.length > 120) throw new AppError(400, 'Custom course name must be between 2 and 120 characters.')
+    return { code, name }
+  })
+
+  const uniqueByCode = new Map()
+  parsedCourses.forEach((course) => {
+    if (!uniqueByCode.has(course.code)) uniqueByCode.set(course.code, course)
+  })
+  return Array.from(uniqueByCode.values())
+}
+
+async function resolveCourseIds(tx, courseIds, customCourses, schoolId) {
+  const resolvedCourseIds = [...courseIds]
+  if (customCourses.length === 0) return [...new Set(resolvedCourseIds)]
+  if (schoolId === null) throw new AppError(400, 'schoolId is required when adding custom courses.')
+
+  for (const customCourse of customCourses) {
+    const existingCourse = await tx.course.findFirst({
+      where: { schoolId, code: { equals: customCourse.code, mode: 'insensitive' } },
+      select: { id: true }
+    })
+    if (existingCourse) {
+      resolvedCourseIds.push(existingCourse.id)
+      continue
+    }
+    const createdCourse = await tx.course.create({
+      data: { schoolId, code: customCourse.code, name: customCourse.name },
+      select: { id: true }
+    })
+    resolvedCourseIds.push(createdCourse.id)
+  }
+
+  return [...new Set(resolvedCourseIds)]
+}
+
+async function validateCourses(courseIds, schoolId) {
+  if (courseIds.length === 0) return
+  const where = { id: { in: courseIds } }
+  if (schoolId !== null) where.schoolId = schoolId
+  const courses = await prisma.course.findMany({ where, select: { id: true } })
+  if (courses.length !== courseIds.length) {
+    throw new AppError(400, 'One or more provided courseIds are invalid for the given school.')
+  }
+}
+
+function sendError(req, res, error) {
+  if (error instanceof AppError) {
+    return res.status(error.statusCode).json({ error: error.message })
+  }
+  if (error && error.code === 'P2002') {
+    return res.status(409).json({ error: 'Username already taken.' })
+  }
+  captureError(error, { route: req.originalUrl, method: req.method })
+  console.error(error)
+  return res.status(500).json({ error: 'Server error. Please try again.' })
+}
+
 // ── REGISTER ─────────────────────────────────────────────────
-router.post('/register', async (req, res) => {
-  const { username, password, schoolId, courseIds } = req.body
+router.post('/register', registerLimiter, async (req, res) => {
+  const body = req.body || {}
+  const username = typeof body.username === 'string' ? body.username.trim() : ''
+  const password = typeof body.password === 'string' ? body.password : ''
+  const { schoolId, courseIds, customCourses } = body
 
-  // Validate input
-  if (!username || !password) {
-    return res.status(400).json({ error: 'Username and password are required.' })
-  }
-
-  const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/
-  if (!usernameRegex.test(username)) {
-    return res.status(400).json({ error: 'Invalid username format.' })
-  }
-
-  if (password.length < 8) {
-    return res.status(400).json({ error: 'Password must be at least 8 characters.' })
+  if (!username || !password) return res.status(400).json({ error: 'Username and password are required.' })
+  if (!USERNAME_REGEX.test(username)) return res.status(400).json({ error: 'Invalid username format.' })
+  if (password.length < PASSWORD_MIN_LENGTH) {
+    return res.status(400).json({ error: `Password must be at least ${PASSWORD_MIN_LENGTH} characters.` })
   }
 
   try {
-    // Check if username already taken
-    const existing = await prisma.user.findUnique({ where: { username } })
-    if (existing) {
-      return res.status(409).json({ error: 'Username already taken.' })
+    const jwtSecret = getJwtSecret()
+    const parsedSchoolId = parseOptionalInteger(schoolId, 'schoolId')
+    const parsedCourseIds = parseCourseIds(courseIds)
+    const parsedCustomCourses = parseCustomCourses(customCourses)
+
+    if (parsedCustomCourses.length > 0 && parsedSchoolId === null) {
+      throw new AppError(400, 'Please select a school before adding custom courses.')
     }
 
-    // Hash password
+    const existingUser = await prisma.user.findUnique({ where: { username }, select: { id: true } })
+    if (existingUser) return res.status(409).json({ error: 'Username already taken.' })
+
+    await validateCourses(parsedCourseIds, parsedSchoolId)
     const passwordHash = await bcrypt.hash(password, 12)
 
-    // Create user
-    const user = await prisma.user.create({
-      data: { username, passwordHash }
-    })
-
-    // Enroll in courses if provided
-    if (courseIds !== undefined && courseIds !== null) {
-      if (!Array.isArray(courseIds)) {
-        return res.status(400).json({ error: 'courseIds must be an array of integers.' })
-      }
-
-      if (courseIds.length > 0) {
-        const parsedCourseIds = courseIds.map((id) => Number(id))
-
-        if (parsedCourseIds.some((id) => !Number.isInteger(id))) {
-          return res.status(400).json({ error: 'courseIds must contain only integer values.' })
-        }
-
-        const uniqueCourseIds = Array.from(new Set(parsedCourseIds))
-
-        const courseWhere = {
-          id: { in: uniqueCourseIds }
-        }
-
-        if (schoolId !== undefined && schoolId !== null) {
-          courseWhere.schoolId = schoolId
-        }
-
-        const existingCourses = await prisma.course.findMany({
-          where: courseWhere
-        })
-
-        if (existingCourses.length !== uniqueCourseIds.length) {
-          return res.status(400).json({ error: 'One or more provided courseIds are invalid for the given school.' })
-        }
-
-        await prisma.enrollment.createMany({
-          data: parsedCourseIds.map((courseId) => ({ userId: user.id, courseId })),
+    const user = await prisma.$transaction(async (tx) => {
+      const createdUser = await tx.user.create({ data: { username, passwordHash } })
+      const resolvedCourseIds = await resolveCourseIds(tx, parsedCourseIds, parsedCustomCourses, parsedSchoolId)
+      if (resolvedCourseIds.length > 0) {
+        await tx.enrollment.createMany({
+          data: resolvedCourseIds.map((courseId) => ({ userId: createdUser.id, courseId })),
           skipDuplicates: true
         })
       }
-    }
-
-    // Create JWT token
-    const token = jwt.sign(
-      { userId: user.id, username: user.username, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: '24h' }
-    )
-
-    res.status(201).json({
-      message: 'Account created!',
-      token,
-      user: { id: user.id, username: user.username, role: user.role }
+      return createdUser
     })
 
-  } catch (err) {
-    console.error(err)
-    res.status(500).json({ error: 'Server error. Please try again.' })
+    const token = createToken(user, jwtSecret)
+    return res.status(201).json({
+      message: 'Account created!',
+      token,
+      user: { id: user.id, username: user.username, role: user.role, email: null, emailVerified: false }
+    })
+  } catch (error) {
+    return sendError(req, res, error)
   }
 })
 
 // ── LOGIN ─────────────────────────────────────────────────────
-router.post('/login', async (req, res) => {
-  const { username, password } = req.body
+router.post('/login', loginLimiter, async (req, res) => {
+  const body = req.body || {}
+  const username = typeof body.username === 'string' ? body.username.trim() : ''
+  const password = typeof body.password === 'string' ? body.password : ''
 
-  if (!username || !password) {
-    return res.status(400).json({ error: 'Please fill in both fields.' })
+  if (!username || !password) return res.status(400).json({ error: 'Please fill in both fields.' })
+
+  try {
+    const jwtSecret = getJwtSecret()
+
+    const user = await prisma.user.findUnique({ where: { username } })
+
+    if (!user) {
+      return res.status(401).json({ error: 'Incorrect username or password.', showForgot: false })
+    }
+
+    // Check account lockout
+    if (user.lockedUntil && user.lockedUntil > new Date()) {
+      const minutesLeft = Math.ceil((user.lockedUntil - new Date()) / 60000)
+      return res.status(429).json({
+        error: `Account locked due to too many failed attempts. Try again in ${minutesLeft} minute${minutesLeft !== 1 ? 's' : ''}.`,
+        locked: true,
+        minutesLeft,
+        showForgot: true,
+      })
+    }
+
+    const isValidPassword = await bcrypt.compare(password, user.passwordHash)
+
+    if (!isValidPassword) {
+      const newFailedAttempts = user.failedAttempts + 1
+      const shouldLock = newFailedAttempts >= 5
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          failedAttempts: newFailedAttempts,
+          lockedUntil: shouldLock ? new Date(Date.now() + 15 * 60 * 1000) : null,
+        }
+      })
+
+      if (shouldLock) {
+        return res.status(429).json({
+          error: 'Too many failed attempts. Account locked for 15 minutes.',
+          locked: true,
+          minutesLeft: 15,
+          showForgot: true,
+        })
+      }
+
+      const attemptsLeft = 5 - newFailedAttempts
+      return res.status(401).json({
+        error: `Incorrect username or password. ${attemptsLeft} attempt${attemptsLeft !== 1 ? 's' : ''} remaining.`,
+        showForgot: newFailedAttempts >= 1,
+      })
+    }
+
+    // Successful login — reset lockout counters
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { failedAttempts: 0, lockedUntil: null }
+    })
+
+    // 2FA check — if enabled and email present, send OTP
+    if (user.twoFaEnabled && user.email) {
+      const code = String(Math.floor(100000 + Math.random() * 900000))
+      const expiry = new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { twoFaCode: code, twoFaExpiry: expiry }
+      })
+      try {
+        await sendTwoFaCode(user.email, user.username, code)
+      } catch (emailErr) {
+        console.error('2FA email failed:', emailErr.message)
+      }
+      return res.json({ requires2fa: true, username: user.username })
+    }
+
+    const token = createToken(user, jwtSecret)
+    return res.json({
+      message: 'Login successful!',
+      token,
+      user: {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        email: user.email,
+        emailVerified: user.emailVerified,
+        twoFaEnabled: user.twoFaEnabled,
+      }
+    })
+  } catch (error) {
+    return sendError(req, res, error)
+  }
+})
+
+// ── FORGOT PASSWORD ───────────────────────────────────────────
+router.post('/forgot-password', forgotLimiter, async (req, res) => {
+  const body = req.body || {}
+  const username = typeof body.username === 'string' ? body.username.trim() : ''
+
+  // Always return 200 — don't reveal if username exists
+  if (!username) return res.json({ message: 'If we have an email on file for that account, a reset link has been sent.' })
+
+  try {
+    const user = await prisma.user.findUnique({ where: { username } })
+
+    if (user && user.email) {
+      const token = crypto.randomBytes(32).toString('hex')
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000) // 1 hour
+
+      await prisma.passwordResetToken.upsert({
+        where: { userId: user.id },
+        create: { userId: user.id, token, expiresAt },
+        update: { token, expiresAt },
+      })
+
+      const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${token}`
+      await sendPasswordReset(user.email, user.username, resetUrl)
+    }
+
+    return res.json({ message: 'If we have an email on file for that account, a reset link has been sent.' })
+  } catch (error) {
+    captureError(error, { route: req.originalUrl, method: req.method })
+    console.error(error)
+    // Still return 200 — don't leak error details
+    return res.json({ message: 'If we have an email on file for that account, a reset link has been sent.' })
+  }
+})
+
+// ── RESET PASSWORD ────────────────────────────────────────────
+router.post('/reset-password', forgotLimiter, async (req, res) => {
+  const body = req.body || {}
+  const token = typeof body.token === 'string' ? body.token.trim() : ''
+  const newPassword = typeof body.newPassword === 'string' ? body.newPassword : ''
+
+  if (!token || !newPassword) return res.status(400).json({ error: 'Token and new password are required.' })
+  if (newPassword.length < PASSWORD_MIN_LENGTH) {
+    return res.status(400).json({ error: `Password must be at least ${PASSWORD_MIN_LENGTH} characters.` })
   }
 
   try {
-    // Find user
-    const user = await prisma.user.findUnique({ where: { username } })
-    if (!user) {
-      return res.status(401).json({ error: 'Incorrect username or password.' })
-    }
-
-    // Check password
-    const valid = await bcrypt.compare(password, user.passwordHash)
-    if (!valid) {
-      return res.status(401).json({ error: 'Incorrect username or password.' })
-    }
-
-    // Create JWT token
-    const token = jwt.sign(
-      { userId: user.id, username: user.username, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: '24h' }
-    )
-
-    res.json({
-      message: 'Login successful!',
-      token,
-      user: { id: user.id, username: user.username, role: user.role }
+    const resetToken = await prisma.passwordResetToken.findUnique({
+      where: { token },
+      include: { user: true }
     })
 
-  } catch (err) {
-    console.error(err)
-    res.status(500).json({ error: 'Server error. Please try again.' })
+    if (!resetToken || resetToken.expiresAt < new Date()) {
+      return res.status(400).json({ error: 'Reset link is invalid or has expired. Please request a new one.' })
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12)
+    await prisma.user.update({ where: { id: resetToken.userId }, data: { passwordHash, failedAttempts: 0, lockedUntil: null } })
+    await prisma.passwordResetToken.delete({ where: { token } })
+
+    return res.json({ message: 'Password updated successfully.' })
+  } catch (error) {
+    return sendError(req, res, error)
+  }
+})
+
+// ── VERIFY 2FA CODE ───────────────────────────────────────────
+router.post('/verify-2fa', loginLimiter, async (req, res) => {
+  const body = req.body || {}
+  const username = typeof body.username === 'string' ? body.username.trim() : ''
+  const code     = typeof body.code === 'string' ? body.code.trim() : ''
+
+  if (!username || !code) return res.status(400).json({ error: 'Username and code are required.' })
+
+  try {
+    const jwtSecret = getJwtSecret()
+    const user = await prisma.user.findUnique({ where: { username } })
+    if (!user || !user.twoFaCode) return res.status(400).json({ error: 'Invalid or expired code.' })
+
+    if (user.twoFaExpiry && user.twoFaExpiry < new Date()) {
+      await prisma.user.update({ where: { id: user.id }, data: { twoFaCode: null, twoFaExpiry: null } })
+      return res.status(400).json({ error: 'Code has expired. Please sign in again.' })
+    }
+
+    if (user.twoFaCode !== code) return res.status(400).json({ error: 'Incorrect code.' })
+
+    // Clear the one-time code
+    await prisma.user.update({ where: { id: user.id }, data: { twoFaCode: null, twoFaExpiry: null } })
+
+    const token = createToken(user, jwtSecret)
+    return res.json({
+      message: 'Login successful!',
+      token,
+      user: {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        email: user.email,
+        emailVerified: user.emailVerified,
+        twoFaEnabled: user.twoFaEnabled,
+      }
+    })
+  } catch (error) {
+    return sendError(req, res, error)
+  }
+})
+
+const requireAuth = require('../middleware/auth')
+
+// ── GET CURRENT USER ──────────────────────────────────────────
+router.get('/me', requireAuth, async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: {
+        id: true,
+        username: true,
+        role: true,
+        email: true,
+        emailVerified: true,
+        twoFaEnabled: true,
+        createdAt: true,
+        enrollments: {
+          include: { course: { include: { school: true } } }
+        }
+      }
+    })
+    return res.json(user)
+  } catch (error) {
+    captureError(error, { route: req.originalUrl, method: req.method })
+    return res.status(500).json({ error: 'Server error.' })
   }
 })
 

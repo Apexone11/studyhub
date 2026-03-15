@@ -1,96 +1,151 @@
-# Contributing to StudyHub 📚
+# Contributing to StudyHub
 
-Thank you for wanting to help! StudyHub is built by students, for students.
-Every contribution — big or small — makes a difference.
-
----
-
-## What You Can Contribute
-- 📄 Study sheets and guides
-- ✅ Practice test questions
-- 🐛 Bug fixes
-- 💡 Feature suggestions
-- 📝 Improving documentation
+Thank you for your interest in contributing. StudyHub is built for students by students, and every contribution — whether it's a study sheet, a bug report, or a code improvement — helps make it better for everyone.
 
 ---
 
-## Ground Rules
-- Be respectful to every contributor — we are all learning
-- No plagiarized content — only submit your own original work
-- Keep study materials academic and appropriate
-- Do not submit anything unrelated to the course or CS topics
-- Test your changes before submitting them
+## Ways to Contribute
+
+| Type | How |
+|------|-----|
+| Upload a study sheet | Directly through the website — no GitHub required |
+| Report a bug | Open a GitHub Issue |
+| Suggest a feature | Open a GitHub Issue with the `enhancement` label |
+| Fix a bug or add a feature | Fork the repo and open a Pull Request |
+| Improve documentation | Fork the repo and open a Pull Request |
 
 ---
 
-## How to Contribute (Step by Step)
+## Uploading Study Sheets (No GitHub Needed)
+
+StudyHub has a built-in upload system. You do not need to touch GitHub to share study materials.
+
+1. **Create an account** at the StudyHub site and log in
+2. **Click "Upload Sheet"** from the Study Sheets page or the navigation bar
+3. **Fill in the form** — title, course, and your content in Markdown format
+4. **Publish** — your sheet is immediately visible to other students
+
+### Content Guidelines
+
+- Write in your own words — do not copy-paste from textbooks or other sources
+- Organize content with headings (`#`, `##`, `###`) so the table of contents generates correctly
+- Include at least one example, diagram description, or worked problem
+- Keep content relevant to the course and academically appropriate
+- You are credited as the author on every sheet you upload
+
+### Supported Markdown
+
+Sheets are rendered with a built-in Markdown parser. The following syntax is supported:
+
+```
+# Heading 1      ## Heading 2     ### Heading 3
+**bold**         *italic*         ***bold italic***
+`inline code`    ~~strikethrough~~
+[Link text](url)
+
+- Unordered list item
+  - Nested item
+1. Ordered list item
+
+> Blockquote
+
+| Column A | Column B |
+|----------|----------|
+| Value    | Value    |
+
+---  (horizontal rule)
+
+```
+Fenced code block (copy button included)
+```
+```
+
+---
+
+## Code Contributions
+
+For bug fixes, new features, or other code changes, use the standard GitHub workflow.
 
 ### 1. Fork the Repository
-Click the **Fork** button at the top right of this page.
-This creates your own copy of StudyHub under your GitHub account.
+
+Click **Fork** in the top right of the repository page to create your own copy.
 
 ### 2. Clone Your Fork
+
 ```bash
 git clone https://github.com/YOUR-USERNAME/studyhub.git
 cd studyhub
 ```
 
 ### 3. Create a Branch
-Always create a new branch for your work — never edit the main branch directly.
+
 ```bash
-git checkout -b your-branch-name
+git checkout -b fix/short-description
 ```
 
-**Branch naming rules:**
-- Adding a study sheet → `add-topic-name` (example: `add-binary-numbers`)
-- Fixing a bug → `fix-description` (example: `fix-login-error`)
-- New feature → `feature-description` (example: `feature-dark-mode`)
+Branch naming:
+- Bug fix → `fix/description` (e.g., `fix/login-redirect`)
+- New feature → `feat/description` (e.g., `feat/dark-mode`)
+- Documentation → `docs/description`
 
-### 4. Make Your Changes
-- Study sheets go in the `study-materials/` folder
-- Follow the HTML template provided in `study-materials/TEMPLATE.html`
-- Keep file names lowercase with hyphens: `two-complement.html`
+### 4. Set Up Locally
 
-### 5. Commit Your Changes
-Write clear commit messages that explain what you did:
+```bash
+# Install dependencies
+npm --prefix backend install
+npm --prefix frontend/studyhub-app install
+
+# Create backend/.env with:
+#   PORT=4000
+#   JWT_SECRET=your_secret_here
+#   DATABASE_URL=postgresql://...
+
+# Run migrations
+cd backend && npx prisma migrate dev
+
+# Start backend (port 4000)
+npm --prefix backend run dev
+
+# Start frontend (port 5173)
+npm --prefix frontend/studyhub-app run dev
+```
+
+### 5. Commit and Push
+
+Write clear, descriptive commit messages:
+
 ```bash
 git add .
-git commit -m "Add Two's Complement study sheet"
-git push origin your-branch-name
+git commit -m "fix: redirect to /feed after login"
+git push origin fix/your-branch
 ```
 
-**Good commit messages:**
-- ✅ `Add binary numbers study sheet`
-- ✅ `Fix typo on homepage announcement`
-- ❌ `updated stuff`
-- ❌ `fix`
+Good commit messages:
+- `feat: add dark mode toggle`
+- `fix: correct star count after optimistic update`
+- `docs: update local dev setup instructions`
+
+Avoid: `updated stuff`, `fix`, `changes`
 
 ### 6. Open a Pull Request
+
 - Go to the original StudyHub repo on GitHub
-- Click **Pull Requests** → **New Pull Request**
-- Select your branch
-- Fill out the PR template completely
-- Submit and wait for review
+- Click **Pull Requests → New Pull Request**
+- Select your branch and fill out the PR template
+- A maintainer will review and may request changes — this is part of the process
 
 ---
 
-## Study Sheet Guidelines
-If you are submitting a study sheet, make sure it includes:
-- [ ] A clear title and topic
-- [ ] Your name as the author (optional but appreciated)
-- [ ] Organized sections with headings
-- [ ] At least one example or diagram
-- [ ] No copy-paste from textbooks — explain it in your own words
+## Code Standards
+
+- Keep changes focused — one thing per PR
+- Test your change manually before opening a PR
+- Do not commit `.env` files, credentials, or secrets
+- Follow the existing inline-style pattern for React components (no Tailwind, no CSS modules)
+- Backend routes use Express + Prisma — follow the existing handler structure in `backend/src/routes/`
 
 ---
 
-## Pull Request Review Process
-1. A maintainer will review your PR within a few days
-2. They may request changes — this is normal, not a rejection
-3. Once approved it gets merged into the main branch
-4. Your contribution will be live for all students 🎉
+## Questions
 
----
-
-## Questions?
-Open a **GitHub Issue** with the label `question` and we will get back to you.
+Open a GitHub Issue with the `question` label and we will respond.

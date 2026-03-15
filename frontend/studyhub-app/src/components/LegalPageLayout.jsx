@@ -1,0 +1,90 @@
+import { Link } from 'react-router-dom'
+import Navbar from './Navbar'
+
+const RELATED_LINKS = [
+  { label: 'Terms of Use', to: '/terms' },
+  { label: 'Privacy Policy', to: '/privacy' },
+  { label: 'Community Guidelines', to: '/guidelines' },
+]
+
+export function LegalSection({ title, children }) {
+  return (
+    <section className="legal-section">
+      <h2 className="legal-section-title">{title}</h2>
+      <div className="legal-section-body">{children}</div>
+    </section>
+  )
+}
+
+export default function LegalPageLayout({
+  tone = 'blue',
+  title,
+  updated,
+  summary,
+  intro,
+  icon,
+  asideTitle = 'Related Pages',
+  asideNote = 'Questions or concerns can always be raised through the StudyHub GitHub repository.',
+  children,
+}) {
+  return (
+    <div className="legal-page">
+      <Navbar variant="landing" hideSearch />
+
+      <main className="legal-shell">
+        <section className={`legal-hero legal-hero--${tone}`}>
+          <div className="legal-hero-head">
+            <div className={`legal-hero-icon-shell legal-hero-icon-shell--${tone}`} aria-hidden="true">
+              {icon}
+            </div>
+            <div className="legal-hero-copy">
+              <div className="legal-updated">{updated}</div>
+              <h1 className="legal-title">{title}</h1>
+              <p className="legal-subtitle">{summary}</p>
+            </div>
+          </div>
+
+          <div className={`legal-intro legal-intro--${tone}`}>
+            {intro}
+          </div>
+        </section>
+
+        <div className="legal-grid">
+          <article className="legal-article">{children}</article>
+
+          <aside className="legal-sidebar">
+            <div className="legal-sidecard">
+              <div className="legal-sidecard-kicker">{asideTitle}</div>
+              <div className="legal-sidecard-links">
+                {RELATED_LINKS.map((link) => (
+                  <Link key={link.to} to={link.to} className="legal-side-link">
+                    {link.label}
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            <div className="legal-sidecard">
+              <div className="legal-sidecard-kicker">Open Source</div>
+              <p className="legal-sidecard-copy">{asideNote}</p>
+              <a
+                href="https://github.com/Apexone11/studyhub"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="legal-side-link"
+              >
+                View the repository
+              </a>
+            </div>
+          </aside>
+        </div>
+      </main>
+
+      <footer className="legal-footer">
+        <span className="legal-footer-brand">StudyHub</span>
+        <span className="legal-footer-divider">·</span>
+        <span>Built by students, for students</span>
+      </footer>
+    </div>
+  )
+}
