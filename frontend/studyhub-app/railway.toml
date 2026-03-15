@@ -4,7 +4,7 @@ builder = "nixpacks"
 buildCommand = "npm install && npm run build"
 
 [deploy]
-startCommand = "npx serve dist -s -p 3000"
+startCommand = "npm start"
 
 [[services]]
 name = "studyhub-app"
