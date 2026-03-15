@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import { API } from '../config'
+import { getStoredUser, hasStoredSession } from '../lib/session'
 
-const getToken = () => localStorage.getItem('token')
 const authHeaders = () => ({
   'Content-Type': 'application/json',
-  ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
 })
 
 export default function UserProfilePage() {
@@ -19,7 +18,7 @@ export default function UserProfilePage() {
   const [followers, setFollowers] = useState(0)
   const [toggling,  setToggling]  = useState(false)
 
-  const currentUser = (() => { try { return JSON.parse(localStorage.getItem('user') || 'null') } catch { return null } })()
+  const currentUser = getStoredUser()
   const isOwnProfile = currentUser?.username === username
 
   useEffect(() => {
@@ -36,7 +35,7 @@ export default function UserProfilePage() {
   }, [username])
 
   async function handleFollowToggle() {
-    if (!getToken()) { navigate('/login'); return }
+    if (!hasStoredSession()) { navigate('/login'); return }
     setToggling(true)
     try {
       const method = following ? 'DELETE' : 'POST'

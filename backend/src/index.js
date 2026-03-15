@@ -40,6 +40,10 @@ const allowedOrigins = isProd
   ? [process.env.FRONTEND_URL].filter(Boolean)
   : ['http://localhost:5173', 'http://localhost:4173']
 
+if (isProd) {
+  app.set('trust proxy', 1)
+}
+
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true)
@@ -53,7 +57,12 @@ app.use(cors({
 app.use(express.json())
 
 // Serve uploaded files (avatars, attachments) as static assets.
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')))
+app.use('/uploads', express.static(path.join(__dirname, '../uploads'), {
+  index: false,
+  setHeaders: (res) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff')
+  },
+}))
 
 // Mount authentication endpoints under /api/auth.
 app.use('/api/auth', authRoutes)

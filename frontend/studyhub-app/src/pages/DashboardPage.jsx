@@ -18,13 +18,12 @@ import {
   LogoMark,
 } from '../components/Icons'
 import { pageColumns, pageShell } from '../lib/ui'
+import { clearStoredSession, getStoredUser, hasStoredSession, logoutSession, setStoredUser } from '../lib/session'
 
 import { API } from '../config'
 
-const getToken = () => localStorage.getItem('token')
 const authHeaders = () => ({
   'Content-Type': 'application/json',
-  ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
 })
 
 function Avatar({ name, size = 36, role }) {
@@ -69,17 +68,6 @@ const QUICK_ACTIONS = [
   { icon: IconSettings, label: 'Settings', to: '/settings', color: '#64748b', bg: '#f8fafc' },
 ]
 
-function getStoredUser() {
-  const rawUser = localStorage.getItem('user')
-  if (!rawUser) return null
-  try {
-    return JSON.parse(rawUser)
-  } catch {
-    localStorage.removeItem('user')
-    return null
-  }
-}
-
 export default function DashboardPage() {
   const [user, setUser] = useState(() => getStoredUser())
   const [loading, setLoading] = useState(true)
@@ -115,13 +103,12 @@ export default function DashboardPage() {
     try {
       const res = await fetch(`${API}/api/upload/avatar`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${getToken()}` },
         body: formData,
       })
       const data = await res.json()
       if (!res.ok) { setAvatarError(data.error || 'Upload failed.'); return }
       setUser(prev => ({ ...prev, avatarUrl: data.avatarUrl }))
-      localStorage.setItem('user', JSON.stringify({ ...user, avatarUrl: data.avatarUrl }))
+      setStoredUser({ ...user, avatarUrl: data.avatarUrl })
     } catch {
       setAvatarError('Could not connect to server.')
     } finally {
@@ -131,8 +118,7 @@ export default function DashboardPage() {
   }
 
   useEffect(() => {
-    const token = getToken()
-    if (!token) {
+    if (!hasStoredSession()) {
       navigate('/login')
       return undefined
     }
@@ -143,15 +129,14 @@ export default function DashboardPage() {
       try {
         const meResponse = await fetch(`${API}/api/auth/me`, { headers: authHeaders() })
         if (!meResponse.ok) {
-          localStorage.removeItem('token')
-          localStorage.removeItem('user')
+          clearStoredSession()
           navigate('/login')
           return
         }
         const meData = await meResponse.json()
         if (!isMounted) return
         setUser(meData)
-        localStorage.setItem('user', JSON.stringify(meData))
+        setStoredUser(meData)
 
         const [sheetsResponse, mineResponse] = await Promise.all([
           fetch(`${API}/api/sheets?limit=10`, { headers: authHeaders() }),
@@ -177,9 +162,8 @@ export default function DashboardPage() {
     return () => { isMounted = false }
   }, [navigate])
 
-  function handleLogout() {
-    localStorage.removeItem('token')
-    localStorage.removeItem('user')
+  async function handleLogout() {
+    await logoutSession()
     navigate('/')
   }
 

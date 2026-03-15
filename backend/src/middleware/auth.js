@@ -1,15 +1,14 @@
-const jwt = require('jsonwebtoken')
+const { getAuthTokenFromRequest, verifyAuthToken } = require('../lib/authTokens')
 
 function requireAuth(req, res, next) {
-  const authHeader = req.headers['authorization']
-  const token = authHeader && authHeader.split(' ')[1] // "Bearer <token>"
+  const token = getAuthTokenFromRequest(req)
 
   if (!token) {
     return res.status(401).json({ error: 'Login required.' })
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET)
+    const decoded = verifyAuthToken(token)
     req.user = decoded // { userId, username, role }
     next()
   } catch (err) {

@@ -9,15 +9,14 @@ import {
   IconSearch, IconStar, IconStarFilled, IconFork,
   IconDownload, IconUpload,
 } from '../components/Icons'
-import { pageColumns, pageShell } from '../lib/ui'
+import { pageShell } from '../lib/ui'
+import { hasStoredSession } from '../lib/session'
 
 import { API } from '../config'
 const LIMIT  = 10
 const FONT   = "'Plus Jakarta Sans', system-ui, sans-serif"
-const getToken    = () => localStorage.getItem('token')
 const authHeaders = () => ({
   'Content-Type': 'application/json',
-  ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
 })
 
 // course prefix → accent color
@@ -209,13 +208,7 @@ export default function SheetsPage() {
 
   // 'all' | 'mine' | 'starred'  — stays in sync with URL params
   const viewFromUrl = sp.get('mine') === '1' ? 'mine' : sp.get('starred') === '1' ? 'starred' : 'all'
-  const [view,    setView]    = useState(viewFromUrl)
-
-  // Sync view when URL params change (e.g. Navbar tab clicks)
-  useEffect(() => {
-    const v = sp.get('mine') === '1' ? 'mine' : sp.get('starred') === '1' ? 'starred' : 'all'
-    setView(v)
-  }, [sp])
+  const view = viewFromUrl
   const [filters, setFilters] = useState({
     search:   sp.get('q')        || '',
     schoolId: sp.get('schoolId') || null,
@@ -278,10 +271,18 @@ export default function SheetsPage() {
   },[filters,view,setSp])
 
   const update=(patch)=>{ setFilters(f=>({...f,...patch})); setPage(1) }
-  const switchView=(v)=>{ setView(v); setPage(1) }
+  const switchView=(v)=>{
+    const next = new URLSearchParams(sp)
+    next.delete('mine')
+    next.delete('starred')
+    if (v === 'mine') next.set('mine', '1')
+    if (v === 'starred') next.set('starred', '1')
+    setSp(next, { replace: true })
+    setPage(1)
+  }
 
   const handleStar=async(id)=>{
-    if(!getToken()){ navigate('/login'); return }
+    if(!hasStoredSession()){ navigate('/login'); return }
     const original = sheets.find(s=>s.id===id)
     setSheets(list=>list.map(s=>s.id===id
       ? { ...s, starred:!s.starred, stars:(s.stars||0)+(s.starred?-1:1) }

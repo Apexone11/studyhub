@@ -16,6 +16,7 @@ import {
   IconChevronDown,
 } from './Icons'
 import { pageWidths } from '../lib/ui'
+import { getStoredUser } from '../lib/session'
 import { API } from '../config'
 
 // ─── NAV CONFIG ───────────────────────────────────────────────────
@@ -45,6 +46,16 @@ const ROUTE_CONFIG = {
   '/submit':        { crumbs: [{ label: 'Submit Request',  to: '/submit' }],         backTo: '/feed' },
   '/admin':         { crumbs: [{ label: 'Admin',           to: '/admin' }],          backTo: '/feed' },
   '/dashboard':     { crumbs: [{ label: 'Profile',         to: '/dashboard' }],      backTo: '/feed' },
+}
+
+function formatRelativeTime(iso, nowMs) {
+  const diff = nowMs - new Date(iso).getTime()
+  const m = Math.floor(diff / 60000)
+  if (m < 1) return 'just now'
+  if (m < 60) return `${m}m ago`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h}h ago`
+  return `${Math.floor(h / 24)}d ago`
 }
 
 function getConfig(pathname) {
@@ -199,9 +210,7 @@ export default function Navbar({
   const shellWidth = isLanding ? pageWidths.landing : pageWidths.app
 
   // user info from localStorage (set on login)
-  const user = (() => {
-    try { return JSON.parse(localStorage.getItem('user') || 'null') } catch { return null }
-  })()
+  const user = getStoredUser()
   const initials = user?.username?.slice(0, 2).toUpperCase() || '??'
 
   // notification bell state
@@ -212,15 +221,17 @@ export default function Navbar({
 
   useEffect(() => {
     if (!user) return
-    const token = localStorage.getItem('token')
-    if (!token) return
     fetch(`${API}/api/notifications?limit=15`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { 'Content-Type': 'application/json' },
     })
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (!data) return
-        setNotifications(data.notifications || [])
+        const nowMs = Date.now()
+        setNotifications((data.notifications || []).map(notif => ({
+          ...notif,
+          timeAgoLabel: formatRelativeTime(notif.createdAt, nowMs),
+        })))
         setUnreadCount(data.unreadCount || 0)
       })
       .catch(() => {})
@@ -237,22 +248,20 @@ export default function Navbar({
   }, [showBell])
 
   async function markAllRead() {
-    const token = localStorage.getItem('token')
-    if (!token) return
+    if (!user) return
     await fetch(`${API}/api/notifications/read-all`, {
       method: 'PATCH',
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { 'Content-Type': 'application/json' },
     }).catch(() => {})
     setNotifications(prev => prev.map(n => ({ ...n, read: true })))
     setUnreadCount(0)
   }
 
   async function markOneRead(notif) {
-    const token = localStorage.getItem('token')
-    if (!notif.read && token) {
+    if (!notif.read && user) {
       fetch(`${API}/api/notifications/${notif.id}/read`, {
         method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' },
       }).catch(() => {})
       setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n))
       setUnreadCount(c => Math.max(0, c - 1))
@@ -262,15 +271,6 @@ export default function Navbar({
     else if (notif.actor?.username) navigate(`/users/${notif.actor.username}`)
   }
 
-  function timeAgo(iso) {
-    const diff = Date.now() - new Date(iso).getTime()
-    const m = Math.floor(diff / 60000)
-    if (m < 1) return 'just now'
-    if (m < 60) return `${m}m ago`
-    const h = Math.floor(m / 60)
-    if (h < 24) return `${h}h ago`
-    return `${Math.floor(h / 24)}d ago`
-  }
   const rowStyle = {
     ...S.topRow,
     height: isLanding ? 'clamp(68px, 7vw, 90px)' : 'clamp(60px, 5vw, 74px)',
@@ -476,7 +476,7 @@ export default function Navbar({
                         <div style={{ fontSize: 13, color: '#334155', lineHeight: 1.4, marginBottom: 4 }}>
                           <strong>{notif.actor?.username || 'Someone'}</strong> {notif.message}
                         </div>
-                        <div style={{ fontSize: 11, color: '#94a3b8' }}>{timeAgo(notif.createdAt)}</div>
+                        <div style={{ fontSize: 11, color: '#94a3b8' }}>{notif.timeAgoLabel || 'just now'}</div>
                       </div>
                     ))
                   }

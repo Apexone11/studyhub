@@ -6,7 +6,8 @@
 	"scripts": {
 		"dev": "nodemon src/index.js",
 		"start": "node src/index.js",
-		"seed": "node prisma/seed.js"
+		"seed": "node prisma/seed.js",
+		"seed:admin": "node scripts/seedAdmin.js"
 	},
 	"dependencies": {
 		"@prisma/client": "^6.19.2",

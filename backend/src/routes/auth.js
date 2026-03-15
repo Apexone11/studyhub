@@ -1,18 +1,17 @@
 const express = require('express')
 const bcrypt = require('bcryptjs')
-const jwt = require('jsonwebtoken')
 const crypto = require('crypto')
 const rateLimit = require('express-rate-limit')
 const { PrismaClient } = require('@prisma/client')
 const { captureError } = require('../monitoring/sentry')
 const { sendPasswordReset, sendTwoFaCode } = require('../lib/email')
+const { clearAuthCookie, hashStoredSecret, setAuthCookie, signAuthToken } = require('../lib/authTokens')
 
 const router = express.Router()
 const prisma = new PrismaClient()
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,20}$/
 const PASSWORD_MIN_LENGTH = 8
-const TOKEN_EXPIRES_IN = '24h'
 const COURSE_CODE_REGEX = /^[A-Z0-9-]{2,20}$/
 
 // ── Rate limiters ──────────────────────────────────────────────
@@ -45,21 +44,6 @@ class AppError extends Error {
     super(message)
     this.statusCode = statusCode
   }
-}
-
-function getJwtSecret() {
-  if (!process.env.JWT_SECRET) {
-    throw new Error('JWT_SECRET is not configured.')
-  }
-  return process.env.JWT_SECRET
-}
-
-function createToken(user, jwtSecret) {
-  return jwt.sign(
-    { userId: user.id, username: user.username, role: user.role },
-    jwtSecret,
-    { expiresIn: TOKEN_EXPIRES_IN }
-  )
 }
 
 function parseOptionalInteger(value, fieldName) {
@@ -163,7 +147,6 @@ router.post('/register', registerLimiter, async (req, res) => {
   }
 
   try {
-    const jwtSecret = getJwtSecret()
     const parsedSchoolId = parseOptionalInteger(schoolId, 'schoolId')
     const parsedCourseIds = parseCourseIds(courseIds)
     const parsedCustomCourses = parseCustomCourses(customCourses)
@@ -190,10 +173,10 @@ router.post('/register', registerLimiter, async (req, res) => {
       return createdUser
     })
 
-    const token = createToken(user, jwtSecret)
+    const token = signAuthToken(user)
+    setAuthCookie(res, token)
     return res.status(201).json({
       message: 'Account created!',
-      token,
       user: { id: user.id, username: user.username, role: user.role, email: null, emailVerified: false }
     })
   } catch (error) {
@@ -210,8 +193,6 @@ router.post('/login', loginLimiter, async (req, res) => {
   if (!username || !password) return res.status(400).json({ error: 'Please fill in both fields.' })
 
   try {
-    const jwtSecret = getJwtSecret()
-
     const user = await prisma.user.findUnique({ where: { username } })
 
     if (!user) {
@@ -270,7 +251,7 @@ router.post('/login', loginLimiter, async (req, res) => {
       const expiry = new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
       await prisma.user.update({
         where: { id: user.id },
-        data: { twoFaCode: code, twoFaExpiry: expiry }
+        data: { twoFaCode: hashStoredSecret(code), twoFaExpiry: expiry }
       })
       try {
         await sendTwoFaCode(user.email, user.username, code)
@@ -280,10 +261,10 @@ router.post('/login', loginLimiter, async (req, res) => {
       return res.json({ requires2fa: true, username: user.username })
     }
 
-    const token = createToken(user, jwtSecret)
+    const token = signAuthToken(user)
+    setAuthCookie(res, token)
     return res.json({
       message: 'Login successful!',
-      token,
       user: {
         id: user.id,
         username: user.username,
@@ -311,12 +292,13 @@ router.post('/forgot-password', forgotLimiter, async (req, res) => {
 
     if (user && user.email) {
       const token = crypto.randomBytes(32).toString('hex')
+      const tokenHash = hashStoredSecret(token)
       const expiresAt = new Date(Date.now() + 60 * 60 * 1000) // 1 hour
 
       await prisma.passwordResetToken.upsert({
         where: { userId: user.id },
-        create: { userId: user.id, token, expiresAt },
-        update: { token, expiresAt },
+        create: { userId: user.id, token: tokenHash, expiresAt },
+        update: { token: tokenHash, expiresAt },
       })
 
       const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${token}`
@@ -344,8 +326,9 @@ router.post('/reset-password', forgotLimiter, async (req, res) => {
   }
 
   try {
+    const tokenHash = hashStoredSecret(token)
     const resetToken = await prisma.passwordResetToken.findUnique({
-      where: { token },
+      where: { token: tokenHash },
       include: { user: true }
     })
 
@@ -355,7 +338,7 @@ router.post('/reset-password', forgotLimiter, async (req, res) => {
 
     const passwordHash = await bcrypt.hash(newPassword, 12)
     await prisma.user.update({ where: { id: resetToken.userId }, data: { passwordHash, failedAttempts: 0, lockedUntil: null } })
-    await prisma.passwordResetToken.delete({ where: { token } })
+    await prisma.passwordResetToken.delete({ where: { token: tokenHash } })
 
     return res.json({ message: 'Password updated successfully.' })
   } catch (error) {
@@ -372,7 +355,6 @@ router.post('/verify-2fa', loginLimiter, async (req, res) => {
   if (!username || !code) return res.status(400).json({ error: 'Username and code are required.' })
 
   try {
-    const jwtSecret = getJwtSecret()
     const user = await prisma.user.findUnique({ where: { username } })
     if (!user || !user.twoFaCode) return res.status(400).json({ error: 'Invalid or expired code.' })
 
@@ -381,15 +363,15 @@ router.post('/verify-2fa', loginLimiter, async (req, res) => {
       return res.status(400).json({ error: 'Code has expired. Please sign in again.' })
     }
 
-    if (user.twoFaCode !== code) return res.status(400).json({ error: 'Incorrect code.' })
+    if (user.twoFaCode !== hashStoredSecret(code)) return res.status(400).json({ error: 'Incorrect code.' })
 
     // Clear the one-time code
     await prisma.user.update({ where: { id: user.id }, data: { twoFaCode: null, twoFaExpiry: null } })
 
-    const token = createToken(user, jwtSecret)
+    const token = signAuthToken(user)
+    setAuthCookie(res, token)
     return res.json({
       message: 'Login successful!',
-      token,
       user: {
         id: user.id,
         username: user.username,
@@ -405,6 +387,11 @@ router.post('/verify-2fa', loginLimiter, async (req, res) => {
 })
 
 const requireAuth = require('../middleware/auth')
+
+router.post('/logout', (req, res) => {
+  clearAuthCookie(res)
+  return res.json({ message: 'Logged out.' })
+})
 
 // ── GET CURRENT USER ──────────────────────────────────────────
 router.get('/me', requireAuth, async (req, res) => {

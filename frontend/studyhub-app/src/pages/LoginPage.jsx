@@ -2,6 +2,7 @@ import Navbar from '../components/Navbar'
 import { Link, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import { identifyAuthenticatedUser } from '../lib/telemetry'
+import { setStoredUser } from '../lib/session'
 import { API } from '../config'
 
 function LoginPage() {
@@ -44,8 +45,7 @@ function LoginPage() {
         setRequires2fa(true)
         return
       }
-      localStorage.setItem('token', data.token)
-      localStorage.setItem('user', JSON.stringify(data.user))
+      setStoredUser(data.user)
       identifyAuthenticatedUser(data.user)
       navigate('/feed')
     } catch {
@@ -66,8 +66,7 @@ function LoginPage() {
       })
       const data = await res.json()
       if (!res.ok) { setTwoFaError(data.error || 'Verification failed.'); return }
-      localStorage.setItem('token', data.token)
-      localStorage.setItem('user', JSON.stringify(data.user))
+      setStoredUser(data.user)
       identifyAuthenticatedUser(data.user)
       navigate('/feed')
     } catch {

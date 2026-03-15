@@ -4,6 +4,7 @@ const { PrismaClient } = require('@prisma/client')
 const requireAuth = require('../middleware/auth')
 const { captureError } = require('../monitoring/sentry')
 const { createNotification } = require('../lib/notify')
+const { getAuthTokenFromRequest, verifyAuthToken } = require('../lib/authTokens')
 
 const router = express.Router()
 const prisma = new PrismaClient()
@@ -27,12 +28,10 @@ const commentLimiter = rateLimit({
 
 // Optional auth — attaches req.user if token present, but doesn't block
 function optionalAuth(req, res, next) {
-  const authHeader = req.headers['authorization']
-  const token = authHeader && authHeader.split(' ')[1]
+  const token = getAuthTokenFromRequest(req)
   if (!token) return next()
   try {
-    const jwt = require('jsonwebtoken')
-    req.user = jwt.verify(token, process.env.JWT_SECRET)
+    req.user = verifyAuthToken(token)
   } catch {
     // Invalid token — proceed as unauthenticated
   }

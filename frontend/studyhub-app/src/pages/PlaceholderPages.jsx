@@ -10,13 +10,12 @@ import Navbar from '../components/Navbar'
 import AppSidebar from '../components/AppSidebar'
 import { IconUpload, IconEye, IconPlus, IconCheck } from '../components/Icons'
 import { pageColumns, pageShell } from '../lib/ui'
+import { getStoredUser, setStoredUser } from '../lib/session'
 
 import { API } from '../config'
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
-const getToken    = () => localStorage.getItem('token')
 const authHeaders = () => ({
   'Content-Type': 'application/json',
-  ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
 })
 
 function timeAgo(d) {
@@ -207,7 +206,6 @@ export function UploadSheetPage() {
         try {
           await fetch(`${API}/api/upload/attachment/${sheet.id}`, {
             method: 'POST',
-            headers: { Authorization: `Bearer ${getToken()}` },
             body: fd,
           })
         } catch { /* attachment upload failure is non-fatal */ }
@@ -617,7 +615,7 @@ export function NotesPage() {
 // ANNOUNCEMENTS PAGE
 // ─────────────────────────────────────────────────────────────────
 export function AnnouncementsPage() {
-  const user=(() => { try { return JSON.parse(localStorage.getItem('user')||'null') } catch { return null } })()
+  const user = getStoredUser()
   const isAdmin=user?.role==='admin'
 
   const [announcements, setAnnouncements] = useState([])
@@ -729,7 +727,7 @@ export function SubmitPage() {
 
 export function AdminPage() {
   const navigate = useNavigate()
-  const currentUser = (() => { try { return JSON.parse(localStorage.getItem('user')||'null') } catch { return null } })()
+  const currentUser = getStoredUser()
 
   const [tab, setTab] = useState('overview')
   const [stats, setStats] = useState(null)
@@ -853,7 +851,7 @@ export function AdminPage() {
       })
       const data = await res.json()
       if (!res.ok) { setMsg({ type:'error', text: data.error }); return }
-      if (data.token) { localStorage.setItem('token', data.token); localStorage.setItem('user', JSON.stringify(data.user)) }
+      if (data.user) setStoredUser(data.user)
       setMsg({ type:'success', text: data.message })
     } catch { setMsg({ type:'error', text:'Server error.' }) }
     finally { setAdSaving(false) }
