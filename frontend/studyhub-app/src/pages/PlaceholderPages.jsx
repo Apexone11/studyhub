@@ -7,15 +7,15 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import DOMPurify from 'dompurify'
 import Navbar from '../components/Navbar'
+import AppSidebar from '../components/AppSidebar'
 import { IconUpload, IconEye, IconPlus, IconCheck } from '../components/Icons'
 import { pageColumns, pageShell } from '../lib/ui'
+import { getStoredUser, setStoredUser } from '../lib/session'
 
 import { API } from '../config'
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
-const getToken    = () => localStorage.getItem('token')
 const authHeaders = () => ({
   'Content-Type': 'application/json',
-  ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
 })
 
 function timeAgo(d) {
@@ -151,6 +151,7 @@ export function UploadSheetPage() {
   const [title,   setTitle]   = useState('')
   const [courseId,setCourseId]= useState('')
   const [content, setContent] = useState('# Sheet Title\n\n## Topic 1\n\nYour notes here…\n\n## Topic 2\n\n- Point one\n- Point two\n- Point three\n\n```java\n// Code example\npublic class Hello {\n  public static void main(String[] args) {\n    System.out.println("Hello!");\n  }\n}\n```\n')
+  const [description, setDescription] = useState('')
   const [courses, setCourses] = useState([])
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState('')
@@ -173,7 +174,7 @@ export function UploadSheetPage() {
     setSaved(false); clearTimeout(autoTimer.current)
     autoTimer.current=setTimeout(()=>setSaved(true),1500)
     return ()=>clearTimeout(autoTimer.current)
-  },[title,content,courseId])
+  },[title,content,courseId,description])
 
   function handleFileSelect(e) {
     const file = e.target.files?.[0]
@@ -192,7 +193,7 @@ export function UploadSheetPage() {
     try {
       const res=await fetch(`${API}/api/sheets`,{
         method:'POST',headers:authHeaders(),
-        body:JSON.stringify({title:title.trim(),courseId:parseInt(courseId),content}),
+        body:JSON.stringify({title:title.trim(),courseId:parseInt(courseId),content,description:description.trim()}),
       })
       if(!res.ok) throw new Error((await res.json()).error||'Failed to publish.')
       const sheet=await res.json()
@@ -205,7 +206,6 @@ export function UploadSheetPage() {
         try {
           await fetch(`${API}/api/upload/attachment/${sheet.id}`, {
             method: 'POST',
-            headers: { Authorization: `Bearer ${getToken()}` },
             body: fd,
           })
         } catch { /* attachment upload failure is non-fatal */ }
@@ -252,6 +252,17 @@ export function UploadSheetPage() {
             <label style={{ fontSize:10, fontWeight:700, color:'#64748b', letterSpacing:'.06em', display:'block', marginBottom:5 }}>VISIBILITY</label>
             <div style={{ padding:'8px 12px', border:'1.5px solid #e2e8f0', borderRadius:8, fontSize:13, color:'#64748b', background:'#f8fafc' }}>Public</div>
           </div>
+        </div>
+        {/* description row */}
+        <div style={{ background:'#fff', borderRadius:14, border:'1px solid #e2e8f0', padding:'14px 20px', marginBottom:12 }}>
+          <label style={{ fontSize:10, fontWeight:700, color:'#64748b', letterSpacing:'.06em', display:'block', marginBottom:5 }}>
+            DESCRIPTION <span style={{ fontSize:9, color:'#94a3b8', textTransform:'none', letterSpacing:0 }}>(optional — max 300 chars)</span>
+          </label>
+          <textarea value={description} onChange={e=>setDescription(e.target.value.slice(0,300))} rows={2} maxLength={300}
+            placeholder="Brief summary of what this sheet covers…"
+            style={{ width:'100%', padding:'8px 12px', border:'1.5px solid #e2e8f0', borderRadius:8, fontSize:13, fontFamily:FONT, outline:'none', color:'#0f172a', boxSizing:'border-box', resize:'none', lineHeight:1.6 }}
+          />
+          <div style={{ fontSize:10, color:'#94a3b8', textAlign:'right', marginTop:3 }}>{description.length}/300</div>
         </div>
 
         {/* Attachment row */}
@@ -330,15 +341,22 @@ export function UploadSheetPage() {
 // TESTS PAGE
 // ─────────────────────────────────────────────────────────────────
 export function TestsPage() {
-  const sidebar=(<SideCard sections={[
-    { label:'Browse', items:[{label:'All Tests',active:true},{label:'My Attempts',active:false},{label:'Leaderboard',active:false}]},
-    { label:'My Courses', items:[{label:'CMSC131',dot:'#8b5cf6',active:false},{label:'MATH140',dot:'#10b981',active:false},{label:'ENGL101',dot:'#f59e0b',active:false}]},
-  ]}/>)
+  const [browseTab, setBrowseTab] = useState('all')
   return (
-    <PageShell nav={<Navbar crumbs={[{label:'Practice Tests',to:'/tests'}]} hideTabs/>} sidebar={sidebar}>
+    <PageShell nav={<Navbar crumbs={[{label:'Practice Tests',to:'/tests'}]} hideTabs/>} sidebar={<AppSidebar/>}>
       <div style={{ marginBottom:14 }}>
         <h1 style={{ fontSize:20, fontWeight:800, color:'#0f172a', marginBottom:4 }}>Practice Tests</h1>
         <p style={{ fontSize:13, color:'#64748b' }}>Course-linked tests with instant scoring. Coming in V1.</p>
+        <div style={{ display:'flex', gap:6, marginTop:12 }}>
+          {[['all','All Tests'],['attempts','My Attempts'],['leaderboard','Leaderboard']].map(([id,label])=>(
+            <button key={id} onClick={()=>setBrowseTab(id)}
+              style={{ padding:'5px 14px', borderRadius:99, border:'none', fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:FONT,
+                background:browseTab===id?'#0f172a':'#fff', color:browseTab===id?'#fff':'#64748b',
+                boxShadow:browseTab===id?'none':'0 1px 3px rgba(0,0,0,0.06)' }}>
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
       <TeaserCard title="CMSC131 Final Exam Prep" sub="20 questions · Multiple choice · Based on CMSC131 Complete Study Guide"
         chips={[{label:'CMSC131',bg:'#ede9fe',color:'#5b21b6',border:'#c4b5fd'},{label:'20 questions'},{label:'~15 min'}]}/>
@@ -357,8 +375,6 @@ export function TestsPage() {
 // ─────────────────────────────────────────────────────────────────
 // NOTES PAGE — full CRUD editor
 // ─────────────────────────────────────────────────────────────────
-const COURSE_COLORS = ['#8b5cf6','#10b981','#f59e0b','#3b82f6','#ef4444','#06b6d4','#ec4899']
-
 export function NotesPage() {
   const [notes, setNotes] = useState([])
   const [activeNote, setActiveNote] = useState(null)
@@ -461,40 +477,23 @@ export function NotesPage() {
     return true
   })
 
-  const enrolledCourses = courses.slice(0, 8)
-
-  const sidebar = (
-    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-      <div style={{ background:'#fff', borderRadius:13, border:'1px solid #e2e8f0', overflow:'hidden' }}>
-        <div style={{ fontSize:9, letterSpacing:'.1em', fontWeight:600, color:'#94a3b8', padding:'12px 14px 5px', textTransform:'uppercase' }}>Filter</div>
-        {[['all','All Notes'],['private','Private'],['shared','Shared']].map(([id, label]) => (
-          <div key={id} onClick={() => { setFilterTab(id); setActiveNote(null) }}
-            style={{ display:'flex', alignItems:'center', gap:7, padding:'7px 12px', borderLeft:`2px solid ${filterTab===id?'#3b82f6':'transparent'}`, background:filterTab===id?'#eff6ff':'transparent', color:filterTab===id?'#1d4ed8':'#64748b', fontSize:12, fontWeight:filterTab===id?600:400, cursor:'pointer' }}>
-            <i className={`fas ${id==='all'?'fa-layer-group':id==='private'?'fa-lock':'fa-share-nodes'}`} style={{ fontSize:10 }}></i>
-            {label}
-          </div>
-        ))}
-      </div>
-      {enrolledCourses.length > 0 && (
-        <div style={{ background:'#fff', borderRadius:13, border:'1px solid #e2e8f0', overflow:'hidden' }}>
-          <div style={{ fontSize:9, letterSpacing:'.1em', fontWeight:600, color:'#94a3b8', padding:'12px 14px 5px', textTransform:'uppercase' }}>My Courses</div>
-          {enrolledCourses.map((c, i) => (
-            <div key={c.id} style={{ display:'flex', alignItems:'center', gap:7, padding:'7px 12px', fontSize:12, color:'#64748b' }}>
-              <span style={{ width:8, height:8, borderRadius:'50%', background:COURSE_COLORS[i%COURSE_COLORS.length], flexShrink:0 }}/>
-              {c.code}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-
   return (
-    <PageShell nav={<Navbar crumbs={[{label:'My Notes',to:'/notes'}]} hideTabs/>} sidebar={sidebar}>
-      <div style={{ marginBottom:14, display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
+    <PageShell nav={<Navbar crumbs={[{label:'My Notes',to:'/notes'}]} hideTabs/>} sidebar={<AppSidebar/>}>
+      <div style={{ marginBottom:14, display:'flex', alignItems:'flex-start', justifyContent:'space-between', flexWrap:'wrap', gap:10 }}>
         <div>
           <h1 style={{ fontSize:20, fontWeight:800, color:'#0f172a', marginBottom:4 }}>My Notes</h1>
           <p style={{ fontSize:13, color:'#64748b' }}>Markdown notes per course. Private by default.</p>
+          <div style={{ display:'flex', gap:6, marginTop:10 }}>
+            {[['all','All Notes'],['private','Private'],['shared','Shared']].map(([id,label])=>(
+              <button key={id} onClick={()=>{setFilterTab(id);setActiveNote(null)}}
+                style={{ padding:'4px 12px', borderRadius:99, border:'none', fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:FONT,
+                  background:filterTab===id?'#0f172a':'#fff', color:filterTab===id?'#fff':'#64748b',
+                  boxShadow:filterTab===id?'none':'0 1px 3px rgba(0,0,0,0.06)' }}>
+                <i className={`fas ${id==='all'?'fa-layer-group':id==='private'?'fa-lock':'fa-share-nodes'}`} style={{ marginRight:5, fontSize:10 }}></i>
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
         <button onClick={createNote} disabled={creating}
           style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 14px', background:'#3b82f6', border:'none', borderRadius:8, fontSize:12, fontWeight:600, color:'#fff', cursor:'pointer', fontFamily:FONT }}>
@@ -616,7 +615,7 @@ export function NotesPage() {
 // ANNOUNCEMENTS PAGE
 // ─────────────────────────────────────────────────────────────────
 export function AnnouncementsPage() {
-  const user=(() => { try { return JSON.parse(localStorage.getItem('user')||'null') } catch { return null } })()
+  const user = getStoredUser()
   const isAdmin=user?.role==='admin'
 
   const [announcements, setAnnouncements] = useState([])
@@ -660,12 +659,8 @@ export function AnnouncementsPage() {
     </button>
   ):null
 
-  const sidebar=(<SideCard sections={[
-    { label:'Filter', items:[{label:'All',active:true},{label:'Pinned',active:false}]},
-  ]}/>)
-
   return (
-    <PageShell nav={<Navbar crumbs={[{label:'Announcements',to:'/announcements'}]} hideTabs actions={navActions}/>} sidebar={sidebar}>
+    <PageShell nav={<Navbar crumbs={[{label:'Announcements',to:'/announcements'}]} hideTabs actions={navActions}/>} sidebar={<AppSidebar/>}>
       <div style={{ marginBottom:14 }}>
         <h1 style={{ fontSize:20, fontWeight:800, color:'#0f172a', marginBottom:4 }}>Announcements</h1>
         <p style={{ fontSize:13, color:'#64748b' }}>Official updates from the StudyHub team.</p>
@@ -720,22 +715,19 @@ export function AnnouncementsPage() {
 // ─────────────────────────────────────────────────────────────────
 export function SubmitPage() {
   return (
-    <div style={{ minHeight:'100vh', background:'#edf0f5', fontFamily:FONT }}>
-      <Navbar crumbs={[{label:'Submit Request',to:'/submit'}]} hideTabs/>
-      <div style={{ maxWidth:640, margin:'48px auto', padding:'0 20px' }}>
-        <div style={{ background:'#fff', borderRadius:16, border:'1px solid #e2e8f0', padding:'32px' }}>
-          <h1 style={{ fontSize:20, fontWeight:800, color:'#0f172a', marginBottom:8 }}>Request a Missing Course</h1>
-          <p style={{ fontSize:13, color:'#64748b', marginBottom:24 }}>Can't find your course? Let us know and we'll add it within 24h.</p>
-          <div style={{ fontSize:12, color:'#94a3b8', border:'1.5px dashed #cbd5e1', borderRadius:10, padding:20, textAlign:'center' }}>Form coming soon — POST /api/courses/request</div>
-        </div>
+    <PageShell nav={<Navbar crumbs={[{label:'Submit Request',to:'/submit'}]} hideTabs/>} sidebar={<AppSidebar/>}>
+      <div style={{ background:'#fff', borderRadius:16, border:'1px solid #e2e8f0', padding:'32px' }}>
+        <h1 style={{ fontSize:20, fontWeight:800, color:'#0f172a', marginBottom:8 }}>Request a Missing Course</h1>
+        <p style={{ fontSize:13, color:'#64748b', marginBottom:24 }}>Can't find your course? Let us know and we'll add it within 24h.</p>
+        <div style={{ fontSize:12, color:'#94a3b8', border:'1.5px dashed #cbd5e1', borderRadius:10, padding:20, textAlign:'center' }}>Form coming soon — POST /api/courses/request</div>
       </div>
-    </div>
+    </PageShell>
   )
 }
 
 export function AdminPage() {
   const navigate = useNavigate()
-  const currentUser = (() => { try { return JSON.parse(localStorage.getItem('user')||'null') } catch { return null } })()
+  const currentUser = getStoredUser()
 
   const [tab, setTab] = useState('overview')
   const [stats, setStats] = useState(null)
@@ -859,7 +851,7 @@ export function AdminPage() {
       })
       const data = await res.json()
       if (!res.ok) { setMsg({ type:'error', text: data.error }); return }
-      if (data.token) { localStorage.setItem('token', data.token); localStorage.setItem('user', JSON.stringify(data.user)) }
+      if (data.user) setStoredUser(data.user)
       setMsg({ type:'success', text: data.message })
     } catch { setMsg({ type:'error', text:'Server error.' }) }
     finally { setAdSaving(false) }

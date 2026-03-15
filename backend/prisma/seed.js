@@ -1,5 +1,6 @@
 const { PrismaClient } = require('@prisma/client')
 const bcrypt = require('bcryptjs')
+const crypto = require('crypto')
 const prisma = new PrismaClient()
 
 const SCHOOLS = [
@@ -127,13 +128,20 @@ async function main() {
   let seedUser = await prisma.user.findUnique({ where: { username: 'studyhub_seed' } })
 
   if (!seedUser) {
+    const seedPassword = process.env.SEED_USER_PASSWORD || crypto.randomBytes(12).toString('base64url')
     seedUser = await prisma.user.create({
       data: {
         username: 'studyhub_seed',
-        passwordHash: await bcrypt.hash('Seed1234!', 12),
-        role: 'admin'
+        passwordHash: await bcrypt.hash(seedPassword, 12),
+        role: 'student'
       }
     })
+    console.log('Created sample user: studyhub_seed')
+    if (process.env.SEED_USER_PASSWORD) {
+      console.log('Sample user password was taken from the SEED_USER_PASSWORD environment variable.')
+    } else {
+      console.log('A random sample password was generated for local use. To use a known password, set the SEED_USER_PASSWORD env var before running the seed script.')
+    }
   }
 
   if (cmsc131 && math140) {

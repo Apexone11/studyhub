@@ -5,6 +5,7 @@ import {
   identifyAuthenticatedUser,
   clearAuthenticatedUser
 } from './lib/telemetry'
+import { getStoredUser, hasStoredSession } from './lib/session'
 
 // ── existing pages ────────────────────────────────────────────────
 import HomePage        from './pages/HomePage'
@@ -38,14 +39,12 @@ import {
 // Redirects to /feed if the user is already logged in.
 // Prevents authenticated users from seeing the marketing/auth pages.
 function PublicRoute({ children }) {
-  const token = localStorage.getItem('token')
-  return token ? <Navigate to="/feed" replace /> : children
+  return hasStoredSession() ? <Navigate to="/feed" replace /> : children
 }
 
 // Redirects to /login if the user is not logged in.
 function PrivateRoute({ children }) {
-  const token = localStorage.getItem('token')
-  return token ? children : <Navigate to="/login" replace />
+  return hasStoredSession() ? children : <Navigate to="/login" replace />
 }
 
 function RouteTelemetry() {
@@ -55,18 +54,13 @@ function RouteTelemetry() {
     const nextPath = `${location.pathname}${location.search}`
     trackPageView(nextPath)
 
-    const rawUser = localStorage.getItem('user')
+    const user = getStoredUser()
 
-    if (!rawUser) {
+    if (!user) {
       clearAuthenticatedUser()
       return
     }
-
-    try {
-      identifyAuthenticatedUser(JSON.parse(rawUser))
-    } catch {
-      clearAuthenticatedUser()
-    }
+    identifyAuthenticatedUser(user)
   }, [location.pathname, location.search])
 
   return null

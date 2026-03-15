@@ -13,12 +13,11 @@ import {
   LogoMark,
 } from '../components/Icons'
 import { pageColumns, pageShell } from '../lib/ui'
+import { getStoredUser, hasStoredSession } from '../lib/session'
 
 import { API } from '../config'
-const getToken = () => localStorage.getItem('token')
 const authHeaders = () => ({
   'Content-Type': 'application/json',
-  ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
 })
 
 // ─────────────────────────────────────────────────────────────────
@@ -467,6 +466,9 @@ export default function SheetViewerPage() {
   const [commentErr,   setCommentErr]   = useState('')
   const [postingCmt,   setPostingCmt]   = useState(false)
   const [copied,     setCopied]     = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleting,          setDeleting]          = useState(false)
+  const [deleteErr,         setDeleteErr]         = useState('')
   const contentRef = useRef()
 
   // inject markdown styles once
@@ -581,7 +583,7 @@ export default function SheetViewerPage() {
 
   // star handler
   async function handleStar() {
-    if (starring || !getToken()) return
+    if (starring || !hasStoredSession()) return
     setStarring(true)
     setHasStarred(v => !v)
     setLocalStars(n => n + (hasStarred ? -1 : 1))
@@ -617,7 +619,7 @@ export default function SheetViewerPage() {
 
   // react (like/dislike)
   async function handleReact(type) {
-    if (reacting || !getToken()) return
+    if (reacting || !hasStoredSession()) return
     setReacting(true)
     // optimistic update
     const prev = userReaction
@@ -641,6 +643,16 @@ export default function SheetViewerPage() {
     finally { setReacting(false) }
   }
 
+  async function handleDeleteSheet() {
+    setDeleting(true); setDeleteErr('')
+    try {
+      const res = await fetch(`${API}/api/sheets/${id}`, { method: 'DELETE', headers: authHeaders() })
+      if (!res.ok) { const d = await res.json(); setDeleteErr(d.error || 'Failed to delete.'); return }
+      navigate('/sheets')
+    } catch { setDeleteErr('Could not connect to server.') }
+    finally { setDeleting(false) }
+  }
+
   // fork success
   function onForkSuccess(forked) {
     setShowFork(false)
@@ -655,7 +667,7 @@ export default function SheetViewerPage() {
   const schoolName  = sheet?.course?.school?.name || ''
   const authorName  = sheet?.author?.username || 'unknown'
   const fmtDate     = d => d ? new Date(d).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : ''
-  const currentUser = (() => { try { return JSON.parse(localStorage.getItem('user') || 'null') } catch { return null } })()
+  const currentUser = getStoredUser()
   const isOwn       = sheet && currentUser ? currentUser.id === sheet.userId : false
 
   return (
@@ -802,10 +814,16 @@ export default function SheetViewerPage() {
 
                 <h1 style={{
                   fontSize: 26, fontWeight: 800, color: '#0f172a',
-                  margin: '0 0 14px', lineHeight: 1.3,
+                  margin: '0 0 8px', lineHeight: 1.3,
                 }}>
                   {sheet.title}
                 </h1>
+
+                {sheet.description && (
+                  <p style={{ fontSize: 14, color: '#64748b', margin: '0 0 14px', lineHeight: 1.6 }}>
+                    {sheet.description}
+                  </p>
+                )}
 
                 {/* author + stats row */}
                 <div style={{
@@ -845,8 +863,8 @@ export default function SheetViewerPage() {
 
                 {/* action buttons */}
                 <div style={{ display: 'flex', gap: 8, paddingTop: 16, flexWrap: 'wrap' }}>
-                  <button onClick={handleStar} disabled={starring || !getToken()}
-                    title={!getToken() ? 'Log in to star' : undefined}
+                  <button onClick={handleStar} disabled={starring || !hasStoredSession()}
+                    title={!hasStoredSession() ? 'Log in to star' : undefined}
                     style={{
                       padding: '8px 16px', borderRadius: 9, border: '1px solid',
                       borderColor:  hasStarred ? '#fde68a' : '#e2e8f0',
@@ -855,14 +873,14 @@ export default function SheetViewerPage() {
                       fontSize: 13, fontWeight: 700, cursor: 'pointer',
                       fontFamily: 'inherit', transition: 'all .15s',
                       display: 'flex', alignItems: 'center', gap: 6,
-                      opacity: !getToken() ? 0.5 : 1,
+                      opacity: !hasStoredSession() ? 0.5 : 1,
                     }}>
                     {hasStarred ? <IconStarFilled size={14} style={{ color: '#f59e0b' }} /> : <IconStar size={14} />}
                     {hasStarred ? 'Starred' : 'Star'} · {localStars}
                   </button>
 
                   <button
-                    onClick={() => getToken() ? setShowFork(true) : navigate('/login')}
+                    onClick={() => hasStoredSession() ? setShowFork(true) : navigate('/login')}
                     style={{
                       padding: '8px 16px', borderRadius: 9,
                       border: '1px solid #bbf7d0', background: '#f0fdf4',
@@ -916,24 +934,48 @@ export default function SheetViewerPage() {
                       <IconPen size={14} />Edit
                     </Link>
                   )}
+
+                  {(isOwn || currentUser?.role === 'admin') && !showDeleteConfirm && (
+                    <button onClick={() => setShowDeleteConfirm(true)} style={{
+                      padding: '8px 16px', borderRadius: 9,
+                      border: '1px solid #fecaca', background: '#fef2f2',
+                      color: '#dc2626', fontSize: 13, fontWeight: 700,
+                      cursor: 'pointer', fontFamily: 'inherit',
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      transition: 'all .15s',
+                    }}>
+                      <i className="fas fa-trash" style={{ fontSize: 12 }}></i>Delete
+                    </button>
+                  )}
                 </div>
+
+                {showDeleteConfirm && (
+                  <div style={{ marginTop: 12, padding: '12px 16px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 13, color: '#dc2626', fontWeight: 600 }}>Delete this sheet permanently? This cannot be undone.</span>
+                    <button onClick={handleDeleteSheet} disabled={deleting} style={{ padding: '6px 14px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                      {deleting ? 'Deleting…' : 'Confirm Delete'}
+                    </button>
+                    <button onClick={() => { setShowDeleteConfirm(false); setDeleteErr('') }} style={{ padding: '6px 12px', background: '#fff', border: '1px solid #e2e8f0', color: '#64748b', borderRadius: 7, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
+                    {deleteErr && <span style={{ fontSize: 12, color: '#dc2626' }}>{deleteErr}</span>}
+                  </div>
+                )}
               </div>
 
               {/* reactions bar */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 32px', borderBottom: '1px solid #f1f5f9' }}>
                 <button
                   onClick={() => handleReact('like')}
-                  disabled={reacting || !getToken()}
-                  title={!getToken() ? 'Log in to react' : 'Like'}
+                  disabled={reacting || !hasStoredSession()}
+                  title={!hasStoredSession() ? 'Log in to react' : 'Like'}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 6,
                     padding: '6px 14px', borderRadius: 8, border: '1px solid',
                     borderColor: userReaction === 'like' ? '#bfdbfe' : '#e2e8f0',
                     background: userReaction === 'like' ? '#eff6ff' : '#fff',
                     color: userReaction === 'like' ? '#1d4ed8' : '#64748b',
-                    fontSize: 13, fontWeight: 700, cursor: getToken() ? 'pointer' : 'default',
+                    fontSize: 13, fontWeight: 700, cursor: hasStoredSession() ? 'pointer' : 'default',
                     fontFamily: 'inherit', transition: 'all .15s',
-                    opacity: !getToken() ? 0.5 : 1,
+                    opacity: !hasStoredSession() ? 0.5 : 1,
                   }}
                 >
                   <i className="fas fa-thumbs-up" style={{ fontSize: 13 }}></i>
@@ -941,17 +983,17 @@ export default function SheetViewerPage() {
                 </button>
                 <button
                   onClick={() => handleReact('dislike')}
-                  disabled={reacting || !getToken()}
-                  title={!getToken() ? 'Log in to react' : 'Dislike'}
+                  disabled={reacting || !hasStoredSession()}
+                  title={!hasStoredSession() ? 'Log in to react' : 'Dislike'}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 6,
                     padding: '6px 14px', borderRadius: 8, border: '1px solid',
                     borderColor: userReaction === 'dislike' ? '#fecaca' : '#e2e8f0',
                     background: userReaction === 'dislike' ? '#fef2f2' : '#fff',
                     color: userReaction === 'dislike' ? '#dc2626' : '#64748b',
-                    fontSize: 13, fontWeight: 700, cursor: getToken() ? 'pointer' : 'default',
+                    fontSize: 13, fontWeight: 700, cursor: hasStoredSession() ? 'pointer' : 'default',
                     fontFamily: 'inherit', transition: 'all .15s',
-                    opacity: !getToken() ? 0.5 : 1,
+                    opacity: !hasStoredSession() ? 0.5 : 1,
                   }}
                 >
                   <i className="fas fa-thumbs-down" style={{ fontSize: 13 }}></i>

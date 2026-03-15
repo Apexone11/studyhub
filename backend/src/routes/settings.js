@@ -1,10 +1,10 @@
 const express = require('express')
 const bcrypt = require('bcryptjs')
-const jwt = require('jsonwebtoken')
 const rateLimit = require('express-rate-limit')
 const { PrismaClient } = require('@prisma/client')
 const requireAuth = require('../middleware/auth')
 const { captureError } = require('../monitoring/sentry')
+const { setAuthCookie, signAuthToken } = require('../lib/authTokens')
 
 const twoFaLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -19,15 +19,6 @@ const prisma = new PrismaClient()
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,20}$/
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const TOKEN_EXPIRES_IN = '24h'
-
-function createToken(user) {
-  return jwt.sign(
-    { userId: user.id, username: user.username, role: user.role },
-    process.env.JWT_SECRET,
-    { expiresIn: TOKEN_EXPIRES_IN }
-  )
-}
 
 function sendError(req, res, error) {
   if (error.code === 'P2002') return res.status(409).json({ error: 'That username or email is already taken.' })
@@ -63,7 +54,7 @@ router.get('/me', async (req, res) => {
 })
 
 // ── PATCH /api/settings/password ────────────────────────────
-router.patch('/password', async (req, res) => {
+router.patch('/password', twoFaLimiter, async (req, res) => {
   const { currentPassword, newPassword } = req.body || {}
 
   if (!currentPassword || !newPassword) {
@@ -124,10 +115,10 @@ router.patch('/username', async (req, res) => {
     })
 
     // Re-issue token with new username
-    const token = createToken(updated)
+    const token = signAuthToken(updated)
+    setAuthCookie(res, token)
     return res.json({
       message: 'Username updated successfully.',
-      token,
       user: { id: updated.id, username: updated.username, role: updated.role, email: updated.email, emailVerified: updated.emailVerified }
     })
   } catch (error) {
