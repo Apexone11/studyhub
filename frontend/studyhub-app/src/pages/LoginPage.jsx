@@ -5,6 +5,10 @@ import { identifyAuthenticatedUser } from '../lib/telemetry'
 import { setStoredUser } from '../lib/session'
 import { API } from '../config'
 
+function getPostLoginPath(user) {
+  return user?.role === 'admin' ? '/admin' : '/feed'
+}
+
 function LoginPage() {
   const navigate = useNavigate()
   const [showPassword, setShowPassword] = useState(false)
@@ -47,7 +51,7 @@ function LoginPage() {
       }
       setStoredUser(data.user)
       identifyAuthenticatedUser(data.user)
-      navigate('/feed')
+      navigate(getPostLoginPath(data.user))
     } catch {
       setError('Could not connect to server. Make sure the backend is running.')
     }
@@ -68,7 +72,7 @@ function LoginPage() {
       if (!res.ok) { setTwoFaError(data.error || 'Verification failed.'); return }
       setStoredUser(data.user)
       identifyAuthenticatedUser(data.user)
-      navigate('/feed')
+      navigate(getPostLoginPath(data.user))
     } catch {
       setTwoFaError('Could not connect to server.')
     } finally {
