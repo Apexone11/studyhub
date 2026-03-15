@@ -127,12 +127,12 @@ function SheetCard({ sheet, onStar }) {
             <button onClick={()=>onStar(sheet.id)} style={{
               display:'flex', alignItems:'center', gap:4, padding:'5px 11px',
               border:'1px solid #e2e8f0', borderRadius:7,
-              background: sheet._starred?'#fef9ec':'#fff',
-              color: sheet._starred?'#92400e':'#64748b',
+              background: sheet.starred?'#fef9ec':'#fff',
+              color: sheet.starred?'#92400e':'#64748b',
               fontSize:11, fontWeight:600, cursor:'pointer', fontFamily:FONT, transition:'all .15s',
             }}>
-              {sheet._starred ? <IconStarFilled size={12} style={{ color:'#f59e0b' }}/> : <IconStar size={12}/>}
-              {sheet._starred ? 'Starred' : 'Star'}
+              {sheet.starred ? <IconStarFilled size={12} style={{ color:'#f59e0b' }}/> : <IconStar size={12}/>}
+              {sheet.starred ? 'Starred' : 'Star'}
             </button>
             <Link to={`/sheets/${sheet.id}`} style={{
               display:'flex', alignItems:'center', gap:4, padding:'5px 14px',
@@ -206,6 +206,15 @@ export default function SheetsPage() {
   const navigate  = useNavigate()
   const [sp,setSp]= useSearchParams()
 
+  // 'all' | 'mine' | 'starred'  — stays in sync with URL params
+  const viewFromUrl = sp.get('mine') === '1' ? 'mine' : sp.get('starred') === '1' ? 'starred' : 'all'
+  const [view,    setView]    = useState(viewFromUrl)
+
+  // Sync view when URL params change (e.g. Navbar tab clicks)
+  useEffect(() => {
+    const v = sp.get('mine') === '1' ? 'mine' : sp.get('starred') === '1' ? 'starred' : 'all'
+    setView(v)
+  }, [sp])
   const [filters, setFilters] = useState({
     search:   sp.get('q')        || '',
     schoolId: sp.get('schoolId') || null,
@@ -230,12 +239,14 @@ export default function SheetsPage() {
       }).catch(()=>{})
   },[])
 
-  const fetchSheets = useCallback((f,pg)=>{
+  const fetchSheets = useCallback((f,pg,v)=>{
     setLoading(true); setError(null)
     const p=new URLSearchParams({ limit:LIMIT, offset:(pg-1)*LIMIT,
       ...(f.search&&{search:f.search}),
       ...(f.schoolId&&{schoolId:f.schoolId}),
       ...(f.courseId&&{courseId:f.courseId}),
+      ...(v==='mine'    && {mine:'1'}),
+      ...(v==='starred' && {starred:'1'}),
     })
     fetch(`${API}/api/sheets?${p}`,{ headers:authHeaders() })
       .then(r=>{ if(!r.ok) throw new Error(r.status); return r.json() })
@@ -250,9 +261,9 @@ export default function SheetsPage() {
   },[])
 
   useEffect(()=>{
-    const timer = setTimeout(()=>{ fetchSheets(filters,page) }, 0)
+    const timer = setTimeout(()=>{ fetchSheets(filters,page,view) }, 0)
     return ()=>clearTimeout(timer)
-  },[filters,page,fetchSheets])
+  },[filters,page,view,fetchSheets])
 
   useEffect(()=>{
     const p=new URLSearchParams()
@@ -260,15 +271,24 @@ export default function SheetsPage() {
     if(filters.schoolId) p.set('schoolId',filters.schoolId)
     if(filters.courseId) p.set('courseId',filters.courseId)
     if(filters.sortBy!=='newest') p.set('sort',filters.sortBy)
+    if(view==='mine')    p.set('mine','1')
+    if(view==='starred') p.set('starred','1')
     setSp(p,{replace:true})
-  },[filters,setSp])
+  },[filters,view,setSp])
 
   const update=(patch)=>{ setFilters(f=>({...f,...patch})); setPage(1) }
+  const switchView=(v)=>{ setView(v); setPage(1) }
 
   const handleStar=async(id)=>{
     if(!getToken()){ navigate('/login'); return }
-    setSheets(prev=>prev.map(s=>s.id===id?{...s,_starred:!s._starred,stars:(s.stars||0)+(s._starred?-1:1)}:s))
-    fetch(`${API}/api/sheets/${id}/star`,{ method:'POST', headers:authHeaders() }).catch(()=>{})
+    setSheets(prev=>prev.map(s=>s.id===id
+      ? { ...s, starred:!s.starred, stars:(s.stars||0)+(s.starred?-1:1) }
+      : s
+    ))
+    fetch(`${API}/api/sheets/${id}/star`,{ method:'POST', headers:authHeaders() })
+      .then(r=>r.ok?r.json():null)
+      .then(d=>{ if(d) setSheets(prev=>prev.map(s=>s.id===id?{...s,stars:d.stars}:s)) })
+      .catch(()=>{})
   }
 
   const totalPages=Math.ceil(total/LIMIT)
@@ -300,6 +320,17 @@ export default function SheetsPage() {
           </div>
           {/* main */}
           <main style={{ animation:'fadeIn .3s ease-out' }}>
+            {/* view tabs */}
+            <div style={{ display:'flex', gap:2, marginBottom:14, background:'#fff', borderRadius:12, border:'1px solid #e2e8f0', padding:4, width:'fit-content' }}>
+              {[['all','Browse All'],['mine','My Sheets'],['starred','Starred']].map(([v,label])=>(
+                <button key={v} onClick={()=>switchView(v)} style={{
+                  padding:'6px 18px', borderRadius:9, border:'none',
+                  background: view===v ? '#3b82f6' : 'transparent',
+                  color: view===v ? '#fff' : '#64748b',
+                  fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT, transition:'all .15s',
+                }}>{label}</button>
+              ))}
+            </div>
             {/* search */}
             <div style={{ background:'#fff', borderRadius:14, border:'1px solid #e2e8f0', display:'flex', alignItems:'center', gap:10, padding:'0 16px', minHeight:48, marginBottom:14 }}>
               <IconSearch size={15} style={{ color:'#94a3b8', flexShrink:0 }}/>
@@ -332,8 +363,15 @@ export default function SheetsPage() {
             {!loading&&!error&&sheets.length===0&&(
               <div style={{ background:'#fff', borderRadius:16, border:'1.5px dashed #cbd5e1', padding:'56px 28px', minHeight:320, display:'flex', flexDirection:'column', justifyContent:'center', alignItems:'center', textAlign:'center' }}>
                 <div style={{ fontSize:32, marginBottom:12, color:'#cbd5e1' }}><i className="fas fa-file-lines"></i></div>
-                <div style={{ fontWeight:700, fontSize:18, color:'#64748b', marginBottom:8 }}>No sheets yet</div>
-                <div style={{ fontSize:14, color:'#94a3b8', marginBottom:22 }}>{filters.search?`No results for "${filters.search}"`:'Be the first to upload!'}</div>
+                <div style={{ fontWeight:700, fontSize:18, color:'#64748b', marginBottom:8 }}>
+                  {view==='mine'?'No sheets yet':view==='starred'?'No starred sheets yet':'No sheets yet'}
+                </div>
+                <div style={{ fontSize:14, color:'#94a3b8', marginBottom:22 }}>
+                  {filters.search?`No results for "${filters.search}"`:
+                   view==='mine'?'Upload your first sheet!':
+                   view==='starred'?'Star sheets you want to save and they\'ll appear here.':
+                   'Be the first to upload!'}
+                </div>
                 <Link to="/sheets/upload" style={{ padding:'8px 20px', background:'#3b82f6', color:'#fff', borderRadius:8, textDecoration:'none', fontSize:13, fontWeight:700, display:'inline-flex', alignItems:'center', gap:6 }}>
                   <IconUpload size={13}/>Upload first sheet
                 </Link>

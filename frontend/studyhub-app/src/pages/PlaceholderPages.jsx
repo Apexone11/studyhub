@@ -468,8 +468,9 @@ export function NotesPage() {
       <div style={{ background:'#fff', borderRadius:13, border:'1px solid #e2e8f0', overflow:'hidden' }}>
         <div style={{ fontSize:9, letterSpacing:'.1em', fontWeight:600, color:'#94a3b8', padding:'12px 14px 5px', textTransform:'uppercase' }}>Filter</div>
         {[['all','All Notes'],['private','Private'],['shared','Shared']].map(([id, label]) => (
-          <div key={id} onClick={() => setFilterTab(id)}
+          <div key={id} onClick={() => { setFilterTab(id); setActiveNote(null) }}
             style={{ display:'flex', alignItems:'center', gap:7, padding:'7px 12px', borderLeft:`2px solid ${filterTab===id?'#3b82f6':'transparent'}`, background:filterTab===id?'#eff6ff':'transparent', color:filterTab===id?'#1d4ed8':'#64748b', fontSize:12, fontWeight:filterTab===id?600:400, cursor:'pointer' }}>
+            <i className={`fas ${id==='all'?'fa-layer-group':id==='private'?'fa-lock':'fa-share-nodes'}`} style={{ fontSize:10 }}></i>
             {label}
           </div>
         ))}
@@ -507,8 +508,14 @@ export function NotesPage() {
       ) : visibleNotes.length === 0 && !activeNote ? (
         <div style={{ background:'#fff', borderRadius:14, border:'1.5px dashed #cbd5e1', padding:'48px 24px', textAlign:'center' }}>
           <i className="fas fa-book-open" style={{ fontSize:32, color:'#cbd5e1', marginBottom:12, display:'block' }}></i>
-          <div style={{ fontSize:14, fontWeight:600, color:'#64748b', marginBottom:6 }}>No notes yet</div>
-          <div style={{ fontSize:12, color:'#94a3b8', marginBottom:16 }}>Create your first note to get started.</div>
+          <div style={{ fontSize:14, fontWeight:600, color:'#64748b', marginBottom:6 }}>
+            {filterTab==='private'?'No private notes':filterTab==='shared'?'No shared notes':'No notes yet'}
+          </div>
+          <div style={{ fontSize:12, color:'#94a3b8', marginBottom:16 }}>
+            {filterTab==='private'?'Create a note and keep the Private checkbox checked.':
+             filterTab==='shared'?'Uncheck "Private" on a note to share it.':
+             'Create your first note to get started.'}
+          </div>
           <button onClick={createNote} style={{ background:'#3b82f6', color:'#fff', border:'none', borderRadius:8, padding:'8px 20px', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:FONT }}>
             Create a Note
           </button>

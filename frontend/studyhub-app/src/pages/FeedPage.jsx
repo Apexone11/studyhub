@@ -329,7 +329,13 @@ function FeedCard({ item }) {
 
           <div style={{ flex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
-              <span style={{ fontWeight: 700, fontSize: 13, color: '#1e293b' }}>{item.author}</span>
+              <Link
+                to={`/users/${item.author}`}
+                onClick={e => e.stopPropagation()}
+                style={{ fontWeight: 700, fontSize: 13, color: '#1e293b', textDecoration: 'none' }}
+                onMouseEnter={e => e.currentTarget.style.color='#3b82f6'}
+                onMouseLeave={e => e.currentTarget.style.color='#1e293b'}
+              >{item.author}</Link>
               {item.authorRole === 'admin' && <Badge text="Admin" color="#f59e0b" />}
               {item.course && <Badge text={item.course} color={courseColor(item.course)} />}
             </div>

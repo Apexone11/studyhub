@@ -85,6 +85,7 @@ router.get('/leaderboard', async (req, res) => {
 router.get('/', optionalAuth, async (req, res) => {
   const {
     courseId, schoolId, search,
+    mine, starred,
     limit   = 20,
     offset  = 0,
     orderBy = 'createdAt',
@@ -92,12 +93,50 @@ router.get('/', optionalAuth, async (req, res) => {
 
   try {
     const where = {}
+
+    // mine=1 — only the authenticated user's own sheets
+    if (mine === '1') {
+      if (!req.user) return res.status(401).json({ error: 'Login required.' })
+      where.userId = req.user.userId
+    }
+
     if (courseId) where.courseId = parseInt(courseId)
     if (schoolId) where.course   = { schoolId: parseInt(schoolId) }
-    if (search)   where.title    = { contains: search, mode: 'insensitive' }
+    if (search)   where.OR = [
+      { title:   { contains: search, mode: 'insensitive' } },
+      { content: { contains: search, mode: 'insensitive' } },
+    ]
 
     const ALLOWED_SORT = ['createdAt', 'stars', 'downloads', 'forks']
     const sortField = ALLOWED_SORT.includes(orderBy) ? orderBy : 'createdAt'
+
+    // starred=1 — only sheets the user has starred (join via StarredSheet)
+    if (starred === '1') {
+      if (!req.user) return res.status(401).json({ error: 'Login required.' })
+      const starredRecords = await prisma.starredSheet.findMany({
+        where: { userId: req.user.userId },
+        select: { sheetId: true },
+        orderBy: { createdAt: 'desc' },
+        take:  parseInt(limit),
+        skip:  parseInt(offset),
+      })
+      const starredSheetIds = starredRecords.map(r => r.sheetId)
+      const totalStarred = await prisma.starredSheet.count({ where: { userId: req.user.userId } })
+
+      const sheets = await prisma.studySheet.findMany({
+        where: { id: { in: starredSheetIds }, ...where },
+        include: {
+          author: { select: { id: true, username: true } },
+          course: { include: { school: true } },
+        },
+      })
+      // Preserve order from starredRecords
+      const ordered = starredSheetIds
+        .map(sid => sheets.find(s => s.id === sid))
+        .filter(Boolean)
+        .map(s => ({ ...s, starred: true }))
+      return res.json({ sheets: ordered, total: totalStarred, limit: parseInt(limit), offset: parseInt(offset) })
+    }
 
     const [sheets, total] = await Promise.all([
       prisma.studySheet.findMany({
@@ -116,11 +155,11 @@ router.get('/', optionalAuth, async (req, res) => {
     // Attach starred flag for authenticated users
     let starredIds = new Set()
     if (req.user) {
-      const starred = await prisma.starredSheet.findMany({
+      const starredRows = await prisma.starredSheet.findMany({
         where: { userId: req.user.userId, sheetId: { in: sheets.map(s => s.id) } },
         select: { sheetId: true }
       })
-      starredIds = new Set(starred.map(s => s.sheetId))
+      starredIds = new Set(starredRows.map(s => s.sheetId))
     }
 
     const sheetsWithStarred = sheets.map(s => ({ ...s, starred: starredIds.has(s.id) }))

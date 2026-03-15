@@ -486,6 +486,7 @@ export default function SheetViewerPage() {
       .then(data => {
         setSheet(data)
         setLocalStars(data.stars || 0)
+        setHasStarred(data.starred || false)
         if (data.reactions) {
           setLikes(data.reactions.likes || 0)
           setDislikes(data.reactions.dislikes || 0)
