@@ -8,6 +8,7 @@ import {
   IconAnnouncements, IconProfile, IconPlus,
 } from './Icons'
 import { API } from '../config'
+import { getStoredUser } from '../lib/session'
 
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 
@@ -50,9 +51,7 @@ export default function AppSidebar() {
   const { pathname } = useLocation()
   const navigate = useNavigate()
 
-  const user = (() => {
-    try { return JSON.parse(localStorage.getItem('user') || 'null') } catch { return null }
-  })()
+  const user = getStoredUser()
 
   if (!user) return null
 
