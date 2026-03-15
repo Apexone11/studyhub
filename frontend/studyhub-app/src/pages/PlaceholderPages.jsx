@@ -12,7 +12,7 @@ import { IconUpload, IconEye, IconPlus, IconCheck } from '../components/Icons'
 import { pageColumns, pageShell } from '../lib/ui'
 import { getStoredUser, setStoredUser } from '../lib/session'
 
-import { API } from '../config'
+import { API, SUPPORT_EMAIL } from '../config'
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 const authHeaders = () => ({
   'Content-Type': 'application/json',
@@ -756,8 +756,10 @@ export function AdminPage() {
   // Admin settings form
   const [adPwForm, setAdPwForm] = useState({ currentPassword:'', newPassword:'', confirmPassword:'' })
   const [adUnForm, setAdUnForm] = useState({ newUsername:'', password:'' })
+  const [adEmailForm, setAdEmailForm] = useState({ email: currentUser?.email || SUPPORT_EMAIL, password: '' })
   const [adPwMsg, setAdPwMsg] = useState(null)
   const [adUnMsg, setAdUnMsg] = useState(null)
+  const [adEmailMsg, setAdEmailMsg] = useState(null)
   const [adSaving, setAdSaving] = useState(false)
 
   // User delete confirm
@@ -843,7 +845,7 @@ export function AdminPage() {
     finally { setPosting(false) }
   }
 
-  async function handleAdminPatch(endpoint, body, setMsg) {
+  async function handleAdminPatch(endpoint, body, setMsg, onSuccess) {
     setAdSaving(true); setMsg(null)
     try {
       const res = await fetch(`${API}/api/settings/${endpoint}`, {
@@ -853,6 +855,7 @@ export function AdminPage() {
       if (!res.ok) { setMsg({ type:'error', text: data.error }); return }
       if (data.user) setStoredUser(data.user)
       setMsg({ type:'success', text: data.message })
+      if (onSuccess) onSuccess(data)
     } catch { setMsg({ type:'error', text:'Server error.' }) }
     finally { setAdSaving(false) }
   }
@@ -899,6 +902,7 @@ export function AdminPage() {
                   ['Comments', stats?.totalComments, 'fa-comments', '#f59e0b'],
                   ['Reactions', stats?.totalReactions, 'fa-thumbs-up', '#ef4444'],
                   ['Follows', stats?.totalFollows, 'fa-user-plus', '#06b6d4'],
+                  ['Flagged Requests', stats?.flaggedRequests, 'fa-flag', '#f97316'],
                 ].map(([lbl, val, icon, color]) => (
                   <div key={lbl} style={{ background:'#fff', borderRadius:12, border:'1px solid #e2e8f0', padding:'16px 14px' }}>
                     <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
@@ -1088,6 +1092,26 @@ export function AdminPage() {
         {tab === 'admin-settings' && (
           <div>
             <div style={{ fontSize:15, fontWeight:800, color:'#0f172a', marginBottom:16 }}>Admin Account Settings</div>
+            <div style={{ background:'#fff', borderRadius:14, border:'1px solid #e2e8f0', padding:'20px', marginBottom:14 }}>
+              <div style={{ fontSize:13, fontWeight:700, color:'#0f172a', marginBottom:12 }}>Admin Email</div>
+              <p style={{ fontSize:12, color:'#64748b', lineHeight:1.6, margin:'0 0 12px' }}>
+                {currentUser?.email
+                  ? <>Current admin email: <strong>{currentUser.email}</strong></>
+                  : <>No admin email is set yet. Recommended company inbox: <strong>{SUPPORT_EMAIL}</strong></>}
+              </p>
+              <input type="email" placeholder={SUPPORT_EMAIL} value={adEmailForm.email} onChange={e => setAdEmailForm(f => ({ ...f, email:e.target.value }))} style={adInputStyle}/>
+              <input type="password" placeholder="Confirm with password" value={adEmailForm.password} onChange={e => setAdEmailForm(f => ({ ...f, password:e.target.value }))} style={adInputStyle}/>
+              {adEmailMsg && <div style={{ fontSize:12, color:adEmailMsg.type==='error'?'#dc2626':'#16a34a', marginBottom:10 }}>{adEmailMsg.text}</div>}
+              <button
+                disabled={adSaving}
+                onClick={() => handleAdminPatch('email', adEmailForm, setAdEmailMsg, (data) => {
+                  setAdEmailForm({ email: data.user?.email || SUPPORT_EMAIL, password: '' })
+                })}
+                style={adBtnStyle}
+              >
+                {adSaving ? 'Saving…' : 'Update Admin Email'}
+              </button>
+            </div>
             {/* Change password */}
             <div style={{ background:'#fff', borderRadius:14, border:'1px solid #e2e8f0', padding:'20px', marginBottom:14 }}>
               <div style={{ fontSize:13, fontWeight:700, color:'#0f172a', marginBottom:12 }}>Change Password</div>
@@ -1107,7 +1131,15 @@ export function AdminPage() {
               <input type="text" placeholder="New username (3-20 chars)" value={adUnForm.newUsername} onChange={e => setAdUnForm(f => ({...f,newUsername:e.target.value}))} style={adInputStyle}/>
               <input type="password" placeholder="Confirm with password" value={adUnForm.password} onChange={e => setAdUnForm(f => ({...f,password:e.target.value}))} style={adInputStyle}/>
               {adUnMsg && <div style={{ fontSize:12, color:adUnMsg.type==='error'?'#dc2626':'#16a34a', marginBottom:10 }}>{adUnMsg.text}</div>}
-              <button disabled={adSaving} onClick={() => handleAdminPatch('username', adUnForm, setAdUnMsg)} style={adBtnStyle}>{adSaving ? 'Saving…' : 'Update Username'}</button>
+              <button
+                disabled={adSaving}
+                onClick={() => handleAdminPatch('username', adUnForm, setAdUnMsg, () => {
+                  setAdUnForm({ newUsername:'', password:'' })
+                })}
+                style={adBtnStyle}
+              >
+                {adSaving ? 'Saving…' : 'Update Username'}
+              </button>
             </div>
           </div>
         )}
