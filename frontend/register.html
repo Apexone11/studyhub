@@ -1568,26 +1568,65 @@
 
     schoolInput.addEventListener('input', () => {
       const q = schoolInput.value.trim().toLowerCase();
-      if (!q) { schoolDropdown.classList.remove('show'); return; }
+      if (!q) {
+        schoolDropdown.classList.remove('show');
+        schoolDropdown.innerHTML = '';
+        return;
+      }
 
       const matches = SCHOOLS.filter(s =>
         s.name.toLowerCase().includes(q) || s.short.toLowerCase().includes(q)
       );
+
+      // Clear previous dropdown content
+      schoolDropdown.innerHTML = '';
+
       if (matches.length === 0) {
-        schoolDropdown.innerHTML = '<div class="dropdown-empty">No schools found. You can still continue.</div>';
+        const emptyDiv = document.createElement('div');
+        emptyDiv.classList.add('dropdown-empty');
+        emptyDiv.textContent = 'No schools found. You can still continue.';
+        schoolDropdown.appendChild(emptyDiv);
       } else {
-        schoolDropdown.innerHTML = matches.map(s =>
-          `<div class="dropdown-item" onclick="selectSchool(${s.id},'${s.name.replace(/'/g, "\\'")}')"><i class="fas fa-school"></i>${s.name}</div>`
-        ).join('');
+        matches.forEach(s => {
+          const item = document.createElement('div');
+          item.classList.add('dropdown-item');
+          item.dataset.schoolId = String(s.id);
+
+          const icon = document.createElement('i');
+          icon.classList.add('fas', 'fa-school');
+
+          item.appendChild(icon);
+          item.appendChild(document.createTextNode(s.name));
+
+          schoolDropdown.appendChild(item);
+        });
       }
       schoolDropdown.classList.add('show');
     });
 
+    schoolDropdown.addEventListener('click', (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const item = target.closest('.dropdown-item');
+      if (!item) return;
+      const id = Number(item.dataset.schoolId);
+      if (!Number.isNaN(id)) {
+        selectSchool(id);
+      }
+    });
+
     let currentSchoolId = null;
 
-    function selectSchool(id, name) {
-      currentSchoolId = id;
-      selectedSchoolName.textContent = name;
+    function selectSchool(id) {
+      const school = SCHOOLS.find(s => s.id === id);
+      if (!school) {
+        // Treat missing school as invalid selection
+        clearSchool();
+        return;
+      }
+
+      currentSchoolId = school.id;
+      selectedSchoolName.textContent = school.name;
       selectedSchool.classList.add('show');
       schoolDropdown.classList.remove('show');
       schoolInput.value = '';
@@ -1640,9 +1679,23 @@
       if (matches.length === 0) {
         courseDropdown.innerHTML = '<div class="dropdown-empty">No courses found.</div>';
       } else {
+        // Build list items without inline onclick handlers
         courseDropdown.innerHTML = matches.map(c =>
-          `<div class="course-item" onclick="addCourse('${c.code}', '${c.name.replace(/'/g, "\\'")}')"><span class="course-code">${c.code}</span>${c.name}</div>`
+          `<div class="course-item"><span class="course-code"></span><span class="course-name"></span></div>`
         ).join('');
+
+        // Attach data and event listeners safely
+        const items = courseDropdown.querySelectorAll('.course-item');
+        items.forEach((item, index) => {
+          const course = matches[index];
+          const codeEl = item.querySelector('.course-code');
+          const nameEl = item.querySelector('.course-name');
+          if (codeEl) codeEl.textContent = course.code;
+          if (nameEl) nameEl.textContent = course.name;
+          item.addEventListener('click', () => {
+            addCourse(course.code, course.name);
+          });
+        });
       }
       courseDropdown.classList.add('show');
     });
@@ -1666,9 +1719,30 @@
     }
 
     function renderCourseTags() {
-      selectedCoursesEl.innerHTML = selectedCourses.map(c =>
-        `<div class="course-tag">${c.code}<button onclick="removeCourse('${c.code}')" aria-label="Remove ${c.code}"><i class="fas fa-times"></i></button></div>`
-      ).join('');
+      // Clear existing tags
+      selectedCoursesEl.innerHTML = '';
+
+      selectedCourses.forEach(c => {
+        const tag = document.createElement('div');
+        tag.className = 'course-tag';
+
+        const codeNode = document.createTextNode(c.code);
+        tag.appendChild(codeNode);
+
+        const btn = document.createElement('button');
+        btn.setAttribute('aria-label', `Remove ${c.code}`);
+
+        const icon = document.createElement('i');
+        icon.className = 'fas fa-times';
+        btn.appendChild(icon);
+
+        btn.addEventListener('click', () => {
+          removeCourse(c.code);
+        });
+
+        tag.appendChild(btn);
+        selectedCoursesEl.appendChild(tag);
+      });
     }
 
     // Close course dropdown when clicking outside
