@@ -2,6 +2,7 @@ const express = require('express')
 const { PrismaClient } = require('@prisma/client')
 const rateLimit = require('express-rate-limit')
 const requireAuth = require('../middleware/auth')
+const { sendCourseRequestNotice } = require('../lib/email')
 const { captureError } = require('../monitoring/sentry')
 
 const router = express.Router()
@@ -176,6 +177,38 @@ router.post('/request', requireAuth, async (req, res) => {
     const message = result.flagged
       ? `"${rawName}" has been flagged for review and will likely be added soon!`
       : `"${rawName}" has been requested. We'll add it when it's popular enough.`
+
+    try {
+      const [requester, school] = await Promise.all([
+        prisma.user.findUnique({
+          where: { id: req.user.userId },
+          select: { username: true, email: true }
+        }),
+        parsedSchoolId === null
+          ? Promise.resolve(null)
+          : prisma.school.findUnique({
+              where: { id: parsedSchoolId },
+              select: { name: true, short: true }
+            })
+      ])
+
+      await sendCourseRequestNotice({
+        courseName: rawName,
+        courseCode: rawCode || null,
+        schoolName: school ? `${school.short} - ${school.name}` : null,
+        requesterUsername: requester?.username || req.user.username,
+        requesterEmail: requester?.email || null,
+        requestCount: result.count,
+        flagged: result.flagged,
+      })
+    } catch (emailError) {
+      captureError(emailError, {
+        route: req.originalUrl,
+        method: req.method,
+        source: 'sendCourseRequestNotice',
+      })
+      console.error('Course request notification failed:', emailError)
+    }
 
     return res.status(201).json({
       message,

@@ -150,12 +150,20 @@ router.patch('/email', async (req, res) => {
       return res.status(400).json({ error: 'New email must be different from current email.' })
     }
 
-    await prisma.user.update({
+    const updated = await prisma.user.update({
       where: { id: user.id },
-      data: { email: trimmedEmail, emailVerified: false }
+      data: { email: trimmedEmail, emailVerified: false },
+      select: {
+        id: true,
+        username: true,
+        role: true,
+        email: true,
+        emailVerified: true,
+        twoFaEnabled: true,
+      }
     })
 
-    return res.json({ message: 'Email updated successfully.' })
+    return res.json({ message: 'Email updated successfully.', user: updated })
   } catch (error) {
     return sendError(req, res, error)
   }

@@ -1,5 +1,6 @@
 import LegalPageLayout, { LegalSection } from '../components/LegalPageLayout'
 import { IconUsers } from '../components/Icons'
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '../config'
 
 function GuidelinesPage() {
   return (
@@ -71,7 +72,7 @@ function GuidelinesPage() {
         <p>If you see content that violates these guidelines:</p>
         <ul className="legal-list">
           <li>Use the Report button on the relevant study sheet or post.</li>
-          <li>Open a GitHub Issue with the label <strong>content-report</strong>.</li>
+          <li>Email <a href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a> with the details and a link to the content.</li>
           <li>Moderators will review and act within a reasonable timeframe.</li>
         </ul>
         <p>False or malicious reports are themselves a violation of these guidelines.</p>
@@ -85,7 +86,7 @@ function GuidelinesPage() {
           <li><strong>Severe or repeated violations:</strong> account suspension.</li>
         </ul>
         <p>
-          Appeals can be made through GitHub Issues. We aim to be fair and to explain moderation decisions clearly.
+          Appeals can be made by emailing <a href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>. We aim to be fair and to explain moderation decisions clearly.
         </p>
       </LegalSection>
     </LegalPageLayout>
