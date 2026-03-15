@@ -18,13 +18,12 @@ import {
   LogoMark,
 } from '../components/Icons'
 import { pageColumns, pageShell } from '../lib/ui'
+import { clearStoredSession, getStoredUser, hasStoredSession, logoutSession, setStoredUser } from '../lib/session'
 
 import { API } from '../config'
 
-const getToken = () => localStorage.getItem('token')
 const authHeaders = () => ({
   'Content-Type': 'application/json',
-  ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
 })
 
 function Avatar({ name, size = 36, role }) {
@@ -69,21 +68,11 @@ const QUICK_ACTIONS = [
   { icon: IconSettings, label: 'Settings', to: '/settings', color: '#64748b', bg: '#f8fafc' },
 ]
 
-function getStoredUser() {
-  const rawUser = localStorage.getItem('user')
-  if (!rawUser) return null
-  try {
-    return JSON.parse(rawUser)
-  } catch {
-    localStorage.removeItem('user')
-    return null
-  }
-}
-
 export default function DashboardPage() {
   const [user, setUser] = useState(() => getStoredUser())
   const [loading, setLoading] = useState(true)
   const [sheets, setSheets] = useState([])
+  const [mySheetCount, setMySheetCount] = useState(0)
   const [avatarUploading, setAvatarUploading] = useState(false)
   const [avatarError, setAvatarError] = useState('')
   const avatarInputRef = useRef(null)
@@ -114,13 +103,12 @@ export default function DashboardPage() {
     try {
       const res = await fetch(`${API}/api/upload/avatar`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${getToken()}` },
         body: formData,
       })
       const data = await res.json()
       if (!res.ok) { setAvatarError(data.error || 'Upload failed.'); return }
       setUser(prev => ({ ...prev, avatarUrl: data.avatarUrl }))
-      localStorage.setItem('user', JSON.stringify({ ...user, avatarUrl: data.avatarUrl }))
+      setStoredUser({ ...user, avatarUrl: data.avatarUrl })
     } catch {
       setAvatarError('Could not connect to server.')
     } finally {
@@ -130,8 +118,7 @@ export default function DashboardPage() {
   }
 
   useEffect(() => {
-    const token = getToken()
-    if (!token) {
+    if (!hasStoredSession()) {
       navigate('/login')
       return undefined
     }
@@ -142,21 +129,27 @@ export default function DashboardPage() {
       try {
         const meResponse = await fetch(`${API}/api/auth/me`, { headers: authHeaders() })
         if (!meResponse.ok) {
-          localStorage.removeItem('token')
-          localStorage.removeItem('user')
+          clearStoredSession()
           navigate('/login')
           return
         }
         const meData = await meResponse.json()
         if (!isMounted) return
         setUser(meData)
-        localStorage.setItem('user', JSON.stringify(meData))
+        setStoredUser(meData)
 
-        const sheetsResponse = await fetch(`${API}/api/sheets?limit=10`, { headers: authHeaders() })
+        const [sheetsResponse, mineResponse] = await Promise.all([
+          fetch(`${API}/api/sheets?limit=10`, { headers: authHeaders() }),
+          fetch(`${API}/api/sheets?mine=1&limit=1`, { headers: authHeaders() }),
+        ])
         if (!isMounted) return
         if (sheetsResponse.ok) {
           const sheetsData = await sheetsResponse.json()
           setSheets(sheetsData.sheets || sheetsData || [])
+        }
+        if (mineResponse.ok) {
+          const mineData = await mineResponse.json()
+          setMySheetCount(mineData.total || 0)
         }
       } catch {
         // silently fail — user data from localStorage still shown
@@ -169,9 +162,8 @@ export default function DashboardPage() {
     return () => { isMounted = false }
   }, [navigate])
 
-  function handleLogout() {
-    localStorage.removeItem('token')
-    localStorage.removeItem('user')
+  async function handleLogout() {
+    await logoutSession()
     navigate('/')
   }
 
@@ -297,7 +289,7 @@ export default function DashboardPage() {
               <div style={{ position: 'relative' }}>
                 {user?.avatarUrl ? (
                   <img
-                    src={`${API}${user.avatarUrl}`}
+                    src={user.avatarUrl?.startsWith('http') ? user.avatarUrl : `${API}${user.avatarUrl}`}
                     alt={user.username}
                     style={{ width: 64, height: 64, borderRadius: '50%', objectFit: 'cover', border: '2px solid #e2e8f0' }}
                   />
@@ -346,7 +338,7 @@ export default function DashboardPage() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, width: '100%', marginTop: 4 }}>
                 {[
                   { label: 'Courses', val: courseCount },
-                  { label: 'Sheets', val: sheets.filter((s) => s.author?.username === user?.username).length },
+                  { label: 'Sheets', val: mySheetCount },
                   { label: 'Stars', val: 0 },
                 ].map((stat) => (
                   <div key={stat.label} style={{ textAlign: 'center', background: '#f8fafc', borderRadius: 10, padding: '8px 4px' }}>

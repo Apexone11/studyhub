@@ -4,19 +4,19 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import Navbar from '../components/Navbar'
+import AppSidebar from '../components/AppSidebar'
 import {
   IconSearch, IconStar, IconStarFilled, IconFork,
   IconDownload, IconUpload,
 } from '../components/Icons'
-import { pageColumns, pageShell } from '../lib/ui'
+import { pageShell } from '../lib/ui'
+import { hasStoredSession } from '../lib/session'
 
 import { API } from '../config'
 const LIMIT  = 10
 const FONT   = "'Plus Jakarta Sans', system-ui, sans-serif"
-const getToken    = () => localStorage.getItem('token')
 const authHeaders = () => ({
   'Content-Type': 'application/json',
-  ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
 })
 
 // course prefix → accent color
@@ -208,13 +208,7 @@ export default function SheetsPage() {
 
   // 'all' | 'mine' | 'starred'  — stays in sync with URL params
   const viewFromUrl = sp.get('mine') === '1' ? 'mine' : sp.get('starred') === '1' ? 'starred' : 'all'
-  const [view,    setView]    = useState(viewFromUrl)
-
-  // Sync view when URL params change (e.g. Navbar tab clicks)
-  useEffect(() => {
-    const v = sp.get('mine') === '1' ? 'mine' : sp.get('starred') === '1' ? 'starred' : 'all'
-    setView(v)
-  }, [sp])
+  const view = viewFromUrl
   const [filters, setFilters] = useState({
     search:   sp.get('q')        || '',
     schoolId: sp.get('schoolId') || null,
@@ -277,18 +271,30 @@ export default function SheetsPage() {
   },[filters,view,setSp])
 
   const update=(patch)=>{ setFilters(f=>({...f,...patch})); setPage(1) }
-  const switchView=(v)=>{ setView(v); setPage(1) }
+  const switchView=(v)=>{
+    const next = new URLSearchParams(sp)
+    next.delete('mine')
+    next.delete('starred')
+    if (v === 'mine') next.set('mine', '1')
+    if (v === 'starred') next.set('starred', '1')
+    setSp(next, { replace: true })
+    setPage(1)
+  }
 
   const handleStar=async(id)=>{
-    if(!getToken()){ navigate('/login'); return }
-    setSheets(prev=>prev.map(s=>s.id===id
+    if(!hasStoredSession()){ navigate('/login'); return }
+    const original = sheets.find(s=>s.id===id)
+    setSheets(list=>list.map(s=>s.id===id
       ? { ...s, starred:!s.starred, stars:(s.stars||0)+(s.starred?-1:1) }
       : s
     ))
     fetch(`${API}/api/sheets/${id}/star`,{ method:'POST', headers:authHeaders() })
       .then(r=>r.ok?r.json():null)
-      .then(d=>{ if(d) setSheets(prev=>prev.map(s=>s.id===id?{...s,stars:d.stars}:s)) })
-      .catch(()=>{})
+      .then(d=>{
+        if(d) setSheets(list=>list.map(s=>s.id===id?{...s,stars:d.stars,starred:d.starred}:s))
+        else if(original) setSheets(list=>list.map(s=>s.id===id?original:s))
+      })
+      .catch(()=>{ if(original) setSheets(list=>list.map(s=>s.id===id?original:s)) })
   }
 
   const totalPages=Math.ceil(total/LIMIT)
@@ -313,8 +319,10 @@ export default function SheetsPage() {
       <style>{`@keyframes shimmer{0%,100%{opacity:1}50%{opacity:.45}} @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}`}</style>
       <Navbar actions={navActions}/>
       <div style={pageShell('app')}>
-        <div style={{ display:'grid', gridTemplateColumns:pageColumns.appTwoColumn, gap:20, alignItems:'start' }}>
-          {/* sidebar */}
+        <div style={{ display:'grid', gridTemplateColumns:'220px 180px 1fr', gap:20, alignItems:'start' }}>
+          {/* nav sidebar */}
+          <AppSidebar/>
+          {/* filter sidebar */}
           <div style={{ position:'sticky', top:74 }}>
             <Sidebar schools={schools} courses={courses} filters={filters} onChange={update}/>
           </div>

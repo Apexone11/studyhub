@@ -1,10 +1,12 @@
 import Navbar from '../components/Navbar'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import { identifyAuthenticatedUser } from '../lib/telemetry'
+import { setStoredUser } from '../lib/session'
 import { API } from '../config'
 
 function LoginPage() {
+  const navigate = useNavigate()
   const [showPassword, setShowPassword] = useState(false)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -43,10 +45,9 @@ function LoginPage() {
         setRequires2fa(true)
         return
       }
-      localStorage.setItem('token', data.token)
-      localStorage.setItem('user', JSON.stringify(data.user))
+      setStoredUser(data.user)
       identifyAuthenticatedUser(data.user)
-      window.location.href = '/feed'
+      navigate('/feed')
     } catch {
       setError('Could not connect to server. Make sure the backend is running.')
     }
@@ -65,10 +66,9 @@ function LoginPage() {
       })
       const data = await res.json()
       if (!res.ok) { setTwoFaError(data.error || 'Verification failed.'); return }
-      localStorage.setItem('token', data.token)
-      localStorage.setItem('user', JSON.stringify(data.user))
+      setStoredUser(data.user)
       identifyAuthenticatedUser(data.user)
-      window.location.href = '/feed'
+      navigate('/feed')
     } catch {
       setTwoFaError('Could not connect to server.')
     } finally {

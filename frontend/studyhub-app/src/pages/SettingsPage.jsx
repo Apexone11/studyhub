@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { LogoMark } from '../components/Icons'
 import { API } from '../config'
+import { clearStoredSession, hasStoredSession, logoutSession, setStoredUser } from '../lib/session'
 
 const NAV_TABS = [
   { id: 'profile',  label: 'Profile' },
@@ -45,15 +46,13 @@ function SettingsPage() {
   const [emMsg,  setEmMsg]   = useState(null)
   const [saving, setSaving]  = useState(false)
 
-  const token = localStorage.getItem('token')
-
   useEffect(() => {
-    if (!token) { navigate('/login'); return }
-    fetch(`${API}/api/settings/me`, { headers: { Authorization: `Bearer ${token}` } })
+    if (!hasStoredSession()) { navigate('/login'); return }
+    fetch(`${API}/api/settings/me`)
       .then(r => r.json())
       .then(data => { setUser(data); setLoading(false) })
       .catch(() => setLoading(false))
-  }, [token, navigate])
+  }, [navigate])
 
   async function handlePatch(endpoint, body, setMsg, onSuccess) {
     setSaving(true)
@@ -61,7 +60,7 @@ function SettingsPage() {
     try {
       const res = await fetch(`${API}/api/settings/${endpoint}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
       const data = await res.json()
@@ -88,8 +87,7 @@ function SettingsPage() {
   function handleUsernameSubmit(e) {
     e.preventDefault()
     handlePatch('username', unForm, setUnMsg, (data) => {
-      localStorage.setItem('token', data.token)
-      localStorage.setItem('user', JSON.stringify(data.user))
+      setStoredUser(data.user)
       setUser(u => ({ ...u, username: data.user.username }))
       setUnForm({ newUsername: '', password: '' })
     })
@@ -110,7 +108,7 @@ function SettingsPage() {
       const endpoint = enable ? '2fa/enable' : '2fa/disable'
       const res = await fetch(`${API}/api/settings/${endpoint}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: twoFaPassword }),
       })
       const data = await res.json()
@@ -134,13 +132,12 @@ function SettingsPage() {
     try {
       const res = await fetch(`${API}/api/settings/account`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(deleteForm),
       })
       const data = await res.json()
       if (!res.ok) { setDeleteMsg({ type: 'error', text: data.error }); return }
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
+      clearStoredSession()
       navigate('/')
     } catch {
       setDeleteMsg({ type: 'error', text: 'Could not connect to server.' })
@@ -149,9 +146,8 @@ function SettingsPage() {
     }
   }
 
-  function handleSignOut() {
-    localStorage.removeItem('token')
-    localStorage.removeItem('user')
+  async function handleSignOut() {
+    await logoutSession()
     navigate('/login')
   }
 

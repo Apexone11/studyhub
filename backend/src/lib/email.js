@@ -1,5 +1,9 @@
 const nodemailer = require('nodemailer')
 
+function getPublicAppUrl() {
+  return process.env.FRONTEND_URL || 'http://localhost:5173'
+}
+
 // Create transporter lazily so missing env vars don't crash on startup
 function getTransporter() {
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) return null
@@ -46,7 +50,7 @@ function htmlWrap(title, bodyHtml) {
           <td style="background:#f8fafc;padding:20px 40px;text-align:center;border-top:1px solid #e5e7eb;">
             <p style="margin:0;font-size:12px;color:#9ca3af;">
               Built by students, for students &middot;
-              <a href="https://studyhub.up.railway.app" style="color:#3b82f6;text-decoration:none;">StudyHub</a>
+              <a href="${getPublicAppUrl()}" style="color:#3b82f6;text-decoration:none;">StudyHub</a>
             </p>
             <p style="margin:6px 0 0;font-size:11px;color:#d1d5db;">
               If you did not request this email, you can safely ignore it.

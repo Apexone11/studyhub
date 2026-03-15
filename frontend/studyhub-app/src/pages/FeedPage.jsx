@@ -20,14 +20,12 @@ import {
   LogoMark,
 } from '../components/Icons'
 import { pageColumns, pageShell } from '../lib/ui'
+import { hasStoredSession, logoutSession } from '../lib/session'
 
 import { API } from '../config'
 
-const getToken = () => localStorage.getItem('token')
-
 const authHeaders = () => ({
   'Content-Type': 'application/json',
-  ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
 })
 
 const FALLBACK_USER = {
@@ -248,7 +246,7 @@ function FeedCard({ item }) {
 
   async function handleStar(e) {
     e.stopPropagation()
-    if (!getToken()) { navigate('/login'); return }
+    if (!hasStoredSession()) { navigate('/login'); return }
     if (busy) return
     setBusy(true)
     try {
@@ -280,7 +278,7 @@ function FeedCard({ item }) {
 
   function handleFork(e) {
     e.stopPropagation()
-    if (!getToken()) { navigate('/login'); return }
+    if (!hasStoredSession()) { navigate('/login'); return }
     navigate(`/sheets/${sheetId}`)
   }
 
@@ -444,9 +442,7 @@ export default function FeedPage() {
 
   useEffect(() => {
     let cancelled = false
-    const token = getToken()
-
-    if (!token) {
+    if (!hasStoredSession()) {
       navigate('/login')
       return undefined
     }
@@ -1217,9 +1213,8 @@ export default function FeedPage() {
           </div>
 
           <button
-            onClick={() => {
-              localStorage.removeItem('token')
-              localStorage.removeItem('user')
+            onClick={async () => {
+              await logoutSession()
               navigate('/login')
             }}
             style={{
