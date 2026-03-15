@@ -23,8 +23,8 @@ async function main() {
   })
   console.log('Admin created (username not logged).')
   if (!process.env.ADMIN_PASSWORD) {
-    console.log('Generated password:', password)
-    console.log('No ADMIN_PASSWORD env var was provided, so this password was generated for one-time bootstrap use.')
+    console.log('A random admin password was generated for one-time bootstrap use (not printed here for security).')
+    console.log('Set the ADMIN_PASSWORD environment variable and re-run this script if you need to control the initial password value.')
   } else {
     console.log('Password source: ADMIN_PASSWORD env var (not reprinted here).')
   }
