@@ -14,14 +14,14 @@ async function main() {
 
   const existing = await prisma.user.findUnique({ where: { username } })
   if (existing) {
-    console.log('Admin already exists:', username)
+    console.log('Admin already exists (username not logged).')
     return
   }
   const hash = await bcrypt.hash(password, 12)
   await prisma.user.create({
     data: { username, passwordHash: hash, role: 'admin' }
   })
-  console.log('Admin created:', username)
+  console.log('Admin created (username not logged).')
   if (!process.env.ADMIN_PASSWORD) {
     console.log('Generated password:', password)
     console.log('No ADMIN_PASSWORD env var was provided, so this password was generated for one-time bootstrap use.')
