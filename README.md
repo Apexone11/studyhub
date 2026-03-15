@@ -6,7 +6,7 @@ StudyHub is a student-focused web app where users can register, log in, and coll
 - Frontend built with React and Vite
 - Backend API built with Node.js and Express
 - PostgreSQL database managed through Prisma
-- JWT-based authentication for user sessions
+- Cookie-based JWT authentication for user sessions
 
 ## Main User Flow
 1. Create an account and select enrolled courses during registration
@@ -67,6 +67,17 @@ npm --prefix frontend/studyhub-app run dev
 ```
 
 ## Docker (Always-On Dev Stack)
+Before running Docker, copy the root `.env.example` to `.env` and choose your own local-only values for:
+
+- `POSTGRES_PASSWORD`
+- `JWT_SECRET`
+- `DATABASE_URL`
+- `SHADOW_DATABASE_URL`
+- `PGADMIN_DEFAULT_EMAIL`
+- `PGADMIN_DEFAULT_PASSWORD`
+
+Do not reuse production secrets here, and do not commit the resulting `.env` file.
+
 1. Build and start everything in the background:
 
 ```bash
@@ -98,14 +109,14 @@ docker compose down
 StudyHub now includes pgAdmin in Docker for viewing tables, users, and records.
 
 1. Open pgAdmin at `http://localhost:5050`
-2. Sign in with:
-	- Email: `admin@studyhub.com`
-	- Password: `studyhub_admin`
+2. Sign in with the values from your local root `.env`:
+	- Email: `PGADMIN_DEFAULT_EMAIL`
+	- Password: `PGADMIN_DEFAULT_PASSWORD`
 3. Add a server in pgAdmin:
 	- Host: `db`
 	- Port: `5432`
 	- Username: `studyhub`
-	- Password: `studyhub_dev_password`
+	- Password: `POSTGRES_PASSWORD`
 	- Database: `studyhub`
 
 ## Analytics and Monitoring
@@ -119,6 +130,8 @@ To enable them, copy `.env.example` files and set your keys:
 - `frontend/studyhub-app/.env.example` (frontend local values)
 - `backend/.env.example` (backend local values)
 
+Never commit real passwords, API keys, or production URLs into any of those files.
+
 After setting keys for Docker, restart the stack:
 
 ```bash
@@ -129,6 +142,11 @@ docker compose up -d --build
 - User passwords are never stored in plain text.
 - Passwords are hashed with bcrypt in the backend.
 - You can view usernames and password hashes in the database, but never the original passwords.
+
+## Production Admin Bootstrap
+- Set `ADMIN_USERNAME` yourself before running `npm run seed:admin`.
+- If you leave `ADMIN_PASSWORD` blank, the script will generate a one-time password and print it once in the shell.
+- If you set `ADMIN_PASSWORD` yourself, the script will not echo it back.
 
 ## Notes
 - Keep secrets only in local `.env` files.

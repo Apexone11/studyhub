@@ -95,10 +95,11 @@ Branch naming:
 npm --prefix backend install
 npm --prefix frontend/studyhub-app install
 
-# Create backend/.env with:
-#   PORT=4000
-#   JWT_SECRET=your_secret_here
-#   DATABASE_URL=postgresql://...
+# Copy backend/.env.example to backend/.env
+# Then fill in your own local-only values for:
+#   PORT
+#   JWT_SECRET
+#   DATABASE_URL
 
 # Run migrations
 cd backend && npx prisma migrate dev

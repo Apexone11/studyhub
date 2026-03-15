@@ -5,7 +5,7 @@ services:
     environment:
       POSTGRES_DB: studyhub
       POSTGRES_USER: studyhub
-      POSTGRES_PASSWORD: studyhub_dev_password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-set_a_local_postgres_password}
     ports:
       - "5432:5432"
     volumes:
@@ -22,9 +22,9 @@ services:
     restart: unless-stopped
     environment:
       PORT: 4000
-      JWT_SECRET: dev_jwt_change_me
-      DATABASE_URL: postgresql://studyhub:studyhub_dev_password@db:5432/studyhub?schema=public
-      SHADOW_DATABASE_URL: postgresql://studyhub:studyhub_dev_password@db:5432/studyhub_shadow?schema=public
+      JWT_SECRET: ${JWT_SECRET:-set_a_local_jwt_secret}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://studyhub:set_a_local_postgres_password@db:5432/studyhub?schema=public}
+      SHADOW_DATABASE_URL: ${SHADOW_DATABASE_URL:-postgresql://studyhub:set_a_local_postgres_password@db:5432/studyhub_shadow?schema=public}
       SENTRY_DSN: ${SENTRY_DSN:-}
       SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0.1}
     ports:
@@ -41,8 +41,8 @@ services:
     image: dpage/pgadmin4:8
     restart: unless-stopped
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@studyhub.com
-      PGADMIN_DEFAULT_PASSWORD: studyhub_admin
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@example.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-set_a_local_pgadmin_password}
       PGADMIN_CONFIG_ENHANCED_COOKIE_PROTECTION: "True"
     ports:
       - "5050:80"
