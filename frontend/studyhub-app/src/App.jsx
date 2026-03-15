@@ -39,7 +39,9 @@ import {
 // Redirects to /feed if the user is already logged in.
 // Prevents authenticated users from seeing the marketing/auth pages.
 function PublicRoute({ children }) {
-  return hasStoredSession() ? <Navigate to="/feed" replace /> : children
+  const user = getStoredUser()
+  if (!hasStoredSession() || !user) return children
+  return <Navigate to={user.role === 'admin' ? '/admin' : '/feed'} replace />
 }
 
 // Redirects to /login if the user is not logged in.
