@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "start": "serve dist --single"
+    "start": "node scripts/start.js"
   },
   "dependencies": {
     "@sentry/react": "^10.43.0",
