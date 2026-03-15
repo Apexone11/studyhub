@@ -8,8 +8,9 @@ import {
   IconSearch, IconStar, IconStarFilled, IconFork,
   IconDownload, IconUpload,
 } from '../components/Icons'
+import { pageColumns, pageShell } from '../lib/ui'
 
-const API    = 'http://localhost:4000'
+import { API } from '../config'
 const LIMIT  = 10
 const FONT   = "'Plus Jakarta Sans', system-ui, sans-serif"
 const getToken    = () => localStorage.getItem('token')
@@ -248,7 +249,10 @@ export default function SheetsPage() {
       .finally(()=>setLoading(false))
   },[])
 
-  useEffect(()=>{ fetchSheets(filters,page) },[filters,page,fetchSheets])
+  useEffect(()=>{
+    const timer = setTimeout(()=>{ fetchSheets(filters,page) }, 0)
+    return ()=>clearTimeout(timer)
+  },[filters,page,fetchSheets])
 
   useEffect(()=>{
     const p=new URLSearchParams()
@@ -257,7 +261,7 @@ export default function SheetsPage() {
     if(filters.courseId) p.set('courseId',filters.courseId)
     if(filters.sortBy!=='newest') p.set('sort',filters.sortBy)
     setSp(p,{replace:true})
-  },[filters])
+  },[filters,setSp])
 
   const update=(patch)=>{ setFilters(f=>({...f,...patch})); setPage(1) }
 
@@ -288,20 +292,20 @@ export default function SheetsPage() {
     <div style={{ minHeight:'100vh', background:'#edf0f5', fontFamily:FONT }}>
       <style>{`@keyframes shimmer{0%,100%{opacity:1}50%{opacity:.45}} @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}`}</style>
       <Navbar actions={navActions}/>
-      <div style={{ maxWidth:1140, margin:'0 auto', padding:'24px 20px 60px' }}>
-        <div style={{ display:'grid', gridTemplateColumns:'200px 1fr', gap:16, alignItems:'start' }}>
+      <div style={pageShell('app')}>
+        <div style={{ display:'grid', gridTemplateColumns:pageColumns.appTwoColumn, gap:20, alignItems:'start' }}>
           {/* sidebar */}
-          <div style={{ position:'sticky', top:62 }}>
+          <div style={{ position:'sticky', top:74 }}>
             <Sidebar schools={schools} courses={courses} filters={filters} onChange={update}/>
           </div>
           {/* main */}
           <main style={{ animation:'fadeIn .3s ease-out' }}>
             {/* search */}
-            <div style={{ background:'#fff', borderRadius:11, border:'1px solid #e2e8f0', display:'flex', alignItems:'center', gap:10, padding:'0 14px', height:42, marginBottom:12 }}>
+            <div style={{ background:'#fff', borderRadius:14, border:'1px solid #e2e8f0', display:'flex', alignItems:'center', gap:10, padding:'0 16px', minHeight:48, marginBottom:14 }}>
               <IconSearch size={15} style={{ color:'#94a3b8', flexShrink:0 }}/>
               <input defaultValue={filters.search} placeholder="Search sheets by title, content or author…"
                 onChange={e=>{ clearTimeout(searchTimer.current); searchTimer.current=setTimeout(()=>update({search:e.target.value}),350) }}
-                style={{ flex:1, border:'none', outline:'none', fontSize:13, color:'#334155', fontFamily:FONT, background:'transparent' }}
+                style={{ flex:1, border:'none', outline:'none', fontSize:14, color:'#334155', fontFamily:FONT, background:'transparent' }}
               />
             </div>
             {/* count */}
@@ -326,10 +330,10 @@ export default function SheetsPage() {
             {!loading&&!error&&sheets.map(s=><SheetCard key={s.id} sheet={s} onStar={handleStar}/>)}
             {/* empty */}
             {!loading&&!error&&sheets.length===0&&(
-              <div style={{ background:'#fff', borderRadius:14, border:'1.5px dashed #cbd5e1', padding:'48px 24px', textAlign:'center' }}>
-                <div style={{ fontSize:32, marginBottom:12 }}>📄</div>
-                <div style={{ fontWeight:700, fontSize:15, color:'#64748b', marginBottom:6 }}>No sheets yet</div>
-                <div style={{ fontSize:12, color:'#94a3b8', marginBottom:20 }}>{filters.search?`No results for "${filters.search}"`:'Be the first to upload!'}</div>
+              <div style={{ background:'#fff', borderRadius:16, border:'1.5px dashed #cbd5e1', padding:'56px 28px', minHeight:320, display:'flex', flexDirection:'column', justifyContent:'center', alignItems:'center', textAlign:'center' }}>
+                <div style={{ fontSize:32, marginBottom:12, color:'#cbd5e1' }}><i className="fas fa-file-lines"></i></div>
+                <div style={{ fontWeight:700, fontSize:18, color:'#64748b', marginBottom:8 }}>No sheets yet</div>
+                <div style={{ fontSize:14, color:'#94a3b8', marginBottom:22 }}>{filters.search?`No results for "${filters.search}"`:'Be the first to upload!'}</div>
                 <Link to="/sheets/upload" style={{ padding:'8px 20px', background:'#3b82f6', color:'#fff', borderRadius:8, textDecoration:'none', fontSize:13, fontWeight:700, display:'inline-flex', alignItems:'center', gap:6 }}>
                   <IconUpload size={13}/>Upload first sheet
                 </Link>

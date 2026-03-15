@@ -225,6 +225,45 @@ export function IconBell({ size, ...p }) {
   )
 }
 
+// Info Circle
+export function IconInfoCircle({ size, ...p }) {
+  return (
+    <Svg size={size} {...p}>
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" />
+      <line x1="12" y1="10.5" x2="12" y2="16.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <circle cx="12" cy="7.5" r="1.2" fill="currentColor" />
+    </Svg>
+  )
+}
+
+// Shield
+export function IconShield({ size, ...p }) {
+  return (
+    <Svg size={size} {...p}>
+      <path
+        d="M12 3 L19 6 V11.5 C19 16.5 16.2 20 12 21.5 C7.8 20 5 16.5 5 11.5 V6 Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+        fill="none"
+      />
+      <path d="M9.2 12 L11.2 14 L15.3 9.8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    </Svg>
+  )
+}
+
+// Group / Community
+export function IconUsers({ size, ...p }) {
+  return (
+    <Svg size={size} {...p}>
+      <circle cx="9" cy="9" r="3" stroke="currentColor" strokeWidth="1.8" />
+      <circle cx="16.5" cy="10" r="2.5" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M4.5 19 Q5.5 14.5 9 14.5 Q12.5 14.5 13.5 19" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" fill="none" />
+      <path d="M13.8 18 Q14.5 14.8 17.2 14.8 Q19.5 14.8 20.2 18" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" fill="none" />
+    </Svg>
+  )
+}
+
 // Pen / Edit
 export function IconPen({ size, ...p }) {
   return (
@@ -255,6 +294,16 @@ export function IconLink({ size, ...p }) {
   )
 }
 
+// Arrow Right - CTA direction
+export function IconArrowRight({ size, ...p }) {
+  return (
+    <Svg size={size} {...p}>
+      <path d="M5 12 L19 12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M14 7 L19 12 L14 17" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    </Svg>
+  )
+}
+
 // Arrow Left — back navigation
 export function IconArrowLeft({ size, ...p }) {
   return (
@@ -265,12 +314,37 @@ export function IconArrowLeft({ size, ...p }) {
   )
 }
 
+// School - simple campus facade
+export function IconSchool({ size, ...p }) {
+  return (
+    <Svg size={size} {...p}>
+      <path d="M3 10 L12 5 L21 10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      <line x1="6" y1="10" x2="6" y2="18" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <line x1="10" y1="10" x2="10" y2="18" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <line x1="14" y1="10" x2="14" y2="18" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <line x1="18" y1="10" x2="18" y2="18" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <path d="M4 19 L20 19" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </Svg>
+  )
+}
+
 // Plus — add / new
 export function IconPlus({ size, ...p }) {
   return (
     <Svg size={size} {...p}>
       <line x1="12" y1="4" x2="12" y2="20" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
       <line x1="4" y1="12" x2="20" y2="12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </Svg>
+  )
+}
+
+// Spark - AI / magic / assistant
+export function IconSpark({ size, ...p }) {
+  return (
+    <Svg size={size} {...p}>
+      <path d="M12 3 L13.7 8.3 L19 10 L13.7 11.7 L12 17 L10.3 11.7 L5 10 L10.3 8.3 Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" fill="none" />
+      <path d="M18.5 3.5 L19.3 5.7 L21.5 6.5 L19.3 7.3 L18.5 9.5 L17.7 7.3 L15.5 6.5 L17.7 5.7 Z" fill="currentColor" />
+      <path d="M5.5 15.5 L6.2 17.1 L7.8 17.8 L6.2 18.5 L5.5 20.1 L4.8 18.5 L3.2 17.8 L4.8 17.1 Z" fill="currentColor" />
     </Svg>
   )
 }
@@ -350,6 +424,28 @@ export function IconSpinner({ size, ...p }) {
         stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none"
         opacity="0.25"
       />
+    </Svg>
+  )
+}
+
+export function IconSettings({ size, ...p }) {
+  return (
+    <Svg size={size} {...p}>
+      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" fill="none" />
+      <path
+        d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"
+        stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"
+      />
+    </Svg>
+  )
+}
+
+export function IconCamera({ size, ...p }) {
+  return (
+    <Svg size={size} {...p}>
+      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"
+        stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      <circle cx="12" cy="13" r="4" stroke="currentColor" strokeWidth="2" fill="none" />
     </Svg>
   )
 }

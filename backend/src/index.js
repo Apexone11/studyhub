@@ -1,5 +1,6 @@
 const express = require('express')
 const cors = require('cors')
+const path = require('path')
 require('dotenv').config()
 const { initSentry, captureError } = require('./monitoring/sentry')
 
@@ -10,6 +11,13 @@ const PORT = process.env.PORT || 4000
 const authRoutes = require('./routes/auth')
 const courseRoutes = require('./routes/courses')
 const sheetRoutes = require('./routes/sheets')
+const settingsRoutes = require('./routes/settings')
+const announcementRoutes = require('./routes/announcements')
+const adminRoutes = require('./routes/admin')
+const uploadRoutes = require('./routes/upload')
+const notesRoutes = require('./routes/notes')
+const notificationsRoutes = require('./routes/notifications')
+const usersRoutes = require('./routes/users')
 
 if (sentryEnabled) {
     console.log('Sentry monitoring enabled for backend.')
@@ -26,11 +34,26 @@ process.on('unhandledRejection', (reason) => {
     console.error(error)
 })
 
-// Allow the local frontend to call this API with credentials.
-app.use(cors({ origin: 'http://localhost:5173', credentials: true }))
+// Dynamic CORS: dev allows Vite dev/preview servers; production allows the Railway frontend URL.
+const isProd = process.env.NODE_ENV === 'production'
+const allowedOrigins = isProd
+  ? [process.env.FRONTEND_URL].filter(Boolean)
+  : ['http://localhost:5173', 'http://localhost:4173']
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true)
+    if (allowedOrigins.includes(origin)) return callback(null, true)
+    callback(new Error(`CORS: origin ${origin} not allowed`))
+  },
+  credentials: true,
+}))
 
 // Parse JSON request bodies for auth and future API routes.
 app.use(express.json())
+
+// Serve uploaded files (avatars, attachments) as static assets.
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')))
 
 // Mount authentication endpoints under /api/auth.
 app.use('/api/auth', authRoutes)
@@ -40,6 +63,27 @@ app.use('/api/courses', courseRoutes)
 
 // Mount study sheet endpoints under /api/sheets.
 app.use('/api/sheets', sheetRoutes)
+
+// Mount settings endpoints under /api/settings.
+app.use('/api/settings', settingsRoutes)
+
+// Mount announcements endpoints under /api/announcements.
+app.use('/api/announcements', announcementRoutes)
+
+// Mount admin endpoints under /api/admin.
+app.use('/api/admin', adminRoutes)
+
+// Mount upload endpoints under /api/upload.
+app.use('/api/upload', uploadRoutes)
+
+// Mount notes endpoints under /api/notes.
+app.use('/api/notes', notesRoutes)
+
+// Mount notifications endpoints under /api/notifications.
+app.use('/api/notifications', notificationsRoutes)
+
+// Mount user profile endpoints under /api/users.
+app.use('/api/users', usersRoutes)
 
 // Basic API health check.
 app.get('/', (req, res) => {

@@ -16,9 +16,14 @@ import PrivacyPage     from './pages/PrivacyPage'
 import GuidelinesPage  from './pages/GuidelinesPage'
 
 // ── new pages ─────────────────────────────────────────────────────
-import FeedPage         from './pages/FeedPage'
-import SheetsPage       from './pages/SheetsPage'
-import SheetViewerPage  from './pages/SheetViewerPage'
+import FeedPage          from './pages/FeedPage'
+import SheetsPage        from './pages/SheetsPage'
+import SheetViewerPage   from './pages/SheetViewerPage'
+import SettingsPage      from './pages/SettingsPage'
+import AboutPage          from './pages/AboutPage'
+import ForgotPasswordPage from './pages/ForgotPasswordPage'
+import ResetPasswordPage  from './pages/ResetPasswordPage'
+import UserProfilePage    from './pages/UserProfilePage'
 import {
   TestsPage,
   TestTakerPage,
@@ -76,9 +81,12 @@ export default function App() {
         <Route path="/"         element={<PublicRoute><HomePage /></PublicRoute>} />
         <Route path="/login"    element={<PublicRoute><LoginPage /></PublicRoute>} />
         <Route path="/register" element={<PublicRoute><RegisterScreen /></PublicRoute>} />
-        <Route path="/terms"      element={<TermsPage />} />
-        <Route path="/privacy"    element={<PrivacyPage />} />
-        <Route path="/guidelines" element={<GuidelinesPage />} />
+        <Route path="/terms"            element={<TermsPage />} />
+        <Route path="/privacy"          element={<PrivacyPage />} />
+        <Route path="/guidelines"       element={<GuidelinesPage />} />
+        <Route path="/about"            element={<AboutPage />} />
+        <Route path="/forgot-password"  element={<ForgotPasswordPage />} />
+        <Route path="/reset-password"   element={<ResetPasswordPage />} />
 
         {/* ── authenticated ────────────────────────────────────── */}
         <Route path="/feed"          element={<PrivateRoute><FeedPage /></PrivateRoute>} />
@@ -92,6 +100,10 @@ export default function App() {
         <Route path="/submit"        element={<PrivateRoute><SubmitPage /></PrivateRoute>} />
         <Route path="/admin"         element={<PrivateRoute><AdminPage /></PrivateRoute>} />
         <Route path="/dashboard"     element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
+        <Route path="/settings"      element={<PrivateRoute><SettingsPage /></PrivateRoute>} />
+
+        {/* ── public user profiles ─────────────────────────────── */}
+        <Route path="/users/:username" element={<UserProfilePage />} />
 
         {/* ── catch-all ────────────────────────────────────────── */}
         <Route path="*" element={<Navigate to="/" replace />} />

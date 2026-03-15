@@ -1,0 +1,12 @@
+# railway.toml — frontend static site
+# Place this file in: studyhub/frontend/studyhub-app/railway.toml
+
+[build]
+builder = "nixpacks"
+buildCommand = "npm install && npm run build"
+
+[deploy]
+startCommand = "npx serve dist -s -l 3000"
+
+[[services]]
+name = "studyhub-app"

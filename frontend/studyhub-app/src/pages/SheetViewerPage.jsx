@@ -1,7 +1,20 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
+import DOMPurify from 'dompurify'
+import {
+  IconArrowLeft,
+  IconCheck,
+  IconDownload,
+  IconFork,
+  IconLink,
+  IconPen,
+  IconStar,
+  IconStarFilled,
+  LogoMark,
+} from '../components/Icons'
+import { pageColumns, pageShell } from '../lib/ui'
 
-const API = 'http://localhost:4000'
+import { API } from '../config'
 const getToken = () => localStorage.getItem('token')
 const authHeaders = () => ({
   'Content-Type': 'application/json',
@@ -280,7 +293,7 @@ function ForkModal({ sheet, onClose, onFork }) {
             background: '#f0fdf4', border: '1px solid #bbf7d0',
             display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
           }}>
-            <i className="fa-solid fa-code-fork" style={{ color: '#16a34a', fontSize: 20 }} />
+            <IconFork size={20} style={{ color: '#16a34a' }} />
           </div>
           <div>
             <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#0f172a' }}>Fork this sheet</h2>
@@ -330,7 +343,7 @@ function ForkModal({ sheet, onClose, onFork }) {
         />
         {error && (
           <div style={{ fontSize: 12, color: '#dc2626', marginTop: 5 }}>
-            <i className="fa-solid fa-circle-exclamation" style={{ marginRight: 4 }} />{error}
+⚠ {error}
           </div>
         )}
 
@@ -350,8 +363,8 @@ function ForkModal({ sheet, onClose, onFork }) {
             transition: 'background .15s',
           }}>
             {loading
-              ? <><i className="fa-solid fa-spinner fa-spin" style={{ fontSize: 13 }} />Forking…</>
-              : <><i className="fa-solid fa-code-fork" style={{ fontSize: 13 }} />Fork Sheet</>
+              ? <>⟳ Forking…</>
+              : <><IconFork size={14} />Fork Sheet</>
             }
           </button>
         </div>
@@ -440,6 +453,19 @@ export default function SheetViewerPage() {
   const [showFork,   setShowFork]   = useState(false)
   const [activeId,   setActiveId]   = useState('')
   const [readPct,    setReadPct]    = useState(0)
+
+  // Reactions state
+  const [likes,        setLikes]        = useState(0)
+  const [dislikes,     setDislikes]     = useState(0)
+  const [userReaction, setUserReaction] = useState(null)
+  const [reacting,     setReacting]     = useState(false)
+
+  // Comments state
+  const [comments,     setComments]     = useState([])
+  const [commentTotal, setCommentTotal] = useState(0)
+  const [commentText,  setCommentText]  = useState('')
+  const [commentErr,   setCommentErr]   = useState('')
+  const [postingCmt,   setPostingCmt]   = useState(false)
   const [copied,     setCopied]     = useState(false)
   const contentRef = useRef()
 
@@ -460,6 +486,11 @@ export default function SheetViewerPage() {
       .then(data => {
         setSheet(data)
         setLocalStars(data.stars || 0)
+        if (data.reactions) {
+          setLikes(data.reactions.likes || 0)
+          setDislikes(data.reactions.dislikes || 0)
+          setUserReaction(data.reactions.userReaction || null)
+        }
         // ping download counter
         fetch(`${API}/api/sheets/${id}/download`, { method: 'POST' }).catch(() => {})
       })
@@ -475,6 +506,49 @@ export default function SheetViewerPage() {
       .then(d => setRelated((d.sheets || []).filter(s => s.id !== parseInt(id)).slice(0, 3)))
       .catch(() => {})
   }, [sheet?.courseId, id])
+
+  // fetch comments
+  useEffect(() => {
+    if (!id) return
+    fetch(`${API}/api/sheets/${id}/comments`)
+      .then(r => r.json())
+      .then(d => { setComments(d.comments || []); setCommentTotal(d.total || 0) })
+      .catch(() => {})
+  }, [id])
+
+  async function handlePostComment(e) {
+    e.preventDefault()
+    if (!commentText.trim()) return
+    setCommentErr('')
+    setPostingCmt(true)
+    try {
+      const res = await fetch(`${API}/api/sheets/${id}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ content: commentText.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setCommentErr(data.error || 'Could not post comment.'); return }
+      setComments(prev => [data, ...prev])
+      setCommentTotal(t => t + 1)
+      setCommentText('')
+    } catch {
+      setCommentErr('Could not connect to server.')
+    } finally {
+      setPostingCmt(false)
+    }
+  }
+
+  async function handleDeleteComment(commentId) {
+    try {
+      await fetch(`${API}/api/sheets/${id}/comments/${commentId}`, {
+        method: 'DELETE',
+        headers: authHeaders(),
+      })
+      setComments(prev => prev.filter(c => c.id !== commentId))
+      setCommentTotal(t => t - 1)
+    } catch { /* ignore */ }
+  }
 
   // reading progress bar
   useEffect(() => {
@@ -540,6 +614,32 @@ export default function SheetViewerPage() {
     })
   }
 
+  // react (like/dislike)
+  async function handleReact(type) {
+    if (reacting || !getToken()) return
+    setReacting(true)
+    // optimistic update
+    const prev = userReaction
+    const newReaction = userReaction === type ? null : type
+    setUserReaction(newReaction)
+    setLikes(l => l + (type === 'like' ? (newReaction === 'like' ? 1 : -1) : (prev === 'like' ? -1 : 0)))
+    setDislikes(d => d + (type === 'dislike' ? (newReaction === 'dislike' ? 1 : -1) : (prev === 'dislike' ? -1 : 0)))
+    try {
+      const res = await fetch(`${API}/api/sheets/${id}/react`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ type: newReaction }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setLikes(data.likes)
+        setDislikes(data.dislikes)
+        setUserReaction(data.userReaction)
+      }
+    } catch { /* keep optimistic */ }
+    finally { setReacting(false) }
+  }
+
   // fork success
   function onForkSuccess(forked) {
     setShowFork(false)
@@ -554,9 +654,8 @@ export default function SheetViewerPage() {
   const schoolName  = sheet?.course?.school?.name || ''
   const authorName  = sheet?.author?.username || 'unknown'
   const fmtDate     = d => d ? new Date(d).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : ''
-  const isOwn       = sheet && localStorage.getItem('user')
-    ? JSON.parse(localStorage.getItem('user') || '{}').id === sheet.userId
-    : false
+  const currentUser = (() => { try { return JSON.parse(localStorage.getItem('user') || 'null') } catch { return null } })()
+  const isOwn       = sheet && currentUser ? currentUser.id === sheet.userId : false
 
   return (
     <div style={{
@@ -574,21 +673,12 @@ export default function SheetViewerPage() {
 
       {/* top nav */}
       <header style={{
-        background: '#0f172a', height: 56, position: 'sticky', top: 0, zIndex: 100,
-        display: 'flex', alignItems: 'center', padding: '0 24px', gap: 12,
+        background: '#0f172a', height: 'clamp(60px, 5vw, 74px)', position: 'sticky', top: 0, zIndex: 100,
+        display: 'flex', alignItems: 'center', padding: '0 clamp(16px, 2.5vw, 40px)', gap: 12,
         borderBottom: '1px solid #1e293b',
       }}>
         <Link to="/feed" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
-          <svg width="26" height="26" viewBox="0 0 80 80" fill="none">
-            <circle cx="40" cy="40" r="38" fill="#1e293b"/>
-            <line x1="40" y1="64" x2="40" y2="45" stroke="#3b82f6" strokeWidth="4" strokeLinecap="round"/>
-            <path d="M40 45 Q40 33 25 23" stroke="#3b82f6" strokeWidth="3.5" fill="none" strokeLinecap="round"/>
-            <path d="M40 45 Q40 33 55 23" stroke="#3b82f6" strokeWidth="3.5" fill="none" strokeLinecap="round"/>
-            <circle cx="40" cy="45" r="4" fill="#3b82f6"/>
-            <circle cx="25" cy="23" r="3.5" fill="#60a5fa"/>
-            <circle cx="55" cy="23" r="3.5" fill="#60a5fa"/>
-            <rect x="30" y="67" width="20" height="4" rx="2" fill="#f59e0b"/>
-          </svg>
+          <LogoMark size={28} />
           <span style={{ fontWeight: 800, fontSize: 16, color: '#fff' }}>
             Study<span style={{ color: '#3b82f6' }}>Hub</span>
           </span>
@@ -605,25 +695,26 @@ export default function SheetViewerPage() {
         <div style={{ flex: 1 }} />
         {/* action buttons in nav */}
         <button onClick={handleCopyLink} title="Copy link" style={NAV_BTN}>
-          <i className={copied ? 'fa-solid fa-check' : 'fa-solid fa-link'} style={{ fontSize: 13, color: copied ? '#10b981' : '#94a3b8' }} />
+          {copied
+            ? <IconCheck size={14} style={{ color: '#10b981' }} />
+            : <IconLink size={14} style={{ color: '#94a3b8' }} />}
         </button>
         <button onClick={handleDownload} title="Download .md" style={NAV_BTN} disabled={!sheet}>
-          <i className="fa-solid fa-download" style={{ fontSize: 13, color: '#94a3b8' }} />
+          <IconDownload size={14} style={{ color: '#94a3b8' }} />
         </button>
       </header>
 
       {/* body */}
       <div style={{
-        maxWidth: 1200, margin: '0 auto',
-        padding: '28px 20px 60px',
+        ...pageShell('reading', 28, 60),
         display: 'grid',
-        gridTemplateColumns: '220px 1fr 260px',
-        gap: 20,
+        gridTemplateColumns: pageColumns.readingThreeColumn,
+        gap: 24,
         alignItems: 'start',
       }}>
 
         {/* ── LEFT: TOC ──────────────────────────────────────── */}
-        <div style={{ position: 'sticky', top: 72 }}>
+        <div style={{ position: 'sticky', top: 76 }}>
           {loading
             ? <div style={{ background:'#fff', borderRadius:14, border:'1px solid #e8ecf0', padding:16 }}>
                 <Skeleton w="60%" h={11} mb={14} />
@@ -641,7 +732,7 @@ export default function SheetViewerPage() {
               background:'#fef2f2', border:'1px solid #fecaca', borderRadius:14,
               padding:'24px', textAlign:'center',
             }}>
-              <i className="fa-solid fa-circle-exclamation" style={{ color:'#dc2626', fontSize:32, marginBottom:12, display:'block' }} />
+              <span style={{ fontSize:32, color:'#dc2626', display:'block', marginBottom:12 }}>⚠</span>
               <div style={{ fontWeight:800, fontSize:16, color:'#991b1b', marginBottom:6 }}>Sheet not found</div>
               <div style={{ fontSize:13, color:'#b91c1c', marginBottom:16 }}>
                 {error === '404' ? "This sheet doesn't exist or was deleted." : `Error ${error} — backend may be offline.`}
@@ -702,7 +793,7 @@ export default function SheetViewerPage() {
                       fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 99,
                       background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0',
                     }}>
-                      <i className="fa-solid fa-code-fork" style={{ marginRight: 4, fontSize: 10 }} />
+                      <IconFork size={11} style={{ marginRight: 4 }} />
                       forked
                     </span>
                   )}
@@ -721,7 +812,7 @@ export default function SheetViewerPage() {
                   flexWrap: 'wrap', paddingBottom: 18,
                   borderBottom: '1px solid #f1f5f9',
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Link to={`/users/${authorName}`} style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
                     <div style={{
                       width: 32, height: 32, borderRadius: '50%',
                       background: '#0f172a', color: '#fff',
@@ -730,23 +821,25 @@ export default function SheetViewerPage() {
                     }}>
                       {authorName.slice(0,2).toUpperCase()}
                     </div>
-                    <span style={{ fontSize: 14, fontWeight: 600, color: '#334155' }}>{authorName}</span>
-                  </div>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: '#334155' }}
+                      onMouseEnter={e => e.currentTarget.style.color = '#3b82f6'}
+                      onMouseLeave={e => e.currentTarget.style.color = '#334155'}
+                    >{authorName}</span>
+                  </Link>
                   <span style={{ color: '#cbd5e1' }}>·</span>
                   <span style={{ fontSize: 13, color: '#94a3b8' }}>
-                    <i className="fa-regular fa-calendar" style={{ marginRight: 5 }} />
                     {fmtDate(sheet.createdAt)}
                   </span>
                   {/* stats */}
-                  {[
-                    { icon: 'fa-solid fa-star',      val: localStars,       color: hasStarred?'#f59e0b':'#94a3b8' },
-                    { icon: 'fa-solid fa-code-fork', val: sheet.forks||0,   color: '#94a3b8' },
-                    { icon: 'fa-solid fa-download',  val: sheet.downloads||0,color: '#94a3b8' },
-                  ].map((s,i)=>(
-                    <div key={i} style={{ display:'flex', alignItems:'center', gap:4, fontSize:13, color:s.color, fontWeight:500 }}>
-                      <i className={s.icon} style={{ fontSize:13 }} />{s.val}
-                    </div>
-                  ))}
+                  <div style={{ display:'flex', alignItems:'center', gap:4, fontSize:13, color: hasStarred?'#f59e0b':'#94a3b8', fontWeight:500 }}>
+                    {hasStarred ? <IconStarFilled size={13} /> : <IconStar size={13} />}{localStars}
+                  </div>
+                  <div style={{ display:'flex', alignItems:'center', gap:4, fontSize:13, color:'#94a3b8', fontWeight:500 }}>
+                    <IconFork size={13} />{sheet.forks||0}
+                  </div>
+                  <div style={{ display:'flex', alignItems:'center', gap:4, fontSize:13, color:'#94a3b8', fontWeight:500 }}>
+                    <IconDownload size={13} />{sheet.downloads||0}
+                  </div>
                 </div>
 
                 {/* action buttons */}
@@ -763,7 +856,7 @@ export default function SheetViewerPage() {
                       display: 'flex', alignItems: 'center', gap: 6,
                       opacity: !getToken() ? 0.5 : 1,
                     }}>
-                    <i className={hasStarred ? 'fa-solid fa-star' : 'fa-regular fa-star'} style={{ color: hasStarred ? '#f59e0b' : undefined }} />
+                    {hasStarred ? <IconStarFilled size={14} style={{ color: '#f59e0b' }} /> : <IconStar size={14} />}
                     {hasStarred ? 'Starred' : 'Star'} · {localStars}
                   </button>
 
@@ -780,7 +873,7 @@ export default function SheetViewerPage() {
                     onMouseEnter={e=>{e.currentTarget.style.background='#dcfce7';e.currentTarget.style.borderColor='#86efac'}}
                     onMouseLeave={e=>{e.currentTarget.style.background='#f0fdf4';e.currentTarget.style.borderColor='#bbf7d0'}}
                   >
-                    <i className="fa-solid fa-code-fork" />Fork · {sheet.forks || 0}
+                    <IconFork size={14} />Fork · {sheet.forks || 0}
                   </button>
 
                   <button onClick={handleDownload} style={{
@@ -794,7 +887,7 @@ export default function SheetViewerPage() {
                     onMouseEnter={e=>e.currentTarget.style.background='#f8fafc'}
                     onMouseLeave={e=>e.currentTarget.style.background='#fff'}
                   >
-                    <i className="fa-solid fa-download" />Download .md
+                    <IconDownload size={14} />Download .md
                   </button>
 
                   <button onClick={handleCopyLink} style={{
@@ -807,7 +900,7 @@ export default function SheetViewerPage() {
                     display: 'flex', alignItems: 'center', gap: 6,
                     transition: 'all .15s',
                   }}>
-                    <i className={copied ? 'fa-solid fa-check' : 'fa-solid fa-link'} />
+                    {copied ? <IconCheck size={14} /> : <IconLink size={14} />}
                     {copied ? 'Link copied!' : 'Share'}
                   </button>
 
@@ -819,10 +912,50 @@ export default function SheetViewerPage() {
                       textDecoration: 'none',
                       display: 'flex', alignItems: 'center', gap: 6,
                     }}>
-                      <i className="fa-solid fa-pen" />Edit
+                      <IconPen size={14} />Edit
                     </Link>
                   )}
                 </div>
+              </div>
+
+              {/* reactions bar */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 32px', borderBottom: '1px solid #f1f5f9' }}>
+                <button
+                  onClick={() => handleReact('like')}
+                  disabled={reacting || !getToken()}
+                  title={!getToken() ? 'Log in to react' : 'Like'}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '6px 14px', borderRadius: 8, border: '1px solid',
+                    borderColor: userReaction === 'like' ? '#bfdbfe' : '#e2e8f0',
+                    background: userReaction === 'like' ? '#eff6ff' : '#fff',
+                    color: userReaction === 'like' ? '#1d4ed8' : '#64748b',
+                    fontSize: 13, fontWeight: 700, cursor: getToken() ? 'pointer' : 'default',
+                    fontFamily: 'inherit', transition: 'all .15s',
+                    opacity: !getToken() ? 0.5 : 1,
+                  }}
+                >
+                  <i className="fas fa-thumbs-up" style={{ fontSize: 13 }}></i>
+                  {likes}
+                </button>
+                <button
+                  onClick={() => handleReact('dislike')}
+                  disabled={reacting || !getToken()}
+                  title={!getToken() ? 'Log in to react' : 'Dislike'}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '6px 14px', borderRadius: 8, border: '1px solid',
+                    borderColor: userReaction === 'dislike' ? '#fecaca' : '#e2e8f0',
+                    background: userReaction === 'dislike' ? '#fef2f2' : '#fff',
+                    color: userReaction === 'dislike' ? '#dc2626' : '#64748b',
+                    fontSize: 13, fontWeight: 700, cursor: getToken() ? 'pointer' : 'default',
+                    fontFamily: 'inherit', transition: 'all .15s',
+                    opacity: !getToken() ? 0.5 : 1,
+                  }}
+                >
+                  <i className="fas fa-thumbs-down" style={{ fontSize: 13 }}></i>
+                  {dislikes}
+                </button>
               </div>
 
               {/* markdown content */}
@@ -830,29 +963,92 @@ export default function SheetViewerPage() {
                 ref={contentRef}
                 className="md-content"
                 style={{ padding: '32px 40px 40px' }}
-                dangerouslySetInnerHTML={{ __html: mdHtml }}
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(mdHtml) }}
               />
             </div>
           )}
 
-          {/* comments placeholder */}
+          {/* ── COMMENTS ─────────────────────────────────────── */}
           {!loading && !error && sheet && (
-            <div style={{
-              marginTop: 16, background: '#fff', borderRadius: 14,
-              border: '1.5px dashed #cbd5e1', padding: '28px',
-              textAlign: 'center',
-            }}>
-              <i className="fa-regular fa-comments" style={{ fontSize: 28, color: '#cbd5e1', marginBottom: 10, display: 'block' }} />
-              <div style={{ fontWeight: 700, fontSize: 14, color: '#64748b', marginBottom: 4 }}>Comments</div>
-              <div style={{ fontSize: 13, color: '#94a3b8' }}>
-                Student discussion coming soon — planned for V1.
-              </div>
+            <div style={{ marginTop: 16, background: '#fff', borderRadius: 14, border: '1px solid #e5e7eb', padding: '28px' }}>
+              <h3 style={{ margin: '0 0 20px', fontSize: 16, fontWeight: 'bold', color: '#1e3a5f', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <i className="fas fa-comments" style={{ color: '#3b82f6' }}></i> Comments ({commentTotal})
+              </h3>
+
+              {/* Compose box — show only when logged in */}
+              {currentUser && (
+                <form onSubmit={handlePostComment} style={{ marginBottom: 24 }}>
+                  <textarea
+                    value={commentText}
+                    onChange={e => { setCommentText(e.target.value); setCommentErr('') }}
+                    placeholder="Leave a comment…"
+                    maxLength={500}
+                    rows={3}
+                    style={{ width: '100%', boxSizing: 'border-box', border: '2px solid #e5e7eb', borderRadius: 8, padding: '10px 14px', fontSize: 14, fontFamily: 'Arial, sans-serif', resize: 'vertical', outline: 'none' }}
+                    onFocus={e => (e.target.style.borderColor = '#2563eb')}
+                    onBlur={e => (e.target.style.borderColor = '#e5e7eb')}
+                  />
+                  {commentErr && <div style={{ color: '#dc2626', fontSize: 13, marginTop: 4 }}>{commentErr}</div>}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+                    <span style={{ fontSize: 12, color: '#9ca3af' }}>{commentText.length}/500</span>
+                    <button
+                      type="submit"
+                      disabled={postingCmt || !commentText.trim()}
+                      style={{ background: '#2563eb', color: '#fff', border: 'none', borderRadius: 7, padding: '8px 20px', fontSize: 13, fontWeight: 'bold', cursor: 'pointer', opacity: postingCmt || !commentText.trim() ? 0.6 : 1 }}
+                    >
+                      {postingCmt ? 'Posting…' : 'Post Comment'}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {!currentUser && (
+                <div style={{ background: '#f8fafc', borderRadius: 8, padding: '14px 18px', marginBottom: 20, fontSize: 14, color: '#6b7280' }}>
+                  <a href="/login" style={{ color: '#2563eb', fontWeight: 'bold' }}>Sign in</a> to leave a comment.
+                </div>
+              )}
+
+              {/* Comment list */}
+              {comments.length === 0 ? (
+                <div style={{ textAlign: 'center', color: '#9ca3af', fontSize: 14, padding: '20px 0' }}>
+                  No comments yet. Be the first!
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {comments.map(c => (
+                    <div key={c.id} style={{ display: 'flex', gap: 12, padding: '14px 0', borderBottom: '1px solid #f3f4f6' }}>
+                      <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#2563eb', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: 14, flexShrink: 0 }}>
+                        {c.author?.username?.[0]?.toUpperCase() || '?'}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                          <div>
+                            <strong style={{ fontSize: 13, color: '#1e3a5f' }}>{c.author?.username}</strong>
+                            <span style={{ fontSize: 12, color: '#9ca3af', marginLeft: 8 }}>
+                              {new Date(c.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </span>
+                          </div>
+                          {currentUser && (currentUser.id === c.userId || currentUser.role === 'admin') && (
+                            <button
+                              onClick={() => handleDeleteComment(c.id)}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 12, padding: 0 }}
+                            >
+                              Delete
+                            </button>
+                          )}
+                        </div>
+                        <p style={{ margin: 0, fontSize: 14, color: '#374151', lineHeight: 1.6, wordBreak: 'break-word' }}>{c.content}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </main>
 
         {/* ── RIGHT SIDEBAR ──────────────────────────────────── */}
-        <aside style={{ position: 'sticky', top: 72, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <aside style={{ position: 'sticky', top: 76, display: 'flex', flexDirection: 'column', gap: 12 }}>
 
           {/* AI tutor */}
           <div style={{
@@ -861,7 +1057,7 @@ export default function SheetViewerPage() {
             border: '1px solid #1e3a5f',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              <i className="fa-solid fa-robot" style={{ color: '#60a5fa', fontSize: 18 }} />
+              <span style={{ color: '#60a5fa', fontSize: 18 }}>✦</span>
               <span style={{ fontWeight: 700, fontSize: 14, color: '#fff' }}>AI Tutor</span>
               <span style={{
                 fontSize: 10, fontWeight: 700, padding: '2px 7px',
@@ -884,7 +1080,7 @@ export default function SheetViewerPage() {
               fontSize: 13, fontWeight: 600, cursor: 'not-allowed',
               fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
             }}>
-              <i className="fa-solid fa-lock" style={{ fontSize: 12 }} />Coming in V1
+🔒 Coming in V1
             </button>
           </div>
 
@@ -898,20 +1094,19 @@ export default function SheetViewerPage() {
                 SHEET INFO
               </div>
               {[
-                { icon: 'fa-solid fa-user',        label: 'Author',     val: authorName },
-                { icon: 'fa-solid fa-book',         label: 'Course',     val: courseName || '—' },
-                { icon: 'fa-solid fa-school',       label: 'School',     val: sheet.course?.school?.short || '—' },
-                { icon: 'fa-regular fa-calendar',   label: 'Uploaded',   val: fmtDate(sheet.createdAt) },
-                { icon: 'fa-solid fa-star',         label: 'Stars',      val: localStars },
-                { icon: 'fa-solid fa-code-fork',    label: 'Forks',      val: sheet.forks || 0 },
-                { icon: 'fa-solid fa-download',     label: 'Downloads',  val: sheet.downloads || 0 },
+                { label: 'Author',    val: authorName },
+                { label: 'Course',    val: courseName || '—' },
+                { label: 'School',    val: sheet.course?.school?.short || '—' },
+                { label: 'Uploaded',  val: fmtDate(sheet.createdAt) },
+                { label: 'Stars',     val: localStars },
+                { label: 'Forks',     val: sheet.forks || 0 },
+                { label: 'Downloads', val: sheet.downloads || 0 },
               ].map(r => (
                 <div key={r.label} style={{
                   display: 'flex', alignItems: 'center', gap: 8,
                   padding: '7px 0', borderBottom: '1px solid #f8fafc',
                   fontSize: 13,
                 }}>
-                  <i className={r.icon} style={{ width: 16, textAlign: 'center', color: '#94a3b8', fontSize: 12, flexShrink: 0 }} />
                   <span style={{ color: '#94a3b8', flex: 1 }}>{r.label}</span>
                   <span style={{ fontWeight: 600, color: '#334155' }}>{r.val}</span>
                 </div>
@@ -941,8 +1136,8 @@ export default function SheetViewerPage() {
                       {s.title}
                     </div>
                     <div style={{ fontSize: 11, color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span><i className="fa-solid fa-star" style={{ color: '#f59e0b', marginRight: 3 }} />{s.stars||0}</span>
-                      <span><i className="fa-solid fa-code-fork" style={{ marginRight: 3 }} />{s.forks||0}</span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><IconStarFilled size={11} style={{ color: '#f59e0b' }} />{s.stars||0}</span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><IconFork size={11} />{s.forks||0}</span>
                     </div>
                   </div>
                 </Link>
@@ -967,7 +1162,7 @@ export default function SheetViewerPage() {
             onMouseEnter={e=>{e.currentTarget.style.background='#f8fafc';e.currentTarget.style.color='#334155'}}
             onMouseLeave={e=>{e.currentTarget.style.background='#fff';e.currentTarget.style.color='#64748b'}}
           >
-            <i className="fa-solid fa-arrow-left" style={{ fontSize: 12 }} />
+            <IconArrowLeft size={14} />
             Back to all sheets
           </Link>
         </aside>

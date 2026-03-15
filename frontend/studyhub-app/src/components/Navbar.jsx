@@ -5,8 +5,9 @@
 //  - Optional inline tab bar (Sheets page uses Browse/My/Starred)
 //  - Optional right-side actions slot
 //  - Uses custom Icons from Icons.jsx instead of Font Awesome
-//  - Compact 52px height, same #0f172a background, sticky top
+//  - Shared responsive sizing for landing + app nav states
 
+import { useState, useEffect, useRef } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   LogoMark,
@@ -14,6 +15,8 @@ import {
   IconBell,
   IconChevronDown,
 } from './Icons'
+import { pageWidths } from '../lib/ui'
+import { API } from '../config'
 
 // ─── NAV CONFIG ───────────────────────────────────────────────────
 // Maps route patterns → { crumbs, tabs, backTo }
@@ -65,12 +68,12 @@ const S = {
     fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
   },
   topRow: {
-    height: 52,
+    height: 56,
     display: 'flex',
     alignItems: 'center',
-    padding: '0 20px',
+    padding: '0 24px',
     gap: 10,
-    maxWidth: 1200,
+    maxWidth: 1400,
     margin: '0 auto',
   },
   sep: {
@@ -138,8 +141,8 @@ const S = {
   },
   tabsRow: {
     borderTop: '1px solid #1e293b',
-    padding: '0 20px',
-    maxWidth: 1200,
+    padding: '0 24px',
+    maxWidth: 1400,
     margin: '0 auto',
     display: 'flex',
     gap: 2,
@@ -183,9 +186,7 @@ export default function Navbar({
   hideTabs = false,
   hideSearch = false,
   autoSave = false,
-  // legacy props accepted but unused — new Navbar reads from localStorage directly
-  user: _user,
-  onLogout: _onLogout,
+  variant = 'app',
 }) {
   const location  = useLocation()
   const navigate  = useNavigate()
@@ -194,12 +195,129 @@ export default function Navbar({
   const crumbs    = crumbsProp ?? config.crumbs ?? []
   const tabs      = (!hideTabs && (tabsProp ?? config.tabs)) || null
   const backTo    = config.backTo
+  const isLanding = variant === 'landing'
+  const shellWidth = isLanding ? pageWidths.landing : pageWidths.app
 
   // user info from localStorage (set on login)
   const user = (() => {
     try { return JSON.parse(localStorage.getItem('user') || 'null') } catch { return null }
   })()
   const initials = user?.username?.slice(0, 2).toUpperCase() || '??'
+
+  // notification bell state
+  const [notifications, setNotifications] = useState([])
+  const [unreadCount,   setUnreadCount]   = useState(0)
+  const [showBell,      setShowBell]      = useState(false)
+  const bellRef = useRef(null)
+
+  useEffect(() => {
+    if (!user) return
+    const token = localStorage.getItem('token')
+    if (!token) return
+    fetch(`${API}/api/notifications?limit=15`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data) return
+        setNotifications(data.notifications || [])
+        setUnreadCount(data.unreadCount || 0)
+      })
+      .catch(() => {})
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // close dropdown on outside click
+  useEffect(() => {
+    if (!showBell) return
+    function onClickOutside(e) {
+      if (bellRef.current && !bellRef.current.contains(e.target)) setShowBell(false)
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [showBell])
+
+  async function markAllRead() {
+    const token = localStorage.getItem('token')
+    if (!token) return
+    await fetch(`${API}/api/notifications/read-all`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}` },
+    }).catch(() => {})
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })))
+    setUnreadCount(0)
+  }
+
+  async function markOneRead(notif) {
+    const token = localStorage.getItem('token')
+    if (!notif.read && token) {
+      fetch(`${API}/api/notifications/${notif.id}/read`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}` },
+      }).catch(() => {})
+      setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n))
+      setUnreadCount(c => Math.max(0, c - 1))
+    }
+    setShowBell(false)
+    if (notif.sheetId) navigate(`/sheets/${notif.sheetId}`)
+    else if (notif.actorId) navigate(`/users/${notif.actor?.username || ''}`)
+  }
+
+  function timeAgo(iso) {
+    const diff = Date.now() - new Date(iso).getTime()
+    const m = Math.floor(diff / 60000)
+    if (m < 1) return 'just now'
+    if (m < 60) return `${m}m ago`
+    const h = Math.floor(m / 60)
+    if (h < 24) return `${h}h ago`
+    return `${Math.floor(h / 24)}d ago`
+  }
+  const rowStyle = {
+    ...S.topRow,
+    height: isLanding ? 'clamp(68px, 7vw, 90px)' : 'clamp(60px, 5vw, 74px)',
+    padding: '0 clamp(16px, 2.5vw, 40px)',
+    maxWidth: shellWidth,
+    gap: isLanding ? 16 : 10,
+  }
+  const searchBoxStyle = {
+    ...S.searchBox,
+    width: isLanding ? 'clamp(240px, 30vw, 620px)' : 'clamp(180px, 22vw, 520px)',
+    height: isLanding ? 'clamp(40px, 4vw, 52px)' : 'clamp(34px, 3vw, 44px)',
+    borderRadius: isLanding ? 16 : 10,
+    padding: isLanding ? '0 14px' : '0 10px',
+    marginLeft: isLanding ? 'auto' : undefined,
+    marginRight: isLanding ? 'auto' : undefined,
+  }
+  const wordmarkStyle = {
+    fontSize: isLanding ? 'clamp(16px, 1vw + 12px, 22px)' : 15,
+    fontWeight: 800,
+    color: '#fff',
+    letterSpacing: '-0.02em',
+  }
+  const searchTextStyle = {
+    ...S.searchText,
+    fontSize: isLanding ? 'clamp(12px, 0.8vw + 8px, 15px)' : 12,
+  }
+  const publicGhostBtn = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: isLanding ? 'clamp(40px, 4vw, 52px)' : 36,
+    padding: isLanding ? '0 clamp(16px, 1.8vw, 28px)' : '0 12px',
+    borderRadius: isLanding ? 16 : 10,
+    border: '1px solid rgba(255,255,255,0.16)',
+    background: 'rgba(255,255,255,0.04)',
+    color: '#fff',
+    fontSize: isLanding ? 'clamp(13px, 0.8vw + 8px, 17px)' : 12,
+    fontWeight: 600,
+    textDecoration: 'none',
+    transition: 'background .15s, border-color .15s',
+  }
+  const publicPrimaryBtn = {
+    ...publicGhostBtn,
+    border: '1px solid transparent',
+    background: '#3b82f6',
+    fontWeight: 700,
+  }
 
   function handleIconHover(e, enter) {
     e.currentTarget.style.background = enter ? '#1e293b' : 'transparent'
@@ -209,12 +327,12 @@ export default function Navbar({
   return (
     <nav style={S.nav}>
       {/* — top row — */}
-      <div style={S.topRow}>
+      <div style={rowStyle}>
 
         {/* logo */}
         <Link to={user ? '/feed' : '/'} style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <LogoMark size={28} />
-          <span style={{ fontSize: 15, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em' }}>
+          <LogoMark size={isLanding ? 34 : 28} />
+          <span style={wordmarkStyle}>
             Study<span style={{ color: '#3b82f6' }}>Hub</span>
           </span>
         </Link>
@@ -252,13 +370,16 @@ export default function Navbar({
           </span>
         )}
 
-        {/* search box */}
-        {!hideSearch && (
-          <div style={S.searchBox} onClick={() => {}}>
+        {/* search box — hide on auth pages where it's irrelevant */}
+        {!hideSearch && location.pathname !== '/login' && location.pathname !== '/register'
+          && location.pathname !== '/forgot-password' && location.pathname !== '/reset-password' && (
+          <div className={isLanding ? 'sh-landing-search' : undefined} style={searchBoxStyle} onClick={() => {}}>
             <IconSearch size={13} style={{ color: '#475569', flexShrink: 0 }} />
-            <span style={S.searchText}>Search sheets, courses…</span>
+            <span style={searchTextStyle}>Search sheets, courses...</span>
           </div>
         )}
+
+        {!user && isLanding && <div style={{ flex: 1 }} />}
 
         {/* actions slot (Upload button, Publish, etc.) */}
         {actions}
@@ -279,14 +400,90 @@ export default function Navbar({
 
         {/* notification bell */}
         {user && (
-          <button
-            style={S.iconBtn}
-            title="Notifications"
-            onMouseEnter={e => handleIconHover(e, true)}
-            onMouseLeave={e => handleIconHover(e, false)}
-          >
-            <IconBell size={17} />
-          </button>
+          <div ref={bellRef} style={{ position: 'relative' }}>
+            <button
+              style={S.iconBtn}
+              title="Notifications"
+              onClick={() => setShowBell(v => !v)}
+              onMouseEnter={e => handleIconHover(e, true)}
+              onMouseLeave={e => handleIconHover(e, false)}
+            >
+              <IconBell size={17} />
+              {unreadCount > 0 && (
+                <span style={{
+                  position: 'absolute', top: 2, right: 2,
+                  background: '#ef4444', color: '#fff',
+                  fontSize: 10, fontWeight: 800,
+                  borderRadius: 99, minWidth: 16, height: 16,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  padding: '0 3px', lineHeight: 1,
+                }}>
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
+
+            {showBell && (
+              <div style={{
+                position: 'absolute', top: 'calc(100% + 8px)', right: 0,
+                width: 320, background: '#fff', borderRadius: 12,
+                border: '1px solid #e2e8f0',
+                boxShadow: '0 8px 32px rgba(15,23,42,0.18)',
+                zIndex: 200, overflow: 'hidden',
+                fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+              }}>
+                {/* header */}
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '12px 16px', borderBottom: '1px solid #f1f5f9',
+                }}>
+                  <span style={{ fontWeight: 700, fontSize: 14, color: '#0f172a' }}>Notifications</span>
+                  {unreadCount > 0 && (
+                    <button onClick={markAllRead} style={{
+                      fontSize: 12, color: '#3b82f6', fontWeight: 600,
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      fontFamily: 'inherit',
+                    }}>
+                      Mark all read
+                    </button>
+                  )}
+                </div>
+
+                {/* list */}
+                <div style={{ maxHeight: 340, overflowY: 'auto' }}>
+                  {notifications.length === 0
+                    ? (
+                      <div style={{ padding: '28px 16px', textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
+                        <i className="fas fa-bell-slash" style={{ fontSize: 22, display: 'block', marginBottom: 8, color: '#cbd5e1' }}></i>
+                        No notifications yet
+                      </div>
+                    )
+                    : notifications.map(notif => (
+                      <div
+                        key={notif.id}
+                        onClick={() => markOneRead(notif)}
+                        style={{
+                          padding: '12px 16px',
+                          borderBottom: '1px solid #f8fafc',
+                          cursor: 'pointer',
+                          background: notif.read ? '#fff' : '#f0f7ff',
+                          borderLeft: notif.read ? '3px solid transparent' : '3px solid #3b82f6',
+                          transition: 'background .12s',
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = notif.read ? '#f8fafc' : '#e8f0fe'}
+                        onMouseLeave={e => e.currentTarget.style.background = notif.read ? '#fff' : '#f0f7ff'}
+                      >
+                        <div style={{ fontSize: 13, color: '#334155', lineHeight: 1.4, marginBottom: 4 }}>
+                          <strong>{notif.actor?.username || 'Someone'}</strong> {notif.message}
+                        </div>
+                        <div style={{ fontSize: 11, color: '#94a3b8' }}>{timeAgo(notif.createdAt)}</div>
+                      </div>
+                    ))
+                  }
+                </div>
+              </div>
+            )}
+          </div>
         )}
 
         {/* user avatar + name */}
@@ -300,11 +497,54 @@ export default function Navbar({
           </div>
         )}
 
-        {/* login link if no user */}
-        {!user && (
-          <Link to="/login" style={{
-            fontSize: 12, fontWeight: 600, color: '#3b82f6', textDecoration: 'none',
-          }}>Log in</Link>
+        {/* larger landing auth actions */}
+        {!user && isLanding && (
+          <div className="sh-landing-actions">
+            <Link
+              to="/login"
+              style={publicGhostBtn}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = 'rgba(255,255,255,0.08)'
+                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.22)'
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = 'rgba(255,255,255,0.04)'
+                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.16)'
+              }}
+            >
+              Log in
+            </Link>
+            <Link
+              to="/register"
+              style={publicPrimaryBtn}
+              onMouseEnter={e => { e.currentTarget.style.background = '#2563eb' }}
+              onMouseLeave={e => { e.currentTarget.style.background = '#3b82f6' }}
+            >
+              Get Started
+            </Link>
+          </div>
+        )}
+
+        {/* contextual auth links on public pages */}
+        {!user && !isLanding && (
+          location.pathname === '/login' ? (
+            <Link to="/register" style={{ fontSize: 12, fontWeight: 600, color: '#3b82f6', textDecoration: 'none' }}>
+              Create account →
+            </Link>
+          ) : location.pathname === '/register' ? (
+            <Link to="/login" style={{ fontSize: 12, fontWeight: 600, color: '#3b82f6', textDecoration: 'none' }}>
+              Sign in →
+            </Link>
+          ) : location.pathname === '/forgot-password' || location.pathname === '/reset-password' ? (
+            <Link to="/login" style={{ fontSize: 12, fontWeight: 600, color: '#3b82f6', textDecoration: 'none' }}>
+              Back to login
+            </Link>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <Link to="/login" style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', textDecoration: 'none' }}>Log in</Link>
+              <Link to="/register" style={{ fontSize: 12, fontWeight: 700, color: '#fff', textDecoration: 'none', background: '#3b82f6', padding: '5px 12px', borderRadius: 7 }}>Get Started</Link>
+            </div>
+          )
         )}
 
       </div>
@@ -312,7 +552,7 @@ export default function Navbar({
       {/* — tabs row (only if tabs configured) — */}
       {tabs && (
         <div style={{ borderTop: '1px solid #1e293b' }}>
-          <div style={S.tabsRow}>
+          <div style={{ ...S.tabsRow, maxWidth: pageWidths.app, padding: '0 clamp(16px, 2.5vw, 40px)' }}>
             {tabs.map(tab => {
               const isActive = location.pathname + location.search === tab.to
                 || (tab.to === '/sheets' && location.pathname === '/sheets' && !location.search)

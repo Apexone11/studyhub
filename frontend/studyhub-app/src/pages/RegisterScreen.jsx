@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import Navbar from '../components/Navbar'
 import { identifyAuthenticatedUser } from '../lib/telemetry'
+import { API } from '../config'
 
 // ── SCHOOL DATA ──────────────────────────────────────────────
 const SCHOOLS = [
@@ -344,7 +345,7 @@ function RegisterScreen() {
     const payloadCustomCourses = Array.from(customByCode.values())
 
     try {
-      const res = await fetch('http://localhost:4000/api/auth/register', {
+      const res = await fetch(`${API}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -379,7 +380,7 @@ function RegisterScreen() {
   // ── RENDER ────────────────────────────────────────────────
   return (
     <div style={s.page}>
-      <Navbar />
+      <Navbar variant="landing" />
 
       <div style={s.center}>
         <div style={s.card}>

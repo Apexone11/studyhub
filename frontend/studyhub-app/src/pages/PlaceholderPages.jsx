@@ -3,12 +3,14 @@
 // TestsPage / NotesPage / AnnouncementsPage: sidebar layout + teasers
 // SubmitPage / AdminPage / TestTakerPage: cleaned shells
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import DOMPurify from 'dompurify'
 import Navbar from '../components/Navbar'
 import { IconUpload, IconEye, IconPlus, IconCheck } from '../components/Icons'
+import { pageColumns, pageShell } from '../lib/ui'
 
-const API  = 'http://localhost:4000'
+import { API } from '../config'
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 const getToken    = () => localStorage.getItem('token')
 const authHeaders = () => ({
@@ -29,9 +31,9 @@ function PageShell({ nav, sidebar, children }) {
   return (
     <div style={{ minHeight:'100vh', background:'#edf0f5', fontFamily:FONT }}>
       {nav}
-      <div style={{ maxWidth:1140, margin:'0 auto', padding:'24px 20px 60px' }}>
-        <div style={{ display:'grid', gridTemplateColumns:'200px 1fr', gap:16, alignItems:'start' }}>
-          <div style={{ position:'sticky', top:62 }}>{sidebar}</div>
+      <div style={pageShell('app')}>
+        <div style={{ display:'grid', gridTemplateColumns:pageColumns.appTwoColumn, gap:20, alignItems:'start' }}>
+          <div style={{ position:'sticky', top:74 }}>{sidebar}</div>
           <main>{children}</main>
         </div>
       </div>
@@ -97,7 +99,7 @@ function MiniPreview({ md }) {
     const hm=line.match(/^(#{1,4})\s+(.+)/)
     if (hm) {
       const lvl=hm[1].length; const sz=[20,16,14,13][lvl-1]
-      nodes.push(<div key={i} style={{ fontSize:sz, fontWeight:700, color:'#0f172a', margin:lvl===1?'0 0 10px':'8px 0 4px', borderBottom:lvl<=2?'1px solid #f1f5f9':'none', paddingBottom:lvl<=2?5:0 }} dangerouslySetInnerHTML={{ __html:inline(hm[2]) }}/>)
+      nodes.push(<div key={i} style={{ fontSize:sz, fontWeight:700, color:'#0f172a', margin:lvl===1?'0 0 10px':'8px 0 4px', borderBottom:lvl<=2?'1px solid #f1f5f9':'none', paddingBottom:lvl<=2?5:0 }} dangerouslySetInnerHTML={{ __html:DOMPurify.sanitize(inline(hm[2])) }}/>)
       i++; continue
     }
     if (line.match(/^```/)) {
@@ -110,17 +112,17 @@ function MiniPreview({ md }) {
     }
     if (line.startsWith('> ')) {
       nodes.push(<div key={i} style={{ borderLeft:'3px solid #3b82f6', background:'#eff6ff', padding:'8px 12px', borderRadius:'0 8px 8px 0', marginBottom:8 }}>
-        <div style={{ fontSize:12, color:'#1e40af', fontStyle:'italic' }} dangerouslySetInnerHTML={{ __html:inline(line.slice(2)) }}/>
+        <div style={{ fontSize:12, color:'#1e40af', fontStyle:'italic' }} dangerouslySetInnerHTML={{ __html:DOMPurify.sanitize(inline(line.slice(2))) }}/>
       </div>); i++; continue
     }
     if (line.match(/^[-*+]\s/)) {
       const items=[]; while(i<lines.length&&lines[i].match(/^[-*+]\s/)){items.push(lines[i].slice(2));i++}
       nodes.push(<ul key={`ul${i}`} style={{ margin:'0 0 8px 18px', padding:0 }}>
-        {items.map((it,j)=><li key={j} style={{ fontSize:12, color:'#334155', lineHeight:1.7 }} dangerouslySetInnerHTML={{ __html:inline(it) }}/>)}
+        {items.map((it,j)=><li key={j} style={{ fontSize:12, color:'#334155', lineHeight:1.7 }} dangerouslySetInnerHTML={{ __html:DOMPurify.sanitize(inline(it)) }}/>)}
       </ul>); continue
     }
     if (line.trim()===''){nodes.push(<div key={i} style={{ height:8 }}/>);i++;continue}
-    nodes.push(<p key={i} style={{ fontSize:12, color:'#334155', lineHeight:1.7, margin:'0 0 6px' }} dangerouslySetInnerHTML={{ __html:inline(line) }}/>)
+    nodes.push(<p key={i} style={{ fontSize:12, color:'#334155', lineHeight:1.7, margin:'0 0 6px' }} dangerouslySetInnerHTML={{ __html:DOMPurify.sanitize(inline(line)) }}/>)
     i++
   }
   return <>{nodes}</>
@@ -129,6 +131,21 @@ function MiniPreview({ md }) {
 // ─────────────────────────────────────────────────────────────────
 // UPLOAD SHEET PAGE
 // ─────────────────────────────────────────────────────────────────
+// Allowed attachment types (client-side pre-validation)
+const ATTACH_ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'image/webp']
+const ATTACH_ALLOWED_EXT = ['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.webp']
+const ATTACH_MAX_BYTES = 10 * 1024 * 1024
+
+function validateAttachment(file) {
+  if (!file) return ''
+  const ext = '.' + file.name.split('.').pop().toLowerCase()
+  if (!ATTACH_ALLOWED_TYPES.includes(file.type) || !ATTACH_ALLOWED_EXT.includes(ext)) {
+    return 'Attachment must be a PDF or image (JPEG, PNG, GIF, WebP).'
+  }
+  if (file.size > ATTACH_MAX_BYTES) return 'Attachment must be 10 MB or smaller.'
+  return ''
+}
+
 export function UploadSheetPage() {
   const navigate=useNavigate()
   const [title,   setTitle]   = useState('')
@@ -138,6 +155,11 @@ export function UploadSheetPage() {
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState('')
   const [saved,   setSaved]   = useState(false)
+  // File attachment
+  const [attachFile, setAttachFile] = useState(null)
+  const [attachErr,  setAttachErr]  = useState('')
+  const [attachUploading, setAttachUploading] = useState(false)
+  const fileInputRef = useRef()
   const autoTimer = useRef()
 
   useEffect(()=>{
@@ -153,6 +175,15 @@ export function UploadSheetPage() {
     return ()=>clearTimeout(autoTimer.current)
   },[title,content,courseId])
 
+  function handleFileSelect(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const err = validateAttachment(file)
+    if (err) { setAttachErr(err); e.target.value=''; return }
+    setAttachErr('')
+    setAttachFile(file)
+  }
+
   async function handlePublish() {
     if(!title.trim()){setError('Please enter a title.');return}
     if(!courseId){setError('Please select a course.');return}
@@ -165,6 +196,22 @@ export function UploadSheetPage() {
       })
       if(!res.ok) throw new Error((await res.json()).error||'Failed to publish.')
       const sheet=await res.json()
+
+      // Upload attachment if selected
+      if (attachFile) {
+        setAttachUploading(true)
+        const fd = new FormData()
+        fd.append('attachment', attachFile)
+        try {
+          await fetch(`${API}/api/upload/attachment/${sheet.id}`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${getToken()}` },
+            body: fd,
+          })
+        } catch { /* attachment upload failure is non-fatal */ }
+        setAttachUploading(false)
+      }
+
       navigate(`/sheets/${sheet.id}`)
     } catch(err){setError(err.message);setLoading(false)}
   }
@@ -174,8 +221,8 @@ export function UploadSheetPage() {
       {saved&&<span style={{ fontSize:11, color:'#10b981', display:'flex', alignItems:'center', gap:4 }}><IconCheck size={12}/>Saved</span>}
       {!saved&&<span style={{ fontSize:11, color:'#64748b' }}>Saving…</span>}
       <Link to="/sheets" style={{ fontSize:12, color:'#64748b', textDecoration:'none', padding:'5px 10px', border:'1px solid #334155', borderRadius:7 }}>Cancel</Link>
-      <button onClick={handlePublish} disabled={loading} style={{ fontSize:12, fontWeight:700, color:'#fff', padding:'5px 15px', background:loading?'#93c5fd':'#3b82f6', border:'none', borderRadius:7, cursor:loading?'wait':'pointer', fontFamily:FONT, display:'flex', alignItems:'center', gap:5 }}>
-        {loading?'Publishing…':<><IconUpload size={13}/>Publish Sheet</>}
+      <button onClick={handlePublish} disabled={loading||attachUploading} style={{ fontSize:12, fontWeight:700, color:'#fff', padding:'5px 15px', background:(loading||attachUploading)?'#93c5fd':'#3b82f6', border:'none', borderRadius:7, cursor:(loading||attachUploading)?'wait':'pointer', fontFamily:FONT, display:'flex', alignItems:'center', gap:5 }}>
+        {loading?'Publishing…':attachUploading?'Uploading…':<><IconUpload size={13}/>Publish Sheet</>}
       </button>
     </div>
   )
@@ -183,7 +230,7 @@ export function UploadSheetPage() {
   return (
     <div style={{ minHeight:'100vh', background:'#edf0f5', fontFamily:FONT }}>
       <Navbar crumbs={[{label:'Study Sheets',to:'/sheets'},{label:'New Sheet',to:null}]} hideTabs actions={navActions} hideSearch/>
-      <div style={{ maxWidth:1140, margin:'0 auto', padding:'20px 20px 60px' }}>
+      <div style={pageShell('editor', 20, 60)}>
         {/* meta row */}
         <div style={{ background:'#fff', borderRadius:14, border:'1px solid #e2e8f0', padding:'14px 20px', marginBottom:12, display:'grid', gridTemplateColumns:'1fr 1fr 180px', gap:12, alignItems:'end' }}>
           <div>
@@ -206,6 +253,40 @@ export function UploadSheetPage() {
             <div style={{ padding:'8px 12px', border:'1.5px solid #e2e8f0', borderRadius:8, fontSize:13, color:'#64748b', background:'#f8fafc' }}>Public</div>
           </div>
         </div>
+
+        {/* Attachment row */}
+        <div style={{ background:'#fff', borderRadius:14, border:'1px solid #e2e8f0', padding:'14px 20px', marginBottom:12 }}>
+          <label style={{ fontSize:10, fontWeight:700, color:'#64748b', letterSpacing:'.06em', display:'block', marginBottom:8 }}>
+            OPTIONAL ATTACHMENT <span style={{ fontSize:9, color:'#94a3b8', textTransform:'none', letterSpacing:0 }}>(PDF, PNG, JPEG, GIF, WebP — max 10 MB)</span>
+          </label>
+          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+            <input ref={fileInputRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.gif,.webp" style={{ display:'none' }} onChange={handleFileSelect}/>
+            <button
+              type="button"
+              onClick={()=>fileInputRef.current?.click()}
+              style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 14px', background:'#f8fafc', border:'1.5px dashed #cbd5e1', borderRadius:8, fontSize:12, fontWeight:600, color:'#64748b', cursor:'pointer', fontFamily:FONT }}
+            >
+              <i className="fas fa-paperclip" style={{ fontSize:12 }}></i>
+              {attachFile ? 'Change file' : 'Attach file'}
+            </button>
+            {attachFile && (
+              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                <i className={`fas ${attachFile.type==='application/pdf'?'fa-file-pdf':'fa-file-image'}`} style={{ color:'#3b82f6', fontSize:14 }}></i>
+                <span style={{ fontSize:12, color:'#334155', fontWeight:600 }}>{attachFile.name}</span>
+                <span style={{ fontSize:11, color:'#94a3b8' }}>({(attachFile.size/1024/1024).toFixed(1)} MB)</span>
+                <button onClick={()=>{setAttachFile(null);if(fileInputRef.current)fileInputRef.current.value=''}} style={{ background:'none', border:'none', cursor:'pointer', color:'#94a3b8', fontSize:16, padding:'0 4px' }}>
+                  <i className="fas fa-times"></i>
+                </button>
+              </div>
+            )}
+          </div>
+          {attachErr && <div style={{ marginTop:6, fontSize:12, color:'#dc2626' }}><i className="fas fa-circle-exclamation" style={{ marginRight:5 }}></i>{attachErr}</div>}
+          <div style={{ marginTop:8, fontSize:11, color:'#94a3b8' }}>
+            <i className="fas fa-shield-halved" style={{ marginRight:5, color:'#10b981' }}></i>
+            Files are scanned for allowed types. Executable files (.exe, .js, .sh, etc.) are blocked for security.
+          </div>
+        </div>
+
         {error&&<div style={{ background:'#fef2f2', border:'1px solid #fecaca', borderRadius:9, padding:'10px 14px', marginBottom:10, fontSize:13, color:'#dc2626' }}>{error}</div>}
         {/* split pane */}
         <div style={{ background:'#fff', borderRadius:14, border:'1px solid #e2e8f0', overflow:'hidden' }}>
@@ -216,7 +297,9 @@ export function UploadSheetPage() {
             </div>
             <div style={{ display:'flex', alignItems:'center', gap:8, padding:'9px 16px' }}>
               <IconEye size={13} style={{ color:'#64748b' }}/><span style={{ fontSize:12, fontWeight:600, color:'#64748b' }}>Live Preview</span>
-              <span style={{ fontSize:10, color:'#10b981' }}>✓ synced</span>
+              <span style={{ fontSize:10, color:'#10b981' }}>
+                <i className="fas fa-check" style={{ fontSize:9, marginRight:3 }}></i>synced
+              </span>
             </div>
           </div>
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', minHeight:460 }}>
@@ -272,34 +355,252 @@ export function TestsPage() {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// NOTES PAGE
+// NOTES PAGE — full CRUD editor
 // ─────────────────────────────────────────────────────────────────
+const COURSE_COLORS = ['#8b5cf6','#10b981','#f59e0b','#3b82f6','#ef4444','#06b6d4','#ec4899']
+
 export function NotesPage() {
-  const sidebar=(<SideCard sections={[
-    { label:'My Notes', items:[{label:'All Notes',active:true},{label:'Shared by me',active:false},{label:'Recent',active:false}]},
-    { label:'By Course', items:[{label:'CMSC131',dot:'#8b5cf6',active:false},{label:'MATH140',dot:'#10b981',active:false},{label:'ENGL101',dot:'#f59e0b',active:false}]},
-  ]}/>)
+  const [notes, setNotes] = useState([])
+  const [activeNote, setActiveNote] = useState(null)
+  const [editorTitle, setEditorTitle] = useState('')
+  const [editorContent, setEditorContent] = useState('')
+  const [editorPrivate, setEditorPrivate] = useState(true)
+  const [editorCourseId, setEditorCourseId] = useState('')
+  const [courses, setCourses] = useState([])
+  const [filterTab, setFilterTab] = useState('all')
+  const [saving, setSaving] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [loadingNotes, setLoadingNotes] = useState(true)
+  const saveTimer = useRef()
+
+  useEffect(() => {
+    fetch(`${API}/api/notes`, { headers: authHeaders() })
+      .then(r => r.json()).then(d => { setNotes(Array.isArray(d) ? d : []); setLoadingNotes(false) })
+      .catch(() => setLoadingNotes(false))
+    fetch(`${API}/api/courses/schools`, { headers: authHeaders() })
+      .then(r => r.json())
+      .then(data => setCourses((data||[]).flatMap(s => (s.courses||[]).map(c => ({ ...c, schoolName: s.name })))))
+      .catch(() => {})
+  }, [])
+
+  function selectNote(note) {
+    setActiveNote(note)
+    setEditorTitle(note.title)
+    setEditorContent(note.content || '')
+    setEditorPrivate(note.private !== false)
+    setEditorCourseId(note.courseId ? String(note.courseId) : '')
+    setConfirmDelete(false)
+  }
+
+  const autoSave = useCallback((noteId, title, content, priv, courseId) => {
+    clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(async () => {
+      if (!noteId) return
+      setSaving(true)
+      try {
+        const res = await fetch(`${API}/api/notes/${noteId}`, {
+          method: 'PATCH',
+          headers: authHeaders(),
+          body: JSON.stringify({ title, content, private: priv, courseId: courseId || null }),
+        })
+        if (res.ok) {
+          const updated = await res.json()
+          setNotes(prev => prev.map(n => n.id === noteId ? updated : n))
+          setActiveNote(updated)
+        }
+      } finally { setSaving(false) }
+    }, 1500)
+  }, [])
+
+  function handleTitleChange(v) {
+    setEditorTitle(v)
+    if (activeNote) autoSave(activeNote.id, v, editorContent, editorPrivate, editorCourseId)
+  }
+  function handleContentChange(v) {
+    setEditorContent(v)
+    if (activeNote) autoSave(activeNote.id, editorTitle, v, editorPrivate, editorCourseId)
+  }
+  function handlePrivateChange(v) {
+    setEditorPrivate(v)
+    if (activeNote) autoSave(activeNote.id, editorTitle, editorContent, v, editorCourseId)
+  }
+  function handleCourseChange(v) {
+    setEditorCourseId(v)
+    if (activeNote) autoSave(activeNote.id, editorTitle, editorContent, editorPrivate, v)
+  }
+
+  async function createNote() {
+    setCreating(true)
+    try {
+      const res = await fetch(`${API}/api/notes`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ title: 'Untitled Note', content: '' }),
+      })
+      if (!res.ok) return
+      const note = await res.json()
+      setNotes(prev => [note, ...prev])
+      selectNote(note)
+    } finally { setCreating(false) }
+  }
+
+  async function deleteNote() {
+    if (!activeNote) return
+    const res = await fetch(`${API}/api/notes/${activeNote.id}`, { method: 'DELETE', headers: authHeaders() })
+    if (res.ok) {
+      setNotes(prev => prev.filter(n => n.id !== activeNote.id))
+      setActiveNote(null)
+      setConfirmDelete(false)
+    }
+  }
+
+  const visibleNotes = notes.filter(n => {
+    if (filterTab === 'private') return n.private !== false
+    if (filterTab === 'shared')  return n.private === false
+    return true
+  })
+
+  const enrolledCourses = courses.slice(0, 8)
+
+  const sidebar = (
+    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+      <div style={{ background:'#fff', borderRadius:13, border:'1px solid #e2e8f0', overflow:'hidden' }}>
+        <div style={{ fontSize:9, letterSpacing:'.1em', fontWeight:600, color:'#94a3b8', padding:'12px 14px 5px', textTransform:'uppercase' }}>Filter</div>
+        {[['all','All Notes'],['private','Private'],['shared','Shared']].map(([id, label]) => (
+          <div key={id} onClick={() => setFilterTab(id)}
+            style={{ display:'flex', alignItems:'center', gap:7, padding:'7px 12px', borderLeft:`2px solid ${filterTab===id?'#3b82f6':'transparent'}`, background:filterTab===id?'#eff6ff':'transparent', color:filterTab===id?'#1d4ed8':'#64748b', fontSize:12, fontWeight:filterTab===id?600:400, cursor:'pointer' }}>
+            {label}
+          </div>
+        ))}
+      </div>
+      {enrolledCourses.length > 0 && (
+        <div style={{ background:'#fff', borderRadius:13, border:'1px solid #e2e8f0', overflow:'hidden' }}>
+          <div style={{ fontSize:9, letterSpacing:'.1em', fontWeight:600, color:'#94a3b8', padding:'12px 14px 5px', textTransform:'uppercase' }}>My Courses</div>
+          {enrolledCourses.map((c, i) => (
+            <div key={c.id} style={{ display:'flex', alignItems:'center', gap:7, padding:'7px 12px', fontSize:12, color:'#64748b' }}>
+              <span style={{ width:8, height:8, borderRadius:'50%', background:COURSE_COLORS[i%COURSE_COLORS.length], flexShrink:0 }}/>
+              {c.code}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+
   return (
     <PageShell nav={<Navbar crumbs={[{label:'My Notes',to:'/notes'}]} hideTabs/>} sidebar={sidebar}>
       <div style={{ marginBottom:14, display:'flex', alignItems:'flex-start', justifyContent:'space-between' }}>
         <div>
           <h1 style={{ fontSize:20, fontWeight:800, color:'#0f172a', marginBottom:4 }}>My Notes</h1>
-          <p style={{ fontSize:13, color:'#64748b' }}>Private notes per course. Optionally share with classmates.</p>
+          <p style={{ fontSize:13, color:'#64748b' }}>Markdown notes per course. Private by default.</p>
         </div>
-        <button disabled style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 14px', background:'#f1f5f9', border:'none', borderRadius:8, fontSize:12, fontWeight:600, color:'#94a3b8', cursor:'not-allowed', fontFamily:FONT }}>
-          <IconPlus size={13}/>New Note
+        <button onClick={createNote} disabled={creating}
+          style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 14px', background:'#3b82f6', border:'none', borderRadius:8, fontSize:12, fontWeight:600, color:'#fff', cursor:'pointer', fontFamily:FONT }}>
+          <IconPlus size={13}/>{creating ? 'Creating…' : 'New Note'}
         </button>
       </div>
-      <TeaserCard title="CMSC131 — Week 3 OOP Notes" sub="Private · Created by you · 2 pages"
-        chips={[{label:'CMSC131',bg:'#ede9fe',color:'#5b21b6',border:'#c4b5fd'},{label:'Private'},{label:'2 pages'}]}/>
-      <TeaserCard title="MATH140 — Exam Day Formula Sheet" sub="Shared with course · Created by you · 1 page"
-        chips={[{label:'MATH140',bg:'#d1fae5',color:'#065f46',border:'#6ee7b7'},{label:'Shared'}]}/>
-      <TeaserCard title="ENGL101 — Essay Draft Notes" sub="Private · Created by you · 3 pages"
-        chips={[{label:'ENGL101',bg:'#fef3c7',color:'#78350f',border:'#fcd34d'},{label:'Private'}]}/>
-      <div style={{ background:'#fff', borderRadius:14, border:'1.5px dashed #cbd5e1', padding:'28px 24px', textAlign:'center', marginTop:8 }}>
-        <div style={{ fontSize:13, color:'#94a3b8', marginBottom:4 }}>Rich text editor with markdown support</div>
-        <div style={{ fontSize:12, color:'#cbd5e1' }}>GET / POST / DELETE /api/notes — coming in V1</div>
-      </div>
+
+      {/* Notes list */}
+      {loadingNotes ? (
+        <div style={{ color:'#94a3b8', fontSize:13, padding:'20px 0' }}>Loading…</div>
+      ) : visibleNotes.length === 0 && !activeNote ? (
+        <div style={{ background:'#fff', borderRadius:14, border:'1.5px dashed #cbd5e1', padding:'48px 24px', textAlign:'center' }}>
+          <i className="fas fa-book-open" style={{ fontSize:32, color:'#cbd5e1', marginBottom:12, display:'block' }}></i>
+          <div style={{ fontSize:14, fontWeight:600, color:'#64748b', marginBottom:6 }}>No notes yet</div>
+          <div style={{ fontSize:12, color:'#94a3b8', marginBottom:16 }}>Create your first note to get started.</div>
+          <button onClick={createNote} style={{ background:'#3b82f6', color:'#fff', border:'none', borderRadius:8, padding:'8px 20px', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:FONT }}>
+            Create a Note
+          </button>
+        </div>
+      ) : (
+        <>
+          {/* Note list rows */}
+          {!activeNote && (
+            <div style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:16 }}>
+              {visibleNotes.map(n => (
+                <div key={n.id} onClick={() => selectNote(n)}
+                  style={{ background:'#fff', borderRadius:12, border:'1px solid #e2e8f0', padding:'12px 16px', cursor:'pointer', transition:'box-shadow .15s' }}
+                  onMouseEnter={e => e.currentTarget.style.boxShadow='0 2px 8px rgba(0,0,0,0.1)'}
+                  onMouseLeave={e => e.currentTarget.style.boxShadow='none'}>
+                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:4 }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:'#0f172a' }}>{n.title}</div>
+                    <span style={{ fontSize:10, padding:'2px 8px', borderRadius:99, background:n.private!==false?'#f1f5f9':'#dcfce7', color:n.private!==false?'#64748b':'#16a34a', marginLeft:8, whiteSpace:'nowrap' }}>
+                      {n.private !== false ? 'Private' : 'Shared'}
+                    </span>
+                  </div>
+                  <div style={{ fontSize:11, color:'#94a3b8', display:'flex', gap:10 }}>
+                    {n.course && <span><i className="fas fa-book" style={{ marginRight:4 }}></i>{n.course.code}</span>}
+                    <span>{timeAgo(n.updatedAt)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Editor */}
+          {activeNote && (
+            <div>
+              <button onClick={() => setActiveNote(null)} style={{ background:'none', border:'none', color:'#3b82f6', fontSize:12, cursor:'pointer', fontFamily:FONT, marginBottom:10, padding:0, display:'flex', alignItems:'center', gap:5 }}>
+                <i className="fas fa-arrow-left"></i> All Notes
+              </button>
+
+              {/* Meta row */}
+              <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e2e8f0', padding:'12px 16px', marginBottom:10, display:'flex', gap:12, alignItems:'center', flexWrap:'wrap' }}>
+                <input value={editorTitle} onChange={e => handleTitleChange(e.target.value)}
+                  placeholder="Note title…"
+                  style={{ flex:'1 1 200px', border:'none', outline:'none', fontSize:16, fontWeight:700, color:'#0f172a', fontFamily:FONT, minWidth:120 }} />
+                <select value={editorCourseId} onChange={e => handleCourseChange(e.target.value)}
+                  style={{ border:'1px solid #e2e8f0', borderRadius:7, padding:'5px 10px', fontSize:12, fontFamily:FONT, color:'#64748b', outline:'none' }}>
+                  <option value="">No course</option>
+                  {courses.map(c => <option key={c.id} value={String(c.id)}>{c.code}</option>)}
+                </select>
+                <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, color:'#64748b', cursor:'pointer' }}>
+                  <input type="checkbox" checked={editorPrivate} onChange={e => handlePrivateChange(e.target.checked)} />
+                  Private
+                </label>
+                {saving && <span style={{ fontSize:11, color:'#94a3b8' }}>Saving…</span>}
+                {!saving && <span style={{ fontSize:11, color:'#10b981' }}><i className="fas fa-check" style={{ marginRight:3 }}></i>Saved</span>}
+              </div>
+
+              {/* Split pane */}
+              <div style={{ background:'#fff', borderRadius:12, border:'1px solid #e2e8f0', overflow:'hidden', marginBottom:10 }}>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', borderBottom:'1px solid #e2e8f0' }}>
+                  <div style={{ padding:'8px 14px', borderRight:'1px solid #e2e8f0', fontSize:11, fontWeight:600, color:'#3b82f6' }}>
+                    <i className="fas fa-pen" style={{ marginRight:6 }}></i>Markdown
+                  </div>
+                  <div style={{ padding:'8px 14px', fontSize:11, fontWeight:600, color:'#64748b' }}>
+                    <i className="fas fa-eye" style={{ marginRight:6 }}></i>Preview
+                  </div>
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', minHeight:360 }}>
+                  <div style={{ borderRight:'1px solid #1e293b', background:'#0f172a' }}>
+                    <textarea value={editorContent} onChange={e => handleContentChange(e.target.value)} spellCheck={false}
+                      style={{ width:'100%', height:'100%', minHeight:360, background:'transparent', border:'none', outline:'none', resize:'none', padding:'14px 16px', fontFamily:"'JetBrains Mono','Fira Code',monospace", fontSize:12, lineHeight:1.9, color:'#e2e8f0', boxSizing:'border-box' }} />
+                  </div>
+                  <div style={{ padding:'14px 18px', overflowY:'auto', maxHeight:500 }}>
+                    <MiniPreview md={editorContent} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Delete */}
+              {!confirmDelete ? (
+                <button onClick={() => setConfirmDelete(true)}
+                  style={{ background:'#fef2f2', border:'1px solid #fecaca', color:'#dc2626', borderRadius:8, padding:'7px 16px', fontSize:12, cursor:'pointer', fontFamily:FONT }}>
+                  <i className="fas fa-trash" style={{ marginRight:6 }}></i>Delete Note
+                </button>
+              ) : (
+                <div style={{ display:'flex', gap:10, alignItems:'center' }}>
+                  <span style={{ fontSize:12, color:'#dc2626' }}>Delete this note permanently?</span>
+                  <button onClick={deleteNote} style={{ background:'#dc2626', color:'#fff', border:'none', borderRadius:7, padding:'6px 14px', fontSize:12, cursor:'pointer', fontFamily:FONT }}>Yes, delete</button>
+                  <button onClick={() => setConfirmDelete(false)} style={{ background:'none', border:'1px solid #e2e8f0', color:'#64748b', borderRadius:7, padding:'6px 12px', fontSize:12, cursor:'pointer', fontFamily:FONT }}>Cancel</button>
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      )}
     </PageShell>
   )
 }
@@ -307,66 +608,102 @@ export function NotesPage() {
 // ─────────────────────────────────────────────────────────────────
 // ANNOUNCEMENTS PAGE
 // ─────────────────────────────────────────────────────────────────
-const MOCK_ANNOUNCEMENTS = [
-  { id:1, pinned:true,  type:'platform', title:'Welcome to StudyHub Beta!', body:"You're one of the first students using StudyHub. Upload your study sheets, earn stars from classmates, and help us build the best study platform.", author:'StudyHub', createdAt:new Date(Date.now()-2*3600*1000).toISOString() },
-  { id:2, pinned:false, type:'platform', title:'Sheet upload limits raised to 50MB', body:'You can now upload larger study sheets including image-rich PDFs. Markdown rendering has been improved with table and code block support.', author:'StudyHub', createdAt:new Date(Date.now()-28*3600*1000).toISOString() },
-  { id:3, pinned:false, type:'CMSC131', title:'Midterm study session this Friday', body:'Join the virtual study group this Friday at 7pm. We will go through recursion and OOP concepts. Link in the sheet comments.', author:'studyhub_seed', createdAt:new Date(Date.now()-48*3600*1000).toISOString() },
-  { id:4, pinned:false, type:'MATH140', title:'New Calculus cheatsheet uploaded', body:'studyhub_seed uploaded a comprehensive limits & derivatives cheatsheet. 31 stars already — great for quick exam review.', author:'studyhub_seed', createdAt:new Date(Date.now()-3*24*3600*1000).toISOString() },
-]
-const TYPE_COL = {
-  platform:{bg:'#eff6ff',color:'#1d4ed8',border:'#bfdbfe'},
-  CMSC131: {bg:'#ede9fe',color:'#5b21b6',border:'#c4b5fd'},
-  MATH140: {bg:'#d1fae5',color:'#065f46',border:'#6ee7b7'},
-  ENGL101: {bg:'#fef3c7',color:'#78350f',border:'#fcd34d'},
-}
-
 export function AnnouncementsPage() {
   const user=(() => { try { return JSON.parse(localStorage.getItem('user')||'null') } catch { return null } })()
   const isAdmin=user?.role==='admin'
 
-  const sidebar=(<SideCard sections={[
-    { label:'Filter', items:[{label:'All',active:true},{label:'Pinned',active:false},{label:'Platform',active:false}]},
-    { label:'By Course', items:[{label:'CMSC131',dot:'#8b5cf6',active:false},{label:'MATH140',dot:'#10b981',active:false},{label:'ENGL101',dot:'#f59e0b',active:false}]},
-  ]}/>)
+  const [announcements, setAnnouncements] = useState([])
+  const [loading, setLoading] = useState(true)
+  // Admin post form
+  const [showForm, setShowForm] = useState(false)
+  const [aTitle, setATitle] = useState('')
+  const [aBody, setABody] = useState('')
+  const [aPinned, setAPinned] = useState(false)
+  const [posting, setPosting] = useState(false)
+  const [postErr, setPostErr] = useState('')
+
+  useEffect(() => {
+    fetch(`${API}/api/announcements`)
+      .then(r => r.json())
+      .then(data => { setAnnouncements(Array.isArray(data) ? data : []); setLoading(false) })
+      .catch(() => setLoading(false))
+  }, [])
+
+  async function handlePost(e) {
+    e.preventDefault()
+    if (!aTitle.trim() || !aBody.trim()) { setPostErr('Title and body are required.'); return }
+    setPosting(true); setPostErr('')
+    try {
+      const res = await fetch(`${API}/api/announcements`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ title: aTitle.trim(), body: aBody.trim(), pinned: aPinned }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setPostErr(data.error || 'Failed to post.'); return }
+      setAnnouncements(prev => [data, ...prev])
+      setATitle(''); setABody(''); setAPinned(false); setShowForm(false)
+    } catch { setPostErr('Could not connect to server.') }
+    finally { setPosting(false) }
+  }
 
   const navActions=isAdmin?(
-    <button style={{ fontSize:12, fontWeight:700, color:'#fff', padding:'5px 13px', background:'#3b82f6', border:'none', borderRadius:7, cursor:'pointer', fontFamily:FONT, display:'flex', alignItems:'center', gap:5 }}>
-      <IconPlus size={13}/>Post Announcement
+    <button onClick={() => setShowForm(f => !f)} style={{ fontSize:12, fontWeight:700, color:'#fff', padding:'5px 13px', background:'#3b82f6', border:'none', borderRadius:7, cursor:'pointer', fontFamily:FONT, display:'flex', alignItems:'center', gap:5 }}>
+      <IconPlus size={13}/>{showForm ? 'Cancel' : 'Post Announcement'}
     </button>
   ):null
+
+  const sidebar=(<SideCard sections={[
+    { label:'Filter', items:[{label:'All',active:true},{label:'Pinned',active:false}]},
+  ]}/>)
 
   return (
     <PageShell nav={<Navbar crumbs={[{label:'Announcements',to:'/announcements'}]} hideTabs actions={navActions}/>} sidebar={sidebar}>
       <div style={{ marginBottom:14 }}>
         <h1 style={{ fontSize:20, fontWeight:800, color:'#0f172a', marginBottom:4 }}>Announcements</h1>
-        <p style={{ fontSize:13, color:'#64748b' }}>Official updates from admins and course staff.</p>
+        <p style={{ fontSize:13, color:'#64748b' }}>Official updates from the StudyHub team.</p>
       </div>
-      {MOCK_ANNOUNCEMENTS.map(a=>{
-        const tc=TYPE_COL[a.type]||TYPE_COL.platform
-        if(a.pinned) return (
-          <div key={a.id} style={{ background:'#fffbeb', border:'1px solid #fde68a', borderRadius:14, padding:'14px 18px', marginBottom:10 }}>
-            <div style={{ fontSize:9, fontWeight:700, color:'#92400e', letterSpacing:'.08em', marginBottom:8 }}>PINNED</div>
-            <div style={{ fontSize:14, fontWeight:700, color:'#92400e', marginBottom:6 }}>{a.title}</div>
-            <div style={{ fontSize:12, color:'#78350f', lineHeight:1.65, marginBottom:8 }}>{a.body}</div>
-            <div style={{ fontSize:11, color:'#b45309' }}>Posted by <strong>{a.author}</strong> · {timeAgo(a.createdAt)}</div>
+
+      {/* Admin post form */}
+      {isAdmin && showForm && (
+        <form onSubmit={handlePost} style={{ background:'#fff', borderRadius:14, border:'1px solid #e2e8f0', padding:'18px 20px', marginBottom:16 }}>
+          <div style={{ fontSize:13, fontWeight:700, color:'#0f172a', marginBottom:12 }}>New Announcement</div>
+          <input value={aTitle} onChange={e => setATitle(e.target.value)} placeholder="Title" style={{ width:'100%', boxSizing:'border-box', border:'1.5px solid #e2e8f0', borderRadius:8, padding:'8px 12px', fontSize:13, fontFamily:FONT, marginBottom:10, outline:'none' }} />
+          <textarea value={aBody} onChange={e => setABody(e.target.value)} placeholder="Body" rows={3} style={{ width:'100%', boxSizing:'border-box', border:'1.5px solid #e2e8f0', borderRadius:8, padding:'8px 12px', fontSize:13, fontFamily:FONT, resize:'vertical', outline:'none', marginBottom:10 }} />
+          <label style={{ display:'flex', alignItems:'center', gap:8, fontSize:12, color:'#64748b', marginBottom:12, cursor:'pointer' }}>
+            <input type="checkbox" checked={aPinned} onChange={e => setAPinned(e.target.checked)} />
+            Pin this announcement
+          </label>
+          {postErr && <div style={{ color:'#dc2626', fontSize:12, marginBottom:8 }}>{postErr}</div>}
+          <button type="submit" disabled={posting} style={{ background:'#3b82f6', color:'#fff', border:'none', borderRadius:7, padding:'7px 18px', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:FONT }}>
+            {posting ? 'Posting…' : 'Post'}
+          </button>
+        </form>
+      )}
+
+      {loading && <div style={{ color:'#94a3b8', fontSize:13, padding:'20px 0' }}>Loading…</div>}
+      {!loading && announcements.length === 0 && (
+        <div style={{ background:'#fff', borderRadius:14, border:'1.5px dashed #cbd5e1', padding:'28px', textAlign:'center' }}>
+          <div style={{ fontSize:13, color:'#94a3b8' }}>No announcements yet.</div>
+        </div>
+      )}
+      {announcements.map(a => a.pinned ? (
+        <div key={a.id} style={{ background:'#fffbeb', border:'1px solid #fde68a', borderRadius:14, padding:'14px 18px', marginBottom:10 }}>
+          <div style={{ fontSize:9, fontWeight:700, color:'#92400e', letterSpacing:'.08em', marginBottom:8 }}>PINNED</div>
+          <div style={{ fontSize:14, fontWeight:700, color:'#92400e', marginBottom:6 }}>{a.title}</div>
+          <div style={{ fontSize:12, color:'#78350f', lineHeight:1.65, marginBottom:8 }}>{a.body}</div>
+          <div style={{ fontSize:11, color:'#b45309' }}>Posted by <strong>{a.author?.username}</strong> · {timeAgo(a.createdAt)}</div>
+        </div>
+      ) : (
+        <div key={a.id} style={{ background:'#fff', borderRadius:14, border:'1px solid #e2e8f0', padding:'14px 18px', marginBottom:8 }}>
+          <div style={{ display:'flex', gap:7, alignItems:'center', marginBottom:7 }}>
+            <span style={{ fontSize:11, color:'#94a3b8' }}>{timeAgo(a.createdAt)}</span>
           </div>
-        )
-        return (
-          <div key={a.id} style={{ background:'#fff', borderRadius:14, border:'1px solid #e2e8f0', padding:'14px 18px', marginBottom:8 }}>
-            <div style={{ display:'flex', gap:7, alignItems:'center', marginBottom:7 }}>
-              <span style={{ fontSize:10, fontWeight:600, padding:'2px 8px', borderRadius:99, background:tc.bg, color:tc.color, border:`1px solid ${tc.border}` }}>{a.type}</span>
-              <span style={{ fontSize:11, color:'#94a3b8' }}>{timeAgo(a.createdAt)}</span>
-            </div>
-            <div style={{ fontSize:13, fontWeight:700, color:'#0f172a', marginBottom:5 }}>{a.title}</div>
-            <div style={{ fontSize:12, color:'#64748b', lineHeight:1.65, marginBottom:7 }}>{a.body}</div>
-            <div style={{ fontSize:11, color:'#94a3b8' }}>by <strong style={{ color:'#64748b' }}>{a.author}</strong></div>
-          </div>
-        )
-      })}
-      <div style={{ background:'#fff', borderRadius:14, border:'1.5px dashed #cbd5e1', padding:'24px', textAlign:'center', marginTop:8 }}>
-        <div style={{ fontSize:13, color:'#94a3b8', marginBottom:4 }}>Admin posting panel coming soon</div>
-        <div style={{ fontSize:12, color:'#cbd5e1' }}>POST /api/announcements · Pin/unpin · Real-time feed updates</div>
-      </div>
+          <div style={{ fontSize:13, fontWeight:700, color:'#0f172a', marginBottom:5 }}>{a.title}</div>
+          <div style={{ fontSize:12, color:'#64748b', lineHeight:1.65, marginBottom:7 }}>{a.body}</div>
+          <div style={{ fontSize:11, color:'#94a3b8' }}>by <strong style={{ color:'#64748b' }}>{a.author?.username}</strong></div>
+        </div>
+      ))}
     </PageShell>
   )
 }
@@ -390,22 +727,391 @@ export function SubmitPage() {
 }
 
 export function AdminPage() {
+  const navigate = useNavigate()
+  const currentUser = (() => { try { return JSON.parse(localStorage.getItem('user')||'null') } catch { return null } })()
+
+  const [tab, setTab] = useState('overview')
+  const [stats, setStats] = useState(null)
+  const [users, setUsers] = useState([])
+  const [sheets, setSheets] = useState([])
+  const [announcements, setAnnouncements] = useState([])
+  const [deletionReasons, setDeletionReasons] = useState([])
+  const [usersPage, setUsersPage] = useState(1)
+  const [sheetsPage, setSheetsPage] = useState(1)
+  const [annPage, setAnnPage] = useState(1)
+  const [drPage, setDrPage] = useState(1)
+  const [usersTotal, setUsersTotal] = useState(0)
+  const [sheetsTotal, setSheetsTotal] = useState(0)
+  const [annTotal, setAnnTotal] = useState(0)
+  const [drTotal, setDrTotal] = useState(0)
+  const [loading, setLoading] = useState(true)
+
+  // Announcement form
+  const [showAnnForm, setShowAnnForm] = useState(false)
+  const [aTitle, setATitle] = useState('')
+  const [aBody, setABody] = useState('')
+  const [aPinned, setAPinned] = useState(false)
+  const [posting, setPosting] = useState(false)
+  const [postErr, setPostErr] = useState('')
+
+  // Admin settings form
+  const [adPwForm, setAdPwForm] = useState({ currentPassword:'', newPassword:'', confirmPassword:'' })
+  const [adUnForm, setAdUnForm] = useState({ newUsername:'', password:'' })
+  const [adPwMsg, setAdPwMsg] = useState(null)
+  const [adUnMsg, setAdUnMsg] = useState(null)
+  const [adSaving, setAdSaving] = useState(false)
+
+  // User delete confirm
+  const [deleteUserId, setDeleteUserId] = useState(null)
+
+  useEffect(() => {
+    if (!currentUser || currentUser.role !== 'admin') { navigate('/feed'); return }
+    fetch(`${API}/api/admin/stats`, { headers: authHeaders() })
+      .then(r => r.json()).then(setStats).catch(() => {})
+      .finally(() => setLoading(false))
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (tab !== 'users') return
+    fetch(`${API}/api/admin/users?page=${usersPage}`, { headers: authHeaders() })
+      .then(r => r.json()).then(d => { setUsers(d.users || []); setUsersTotal(d.total || 0) }).catch(() => {})
+  }, [tab, usersPage])
+
+  useEffect(() => {
+    if (tab !== 'sheets') return
+    fetch(`${API}/api/admin/sheets?page=${sheetsPage}`, { headers: authHeaders() })
+      .then(r => r.json()).then(d => { setSheets(d.sheets || []); setSheetsTotal(d.total || 0) }).catch(() => {})
+  }, [tab, sheetsPage])
+
+  useEffect(() => {
+    if (tab !== 'announcements') return
+    fetch(`${API}/api/admin/announcements?page=${annPage}`, { headers: authHeaders() })
+      .then(r => r.json()).then(d => { setAnnouncements(d.announcements || []); setAnnTotal(d.total || 0) }).catch(() => {})
+  }, [tab, annPage])
+
+  useEffect(() => {
+    if (tab !== 'deletion-reasons') return
+    fetch(`${API}/api/admin/deletion-reasons?page=${drPage}`, { headers: authHeaders() })
+      .then(r => r.json()).then(d => { setDeletionReasons(d.reasons || []); setDrTotal(d.total || 0) }).catch(() => {})
+  }, [tab, drPage])
+
+  async function patchRole(userId, role) {
+    const res = await fetch(`${API}/api/admin/users/${userId}/role`, {
+      method: 'PATCH', headers: authHeaders(), body: JSON.stringify({ role }),
+    })
+    if (res.ok) setUsers(prev => prev.map(u => u.id === userId ? { ...u, role } : u))
+  }
+
+  async function confirmDeleteUser(userId) {
+    const res = await fetch(`${API}/api/admin/users/${userId}`, { method: 'DELETE', headers: authHeaders() })
+    if (res.ok) { setUsers(prev => prev.filter(u => u.id !== userId)); setDeleteUserId(null) }
+  }
+
+  async function deleteSheet(sheetId) {
+    if (!window.confirm('Delete this sheet permanently?')) return
+    const res = await fetch(`${API}/api/admin/sheets/${sheetId}`, { method: 'DELETE', headers: authHeaders() })
+    if (res.ok) setSheets(prev => prev.filter(s => s.id !== sheetId))
+  }
+
+  async function togglePin(ann) {
+    const res = await fetch(`${API}/api/admin/announcements/${ann.id}/pin`, { method: 'PATCH', headers: authHeaders() })
+    if (res.ok) {
+      const updated = await res.json()
+      setAnnouncements(prev => prev.map(a => a.id === ann.id ? updated : a))
+    }
+  }
+
+  async function deleteAnn(annId) {
+    if (!window.confirm('Delete this announcement?')) return
+    const res = await fetch(`${API}/api/admin/announcements/${annId}`, { method: 'DELETE', headers: authHeaders() })
+    if (res.ok) setAnnouncements(prev => prev.filter(a => a.id !== annId))
+  }
+
+  async function postAnn(e) {
+    e.preventDefault()
+    if (!aTitle.trim() || !aBody.trim()) { setPostErr('Title and body are required.'); return }
+    setPosting(true); setPostErr('')
+    try {
+      const res = await fetch(`${API}/api/admin/announcements`, {
+        method: 'POST', headers: authHeaders(),
+        body: JSON.stringify({ title: aTitle.trim(), body: aBody.trim(), pinned: aPinned }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setPostErr(data.error || 'Failed.'); return }
+      setAnnouncements(prev => [data, ...prev])
+      setATitle(''); setABody(''); setAPinned(false); setShowAnnForm(false)
+    } catch { setPostErr('Server error.') }
+    finally { setPosting(false) }
+  }
+
+  async function handleAdminPatch(endpoint, body, setMsg) {
+    setAdSaving(true); setMsg(null)
+    try {
+      const res = await fetch(`${API}/api/settings/${endpoint}`, {
+        method: 'PATCH', headers: authHeaders(), body: JSON.stringify(body),
+      })
+      const data = await res.json()
+      if (!res.ok) { setMsg({ type:'error', text: data.error }); return }
+      if (data.token) { localStorage.setItem('token', data.token); localStorage.setItem('user', JSON.stringify(data.user)) }
+      setMsg({ type:'success', text: data.message })
+    } catch { setMsg({ type:'error', text:'Server error.' }) }
+    finally { setAdSaving(false) }
+  }
+
+  const TABS = [
+    { id:'overview', label:'Overview' },
+    { id:'users', label:'Users' },
+    { id:'sheets', label:'Sheets' },
+    { id:'announcements', label:'Announcements' },
+    { id:'deletion-reasons', label:'Deletion Reasons' },
+    { id:'admin-settings', label:'Admin Settings' },
+  ]
+
+  const adBtnStyle = { background:'#2563eb', color:'#fff', border:'none', borderRadius:8, padding:'9px 20px', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:FONT }
+  const adInputStyle = { width:'100%', boxSizing:'border-box', border:'1.5px solid #e2e8f0', borderRadius:8, padding:'9px 12px', fontSize:13, fontFamily:FONT, outline:'none', color:'#0f172a', marginBottom:12 }
+
   return (
     <div style={{ minHeight:'100vh', background:'#edf0f5', fontFamily:FONT }}>
       <Navbar crumbs={[{label:'Admin',to:'/admin'}]} hideTabs/>
-      <div style={{ maxWidth:1140, margin:'0 auto', padding:'24px 20px 60px' }}>
-        <h1 style={{ fontSize:20, fontWeight:800, color:'#0f172a', marginBottom:16 }}>Admin Panel</h1>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:20 }}>
-          {[['Total Users','—'],['Total Sheets','—'],['Flagged Courses','—'],['Total Stars','—']].map(([lbl,val])=>(
-            <div key={lbl} style={{ background:'#fff', borderRadius:12, border:'1px solid #e2e8f0', padding:'16px' }}>
-              <div style={{ fontSize:10, fontWeight:600, color:'#94a3b8', letterSpacing:'.06em', marginBottom:6 }}>{lbl.toUpperCase()}</div>
-              <div style={{ fontSize:22, fontWeight:800, color:'#0f172a' }}>{val}</div>
-            </div>
+      <div style={pageShell('reading')}>
+        <div style={{ display:'flex', gap:6, marginBottom:20, flexWrap:'wrap' }}>
+          {TABS.map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)} style={{
+              padding:'7px 14px', borderRadius:8, border:'none', fontSize:12, fontWeight:600,
+              background: tab === t.id ? '#0f172a' : '#fff',
+              color: tab === t.id ? '#fff' : '#64748b',
+              cursor:'pointer', fontFamily:FONT,
+              boxShadow: tab === t.id ? 'none' : '0 1px 3px rgba(0,0,0,0.06)',
+            }}>
+              {t.label}
+            </button>
           ))}
         </div>
-        <div style={{ fontSize:12, color:'#94a3b8', border:'1.5px dashed #cbd5e1', borderRadius:12, padding:28, textAlign:'center' }}>
-          Admin dashboard — user management, flagged courses, and moderation tools coming in V1.
-        </div>
+
+        {/* ── OVERVIEW ── */}
+        {tab === 'overview' && (
+          <div>
+            {loading ? <div style={{ color:'#94a3b8', fontSize:13 }}>Loading stats…</div> : (
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))', gap:10, marginBottom:20 }}>
+                {[
+                  ['Users', stats?.totalUsers, 'fa-users', '#3b82f6'],
+                  ['Sheets', stats?.totalSheets, 'fa-file-lines', '#8b5cf6'],
+                  ['Notes', stats?.totalNotes, 'fa-book-open', '#10b981'],
+                  ['Comments', stats?.totalComments, 'fa-comments', '#f59e0b'],
+                  ['Reactions', stats?.totalReactions, 'fa-thumbs-up', '#ef4444'],
+                  ['Follows', stats?.totalFollows, 'fa-user-plus', '#06b6d4'],
+                ].map(([lbl, val, icon, color]) => (
+                  <div key={lbl} style={{ background:'#fff', borderRadius:12, border:'1px solid #e2e8f0', padding:'16px 14px' }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+                      <i className={`fas ${icon}`} style={{ color, fontSize:14 }}></i>
+                      <div style={{ fontSize:10, fontWeight:600, color:'#94a3b8', letterSpacing:'.06em' }}>{lbl.toUpperCase()}</div>
+                    </div>
+                    <div style={{ fontSize:26, fontWeight:800, color:'#0f172a' }}>{val ?? '—'}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── USERS ── */}
+        {tab === 'users' && (
+          <div>
+            <div style={{ fontSize:13, color:'#64748b', marginBottom:12 }}>{usersTotal} total users</div>
+            {deleteUserId && (
+              <div style={{ background:'#fef2f2', border:'1px solid #fecaca', borderRadius:10, padding:'12px 16px', marginBottom:12, display:'flex', alignItems:'center', gap:12 }}>
+                <span style={{ fontSize:13, color:'#dc2626' }}>Delete this user permanently? This cannot be undone.</span>
+                <button onClick={() => confirmDeleteUser(deleteUserId)} style={{ background:'#dc2626', color:'#fff', border:'none', borderRadius:7, padding:'6px 14px', fontSize:12, cursor:'pointer', fontFamily:FONT }}>Confirm Delete</button>
+                <button onClick={() => setDeleteUserId(null)} style={{ background:'none', border:'1px solid #e2e8f0', borderRadius:7, padding:'6px 12px', fontSize:12, cursor:'pointer', fontFamily:FONT, color:'#64748b' }}>Cancel</button>
+              </div>
+            )}
+            <div style={{ background:'#fff', borderRadius:14, border:'1px solid #e2e8f0', overflow:'auto' }}>
+              <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+                <thead>
+                  <tr style={{ background:'#f8fafc' }}>
+                    {['Username','Email','Role','Sheets','Joined','Actions'].map(h => (
+                      <th key={h} style={{ padding:'10px 14px', textAlign:'left', fontWeight:600, color:'#64748b', borderBottom:'1px solid #e2e8f0', whiteSpace:'nowrap' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map(u => (
+                    <tr key={u.id} style={{ borderBottom:'1px solid #f1f5f9' }}>
+                      <td style={{ padding:'10px 14px', fontWeight:600, color:'#0f172a' }}>{u.username}</td>
+                      <td style={{ padding:'10px 14px', color:'#64748b' }}>{u.email || '—'}</td>
+                      <td style={{ padding:'10px 14px' }}>
+                        <span style={{ fontSize:10, fontWeight:600, padding:'2px 8px', borderRadius:99, background: u.role==='admin'?'#fef3c7':'#f1f5f9', color: u.role==='admin'?'#92400e':'#64748b' }}>
+                          {u.role}
+                        </span>
+                      </td>
+                      <td style={{ padding:'10px 14px', color:'#64748b' }}>{u._count?.studySheets ?? 0}</td>
+                      <td style={{ padding:'10px 14px', color:'#94a3b8', whiteSpace:'nowrap' }}>{new Date(u.createdAt).toLocaleDateString()}</td>
+                      <td style={{ padding:'10px 14px', display:'flex', gap:6, flexWrap:'wrap' }}>
+                        {u.role === 'student'
+                          ? <button onClick={() => patchRole(u.id, 'admin')} style={{ fontSize:11, padding:'3px 10px', borderRadius:6, border:'1px solid #e2e8f0', background:'#fff', cursor:'pointer', fontFamily:FONT, color:'#64748b' }}>Make Admin</button>
+                          : <button onClick={() => patchRole(u.id, 'student')} style={{ fontSize:11, padding:'3px 10px', borderRadius:6, border:'1px solid #fecaca', background:'#fef2f2', cursor:'pointer', fontFamily:FONT, color:'#dc2626' }}>Revoke Admin</button>
+                        }
+                        {u.id !== currentUser?.id && (
+                          <button onClick={() => setDeleteUserId(u.id)} style={{ fontSize:11, padding:'3px 10px', borderRadius:6, border:'1px solid #fecaca', background:'#fef2f2', cursor:'pointer', fontFamily:FONT, color:'#dc2626' }}>
+                            <i className="fas fa-trash" style={{ marginRight:4 }}></i>Delete
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ display:'flex', gap:8, justifyContent:'center', marginTop:14 }}>
+              <button onClick={() => setUsersPage(p => Math.max(1, p-1))} disabled={usersPage===1} style={{ padding:'6px 14px', borderRadius:7, border:'1px solid #e2e8f0', background:'#fff', cursor:'pointer', fontFamily:FONT, fontSize:12 }}>Prev</button>
+              <span style={{ fontSize:12, color:'#64748b', lineHeight:'32px' }}>Page {usersPage}</span>
+              <button onClick={() => setUsersPage(p => p+1)} disabled={usersPage*20>=usersTotal} style={{ padding:'6px 14px', borderRadius:7, border:'1px solid #e2e8f0', background:'#fff', cursor:'pointer', fontFamily:FONT, fontSize:12 }}>Next</button>
+            </div>
+          </div>
+        )}
+
+        {/* ── SHEETS ── */}
+        {tab === 'sheets' && (
+          <div>
+            <div style={{ fontSize:13, color:'#64748b', marginBottom:12 }}>{sheetsTotal} total sheets</div>
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              {sheets.map(s => (
+                <div key={s.id} style={{ background:'#fff', borderRadius:12, border:'1px solid #e2e8f0', padding:'12px 16px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                  <div>
+                    <div style={{ fontSize:13, fontWeight:600, color:'#0f172a', marginBottom:2 }}>{s.title}</div>
+                    <div style={{ fontSize:11, color:'#94a3b8' }}>
+                      by {s.author?.username} · {s.course?.code}
+                      <i className="fas fa-star" style={{ marginLeft:8, marginRight:3, color:'#f59e0b' }}></i>{s.stars}
+                      <i className="fas fa-download" style={{ marginLeft:8, marginRight:3, color:'#3b82f6' }}></i>{s.downloads}
+                    </div>
+                  </div>
+                  <button onClick={() => deleteSheet(s.id)} style={{ fontSize:12, padding:'5px 12px', borderRadius:7, border:'1px solid #fecaca', background:'#fef2f2', color:'#dc2626', cursor:'pointer', fontFamily:FONT }}>Delete</button>
+                </div>
+              ))}
+            </div>
+            <div style={{ display:'flex', gap:8, justifyContent:'center', marginTop:14 }}>
+              <button onClick={() => setSheetsPage(p => Math.max(1,p-1))} disabled={sheetsPage===1} style={{ padding:'6px 14px', borderRadius:7, border:'1px solid #e2e8f0', background:'#fff', cursor:'pointer', fontFamily:FONT, fontSize:12 }}>Prev</button>
+              <span style={{ fontSize:12, color:'#64748b', lineHeight:'32px' }}>Page {sheetsPage}</span>
+              <button onClick={() => setSheetsPage(p => p+1)} disabled={sheetsPage*20>=sheetsTotal} style={{ padding:'6px 14px', borderRadius:7, border:'1px solid #e2e8f0', background:'#fff', cursor:'pointer', fontFamily:FONT, fontSize:12 }}>Next</button>
+            </div>
+          </div>
+        )}
+
+        {/* ── ANNOUNCEMENTS ── */}
+        {tab === 'announcements' && (
+          <div>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+              <div style={{ fontSize:13, color:'#64748b' }}>{annTotal} announcements</div>
+              <button onClick={() => setShowAnnForm(f => !f)} style={{ ...adBtnStyle, background:'#3b82f6', padding:'7px 14px', fontSize:12 }}>
+                <i className="fas fa-plus" style={{ marginRight:5 }}></i>{showAnnForm ? 'Cancel' : 'New Announcement'}
+              </button>
+            </div>
+            {showAnnForm && (
+              <form onSubmit={postAnn} style={{ background:'#fff', borderRadius:14, border:'1px solid #e2e8f0', padding:'18px 20px', marginBottom:14 }}>
+                <div style={{ fontSize:13, fontWeight:700, color:'#0f172a', marginBottom:12 }}>New Announcement</div>
+                <input value={aTitle} onChange={e => setATitle(e.target.value)} placeholder="Title" style={adInputStyle} />
+                <textarea value={aBody} onChange={e => setABody(e.target.value)} placeholder="Body" rows={3} style={{ ...adInputStyle, resize:'vertical' }} />
+                <label style={{ display:'flex', alignItems:'center', gap:8, fontSize:12, color:'#64748b', marginBottom:12, cursor:'pointer' }}>
+                  <input type="checkbox" checked={aPinned} onChange={e => setAPinned(e.target.checked)} /> Pin this announcement
+                </label>
+                {postErr && <div style={{ color:'#dc2626', fontSize:12, marginBottom:8 }}>{postErr}</div>}
+                <button type="submit" disabled={posting} style={adBtnStyle}>{posting ? 'Posting…' : 'Post Announcement'}</button>
+              </form>
+            )}
+            {announcements.map(a => (
+              <div key={a.id} style={{ background: a.pinned ? '#fffbeb' : '#fff', borderRadius:12, border:`1px solid ${a.pinned ? '#fde68a' : '#e2e8f0'}`, padding:'12px 16px', marginBottom:8 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
+                  <div>
+                    {a.pinned && <div style={{ fontSize:9, fontWeight:700, color:'#92400e', letterSpacing:'.08em', marginBottom:4 }}>PINNED</div>}
+                    <div style={{ fontSize:13, fontWeight:700, color: a.pinned?'#92400e':'#0f172a', marginBottom:4 }}>{a.title}</div>
+                    <div style={{ fontSize:12, color: a.pinned?'#78350f':'#64748b', lineHeight:1.6, marginBottom:6 }}>{a.body}</div>
+                    <div style={{ fontSize:11, color:'#94a3b8' }}>by <strong>{a.author?.username}</strong> · {timeAgo(a.createdAt)}</div>
+                  </div>
+                  <div style={{ display:'flex', gap:6, flexShrink:0, marginLeft:12 }}>
+                    <button onClick={() => togglePin(a)} style={{ fontSize:11, padding:'4px 10px', borderRadius:6, border:'1px solid #e2e8f0', background:'#f8fafc', cursor:'pointer', fontFamily:FONT, color:'#64748b' }}>
+                      <i className={`fas ${a.pinned ? 'fa-thumbtack' : 'fa-thumbtack'}`} style={{ marginRight:4, color: a.pinned?'#f59e0b':'#94a3b8' }}></i>{a.pinned ? 'Unpin' : 'Pin'}
+                    </button>
+                    <button onClick={() => deleteAnn(a.id)} style={{ fontSize:11, padding:'4px 10px', borderRadius:6, border:'1px solid #fecaca', background:'#fef2f2', cursor:'pointer', fontFamily:FONT, color:'#dc2626' }}>
+                      <i className="fas fa-trash"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+            <div style={{ display:'flex', gap:8, justifyContent:'center', marginTop:14 }}>
+              <button onClick={() => setAnnPage(p => Math.max(1,p-1))} disabled={annPage===1} style={{ padding:'6px 14px', borderRadius:7, border:'1px solid #e2e8f0', background:'#fff', cursor:'pointer', fontFamily:FONT, fontSize:12 }}>Prev</button>
+              <span style={{ fontSize:12, color:'#64748b', lineHeight:'32px' }}>Page {annPage}</span>
+              <button onClick={() => setAnnPage(p => p+1)} disabled={annPage*20>=annTotal} style={{ padding:'6px 14px', borderRadius:7, border:'1px solid #e2e8f0', background:'#fff', cursor:'pointer', fontFamily:FONT, fontSize:12 }}>Next</button>
+            </div>
+          </div>
+        )}
+
+        {/* ── DELETION REASONS ── */}
+        {tab === 'deletion-reasons' && (
+          <div>
+            <div style={{ fontSize:13, color:'#64748b', marginBottom:12 }}>{drTotal} deletion records</div>
+            {deletionReasons.length === 0 ? (
+              <div style={{ background:'#fff', borderRadius:14, border:'1px solid #e2e8f0', padding:'28px', textAlign:'center', color:'#94a3b8', fontSize:13 }}>
+                No account deletions recorded yet.
+              </div>
+            ) : (
+              <div style={{ background:'#fff', borderRadius:14, border:'1px solid #e2e8f0', overflow:'auto' }}>
+                <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+                  <thead>
+                    <tr style={{ background:'#f8fafc' }}>
+                      {['Username','Reason','Details','Date'].map(h => (
+                        <th key={h} style={{ padding:'10px 14px', textAlign:'left', fontWeight:600, color:'#64748b', borderBottom:'1px solid #e2e8f0' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {deletionReasons.map(r => (
+                      <tr key={r.id} style={{ borderBottom:'1px solid #f1f5f9' }}>
+                        <td style={{ padding:'10px 14px', fontWeight:600, color:'#0f172a' }}>{r.username}</td>
+                        <td style={{ padding:'10px 14px', color:'#64748b' }}>{r.reason.replace(/_/g,' ')}</td>
+                        <td style={{ padding:'10px 14px', color:'#94a3b8', maxWidth:220 }}>{r.details || '—'}</td>
+                        <td style={{ padding:'10px 14px', color:'#94a3b8', whiteSpace:'nowrap' }}>{new Date(r.createdAt).toLocaleDateString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <div style={{ display:'flex', gap:8, justifyContent:'center', marginTop:14 }}>
+              <button onClick={() => setDrPage(p => Math.max(1,p-1))} disabled={drPage===1} style={{ padding:'6px 14px', borderRadius:7, border:'1px solid #e2e8f0', background:'#fff', cursor:'pointer', fontFamily:FONT, fontSize:12 }}>Prev</button>
+              <span style={{ fontSize:12, color:'#64748b', lineHeight:'32px' }}>Page {drPage}</span>
+              <button onClick={() => setDrPage(p => p+1)} disabled={drPage*20>=drTotal} style={{ padding:'6px 14px', borderRadius:7, border:'1px solid #e2e8f0', background:'#fff', cursor:'pointer', fontFamily:FONT, fontSize:12 }}>Next</button>
+            </div>
+          </div>
+        )}
+
+        {/* ── ADMIN SETTINGS ── */}
+        {tab === 'admin-settings' && (
+          <div>
+            <div style={{ fontSize:15, fontWeight:800, color:'#0f172a', marginBottom:16 }}>Admin Account Settings</div>
+            {/* Change password */}
+            <div style={{ background:'#fff', borderRadius:14, border:'1px solid #e2e8f0', padding:'20px', marginBottom:14 }}>
+              <div style={{ fontSize:13, fontWeight:700, color:'#0f172a', marginBottom:12 }}>Change Password</div>
+              <input type="password" placeholder="Current password" value={adPwForm.currentPassword} onChange={e => setAdPwForm(f => ({...f,currentPassword:e.target.value}))} style={adInputStyle}/>
+              <input type="password" placeholder="New password (min 8 chars)" value={adPwForm.newPassword} onChange={e => setAdPwForm(f => ({...f,newPassword:e.target.value}))} style={adInputStyle}/>
+              <input type="password" placeholder="Confirm new password" value={adPwForm.confirmPassword} onChange={e => setAdPwForm(f => ({...f,confirmPassword:e.target.value}))} style={adInputStyle}/>
+              {adPwMsg && <div style={{ fontSize:12, color:adPwMsg.type==='error'?'#dc2626':'#16a34a', marginBottom:10 }}>{adPwMsg.text}</div>}
+              <button disabled={adSaving} onClick={() => {
+                if (adPwForm.newPassword !== adPwForm.confirmPassword) { setAdPwMsg({ type:'error', text:'Passwords do not match.' }); return }
+                handleAdminPatch('password', { currentPassword:adPwForm.currentPassword, newPassword:adPwForm.newPassword }, setAdPwMsg)
+                  .then(() => setAdPwForm({ currentPassword:'', newPassword:'', confirmPassword:'' }))
+              }} style={adBtnStyle}>{adSaving ? 'Saving…' : 'Update Password'}</button>
+            </div>
+            {/* Change username */}
+            <div style={{ background:'#fff', borderRadius:14, border:'1px solid #e2e8f0', padding:'20px' }}>
+              <div style={{ fontSize:13, fontWeight:700, color:'#0f172a', marginBottom:12 }}>Change Username</div>
+              <input type="text" placeholder="New username (3-20 chars)" value={adUnForm.newUsername} onChange={e => setAdUnForm(f => ({...f,newUsername:e.target.value}))} style={adInputStyle}/>
+              <input type="password" placeholder="Confirm with password" value={adUnForm.password} onChange={e => setAdUnForm(f => ({...f,password:e.target.value}))} style={adInputStyle}/>
+              {adUnMsg && <div style={{ fontSize:12, color:adUnMsg.type==='error'?'#dc2626':'#16a34a', marginBottom:10 }}>{adUnMsg.text}</div>}
+              <button disabled={adSaving} onClick={() => handleAdminPatch('username', adUnForm, setAdUnMsg)} style={adBtnStyle}>{adSaving ? 'Saving…' : 'Update Username'}</button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
