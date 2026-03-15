@@ -1,6 +1,6 @@
 /* global process */
 import { createServer } from 'node:http'
-import { createReadStream, existsSync, statSync } from 'node:fs'
+import { createReadStream, existsSync, statSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -8,6 +8,8 @@ const port = Number(process.env.PORT || 3000)
 const host = '0.0.0.0'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const distDir = path.resolve(__dirname, '..', 'dist')
+const runtimeConfigPath = path.join(distDir, 'runtime-config.js')
+const defaultSupportEmail = 'abdulrfornah@getstudyhub.org'
 
 const mimeTypes = {
   '.css': 'text/css; charset=utf-8',
@@ -56,6 +58,21 @@ function sendFile(filePath, res) {
   res.writeHead(200, { 'Content-Type': contentType })
   createReadStream(filePath).pipe(res)
 }
+
+function writeRuntimeConfig() {
+  const config = {
+    API: process.env.VITE_API_URL || process.env.API_URL || 'http://localhost:4000',
+    SUPPORT_EMAIL: process.env.VITE_SUPPORT_EMAIL || defaultSupportEmail,
+  }
+
+  writeFileSync(
+    runtimeConfigPath,
+    `window.__STUDYHUB_CONFIG__ = ${JSON.stringify(config)};\n`,
+    'utf8'
+  )
+}
+
+writeRuntimeConfig()
 
 const server = createServer((req, res) => {
   if (!req.url) {
