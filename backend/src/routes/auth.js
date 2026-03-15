@@ -12,6 +12,14 @@ const prisma = new PrismaClient()
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,20}$/
 const PASSWORD_MIN_LENGTH = 8
+
+// Rate limiting for logout to prevent abuse of authorization-related endpoint
+const logoutLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // allow up to 100 logout requests per IP per window
+  standardHeaders: true,
+  legacyHeaders: false
+})
 const COURSE_CODE_REGEX = /^[A-Z0-9-]{2,20}$/
 
 // ── Rate limiters ──────────────────────────────────────────────
@@ -388,7 +396,7 @@ router.post('/verify-2fa', loginLimiter, async (req, res) => {
 
 const requireAuth = require('../middleware/auth')
 
-router.post('/logout', (req, res) => {
+router.post('/logout', logoutLimiter, (req, res) => {
   clearAuthCookie(res)
   return res.json({ message: 'Logged out.' })
 })
