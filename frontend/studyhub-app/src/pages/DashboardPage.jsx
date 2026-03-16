@@ -19,6 +19,7 @@ import {
 } from '../components/Icons'
 import { pageColumns, pageShell } from '../lib/ui'
 import { clearStoredSession, getStoredUser, hasStoredSession, logoutSession, setStoredUser } from '../lib/session'
+import { useLivePolling } from '../lib/useLivePolling'
 
 import { API } from '../config'
 
@@ -77,6 +78,7 @@ export default function DashboardPage() {
   const [avatarError, setAvatarError] = useState('')
   const avatarInputRef = useRef(null)
   const navigate = useNavigate()
+  const hasSession = hasStoredSession()
 
   async function handleAvatarChange(e) {
     const file = e.target.files?.[0]
@@ -118,49 +120,58 @@ export default function DashboardPage() {
   }
 
   useEffect(() => {
-    if (!hasStoredSession()) {
+    if (!hasSession) {
       navigate('/login')
-      return undefined
     }
+  }, [hasSession, navigate])
 
-    let isMounted = true
+  async function loadDashboard({ signal, startTransition } = {}) {
+    if (!hasSession) return
 
-    async function loadDashboard() {
-      try {
-        const meResponse = await fetch(`${API}/api/auth/me`, { headers: authHeaders() })
-        if (!meResponse.ok) {
+    try {
+      const meResponse = await fetch(`${API}/api/auth/me`, {
+        headers: authHeaders(),
+        signal,
+      })
+      if (!meResponse.ok) {
+        if (meResponse.status === 401 || meResponse.status === 403) {
           clearStoredSession()
           navigate('/login')
-          return
         }
-        const meData = await meResponse.json()
-        if (!isMounted) return
-        setUser(meData)
-        setStoredUser(meData)
+        return
+      }
 
-        const [sheetsResponse, mineResponse] = await Promise.all([
-          fetch(`${API}/api/sheets?limit=10`, { headers: authHeaders() }),
-          fetch(`${API}/api/sheets?mine=1&limit=1`, { headers: authHeaders() }),
-        ])
-        if (!isMounted) return
-        if (sheetsResponse.ok) {
-          const sheetsData = await sheetsResponse.json()
+      const meData = await meResponse.json()
+      const [sheetsResponse, mineResponse] = await Promise.all([
+        fetch(`${API}/api/sheets?limit=10`, { headers: authHeaders(), signal }),
+        fetch(`${API}/api/sheets?mine=1&limit=1`, { headers: authHeaders(), signal }),
+      ])
+
+      const sheetsData = sheetsResponse.ok ? await sheetsResponse.json() : null
+      const mineData = mineResponse.ok ? await mineResponse.json() : null
+      setStoredUser(meData)
+
+      startTransition(() => {
+        setUser(meData)
+        if (sheetsData) {
           setSheets(sheetsData.sheets || sheetsData || [])
         }
-        if (mineResponse.ok) {
-          const mineData = await mineResponse.json()
+        if (mineData) {
           setMySheetCount(mineData.total || 0)
         }
-      } catch {
-        // silently fail — user data from localStorage still shown
-      } finally {
-        if (isMounted) setLoading(false)
+        setLoading(false)
+      })
+    } catch (error) {
+      if (error?.name !== 'AbortError') {
+        setLoading(false)
       }
     }
+  }
 
-    loadDashboard()
-    return () => { isMounted = false }
-  }, [navigate])
+  useLivePolling(loadDashboard, {
+    enabled: hasSession,
+    intervalMs: 45000,
+  })
 
   async function handleLogout() {
     await logoutSession()

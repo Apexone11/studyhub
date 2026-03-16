@@ -568,6 +568,127 @@ async function main() {
       return `${response.status} total=${data.total} unread=${data.unreadCount}`
     })
 
+    await check('live-burst-feed-read-model', async () => {
+      const responses = await Promise.all([
+        ...Array.from({ length: 3 }, () => fetch(`${baseUrl}/api/auth/me`, {
+          headers: { cookie: studentCookie },
+        })),
+        ...Array.from({ length: 3 }, () => fetch(`${baseUrl}/api/sheets?limit=5`, {
+          headers: { cookie: studentCookie },
+        })),
+        ...Array.from({ length: 2 }, () => fetch(`${baseUrl}/api/sheets/leaderboard?type=stars`)),
+        ...Array.from({ length: 2 }, () => fetch(`${baseUrl}/api/sheets/leaderboard?type=downloads`)),
+        ...Array.from({ length: 2 }, () => fetch(`${baseUrl}/api/sheets/leaderboard?type=contributors`)),
+      ])
+
+      const payloads = await Promise.all(responses.map(async (response, index) => {
+        if (!response.ok) {
+          throw new Error(`Feed burst request ${index + 1} failed with ${response.status}.`)
+        }
+        return response.json()
+      }))
+
+      for (const payload of payloads.slice(0, 3)) {
+        if (!payload?.username) {
+          throw new Error('Feed burst auth payload was malformed.')
+        }
+      }
+      for (const payload of payloads.slice(3, 6)) {
+        if (!Array.isArray(payload?.sheets)) {
+          throw new Error('Feed burst sheets payload was malformed.')
+        }
+      }
+      for (const payload of payloads.slice(6)) {
+        if (!Array.isArray(payload)) {
+          throw new Error('Feed burst leaderboard payload was malformed.')
+        }
+      }
+
+      return `requests=${responses.length}`
+    })
+
+    await check('live-burst-admin-read-model', async () => {
+      const responses = await Promise.all([
+        ...Array.from({ length: 3 }, () => fetch(`${baseUrl}/api/admin/stats`, {
+          headers: { cookie: adminCookie },
+        })),
+        ...Array.from({ length: 2 }, () => fetch(`${baseUrl}/api/admin/users?page=1`, {
+          headers: { cookie: adminCookie },
+        })),
+        ...Array.from({ length: 2 }, () => fetch(`${baseUrl}/api/admin/sheets?page=1`, {
+          headers: { cookie: adminCookie },
+        })),
+        ...Array.from({ length: 2 }, () => fetch(`${baseUrl}/api/admin/announcements?page=1`, {
+          headers: { cookie: adminCookie },
+        })),
+      ])
+
+      const payloads = await Promise.all(responses.map(async (response, index) => {
+        if (!response.ok) {
+          throw new Error(`Admin burst request ${index + 1} failed with ${response.status}.`)
+        }
+        return response.json()
+      }))
+
+      for (const payload of payloads.slice(0, 3)) {
+        if (typeof payload?.totalUsers !== 'number') {
+          throw new Error('Admin burst stats payload was malformed.')
+        }
+      }
+      for (const payload of payloads.slice(3, 5)) {
+        if (!Array.isArray(payload?.users)) {
+          throw new Error('Admin burst users payload was malformed.')
+        }
+      }
+      for (const payload of payloads.slice(5, 7)) {
+        if (!Array.isArray(payload?.sheets)) {
+          throw new Error('Admin burst sheets payload was malformed.')
+        }
+      }
+      for (const payload of payloads.slice(7)) {
+        if (!Array.isArray(payload?.announcements)) {
+          throw new Error('Admin burst announcements payload was malformed.')
+        }
+      }
+
+      return `requests=${responses.length}`
+    })
+
+    await check('live-burst-comments-and-notifications', async () => {
+      const responses = await Promise.all([
+        ...Array.from({ length: 4 }, () => fetch(`${baseUrl}/api/sheets/${createdSheetId}/comments`)),
+        ...Array.from({ length: 4 }, () => fetch(`${baseUrl}/api/notifications?limit=15`, {
+          headers: { cookie: studentCookie },
+        })),
+        ...Array.from({ length: 4 }, () => fetch(`${baseUrl}/api/announcements`)),
+      ])
+
+      const payloads = await Promise.all(responses.map(async (response, index) => {
+        if (!response.ok) {
+          throw new Error(`Live burst request ${index + 1} failed with ${response.status}.`)
+        }
+        return response.json()
+      }))
+
+      for (const payload of payloads.slice(0, 4)) {
+        if (!Array.isArray(payload?.comments)) {
+          throw new Error('Comments burst payload was malformed.')
+        }
+      }
+      for (const payload of payloads.slice(4, 8)) {
+        if (!Array.isArray(payload?.notifications)) {
+          throw new Error('Notifications burst payload was malformed.')
+        }
+      }
+      for (const payload of payloads.slice(8)) {
+        if (!Array.isArray(payload)) {
+          throw new Error('Announcements burst payload was malformed.')
+        }
+      }
+
+      return `requests=${responses.length}`
+    })
+
     console.log(JSON.stringify(results, null, 2))
   } finally {
     child.kill('SIGTERM')

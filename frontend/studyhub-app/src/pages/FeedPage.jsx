@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   IconAnnouncements,
@@ -20,7 +20,8 @@ import {
   LogoMark,
 } from '../components/Icons'
 import { pageColumns, pageShell } from '../lib/ui'
-import { hasStoredSession, logoutSession } from '../lib/session'
+import { clearStoredSession, hasStoredSession, logoutSession } from '../lib/session'
+import { useLivePolling } from '../lib/useLivePolling'
 
 import { API } from '../config'
 
@@ -425,6 +426,7 @@ function FeedCard({ item }) {
 export default function FeedPage() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
+  const hasSession = hasStoredSession()
 
   const [user, setUser] = useState(FALLBACK_USER)
   const [filter, setFilter] = useState('all')
@@ -437,101 +439,128 @@ export default function FeedPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchLoading, setSearchLoading] = useState(false)
   const searchTimer = useRef(null)
+  const hadSearchQuery = useRef(false)
 
   const maxCompose = 280
 
   useEffect(() => {
-    let cancelled = false
-    if (!hasStoredSession()) {
+    if (!hasSession) {
       navigate('/login')
-      return undefined
+    }
+  }, [hasSession, navigate])
+
+  async function loadCurrentUser({ signal, startTransition } = {}) {
+    if (!hasSession) return
+
+    const response = await fetch(`${API}/api/auth/me`, {
+      headers: authHeaders(),
+      signal,
+    })
+
+    if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
+        clearStoredSession()
+        navigate('/login')
+      }
+      return
     }
 
-    fetch(`${API}/api/auth/me`, { headers: authHeaders() })
-      .then((response) => {
-        if (!response.ok) throw new Error('Failed to fetch current user')
-        return response.json()
+    const data = await response.json()
+    const courses = (data.enrollments || []).map((entry) => entry.course?.code).filter(Boolean)
+
+    startTransition(() => {
+      setUser({
+        username: data.username || FALLBACK_USER.username,
+        school: data.enrollments?.[0]?.course?.school?.name || 'StudyHub',
+        role: data.role || 'student',
+        courses: courses.length > 0 ? courses : ['No courses yet'],
+        stats: {
+          sheets: 0,
+          stars: 0,
+          forks: 0,
+        },
       })
-      .then((data) => {
-        if (cancelled) return
+    })
+  }
 
-        const courses = (data.enrollments || []).map((entry) => entry.course?.code).filter(Boolean)
+  const loadFeedSheets = useCallback(async ({ signal, startTransition, query = searchQuery.trim(), showSpinner = false } = {}) => {
+    if (!hasSession) return
 
-        setUser({
-          username: data.username || FALLBACK_USER.username,
-          school: data.enrollments?.[0]?.course?.school?.name || 'StudyHub',
-          role: data.role || 'student',
-          courses: courses.length > 0 ? courses : ['No courses yet'],
-          stats: {
-            sheets: 0,
-            stars: 0,
-            forks: 0,
-          },
-        })
+    if (showSpinner) setSearchLoading(true)
+
+    try {
+      const endpoint = query
+        ? `${API}/api/sheets?search=${encodeURIComponent(query)}&limit=10`
+        : `${API}/api/sheets?limit=5`
+      const response = await fetch(endpoint, {
+        headers: authHeaders(),
+        signal,
       })
-      .catch(() => {
-        if (!cancelled) navigate('/login')
-      })
+      if (!response.ok) return
 
-    return () => {
-      cancelled = true
-    }
-  }, [navigate])
-
-  useEffect(() => {
-    let cancelled = false
-
-    fetch(`${API}/api/sheets?limit=5`, { headers: authHeaders() })
-      .then((response) => response.json())
-      .then((data) => {
-        if (cancelled) return
+      const data = await response.json()
+      startTransition(() => {
         setFeedSheets(data.sheets || data || [])
       })
-      .catch(() => {
-        if (!cancelled) setFeedSheets([])
-      })
-
-    return () => {
-      cancelled = true
+    } finally {
+      if (showSpinner) setSearchLoading(false)
     }
-  }, [])
+  }, [hasSession, searchQuery])
 
-  useEffect(() => {
-    let cancelled = false
+  async function loadLeaderboards({ signal, startTransition } = {}) {
+    const [starsResponse, downloadsResponse, contribsResponse] = await Promise.all([
+      fetch(`${API}/api/sheets/leaderboard?type=stars`, { signal }),
+      fetch(`${API}/api/sheets/leaderboard?type=downloads`, { signal }),
+      fetch(`${API}/api/sheets/leaderboard?type=contributors`, { signal }),
+    ])
 
-    Promise.all([
-      fetch(`${API}/api/sheets/leaderboard?type=stars`).then(r => r.json()).catch(() => []),
-      fetch(`${API}/api/sheets/leaderboard?type=downloads`).then(r => r.json()).catch(() => []),
-      fetch(`${API}/api/sheets/leaderboard?type=contributors`).then(r => r.json()).catch(() => []),
-    ]).then(([stars, downloads, contribs]) => {
-      if (cancelled) return
+    const [stars, downloads, contribs] = await Promise.all([
+      starsResponse.ok ? starsResponse.json() : [],
+      downloadsResponse.ok ? downloadsResponse.json() : [],
+      contribsResponse.ok ? contribsResponse.json() : [],
+    ])
+
+    startTransition(() => {
       setLeaderStars(Array.isArray(stars) ? stars : [])
       setLeaderDownloads(Array.isArray(downloads) ? downloads : [])
       setLeaderContribs(Array.isArray(contribs) ? contribs : [])
     })
+  }
 
-    return () => { cancelled = true }
-  }, [])
+  useLivePolling(loadCurrentUser, {
+    enabled: hasSession,
+    intervalMs: 60000,
+  })
+
+  useLivePolling(loadFeedSheets, {
+    enabled: hasSession,
+    intervalMs: searchQuery.trim() ? 45000 : 30000,
+  })
+
+  useLivePolling(loadLeaderboards, {
+    enabled: true,
+    intervalMs: 60000,
+  })
 
   // Debounced search
   useEffect(() => {
     clearTimeout(searchTimer.current)
-    if (!searchQuery.trim()) {
-      // Restore default feed
-      fetch(`${API}/api/sheets?limit=5`, { headers: authHeaders() })
-        .then(r => r.json()).then(d => setFeedSheets(d.sheets || d || [])).catch(() => {})
+    const trimmedQuery = searchQuery.trim()
+
+    if (!trimmedQuery) {
+      if (hadSearchQuery.current) {
+        void loadFeedSheets({ query: '' })
+      }
+      hadSearchQuery.current = false
       return
     }
+
+    hadSearchQuery.current = true
     searchTimer.current = setTimeout(() => {
-      setSearchLoading(true)
-      fetch(`${API}/api/sheets?search=${encodeURIComponent(searchQuery.trim())}&limit=10`, { headers: authHeaders() })
-        .then(r => r.json())
-        .then(d => setFeedSheets(d.sheets || d || []))
-        .catch(() => {})
-        .finally(() => setSearchLoading(false))
+      void loadFeedSheets({ query: trimmedQuery, showSpinner: true })
     }, 300)
     return () => clearTimeout(searchTimer.current)
-  }, [searchQuery])
+  }, [searchQuery, loadFeedSheets])
 
   const combinedFeed = [
     FEED_ITEMS[0],
@@ -1137,7 +1166,7 @@ export default function FeedPage() {
                   letterSpacing: '0.06em',
                 }}
               >
-                SOON
+                V2
               </span>
             </div>
 
@@ -1160,7 +1189,7 @@ export default function FeedPage() {
                 fontFamily: 'inherit',
               }}
             >
-              Coming in V1
+              Planned for Version 2
             </button>
           </div>
 

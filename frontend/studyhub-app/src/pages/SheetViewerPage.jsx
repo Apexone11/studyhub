@@ -14,6 +14,7 @@ import {
 } from '../components/Icons'
 import { pageColumns, pageShell } from '../lib/ui'
 import { getStoredUser, hasStoredSession } from '../lib/session'
+import { useLivePolling } from '../lib/useLivePolling'
 
 import { API } from '../config'
 const authHeaders = () => ({
@@ -510,14 +511,23 @@ export default function SheetViewerPage() {
       .catch(() => {})
   }, [sheet?.courseId, id])
 
-  // fetch comments
-  useEffect(() => {
+  async function loadComments({ signal, startTransition } = {}) {
     if (!id) return
-    fetch(`${API}/api/sheets/${id}/comments`)
-      .then(r => r.json())
-      .then(d => { setComments(d.comments || []); setCommentTotal(d.total || 0) })
-      .catch(() => {})
-  }, [id])
+
+    const response = await fetch(`${API}/api/sheets/${id}/comments`, { signal })
+    if (!response.ok) return
+
+    const data = await response.json()
+    startTransition(() => {
+      setComments(data.comments || [])
+      setCommentTotal(data.total || 0)
+    })
+  }
+
+  useLivePolling(loadComments, {
+    enabled: Boolean(id),
+    intervalMs: 20000,
+  })
 
   async function handlePostComment(e) {
     e.preventDefault()
@@ -1105,7 +1115,7 @@ export default function SheetViewerPage() {
               <span style={{
                 fontSize: 10, fontWeight: 700, padding: '2px 7px',
                 background: '#1d4ed8', color: '#93c5fd', borderRadius: 99,
-              }}>V1</span>
+              }}>V2</span>
             </div>
             <p style={{ fontSize: 12, color: '#94a3b8', lineHeight: 1.65, margin: '0 0 12px' }}>
               Ask Claude anything about this sheet. Context-aware answers, practice questions, and step-by-step breakdowns.
@@ -1123,7 +1133,7 @@ export default function SheetViewerPage() {
               fontSize: 13, fontWeight: 600, cursor: 'not-allowed',
               fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
             }}>
-🔒 Coming in V1
+Planned for Version 2
             </button>
           </div>
 

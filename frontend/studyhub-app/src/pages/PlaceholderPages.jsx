@@ -12,6 +12,7 @@ import { IconUpload, IconEye, IconPlus, IconCheck } from '../components/Icons'
 import { pageColumns, pageShell } from '../lib/ui'
 import { getStoredUser, setStoredUser } from '../lib/session'
 import { useProtectedPage } from '../lib/useProtectedPage'
+import { useLivePolling } from '../lib/useLivePolling'
 
 import { API, SUPPORT_EMAIL } from '../config'
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
@@ -71,7 +72,7 @@ function SideCard({ sections }) {
 function TeaserCard({ title, sub, chips=[] }) {
   return (
     <div style={{ background:'#fff', borderRadius:14, border:'1px solid #e2e8f0', padding:'14px 16px', marginBottom:9, position:'relative', overflow:'hidden' }}>
-      <span style={{ position:'absolute', top:0, right:0, background:'#f1f5f9', fontSize:9, fontWeight:600, color:'#64748b', padding:'3px 10px', borderRadius:'0 0 0 8px' }}>Coming V1</span>
+      <span style={{ position:'absolute', top:0, right:0, background:'#f1f5f9', fontSize:9, fontWeight:600, color:'#64748b', padding:'3px 10px', borderRadius:'0 0 0 8px' }}>Version 2</span>
       <div style={{ fontSize:14, fontWeight:700, color:'#334155', marginBottom:5, paddingRight:64 }}>{title}</div>
       <div style={{ fontSize:12, color:'#94a3b8', lineHeight:1.55, marginBottom:8 }}>{sub}</div>
       <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
@@ -347,7 +348,7 @@ export function TestsPage() {
     <PageShell nav={<Navbar crumbs={[{label:'Practice Tests',to:'/tests'}]} hideTabs/>} sidebar={<AppSidebar/>}>
       <div style={{ marginBottom:14 }}>
         <h1 style={{ fontSize:20, fontWeight:800, color:'#0f172a', marginBottom:4 }}>Practice Tests</h1>
-        <p style={{ fontSize:13, color:'#64748b' }}>Course-linked tests with instant scoring. Coming in V1.</p>
+        <p style={{ fontSize:13, color:'#64748b' }}>Course-linked tests with instant scoring. Planned for Version 2.</p>
         <div style={{ display:'flex', gap:6, marginTop:12 }}>
           {[['all','All Tests'],['attempts','My Attempts'],['leaderboard','Leaderboard']].map(([id,label])=>(
             <button key={id} onClick={()=>setBrowseTab(id)}
@@ -366,7 +367,7 @@ export function TestsPage() {
       <TeaserCard title="CMSC131 Recursion Drills" sub="10 trace-through problems · Based on Recursion Cheatsheet"
         chips={[{label:'CMSC131',bg:'#ede9fe',color:'#5b21b6',border:'#c4b5fd'},{label:'10 problems'},{label:'Intermediate'}]}/>
       <div style={{ background:'linear-gradient(135deg,#0f172a,#1e3a5f)', borderRadius:14, padding:'20px', marginTop:16, textAlign:'center' }}>
-        <div style={{ fontSize:14, fontWeight:700, color:'#fff', marginBottom:6 }}>AI-Generated Tests Coming in V1</div>
+        <div style={{ fontSize:14, fontWeight:700, color:'#fff', marginBottom:6 }}>AI-Generated Tests in Version 2</div>
         <div style={{ fontSize:12, color:'#64748b', maxWidth:340, margin:'0 auto' }}>Claude AI will read your study sheets and automatically generate practice questions with instant scoring.</div>
       </div>
     </PageShell>
@@ -641,12 +642,27 @@ export function AnnouncementsPage() {
   const [posting, setPosting] = useState(false)
   const [postErr, setPostErr] = useState('')
 
-  useEffect(() => {
-    fetch(`${API}/api/announcements`)
-      .then(r => r.json())
-      .then(data => { setAnnouncements(Array.isArray(data) ? data : []); setLoading(false) })
-      .catch(() => setLoading(false))
-  }, [])
+  async function loadAnnouncements({ signal, startTransition } = {}) {
+    try {
+      const response = await fetch(`${API}/api/announcements`, { signal })
+      if (!response.ok) return
+
+      const data = await response.json()
+      startTransition(() => {
+        setAnnouncements(Array.isArray(data) ? data : [])
+        setLoading(false)
+      })
+    } catch (error) {
+      if (error?.name !== 'AbortError') {
+        setLoading(false)
+      }
+    }
+  }
+
+  useLivePolling(loadAnnouncements, {
+    enabled: true,
+    intervalMs: 20000,
+  })
 
   async function handlePost(e) {
     e.preventDefault()
@@ -741,6 +757,7 @@ export function SubmitPage() {
 export function AdminPage() {
   const navigate = useNavigate()
   const currentUser = getStoredUser()
+  const isAdmin = currentUser?.role === 'admin'
 
   const [tab, setTab] = useState('overview')
   const [stats, setStats] = useState(null)
@@ -779,35 +796,111 @@ export function AdminPage() {
   const [deleteUserId, setDeleteUserId] = useState(null)
 
   useEffect(() => {
-    if (!currentUser || currentUser.role !== 'admin') { navigate('/feed'); return }
-    fetch(`${API}/api/admin/stats`, { headers: authHeaders() })
-      .then(r => r.json()).then(setStats).catch(() => {})
-      .finally(() => setLoading(false))
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    if (!isAdmin) {
+      navigate('/feed')
+    }
+  }, [isAdmin, navigate])
 
-  useEffect(() => {
-    if (tab !== 'users') return
-    fetch(`${API}/api/admin/users?page=${usersPage}`, { headers: authHeaders() })
-      .then(r => r.json()).then(d => { setUsers(d.users || []); setUsersTotal(d.total || 0) }).catch(() => {})
-  }, [tab, usersPage])
+  async function loadStats({ signal, startTransition } = {}) {
+    try {
+      const response = await fetch(`${API}/api/admin/stats`, {
+        headers: authHeaders(),
+        signal,
+      })
+      if (!response.ok) return
 
-  useEffect(() => {
-    if (tab !== 'sheets') return
-    fetch(`${API}/api/admin/sheets?page=${sheetsPage}`, { headers: authHeaders() })
-      .then(r => r.json()).then(d => { setSheets(d.sheets || []); setSheetsTotal(d.total || 0) }).catch(() => {})
-  }, [tab, sheetsPage])
+      const data = await response.json()
+      startTransition(() => {
+        setStats(data)
+        setLoading(false)
+      })
+    } catch (error) {
+      if (error?.name !== 'AbortError') {
+        setLoading(false)
+      }
+    }
+  }
 
-  useEffect(() => {
-    if (tab !== 'announcements') return
-    fetch(`${API}/api/admin/announcements?page=${annPage}`, { headers: authHeaders() })
-      .then(r => r.json()).then(d => { setAnnouncements(d.announcements || []); setAnnTotal(d.total || 0) }).catch(() => {})
-  }, [tab, annPage])
+  async function loadUsers({ signal, startTransition } = {}) {
+    const response = await fetch(`${API}/api/admin/users?page=${usersPage}`, {
+      headers: authHeaders(),
+      signal,
+    })
+    if (!response.ok) return
 
-  useEffect(() => {
-    if (tab !== 'deletion-reasons') return
-    fetch(`${API}/api/admin/deletion-reasons?page=${drPage}`, { headers: authHeaders() })
-      .then(r => r.json()).then(d => { setDeletionReasons(d.reasons || []); setDrTotal(d.total || 0) }).catch(() => {})
-  }, [tab, drPage])
+    const data = await response.json()
+    startTransition(() => {
+      setUsers(data.users || [])
+      setUsersTotal(data.total || 0)
+    })
+  }
+
+  async function loadSheets({ signal, startTransition } = {}) {
+    const response = await fetch(`${API}/api/admin/sheets?page=${sheetsPage}`, {
+      headers: authHeaders(),
+      signal,
+    })
+    if (!response.ok) return
+
+    const data = await response.json()
+    startTransition(() => {
+      setSheets(data.sheets || [])
+      setSheetsTotal(data.total || 0)
+    })
+  }
+
+  async function loadAdminAnnouncements({ signal, startTransition } = {}) {
+    const response = await fetch(`${API}/api/admin/announcements?page=${annPage}`, {
+      headers: authHeaders(),
+      signal,
+    })
+    if (!response.ok) return
+
+    const data = await response.json()
+    startTransition(() => {
+      setAnnouncements(data.announcements || [])
+      setAnnTotal(data.total || 0)
+    })
+  }
+
+  async function loadDeletionReasons({ signal, startTransition } = {}) {
+    const response = await fetch(`${API}/api/admin/deletion-reasons?page=${drPage}`, {
+      headers: authHeaders(),
+      signal,
+    })
+    if (!response.ok) return
+
+    const data = await response.json()
+    startTransition(() => {
+      setDeletionReasons(data.reasons || [])
+      setDrTotal(data.total || 0)
+    })
+  }
+
+  useLivePolling(loadStats, {
+    enabled: isAdmin && tab === 'overview',
+    intervalMs: 30000,
+  })
+
+  useLivePolling(loadUsers, {
+    enabled: isAdmin && tab === 'users',
+    intervalMs: 30000,
+  })
+
+  useLivePolling(loadSheets, {
+    enabled: isAdmin && tab === 'sheets',
+    intervalMs: 30000,
+  })
+
+  useLivePolling(loadAdminAnnouncements, {
+    enabled: isAdmin && tab === 'announcements',
+    intervalMs: 25000,
+  })
+
+  useLivePolling(loadDeletionReasons, {
+    enabled: isAdmin && tab === 'deletion-reasons',
+    intervalMs: 30000,
+  })
 
   async function patchRole(userId, role) {
     const res = await fetch(`${API}/api/admin/users/${userId}/role`, {
@@ -1167,7 +1260,7 @@ export function TestTakerPage() {
       <Navbar crumbs={[{label:'Practice Tests',to:'/tests'},{label:'Taking test…',to:null}]} hideTabs hideSearch/>
       <div style={{ maxWidth:720, margin:'48px auto', padding:'0 20px' }}>
         <div style={{ background:'#fff', borderRadius:16, border:'1px solid #e2e8f0', padding:'32px', textAlign:'center' }}>
-          <div style={{ fontSize:16, fontWeight:700, color:'#0f172a', marginBottom:8 }}>Test interface coming in V1</div>
+          <div style={{ fontSize:16, fontWeight:700, color:'#0f172a', marginBottom:8 }}>Test interface planned for Version 2</div>
           <div style={{ fontSize:13, color:'#64748b', marginBottom:20 }}>Multiple choice + short answer with instant AI scoring.</div>
           <Link to="/tests" style={{ fontSize:13, color:'#3b82f6', fontWeight:600, textDecoration:'none' }}>← Back to Practice Tests</Link>
         </div>
