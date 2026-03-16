@@ -4,7 +4,22 @@ const { captureError } = require('../monitoring/sentry')
 
 const BACKEND_ROOT = path.resolve(__dirname, '../..')
 const DEFAULT_UPLOADS_DIR = path.join(BACKEND_ROOT, 'uploads')
+const RAILWAY_VOLUME_ROOT = '/data'
 const UPLOADS_URL_PREFIX = '/uploads'
+
+function detectPersistentUploadsDir() {
+  if (process.platform === 'win32') return null
+  if (process.env.NODE_ENV !== 'production') return null
+
+  try {
+    if (!fs.existsSync(RAILWAY_VOLUME_ROOT)) return null
+    const stats = fs.statSync(RAILWAY_VOLUME_ROOT)
+    if (!stats.isDirectory()) return null
+    return path.join(RAILWAY_VOLUME_ROOT, 'uploads')
+  } catch {
+    return null
+  }
+}
 
 function resolveUploadsDir(candidate) {
   if (!candidate) return DEFAULT_UPLOADS_DIR
@@ -13,7 +28,8 @@ function resolveUploadsDir(candidate) {
     : path.resolve(BACKEND_ROOT, candidate)
 }
 
-const UPLOADS_DIR = resolveUploadsDir(process.env.UPLOADS_DIR)
+const autoDetectedUploadsDir = detectPersistentUploadsDir()
+const UPLOADS_DIR = resolveUploadsDir(process.env.UPLOADS_DIR || autoDetectedUploadsDir)
 const AVATARS_DIR = path.join(UPLOADS_DIR, 'avatars')
 const ATTACHMENTS_DIR = path.join(UPLOADS_DIR, 'attachments')
 
@@ -26,10 +42,11 @@ function ensureUploadDirectories() {
 
 function validateUploadStorage() {
   const allowEphemeralUploads = process.env.ALLOW_EPHEMERAL_UPLOADS === 'true'
+  const hasPersistentUploadsDir = Boolean(process.env.UPLOADS_DIR || autoDetectedUploadsDir)
 
-  if (process.env.NODE_ENV === 'production' && !process.env.UPLOADS_DIR && !allowEphemeralUploads) {
+  if (process.env.NODE_ENV === 'production' && !hasPersistentUploadsDir && !allowEphemeralUploads) {
     throw new Error(
-      'UPLOADS_DIR must point to persistent storage in production. Set UPLOADS_DIR to a mounted volume path such as /data/uploads, or explicitly set ALLOW_EPHEMERAL_UPLOADS=true for non-persistent environments.'
+      'UPLOADS_DIR must point to persistent storage in production. On Railway, attach a volume mounted at /data or set UPLOADS_DIR to a mounted volume path such as /data/uploads. For temporary non-persistent environments only, set ALLOW_EPHEMERAL_UPLOADS=true.'
     )
   }
 
@@ -37,6 +54,8 @@ function validateUploadStorage() {
 
   const storageMode = process.env.UPLOADS_DIR
     ? 'configured'
+    : autoDetectedUploadsDir
+      ? 'auto-detected-persistent'
     : allowEphemeralUploads
       ? 'ephemeral-opt-in'
       : 'default-local'

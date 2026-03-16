@@ -17,4 +17,19 @@ export const SUPPORT_EMAIL =
   import.meta.env.VITE_SUPPORT_EMAIL ||
   'abdulrfornah@getstudyhub.org'
 
+export const GOOGLE_ADS_ID =
+  runtimeConfig.GOOGLE_ADS_ID ||
+  import.meta.env.VITE_GOOGLE_ADS_ID ||
+  'AW-18019301841'
+
+export const GOOGLE_ADS_SIGNUP_CONVERSION_LABEL =
+  runtimeConfig.GOOGLE_ADS_SIGNUP_CONVERSION_LABEL ||
+  import.meta.env.VITE_GOOGLE_ADS_SIGNUP_CONVERSION_LABEL ||
+  ''
+
+export const CLARITY_PROJECT_ID =
+  runtimeConfig.CLARITY_PROJECT_ID ||
+  import.meta.env.VITE_CLARITY_PROJECT_ID ||
+  ''
+
 export const SUPPORT_MAILTO = `mailto:${SUPPORT_EMAIL}`

@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import Navbar from '../components/Navbar'
-import { identifyAuthenticatedUser } from '../lib/telemetry'
+import { identifyAuthenticatedUser, trackSignupConversion } from '../lib/telemetry'
 import { setStoredUser } from '../lib/session'
 import { API } from '../config'
 
@@ -435,6 +435,7 @@ function RegisterScreen() {
 
       setStoredUser(data.user)
       identifyAuthenticatedUser(data.user)
+      trackSignupConversion()
 
       setError('')
       setSuccess(true)

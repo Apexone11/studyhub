@@ -51,6 +51,15 @@ const attachmentDownloadLimiter = rateLimit({
   legacyHeaders: false,
 })
 
+const authLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 240,
+  message: { error: 'Too many authenticated feed requests. Please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
+router.use(authLimiter)
 router.use(requireAuth)
 router.use(feedReadLimiter)
 

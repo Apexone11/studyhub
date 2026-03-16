@@ -2,3 +2,8 @@ interface:
   display_name: "StudyHub Codebase"
   short_description: "Navigate StudyHub architecture and workflows"
   default_prompt: "Use $studyhub-codebase to analyze or update the StudyHub web application."
+  icon_small: "./assets/icon.svg"
+  icon_large: "./assets/icon.svg"
+
+policy:
+  allow_implicit_invocation: true
