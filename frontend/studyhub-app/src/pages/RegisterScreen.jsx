@@ -78,6 +78,10 @@ const DEFAULT_COURSES = [
   { code: 'PHYS101', name: 'Physics I'                         },
 ]
 
+const CAN_USE_LOCAL_CATALOG_FALLBACK =
+  typeof window !== 'undefined' &&
+  ['localhost', '127.0.0.1'].includes(window.location.hostname)
+
 function normalizeCatalogResponse(schools) {
   const normalizedSchools = schools.map((school) => ({
     id: school.id,
@@ -147,8 +151,12 @@ function RegisterScreen() {
   const [customCode, setCustomCode]       = useState('')
   const [customName, setCustomName]       = useState('')
   const [customCourses, setCustomCourses] = useState([])
-  const [catalogSchools, setCatalogSchools] = useState(SCHOOLS)
-  const [catalogCoursesBySchool, setCatalogCoursesBySchool] = useState(COURSES_BY_SCHOOL)
+  const [catalogSchools, setCatalogSchools] = useState(
+    CAN_USE_LOCAL_CATALOG_FALLBACK ? SCHOOLS : []
+  )
+  const [catalogCoursesBySchool, setCatalogCoursesBySchool] = useState(
+    CAN_USE_LOCAL_CATALOG_FALLBACK ? COURSES_BY_SCHOOL : {}
+  )
 
   // UI state
   const [error, setError]                 = useState('')
@@ -194,19 +202,32 @@ function RegisterScreen() {
   useEffect(() => {
     let isMounted = true
 
+    function clearCatalogFallback() {
+      if (!isMounted || CAN_USE_LOCAL_CATALOG_FALLBACK) return
+      setCatalogSchools([])
+      setCatalogCoursesBySchool({})
+    }
+
     async function loadCatalog() {
       try {
         const response = await fetch(`${API}/api/courses/schools`)
-        if (!response.ok) return
+        if (!response.ok) {
+          clearCatalogFallback()
+          return
+        }
 
         const schools = await response.json()
-        if (!isMounted || !Array.isArray(schools) || schools.length === 0) return
+        if (!isMounted || !Array.isArray(schools) || schools.length === 0) {
+          clearCatalogFallback()
+          return
+        }
 
         const { normalizedSchools, normalizedCourses } = normalizeCatalogResponse(schools)
         setCatalogSchools(normalizedSchools)
         setCatalogCoursesBySchool(normalizedCourses)
       } catch {
-        // Fall back to the baked-in catalog if the public course endpoint is unavailable.
+        // In production, avoid sending local hardcoded IDs that may not exist in the live DB.
+        clearCatalogFallback()
       }
     }
 

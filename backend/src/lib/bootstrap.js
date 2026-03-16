@@ -224,7 +224,7 @@ async function ensureCatalogData(prisma) {
       schoolsUpdated += 1
     }
 
-    const targetCourses = COURSES[school.short] || COURSES.DEFAULT || []
+    const targetCourses = COURSES[short] || COURSES.DEFAULT || []
     const existingCodes = new Set(
       (currentSchool.courses || []).map((course) => String(course.code).toUpperCase())
     )
