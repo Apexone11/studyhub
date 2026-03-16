@@ -26,6 +26,8 @@ services:
       JWT_SECRET: ${JWT_SECRET:-set_a_local_jwt_secret}
       DATABASE_URL: ${DATABASE_URL:-postgresql://studyhub:set_a_local_postgres_password@db:5432/studyhub?schema=public}
       SHADOW_DATABASE_URL: ${SHADOW_DATABASE_URL:-postgresql://studyhub:set_a_local_postgres_password@db:5432/studyhub_shadow?schema=public}
+      OPTIMIZE_ENABLE: ${OPTIMIZE_ENABLE:-false}
+      OPTIMIZE_API_KEY: ${OPTIMIZE_API_KEY:-}
       UPLOADS_DIR: ${UPLOADS_DIR:-/app/uploads}
       SENTRY_DSN: ${SENTRY_DSN:-}
       SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0.1}

@@ -3,6 +3,7 @@ const cors = require('cors')
 require('dotenv').config()
 const { initSentry, captureError } = require('./monitoring/sentry')
 const { bootstrapRuntime } = require('./lib/bootstrap')
+const { validatePrismaEnvironment } = require('./lib/prisma')
 const { UPLOADS_DIR, validateUploadStorage } = require('./lib/storage')
 
 const sentryEnabled = initSentry()
@@ -107,7 +108,12 @@ app.get('/', (req, res) => {
     res.json({ message: 'StudyHub API is running ✅' })
 })
 
+app.get('/health', (req, res) => {
+    res.json({ status: 'ok' })
+})
+
 async function startServer() {
+  validatePrismaEnvironment()
   validateUploadStorage()
   await bootstrapRuntime()
 

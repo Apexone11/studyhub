@@ -1,7 +1,7 @@
 const bcrypt = require('bcryptjs')
-const { PrismaClient } = require('@prisma/client')
 const { captureError } = require('../monitoring/sentry')
 const { SCHOOLS, COURSES } = require('./catalogData')
+const { createPrismaClient } = require('./prisma')
 
 const DEFAULT_ADMIN_EMAIL = 'abdulrfornah@getstudyhub.org'
 
@@ -404,7 +404,7 @@ async function ensureAdminUser(prisma) {
 }
 
 async function bootstrapRuntime() {
-  const prisma = new PrismaClient()
+  const prisma = createPrismaClient({ preferDirectUrl: true })
 
   try {
     await repairRuntimeSchema(prisma)

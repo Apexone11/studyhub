@@ -1,6 +1,6 @@
-const { PrismaClient } = require('@prisma/client')
 const { DEFAULT_ADMIN_EMAIL, ensureAdminUser, repairRuntimeSchema } = require('../src/lib/bootstrap')
-const prisma = new PrismaClient()
+const { createPrismaClient } = require('../src/lib/prisma')
+const prisma = createPrismaClient({ preferDirectUrl: true })
 
 async function main() {
   if (!(process.env.ADMIN_USERNAME || '').trim()) {
