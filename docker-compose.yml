@@ -72,7 +72,7 @@ services:
     volumes:
       - ./frontend/studyhub-app:/app
       - frontend_node_modules:/app/node_modules
-    command: npm run dev -- --host 0.0.0.0 --port 5173
+    command: node scripts/dev-entrypoint.js
 
 volumes:
   postgres_data:

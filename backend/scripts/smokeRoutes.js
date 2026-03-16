@@ -1,6 +1,7 @@
 const fs = require('node:fs')
 const path = require('node:path')
 const { spawn } = require('node:child_process')
+const { ensureRuntimeDir, resolveRuntimePath } = require('../src/lib/runtimePaths')
 
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -26,6 +27,13 @@ function uploadUrlToLocalPath(uploadRootDir, uploadUrl) {
   }
 
   return path.join(uploadRootDir, String(uploadUrl).replace('/uploads/', ''))
+}
+
+function resolveChildPath(candidate, baseDir) {
+  if (!candidate) return ''
+  return path.isAbsolute(candidate)
+    ? path.normalize(candidate)
+    : path.resolve(baseDir, candidate)
 }
 
 async function waitForCapturedEmail(captureDir, kind, recipient) {
@@ -78,10 +86,14 @@ async function main() {
   const port = process.env.SMOKE_PORT || '4010'
   const baseUrl = `http://127.0.0.1:${port}`
   const adminUsername = process.env.ADMIN_USERNAME || 'studyhub_owner'
-  const outputLog = path.join(repoRoot, '..', 'backend-smoke.out.log')
-  const errorLog = path.join(repoRoot, '..', 'backend-smoke.err.log')
-  const emailCaptureDir = path.join(repoRoot, '..', '.tmp-email-capture')
-  const uploadRootDir = path.join(repoRoot, '..', 'tmp-uploads-smoke')
+  ensureRuntimeDir('logs')
+  ensureRuntimeDir('captures')
+  const outputLog = resolveRuntimePath('logs', 'backend-smoke.out.log')
+  const errorLog = resolveRuntimePath('logs', 'backend-smoke.err.log')
+  const emailCaptureDir = resolveChildPath(process.env.EMAIL_CAPTURE_DIR, backendDir)
+    || resolveRuntimePath('captures', 'email')
+  const uploadRootDir = resolveChildPath(process.env.UPLOADS_DIR, backendDir)
+    || resolveRuntimePath('captures', 'smoke-uploads')
   const smokeId = Date.now().toString(36).slice(-8)
   const studentUsername = `smoke_${smokeId}`
   const studentPassword = 'Password1A'
