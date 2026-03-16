@@ -1,13 +1,12 @@
 const express = require('express')
 const rateLimit = require('express-rate-limit')
-const { PrismaClient } = require('@prisma/client')
 const requireAuth = require('../middleware/auth')
 const { captureError } = require('../monitoring/sentry')
 const { createNotification } = require('../lib/notify')
 const { getAuthTokenFromRequest, verifyAuthToken } = require('../lib/authTokens')
+const prisma = require('../lib/prisma')
 
 const router = express.Router()
-const prisma = new PrismaClient()
 
 const followLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -108,6 +107,7 @@ router.post('/:username/follow', requireAuth, followLimiter, async (req, res) =>
       type: 'follow',
       message: `${req.user.username} started following you.`,
       actorId: req.user.userId,
+      linkPath: `/users/${req.user.username}`,
     })
 
     const followerCount = await prisma.userFollow.count({ where: { followingId: target.id } })

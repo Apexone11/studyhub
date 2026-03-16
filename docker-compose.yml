@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:16-alpine
+    image: postgres:16-alpine3.23
     restart: unless-stopped
     environment:
       POSTGRES_DB: studyhub
@@ -21,10 +21,14 @@ services:
       context: ./backend
     restart: unless-stopped
     environment:
+      NODE_ENV: development
       PORT: 4000
       JWT_SECRET: ${JWT_SECRET:-set_a_local_jwt_secret}
       DATABASE_URL: ${DATABASE_URL:-postgresql://studyhub:set_a_local_postgres_password@db:5432/studyhub?schema=public}
       SHADOW_DATABASE_URL: ${SHADOW_DATABASE_URL:-postgresql://studyhub:set_a_local_postgres_password@db:5432/studyhub_shadow?schema=public}
+      OPTIMIZE_ENABLE: ${OPTIMIZE_ENABLE:-false}
+      OPTIMIZE_API_KEY: ${OPTIMIZE_API_KEY:-}
+      UPLOADS_DIR: ${UPLOADS_DIR:-/app/uploads}
       SENTRY_DSN: ${SENTRY_DSN:-}
       SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0.1}
     ports:
@@ -35,7 +39,8 @@ services:
     volumes:
       - ./backend:/app
       - backend_node_modules:/app/node_modules
-    command: sh -c "npx prisma generate && npx prisma migrate deploy && npm run dev"
+      - backend_uploads:/app/uploads
+    command: node scripts/dev-entrypoint.js
 
   pgadmin:
     image: dpage/pgadmin4:8
@@ -57,6 +62,8 @@ services:
       context: ./frontend/studyhub-app
     restart: unless-stopped
     environment:
+      NODE_ENV: development
+      PORT: 5173
       CHOKIDAR_USEPOLLING: "true"
       VITE_POSTHOG_KEY: ${VITE_POSTHOG_KEY:-}
       VITE_POSTHOG_HOST: ${VITE_POSTHOG_HOST:-https://us.i.posthog.com}
@@ -70,10 +77,11 @@ services:
     volumes:
       - ./frontend/studyhub-app:/app
       - frontend_node_modules:/app/node_modules
-    command: npm run dev -- --host 0.0.0.0 --port 5173
+    command: node scripts/dev-entrypoint.js
 
 volumes:
   postgres_data:
   pgadmin_data:
   backend_node_modules:
   frontend_node_modules:
+  backend_uploads:

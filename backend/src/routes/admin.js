@@ -1,10 +1,10 @@
 const express = require('express')
-const { PrismaClient } = require('@prisma/client')
 const requireAuth = require('../middleware/auth')
 const { captureError } = require('../monitoring/sentry')
+const { deleteUserAccount } = require('../lib/deleteUserAccount')
+const prisma = require('../lib/prisma')
 
 const router = express.Router()
-const prisma = new PrismaClient()
 
 // All admin routes require auth + admin role
 router.use(requireAuth)
@@ -133,16 +133,30 @@ router.delete('/sheets/:id', async (req, res) => {
 // ── DELETE /api/admin/users/:id ──────────────────────────────
 router.delete('/users/:id', async (req, res) => {
   const targetId = parseInt(req.params.id)
+  if (!Number.isInteger(targetId)) {
+    return res.status(400).json({ error: 'User id must be an integer.' })
+  }
   if (targetId === req.user.userId) {
     return res.status(400).json({ error: 'You cannot delete your own account through this endpoint.' })
   }
   try {
-    await prisma.user.delete({ where: { id: targetId } })
+    const targetUser = await prisma.user.findUnique({
+      where: { id: targetId },
+      select: { id: true, username: true },
+    })
+    if (!targetUser) return res.status(404).json({ error: 'User not found.' })
+
+    await deleteUserAccount(prisma, {
+      userId: targetUser.id,
+      username: targetUser.username,
+    })
+
     res.json({ message: 'User deleted.' })
   } catch (err) {
     if (err.code === 'P2025') return res.status(404).json({ error: 'User not found.' })
+    if (err.code === 'P2003') return res.status(409).json({ error: 'Cannot delete user: dependent records still exist. Contact support.' })
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    res.status(500).json({ error: `Deletion failed: ${err.message}` })
   }
 })
 

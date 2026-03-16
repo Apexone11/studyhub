@@ -1,11 +1,10 @@
 const express = require('express')
 const rateLimit = require('express-rate-limit')
-const { PrismaClient } = require('@prisma/client')
 const requireAuth = require('../middleware/auth')
 const { captureError } = require('../monitoring/sentry')
+const prisma = require('../lib/prisma')
 
 const router = express.Router()
-const prisma = new PrismaClient()
 
 const mutateLimiter = rateLimit({
   windowMs: 60 * 1000,

@@ -223,7 +223,75 @@ export default function HomePage() {
       </section>
 
       <section className="home-steps-section">
-        <div className="home-shell home-shell-narrow">
+        {/* Background tree illustration — fork-tree motif scaled up, behind cards */}
+        <div className="home-steps-bg-art" aria-hidden="true">
+          <svg
+            viewBox="0 0 900 460"
+            preserveAspectRatio="xMidYMid meet"
+            xmlns="http://www.w3.org/2000/svg"
+            style={{ width: '100%', height: '100%' }}
+          >
+            {/* Glow layer (blurred duplicate of key nodes) */}
+            <g style={{ filter: 'blur(8px)' }} opacity="0.18">
+              <circle cx="450" cy="80" r="18" fill="#3b82f6" />
+              <circle cx="290" cy="200" r="12" fill="#60a5fa" />
+              <circle cx="610" cy="200" r="12" fill="#60a5fa" />
+            </g>
+
+            {/* Main trunk — vertical */}
+            <line x1="450" y1="420" x2="450" y2="240" stroke="#3b82f6" strokeWidth="3" strokeLinecap="round" opacity="0.18" />
+
+            {/* Fork split at y=240 */}
+            <line x1="450" y1="240" x2="290" y2="140" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" opacity="0.18" />
+            <line x1="450" y1="240" x2="610" y2="140" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" opacity="0.18" />
+
+            {/* Left branch continues up */}
+            <line x1="290" y1="140" x2="210" y2="60" stroke="#60a5fa" strokeWidth="2" strokeLinecap="round" opacity="0.16" />
+            <line x1="290" y1="140" x2="340" y2="60" stroke="#60a5fa" strokeWidth="2" strokeLinecap="round" opacity="0.16" />
+
+            {/* Right branch continues up */}
+            <line x1="610" y1="140" x2="560" y2="60" stroke="#60a5fa" strokeWidth="2" strokeLinecap="round" opacity="0.16" />
+            <line x1="610" y1="140" x2="680" y2="60" stroke="#60a5fa" strokeWidth="2" strokeLinecap="round" opacity="0.16" />
+
+            {/* Junction nodes */}
+            <circle cx="450" cy="240" r="5" fill="#3b82f6" opacity="0.22" />
+            <circle cx="290" cy="140" r="4" fill="#60a5fa" opacity="0.22" />
+            <circle cx="610" cy="140" r="4" fill="#60a5fa" opacity="0.22" />
+            <circle cx="450" cy="420" r="4" fill="#3b82f6" opacity="0.15" />
+
+            {/* Leaf nodes */}
+            <circle cx="210" cy="60"  r="3" fill="#93c5fd" opacity="0.22" />
+            <circle cx="340" cy="60"  r="3" fill="#93c5fd" opacity="0.22" />
+            <circle cx="560" cy="60"  r="3" fill="#93c5fd" opacity="0.22" />
+            <circle cx="680" cy="60"  r="3" fill="#93c5fd" opacity="0.22" />
+
+            {/* Center top node */}
+            <circle cx="450" cy="80"  r="5" fill="#3b82f6" opacity="0.20" />
+            <line x1="450" y1="140"  x2="450" y2="80" stroke="#3b82f6" strokeWidth="1.5" strokeLinecap="round" opacity="0.12" />
+
+            {/* Student figure — lower left, reaching up toward left branch */}
+            {/* body */}
+            <ellipse cx="130" cy="390" rx="10" ry="14" fill="none" stroke="#3b82f6" strokeWidth="1.8" opacity="0.18" />
+            {/* head */}
+            <circle cx="130" cy="368" r="9" fill="none" stroke="#3b82f6" strokeWidth="1.8" opacity="0.18" />
+            {/* right arm reaching up-right */}
+            <path d="M138,380 Q170,340 210,290" fill="none" stroke="#60a5fa" strokeWidth="1.8" strokeLinecap="round" opacity="0.20" />
+            {/* left arm */}
+            <path d="M122,382 Q110,390 104,400" fill="none" stroke="#60a5fa" strokeWidth="1.5" strokeLinecap="round" opacity="0.15" />
+            {/* legs */}
+            <line x1="126" y1="404" x2="120" y2="424" stroke="#3b82f6" strokeWidth="1.5" strokeLinecap="round" opacity="0.15" />
+            <line x1="134" y1="404" x2="138" y2="424" stroke="#3b82f6" strokeWidth="1.5" strokeLinecap="round" opacity="0.15" />
+            {/* mortarboard cap — matches LogoMark DNA */}
+            <rect x="120" y="357" width="20" height="3" rx="1" fill="#f59e0b" opacity="0.25" />
+            <line x1="130" y1="360" x2="136" y2="367" stroke="#f59e0b" strokeWidth="1.2" opacity="0.20" />
+
+            {/* Codex easter egg — tiny brace-shaped node cluster in upper canopy, nearly invisible */}
+            <path d="M450,30 Q444,24 444,18 Q444,12 450,12 Q456,12 456,18 Q456,24 450,30" fill="none" stroke="#3b82f6" strokeWidth="0.9" opacity="0.04" />
+            <path d="M450,30 Q444,36 444,42 Q444,48 450,48 Q456,48 456,42 Q456,36 450,30" fill="none" stroke="#3b82f6" strokeWidth="0.9" opacity="0.04" />
+          </svg>
+        </div>
+
+        <div className="home-shell home-shell-narrow" style={{ position: 'relative', zIndex: 1 }}>
           <div className="home-section-header">
             <p className="home-section-kicker">Simple Setup</p>
             <h2 className="home-section-title">Up and Running in 60 Seconds</h2>

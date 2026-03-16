@@ -7,10 +7,13 @@
 		"dev": "nodemon src/index.js",
 		"start": "node src/index.js",
 		"seed": "node prisma/seed.js",
-		"seed:admin": "node scripts/seedAdmin.js"
+		"seed:admin": "node scripts/seedAdmin.js",
+		"load:test": "node scripts/loadTraffic.js"
 	},
 	"dependencies": {
 		"@prisma/client": "^6.19.2",
+		"@prisma/extension-accelerate": "^3.0.1",
+		"@prisma/extension-optimize": "^2.0.1",
 		"@sentry/node": "^10.43.0",
 		"bcryptjs": "^3.0.3",
 		"cors": "^2.8.6",
@@ -23,6 +26,7 @@
 		"prisma": "^6.19.2"
 	},
 	"devDependencies": {
+		"autocannon": "^8.0.0",
 		"nodemon": "^3.1.14"
 	},
 	"engines": {

@@ -14,6 +14,8 @@ model User {
   role           String    @default("student")
   email          String?   @unique
   emailVerified  Boolean   @default(false)
+  emailVerificationCode   String?
+  emailVerificationExpiry DateTime?
   failedAttempts Int       @default(0)
   lockedUntil    DateTime?
   avatarUrl      String?
@@ -30,6 +32,11 @@ model User {
   announcements      Announcement[]
   notes              Note[]
   reactions          Reaction[]
+  feedPosts          FeedPost[]
+  feedPostComments   FeedPostComment[]
+  feedPostReactions  FeedPostReaction[]
+  proposedContributions SheetContribution[] @relation("ContributionProposer")
+  reviewedContributions SheetContribution[] @relation("ContributionReviewer")
   notificationsReceived Notification[] @relation("NotifRecipient")
   notificationsSent     Notification[] @relation("NotifActor")
   following          UserFollow[]   @relation("Following")
@@ -52,6 +59,7 @@ model Course {
   studySheets  StudySheet[]
   enrollments  Enrollment[]
   notes        Note[]
+  feedPosts    FeedPost[]
 }
 
 model Enrollment {
@@ -77,14 +85,20 @@ model StudySheet {
   description    String   @default("")
   attachmentUrl  String?
   attachmentType String?
+  attachmentName String?
+  allowDownloads Boolean  @default(true)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   course    Course   @relation(fields: [courseId], references: [id])
   author    User     @relation(fields: [userId], references: [id])
+  forkSource StudySheet? @relation("SheetForks", fields: [forkOf], references: [id])
+  forkChildren StudySheet[] @relation("SheetForks")
 
   comments     Comment[]
   starredBy    StarredSheet[]
   reactions    Reaction[]
+  incomingContributions SheetContribution[] @relation("ContributionTarget")
+  outgoingContributions SheetContribution[] @relation("ContributionFork")
 }
 
 model RequestedCourse {
@@ -159,6 +173,7 @@ model Notification {
   read      Boolean  @default(false)
   actorId   Int?
   sheetId   Int?
+  linkPath  String?
   createdAt DateTime @default(now())
   user      User     @relation("NotifRecipient", fields: [userId], references: [id], onDelete: Cascade)
   actor     User?    @relation("NotifActor", fields: [actorId], references: [id], onDelete: SetNull)
@@ -190,4 +205,61 @@ model DeletionReason {
   reason    String
   details   String?
   createdAt DateTime @default(now())
+}
+
+model FeedPost {
+  id             Int                @id @default(autoincrement())
+  content        String
+  userId         Int
+  courseId       Int?
+  attachmentUrl  String?
+  attachmentType String?
+  attachmentName String?
+  allowDownloads Boolean            @default(true)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  author         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course         Course?            @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  comments       FeedPostComment[]
+  reactions      FeedPostReaction[]
+}
+
+model FeedPostComment {
+  id        Int      @id @default(autoincrement())
+  content   String
+  postId    Int
+  userId    Int
+  createdAt DateTime @default(now())
+  post      FeedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model FeedPostReaction {
+  userId Int
+  postId Int
+  type   String
+  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post   FeedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@id([userId, postId])
+}
+
+model SheetContribution {
+  id           Int       @id @default(autoincrement())
+  targetSheetId Int
+  forkSheetId   Int
+  proposerId    Int
+  reviewerId    Int?
+  status        String   @default("pending")
+  message       String   @default("")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  reviewedAt    DateTime?
+  targetSheet   StudySheet @relation("ContributionTarget", fields: [targetSheetId], references: [id], onDelete: Cascade)
+  forkSheet     StudySheet @relation("ContributionFork", fields: [forkSheetId], references: [id], onDelete: Cascade)
+  proposer      User      @relation("ContributionProposer", fields: [proposerId], references: [id], onDelete: Cascade)
+  reviewer      User?     @relation("ContributionReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+
+  @@index([targetSheetId, status])
+  @@index([proposerId, status])
 }

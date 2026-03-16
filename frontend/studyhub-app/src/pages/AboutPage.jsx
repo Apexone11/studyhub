@@ -1,23 +1,21 @@
 import Navbar from '../components/Navbar'
 import { Link } from 'react-router-dom'
 
-const ROADMAP_V1 = [
-  'Study sheet creation & sharing',
-  'Fork & collaborate on sheets',
+const ROADMAP_VERSION_1 = [
+  'Study sheet creation, uploads, and sharing',
+  'Forks, stars, downloads, comments, and public profiles',
   'Per-course organization with school directories',
-  'Star, download, and comment on sheets',
-  'Password reset via email',
-  'Account settings & profile management',
-  'Announcements from the team',
+  'Private markdown notes linked to your courses',
+  'Verified email, password reset, and 2-step verification',
+  'Account settings, course management, and team announcements',
 ]
 
-const ROADMAP_V2 = [
+const ROADMAP_VERSION_2 = [
   'AI Tutor — ask questions about your study materials',
   'Practice Tests with auto-scoring',
-  'Personal Notes (private, markdown-powered)',
   'Mobile App (iOS & Android)',
   'Study groups & real-time collaboration',
-  '2-Factor Authentication',
+  'Smarter recommendations and campus expansion',
 ]
 
 const HOW_STEPS = [
@@ -64,7 +62,7 @@ export default function AboutPage() {
                 share and improve code on GitHub, students should be able to share and improve notes.
               </p>
               <p style={s.p}>
-                That&apos;s StudyHub. Start at Maryland. Scale to every campus.
+                That&apos;s StudyHub Version 1. Start at Maryland. Scale to every campus.
               </p>
             </div>
             <div style={s.storyStats}>
@@ -110,8 +108,8 @@ export default function AboutPage() {
         <div style={s.sectionInner}>
           <h2 style={s.sectionH2}>Roadmap</h2>
           <div style={s.roadmapGrid}>
-            <RoadmapColumn title="V1 — Live Now" color="#16a34a" items={ROADMAP_V1} />
-            <RoadmapColumn title="V2 — Coming Soon" color="#2563eb" items={ROADMAP_V2} />
+            <RoadmapColumn title="Version 1 — Live Now" color="#16a34a" items={ROADMAP_VERSION_1} />
+            <RoadmapColumn title="Version 2 — Coming Soon" color="#2563eb" items={ROADMAP_VERSION_2} />
           </div>
         </div>
       </section>

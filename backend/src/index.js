@@ -1,8 +1,10 @@
 const express = require('express')
 const cors = require('cors')
-const path = require('path')
 require('dotenv').config()
 const { initSentry, captureError } = require('./monitoring/sentry')
+const { bootstrapRuntime } = require('./lib/bootstrap')
+const { validatePrismaEnvironment } = require('./lib/prisma')
+const { UPLOADS_DIR, validateUploadStorage } = require('./lib/storage')
 
 const sentryEnabled = initSentry()
 
@@ -11,6 +13,7 @@ const PORT = process.env.PORT || 4000
 const authRoutes = require('./routes/auth')
 const courseRoutes = require('./routes/courses')
 const sheetRoutes = require('./routes/sheets')
+const feedRoutes = require('./routes/feed')
 const settingsRoutes = require('./routes/settings')
 const announcementRoutes = require('./routes/announcements')
 const adminRoutes = require('./routes/admin')
@@ -60,7 +63,7 @@ app.use(cors({
 app.use(express.json())
 
 // Serve uploaded files (avatars, attachments) as static assets.
-app.use('/uploads', express.static(path.join(__dirname, '../uploads'), {
+app.use('/uploads', express.static(UPLOADS_DIR, {
   index: false,
   setHeaders: (res) => {
     res.setHeader('X-Content-Type-Options', 'nosniff')
@@ -75,6 +78,9 @@ app.use('/api/courses', courseRoutes)
 
 // Mount study sheet endpoints under /api/sheets.
 app.use('/api/sheets', sheetRoutes)
+
+// Mount feed endpoints under /api/feed.
+app.use('/api/feed', feedRoutes)
 
 // Mount settings endpoints under /api/settings.
 app.use('/api/settings', settingsRoutes)
@@ -102,9 +108,24 @@ app.get('/', (req, res) => {
     res.json({ message: 'StudyHub API is running ✅' })
 })
 
-// Start server
-app.listen(PORT, () => {
+app.get('/health', (req, res) => {
+    res.json({ status: 'ok' })
+})
+
+async function startServer() {
+  validatePrismaEnvironment()
+  validateUploadStorage()
+  await bootstrapRuntime()
+
+  app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`)
+  })
+}
+
+startServer().catch((error) => {
+  captureError(error, { source: 'serverStartup' })
+  console.error(error)
+  process.exit(1)
 })
 
 
