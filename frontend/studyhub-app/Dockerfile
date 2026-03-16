@@ -1,4 +1,5 @@
-FROM node:20-bookworm-slim AS build
+ARG NODE_IMAGE=node:24-bookworm-slim
+FROM ${NODE_IMAGE} AS build
 
 WORKDIR /app
 
@@ -8,7 +9,7 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-FROM node:20-bookworm-slim AS runtime
+FROM ${NODE_IMAGE} AS runtime
 
 WORKDIR /app
 

@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:16-alpine
+    image: postgres:16-alpine3.23
     restart: unless-stopped
     environment:
       POSTGRES_DB: studyhub
@@ -21,6 +21,7 @@ services:
       context: ./backend
     restart: unless-stopped
     environment:
+      NODE_ENV: development
       PORT: 4000
       JWT_SECRET: ${JWT_SECRET:-set_a_local_jwt_secret}
       DATABASE_URL: ${DATABASE_URL:-postgresql://studyhub:set_a_local_postgres_password@db:5432/studyhub?schema=public}
@@ -37,7 +38,7 @@ services:
       - ./backend:/app
       - backend_node_modules:/app/node_modules
       - backend_uploads:/app/uploads
-    command: sh -c "npx prisma generate && npx prisma migrate deploy && npm run dev"
+    command: node scripts/dev-entrypoint.js
 
   pgadmin:
     image: dpage/pgadmin4:8
@@ -59,6 +60,8 @@ services:
       context: ./frontend/studyhub-app
     restart: unless-stopped
     environment:
+      NODE_ENV: development
+      PORT: 5173
       CHOKIDAR_USEPOLLING: "true"
       VITE_POSTHOG_KEY: ${VITE_POSTHOG_KEY:-}
       VITE_POSTHOG_HOST: ${VITE_POSTHOG_HOST:-https://us.i.posthog.com}

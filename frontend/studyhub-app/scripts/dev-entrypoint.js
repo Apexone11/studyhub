@@ -57,7 +57,7 @@ function runOrExit(command, args) {
 
 if (needsInstall()) {
   console.log('Refreshing frontend dependencies for the Docker dev container...')
-  runOrExit(npmCommand(), ['ci'])
+  runOrExit(npmCommand(), ['ci', '--include=dev'])
   mkdirSync(stateDir, { recursive: true })
   writeFileSync(lockHashPath, `${packageLockHash()}\n`, 'utf8')
 }
