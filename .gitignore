@@ -17,3 +17,4 @@ backend/uploads/
 tmp-uploads-smoke/
 backend-smoke.out.log
 backend-smoke.err.log
+*.enc.txt

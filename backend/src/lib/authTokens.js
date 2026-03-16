@@ -24,6 +24,18 @@ function verifyAuthToken(token) {
   return jwt.verify(token, getJwtSecret())
 }
 
+function signCsrfToken(user) {
+  return jwt.sign(
+    { userId: user.id, type: 'csrf' },
+    getJwtSecret(),
+    { expiresIn: TOKEN_EXPIRES_IN }
+  )
+}
+
+function verifyCsrfToken(token) {
+  return jwt.verify(token, getJwtSecret())
+}
+
 function parseCookies(cookieHeader = '') {
   return cookieHeader
     .split(';')
@@ -40,6 +52,11 @@ function parseCookies(cookieHeader = '') {
     }, {})
 }
 
+function getAuthCookieTokenFromRequest(req) {
+  const cookies = parseCookies(req.headers.cookie)
+  return cookies[AUTH_COOKIE_NAME] || null
+}
+
 function getAuthTokenFromRequest(req) {
   const authHeader = req.headers.authorization
   if (authHeader) {
@@ -47,8 +64,7 @@ function getAuthTokenFromRequest(req) {
     if (/^Bearer$/i.test(scheme) && token) return token
   }
 
-  const cookies = parseCookies(req.headers.cookie)
-  return cookies[AUTH_COOKIE_NAME] || null
+  return getAuthCookieTokenFromRequest(req)
 }
 
 function getAuthCookieOptions() {
@@ -83,10 +99,13 @@ module.exports = {
   AUTH_COOKIE_NAME,
   clearAuthCookie,
   getAuthCookieOptions,
+  getAuthCookieTokenFromRequest,
   getAuthTokenFromRequest,
   getJwtSecret,
   hashStoredSecret,
+  signCsrfToken,
   setAuthCookie,
   signAuthToken,
+  verifyCsrfToken,
   verifyAuthToken,
 }

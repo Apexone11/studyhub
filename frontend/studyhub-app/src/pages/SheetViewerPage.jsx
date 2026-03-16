@@ -40,7 +40,12 @@ function parseMarkdown(raw) {
   }
 
   function escHtml(s) {
-    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    return s
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
   }
 
   function inlineFormat(s) {
@@ -115,7 +120,7 @@ function parseMarkdown(raw) {
         code += escHtml(lines[i]) + '\n'
         i++
       }
-      html += `<div class="md-code-wrap"><div class="md-code-header"><span class="md-code-lang">${lang || 'code'}</span><button class="md-copy-btn" onclick="(function(b){navigator.clipboard.writeText(b.closest('.md-code-wrap').querySelector('code').innerText).then(()=>{b.textContent='Copied!';setTimeout(()=>b.textContent='Copy',1500)})})(this)">Copy</button></div><pre class="md-pre"><code class="md-code">${code}</code></pre></div>`
+      html += `<div class="md-code-wrap"><div class="md-code-header"><span class="md-code-lang">${lang || 'code'}</span><button class="md-copy-btn" type="button">Copy</button></div><pre class="md-pre"><code class="md-code">${code}</code></pre></div>`
       i++; continue
     }
 
@@ -238,6 +243,50 @@ const MD_STYLES = `
   .md-link { color: #3b82f6; text-decoration: none; border-bottom: 1px solid #bfdbfe; transition: border-color .15s; }
   .md-link:hover { border-color: #3b82f6; }
 `
+
+const MARKDOWN_SANITIZER_CONFIG = {
+  RETURN_DOM_FRAGMENT: true,
+  ALLOW_DATA_ATTR: false,
+  FORBID_TAGS: ['style', 'script'],
+  FORBID_ATTR: ['style'],
+  ALLOWED_TAGS: [
+    'a', 'blockquote', 'button', 'code', 'del', 'div', 'em',
+    'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'li', 'ol',
+    'p', 'pre', 'span', 'strong', 'table', 'tbody', 'td',
+    'th', 'thead', 'tr', 'ul',
+  ],
+  ALLOWED_ATTR: ['class', 'href', 'id', 'rel', 'target', 'type'],
+  ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel):|\/|#)/i,
+}
+
+function SafeMarkdownContent({ html, contentRef }) {
+  const renderedRef = useRef(null)
+
+  useEffect(() => {
+    const target = renderedRef.current
+    if (!target) return
+
+    const fragment = DOMPurify.sanitize(html, MARKDOWN_SANITIZER_CONFIG)
+    target.replaceChildren(fragment)
+
+    return () => {
+      target.replaceChildren()
+    }
+  }, [html])
+
+  return (
+    <div
+      ref={(node) => {
+        renderedRef.current = node
+        if (contentRef) {
+          contentRef.current = node
+        }
+      }}
+      className="md-content"
+      style={{ padding: '32px 40px 40px' }}
+    />
+  )
+}
 
 // ─────────────────────────────────────────────────────────────────
 // FORK MODAL
@@ -470,6 +519,7 @@ export default function SheetViewerPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting,          setDeleting]          = useState(false)
   const [deleteErr,         setDeleteErr]         = useState('')
+  const [contributionErr,   setContributionErr]   = useState('')
   const [contribMessage,    setContribMessage]    = useState('')
   const [submittingContrib, setSubmittingContrib] = useState(false)
   const [reviewingContrib,  setReviewingContrib]  = useState(false)
@@ -480,9 +530,38 @@ export default function SheetViewerPage() {
     if (document.getElementById('md-styles')) return
     const tag = document.createElement('style')
     tag.id        = 'md-styles'
-    tag.innerHTML = MD_STYLES
+    tag.textContent = MD_STYLES
     document.head.appendChild(tag)
   }, [])
+
+  useEffect(() => {
+    const container = contentRef.current
+    if (!container) return undefined
+
+    function handleCopyClick(event) {
+      const button = event.target.closest('.md-copy-btn')
+      if (!button || !container.contains(button)) return
+
+      const code = button.closest('.md-code-wrap')?.querySelector('.md-code')
+      const text = code?.textContent || ''
+      if (!text) return
+
+      const originalLabel = button.textContent || 'Copy'
+      const applyTemporaryLabel = (label) => {
+        button.textContent = label
+        window.setTimeout(() => {
+          button.textContent = originalLabel
+        }, 1500)
+      }
+
+      navigator.clipboard.writeText(text)
+        .then(() => applyTemporaryLabel('Copied!'))
+        .catch(() => applyTemporaryLabel('Copy failed'))
+    }
+
+    container.addEventListener('click', handleCopyClick)
+    return () => container.removeEventListener('click', handleCopyClick)
+  }, [sheet?.content])
 
   const loadSheet = useCallback(async () => {
     setLoading(true)
@@ -537,6 +616,7 @@ export default function SheetViewerPage() {
   useLivePolling(loadComments, {
     enabled: Boolean(id),
     intervalMs: 20000,
+    refreshKey: id,
   })
 
   async function handlePostComment(e) {
@@ -682,6 +762,7 @@ export default function SheetViewerPage() {
   async function handleContributeBack() {
     if (!sheet?.forkSource) return
     setSubmittingContrib(true)
+    setContributionErr('')
     try {
       const res = await fetch(`${API}/api/sheets/${id}/contributions`, {
         method: 'POST',
@@ -693,7 +774,7 @@ export default function SheetViewerPage() {
       setContribMessage('')
       await loadSheet()
     } catch (err) {
-      setDeleteErr(err.message)
+      setContributionErr(err.message)
     } finally {
       setSubmittingContrib(false)
     }
@@ -701,7 +782,7 @@ export default function SheetViewerPage() {
 
   async function handleReviewContribution(contributionId, action) {
     setReviewingContrib(true)
-    setDeleteErr('')
+    setContributionErr('')
     try {
       const res = await fetch(`${API}/api/sheets/contributions/${contributionId}`, {
         method: 'PATCH',
@@ -712,7 +793,7 @@ export default function SheetViewerPage() {
       if (!res.ok) throw new Error(data.error || 'Could not review contribution.')
       await loadSheet()
     } catch (err) {
-      setDeleteErr(err.message)
+      setContributionErr(err.message)
     } finally {
       setReviewingContrib(false)
     }
@@ -1083,12 +1164,7 @@ export default function SheetViewerPage() {
               </div>
 
               {/* markdown content */}
-              <div
-                ref={contentRef}
-                className="md-content"
-                style={{ padding: '32px 40px 40px' }}
-                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(mdHtml) }}
-              />
+              <SafeMarkdownContent html={mdHtml} contentRef={contentRef} />
 
               {sheet.forkSource && isOwn && currentUser?.id !== sheet.forkSource.userId && (
                 <div style={{ margin: '0 32px 28px', padding: '18px', borderRadius: 12, border: '1px solid #bbf7d0', background: '#f0fdf4' }}>
@@ -1106,12 +1182,18 @@ export default function SheetViewerPage() {
                   <button onClick={handleContributeBack} disabled={submittingContrib} style={{ padding: '8px 14px', border: 'none', borderRadius: 8, background: submittingContrib ? '#86efac' : '#16a34a', color: '#fff', fontSize: 12, fontWeight: 700, cursor: submittingContrib ? 'wait' : 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                     <IconFork size={13} />{submittingContrib ? 'Sending…' : 'Send Contribution'}
                   </button>
+                  {contributionErr && (
+                    <div style={{ marginTop: 10, fontSize: 12, color: '#dc2626' }}>{contributionErr}</div>
+                  )}
                 </div>
               )}
 
               {(isOwn || currentUser?.role === 'admin') && sheet.incomingContributions?.length > 0 && (
                 <div style={{ margin: '0 32px 28px', padding: '18px', borderRadius: 12, border: '1px solid #e2e8f0', background: '#f8fafc' }}>
                   <div style={{ fontSize: 14, fontWeight: 800, color: '#0f172a', marginBottom: 10 }}>Contribution Requests</div>
+                  {contributionErr && (
+                    <div style={{ marginBottom: 10, fontSize: 12, color: '#dc2626' }}>{contributionErr}</div>
+                  )}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     {sheet.incomingContributions.map((contribution) => (
                       <div key={contribution.id} style={{ padding: '12px 14px', borderRadius: 10, background: '#fff', border: '1px solid #dbe1e8' }}>

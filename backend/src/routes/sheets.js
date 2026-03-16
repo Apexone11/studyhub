@@ -20,10 +20,42 @@ const reactLimiter = rateLimit({
   legacyHeaders: false,
 })
 
+const sheetWriteLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 120,
+  message: { error: 'Too many sheet updates. Please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
 const commentLimiter = rateLimit({
   windowMs: 5 * 60 * 1000,
   max: 10,
   message: { error: 'Too many comments. Please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
+const contributionRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  message: { error: 'Too many contribution requests. Please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
+const contributionReviewLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  message: { error: 'Too many contribution reviews. Please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
+const attachmentDownloadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 120,
+  message: { error: 'Too many attachment downloads. Please slow down.' },
   standardHeaders: true,
   legacyHeaders: false,
 })
@@ -223,7 +255,7 @@ router.get('/leaderboard', async (req, res) => {
   }
 })
 
-router.patch('/contributions/:contributionId', requireAuth, async (req, res) => {
+router.patch('/contributions/:contributionId', requireAuth, contributionReviewLimiter, async (req, res) => {
   const contributionId = Number.parseInt(req.params.contributionId, 10)
   const action = typeof req.body.action === 'string' ? req.body.action.trim().toLowerCase() : ''
 
@@ -470,7 +502,7 @@ router.get('/', optionalAuth, async (req, res) => {
   }
 })
 
-router.get('/:id/download', async (req, res) => {
+router.get('/:id/download', attachmentDownloadLimiter, async (req, res) => {
   const sheetId = Number.parseInt(req.params.id, 10)
 
   try {
@@ -506,7 +538,7 @@ router.get('/:id/download', async (req, res) => {
   }
 })
 
-router.get('/:id/attachment', async (req, res) => {
+router.get('/:id/attachment', attachmentDownloadLimiter, async (req, res) => {
   const sheetId = Number.parseInt(req.params.id, 10)
 
   try {
@@ -536,7 +568,7 @@ router.get('/:id/attachment', async (req, res) => {
       data: { downloads: { increment: 1 } },
     })
 
-    res.download(localPath, sheet.attachmentName || path.basename(localPath))
+    res.download(localPath, safeDownloadName(sheet.attachmentName || path.basename(localPath), path.extname(localPath)))
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
@@ -600,7 +632,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
   }
 })
 
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', requireAuth, sheetWriteLimiter, async (req, res) => {
   const { title, content, courseId, forkOf, description, allowDownloads } = req.body || {}
 
   if (!title?.trim()) return res.status(400).json({ error: 'Title is required.' })
@@ -631,7 +663,7 @@ router.post('/', requireAuth, async (req, res) => {
   }
 })
 
-router.patch('/:id', requireAuth, async (req, res) => {
+router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
   const sheetId = Number.parseInt(req.params.id, 10)
   const { title, description, content, courseId, allowDownloads, removeAttachment } = req.body || {}
 
@@ -706,7 +738,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
   }
 })
 
-router.post('/:id/fork', requireAuth, async (req, res) => {
+router.post('/:id/fork', requireAuth, sheetWriteLimiter, async (req, res) => {
   const originalId = Number.parseInt(req.params.id, 10)
 
   try {
@@ -780,7 +812,7 @@ router.post('/:id/fork', requireAuth, async (req, res) => {
   }
 })
 
-router.post('/:id/contributions', requireAuth, async (req, res) => {
+router.post('/:id/contributions', requireAuth, contributionRateLimiter, async (req, res) => {
   const forkSheetId = Number.parseInt(req.params.id, 10)
   const message = typeof req.body.message === 'string' ? req.body.message.trim().slice(0, 500) : ''
 
@@ -861,7 +893,7 @@ router.post('/:id/contributions', requireAuth, async (req, res) => {
   }
 })
 
-router.post('/:id/star', requireAuth, async (req, res) => {
+router.post('/:id/star', requireAuth, reactLimiter, async (req, res) => {
   const sheetId = Number.parseInt(req.params.id, 10)
   const userId = req.user.userId
 
@@ -906,7 +938,7 @@ router.post('/:id/star', requireAuth, async (req, res) => {
   }
 })
 
-router.post('/:id/download', async (req, res) => {
+router.post('/:id/download', attachmentDownloadLimiter, async (req, res) => {
   const sheetId = Number.parseInt(req.params.id, 10)
 
   try {
@@ -932,7 +964,7 @@ router.post('/:id/download', async (req, res) => {
   }
 })
 
-router.delete('/:id', requireAuth, async (req, res) => {
+router.delete('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
   const sheetId = Number.parseInt(req.params.id, 10)
 
   try {
@@ -1076,7 +1108,7 @@ router.post('/:id/react', requireAuth, reactLimiter, async (req, res) => {
   }
 })
 
-router.delete('/:id/comments/:commentId', requireAuth, async (req, res) => {
+router.delete('/:id/comments/:commentId', requireAuth, commentLimiter, async (req, res) => {
   const commentId = Number.parseInt(req.params.commentId, 10)
 
   try {

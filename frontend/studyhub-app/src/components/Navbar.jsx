@@ -243,7 +243,7 @@ export default function Navbar({
 
   useLivePolling(refreshNotifications, {
     enabled: Boolean(user),
-    intervalMs: showBell ? 15000 : 30000,
+    intervalMs: 30000,
   })
 
   // close dropdown on outside click

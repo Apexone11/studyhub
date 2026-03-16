@@ -5,7 +5,6 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import DOMPurify from 'dompurify'
 import Navbar from '../components/Navbar'
 import AppSidebar from '../components/AppSidebar'
 import { IconUpload, IconEye, IconPlus, IconCheck } from '../components/Icons'
@@ -89,11 +88,6 @@ function TeaserCard({ title, sub, chips=[] }) {
 function MiniPreview({ md }) {
   if (!md) return <div style={{ fontSize:12, color:'#94a3b8', fontStyle:'italic' }}>Start typing to see a live preview…</div>
   const esc    = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-  const inline = s => esc(s)
-    .replace(/\*\*\*(.+?)\*\*\*/g,'<strong><em>$1</em></strong>')
-    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g,'<em>$1</em>')
-    .replace(/`(.+?)`/g,'<code style="background:#f1f5f9;border-radius:4px;padding:1px 5px;font-size:.88em;color:#be185d;font-family:monospace">$1</code>')
   const lines = md.split('\n')
   const nodes = []; let i=0
   while (i < lines.length) {
@@ -101,7 +95,7 @@ function MiniPreview({ md }) {
     const hm=line.match(/^(#{1,4})\s+(.+)/)
     if (hm) {
       const lvl=hm[1].length; const sz=[20,16,14,13][lvl-1]
-      nodes.push(<div key={i} style={{ fontSize:sz, fontWeight:700, color:'#0f172a', margin:lvl===1?'0 0 10px':'8px 0 4px', borderBottom:lvl<=2?'1px solid #f1f5f9':'none', paddingBottom:lvl<=2?5:0 }} dangerouslySetInnerHTML={{ __html:DOMPurify.sanitize(inline(hm[2])) }}/>)
+      nodes.push(<div key={i} style={{ fontSize:sz, fontWeight:700, color:'#0f172a', margin:lvl===1?'0 0 10px':'8px 0 4px', borderBottom:lvl<=2?'1px solid #f1f5f9':'none', paddingBottom:lvl<=2?5:0 }}>{hm[2]}</div>)
       i++; continue
     }
     if (line.match(/^```/)) {
@@ -114,17 +108,17 @@ function MiniPreview({ md }) {
     }
     if (line.startsWith('> ')) {
       nodes.push(<div key={i} style={{ borderLeft:'3px solid #3b82f6', background:'#eff6ff', padding:'8px 12px', borderRadius:'0 8px 8px 0', marginBottom:8 }}>
-        <div style={{ fontSize:12, color:'#1e40af', fontStyle:'italic' }} dangerouslySetInnerHTML={{ __html:DOMPurify.sanitize(inline(line.slice(2))) }}/>
+        <div style={{ fontSize:12, color:'#1e40af', fontStyle:'italic' }}>{line.slice(2)}</div>
       </div>); i++; continue
     }
     if (line.match(/^[-*+]\s/)) {
       const items=[]; while(i<lines.length&&lines[i].match(/^[-*+]\s/)){items.push(lines[i].slice(2));i++}
       nodes.push(<ul key={`ul${i}`} style={{ margin:'0 0 8px 18px', padding:0 }}>
-        {items.map((it,j)=><li key={j} style={{ fontSize:12, color:'#334155', lineHeight:1.7 }} dangerouslySetInnerHTML={{ __html:DOMPurify.sanitize(inline(it)) }}/>)}
+        {items.map((it,j)=><li key={j} style={{ fontSize:12, color:'#334155', lineHeight:1.7 }}>{it}</li>)}
       </ul>); continue
     }
     if (line.trim()===''){nodes.push(<div key={i} style={{ height:8 }}/>);i++;continue}
-    nodes.push(<p key={i} style={{ fontSize:12, color:'#334155', lineHeight:1.7, margin:'0 0 6px' }} dangerouslySetInnerHTML={{ __html:DOMPurify.sanitize(inline(line)) }}/>)
+    nodes.push(<p key={i} style={{ fontSize:12, color:'#334155', lineHeight:1.7, margin:'0 0 6px' }}>{line}</p>)
     i++
   }
   return <>{nodes}</>
@@ -961,21 +955,25 @@ export function AdminPage() {
   useLivePolling(loadUsers, {
     enabled: isAdmin && tab === 'users',
     intervalMs: 30000,
+    refreshKey: usersPage,
   })
 
   useLivePolling(loadSheets, {
     enabled: isAdmin && tab === 'sheets',
     intervalMs: 30000,
+    refreshKey: sheetsPage,
   })
 
   useLivePolling(loadAdminAnnouncements, {
     enabled: isAdmin && tab === 'announcements',
     intervalMs: 25000,
+    refreshKey: annPage,
   })
 
   useLivePolling(loadDeletionReasons, {
     enabled: isAdmin && tab === 'deletion-reasons',
     intervalMs: 30000,
+    refreshKey: drPage,
   })
 
   async function patchRole(userId, role) {

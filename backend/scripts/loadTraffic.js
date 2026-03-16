@@ -19,6 +19,27 @@ function extractCookie(response) {
   return rawCookie ? rawCookie.split(';')[0] : ''
 }
 
+function extractCsrfToken(payload) {
+  return payload?.user?.csrfToken || payload?.csrfToken || ''
+}
+
+function syncSessionState(previousCookie, response, payload, csrfTokenByCookie) {
+  const nextCookie = extractCookie(response) || previousCookie || ''
+  const csrfToken = extractCsrfToken(payload)
+
+  if (previousCookie && previousCookie !== nextCookie) {
+    csrfTokenByCookie.delete(previousCookie)
+  }
+  if (nextCookie && csrfToken) {
+    csrfTokenByCookie.set(nextCookie, csrfToken)
+  }
+
+  return {
+    cookie: nextCookie,
+    csrfToken: csrfToken || csrfTokenByCookie.get(nextCookie) || '',
+  }
+}
+
 async function parseBody(response) {
   const text = await response.text()
   if (!text) return null
@@ -64,7 +85,7 @@ async function getCatalog(baseUrl) {
   return body
 }
 
-async function loginSession(baseUrl, username, password, label) {
+async function loginSession(baseUrl, username, password, label, csrfTokenByCookie) {
   const { response, body } = await apiRequest(`${baseUrl}/api/auth/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -79,15 +100,15 @@ async function loginSession(baseUrl, username, password, label) {
     throw new Error(`${label} requires 2-step verification. Use a dedicated non-2FA load-test account.`)
   }
 
-  const cookie = extractCookie(response)
-  if (!cookie) {
+  const session = syncSessionState('', response, body, csrfTokenByCookie)
+  if (!session.cookie) {
     throw new Error(`${label} login succeeded but no session cookie was returned.`)
   }
 
-  return { ok: true, cookie, body }
+  return { ok: true, ...session, body }
 }
 
-async function registerLoadUser(baseUrl, catalog, username, password) {
+async function registerLoadUser(baseUrl, catalog, username, password, csrfTokenByCookie) {
   const school = catalog[0]
   const courseIds = (school.courses || []).slice(0, 2).map((course) => course.id)
 
@@ -105,21 +126,27 @@ async function registerLoadUser(baseUrl, catalog, username, password) {
 
   assertStatus(response, body, [201], 'register-load-user')
 
-  const cookie = extractCookie(response)
-  if (!cookie) {
+  const session = syncSessionState('', response, body, csrfTokenByCookie)
+  if (!session.cookie) {
     throw new Error('Load-test registration succeeded but no session cookie was returned.')
   }
 
-  return { cookie, school, courseIds }
+  return { ...session, school, courseIds }
 }
 
-async function ensureStudentSession(baseUrl, catalog) {
+async function ensureStudentSession(baseUrl, catalog, csrfTokenByCookie) {
   const username = process.env.LOAD_TEST_USERNAME || 'loadtest_student'
   const password = process.env.LOAD_TEST_PASSWORD || 'LoadTest123!'
 
-  const loginResult = await loginSession(baseUrl, username, password, 'Load-test student')
+  const loginResult = await loginSession(baseUrl, username, password, 'Load-test student', csrfTokenByCookie)
   if (loginResult.ok) {
-    return { cookie: loginResult.cookie, username, password, created: false }
+    return {
+      cookie: loginResult.cookie,
+      csrfToken: loginResult.csrfToken,
+      username,
+      password,
+      created: false,
+    }
   }
 
   if (loginResult.response.status !== 401) {
@@ -127,9 +154,10 @@ async function ensureStudentSession(baseUrl, catalog) {
   }
 
   try {
-    const registration = await registerLoadUser(baseUrl, catalog, username, password)
+    const registration = await registerLoadUser(baseUrl, catalog, username, password, csrfTokenByCookie)
     return {
       cookie: registration.cookie,
+      csrfToken: registration.csrfToken,
       username,
       password,
       created: true,
@@ -145,16 +173,16 @@ async function ensureStudentSession(baseUrl, catalog) {
   }
 }
 
-async function ensureAdminSession(baseUrl) {
+async function ensureAdminSession(baseUrl, csrfTokenByCookie) {
   const username = process.env.ADMIN_USERNAME || 'studyhub_owner'
   const password = process.env.ADMIN_PASSWORD || 'AdminPass123'
 
-  const loginResult = await loginSession(baseUrl, username, password, 'Admin account')
+  const loginResult = await loginSession(baseUrl, username, password, 'Admin account', csrfTokenByCookie)
   if (!loginResult.ok) {
     throw new Error(`Could not log in admin account: ${JSON.stringify(loginResult.body)}`)
   }
 
-  return { cookie: loginResult.cookie, username }
+  return { cookie: loginResult.cookie, csrfToken: loginResult.csrfToken, username }
 }
 
 async function ensureSheetFixtures(baseUrl, studentCookie, catalog) {
@@ -323,12 +351,37 @@ async function main() {
   const baseUrl = process.env.LOAD_TEST_BASE_URL || 'http://127.0.0.1:4000'
   const durationSeconds = toPositiveInt(process.env.LOAD_TEST_DURATION, 10)
   const connectionScale = toPositiveNumber(process.env.LOAD_TEST_SCALE, 1)
+  const safeMethods = new Set(['GET', 'HEAD', 'OPTIONS'])
+  const csrfTokenByCookie = new Map()
+  const nativeFetch = global.fetch.bind(global)
+
+  global.fetch = async (input, init = {}) => {
+    const method = String(init.method || (input instanceof Request ? input.method : 'GET')).toUpperCase()
+    const headers = new Headers(input instanceof Request ? input.headers : init.headers)
+    const cookie = headers.get('cookie') || ''
+    const csrfToken = csrfTokenByCookie.get(cookie)
+
+    if (!safeMethods.has(method)) {
+      if (csrfToken && !headers.has('x-csrf-token')) {
+        headers.set('x-csrf-token', csrfToken)
+      }
+      if (!headers.has('x-requested-with')) {
+        headers.set('x-requested-with', 'XMLHttpRequest')
+      }
+    }
+
+    const nextInit = { ...init, headers }
+    if (input instanceof Request) {
+      return nativeFetch(new Request(input, nextInit))
+    }
+    return nativeFetch(input, nextInit)
+  }
 
   await waitForServer(`${baseUrl}/`)
 
   const catalog = await getCatalog(baseUrl)
-  const student = await ensureStudentSession(baseUrl, catalog)
-  const admin = await ensureAdminSession(baseUrl)
+  const student = await ensureStudentSession(baseUrl, catalog, csrfTokenByCookie)
+  const admin = await ensureAdminSession(baseUrl, csrfTokenByCookie)
   const fixture = await ensureSheetFixtures(baseUrl, student.cookie, catalog)
   const engagement = await ensureEngagementFixtures(
     baseUrl,
@@ -337,7 +390,7 @@ async function main() {
     admin.cookie
   )
 
-  console.log(`Load-test student: ${student.username}${student.created ? ' (created now)' : ' (reused)'}`)
+  console.log(`Load-test student account ${student.created ? '(created now)' : '(reused)'}`)
   console.log(`Hot sheet: #${fixture.hotSheet.id} "${fixture.hotSheet.title}"`)
   console.log(`Fixture sheets available: ${fixture.sheetCount}`)
   console.log(`Student notifications available: ${engagement.notificationCount}`)
@@ -450,6 +503,11 @@ async function main() {
           name: 'download-counter-burst',
           url: `${baseUrl}/api/sheets/${fixture.hotSheet.id}/download`,
           method: 'POST',
+          headers: {
+            cookie: student.cookie,
+            'x-csrf-token': student.csrfToken,
+            'x-requested-with': 'XMLHttpRequest',
+          },
           connections: scaledConnections(8, connectionScale),
           duration: durationSeconds,
         },
@@ -477,7 +535,7 @@ async function main() {
     durationSeconds,
     connectionScale,
     fixture: {
-      studentUsername: student.username,
+      studentAccountState: student.created ? 'created-now' : 'reused',
       sheetCount: fixture.sheetCount,
       hotSheetId: fixture.hotSheet.id,
       hotSheetTitle: fixture.hotSheet.title,

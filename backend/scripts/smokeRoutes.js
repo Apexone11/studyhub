@@ -12,6 +12,24 @@ function extractCookie(response) {
   return rawCookie ? rawCookie.split(';')[0] : ''
 }
 
+function extractCsrfToken(payload) {
+  return payload?.user?.csrfToken || payload?.csrfToken || ''
+}
+
+function syncSessionCookie(previousCookie, response, payload, csrfTokenByCookie) {
+  const nextCookie = extractCookie(response) || previousCookie || ''
+  const csrfToken = extractCsrfToken(payload)
+
+  if (previousCookie && previousCookie !== nextCookie) {
+    csrfTokenByCookie.delete(previousCookie)
+  }
+  if (nextCookie && csrfToken) {
+    csrfTokenByCookie.set(nextCookie, csrfToken)
+  }
+
+  return nextCookie
+}
+
 function extractSixDigitCode(text) {
   const match = String(text || '').match(/\b(\d{6})\b/)
   if (!match) {
@@ -98,6 +116,31 @@ async function main() {
   const studentUsername = `smoke_${smokeId}`
   const studentPassword = 'Password1A'
   const studentEmail = `${studentUsername}@example.com`
+  const safeMethods = new Set(['GET', 'HEAD', 'OPTIONS'])
+  const csrfTokenByCookie = new Map()
+  const nativeFetch = global.fetch.bind(global)
+
+  global.fetch = async (input, init = {}) => {
+    const method = String(init.method || (input instanceof Request ? input.method : 'GET')).toUpperCase()
+    const headers = new Headers(input instanceof Request ? input.headers : init.headers)
+    const cookie = headers.get('cookie') || ''
+    const csrfToken = csrfTokenByCookie.get(cookie)
+
+    if (!safeMethods.has(method)) {
+      if (csrfToken && !headers.has('x-csrf-token')) {
+        headers.set('x-csrf-token', csrfToken)
+      }
+      if (!headers.has('x-requested-with')) {
+        headers.set('x-requested-with', 'XMLHttpRequest')
+      }
+    }
+
+    const nextInit = { ...init, headers }
+    if (input instanceof Request) {
+      return nativeFetch(new Request(input, nextInit))
+    }
+    return nativeFetch(input, nextInit)
+  }
 
   try {
     fs.unlinkSync(outputLog)
@@ -216,7 +259,7 @@ async function main() {
       if (response.status !== 201) {
         throw new Error(JSON.stringify(data))
       }
-      studentCookie = extractCookie(response)
+      studentCookie = syncSessionCookie(studentCookie, response, data, csrfTokenByCookie)
       return `${response.status} role=${data.user.role}`
     })
 
@@ -228,6 +271,7 @@ async function main() {
       if (response.status !== 200) {
         throw new Error(JSON.stringify(data))
       }
+      studentCookie = syncSessionCookie(studentCookie, response, data, csrfTokenByCookie)
       return `${response.status} ${data.username}/${data.role}`
     })
 
@@ -336,7 +380,7 @@ async function main() {
       if (response.status !== 200 || !data.user?.twoFaEnabled) {
         throw new Error(JSON.stringify(data))
       }
-      studentCookie = extractCookie(response) || studentCookie
+      studentCookie = syncSessionCookie(studentCookie, response, data, csrfTokenByCookie)
       return `${response.status} twoFaEnabled=${data.user.twoFaEnabled}`
     })
 
@@ -367,7 +411,7 @@ async function main() {
       if (response.status !== 200) {
         throw new Error(JSON.stringify(data))
       }
-      adminCookie = extractCookie(response)
+      adminCookie = syncSessionCookie(adminCookie, response, data, csrfTokenByCookie)
       if (!adminCookie) {
         throw new Error('Login did not return a session cookie.')
       }

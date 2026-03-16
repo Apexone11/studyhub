@@ -19,6 +19,22 @@ const reactLimiter = rateLimit({
   legacyHeaders: false,
 })
 
+const feedReadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 600,
+  message: { error: 'Too many feed requests. Please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
+const feedWriteLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 120,
+  message: { error: 'Too many feed updates. Please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
 const commentLimiter = rateLimit({
   windowMs: 5 * 60 * 1000,
   max: 10,
@@ -27,7 +43,16 @@ const commentLimiter = rateLimit({
   legacyHeaders: false,
 })
 
+const attachmentDownloadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 120,
+  message: { error: 'Too many attachment downloads. Please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
 router.use(requireAuth)
+router.use(feedReadLimiter)
 
 function parsePositiveInt(value, fallback) {
   const parsed = Number.parseInt(value, 10)
@@ -148,6 +173,7 @@ router.get('/', async (req, res) => {
   const limit = parsePositiveInt(req.query.limit, 20)
   const offset = Math.max(0, Number.parseInt(req.query.offset, 10) || 0)
   const take = limit + offset + 8
+  const announcementTake = Math.min(6, Math.max(2, Math.ceil((limit + offset) / 3)))
   const search = typeof req.query.search === 'string' ? req.query.search.trim() : ''
 
   const sheetWhere = search
@@ -177,7 +203,7 @@ router.get('/', async (req, res) => {
         where: announcementWhere,
         include: { author: { select: { id: true, username: true } } },
         orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
-        take: Math.max(6, take),
+        take: announcementTake,
       }),
       prisma.studySheet.findMany({
         where: sheetWhere,
@@ -299,7 +325,7 @@ router.get('/', async (req, res) => {
   }
 })
 
-router.post('/posts', async (req, res) => {
+router.post('/posts', feedWriteLimiter, async (req, res) => {
   const content = typeof req.body.content === 'string' ? req.body.content.trim() : ''
   const courseId = req.body.courseId ? Number.parseInt(req.body.courseId, 10) : null
   const allowDownloads = req.body.allowDownloads !== false
@@ -371,7 +397,7 @@ router.get('/posts/:id', async (req, res) => {
   }
 })
 
-router.get('/posts/:id/attachment', async (req, res) => {
+router.get('/posts/:id/attachment', attachmentDownloadLimiter, async (req, res) => {
   const postId = Number.parseInt(req.params.id, 10)
 
   try {
@@ -527,7 +553,7 @@ router.post('/posts/:id/react', reactLimiter, async (req, res) => {
   }
 })
 
-router.delete('/posts/:id/comments/:commentId', async (req, res) => {
+router.delete('/posts/:id/comments/:commentId', feedWriteLimiter, async (req, res) => {
   const commentId = Number.parseInt(req.params.commentId, 10)
 
   try {
@@ -545,7 +571,7 @@ router.delete('/posts/:id/comments/:commentId', async (req, res) => {
   }
 })
 
-router.delete('/posts/:id', async (req, res) => {
+router.delete('/posts/:id', feedWriteLimiter, async (req, res) => {
   const postId = Number.parseInt(req.params.id, 10)
 
   try {

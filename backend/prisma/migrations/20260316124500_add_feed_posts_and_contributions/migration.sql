@@ -1,9 +1,9 @@
 ALTER TABLE "StudySheet"
-ADD COLUMN "attachmentName" TEXT,
-ADD COLUMN "allowDownloads" BOOLEAN NOT NULL DEFAULT true;
+ADD COLUMN IF NOT EXISTS "attachmentName" TEXT,
+ADD COLUMN IF NOT EXISTS "allowDownloads" BOOLEAN NOT NULL DEFAULT true;
 
 ALTER TABLE "Notification"
-ADD COLUMN "linkPath" TEXT;
+ADD COLUMN IF NOT EXISTS "linkPath" TEXT;
 
 CREATE TABLE "FeedPost" (
     "id" SERIAL NOT NULL,

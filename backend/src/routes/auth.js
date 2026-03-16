@@ -4,7 +4,13 @@ const crypto = require('crypto')
 const rateLimit = require('express-rate-limit')
 const { captureError } = require('../monitoring/sentry')
 const { sendPasswordReset, sendTwoFaCode } = require('../lib/email')
-const { clearAuthCookie, hashStoredSecret, setAuthCookie, signAuthToken } = require('../lib/authTokens')
+const {
+  clearAuthCookie,
+  hashStoredSecret,
+  setAuthCookie,
+  signAuthToken,
+  signCsrfToken,
+} = require('../lib/authTokens')
 const { generateSixDigitCode, maskEmailAddress } = require('../lib/verificationCodes')
 const prisma = require('../lib/prisma')
 
@@ -142,6 +148,19 @@ function sendError(req, res, error) {
   return res.status(500).json({ error: 'Server error. Please try again.' })
 }
 
+function buildAuthenticatedUserPayload(user, extraFields = {}) {
+  return {
+    id: user.id,
+    username: user.username,
+    role: user.role,
+    email: user.email ?? null,
+    emailVerified: Boolean(user.emailVerified),
+    twoFaEnabled: Boolean(user.twoFaEnabled),
+    ...extraFields,
+    csrfToken: signCsrfToken(user),
+  }
+}
+
 // ── REGISTER ─────────────────────────────────────────────────
 router.post('/register', registerLimiter, async (req, res) => {
   const body = req.body || {}
@@ -186,7 +205,7 @@ router.post('/register', registerLimiter, async (req, res) => {
     setAuthCookie(res, token)
     return res.status(201).json({
       message: 'Account created!',
-      user: { id: user.id, username: user.username, role: user.role, email: null, emailVerified: false }
+      user: buildAuthenticatedUserPayload(user),
     })
   } catch (error) {
     return sendError(req, res, error)
@@ -289,14 +308,7 @@ router.post('/login', loginLimiter, async (req, res) => {
     setAuthCookie(res, token)
     return res.json({
       message: 'Login successful!',
-      user: {
-        id: user.id,
-        username: user.username,
-        role: user.role,
-        email: user.email,
-        emailVerified: user.emailVerified,
-        twoFaEnabled: user.twoFaEnabled,
-      }
+      user: buildAuthenticatedUserPayload(user),
     })
   } catch (error) {
     return sendError(req, res, error)
@@ -396,14 +408,7 @@ router.post('/verify-2fa', loginLimiter, async (req, res) => {
     setAuthCookie(res, token)
     return res.json({
       message: 'Login successful!',
-      user: {
-        id: user.id,
-        username: user.username,
-        role: user.role,
-        email: user.email,
-        emailVerified: user.emailVerified,
-        twoFaEnabled: user.twoFaEnabled,
-      }
+      user: buildAuthenticatedUserPayload(user),
     })
   } catch (error) {
     return sendError(req, res, error)
@@ -435,7 +440,10 @@ router.get('/me', requireAuth, async (req, res) => {
         }
       }
     })
-    return res.json(user)
+    return res.json(buildAuthenticatedUserPayload(user, {
+      createdAt: user.createdAt,
+      enrollments: user.enrollments,
+    }))
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
     return res.status(500).json({ error: 'Server error.' })

@@ -56,6 +56,21 @@ function buildAttachmentUrl(fileName) {
   return buildUploadUrl('attachments', fileName)
 }
 
+function isPathWithinRoot(candidatePath, rootDirectory) {
+  const resolvedCandidate = path.resolve(candidatePath)
+  const resolvedRoot = path.resolve(rootDirectory)
+  return (
+    resolvedCandidate === resolvedRoot ||
+    resolvedCandidate.startsWith(`${resolvedRoot}${path.sep}`)
+  )
+}
+
+function isManagedLeafFileName(fileName) {
+  const normalized = String(fileName || '')
+  if (!normalized || normalized.includes('\0')) return false
+  return normalized === path.basename(normalized)
+}
+
 function resolveManagedUploadPath(uploadUrl) {
   const normalizedUrl = String(uploadUrl || '')
   const prefixes = [
@@ -67,11 +82,10 @@ function resolveManagedUploadPath(uploadUrl) {
     if (!normalizedUrl.startsWith(entry.prefix)) continue
 
     const fileName = normalizedUrl.slice(entry.prefix.length)
-    if (!fileName) return null
+    if (!isManagedLeafFileName(fileName)) return null
 
     const resolved = path.resolve(entry.directory, fileName)
-    const expectedRoot = `${path.resolve(entry.directory)}${path.sep}`
-    if (resolved !== path.resolve(entry.directory) && !resolved.startsWith(expectedRoot)) {
+    if (!isPathWithinRoot(resolved, entry.directory) || resolved === path.resolve(entry.directory)) {
       return null
     }
 
@@ -91,15 +105,32 @@ function resolveAttachmentPath(attachmentUrl) {
   return resolveManagedUploadPath(attachmentUrl)
 }
 
+function resolveManagedFilePath(filePath) {
+  if (!filePath) return null
+
+  const resolved = path.resolve(String(filePath))
+  const managedRoots = [AVATARS_DIR, ATTACHMENTS_DIR]
+  const isManagedPath = managedRoots.some(
+    (rootDirectory) => isPathWithinRoot(resolved, rootDirectory) && resolved !== path.resolve(rootDirectory)
+  )
+  if (!isManagedPath) {
+    return null
+  }
+
+  if (!isManagedLeafFileName(path.basename(resolved))) return null
+  return resolved
+}
+
 function safeUnlinkFile(filePath) {
-  if (!filePath) return false
+  const resolvedPath = resolveManagedFilePath(filePath)
+  if (!resolvedPath) return false
 
   try {
-    if (!fs.existsSync(filePath)) return false
-    fs.unlinkSync(filePath)
+    if (!fs.existsSync(resolvedPath)) return false
+    fs.unlinkSync(resolvedPath)
     return true
   } catch (error) {
-    captureError(error, { source: 'safeUnlinkFile', filePath })
+    captureError(error, { source: 'safeUnlinkFile', filePath: resolvedPath })
     return false
   }
 }

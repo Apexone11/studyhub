@@ -23,6 +23,11 @@ COPY --from=prod-deps /app/node_modules ./node_modules
 COPY scripts ./scripts
 COPY src ./src
 
+RUN mkdir -p /app/uploads \
+  && chown -R node:node /app
+
 EXPOSE 4000
+
+USER node
 
 CMD ["npm", "start"]

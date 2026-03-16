@@ -1,6 +1,7 @@
 const express = require('express')
 const multer = require('multer')
 const path = require('path')
+const rateLimit = require('express-rate-limit')
 const requireAuth = require('../middleware/auth')
 const { captureError } = require('../monitoring/sentry')
 const prisma = require('../lib/prisma')
@@ -24,6 +25,22 @@ const AVATAR_MAX_BYTES    = 2 * 1024 * 1024   // 2 MB
 const ATTACHMENT_ALLOWED_MIME = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'image/webp'])
 const ATTACHMENT_ALLOWED_EXT  = new Set(['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.webp'])
 const ATTACHMENT_MAX_BYTES    = 10 * 1024 * 1024  // 10 MB
+
+const avatarUploadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { error: 'Too many avatar uploads. Please wait a bit.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
+const attachmentUploadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 40,
+  message: { error: 'Too many attachment uploads. Please wait a bit.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
 
 // ── Safe filename: strip to alphanumeric + dash/dot ───────────
 function safeName(original) {
@@ -58,7 +75,7 @@ const avatarUpload = multer({
 })
 
 // POST /api/upload/avatar
-router.post('/avatar', requireAuth, (req, res) => {
+router.post('/avatar', requireAuth, avatarUploadLimiter, (req, res) => {
   avatarUpload.single('avatar')(req, res, async (err) => {
     if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({ error: 'Avatar must be 2 MB or smaller.' })
@@ -113,7 +130,7 @@ const attachmentUpload = multer({
 })
 
 // POST /api/upload/attachment/:sheetId
-router.post('/attachment/:sheetId', requireAuth, (req, res) => {
+router.post('/attachment/:sheetId', requireAuth, attachmentUploadLimiter, (req, res) => {
   attachmentUpload.single('attachment')(req, res, async (err) => {
     if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({ error: 'Attachment must be 10 MB or smaller.' })
@@ -121,7 +138,7 @@ router.post('/attachment/:sheetId', requireAuth, (req, res) => {
     if (err) return res.status(400).json({ error: err.message })
     if (!req.file) return res.status(400).json({ error: 'No file uploaded.' })
 
-    const sheetId = parseInt(req.params.sheetId)
+    const sheetId = Number.parseInt(req.params.sheetId, 10)
     try {
       const sheet = await prisma.studySheet.findUnique({
         where: { id: sheetId },
@@ -163,7 +180,7 @@ router.post('/attachment/:sheetId', requireAuth, (req, res) => {
 })
 
 // POST /api/upload/post-attachment/:postId
-router.post('/post-attachment/:postId', requireAuth, (req, res) => {
+router.post('/post-attachment/:postId', requireAuth, attachmentUploadLimiter, (req, res) => {
   attachmentUpload.single('attachment')(req, res, async (err) => {
     if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({ error: 'Attachment must be 10 MB or smaller.' })
@@ -171,7 +188,7 @@ router.post('/post-attachment/:postId', requireAuth, (req, res) => {
     if (err) return res.status(400).json({ error: err.message })
     if (!req.file) return res.status(400).json({ error: 'No file uploaded.' })
 
-    const postId = parseInt(req.params.postId)
+    const postId = Number.parseInt(req.params.postId, 10)
     try {
       const post = await prisma.feedPost.findUnique({
         where: { id: postId },

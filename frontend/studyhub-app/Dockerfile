@@ -20,6 +20,10 @@ COPY package.json ./
 COPY scripts ./scripts
 COPY --from=build /app/dist ./dist
 
+RUN chown -R node:node /app
+
 EXPOSE 8080
+
+USER node
 
 CMD ["node", "scripts/start.js"]
