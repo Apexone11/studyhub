@@ -1,9 +1,15 @@
 import * as Sentry from '@sentry/react'
 import posthog from 'posthog-js'
+import {
+  CLARITY_PROJECT_ID,
+  GOOGLE_ADS_ID,
+  GOOGLE_ADS_SIGNUP_CONVERSION_LABEL,
+} from '../config'
 
 let posthogInitialized = false
 let sentryInitialized = false
 let clarityInitialized = false
+let googleAdsInitialized = false
 let lastTrackedPath = ''
 
 function parseSampleRate(value, fallbackValue) {
@@ -44,6 +50,34 @@ function initClarity(projectId) {
   clarityInitialized = true
 }
 
+function initGoogleAds(adsId) {
+  if (typeof window === 'undefined' || !adsId || googleAdsInitialized) {
+    return
+  }
+
+  window.dataLayer = window.dataLayer || []
+  window.gtag =
+    window.gtag ||
+    function gtagProxy() {
+      window.dataLayer.push(arguments)
+    }
+
+  const existingAdsScript = document.querySelector(
+    `script[src="https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(adsId)}"]`
+  )
+
+  if (!existingAdsScript) {
+    const script = document.createElement('script')
+    script.async = true
+    script.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(adsId)}`
+    document.head.appendChild(script)
+  }
+
+  window.gtag('js', new Date())
+  window.gtag('config', adsId)
+  googleAdsInitialized = true
+}
+
 export function initTelemetry() {
   const sentryDsn = import.meta.env.VITE_SENTRY_DSN
   const sentryTraceRate = parseSampleRate(
@@ -74,7 +108,8 @@ export function initTelemetry() {
     posthogInitialized = true
   }
 
-  initClarity(import.meta.env.VITE_CLARITY_PROJECT_ID)
+  initClarity(CLARITY_PROJECT_ID)
+  initGoogleAds(GOOGLE_ADS_ID)
 }
 
 export function trackPageView(pathname) {
@@ -126,4 +161,23 @@ export function clearAuthenticatedUser() {
   if (sentryInitialized) {
     Sentry.setUser(null)
   }
+}
+
+export function trackSignupConversion() {
+  if (typeof window === 'undefined' || typeof window.gtag !== 'function' || !GOOGLE_ADS_ID) {
+    return
+  }
+
+  window.gtag('event', 'sign_up', {
+    send_to: GOOGLE_ADS_ID,
+    method: 'studyhub',
+  })
+
+  if (!GOOGLE_ADS_SIGNUP_CONVERSION_LABEL) {
+    return
+  }
+
+  window.gtag('event', 'conversion', {
+    send_to: `${GOOGLE_ADS_ID}/${GOOGLE_ADS_SIGNUP_CONVERSION_LABEL}`,
+  })
 }

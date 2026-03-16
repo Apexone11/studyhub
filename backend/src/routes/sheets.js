@@ -60,6 +60,14 @@ const attachmentDownloadLimiter = rateLimit({
   legacyHeaders: false,
 })
 
+const leaderboardLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  message: { error: 'Too many leaderboard requests. Please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
 function optionalAuth(req, res, next) {
   const token = getAuthTokenFromRequest(req)
   if (!token) return next()
@@ -211,7 +219,7 @@ async function fetchContributionCollections(sheet, currentUser) {
   }
 }
 
-router.get('/leaderboard', async (req, res) => {
+router.get('/leaderboard', leaderboardLimiter, async (req, res) => {
   const type = req.query.type || 'stars'
   try {
     if (type === 'contributors') {
@@ -255,7 +263,7 @@ router.get('/leaderboard', async (req, res) => {
   }
 })
 
-router.patch('/contributions/:contributionId', requireAuth, contributionReviewLimiter, async (req, res) => {
+router.patch('/contributions/:contributionId', contributionReviewLimiter, requireAuth, async (req, res) => {
   const contributionId = Number.parseInt(req.params.contributionId, 10)
   const action = typeof req.body.action === 'string' ? req.body.action.trim().toLowerCase() : ''
 
