@@ -942,8 +942,17 @@ textarea {
 }
 
 .home-steps-section {
+  position: relative;
   padding: clamp(84px, 8vw, 112px) clamp(18px, 4vw, 40px);
   background: var(--white);
+  overflow: hidden;
+}
+
+.home-steps-bg-art {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
 }
 
 .home-steps-grid {

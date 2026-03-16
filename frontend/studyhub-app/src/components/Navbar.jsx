@@ -17,6 +17,7 @@ import {
 } from './Icons'
 import { pageWidths } from '../lib/ui'
 import { getStoredUser } from '../lib/session'
+import { useLivePolling } from '../lib/useLivePolling'
 import { API } from '../config'
 
 // ─── NAV CONFIG ───────────────────────────────────────────────────
@@ -219,23 +220,31 @@ export default function Navbar({
   const [showBell,      setShowBell]      = useState(false)
   const bellRef = useRef(null)
 
-  useEffect(() => {
+  async function refreshNotifications({ signal, startTransition } = {}) {
     if (!user) return
-    fetch(`${API}/api/notifications?limit=15`, {
+
+    const response = await fetch(`${API}/api/notifications?limit=15`, {
       headers: { 'Content-Type': 'application/json' },
+      signal,
     })
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        if (!data) return
-        const nowMs = Date.now()
-        setNotifications((data.notifications || []).map(notif => ({
-          ...notif,
-          timeAgoLabel: formatRelativeTime(notif.createdAt, nowMs),
-        })))
-        setUnreadCount(data.unreadCount || 0)
-      })
-      .catch(() => {})
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    if (!response.ok) return
+
+    const data = await response.json()
+    const nowMs = Date.now()
+
+    startTransition(() => {
+      setNotifications((data.notifications || []).map((notif) => ({
+        ...notif,
+        timeAgoLabel: formatRelativeTime(notif.createdAt, nowMs),
+      })))
+      setUnreadCount(data.unreadCount || 0)
+    })
+  }
+
+  useLivePolling(refreshNotifications, {
+    enabled: Boolean(user),
+    intervalMs: 30000,
+  })
 
   // close dropdown on outside click
   useEffect(() => {
@@ -267,7 +276,8 @@ export default function Navbar({
       setUnreadCount(c => Math.max(0, c - 1))
     }
     setShowBell(false)
-    if (notif.sheetId) navigate(`/sheets/${notif.sheetId}`)
+    if (notif.linkPath) navigate(notif.linkPath)
+    else if (notif.sheetId) navigate(`/sheets/${notif.sheetId}`)
     else if (notif.actor?.username) navigate(`/users/${notif.actor.username}`)
   }
 

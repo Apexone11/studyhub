@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import DOMPurify from 'dompurify'
 import {
@@ -14,6 +14,7 @@ import {
 } from '../components/Icons'
 import { pageColumns, pageShell } from '../lib/ui'
 import { getStoredUser, hasStoredSession } from '../lib/session'
+import { useLivePolling } from '../lib/useLivePolling'
 
 import { API } from '../config'
 const authHeaders = () => ({
@@ -39,7 +40,12 @@ function parseMarkdown(raw) {
   }
 
   function escHtml(s) {
-    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    return s
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
   }
 
   function inlineFormat(s) {
@@ -114,7 +120,7 @@ function parseMarkdown(raw) {
         code += escHtml(lines[i]) + '\n'
         i++
       }
-      html += `<div class="md-code-wrap"><div class="md-code-header"><span class="md-code-lang">${lang || 'code'}</span><button class="md-copy-btn" onclick="(function(b){navigator.clipboard.writeText(b.closest('.md-code-wrap').querySelector('code').innerText).then(()=>{b.textContent='Copied!';setTimeout(()=>b.textContent='Copy',1500)})})(this)">Copy</button></div><pre class="md-pre"><code class="md-code">${code}</code></pre></div>`
+      html += `<div class="md-code-wrap"><div class="md-code-header"><span class="md-code-lang">${lang || 'code'}</span><button class="md-copy-btn" type="button">Copy</button></div><pre class="md-pre"><code class="md-code">${code}</code></pre></div>`
       i++; continue
     }
 
@@ -237,6 +243,50 @@ const MD_STYLES = `
   .md-link { color: #3b82f6; text-decoration: none; border-bottom: 1px solid #bfdbfe; transition: border-color .15s; }
   .md-link:hover { border-color: #3b82f6; }
 `
+
+const MARKDOWN_SANITIZER_CONFIG = {
+  RETURN_DOM_FRAGMENT: true,
+  ALLOW_DATA_ATTR: false,
+  FORBID_TAGS: ['style', 'script'],
+  FORBID_ATTR: ['style'],
+  ALLOWED_TAGS: [
+    'a', 'blockquote', 'button', 'code', 'del', 'div', 'em',
+    'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'li', 'ol',
+    'p', 'pre', 'span', 'strong', 'table', 'tbody', 'td',
+    'th', 'thead', 'tr', 'ul',
+  ],
+  ALLOWED_ATTR: ['class', 'href', 'id', 'rel', 'target', 'type'],
+  ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel):|\/|#)/i,
+}
+
+function SafeMarkdownContent({ html, contentRef }) {
+  const renderedRef = useRef(null)
+
+  useEffect(() => {
+    const target = renderedRef.current
+    if (!target) return
+
+    const fragment = DOMPurify.sanitize(html, MARKDOWN_SANITIZER_CONFIG)
+    target.replaceChildren(fragment)
+
+    return () => {
+      target.replaceChildren()
+    }
+  }, [html])
+
+  return (
+    <div
+      ref={(node) => {
+        renderedRef.current = node
+        if (contentRef) {
+          contentRef.current = node
+        }
+      }}
+      className="md-content"
+      style={{ padding: '32px 40px 40px' }}
+    />
+  )
+}
 
 // ─────────────────────────────────────────────────────────────────
 // FORK MODAL
@@ -469,37 +519,78 @@ export default function SheetViewerPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting,          setDeleting]          = useState(false)
   const [deleteErr,         setDeleteErr]         = useState('')
+  const [contributionErr,   setContributionErr]   = useState('')
+  const [contribMessage,    setContribMessage]    = useState('')
+  const [submittingContrib, setSubmittingContrib] = useState(false)
+  const [reviewingContrib,  setReviewingContrib]  = useState(false)
   const contentRef = useRef()
+  const hasSession = hasStoredSession()
 
   // inject markdown styles once
   useEffect(() => {
     if (document.getElementById('md-styles')) return
     const tag = document.createElement('style')
     tag.id        = 'md-styles'
-    tag.innerHTML = MD_STYLES
+    tag.textContent = MD_STYLES
     document.head.appendChild(tag)
   }, [])
 
+  useEffect(() => {
+    const container = contentRef.current
+    if (!container) return undefined
+
+    function handleCopyClick(event) {
+      const button = event.target.closest('.md-copy-btn')
+      if (!button || !container.contains(button)) return
+
+      const code = button.closest('.md-code-wrap')?.querySelector('.md-code')
+      const text = code?.textContent || ''
+      if (!text) return
+
+      const originalLabel = button.textContent || 'Copy'
+      const applyTemporaryLabel = (label) => {
+        button.textContent = label
+        window.setTimeout(() => {
+          button.textContent = originalLabel
+        }, 1500)
+      }
+
+      navigator.clipboard.writeText(text)
+        .then(() => applyTemporaryLabel('Copied!'))
+        .catch(() => applyTemporaryLabel('Copy failed'))
+    }
+
+    container.addEventListener('click', handleCopyClick)
+    return () => container.removeEventListener('click', handleCopyClick)
+  }, [sheet?.content])
+
+  const loadSheet = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const response = await fetch(`${API}/api/sheets/${id}`, { headers: authHeaders() })
+      if (!response.ok) throw new Error(`${response.status}`)
+      const data = await response.json()
+      setSheet(data)
+      setLocalStars(data.stars || 0)
+      setHasStarred(data.starred || false)
+      setCommentTotal(data.commentCount || 0)
+      if (data.reactions) {
+        setLikes(data.reactions.likes || 0)
+        setDislikes(data.reactions.dislikes || 0)
+        setUserReaction(data.reactions.userReaction || null)
+      }
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }, [id])
+
   // fetch sheet
   useEffect(() => {
-    setLoading(true); setError(null)
-    fetch(`${API}/api/sheets/${id}`, { headers: authHeaders() })
-      .then(r => { if (!r.ok) throw new Error(`${r.status}`); return r.json() })
-      .then(data => {
-        setSheet(data)
-        setLocalStars(data.stars || 0)
-        setHasStarred(data.starred || false)
-        if (data.reactions) {
-          setLikes(data.reactions.likes || 0)
-          setDislikes(data.reactions.dislikes || 0)
-          setUserReaction(data.reactions.userReaction || null)
-        }
-        // ping download counter
-        fetch(`${API}/api/sheets/${id}/download`, { method: 'POST' }).catch(() => {})
-      })
-      .catch(err => setError(err.message))
-      .finally(() => setLoading(false))
-  }, [id])
+    void loadSheet()
+  }, [loadSheet])
 
   // fetch related sheets (same course)
   useEffect(() => {
@@ -510,14 +601,24 @@ export default function SheetViewerPage() {
       .catch(() => {})
   }, [sheet?.courseId, id])
 
-  // fetch comments
-  useEffect(() => {
+  async function loadComments({ signal, startTransition } = {}) {
     if (!id) return
-    fetch(`${API}/api/sheets/${id}/comments`)
-      .then(r => r.json())
-      .then(d => { setComments(d.comments || []); setCommentTotal(d.total || 0) })
-      .catch(() => {})
-  }, [id])
+
+    const response = await fetch(`${API}/api/sheets/${id}/comments`, { signal })
+    if (!response.ok) return
+
+    const data = await response.json()
+    startTransition(() => {
+      setComments(data.comments || [])
+      setCommentTotal(data.total || 0)
+    })
+  }
+
+  useLivePolling(loadComments, {
+    enabled: Boolean(id),
+    intervalMs: 20000,
+    refreshKey: id,
+  })
 
   async function handlePostComment(e) {
     e.preventDefault()
@@ -555,10 +656,10 @@ export default function SheetViewerPage() {
 
   // reading progress bar
   useEffect(() => {
-    function onScroll() {
+    const onScroll = () => {
       const el  = contentRef.current
       if (!el) return
-      const top  = el.getBoundingClientRect().top
+      const { top } = el.getBoundingClientRect()
       const h    = el.offsetHeight
       const winH = window.innerHeight
       const pct  = Math.min(100, Math.max(0, ((winH - top) / h) * 100))
@@ -583,7 +684,7 @@ export default function SheetViewerPage() {
 
   // star handler
   async function handleStar() {
-    if (starring || !hasStoredSession()) return
+    if (starring || !hasSession) return
     setStarring(true)
     setHasStarred(v => !v)
     setLocalStars(n => n + (hasStarred ? -1 : 1))
@@ -598,15 +699,15 @@ export default function SheetViewerPage() {
 
   // download as .md
   function handleDownload() {
-    if (!sheet) return
-    const blob = new Blob([sheet.content], { type: 'text/markdown' })
-    const url  = URL.createObjectURL(blob)
-    const a    = document.createElement('a')
-    a.href     = url
-    a.download = `${sheet.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.md`
-    a.click()
-    URL.revokeObjectURL(url)
-    fetch(`${API}/api/sheets/${id}/download`, { method: 'POST' }).catch(() => {})
+    if (!sheet?.allowDownloads) return
+    window.open(`${API}/api/sheets/${id}/download`, '_blank', 'noopener,noreferrer')
+    setSheet(current => current ? { ...current, downloads: (current.downloads || 0) + 1 } : current)
+  }
+
+  function handleAttachmentDownload() {
+    if (!sheet?.allowDownloads || !sheet?.hasAttachment) return
+    window.open(`${API}/api/sheets/${id}/attachment`, '_blank', 'noopener,noreferrer')
+    setSheet(current => current ? { ...current, downloads: (current.downloads || 0) + 1 } : current)
   }
 
   // copy share link
@@ -658,6 +759,48 @@ export default function SheetViewerPage() {
     setShowFork(false)
     navigate(`/sheets/${forked.id}`)
   }
+
+  async function handleContributeBack() {
+    if (!sheet?.forkSource) return
+    setSubmittingContrib(true)
+    setContributionErr('')
+    try {
+      const res = await fetch(`${API}/api/sheets/${id}/contributions`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ message: contribMessage.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Could not send contribution.')
+      setContribMessage('')
+      await loadSheet()
+    } catch (err) {
+      setContributionErr(err.message)
+    } finally {
+      setSubmittingContrib(false)
+    }
+  }
+
+  async function handleReviewContribution(contributionId, action) {
+    setReviewingContrib(true)
+    setContributionErr('')
+    try {
+      const res = await fetch(`${API}/api/sheets/contributions/${contributionId}`, {
+        method: 'PATCH',
+        headers: authHeaders(),
+        body: JSON.stringify({ action }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Could not review contribution.')
+      await loadSheet()
+    } catch (err) {
+      setContributionErr(err.message)
+    } finally {
+      setReviewingContrib(false)
+    }
+  }
+
+  const canSubmitComment = Boolean(commentText.trim()) && !postingCmt
 
   const { html: mdHtml, headings } = sheet
     ? parseMarkdown(sheet.content)
@@ -712,7 +855,7 @@ export default function SheetViewerPage() {
             ? <IconCheck size={14} style={{ color: '#10b981' }} />
             : <IconLink size={14} style={{ color: '#94a3b8' }} />}
         </button>
-        <button onClick={handleDownload} title="Download .md" style={NAV_BTN} disabled={!sheet}>
+        <button onClick={handleDownload} title="Download .md" style={NAV_BTN} disabled={!sheet || !sheet.allowDownloads}>
           <IconDownload size={14} style={{ color: '#94a3b8' }} />
         </button>
       </header>
@@ -863,8 +1006,8 @@ export default function SheetViewerPage() {
 
                 {/* action buttons */}
                 <div style={{ display: 'flex', gap: 8, paddingTop: 16, flexWrap: 'wrap' }}>
-                  <button onClick={handleStar} disabled={starring || !hasStoredSession()}
-                    title={!hasStoredSession() ? 'Log in to star' : undefined}
+                  <button onClick={handleStar} disabled={starring || !hasSession}
+                    title={hasSession ? undefined : 'Log in to star'}
                     style={{
                       padding: '8px 16px', borderRadius: 9, border: '1px solid',
                       borderColor:  hasStarred ? '#fde68a' : '#e2e8f0',
@@ -873,14 +1016,14 @@ export default function SheetViewerPage() {
                       fontSize: 13, fontWeight: 700, cursor: 'pointer',
                       fontFamily: 'inherit', transition: 'all .15s',
                       display: 'flex', alignItems: 'center', gap: 6,
-                      opacity: !hasStoredSession() ? 0.5 : 1,
+                      opacity: hasSession ? 1 : 0.5,
                     }}>
                     {hasStarred ? <IconStarFilled size={14} style={{ color: '#f59e0b' }} /> : <IconStar size={14} />}
                     {hasStarred ? 'Starred' : 'Star'} · {localStars}
                   </button>
 
                   <button
-                    onClick={() => hasStoredSession() ? setShowFork(true) : navigate('/login')}
+                    onClick={() => hasSession ? setShowFork(true) : navigate('/login')}
                     style={{
                       padding: '8px 16px', borderRadius: 9,
                       border: '1px solid #bbf7d0', background: '#f0fdf4',
@@ -895,18 +1038,19 @@ export default function SheetViewerPage() {
                     <IconFork size={14} />Fork · {sheet.forks || 0}
                   </button>
 
-                  <button onClick={handleDownload} style={{
+                  <button onClick={handleDownload} disabled={!sheet.allowDownloads} style={{
                     padding: '8px 16px', borderRadius: 9,
                     border: '1px solid #e2e8f0', background: '#fff',
                     color: '#475569', fontSize: 13, fontWeight: 700,
-                    cursor: 'pointer', fontFamily: 'inherit',
+                    cursor: sheet.allowDownloads ? 'pointer' : 'not-allowed', fontFamily: 'inherit',
                     display: 'flex', alignItems: 'center', gap: 6,
                     transition: 'background .15s',
+                    opacity: sheet.allowDownloads ? 1 : 0.55,
                   }}
                     onMouseEnter={e=>e.currentTarget.style.background='#f8fafc'}
                     onMouseLeave={e=>e.currentTarget.style.background='#fff'}
                   >
-                    <IconDownload size={14} />Download .md
+                    <IconDownload size={14} />{sheet.allowDownloads ? 'Download .md' : 'Downloads off'}
                   </button>
 
                   <button onClick={handleCopyLink} style={{
@@ -949,6 +1093,27 @@ export default function SheetViewerPage() {
                   )}
                 </div>
 
+                {sheet.hasAttachment && (
+                  <div style={{ marginTop: 14, padding: '12px 14px', borderRadius: 10, background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    <div style={{ fontSize: 12, color: '#475569' }}>
+                      Attachment: <strong>{sheet.attachmentName || 'Attached file'}</strong>
+                    </div>
+                    {sheet.allowDownloads ? (
+                      <button onClick={handleAttachmentDownload} style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid #bfdbfe', background: '#eff6ff', color: '#1d4ed8', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <IconDownload size={13} />Download attachment
+                      </button>
+                    ) : (
+                      <span style={{ fontSize: 12, color: '#94a3b8' }}>The author disabled attachment downloads.</span>
+                    )}
+                  </div>
+                )}
+
+                {!sheet.allowDownloads && (
+                  <div style={{ marginTop: 12, fontSize: 12, color: '#94a3b8' }}>
+                    Version 1 note: the author chose not to show a download button for this sheet.
+                  </div>
+                )}
+
                 {showDeleteConfirm && (
                   <div style={{ marginTop: 12, padding: '12px 16px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 13, color: '#dc2626', fontWeight: 600 }}>Delete this sheet permanently? This cannot be undone.</span>
@@ -965,17 +1130,17 @@ export default function SheetViewerPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 32px', borderBottom: '1px solid #f1f5f9' }}>
                 <button
                   onClick={() => handleReact('like')}
-                  disabled={reacting || !hasStoredSession()}
-                  title={!hasStoredSession() ? 'Log in to react' : 'Like'}
+                  disabled={reacting || !hasSession}
+                  title={hasSession ? 'Like' : 'Log in to react'}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 6,
                     padding: '6px 14px', borderRadius: 8, border: '1px solid',
                     borderColor: userReaction === 'like' ? '#bfdbfe' : '#e2e8f0',
                     background: userReaction === 'like' ? '#eff6ff' : '#fff',
                     color: userReaction === 'like' ? '#1d4ed8' : '#64748b',
-                    fontSize: 13, fontWeight: 700, cursor: hasStoredSession() ? 'pointer' : 'default',
+                    fontSize: 13, fontWeight: 700, cursor: hasSession ? 'pointer' : 'default',
                     fontFamily: 'inherit', transition: 'all .15s',
-                    opacity: !hasStoredSession() ? 0.5 : 1,
+                    opacity: hasSession ? 1 : 0.5,
                   }}
                 >
                   <i className="fas fa-thumbs-up" style={{ fontSize: 13 }}></i>
@@ -983,17 +1148,17 @@ export default function SheetViewerPage() {
                 </button>
                 <button
                   onClick={() => handleReact('dislike')}
-                  disabled={reacting || !hasStoredSession()}
-                  title={!hasStoredSession() ? 'Log in to react' : 'Dislike'}
+                  disabled={reacting || !hasSession}
+                  title={hasSession ? 'Dislike' : 'Log in to react'}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 6,
                     padding: '6px 14px', borderRadius: 8, border: '1px solid',
                     borderColor: userReaction === 'dislike' ? '#fecaca' : '#e2e8f0',
                     background: userReaction === 'dislike' ? '#fef2f2' : '#fff',
                     color: userReaction === 'dislike' ? '#dc2626' : '#64748b',
-                    fontSize: 13, fontWeight: 700, cursor: hasStoredSession() ? 'pointer' : 'default',
+                    fontSize: 13, fontWeight: 700, cursor: hasSession ? 'pointer' : 'default',
                     fontFamily: 'inherit', transition: 'all .15s',
-                    opacity: !hasStoredSession() ? 0.5 : 1,
+                    opacity: hasSession ? 1 : 0.5,
                   }}
                 >
                   <i className="fas fa-thumbs-down" style={{ fontSize: 13 }}></i>
@@ -1002,12 +1167,71 @@ export default function SheetViewerPage() {
               </div>
 
               {/* markdown content */}
-              <div
-                ref={contentRef}
-                className="md-content"
-                style={{ padding: '32px 40px 40px' }}
-                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(mdHtml) }}
-              />
+              <SafeMarkdownContent html={mdHtml} contentRef={contentRef} />
+
+              {sheet.forkSource && isOwn && currentUser?.id !== sheet.forkSource.userId && (
+                <div style={{ margin: '0 32px 28px', padding: '18px', borderRadius: 12, border: '1px solid #bbf7d0', background: '#f0fdf4' }}>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: '#166534', marginBottom: 6 }}>Contribute this fork back</div>
+                  <div style={{ fontSize: 12, color: '#166534', lineHeight: 1.6, marginBottom: 10 }}>
+                    Send your improvements back to the original author for review, GitHub-style.
+                  </div>
+                  <textarea
+                    value={contribMessage}
+                    onChange={e => setContribMessage(e.target.value.slice(0, 500))}
+                    placeholder="What did you improve?"
+                    rows={3}
+                    style={{ width: '100%', boxSizing: 'border-box', border: '1px solid #bbf7d0', borderRadius: 10, padding: '10px 12px', fontSize: 13, fontFamily: 'inherit', resize: 'vertical', marginBottom: 10 }}
+                  />
+                  <button onClick={handleContributeBack} disabled={submittingContrib} style={{ padding: '8px 14px', border: 'none', borderRadius: 8, background: submittingContrib ? '#86efac' : '#16a34a', color: '#fff', fontSize: 12, fontWeight: 700, cursor: submittingContrib ? 'wait' : 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <IconFork size={13} />{submittingContrib ? 'Sending…' : 'Send Contribution'}
+                  </button>
+                  {contributionErr && (
+                    <div style={{ marginTop: 10, fontSize: 12, color: '#dc2626' }}>{contributionErr}</div>
+                  )}
+                </div>
+              )}
+
+              {(isOwn || currentUser?.role === 'admin') && sheet.incomingContributions?.length > 0 && (
+                <div style={{ margin: '0 32px 28px', padding: '18px', borderRadius: 12, border: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: '#0f172a', marginBottom: 10 }}>Contribution Requests</div>
+                  {contributionErr && (
+                    <div style={{ marginBottom: 10, fontSize: 12, color: '#dc2626' }}>{contributionErr}</div>
+                  )}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {sheet.incomingContributions.map((contribution) => (
+                      <div key={contribution.id} style={{ padding: '12px 14px', borderRadius: 10, background: '#fff', border: '1px solid #dbe1e8' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 5 }}>
+                          <strong style={{ fontSize: 13, color: '#0f172a' }}>{contribution.proposer?.username}</strong>
+                          <span style={{ fontSize: 11, color: '#94a3b8' }}>{new Date(contribution.createdAt).toLocaleDateString()}</span>
+                          <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: contribution.status === 'pending' ? '#eff6ff' : contribution.status === 'accepted' ? '#f0fdf4' : '#fef2f2', color: contribution.status === 'pending' ? '#1d4ed8' : contribution.status === 'accepted' ? '#166534' : '#dc2626' }}>{contribution.status.toUpperCase()}</span>
+                        </div>
+                        <div style={{ fontSize: 12, color: '#475569', marginBottom: contribution.message ? 8 : 0 }}>
+                          Fork: <strong>{contribution.forkSheet?.title}</strong>
+                        </div>
+                        {contribution.message && <div style={{ fontSize: 12, color: '#475569', lineHeight: 1.6, marginBottom: 10 }}>{contribution.message}</div>}
+                        {contribution.status === 'pending' && (
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <button onClick={() => handleReviewContribution(contribution.id, 'accept')} disabled={reviewingContrib} style={{ padding: '7px 12px', border: '1px solid #bbf7d0', borderRadius: 8, background: '#f0fdf4', color: '#166534', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Accept</button>
+                            <button onClick={() => handleReviewContribution(contribution.id, 'reject')} disabled={reviewingContrib} style={{ padding: '7px 12px', border: '1px solid #fecaca', borderRadius: 8, background: '#fef2f2', color: '#dc2626', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Reject</button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {isOwn && sheet.outgoingContributions?.length > 0 && (
+                <div style={{ margin: '0 32px 28px', padding: '16px 18px', borderRadius: 12, border: '1px solid #e2e8f0', background: '#fff' }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', marginBottom: 8 }}>Your Contribution Status</div>
+                  {sheet.outgoingContributions.map((contribution) => (
+                    <div key={contribution.id} style={{ fontSize: 12, color: '#475569', marginBottom: 6 }}>
+                      <strong>{contribution.status.toUpperCase()}</strong> · {new Date(contribution.createdAt).toLocaleDateString()}
+                      {contribution.reviewer?.username ? ` · Reviewed by ${contribution.reviewer.username}` : ''}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -1036,8 +1260,8 @@ export default function SheetViewerPage() {
                     <span style={{ fontSize: 12, color: '#9ca3af' }}>{commentText.length}/500</span>
                     <button
                       type="submit"
-                      disabled={postingCmt || !commentText.trim()}
-                      style={{ background: '#2563eb', color: '#fff', border: 'none', borderRadius: 7, padding: '8px 20px', fontSize: 13, fontWeight: 'bold', cursor: 'pointer', opacity: postingCmt || !commentText.trim() ? 0.6 : 1 }}
+                      disabled={!canSubmitComment}
+                      style={{ background: '#2563eb', color: '#fff', border: 'none', borderRadius: 7, padding: '8px 20px', fontSize: 13, fontWeight: 'bold', cursor: 'pointer', opacity: canSubmitComment ? 1 : 0.6 }}
                     >
                       {postingCmt ? 'Posting…' : 'Post Comment'}
                     </button>
@@ -1105,7 +1329,7 @@ export default function SheetViewerPage() {
               <span style={{
                 fontSize: 10, fontWeight: 700, padding: '2px 7px',
                 background: '#1d4ed8', color: '#93c5fd', borderRadius: 99,
-              }}>V1</span>
+              }}>V2</span>
             </div>
             <p style={{ fontSize: 12, color: '#94a3b8', lineHeight: 1.65, margin: '0 0 12px' }}>
               Ask Claude anything about this sheet. Context-aware answers, practice questions, and step-by-step breakdowns.
@@ -1123,7 +1347,7 @@ export default function SheetViewerPage() {
               fontSize: 13, fontWeight: 600, cursor: 'not-allowed',
               fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
             }}>
-🔒 Coming in V1
+Planned for Version 2
             </button>
           </div>
 

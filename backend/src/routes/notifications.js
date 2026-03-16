@@ -1,10 +1,9 @@
 const express = require('express')
-const { PrismaClient } = require('@prisma/client')
 const requireAuth = require('../middleware/auth')
 const { captureError } = require('../monitoring/sentry')
+const prisma = require('../lib/prisma')
 
 const router = express.Router()
-const prisma = new PrismaClient()
 
 // All notification routes require auth
 router.use(requireAuth)

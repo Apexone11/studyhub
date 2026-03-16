@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { LogoMark } from '../components/Icons'
 import { API } from '../config'
 import { clearStoredSession, hasStoredSession, logoutSession, setStoredUser } from '../lib/session'
@@ -7,6 +7,7 @@ import { clearStoredSession, hasStoredSession, logoutSession, setStoredUser } fr
 const NAV_TABS = [
   { id: 'profile',  label: 'Profile' },
   { id: 'security', label: 'Security' },
+  { id: 'courses',  label: 'Courses' },
   { id: 'account',  label: 'Account' },
 ]
 
@@ -20,7 +21,9 @@ const DELETION_REASONS = [
 
 function SettingsPage() {
   const navigate = useNavigate()
-  const [tab, setTab] = useState('profile')
+  const [searchParams] = useSearchParams()
+  const initialTab = NAV_TABS.find(t => t.id === searchParams.get('tab'))?.id || 'profile'
+  const [tab, setTab] = useState(initialTab)
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -28,6 +31,10 @@ function SettingsPage() {
   const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
   const [unForm, setUnForm] = useState({ newUsername: '', password: '' })
   const [emForm, setEmForm] = useState({ email: '', password: '' })
+  const [emailVerificationCode, setEmailVerificationCode] = useState('')
+  const [emailVerificationMsg, setEmailVerificationMsg] = useState(null)
+  const [emailVerifying, setEmailVerifying] = useState(false)
+  const [emailResending, setEmailResending] = useState(false)
 
   // 2FA states
   const [twoFaPassword, setTwoFaPassword] = useState('')
@@ -46,13 +53,68 @@ function SettingsPage() {
   const [emMsg,  setEmMsg]   = useState(null)
   const [saving, setSaving]  = useState(false)
 
+  // Courses tab state
+  const [courseSchools, setCourseSchools]       = useState([])
+  const [courseSchoolId, setCourseSchoolId]     = useState('')
+  const [courseSelectedIds, setCourseSelectedIds] = useState([])
+  const [coursesMsg, setCoursesMsg]             = useState(null)
+  const [coursesSaving, setCoursesSaving]       = useState(false)
+  const [courseSearch, setCourseSearch]         = useState('')
+
   useEffect(() => {
     if (!hasStoredSession()) { navigate('/login'); return }
     fetch(`${API}/api/settings/me`)
       .then(r => r.json())
-      .then(data => { setUser(data); setLoading(false) })
+      .then(data => {
+        setUser(data)
+        setLoading(false)
+        // Pre-populate courses tab from current enrollments
+        if (data?.enrollments?.length > 0) {
+          const firstSchoolId = data.enrollments[0]?.course?.schoolId
+          if (firstSchoolId) setCourseSchoolId(String(firstSchoolId))
+          setCourseSelectedIds(data.enrollments.map(e => e.courseId))
+        }
+      })
       .catch(() => setLoading(false))
   }, [navigate])
+
+  function syncUser(nextUser) {
+    if (!nextUser) return
+    setStoredUser(nextUser)
+    setUser(nextUser)
+  }
+
+  // Load school catalog when courses tab is opened
+  useEffect(() => {
+    if (tab !== 'courses' || courseSchools.length > 0) return
+    fetch(`${API}/api/courses/schools`)
+      .then(r => r.json())
+      .then(data => setCourseSchools(Array.isArray(data) ? data : []))
+      .catch(() => {})
+  }, [tab, courseSchools.length])
+
+  async function handleCoursesSave() {
+    if (!courseSchoolId) { setCoursesMsg({ type: 'error', text: 'Please select a school first.' }); return }
+    setCoursesSaving(true)
+    setCoursesMsg(null)
+    try {
+      const res = await fetch(`${API}/api/settings/courses`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ schoolId: parseInt(courseSchoolId), courseIds: courseSelectedIds, customCourses: [] }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setCoursesMsg({ type: 'error', text: data.error }); return }
+      if (data.user) {
+        syncUser(data.user)
+      }
+      setCoursesMsg({ type: 'success', text: data.message || 'Courses updated.' })
+    } catch {
+      setCoursesMsg({ type: 'error', text: 'Could not connect to server.' })
+    } finally {
+      setCoursesSaving(false)
+    }
+  }
 
   async function handlePatch(endpoint, body, setMsg, onSuccess) {
     setSaving(true)
@@ -87,19 +149,63 @@ function SettingsPage() {
   function handleUsernameSubmit(e) {
     e.preventDefault()
     handlePatch('username', unForm, setUnMsg, (data) => {
-      setStoredUser(data.user)
-      setUser(u => ({ ...u, username: data.user.username }))
+      syncUser(data.user)
       setUnForm({ newUsername: '', password: '' })
     })
   }
 
   function handleEmailSubmit(e) {
     e.preventDefault()
+    setEmailVerificationMsg(null)
     handlePatch('email', emForm, setEmMsg, (data) => {
-      if (data.user) setStoredUser(data.user)
-      setUser(u => ({ ...u, email: data.user?.email || emForm.email, emailVerified: data.user?.emailVerified ?? false }))
+      syncUser(data.user)
+      setEmailVerificationCode('')
       setEmForm({ email: '', password: '' })
     })
+  }
+
+  async function handleVerifyEmail() {
+    if (!emailVerificationCode.trim()) {
+      setEmailVerificationMsg({ type: 'error', text: 'Enter the 6-digit verification code.' })
+      return
+    }
+
+    setEmailVerifying(true)
+    setEmailVerificationMsg(null)
+    try {
+      const res = await fetch(`${API}/api/settings/email/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: emailVerificationCode.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setEmailVerificationMsg({ type: 'error', text: data.error }); return }
+      syncUser(data.user)
+      setEmailVerificationCode('')
+      setEmailVerificationMsg({ type: 'success', text: data.message })
+    } catch {
+      setEmailVerificationMsg({ type: 'error', text: 'Could not connect to server.' })
+    } finally {
+      setEmailVerifying(false)
+    }
+  }
+
+  async function handleResendVerification() {
+    setEmailResending(true)
+    setEmailVerificationMsg(null)
+    try {
+      const res = await fetch(`${API}/api/settings/email/resend-verification`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      const data = await res.json()
+      if (!res.ok) { setEmailVerificationMsg({ type: 'error', text: data.error }); return }
+      setEmailVerificationMsg({ type: 'success', text: data.message })
+    } catch {
+      setEmailVerificationMsg({ type: 'error', text: 'Could not connect to server.' })
+    } finally {
+      setEmailResending(false)
+    }
   }
 
   async function handleTwoFaToggle(enable) {
@@ -114,7 +220,11 @@ function SettingsPage() {
       })
       const data = await res.json()
       if (!res.ok) { setTwoFaMsg({ type: 'error', text: data.error }); return }
-      setUser(u => ({ ...u, twoFaEnabled: data.twoFaEnabled }))
+      setUser(u => {
+        const nextUser = { ...u, twoFaEnabled: data.twoFaEnabled }
+        setStoredUser(nextUser)
+        return nextUser
+      })
       setTwoFaPassword('')
       setTwoFaMsg({ type: 'success', text: data.message })
     } catch {
@@ -208,6 +318,7 @@ function SettingsPage() {
               <div style={styles.infoGrid}>
                 <InfoRow label="Username"     value={user?.username} />
                 <InfoRow label="Email"        value={user?.email || 'Not set'} />
+                <InfoRow label="Email Status" value={user?.email ? (user.emailVerified ? 'Verified' : 'Pending verification') : '—'} />
                 <InfoRow label="Role"         value={user?.role} />
                 <InfoRow label="Study Sheets" value={user?._count?.studySheets ?? 0} />
                 <InfoRow label="Courses"      value={user?._count?.enrollments ?? 0} />
@@ -265,6 +376,11 @@ function SettingsPage() {
                     <i className="fas fa-circle-info" style={{ marginRight: 8, color: '#2563eb' }} />
                     Add an email address first to enable 2-step verification.
                   </div>
+                ) : !user?.emailVerified ? (
+                  <div style={{ ...styles.infoBanner }}>
+                    <i className="fas fa-envelope-open-text" style={{ marginRight: 8, color: '#2563eb' }} />
+                    Verify <strong>{user.email}</strong> in the Account tab before enabling 2-step verification.
+                  </div>
                 ) : user?.twoFaEnabled ? (
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
@@ -297,6 +413,83 @@ function SettingsPage() {
             </section>
           )}
 
+          {/* ── COURSES TAB ─────────────────────────── */}
+          {tab === 'courses' && (
+            <section>
+              <h2 style={styles.sectionTitle}>My Courses</h2>
+
+              <div style={styles.formCard}>
+                <h3 style={styles.formCardTitle}>School</h3>
+                <p style={styles.formCardNote}>Select your school to see its course catalog.</p>
+                <select
+                  value={courseSchoolId}
+                  onChange={e => { setCourseSchoolId(e.target.value); setCourseSelectedIds([]); setCourseSearch('') }}
+                  style={styles.input}
+                >
+                  <option value="">-- Select a school --</option>
+                  {courseSchools.map(s => (
+                    <option key={s.id} value={String(s.id)}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {courseSchoolId && (() => {
+                const school = courseSchools.find(s => String(s.id) === courseSchoolId)
+                const allCourses = school?.courses || []
+                const filtered = courseSearch
+                  ? allCourses.filter(c =>
+                      c.code.toLowerCase().includes(courseSearch.toLowerCase()) ||
+                      c.name.toLowerCase().includes(courseSearch.toLowerCase()))
+                  : allCourses
+                return (
+                  <div style={styles.formCard}>
+                    <h3 style={styles.formCardTitle}>Courses — {school?.short || school?.name}</h3>
+                    <p style={styles.formCardNote}>
+                      {courseSelectedIds.length} course{courseSelectedIds.length !== 1 ? 's' : ''} selected (max 10)
+                    </p>
+                    <input
+                      type="text"
+                      placeholder="Search courses…"
+                      value={courseSearch}
+                      onChange={e => setCourseSearch(e.target.value)}
+                      style={{ ...styles.input, marginBottom: 12 }}
+                    />
+                    <div style={{ maxHeight: 320, overflowY: 'auto', border: '1px solid #e5e7eb', borderRadius: 8 }}>
+                      {filtered.length === 0 && (
+                        <div style={{ padding: 16, color: '#9ca3af', fontSize: 13, textAlign: 'center' }}>No courses match your search.</div>
+                      )}
+                      {filtered.map(c => {
+                        const checked = courseSelectedIds.includes(c.id)
+                        return (
+                          <label key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer', background: checked ? '#eff6ff' : 'transparent' }}>
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => {
+                                setCourseSelectedIds(prev =>
+                                  checked
+                                    ? prev.filter(id => id !== c.id)
+                                    : prev.length < 10 ? [...prev, c.id] : prev
+                                )
+                              }}
+                            />
+                            <span style={{ fontSize: 13, fontWeight: 600, color: '#1e40af', minWidth: 72 }}>{c.code}</span>
+                            <span style={{ fontSize: 13, color: '#374151' }}>{c.name}</span>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })()}
+
+              {coursesMsg && <Msg msg={coursesMsg} />}
+              <button onClick={handleCoursesSave} disabled={coursesSaving || !courseSchoolId} style={styles.submitBtn}>
+                {coursesSaving ? 'Saving…' : 'Save Courses'}
+              </button>
+            </section>
+          )}
+
           {/* ── ACCOUNT TAB ─────────────────────────── */}
           {tab === 'account' && (
             <section>
@@ -308,6 +501,12 @@ function SettingsPage() {
                 <p style={styles.formCardNote}>
                   {user?.email ? <>Current: <strong>{user.email}</strong></> : 'No email set. Add one to enable password reset and 2FA.'}
                 </p>
+                {user?.email && (
+                  <div style={{ ...styles.statusPill, ...(user.emailVerified ? styles.statusPillVerified : styles.statusPillPending) }}>
+                    <i className={`fas ${user.emailVerified ? 'fa-circle-check' : 'fa-clock'}`} style={{ marginRight: 6 }} />
+                    {user.emailVerified ? 'Verified email' : 'Verification required'}
+                  </div>
+                )}
                 <form onSubmit={handleEmailSubmit}>
                   <FormField label="New Email" type="email" value={emForm.email}
                     onChange={v => setEmForm(f => ({ ...f, email: v }))} placeholder="you@example.com" />
@@ -318,6 +517,44 @@ function SettingsPage() {
                     {saving ? 'Saving…' : 'Update Email'}
                   </button>
                 </form>
+                {user?.email && !user?.emailVerified && (
+                  <div style={styles.verificationBox}>
+                    <p style={{ ...styles.formCardNote, marginBottom: 12 }}>
+                      Enter the 6-digit code sent to <strong>{user.email}</strong>. Password reset and 2-step verification stay disabled until this email is verified.
+                    </p>
+                    <div style={styles.verificationRow}>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={6}
+                        placeholder="000000"
+                        value={emailVerificationCode}
+                        onChange={e => {
+                          setEmailVerificationCode(e.target.value.replace(/\D/g, ''))
+                          setEmailVerificationMsg(null)
+                        }}
+                        style={{ ...styles.input, ...styles.verificationInput }}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleVerifyEmail}
+                        disabled={emailVerifying || emailVerificationCode.trim().length !== 6}
+                        style={styles.submitBtn}
+                      >
+                        {emailVerifying ? 'Verifying…' : 'Verify Email'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleResendVerification}
+                        disabled={emailResending}
+                        style={styles.secondaryBtn}
+                      >
+                        {emailResending ? 'Sending…' : 'Resend Code'}
+                      </button>
+                    </div>
+                    {emailVerificationMsg && <Msg msg={emailVerificationMsg} />}
+                  </div>
+                )}
               </div>
 
               {/* Danger Zone */}
@@ -326,17 +563,7 @@ function SettingsPage() {
                   <i className="fas fa-triangle-exclamation" style={{ marginRight: 8 }} />
                   Danger Zone
                 </h3>
-                {!deleteOpen ? (
-                  <div>
-                    <p style={{ ...styles.formCardNote, marginBottom: 16 }}>
-                      Deleting your account is permanent. All your sheets, notes, and comments will be removed.
-                    </p>
-                    <button onClick={() => setDeleteOpen(true)}
-                      style={{ background: '#fee2e2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: 8, padding: '8px 18px', fontSize: 14, cursor: 'pointer', fontFamily: 'Arial, sans-serif', fontWeight: '600' }}>
-                      Delete My Account
-                    </button>
-                  </div>
-                ) : (
+                {deleteOpen ? (
                   <form onSubmit={handleDeleteAccount}>
                     <p style={{ fontSize: 14, color: '#374151', marginBottom: 16 }}>
                       We are sorry to see you go. Please tell us why you are leaving:
@@ -379,6 +606,16 @@ function SettingsPage() {
                       </button>
                     </div>
                   </form>
+                ) : (
+                  <div>
+                    <p style={{ ...styles.formCardNote, marginBottom: 16 }}>
+                      Deleting your account is permanent. All your sheets, notes, and comments will be removed.
+                    </p>
+                    <button onClick={() => setDeleteOpen(true)}
+                      style={{ background: '#fee2e2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: 8, padding: '8px 18px', fontSize: 14, cursor: 'pointer', fontFamily: 'Arial, sans-serif', fontWeight: '600' }}>
+                      Delete My Account
+                    </button>
+                  </div>
                 )}
               </div>
             </section>
@@ -458,9 +695,16 @@ const styles = {
   input: { width: '100%', padding: '10px 14px', border: '2px solid #e5e7eb', borderRadius: 8, fontSize: 14, color: '#111827', outline: 'none', boxSizing: 'border-box', transition: 'border-color 0.2s', fontFamily: 'Arial, sans-serif' },
   msg: { padding: '10px 14px', borderRadius: 8, fontSize: 13, marginBottom: 14 },
   submitBtn: { background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontSize: 14, fontWeight: 'bold', cursor: 'pointer', fontFamily: 'Arial, sans-serif' },
+  secondaryBtn: { background: '#fff', color: '#374151', border: '1px solid #d1d5db', borderRadius: 8, padding: '10px 18px', fontSize: 14, fontWeight: 'bold', cursor: 'pointer', fontFamily: 'Arial, sans-serif' },
   dangerCard: { background: '#fff', borderRadius: 14, padding: '24px 28px', boxShadow: '0 1px 6px rgba(0,0,0,0.06)', border: '1px solid #fecaca' },
   dangerTitle: { fontSize: 16, fontWeight: 'bold', color: '#dc2626', margin: '0 0 12px' },
   infoBanner: { background: '#eff6ff', border: '1px solid #bfdbfe', color: '#1d4ed8', borderRadius: 8, padding: '10px 14px', fontSize: 13 },
+  statusPill: { display: 'inline-flex', alignItems: 'center', borderRadius: 999, padding: '5px 12px', fontSize: 12, fontWeight: 'bold', marginBottom: 16 },
+  statusPillVerified: { background: '#dcfce7', color: '#166534' },
+  statusPillPending: { background: '#fff7ed', color: '#c2410c' },
+  verificationBox: { marginTop: 18, paddingTop: 18, borderTop: '1px solid #e5e7eb' },
+  verificationRow: { display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' },
+  verificationInput: { maxWidth: 160, letterSpacing: '0.35em', textAlign: 'center' },
 }
 
 export default SettingsPage

@@ -2,16 +2,23 @@ const express = require('express')
 const bcrypt = require('bcryptjs')
 const crypto = require('crypto')
 const rateLimit = require('express-rate-limit')
-const { PrismaClient } = require('@prisma/client')
 const { captureError } = require('../monitoring/sentry')
 const { sendPasswordReset, sendTwoFaCode } = require('../lib/email')
-const { clearAuthCookie, hashStoredSecret, setAuthCookie, signAuthToken } = require('../lib/authTokens')
+const {
+  clearAuthCookie,
+  hashStoredSecret,
+  setAuthCookie,
+  signAuthToken,
+  signCsrfToken,
+} = require('../lib/authTokens')
+const { generateSixDigitCode, maskEmailAddress } = require('../lib/verificationCodes')
+const prisma = require('../lib/prisma')
 
 const router = express.Router()
-const prisma = new PrismaClient()
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,20}$/
 const PASSWORD_MIN_LENGTH = 8
+const TWO_FA_CODE_TTL_MS = 10 * 60 * 1000
 
 // Rate limiting for logout to prevent abuse of authorization-related endpoint
 const logoutLimiter = rateLimit({
@@ -141,6 +148,19 @@ function sendError(req, res, error) {
   return res.status(500).json({ error: 'Server error. Please try again.' })
 }
 
+function buildAuthenticatedUserPayload(user, extraFields = {}) {
+  return {
+    id: user.id,
+    username: user.username,
+    role: user.role,
+    email: user.email ?? null,
+    emailVerified: Boolean(user.emailVerified),
+    twoFaEnabled: Boolean(user.twoFaEnabled),
+    ...extraFields,
+    csrfToken: signCsrfToken(user),
+  }
+}
+
 // ── REGISTER ─────────────────────────────────────────────────
 router.post('/register', registerLimiter, async (req, res) => {
   const body = req.body || {}
@@ -185,7 +205,7 @@ router.post('/register', registerLimiter, async (req, res) => {
     setAuthCookie(res, token)
     return res.status(201).json({
       message: 'Account created!',
-      user: { id: user.id, username: user.username, role: user.role, email: null, emailVerified: false }
+      user: buildAuthenticatedUserPayload(user),
     })
   } catch (error) {
     return sendError(req, res, error)
@@ -255,8 +275,8 @@ router.post('/login', loginLimiter, async (req, res) => {
 
     // 2FA check — if enabled and email present, send OTP
     if (user.twoFaEnabled && user.email) {
-      const code = String(Math.floor(100000 + Math.random() * 900000))
-      const expiry = new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
+      const code = generateSixDigitCode()
+      const expiry = new Date(Date.now() + TWO_FA_CODE_TTL_MS)
       await prisma.user.update({
         where: { id: user.id },
         data: { twoFaCode: hashStoredSecret(code), twoFaExpiry: expiry }
@@ -264,23 +284,31 @@ router.post('/login', loginLimiter, async (req, res) => {
       try {
         await sendTwoFaCode(user.email, user.username, code)
       } catch (emailErr) {
-        console.error('2FA email failed:', emailErr.message)
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { twoFaCode: null, twoFaExpiry: null }
+        })
+        captureError(emailErr, {
+          route: req.originalUrl,
+          method: req.method,
+          source: 'sendTwoFaCode'
+        })
+        return res.status(503).json({
+          error: 'We could not send your 2-step verification code. Please try again in a moment.'
+        })
       }
-      return res.json({ requires2fa: true, username: user.username })
+      return res.json({
+        requires2fa: true,
+        username: user.username,
+        deliveryHint: maskEmailAddress(user.email)
+      })
     }
 
     const token = signAuthToken(user)
     setAuthCookie(res, token)
     return res.json({
       message: 'Login successful!',
-      user: {
-        id: user.id,
-        username: user.username,
-        role: user.role,
-        email: user.email,
-        emailVerified: user.emailVerified,
-        twoFaEnabled: user.twoFaEnabled,
-      }
+      user: buildAuthenticatedUserPayload(user),
     })
   } catch (error) {
     return sendError(req, res, error)
@@ -298,7 +326,7 @@ router.post('/forgot-password', forgotLimiter, async (req, res) => {
   try {
     const user = await prisma.user.findUnique({ where: { username } })
 
-    if (user && user.email) {
+    if (user && user.email && user.emailVerified) {
       const token = crypto.randomBytes(32).toString('hex')
       const tokenHash = hashStoredSecret(token)
       const expiresAt = new Date(Date.now() + 60 * 60 * 1000) // 1 hour
@@ -380,14 +408,7 @@ router.post('/verify-2fa', loginLimiter, async (req, res) => {
     setAuthCookie(res, token)
     return res.json({
       message: 'Login successful!',
-      user: {
-        id: user.id,
-        username: user.username,
-        role: user.role,
-        email: user.email,
-        emailVerified: user.emailVerified,
-        twoFaEnabled: user.twoFaEnabled,
-      }
+      user: buildAuthenticatedUserPayload(user),
     })
   } catch (error) {
     return sendError(req, res, error)
@@ -419,7 +440,10 @@ router.get('/me', requireAuth, async (req, res) => {
         }
       }
     })
-    return res.json(user)
+    return res.json(buildAuthenticatedUserPayload(user, {
+      createdAt: user.createdAt,
+      enrollments: user.enrollments,
+    }))
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
     return res.status(500).json({ error: 'Server error.' })

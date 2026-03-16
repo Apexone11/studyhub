@@ -21,6 +21,7 @@ function LoginPage() {
   // 2FA state
   const [requires2fa, setRequires2fa] = useState(false)
   const [twoFaUsername, setTwoFaUsername] = useState('')
+  const [twoFaDeliveryHint, setTwoFaDeliveryHint] = useState('')
   const [twoFaCode, setTwoFaCode] = useState('')
   const [twoFaError, setTwoFaError] = useState('')
   const [twoFaLoading, setTwoFaLoading] = useState(false)
@@ -46,6 +47,9 @@ function LoginPage() {
       }
       if (data.requires2fa) {
         setTwoFaUsername(data.username)
+        setTwoFaDeliveryHint(data.deliveryHint || '')
+        setTwoFaCode('')
+        setTwoFaError('')
         setRequires2fa(true)
         return
       }
@@ -92,7 +96,11 @@ function LoginPage() {
                 <i className="fas fa-shield-halved" style={{ ...styles.icon, color: '#16a34a' }}></i>
               </div>
               <h1 style={styles.h1}>2-Step Verification</h1>
-              <p style={styles.sub}>Enter the 6-digit code sent to your email</p>
+              <p style={styles.sub}>
+                {twoFaDeliveryHint
+                  ? `Enter the 6-digit code sent to ${twoFaDeliveryHint}`
+                  : 'Enter the 6-digit code sent to your email'}
+              </p>
             </div>
             {twoFaError && (
               <div style={styles.errorBox}>
@@ -125,7 +133,12 @@ function LoginPage() {
               </button>
             </form>
             <p style={{ ...styles.forgotText, marginTop: 16 }}>
-              <button onClick={() => setRequires2fa(false)}
+              <button onClick={() => {
+                setRequires2fa(false)
+                setTwoFaCode('')
+                setTwoFaError('')
+                setTwoFaDeliveryHint('')
+              }}
                 style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: 13, textDecoration: 'underline' }}>
                 Back to sign in
               </button>

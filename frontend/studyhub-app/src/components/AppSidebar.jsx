@@ -5,7 +5,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   IconFeed, IconSheets, IconTests, IconNotes,
-  IconAnnouncements, IconProfile, IconPlus,
+  IconAnnouncements, IconProfile, IconPlus, IconSettings,
 } from './Icons'
 import { API } from '../config'
 import { getStoredUser } from '../lib/session'
@@ -154,7 +154,7 @@ export default function AppSidebar() {
             ))
         }
         <button
-          onClick={() => navigate('/register')}
+          onClick={() => navigate('/settings?tab=courses')}
           style={{
             marginTop: 10, width: '100%', padding: '7px',
             background: '#f8fafc', border: '1px dashed #cbd5e1',
@@ -166,6 +166,27 @@ export default function AppSidebar() {
           <IconPlus size={12} />Add Course
         </button>
       </div>
+
+      {/* Admin panel shortcut */}
+      {user.role === 'admin' && (
+        <div style={{ marginTop: 12 }}>
+          <Link
+            to="/admin"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '10px 12px', borderRadius: 10,
+              textDecoration: 'none', background: '#fefce8',
+              color: '#92400e', fontWeight: 700, fontSize: 13,
+              border: '1px solid #fde68a',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#fef9c3' }}
+            onMouseLeave={e => { e.currentTarget.style.background = '#fefce8' }}
+          >
+            <IconSettings size={14} />
+            Admin Panel
+          </Link>
+        </div>
+      )}
     </aside>
   )
 }

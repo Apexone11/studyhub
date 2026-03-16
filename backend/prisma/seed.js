@@ -1,8 +1,8 @@
-const { PrismaClient } = require('@prisma/client')
 const bcrypt = require('bcryptjs')
 const crypto = require('crypto')
 const { SCHOOLS, COURSES } = require('../src/lib/catalogData')
-const prisma = new PrismaClient()
+const { createPrismaClient } = require('../src/lib/prisma')
+const prisma = createPrismaClient({ preferDirectUrl: true })
 
 async function main() {
   console.log('🌱 Seeding database...')

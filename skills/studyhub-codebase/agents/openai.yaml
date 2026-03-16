@@ -1,0 +1,4 @@
+interface:
+  display_name: "StudyHub Codebase"
+  short_description: "Navigate StudyHub architecture and workflows"
+  default_prompt: "Use $studyhub-codebase to analyze or update the StudyHub web application."

@@ -637,7 +637,15 @@ function RegisterScreen() {
               <div style={s.formGroup}>
                 <label style={s.label}>School</label>
 
-                {!selectedSchool ? (
+                {selectedSchool ? (
+                  <div style={s.selectedSchoolBadge}>
+                    <i className="fas fa-university" style={{ color: '#2563eb' }}></i>
+                    <span style={{ flex: 1, fontWeight: 'bold', fontSize: '13px' }}>{selectedSchool.name}</span>
+                    <button onClick={clearSchool} style={s.clearBtn} title="Change school">
+                      <i className="fas fa-xmark"></i>
+                    </button>
+                  </div>
+                ) : (
                   <div ref={schoolSearchRef} style={{ position: 'relative' }}>
                     <div style={s.inputWrap}>
                       <i className="fas fa-university" style={s.inputIcon}></i>
@@ -669,14 +677,6 @@ function RegisterScreen() {
                         <div style={s.dropdownEmpty}>No schools found — try a different search</div>
                       </div>
                     )}
-                  </div>
-                ) : (
-                  <div style={s.selectedSchoolBadge}>
-                    <i className="fas fa-university" style={{ color: '#2563eb' }}></i>
-                    <span style={{ flex: 1, fontWeight: 'bold', fontSize: '13px' }}>{selectedSchool.name}</span>
-                    <button onClick={clearSchool} style={s.clearBtn} title="Change school">
-                      <i className="fas fa-xmark"></i>
-                    </button>
                   </div>
                 )}
               </div>

@@ -19,6 +19,7 @@ import {
 } from '../components/Icons'
 import { pageColumns, pageShell } from '../lib/ui'
 import { clearStoredSession, getStoredUser, hasStoredSession, logoutSession, setStoredUser } from '../lib/session'
+import { useLivePolling } from '../lib/useLivePolling'
 
 import { API } from '../config'
 
@@ -77,6 +78,7 @@ export default function DashboardPage() {
   const [avatarError, setAvatarError] = useState('')
   const avatarInputRef = useRef(null)
   const navigate = useNavigate()
+  const hasSession = hasStoredSession()
 
   async function handleAvatarChange(e) {
     const file = e.target.files?.[0]
@@ -118,49 +120,58 @@ export default function DashboardPage() {
   }
 
   useEffect(() => {
-    if (!hasStoredSession()) {
+    if (!hasSession) {
       navigate('/login')
-      return undefined
     }
+  }, [hasSession, navigate])
 
-    let isMounted = true
+  async function loadDashboard({ signal, startTransition } = {}) {
+    if (!hasSession) return
 
-    async function loadDashboard() {
-      try {
-        const meResponse = await fetch(`${API}/api/auth/me`, { headers: authHeaders() })
-        if (!meResponse.ok) {
+    try {
+      const meResponse = await fetch(`${API}/api/auth/me`, {
+        headers: authHeaders(),
+        signal,
+      })
+      if (!meResponse.ok) {
+        if (meResponse.status === 401 || meResponse.status === 403) {
           clearStoredSession()
           navigate('/login')
-          return
         }
-        const meData = await meResponse.json()
-        if (!isMounted) return
-        setUser(meData)
-        setStoredUser(meData)
+        return
+      }
 
-        const [sheetsResponse, mineResponse] = await Promise.all([
-          fetch(`${API}/api/sheets?limit=10`, { headers: authHeaders() }),
-          fetch(`${API}/api/sheets?mine=1&limit=1`, { headers: authHeaders() }),
-        ])
-        if (!isMounted) return
-        if (sheetsResponse.ok) {
-          const sheetsData = await sheetsResponse.json()
+      const meData = await meResponse.json()
+      const [sheetsResponse, mineResponse] = await Promise.all([
+        fetch(`${API}/api/sheets?limit=10`, { headers: authHeaders(), signal }),
+        fetch(`${API}/api/sheets?mine=1&limit=1`, { headers: authHeaders(), signal }),
+      ])
+
+      const sheetsData = sheetsResponse.ok ? await sheetsResponse.json() : null
+      const mineData = mineResponse.ok ? await mineResponse.json() : null
+      setStoredUser(meData)
+
+      startTransition(() => {
+        setUser(meData)
+        if (sheetsData) {
           setSheets(sheetsData.sheets || sheetsData || [])
         }
-        if (mineResponse.ok) {
-          const mineData = await mineResponse.json()
+        if (mineData) {
           setMySheetCount(mineData.total || 0)
         }
-      } catch {
-        // silently fail — user data from localStorage still shown
-      } finally {
-        if (isMounted) setLoading(false)
+        setLoading(false)
+      })
+    } catch (error) {
+      if (error?.name !== 'AbortError') {
+        setLoading(false)
       }
     }
+  }
 
-    loadDashboard()
-    return () => { isMounted = false }
-  }, [navigate])
+  useLivePolling(loadDashboard, {
+    enabled: hasSession,
+    intervalMs: 45000,
+  })
 
   async function handleLogout() {
     await logoutSession()
@@ -444,7 +455,7 @@ export default function DashboardPage() {
               </p>
             </div>
             <Link
-              to="/register"
+              to="/settings?tab=courses"
               style={{
                 flexShrink: 0,
                 padding: '10px 20px',
@@ -459,6 +470,18 @@ export default function DashboardPage() {
               {courseCount > 0 ? 'Manage Courses' : 'Add Courses'}
             </Link>
           </div>
+
+          {/* Admin shortcut */}
+          {user?.role === 'admin' && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Link
+                to="/admin"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#3b82f6', fontWeight: 700, textDecoration: 'none', padding: '6px 14px', background: '#eff6ff', borderRadius: 8, border: '1px solid #bfdbfe' }}
+              >
+                ← Back to Admin Panel
+              </Link>
+            </div>
+          )}
 
           {/* Quick actions */}
           {loading ? (
@@ -502,7 +525,7 @@ export default function DashboardPage() {
               <section>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                   <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#0f172a' }}>My Courses</h2>
-                  <Link to="/register" style={{ fontSize: 13, color: '#3b82f6', textDecoration: 'none', fontWeight: 600 }}>Manage</Link>
+                  <Link to="/settings?tab=courses" style={{ fontSize: 13, color: '#3b82f6', textDecoration: 'none', fontWeight: 600 }}>Manage</Link>
                 </div>
 
                 {courses.length === 0 ? (
@@ -520,7 +543,7 @@ export default function DashboardPage() {
                     <IconSheets size={28} style={{ color: '#cbd5e1', marginBottom: 10 }} />
                     <p style={{ margin: '0 0 16px' }}>No courses added yet.</p>
                     <Link
-                      to="/register"
+                      to="/settings?tab=courses"
                       style={{
                         padding: '8px 20px',
                         background: '#3b82f6',

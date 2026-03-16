@@ -1,9 +1,11 @@
 const express = require('express')
 const cors = require('cors')
-const path = require('path')
 require('dotenv').config()
 const { initSentry, captureError } = require('./monitoring/sentry')
 const { bootstrapRuntime } = require('./lib/bootstrap')
+const { validatePrismaEnvironment } = require('./lib/prisma')
+const { UPLOADS_DIR, validateUploadStorage } = require('./lib/storage')
+const csrfProtection = require('./middleware/csrf')
 
 const sentryEnabled = initSentry()
 
@@ -12,6 +14,7 @@ const PORT = process.env.PORT || 4000
 const authRoutes = require('./routes/auth')
 const courseRoutes = require('./routes/courses')
 const sheetRoutes = require('./routes/sheets')
+const feedRoutes = require('./routes/feed')
 const settingsRoutes = require('./routes/settings')
 const announcementRoutes = require('./routes/announcements')
 const adminRoutes = require('./routes/admin')
@@ -44,6 +47,22 @@ const allowedOrigins = isProd
     ].filter(Boolean)
   : ['http://localhost:5173', 'http://localhost:4173']
 
+function normalizeOrigin(value) {
+  if (!value) return null
+
+  try {
+    return new URL(value).origin
+  } catch {
+    return null
+  }
+}
+
+const trustedOrigins = new Set(
+  allowedOrigins
+    .map((origin) => normalizeOrigin(origin))
+    .filter(Boolean)
+)
+
 if (isProd) {
   app.set('trust proxy', 1)
 }
@@ -57,11 +76,31 @@ app.use(cors({
   credentials: true,
 }))
 
+// Lightweight CSRF protection for cookie-authenticated browser requests.
+app.use((req, res, next) => {
+  if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') {
+    return next()
+  }
+
+  const requestOrigin = normalizeOrigin(req.headers.origin || req.headers.referer)
+  if (!requestOrigin) return next()
+
+  const currentHostOrigin = normalizeOrigin(`${req.protocol}://${req.get('host')}`)
+  if (trustedOrigins.has(requestOrigin) || requestOrigin === currentHostOrigin) {
+    return next()
+  }
+
+  return res.status(403).json({ error: 'Origin not allowed.' })
+})
+
 // Parse JSON request bodies for auth and future API routes.
 app.use(express.json())
 
+// CSRF protection for cookie-authenticated session mutations.
+app.use(csrfProtection)
+
 // Serve uploaded files (avatars, attachments) as static assets.
-app.use('/uploads', express.static(path.join(__dirname, '../uploads'), {
+app.use('/uploads', express.static(UPLOADS_DIR, {
   index: false,
   setHeaders: (res) => {
     res.setHeader('X-Content-Type-Options', 'nosniff')
@@ -76,6 +115,9 @@ app.use('/api/courses', courseRoutes)
 
 // Mount study sheet endpoints under /api/sheets.
 app.use('/api/sheets', sheetRoutes)
+
+// Mount feed endpoints under /api/feed.
+app.use('/api/feed', feedRoutes)
 
 // Mount settings endpoints under /api/settings.
 app.use('/api/settings', settingsRoutes)
@@ -103,7 +145,13 @@ app.get('/', (req, res) => {
     res.json({ message: 'StudyHub API is running ✅' })
 })
 
+app.get('/health', (req, res) => {
+    res.json({ status: 'ok' })
+})
+
 async function startServer() {
+  validatePrismaEnvironment()
+  validateUploadStorage()
   await bootstrapRuntime()
 
   app.listen(PORT, () => {

@@ -1,119 +1,25 @@
-import { useEffect, useRef, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
+import Navbar from '../components/Navbar'
+import AppSidebar from '../components/AppSidebar'
 import {
-  IconAnnouncements,
-  IconBell,
-  IconChevronDown,
   IconDownload,
-  IconFeed,
   IconFork,
-  IconNotes,
   IconPlus,
-  IconProfile,
-  IconSearch,
-  IconSheets,
-  IconSignOut,
   IconStar,
   IconStarFilled,
-  IconTests,
   IconUpload,
-  LogoMark,
 } from '../components/Icons'
 import { pageColumns, pageShell } from '../lib/ui'
-import { hasStoredSession, logoutSession } from '../lib/session'
-
+import { getStoredUser } from '../lib/session'
+import { useLivePolling } from '../lib/useLivePolling'
 import { API } from '../config'
+
+const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 
 const authHeaders = () => ({
   'Content-Type': 'application/json',
 })
-
-const FALLBACK_USER = {
-  username: '...',
-  school: '',
-  role: 'student',
-  courses: [],
-  stats: { sheets: 0, stars: 0, forks: 0 },
-}
-
-const FEED_ITEMS = [
-  {
-    id: 1,
-    type: 'announcement',
-    pinned: true,
-    author: 'StudyHub',
-    authorRole: 'admin',
-    time: '2h ago',
-    title: 'Welcome to StudyHub Beta!',
-    body: "You're one of the first students using StudyHub. Upload your study sheets, earn stars from classmates, and help us build the best study platform at UMD.",
-    tags: ['announcement'],
-  },
-  {
-    id: 2,
-    type: 'sheet',
-    pinned: false,
-    author: 'studyhub_seed',
-    authorRole: 'student',
-    time: '3h ago',
-    title: 'CMSC131 Complete Study Guide',
-    body: 'Covers object-oriented programming basics, classes, inheritance, recursion, and arrays. 8 pages of clean notes with code examples.',
-    course: 'CMSC131',
-    stars: 24,
-    forks: 7,
-    downloads: 67,
-    tags: ['java', 'oop', 'cmsc131'],
-  },
-  {
-    id: 3,
-    type: 'sheet',
-    pinned: false,
-    author: 'studyhub_seed',
-    authorRole: 'student',
-    time: '5h ago',
-    title: 'Calculus I - Limits & Derivatives Cheatsheet',
-    body: 'Power rule, chain rule, product and quotient rules all in one page. Great for quick review before exams.',
-    course: 'MATH140',
-    stars: 31,
-    forks: 9,
-    downloads: 89,
-    tags: ['calculus', 'derivatives', 'math140'],
-  },
-  {
-    id: 4,
-    type: 'activity',
-    pinned: false,
-    author: 'classmate_42',
-    authorRole: 'student',
-    time: '6h ago',
-    title: 'forked your sheet',
-    body: '"CMSC131 Recursion Cheatsheet" was forked by classmate_42.',
-    relatedSheet: 'CMSC131 Recursion Cheatsheet',
-  },
-  {
-    id: 5,
-    type: 'sheet',
-    pinned: false,
-    author: 'studyhub_seed',
-    authorRole: 'student',
-    time: '1d ago',
-    title: 'CMSC131 Recursion Cheatsheet',
-    body: 'Base case, recursive case, common patterns, and tracing diagrams. Everything you need for the recursion unit.',
-    course: 'CMSC131',
-    stars: 18,
-    forks: 5,
-    downloads: 45,
-    tags: ['recursion', 'java', 'cmsc131'],
-  },
-]
-
-const NAV_LINKS = [
-  { icon: IconFeed, label: 'Feed', to: '/feed' },
-  { icon: IconSheets, label: 'Study Sheets', to: '/sheets' },
-  { icon: IconTests, label: 'Practice Tests', to: '/tests' },
-  { icon: IconNotes, label: 'My Notes', to: '/notes' },
-  { icon: IconAnnouncements, label: 'Announcements', to: '/announcements' },
-  { icon: IconProfile, label: 'Profile', to: '/dashboard' },
-]
 
 const COURSE_COLORS = {
   CMSC: '#8b5cf6',
@@ -142,26 +48,10 @@ function timeAgo(value) {
   return `${Math.floor(seconds / 86400)}d ago`
 }
 
-function summarizeSheetContent(content = '') {
-  const plain = content
-    .replace(/[#*`>_~[\]]/g, '')
-    .replace(/\n+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-
-  if (!plain) return ''
-  if (plain.length <= 160) return plain
-  return `${plain.slice(0, 157)}...`
-}
-
-function extractTags(content = '') {
-  return (content.match(/#\w+/g) || []).slice(0, 3).map((tag) => tag.replace(/^#/, ''))
-}
-
-function Avatar({ name, size = 36, role }) {
-  const initials = (name || '?').slice(0, 2).toUpperCase()
-  const colors = { admin: '#1d4ed8', student: '#0f172a' }
-  const bg = colors[role] || '#1e293b'
+function Avatar({ user, size = 38 }) {
+  const name = user?.username || '?'
+  const initials = name.slice(0, 2).toUpperCase()
+  const bg = user?.role === 'admin' ? '#1d4ed8' : '#0f172a'
 
   return (
     <div
@@ -174,10 +64,9 @@ function Avatar({ name, size = 36, role }) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        fontSize: size * 0.35,
-        fontWeight: 700,
+        fontSize: size * 0.34,
+        fontWeight: 800,
         flexShrink: 0,
-        border: '2px solid #e2e8f0',
       }}
     >
       {initials}
@@ -185,18 +74,20 @@ function Avatar({ name, size = 36, role }) {
   )
 }
 
-function Badge({ text, color = '#64748b' }) {
+function TinyBadge({ text, color = '#64748b', background = '#f1f5f9', border = '#e2e8f0' }) {
   return (
     <span
       style={{
-        fontSize: 11,
-        fontWeight: 600,
-        letterSpacing: '0.04em',
-        padding: '2px 8px',
-        borderRadius: 99,
-        background: `${color}18`,
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 4,
+        padding: '3px 8px',
+        borderRadius: 999,
+        background,
         color,
-        border: `1px solid ${color}30`,
+        border: `1px solid ${border}`,
+        fontSize: 11,
+        fontWeight: 700,
       }}
     >
       {text}
@@ -204,1053 +95,1088 @@ function Badge({ text, color = '#64748b' }) {
   )
 }
 
-function actionBtn(color) {
+function actionBtn(active = false, tone = '#64748b') {
   return {
-    display: 'flex',
+    display: 'inline-flex',
     alignItems: 'center',
-    gap: 4,
-    padding: '5px 9px',
-    borderRadius: 7,
-    border: 'none',
-    background: 'transparent',
-    color,
+    gap: 6,
+    padding: '7px 12px',
+    borderRadius: 9,
+    border: `1px solid ${active ? `${tone}30` : '#e2e8f0'}`,
+    background: active ? `${tone}12` : '#fff',
+    color: active ? tone : '#64748b',
     fontSize: 12,
-    fontWeight: 500,
+    fontWeight: 700,
     cursor: 'pointer',
-    transition: 'background .15s',
-    fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+    fontFamily: FONT,
   }
 }
 
-function FeedCard({ item }) {
-  const sheetId = item.sheetId || item.id
-  const [starred, setStarred] = useState(!!item.starred)
-  const [starCount, setStarCount] = useState(item.stars || 0)
-  const [dlCount, setDlCount] = useState(item.downloads || 0)
-  const [busy, setBusy] = useState(false)
-  const navigate = useNavigate()
-
-  const typeColors = {
-    announcement: '#f59e0b',
-    sheet: '#3b82f6',
-    activity: '#10b981',
+function cardStyles(expanded) {
+  return {
+    background: '#fff',
+    borderRadius: 16,
+    border: '1px solid #e2e8f0',
+    boxShadow: expanded ? '0 14px 40px rgba(15,23,42,0.10)' : '0 2px 10px rgba(15,23,42,0.05)',
+    overflow: 'hidden',
+    transition: 'box-shadow .18s ease, transform .18s ease',
   }
+}
 
-  const typeLabel = {
-    announcement: 'Announcement',
-    sheet: 'Study Sheet',
-    activity: 'Activity',
-  }
-
-  const accent = typeColors[item.type] || '#3b82f6'
-
-  async function handleStar(e) {
-    e.stopPropagation()
-    if (!hasStoredSession()) { navigate('/login'); return }
-    if (busy) return
-    setBusy(true)
-    try {
-      const res = await fetch(`${API}/api/sheets/${sheetId}/star`, {
-        method: 'POST',
-        headers: authHeaders(),
-      })
-      if (res.ok) {
-        const data = await res.json()
-        setStarred(data.starred)
-        setStarCount(data.stars)
-      }
-    } catch { /* silently ignore */ }
-    finally { setBusy(false) }
-  }
-
-  async function handleDownload(e) {
-    e.stopPropagation()
-    try {
-      const res = await fetch(`${API}/api/sheets/${sheetId}/download`, { method: 'POST' })
-      if (res.ok) {
-        const data = await res.json()
-        setDlCount(data.downloads)
-      }
-    } catch { /* silently ignore */ }
-    // Navigate to view the sheet so they can copy/save content
-    navigate(`/sheets/${sheetId}`)
-  }
-
-  function handleFork(e) {
-    e.stopPropagation()
-    if (!hasStoredSession()) { navigate('/login'); return }
-    navigate(`/sheets/${sheetId}`)
-  }
+function AttachmentPanel({ label, href, allowDownloads, helperText }) {
+  if (!label) return null
 
   return (
     <div
-      onClick={() => item.type === 'sheet' && navigate(`/sheets/${sheetId}`)}
       style={{
-        background: '#fff',
-        borderRadius: 14,
-        border: item.pinned ? '1px solid #fbbf24' : '1px solid #e8ecf0',
-        borderLeft: `3px solid ${accent}`,
-        marginBottom: 14,
-        overflow: 'hidden',
-        transition: 'box-shadow 0.18s',
-        cursor: item.type === 'sheet' ? 'pointer' : 'default',
-      }}
-      onMouseEnter={(event) => {
-        event.currentTarget.style.boxShadow = '0 4px 20px rgba(15,23,42,0.08)'
-      }}
-      onMouseLeave={(event) => {
-        event.currentTarget.style.boxShadow = 'none'
+        marginTop: 12,
+        padding: '12px 14px',
+        borderRadius: 12,
+        background: '#f8fafc',
+        border: '1px solid #e2e8f0',
       }}
     >
-      {item.pinned && (
-        <div
+      <div style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', marginBottom: 4 }}>
+        Attachment
+      </div>
+      <div style={{ fontSize: 12, color: '#64748b', marginBottom: allowDownloads ? 10 : 0 }}>
+        {label}
+      </div>
+      {allowDownloads && href ? (
+        <a
+          href={href}
           style={{
-            background: '#fef9ec',
-            padding: '5px 18px',
-            borderBottom: '1px solid #fde68a',
-            fontSize: 11,
-            fontWeight: 600,
-            color: '#92400e',
-            display: 'flex',
+            display: 'inline-flex',
             alignItems: 'center',
-            gap: 5,
+            gap: 6,
+            padding: '7px 12px',
+            borderRadius: 8,
+            background: '#eff6ff',
+            color: '#1d4ed8',
+            border: '1px solid #bfdbfe',
+            fontSize: 12,
+            fontWeight: 700,
+            textDecoration: 'none',
           }}
         >
-          <i className="fas fa-thumbtack" style={{ fontSize: 10 }}></i>
-          Pinned announcement
+          <IconDownload size={13} />
+          Download file
+        </a>
+      ) : (
+        <div style={{ fontSize: 12, color: '#94a3b8' }}>
+          {helperText || 'The author disabled downloads for this attachment.'}
         </div>
       )}
+    </div>
+  )
+}
 
-      <div style={{ padding: '16px 18px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 11 }}>
-          <Avatar name={item.author} size={36} role={item.authorRole} />
+function CommentComposer({
+  value,
+  onChange,
+  onSubmit,
+  disabled,
+  placeholder = 'Write a comment...',
+}) {
+  return (
+    <form onSubmit={onSubmit} style={{ marginTop: 14 }}>
+      <textarea
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        maxLength={500}
+        rows={3}
+        style={{
+          width: '100%',
+          boxSizing: 'border-box',
+          padding: '10px 12px',
+          borderRadius: 10,
+          border: '1px solid #dbe1e8',
+          resize: 'vertical',
+          outline: 'none',
+          fontSize: 13,
+          fontFamily: FONT,
+          color: '#0f172a',
+        }}
+      />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+        <span style={{ fontSize: 11, color: '#94a3b8' }}>{value.length}/500</span>
+        <button
+          type="submit"
+          disabled={disabled || !value.trim()}
+          style={{
+            padding: '7px 14px',
+            border: 'none',
+            borderRadius: 8,
+            background: disabled || !value.trim() ? '#bfdbfe' : '#3b82f6',
+            color: '#fff',
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: disabled || !value.trim() ? 'not-allowed' : 'pointer',
+            fontFamily: FONT,
+          }}
+        >
+          {disabled ? 'Posting...' : 'Post Comment'}
+        </button>
+      </div>
+    </form>
+  )
+}
 
+function CommentList({ comments, currentUser, onDelete }) {
+  if (!comments || comments.length === 0) {
+    return (
+      <div style={{ fontSize: 12, color: '#94a3b8', padding: '8px 0 2px' }}>
+        No comments yet.
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 14 }}>
+      {comments.map((comment) => (
+        <div
+          key={comment.id}
+          style={{
+            display: 'flex',
+            gap: 10,
+            padding: '12px 0',
+            borderTop: '1px solid #f1f5f9',
+          }}
+        >
+          <Avatar user={comment.author} size={30} />
           <div style={{ flex: 1 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
-              <Link
-                to={`/users/${item.author}`}
-                onClick={e => e.stopPropagation()}
-                style={{ fontWeight: 700, fontSize: 13, color: '#1e293b', textDecoration: 'none' }}
-                onMouseEnter={e => e.currentTarget.style.color='#3b82f6'}
-                onMouseLeave={e => e.currentTarget.style.color='#1e293b'}
-              >{item.author}</Link>
-              {item.authorRole === 'admin' && <Badge text="Admin" color="#f59e0b" />}
-              {item.course && <Badge text={item.course} color={courseColor(item.course)} />}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <strong style={{ fontSize: 12, color: '#0f172a' }}>{comment.author?.username}</strong>
+              <span style={{ fontSize: 11, color: '#94a3b8' }}>{timeAgo(comment.createdAt)}</span>
             </div>
-
-            <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
-              {typeLabel[item.type]} · {item.time}
+            <div style={{ fontSize: 13, color: '#334155', lineHeight: 1.65, whiteSpace: 'pre-wrap' }}>
+              {comment.content}
             </div>
           </div>
-
-          <div style={{ width: 8, height: 8, borderRadius: '50%', background: accent, flexShrink: 0 }} />
-        </div>
-
-        <div style={{ marginBottom: 10 }}>
-          <div style={{ fontWeight: 700, fontSize: 14, color: '#0f172a', marginBottom: 5, lineHeight: 1.35 }}>
-            {item.type === 'activity'
-              ? (
-                  <span>
-                    <span style={{ color: '#3b82f6' }}>{item.author}</span>
-                    {' '}
-                    {item.title}
-                  </span>
-                )
-              : item.title}
-          </div>
-          <p style={{ fontSize: 13, color: '#475569', lineHeight: 1.65, margin: 0 }}>{item.body}</p>
-        </div>
-
-        {item.tags && item.tags.length > 0 && (
-          <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 12 }}>
-            {item.tags.map((tag) => (
-              <span
-                key={tag}
-                style={{
-                  fontSize: 11,
-                  color: '#64748b',
-                  background: '#f1f5f9',
-                  padding: '2px 8px',
-                  borderRadius: 99,
-                }}
-              >
-                #{tag}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {item.type === 'sheet' && (
-          <div style={{ display: 'flex', gap: 3, paddingTop: 10, borderTop: '1px solid #f1f5f9', alignItems: 'center' }}>
-            <button onClick={handleStar} style={actionBtn(starred ? '#f59e0b' : '#64748b')} title={starred ? 'Unstar' : 'Star'}>
-              {starred ? <IconStarFilled size={13} style={{ color: '#f59e0b' }} /> : <IconStar size={13} />}
-              <span>{starCount}</span>
-            </button>
-
-            <button onClick={handleFork} style={actionBtn('#64748b')} title="Fork sheet">
-              <IconFork size={13} />
-              <span>{item.forks || 0}</span>
-            </button>
-
-            <button onClick={handleDownload} style={actionBtn('#64748b')} title="Download / view sheet">
-              <IconDownload size={13} />
-              <span>{dlCount}</span>
-            </button>
-
-            <div style={{ flex: 1 }} />
-
-            <Link
-              to={`/sheets/${sheetId}`}
-              onClick={(e) => e.stopPropagation()}
+          {currentUser && (currentUser.id === comment.userId || currentUser.role === 'admin') && (
+            <button
+              onClick={() => onDelete(comment.id)}
               style={{
+                background: 'none',
+                border: 'none',
+                color: '#dc2626',
+                cursor: 'pointer',
                 fontSize: 12,
-                fontWeight: 700,
-                color: '#3b82f6',
-                textDecoration: 'none',
-                padding: '5px 13px',
-                borderRadius: 8,
-                border: '1px solid #bfdbfe',
-                background: '#eff6ff',
+                fontFamily: FONT,
               }}
             >
-              View Sheet
-            </Link>
+              Delete
+            </button>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function ContributionList({ contributions, onReview, reviewing }) {
+  if (!contributions || contributions.length === 0) return null
+
+  return (
+    <div style={{ marginTop: 16 }}>
+      <div style={{ fontSize: 12, fontWeight: 800, color: '#0f172a', marginBottom: 8 }}>
+        Contribution Requests
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {contributions.map((contribution) => (
+          <div
+            key={contribution.id}
+            style={{
+              borderRadius: 12,
+              border: '1px solid #dbe1e8',
+              background: '#f8fafc',
+              padding: '12px 14px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
+              <strong style={{ fontSize: 13, color: '#0f172a' }}>
+                {contribution.proposer?.username}
+              </strong>
+              <TinyBadge
+                text={contribution.status.toUpperCase()}
+                color={contribution.status === 'pending' ? '#1d4ed8' : contribution.status === 'accepted' ? '#166534' : '#b91c1c'}
+                background={contribution.status === 'pending' ? '#eff6ff' : contribution.status === 'accepted' ? '#f0fdf4' : '#fef2f2'}
+                border={contribution.status === 'pending' ? '#bfdbfe' : contribution.status === 'accepted' ? '#bbf7d0' : '#fecaca'}
+              />
+              <span style={{ fontSize: 11, color: '#94a3b8' }}>{timeAgo(contribution.createdAt)}</span>
+            </div>
+            <div style={{ fontSize: 12, color: '#334155', marginBottom: contribution.message ? 8 : 0 }}>
+              Forked sheet: <strong>{contribution.forkSheet?.title}</strong>
+            </div>
+            {contribution.message && (
+              <div style={{ fontSize: 12, color: '#475569', lineHeight: 1.6, marginBottom: 10 }}>
+                {contribution.message}
+              </div>
+            )}
+            {contribution.status === 'pending' && (
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  onClick={() => onReview(contribution.id, 'accept')}
+                  disabled={reviewing}
+                  style={{
+                    ...actionBtn(false, '#166534'),
+                    background: '#f0fdf4',
+                    border: '1px solid #bbf7d0',
+                    color: '#166534',
+                  }}
+                >
+                  Accept
+                </button>
+                <button
+                  onClick={() => onReview(contribution.id, 'reject')}
+                  disabled={reviewing}
+                  style={{
+                    ...actionBtn(false, '#dc2626'),
+                    background: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    color: '#dc2626',
+                  }}
+                >
+                  Reject
+                </button>
+              </div>
+            )}
           </div>
-        )}
+        ))}
       </div>
     </div>
   )
 }
 
-export default function FeedPage() {
-  const navigate = useNavigate()
-  const { pathname } = useLocation()
+function FeedItemCard({
+  item,
+  expanded,
+  detail,
+  currentUser,
+  commentText,
+  onToggle,
+  onStarSheet,
+  onReact,
+  onCommentChange,
+  onCommentSubmit,
+  onCommentDelete,
+  onContribute,
+  onReviewContribution,
+  busyKey,
+}) {
+  const author = item.author || { username: 'unknown' }
+  const courseCode = item.course?.code
+  const canSubmitContribution = item.type === 'sheet'
+    && detail?.forkSource
+    && currentUser
+    && currentUser.id === detail.userId
+    && detail.forkSource.userId !== currentUser.id
+  const canReviewContributions = item.type === 'sheet'
+    && Array.isArray(detail?.incomingContributions)
+    && detail.incomingContributions.length > 0
 
-  const [user, setUser] = useState(FALLBACK_USER)
+  const bodyText = item.type === 'sheet'
+    ? detail?.content || item.preview || item.description || ''
+    : detail?.content || item.body || item.preview || ''
+
+  return (
+    <div
+      id={item.feedKey}
+      style={cardStyles(expanded)}
+      onMouseEnter={(event) => {
+        event.currentTarget.style.transform = 'translateY(-1px)'
+      }}
+      onMouseLeave={(event) => {
+        event.currentTarget.style.transform = 'translateY(0)'
+      }}
+    >
+      <button
+        onClick={onToggle}
+        style={{
+          width: '100%',
+          textAlign: 'left',
+          background: 'transparent',
+          border: 'none',
+          padding: '18px 18px 16px',
+          cursor: 'pointer',
+          fontFamily: FONT,
+        }}
+      >
+        {item.type === 'announcement' && item.pinned && (
+          <div
+            style={{
+              display: 'inline-flex',
+              marginBottom: 10,
+              padding: '3px 8px',
+              borderRadius: 999,
+              background: '#fffbeb',
+              color: '#92400e',
+              border: '1px solid #fde68a',
+              fontSize: 11,
+              fontWeight: 800,
+            }}
+          >
+            Pinned Announcement
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: 12 }}>
+          <Avatar user={author} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 5 }}>
+              <span style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>
+                {author.username}
+              </span>
+              {item.type === 'announcement' && (
+                <TinyBadge text="ANNOUNCEMENT" color="#92400e" background="#fffbeb" border="#fde68a" />
+              )}
+              {courseCode && (
+                <TinyBadge
+                  text={courseCode}
+                  color={courseColor(courseCode)}
+                  background={`${courseColor(courseCode)}12`}
+                  border={`${courseColor(courseCode)}40`}
+                />
+              )}
+              {item.type === 'sheet' && item.forkSource && (
+                <TinyBadge text={`Fork of ${item.forkSource.title}`} color="#166534" background="#f0fdf4" border="#bbf7d0" />
+              )}
+            </div>
+            <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 10 }}>
+              {item.type === 'sheet' ? 'Study Sheet' : item.type === 'post' ? 'Post' : 'Update'} · {timeAgo(item.createdAt)}
+            </div>
+            {item.title && (
+              <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 8 }}>
+                {item.title}
+              </div>
+            )}
+            <div style={{ fontSize: 13, color: '#475569', lineHeight: 1.7, whiteSpace: expanded ? 'pre-wrap' : 'normal' }}>
+              {expanded ? bodyText : item.preview || item.body || item.description || ''}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 14, fontSize: 12, color: '#94a3b8' }}>
+          {item.type === 'sheet' && (
+            <>
+              <span><IconStar size={12} /> {item.stars ?? detail?.stars ?? 0}</span>
+              <span><IconFork size={12} /> {item.forks ?? detail?.forks ?? 0}</span>
+              <span><IconDownload size={12} /> {item.downloads ?? detail?.downloads ?? 0}</span>
+            </>
+          )}
+          {item.type !== 'announcement' && (
+            <>
+              <span><i className="fas fa-thumbs-up" style={{ marginRight: 4 }}></i>{item.reactions?.likes ?? detail?.reactions?.likes ?? 0}</span>
+              <span><i className="fas fa-thumbs-down" style={{ marginRight: 4 }}></i>{item.reactions?.dislikes ?? detail?.reactions?.dislikes ?? 0}</span>
+              <span><i className="fas fa-comments" style={{ marginRight: 4 }}></i>{item.commentCount ?? detail?.commentCount ?? 0}</span>
+            </>
+          )}
+          <span style={{ marginLeft: 'auto', color: '#3b82f6', fontWeight: 700 }}>
+            {expanded ? 'Collapse' : 'Expand'}
+          </span>
+        </div>
+      </button>
+
+      {expanded && item.type !== 'announcement' && detail && (
+        <div style={{ padding: '0 18px 18px', borderTop: '1px solid #f1f5f9' }}>
+          {item.type === 'sheet' && (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', paddingTop: 14 }}>
+              <button onClick={() => onStarSheet(item.id)} style={actionBtn(detail.starred, '#f59e0b')}>
+                {detail.starred ? <IconStarFilled size={13} style={{ color: '#f59e0b' }} /> : <IconStar size={13} />}
+                {detail.starred ? 'Starred' : 'Star'}
+              </button>
+              <button onClick={() => onReact(item.type, item.id, 'like')} style={actionBtn(detail.reactions?.userReaction === 'like', '#1d4ed8')}>
+                <i className="fas fa-thumbs-up" style={{ fontSize: 12 }}></i>
+                Like
+              </button>
+              <button onClick={() => onReact(item.type, item.id, 'dislike')} style={actionBtn(detail.reactions?.userReaction === 'dislike', '#dc2626')}>
+                <i className="fas fa-thumbs-down" style={{ fontSize: 12 }}></i>
+                Dislike
+              </button>
+              <Link to={`/sheets/${item.id}`} style={{ ...actionBtn(false), textDecoration: 'none' }}>
+                View full sheet
+              </Link>
+              {detail.allowDownloads && (
+                <a href={`${API}/api/sheets/${item.id}/download`} style={{ ...actionBtn(false), textDecoration: 'none' }}>
+                  <IconDownload size={13} />
+                  Download .md
+                </a>
+              )}
+              {detail.forkSource ? (
+                <button
+                  onClick={onContribute}
+                  disabled={busyKey === `contribute-${item.feedKey}` || !canSubmitContribution}
+                  style={actionBtn(false, '#166534')}
+                >
+                  <IconFork size={13} />
+                  {canSubmitContribution ? 'Contribute back' : 'Contribution sent from your fork page'}
+                </button>
+              ) : (
+                <Link to={`/sheets/${item.id}`} style={{ ...actionBtn(false, '#166534'), textDecoration: 'none' }}>
+                  <IconFork size={13} />
+                  Fork
+                </Link>
+              )}
+            </div>
+          )}
+
+          {item.type === 'post' && (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', paddingTop: 14 }}>
+              <button onClick={() => onReact(item.type, item.id, 'like')} style={actionBtn(detail.reactions?.userReaction === 'like', '#1d4ed8')}>
+                <i className="fas fa-thumbs-up" style={{ fontSize: 12 }}></i>
+                Like
+              </button>
+              <button onClick={() => onReact(item.type, item.id, 'dislike')} style={actionBtn(detail.reactions?.userReaction === 'dislike', '#dc2626')}>
+                <i className="fas fa-thumbs-down" style={{ fontSize: 12 }}></i>
+                Dislike
+              </button>
+            </div>
+          )}
+
+          <AttachmentPanel
+            label={detail.attachmentName || (detail.hasAttachment ? 'Attached file' : '')}
+            href={item.type === 'sheet' ? `${API}/api/sheets/${item.id}/attachment` : `${API}/api/feed/posts/${item.id}/attachment`}
+            allowDownloads={detail.allowDownloads && detail.hasAttachment}
+          />
+
+          {canReviewContributions && (
+            <ContributionList
+              contributions={detail.incomingContributions}
+              reviewing={busyKey === `review-${item.feedKey}`}
+              onReview={onReviewContribution}
+            />
+          )}
+
+          {detail.outgoingContributions?.length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: '#0f172a', marginBottom: 8 }}>
+                Your Contribution Status
+              </div>
+              {detail.outgoingContributions.map((contribution) => (
+                <div key={contribution.id} style={{ fontSize: 12, color: '#475569', marginBottom: 6 }}>
+                  <strong>{contribution.status.toUpperCase()}</strong> · {timeAgo(contribution.createdAt)}
+                  {contribution.message ? ` · ${contribution.message}` : ''}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <CommentComposer
+            value={commentText}
+            onChange={onCommentChange}
+            onSubmit={onCommentSubmit}
+            disabled={busyKey === `comment-${item.feedKey}`}
+            placeholder="Reply, ask a question, or mention someone with @username"
+          />
+          <CommentList
+            comments={detail.comments || []}
+            currentUser={currentUser}
+            onDelete={onCommentDelete}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function RightSidebar({ leaderStars, leaderDownloads, leaderContribs }) {
+  return (
+    <div style={{ position: 'sticky', top: 74, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {[{
+        title: 'Top Starred',
+        items: leaderStars,
+        tone: '#f59e0b',
+        renderMeta: (item) => `${item.stars || 0} stars`,
+      }, {
+        title: 'Most Downloaded',
+        items: leaderDownloads,
+        tone: '#3b82f6',
+        renderMeta: (item) => `${item.downloads || 0} downloads`,
+      }].map((section) => (
+        <div key={section.title} style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', padding: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: '#94a3b8', letterSpacing: '0.08em', marginBottom: 10 }}>
+            {section.title.toUpperCase()}
+          </div>
+          {section.items.length === 0 ? (
+            <div style={{ fontSize: 12, color: '#cbd5e1' }}>No data yet.</div>
+          ) : (
+            section.items.map((item) => (
+              <Link key={item.id} to={`/sheets/${item.id}`} style={{ display: 'block', textDecoration: 'none', padding: '8px 0', borderBottom: '1px solid #f8fafc' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', lineHeight: 1.4 }}>{item.title}</div>
+                <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{section.renderMeta(item)}</div>
+              </Link>
+            ))
+          )}
+        </div>
+      ))}
+
+      <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', padding: 16 }}>
+        <div style={{ fontSize: 11, fontWeight: 800, color: '#94a3b8', letterSpacing: '0.08em', marginBottom: 10 }}>
+          TOP CONTRIBUTORS
+        </div>
+        {leaderContribs.length === 0 ? (
+          <div style={{ fontSize: 12, color: '#cbd5e1' }}>No data yet.</div>
+        ) : (
+          leaderContribs.map((item, index) => (
+            <div key={item.username} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: index < leaderContribs.length - 1 ? '1px solid #f8fafc' : 'none' }}>
+              <Avatar user={{ username: item.username }} size={28} />
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{item.username}</div>
+                <div style={{ fontSize: 11, color: '#94a3b8' }}>{item.count} sheets shared</div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      <div style={{ background: '#0f172a', color: '#fff', borderRadius: 16, padding: 18 }}>
+        <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 8 }}>Version 1 collaboration tips</div>
+        <div style={{ fontSize: 12, color: '#cbd5e1', lineHeight: 1.7 }}>
+          Post updates with `@mentions`, fork a sheet before improving it, and send contributions back from your fork so the original author can review safely.
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const ATTACH_ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'image/webp']
+const ATTACH_ALLOWED_EXT = ['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.webp']
+const ATTACH_MAX_BYTES = 10 * 1024 * 1024
+
+function validateAttachment(file) {
+  if (!file) return ''
+  const ext = `.${file.name.split('.').pop().toLowerCase()}`
+  if (!ATTACH_ALLOWED_TYPES.includes(file.type) || !ATTACH_ALLOWED_EXT.includes(ext)) {
+    return 'Attachment must be a PDF or image file.'
+  }
+  if (file.size > ATTACH_MAX_BYTES) return 'Attachment must be 10 MB or smaller.'
+  return ''
+}
+
+export default function FeedPage() {
+  const [searchParams] = useSearchParams()
+  const currentUser = getStoredUser()
+  const fileInputRef = useRef(null)
+  const searchTimer = useRef(null)
+
   const [filter, setFilter] = useState('all')
-  const [compose, setCompose] = useState('')
-  const [composeExpanded, setComposeExpanded] = useState(false)
-  const [feedSheets, setFeedSheets] = useState([])
+  const [feedItems, setFeedItems] = useState([])
+  const [expandedKey, setExpandedKey] = useState(null)
+  const [detailsByKey, setDetailsByKey] = useState({})
+  const [commentDrafts, setCommentDrafts] = useState({})
+  const [searchQuery, setSearchQuery] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [busyKey, setBusyKey] = useState('')
   const [leaderStars, setLeaderStars] = useState([])
   const [leaderDownloads, setLeaderDownloads] = useState([])
   const [leaderContribs, setLeaderContribs] = useState([])
-  const [searchQuery, setSearchQuery] = useState('')
-  const [searchLoading, setSearchLoading] = useState(false)
-  const searchTimer = useRef(null)
+  const [courses, setCourses] = useState([])
 
-  const maxCompose = 280
+  const [compose, setCompose] = useState('')
+  const [composeCourseId, setComposeCourseId] = useState('')
+  const [composeAttach, setComposeAttach] = useState(null)
+  const [composeAttachErr, setComposeAttachErr] = useState('')
+  const [composeAllowDownloads, setComposeAllowDownloads] = useState(true)
 
-  useEffect(() => {
-    let cancelled = false
-    if (!hasStoredSession()) {
-      navigate('/login')
-      return undefined
+  const visibleItems = useMemo(
+    () => filter === 'all' ? feedItems : feedItems.filter((item) => item.type === filter),
+    [feedItems, filter]
+  )
+
+  const loadFeed = useCallback(async ({ signal, startTransition, query = searchQuery.trim() } = {}) => {
+    try {
+      const params = new URLSearchParams({ limit: '24' })
+      if (query) params.set('search', query)
+      const response = await fetch(`${API}/api/feed?${params.toString()}`, {
+        headers: authHeaders(),
+        signal,
+      })
+      if (!response.ok) throw new Error('Could not load the feed.')
+      const data = await response.json()
+      startTransition(() => {
+        setFeedItems(data.items || [])
+        setLoading(false)
+      })
+    } catch (loadError) {
+      if (loadError?.name !== 'AbortError') {
+        setError(loadError.message || 'Could not load the feed.')
+        setLoading(false)
+      }
     }
+  }, [searchQuery])
 
-    fetch(`${API}/api/auth/me`, { headers: authHeaders() })
-      .then((response) => {
-        if (!response.ok) throw new Error('Failed to fetch current user')
-        return response.json()
-      })
-      .then((data) => {
-        if (cancelled) return
+  const loadLeaderboards = useCallback(async ({ signal, startTransition } = {}) => {
+    const [starsResponse, downloadsResponse, contribsResponse] = await Promise.all([
+      fetch(`${API}/api/sheets/leaderboard?type=stars`, { signal }),
+      fetch(`${API}/api/sheets/leaderboard?type=downloads`, { signal }),
+      fetch(`${API}/api/sheets/leaderboard?type=contributors`, { signal }),
+    ])
 
-        const courses = (data.enrollments || []).map((entry) => entry.course?.code).filter(Boolean)
+    const [stars, downloads, contribs] = await Promise.all([
+      starsResponse.ok ? starsResponse.json() : [],
+      downloadsResponse.ok ? downloadsResponse.json() : [],
+      contribsResponse.ok ? contribsResponse.json() : [],
+    ])
 
-        setUser({
-          username: data.username || FALLBACK_USER.username,
-          school: data.enrollments?.[0]?.course?.school?.name || 'StudyHub',
-          role: data.role || 'student',
-          courses: courses.length > 0 ? courses : ['No courses yet'],
-          stats: {
-            sheets: 0,
-            stars: 0,
-            forks: 0,
-          },
-        })
-      })
-      .catch(() => {
-        if (!cancelled) navigate('/login')
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [navigate])
-
-  useEffect(() => {
-    let cancelled = false
-
-    fetch(`${API}/api/sheets?limit=5`, { headers: authHeaders() })
-      .then((response) => response.json())
-      .then((data) => {
-        if (cancelled) return
-        setFeedSheets(data.sheets || data || [])
-      })
-      .catch(() => {
-        if (!cancelled) setFeedSheets([])
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-
-    Promise.all([
-      fetch(`${API}/api/sheets/leaderboard?type=stars`).then(r => r.json()).catch(() => []),
-      fetch(`${API}/api/sheets/leaderboard?type=downloads`).then(r => r.json()).catch(() => []),
-      fetch(`${API}/api/sheets/leaderboard?type=contributors`).then(r => r.json()).catch(() => []),
-    ]).then(([stars, downloads, contribs]) => {
-      if (cancelled) return
+    startTransition(() => {
       setLeaderStars(Array.isArray(stars) ? stars : [])
       setLeaderDownloads(Array.isArray(downloads) ? downloads : [])
       setLeaderContribs(Array.isArray(contribs) ? contribs : [])
     })
-
-    return () => { cancelled = true }
   }, [])
 
-  // Debounced search
+  useEffect(() => {
+    fetch(`${API}/api/courses/schools`, { headers: authHeaders() })
+      .then((response) => response.json())
+      .then((data) => setCourses((data || []).flatMap((school) => school.courses || [])))
+      .catch(() => {})
+  }, [])
+
+  useLivePolling(loadFeed, {
+    enabled: true,
+    intervalMs: 25000,
+  })
+
+  useLivePolling(loadLeaderboards, {
+    enabled: true,
+    intervalMs: 60000,
+  })
+
   useEffect(() => {
     clearTimeout(searchTimer.current)
-    if (!searchQuery.trim()) {
-      // Restore default feed
-      fetch(`${API}/api/sheets?limit=5`, { headers: authHeaders() })
-        .then(r => r.json()).then(d => setFeedSheets(d.sheets || d || [])).catch(() => {})
+    searchTimer.current = setTimeout(() => {
+      setLoading(true)
+      setError('')
+      void loadFeed({ query: searchQuery.trim() })
+    }, searchQuery.trim() ? 280 : 0)
+    return () => clearTimeout(searchTimer.current)
+  }, [searchQuery, loadFeed])
+
+  const loadItemDetail = useCallback(async (item) => {
+    if (!item || item.type === 'announcement') return
+    const key = item.feedKey
+    const detailUrl = item.type === 'sheet' ? `${API}/api/sheets/${item.id}` : `${API}/api/feed/posts/${item.id}`
+    const commentsUrl = item.type === 'sheet' ? `${API}/api/sheets/${item.id}/comments` : `${API}/api/feed/posts/${item.id}/comments`
+
+    const [detailResponse, commentsResponse] = await Promise.all([
+      fetch(detailUrl, { headers: authHeaders() }),
+      fetch(commentsUrl, { headers: authHeaders() }),
+    ])
+    if (!detailResponse.ok || !commentsResponse.ok) {
+      throw new Error('Could not load item details.')
+    }
+
+    const [detail, commentsData] = await Promise.all([detailResponse.json(), commentsResponse.json()])
+    setDetailsByKey((current) => ({
+      ...current,
+      [key]: {
+        ...detail,
+        comments: commentsData.comments || [],
+      },
+    }))
+  }, [])
+
+  useEffect(() => {
+    const targetPost = Number.parseInt(searchParams.get('post') || '', 10)
+    if (!Number.isInteger(targetPost) || feedItems.length === 0) return
+
+    const match = feedItems.find((item) => item.type === 'post' && item.id === targetPost)
+    if (!match) return
+
+    setExpandedKey(match.feedKey)
+    if (!detailsByKey[match.feedKey]) {
+      void loadItemDetail(match)
+    }
+    setTimeout(() => {
+      document.getElementById(match.feedKey)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 80)
+  }, [detailsByKey, feedItems, loadItemDetail, searchParams])
+
+  function setCommentDraft(key, value) {
+    setCommentDrafts((current) => ({ ...current, [key]: value }))
+  }
+
+  async function handleToggle(item) {
+    if (expandedKey === item.feedKey) {
+      setExpandedKey(null)
       return
     }
-    searchTimer.current = setTimeout(() => {
-      setSearchLoading(true)
-      fetch(`${API}/api/sheets?search=${encodeURIComponent(searchQuery.trim())}&limit=10`, { headers: authHeaders() })
-        .then(r => r.json())
-        .then(d => setFeedSheets(d.sheets || d || []))
-        .catch(() => {})
-        .finally(() => setSearchLoading(false))
-    }, 300)
-    return () => clearTimeout(searchTimer.current)
-  }, [searchQuery])
 
-  const combinedFeed = [
-    FEED_ITEMS[0],
-    ...feedSheets.map((sheet) => ({
-      id: sheet.id,
-      sheetId: sheet.id,
-      type: 'sheet',
-      author: sheet.author?.username || 'unknown',
-      authorRole: 'student',
-      time: timeAgo(sheet.createdAt),
-      title: sheet.title,
-      body: summarizeSheetContent(sheet.content),
-      course: sheet.course?.code,
-      stars: sheet.stars || 0,
-      forks: sheet.forks || 0,
-      downloads: sheet.downloads || 0,
-      tags: extractTags(sheet.content),
-    })),
-    FEED_ITEMS[3],
-  ]
+    setExpandedKey(item.feedKey)
+    if (!detailsByKey[item.feedKey] && item.type !== 'announcement') {
+      try {
+        await loadItemDetail(item)
+      } catch (detailError) {
+        setError(detailError.message)
+      }
+    }
+  }
 
-  const filtered = filter === 'all'
-    ? combinedFeed
-    : combinedFeed.filter((item) => item.type === filter)
+  async function handleCreatePost(event) {
+    event.preventDefault()
+    if (!compose.trim()) return
 
-  return (
-    <div
+    setBusyKey('compose')
+    setComposeAttachErr('')
+    try {
+      const response = await fetch(`${API}/api/feed/posts`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          content: compose.trim(),
+          courseId: composeCourseId || null,
+          allowDownloads: composeAllowDownloads,
+        }),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Could not publish your post.')
+
+      if (composeAttach) {
+        const formData = new FormData()
+        formData.append('attachment', composeAttach)
+        const uploadResponse = await fetch(`${API}/api/upload/post-attachment/${data.id}`, {
+          method: 'POST',
+          body: formData,
+        })
+        if (!uploadResponse.ok) {
+          const uploadData = await uploadResponse.json()
+          throw new Error(uploadData.error || 'The post was created, but the attachment upload failed.')
+        }
+      }
+
+      setCompose('')
+      setComposeCourseId('')
+      setComposeAttach(null)
+      setComposeAllowDownloads(true)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      setLoading(true)
+      await loadFeed({ query: searchQuery.trim() })
+    } catch (createError) {
+      setComposeAttachErr(createError.message || 'Could not create your post.')
+    } finally {
+      setBusyKey('')
+    }
+  }
+
+  async function handleStarSheet(sheetId) {
+    const key = `sheet-${sheetId}`
+    setBusyKey(`star-${key}`)
+    try {
+      const response = await fetch(`${API}/api/sheets/${sheetId}/star`, {
+        method: 'POST',
+        headers: authHeaders(),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Could not update star.')
+
+      setFeedItems((items) => items.map((item) => item.type === 'sheet' && item.id === sheetId
+        ? { ...item, starred: data.starred, stars: data.stars }
+        : item
+      ))
+      setDetailsByKey((current) => current[key]
+        ? { ...current, [key]: { ...current[key], starred: data.starred, stars: data.stars } }
+        : current
+      )
+    } catch (starError) {
+      setError(starError.message)
+    } finally {
+      setBusyKey('')
+    }
+  }
+
+  async function handleReact(type, id, reaction) {
+    const key = `${type}-${id}`
+    setBusyKey(`react-${key}`)
+    try {
+      const endpoint = type === 'sheet' ? `${API}/api/sheets/${id}/react` : `${API}/api/feed/posts/${id}/react`
+      const currentReaction = detailsByKey[key]?.reactions?.userReaction || null
+      const nextReaction = currentReaction === reaction ? null : reaction
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ type: nextReaction }),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Could not update reaction.')
+
+      setFeedItems((items) => items.map((item) => item.type === type && item.id === id
+        ? { ...item, reactions: data }
+        : item
+      ))
+      setDetailsByKey((current) => current[key]
+        ? { ...current, [key]: { ...current[key], reactions: data } }
+        : current
+      )
+    } catch (reactError) {
+      setError(reactError.message)
+    } finally {
+      setBusyKey('')
+    }
+  }
+
+  async function handleCommentSubmit(type, id) {
+    const key = `${type}-${id}`
+    const content = commentDrafts[key]?.trim()
+    if (!content) return
+
+    setBusyKey(`comment-${key}`)
+    try {
+      const endpoint = type === 'sheet' ? `${API}/api/sheets/${id}/comments` : `${API}/api/feed/posts/${id}/comments`
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ content }),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Could not post comment.')
+
+      setCommentDrafts((current) => ({ ...current, [key]: '' }))
+      setDetailsByKey((current) => current[key]
+        ? {
+            ...current,
+            [key]: {
+              ...current[key],
+              comments: [data, ...(current[key].comments || [])],
+              commentCount: (current[key].commentCount || 0) + 1,
+            },
+          }
+        : current
+      )
+      setFeedItems((items) => items.map((item) => item.type === type && item.id === id
+        ? { ...item, commentCount: (item.commentCount || 0) + 1 }
+        : item
+      ))
+    } catch (commentError) {
+      setError(commentError.message)
+    } finally {
+      setBusyKey('')
+    }
+  }
+
+  async function handleCommentDelete(type, id, commentId) {
+    const key = `${type}-${id}`
+    try {
+      const endpoint = type === 'sheet'
+        ? `${API}/api/sheets/${id}/comments/${commentId}`
+        : `${API}/api/feed/posts/${id}/comments/${commentId}`
+      await fetch(endpoint, { method: 'DELETE', headers: authHeaders() })
+      setDetailsByKey((current) => current[key]
+        ? {
+            ...current,
+            [key]: {
+              ...current[key],
+              comments: (current[key].comments || []).filter((comment) => comment.id !== commentId),
+              commentCount: Math.max(0, (current[key].commentCount || 0) - 1),
+            },
+          }
+        : current
+      )
+      setFeedItems((items) => items.map((item) => item.type === type && item.id === id
+        ? { ...item, commentCount: Math.max(0, (item.commentCount || 0) - 1) }
+        : item
+      ))
+    } catch {
+      setError('Could not delete that comment.')
+    }
+  }
+
+  async function handleContributeBack(item) {
+    const message = window.prompt('Add a short note for the original author (optional):', '') || ''
+    setBusyKey(`contribute-${item.feedKey}`)
+    try {
+      const response = await fetch(`${API}/api/sheets/${item.id}/contributions`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ message }),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Could not send your contribution.')
+      await loadItemDetail(item)
+    } catch (contributionError) {
+      setError(contributionError.message)
+    } finally {
+      setBusyKey('')
+    }
+  }
+
+  async function handleContributionReview(item, contributionId, action) {
+    setBusyKey(`review-${item.feedKey}`)
+    try {
+      const response = await fetch(`${API}/api/sheets/contributions/${contributionId}`, {
+        method: 'PATCH',
+        headers: authHeaders(),
+        body: JSON.stringify({ action }),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Could not review that contribution.')
+      await loadItemDetail(item)
+    } catch (reviewError) {
+      setError(reviewError.message)
+    } finally {
+      setBusyKey('')
+    }
+  }
+
+  const navActions = (
+    <Link
+      to="/sheets/upload"
       style={{
-        minHeight: '100vh',
-        background: '#edf0f5',
-        fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
-        color: '#1e293b',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        padding: '6px 12px',
+        borderRadius: 8,
+        background: '#3b82f6',
+        color: '#fff',
+        textDecoration: 'none',
+        fontSize: 12,
+        fontWeight: 700,
       }}
     >
-      <header
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 100,
-          background: '#0f172a',
-          borderBottom: '1px solid #1e293b',
-          height: 'clamp(60px, 5vw, 74px)',
-          display: 'flex',
-          alignItems: 'center',
-          padding: '0 clamp(16px, 2.5vw, 40px)',
-          gap: 16,
-        }}
-      >
-        <Link to="/feed" style={{ display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none' }}>
-          <LogoMark size={28} />
-          <span style={{ fontWeight: 800, fontSize: 16, color: '#fff', letterSpacing: '-0.3px' }}>
-            Study
-            <span style={{ color: '#3b82f6' }}>Hub</span>
-          </span>
-        </Link>
+      <IconUpload size={13} />
+      Upload Sheet
+    </Link>
+  )
 
-        <div style={{ flex: 1, maxWidth: 520, position: 'relative' }}>
-          <div style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
-            <IconSearch size={13} style={{ color: '#475569' }} />
-          </div>
-
-          <input
-            placeholder="Search sheets, courses, students..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '8px 34px 8px 34px',
-              background: '#1e293b',
-              border: '1px solid #334155',
-              borderRadius: 10,
-              color: searchQuery ? '#fff' : '#94a3b8',
-              fontSize: 13,
-              fontFamily: 'inherit',
-              outline: 'none',
-              boxSizing: 'border-box',
-            }}
-            onFocus={(event) => {
-              event.target.style.borderColor = '#3b82f6'
-              event.target.style.color = '#fff'
-            }}
-            onBlur={(event) => {
-              event.target.style.borderColor = '#334155'
-              if (!searchQuery) event.target.style.color = '#94a3b8'
-            }}
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 13, padding: 0 }}
-            >
-              <i className="fas fa-times"></i>
-            </button>
-          )}
-        </div>
-
-        <div style={{ flex: 1 }} />
-
-        <Link
-          to="/sheets/upload"
-          title="Upload Sheet"
-          style={{
-            background: 'transparent',
-            border: 'none',
-            color: '#94a3b8',
-            cursor: 'pointer',
-            padding: '5px',
-            borderRadius: 8,
-            display: 'flex',
-            alignItems: 'center',
-            transition: 'color .15s',
-            textDecoration: 'none',
-          }}
-          onMouseEnter={(event) => {
-            event.currentTarget.style.color = '#fff'
-          }}
-          onMouseLeave={(event) => {
-            event.currentTarget.style.color = '#94a3b8'
-          }}
-        >
-          <IconUpload size={17} />
-        </Link>
-
-        <button
-          title="Notifications"
-          style={{
-            background: 'transparent',
-            border: 'none',
-            color: '#94a3b8',
-            cursor: 'pointer',
-            padding: '5px',
-            borderRadius: 8,
-            display: 'flex',
-            alignItems: 'center',
-            transition: 'color .15s',
-          }}
-          onMouseEnter={(event) => {
-            event.currentTarget.style.color = '#fff'
-          }}
-          onMouseLeave={(event) => {
-            event.currentTarget.style.color = '#94a3b8'
-          }}
-        >
-          <IconBell size={17} />
-        </button>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer' }} onClick={() => navigate('/dashboard')}>
-          <Avatar name={user.username} size={30} role={user.role} />
-          <span style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0' }}>{user.username}</span>
-          <IconChevronDown size={13} style={{ color: '#64748b' }} />
-        </div>
-      </header>
-
-      <div
-        style={{
-          ...pageShell('app', 72, 60),
-          display: 'grid',
-          gridTemplateColumns: pageColumns.appThreeColumn,
-          gap: 24,
-        }}
-      >
-        <aside style={{ position: 'sticky', top: 76, alignSelf: 'start' }}>
-          <div
-            style={{
-              background: '#fff',
-              borderRadius: 16,
-              border: '1px solid #e8ecf0',
-              boxShadow: '0 2px 10px rgba(15,23,42,0.05)',
-              padding: '20px 16px',
-              marginBottom: 12,
-            }}
-          >
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
-              <div style={{ position: 'relative' }}>
-                <Avatar name={user.username} size={64} role={user.role} />
-                <div
-                  style={{
-                    position: 'absolute',
-                    bottom: 0,
-                    right: 0,
-                    width: 16,
-                    height: 16,
-                    borderRadius: '50%',
-                    background: '#10b981',
-                    border: '2px solid #fff',
-                  }}
-                />
-              </div>
-
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontWeight: 800, fontSize: 16, color: '#0f172a' }}>{user.username}</div>
-                <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{user.school}</div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, width: '100%', marginTop: 4 }}>
-                {[
-                  { label: 'Sheets', val: user.stats.sheets },
-                  { label: 'Stars', val: user.stats.stars },
-                  { label: 'Forks', val: user.stats.forks },
-                ].map((stat) => (
-                  <div key={stat.label} style={{ textAlign: 'center', background: '#f8fafc', borderRadius: 10, padding: '8px 4px' }}>
-                    <div style={{ fontWeight: 800, fontSize: 18, color: '#0f172a' }}>{stat.val}</div>
-                    <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600 }}>{stat.label}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <nav
-            style={{
-              background: '#fff',
-              borderRadius: 16,
-              border: '1px solid #e8ecf0',
-              boxShadow: '0 2px 10px rgba(15,23,42,0.05)',
-              padding: '8px 8px',
-              marginBottom: 12,
-            }}
-          >
-            {NAV_LINKS.map((link) => {
-              const isActive = pathname === link.to
-              const IconComponent = link.icon
-
-              return (
-                <Link
-                  key={link.to}
-                  to={link.to}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    padding: '10px 12px',
-                    borderRadius: 10,
-                    textDecoration: 'none',
-                    background: isActive ? '#eff6ff' : 'transparent',
-                    color: isActive ? '#1d4ed8' : '#475569',
-                    fontWeight: isActive ? 700 : 500,
-                    fontSize: 14,
-                    marginBottom: 2,
-                    transition: 'all 0.15s',
-                    borderLeft: isActive ? '3px solid #3b82f6' : '3px solid transparent',
-                  }}
-                  onMouseEnter={(event) => {
-                    if (!isActive) event.currentTarget.style.background = '#f8fafc'
-                  }}
-                  onMouseLeave={(event) => {
-                    if (!isActive) event.currentTarget.style.background = 'transparent'
-                  }}
-                >
-                  <IconComponent size={15} />
-                  {link.label}
-                </Link>
-              )
-            })}
-          </nav>
-
-          <div
-            style={{
-              background: '#fff',
-              borderRadius: 16,
-              border: '1px solid #e8ecf0',
-              boxShadow: '0 2px 10px rgba(15,23,42,0.05)',
-              padding: '14px 16px',
-            }}
-          >
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.08em', marginBottom: 10 }}>
-              MY COURSES
-            </div>
-
-            {user.courses.map((course) => (
-              <div key={course} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderBottom: '1px solid #f1f5f9' }}>
-                <div style={{ width: 7, height: 7, borderRadius: '50%', background: courseColor(course), flexShrink: 0 }} />
-                <span style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>{course}</span>
-              </div>
-            ))}
-
-            <button
-              style={{
-                marginTop: 10,
-                width: '100%',
-                padding: '7px',
-                background: '#f8fafc',
-                border: '1px dashed #cbd5e1',
-                borderRadius: 8,
-                color: '#64748b',
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 5,
-              }}
-            >
-              <IconPlus size={12} />
-              Add Course
-            </button>
-          </div>
-        </aside>
+  return (
+    <div style={{ minHeight: '100vh', background: '#edf0f5', fontFamily: FONT }}>
+      <Navbar crumbs={[{ label: 'Feed', to: '/feed' }]} hideTabs actions={navActions} />
+      <div style={{ ...pageShell('app'), display: 'grid', gridTemplateColumns: pageColumns.appThreeColumn, gap: 20 }}>
+        <AppSidebar />
 
         <main>
-          <div
-            style={{
-              background: '#fff',
-              borderRadius: 14,
-              border: '1px solid #e8ecf0',
-              padding: composeExpanded ? '14px 16px' : '12px 14px',
-              marginBottom: 14,
-              transition: 'all .2s',
-            }}
-          >
-            {composeExpanded ? (
-              <>
-                <div style={{ display: 'flex', gap: 10, marginBottom: 10, alignItems: 'flex-start' }}>
-                  <Avatar name={user.username} size={34} role={user.role} />
-                  <textarea
-                    value={compose}
-                    onChange={(event) => setCompose(event.target.value.slice(0, maxCompose))}
-                    placeholder="Share a note with your course..."
-                    rows={3}
-                    style={{
-                      flex: 1,
-                      border: 'none',
-                      outline: 'none',
-                      resize: 'none',
-                      fontSize: 14,
-                      fontFamily: 'inherit',
-                      color: '#0f172a',
-                      background: 'transparent',
-                      lineHeight: 1.6,
-                    }}
-                    autoFocus
-                  />
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span
-                    style={{
-                      fontSize: 11,
-                      color: compose.length > maxCompose * 0.85 ? '#ef4444' : '#94a3b8',
-                      marginLeft: 44,
-                    }}
+          <form onSubmit={handleCreatePost} style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', padding: 18, marginBottom: 14 }}>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+              <Avatar user={currentUser} />
+              <div style={{ flex: 1 }}>
+                <textarea
+                  value={compose}
+                  onChange={(event) => setCompose(event.target.value.slice(0, 2000))}
+                  placeholder="Share an update, mention classmates with @username, or point people to a great sheet..."
+                  rows={3}
+                  style={{ width: '100%', boxSizing: 'border-box', border: 'none', outline: 'none', resize: 'vertical', fontSize: 14, color: '#0f172a', fontFamily: FONT, lineHeight: 1.7 }}
+                />
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', marginTop: 12 }}>
+                  <select
+                    value={composeCourseId}
+                    onChange={(event) => setComposeCourseId(event.target.value)}
+                    style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid #dbe1e8', fontSize: 12, fontFamily: FONT, color: '#475569' }}
                   >
-                    {maxCompose - compose.length}
-                  </span>
-                  <div style={{ flex: 1 }} />
+                    <option value="">General post</option>
+                    {courses.map((course) => (
+                      <option key={course.id} value={course.id}>{course.code}</option>
+                    ))}
+                  </select>
 
-                  <button
-                    onClick={() => {
-                      setCompose('')
-                      setComposeExpanded(false)
-                    }}
-                    style={{
-                      padding: '5px 12px',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: 7,
-                      background: '#fff',
-                      color: '#64748b',
-                      fontSize: 12,
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      fontFamily: 'inherit',
-                    }}
-                  >
-                    Cancel
+                  <input ref={fileInputRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.gif,.webp" style={{ display: 'none' }} onChange={(event) => {
+                    const file = event.target.files?.[0]
+                    if (!file) return
+                    const validationError = validateAttachment(file)
+                    if (validationError) {
+                      setComposeAttachErr(validationError)
+                      event.target.value = ''
+                      return
+                    }
+                    setComposeAttachErr('')
+                    setComposeAttach(file)
+                  }} />
+                  <button type="button" onClick={() => fileInputRef.current?.click()} style={actionBtn(false)}>
+                    <IconPlus size={13} />
+                    {composeAttach ? 'Change file' : 'Attach file'}
                   </button>
-
-                  <Link
-                    to="/sheets/upload"
-                    style={{
-                      padding: '6px 16px',
-                      background: '#3b82f6',
-                      color: '#fff',
-                      borderRadius: 8,
-                      fontSize: 12,
-                      fontWeight: 700,
-                      textDecoration: 'none',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 5,
-                    }}
-                  >
-                    <IconUpload size={12} />
-                    Upload Sheet
-                  </Link>
+                  {composeAttach && (
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#64748b' }}>
+                      <input type="checkbox" checked={composeAllowDownloads} onChange={(event) => setComposeAllowDownloads(event.target.checked)} />
+                      Allow downloads
+                    </label>
+                  )}
+                  <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 11, color: '#94a3b8' }}>{compose.length}/2000</span>
+                    <button type="submit" disabled={busyKey === 'compose' || !compose.trim()} style={{ padding: '8px 16px', borderRadius: 9, border: 'none', background: busyKey === 'compose' || !compose.trim() ? '#bfdbfe' : '#3b82f6', color: '#fff', fontSize: 12, fontWeight: 800, cursor: busyKey === 'compose' || !compose.trim() ? 'not-allowed' : 'pointer', fontFamily: FONT }}>
+                      {busyKey === 'compose' ? 'Posting...' : 'Post to Feed'}
+                    </button>
+                  </div>
                 </div>
-              </>
-            ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <Avatar name={user.username} size={34} role={user.role} />
-
-                <div
-                  style={{
-                    flex: 1,
-                    background: '#f8fafc',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: 99,
-                    padding: '9px 16px',
-                    color: '#94a3b8',
-                    fontSize: 13,
-                    cursor: 'pointer',
-                    transition: 'border-color .15s',
-                  }}
-                  onClick={() => setComposeExpanded(true)}
-                  onMouseEnter={(event) => {
-                    event.currentTarget.style.borderColor = '#93c5fd'
-                  }}
-                  onMouseLeave={(event) => {
-                    event.currentTarget.style.borderColor = '#e2e8f0'
-                  }}
-                >
-                  Share a study sheet with your courses...
-                </div>
-
-                <Link
-                  to="/sheets/upload"
-                  style={{
-                    padding: '8px 16px',
-                    background: '#3b82f6',
-                    color: '#fff',
-                    borderRadius: 99,
-                    textDecoration: 'none',
-                    fontSize: 12,
-                    fontWeight: 700,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 5,
-                    flexShrink: 0,
-                  }}
-                >
-                  <IconUpload size={12} />
-                  Upload
-                </Link>
+                {composeAttach && (
+                  <div style={{ marginTop: 8, fontSize: 12, color: '#475569' }}>
+                    Attached: <strong>{composeAttach.name}</strong>
+                  </div>
+                )}
+                {composeAttachErr && (
+                  <div style={{ marginTop: 8, fontSize: 12, color: '#dc2626' }}>{composeAttachErr}</div>
+                )}
               </div>
-            )}
+            </div>
+          </form>
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {[
+                ['all', 'All'],
+                ['post', 'Posts'],
+                ['sheet', 'Sheets'],
+                ['announcement', 'Announcements'],
+              ].map(([key, label]) => (
+                <button key={key} onClick={() => setFilter(key)} style={{ padding: '7px 14px', borderRadius: 999, border: '1px solid', borderColor: filter === key ? '#3b82f6' : '#e2e8f0', background: filter === key ? '#eff6ff' : '#fff', color: filter === key ? '#1d4ed8' : '#64748b', fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: FONT }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <input
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search the feed..."
+              style={{ width: 240, maxWidth: '100%', padding: '8px 12px', borderRadius: 10, border: '1px solid #dbe1e8', fontSize: 12, color: '#475569', fontFamily: FONT }}
+            />
           </div>
 
-          <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
-            {[
-              { key: 'all', label: 'All' },
-              { key: 'sheet', label: 'Sheets' },
-              { key: 'announcement', label: 'Announcements' },
-              { key: 'activity', label: 'Activity' },
-            ].map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => setFilter(tab.key)}
-                style={{
-                  padding: '7px 16px',
-                  borderRadius: 99,
-                  border: '1px solid',
-                  borderColor: filter === tab.key ? '#3b82f6' : '#e2e8f0',
-                  background: filter === tab.key ? '#eff6ff' : '#fff',
-                  color: filter === tab.key ? '#1d4ed8' : '#64748b',
-                  fontWeight: filter === tab.key ? 700 : 500,
-                  fontSize: 13,
-                  cursor: 'pointer',
-                  fontFamily: 'inherit',
-                  transition: 'all 0.15s',
-                }}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          {searchQuery.trim() && (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, padding: '8px 12px', background: '#eff6ff', borderRadius: 8, border: '1px solid #bfdbfe' }}>
-              <span style={{ fontSize: 13, color: '#1d4ed8' }}>
-                {searchLoading ? <><i className="fas fa-spinner fa-spin" style={{ marginRight: 6 }}></i>Searching…</> : <>Results for "<strong>{searchQuery}</strong>"</>}
-              </span>
-              <button onClick={() => setSearchQuery('')} style={{ background: 'none', border: 'none', color: '#3b82f6', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit' }}>
-                Clear
-              </button>
+          {error && (
+            <div style={{ marginBottom: 12, background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', borderRadius: 12, padding: '10px 14px', fontSize: 13 }}>
+              {error}
             </div>
           )}
 
-          {filtered.map((item) => (
-            <FeedCard key={item.id} item={item} />
-          ))}
-
-          <div style={{ textAlign: 'center', padding: '20px', color: '#94a3b8', fontSize: 13 }}>
-            <button
-              style={{
-                padding: '10px 28px',
-                borderRadius: 99,
-                border: '1px solid #e2e8f0',
-                background: '#fff',
-                color: '#64748b',
-                fontWeight: 600,
-                fontSize: 13,
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-              }}
-            >
-              Load more -
-              <span style={{ color: '#94a3b8', fontWeight: 400 }}> pagination coming soon</span>
-            </button>
-          </div>
+          {loading ? (
+            <div style={{ color: '#94a3b8', fontSize: 13, padding: '20px 0' }}>Loading feed...</div>
+          ) : visibleItems.length === 0 ? (
+            <div style={{ background: '#fff', borderRadius: 16, border: '1px dashed #cbd5e1', padding: '42px 26px', textAlign: 'center', color: '#94a3b8' }}>
+              No feed items matched this filter.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {visibleItems.map((item) => (
+                <FeedItemCard
+                  key={item.feedKey}
+                  item={item}
+                  expanded={expandedKey === item.feedKey}
+                  detail={detailsByKey[item.feedKey]}
+                  currentUser={currentUser}
+                  commentText={commentDrafts[item.feedKey] || ''}
+                  busyKey={busyKey}
+                  onToggle={() => handleToggle(item)}
+                  onStarSheet={handleStarSheet}
+                  onReact={handleReact}
+                  onCommentChange={(value) => setCommentDraft(item.feedKey, value)}
+                  onCommentSubmit={(event) => {
+                    event.preventDefault()
+                    void handleCommentSubmit(item.type, item.id)
+                  }}
+                  onCommentDelete={(commentId) => void handleCommentDelete(item.type, item.id, commentId)}
+                  onContribute={() => void handleContributeBack(item)}
+                  onReviewContribution={(contributionId, action) => void handleContributionReview(item, contributionId, action)}
+                />
+              ))}
+            </div>
+          )}
         </main>
 
-        <aside style={{ position: 'sticky', top: 76, alignSelf: 'start', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {/* Most Starred */}
-          <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e8ecf0', boxShadow: '0 2px 10px rgba(15,23,42,0.05)', padding: '16px' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.08em', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <IconStarFilled size={11} style={{ color: '#f59e0b' }} />
-              TOP STARRED
-            </div>
-            {leaderStars.length === 0
-              ? <div style={{ fontSize: 12, color: '#cbd5e1' }}>No data yet.</div>
-              : leaderStars.map((sheet, index) => (
-                <Link
-                  key={sheet.id}
-                  to={`/sheets/${sheet.id}`}
-                  style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 0', borderBottom: index < leaderStars.length - 1 ? '1px solid #f1f5f9' : 'none', textDecoration: 'none' }}
-                >
-                  <span style={{ fontSize: 13, fontWeight: 800, color: '#cbd5e1', minWidth: 18 }}>{index + 1}</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b', lineHeight: 1.4 }}>{sheet.title}</div>
-                    <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
-                      <IconStarFilled size={11} style={{ color: '#f59e0b', marginRight: 3, verticalAlign: 'middle' }} />
-                      {sheet.stars} · {sheet.course?.code}
-                    </div>
-                  </div>
-                </Link>
-              ))
-            }
-          </div>
-
-          {/* Most Downloaded */}
-          <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e8ecf0', boxShadow: '0 2px 10px rgba(15,23,42,0.05)', padding: '16px' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.08em', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <IconDownload size={11} style={{ color: '#3b82f6' }} />
-              MOST DOWNLOADED
-            </div>
-            {leaderDownloads.length === 0
-              ? <div style={{ fontSize: 12, color: '#cbd5e1' }}>No data yet.</div>
-              : leaderDownloads.map((sheet, index) => (
-                <Link
-                  key={sheet.id}
-                  to={`/sheets/${sheet.id}`}
-                  style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 0', borderBottom: index < leaderDownloads.length - 1 ? '1px solid #f1f5f9' : 'none', textDecoration: 'none' }}
-                >
-                  <span style={{ fontSize: 13, fontWeight: 800, color: '#cbd5e1', minWidth: 18 }}>{index + 1}</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b', lineHeight: 1.4 }}>{sheet.title}</div>
-                    <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
-                      <i className="fas fa-download" style={{ fontSize: 9, color: '#3b82f6', marginRight: 3 }}></i>
-                      {sheet.downloads} · {sheet.course?.code}
-                    </div>
-                  </div>
-                </Link>
-              ))
-            }
-          </div>
-
-          {/* Top Contributors */}
-          <div style={{ background: '#fff', borderRadius: 16, border: '1px solid #e8ecf0', boxShadow: '0 2px 10px rgba(15,23,42,0.05)', padding: '16px' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.08em', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <i className="fas fa-trophy" style={{ fontSize: 10, color: '#f59e0b' }}></i>
-              TOP CONTRIBUTORS
-            </div>
-            {leaderContribs.length === 0
-              ? <div style={{ fontSize: 12, color: '#cbd5e1' }}>No data yet.</div>
-              : leaderContribs.map((contrib, index) => (
-                <div
-                  key={contrib.username}
-                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: index < leaderContribs.length - 1 ? '1px solid #f1f5f9' : 'none' }}
-                >
-                  <span style={{ fontSize: 13, fontWeight: 800, color: '#cbd5e1', minWidth: 18 }}>{index + 1}</span>
-                  <Avatar name={contrib.username} size={26} role="student" />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b' }}>{contrib.username}</div>
-                    <div style={{ fontSize: 11, color: '#94a3b8' }}>{contrib.count} sheet{contrib.count !== 1 ? 's' : ''}</div>
-                  </div>
-                </div>
-              ))
-            }
-          </div>
-
-          <div
-            style={{
-              background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%)',
-              borderRadius: 16,
-              padding: '18px 16px',
-              border: '1px solid #1e3a5f',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              <span style={{ fontWeight: 700, fontSize: 14, color: '#fff' }}>AI Tutor</span>
-              <span
-                style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  padding: '2px 7px',
-                  background: '#1d4ed8',
-                  color: '#93c5fd',
-                  borderRadius: 99,
-                  letterSpacing: '0.06em',
-                }}
-              >
-                SOON
-              </span>
-            </div>
-
-            <p style={{ fontSize: 12, color: '#94a3b8', lineHeight: 1.6, margin: '0 0 12px' }}>
-              Ask anything about your courses. Claude AI will explain concepts, generate practice questions, and guide you step by step.
-            </p>
-
-            <button
-              disabled
-              style={{
-                width: '100%',
-                padding: '9px',
-                background: '#1e3a5f',
-                border: '1px solid #2d4a7a',
-                borderRadius: 10,
-                color: '#64748b',
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: 'not-allowed',
-                fontFamily: 'inherit',
-              }}
-            >
-              Coming in V1
-            </button>
-          </div>
-
-          <div
-            style={{
-              background: '#fff',
-              borderRadius: 16,
-              border: '1px solid #e8ecf0',
-              boxShadow: '0 2px 10px rgba(15,23,42,0.05)',
-              padding: '16px',
-            }}
-          >
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.08em', marginBottom: 10 }}>
-              QUICK ACTIONS
-            </div>
-
-            {[
-              { Icon: IconSheets, label: 'Browse All Sheets', to: '/sheets', ready: true },
-              { Icon: IconUpload, label: 'Upload a Sheet', to: '/sheets/upload', ready: true },
-              { Icon: IconTests, label: 'Take a Practice Test', to: '/tests', ready: false },
-              { Icon: IconNotes, label: 'My Notes', to: '/notes', ready: false },
-            ].map((action) => (
-              <Link
-                key={action.label}
-                to={action.to}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 9,
-                  padding: '9px 8px',
-                  borderRadius: 9,
-                  textDecoration: 'none',
-                  color: action.ready ? '#334155' : '#94a3b8',
-                  fontSize: 13,
-                  fontWeight: 500,
-                  marginBottom: 2,
-                  transition: 'background 0.15s',
-                }}
-                onMouseEnter={(event) => {
-                  event.currentTarget.style.background = '#f8fafc'
-                }}
-                onMouseLeave={(event) => {
-                  event.currentTarget.style.background = 'transparent'
-                }}
-              >
-                <action.Icon size={14} style={{ color: action.ready ? '#3b82f6' : '#cbd5e1', flexShrink: 0 }} />
-                {action.label}
-                {!action.ready && <span style={{ marginLeft: 'auto', fontSize: 10, color: '#cbd5e1', fontWeight: 600 }}>SOON</span>}
-              </Link>
-            ))}
-          </div>
-
-          <button
-            onClick={async () => {
-              await logoutSession()
-              navigate('/login')
-            }}
-            style={{
-              width: '100%',
-              padding: '10px',
-              background: '#fff',
-              border: '1px solid #fecaca',
-              borderRadius: 12,
-              color: '#dc2626',
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 7,
-            }}
-            onMouseEnter={(event) => {
-              event.currentTarget.style.background = '#fef2f2'
-            }}
-            onMouseLeave={(event) => {
-              event.currentTarget.style.background = '#fff'
-            }}
-          >
-            <IconSignOut size={14} />
-            Sign Out
-          </button>
-
-          <div style={{ fontSize: 11, color: '#cbd5e1', lineHeight: 1.8, padding: '0 4px' }}>
-            <Link to="/terms" style={{ color: '#cbd5e1', textDecoration: 'none', marginRight: 8 }}>Terms</Link>
-            <Link to="/privacy" style={{ color: '#cbd5e1', textDecoration: 'none', marginRight: 8 }}>Privacy</Link>
-            <Link to="/guidelines" style={{ color: '#cbd5e1', textDecoration: 'none' }}>Guidelines</Link>
-            <div style={{ marginTop: 4 }}>(c) 2026 StudyHub · Built for students</div>
-          </div>
-        </aside>
+        <RightSidebar
+          leaderStars={leaderStars}
+          leaderDownloads={leaderDownloads}
+          leaderContribs={leaderContribs}
+        />
       </div>
     </div>
   )

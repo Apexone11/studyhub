@@ -22,7 +22,13 @@ export function setStoredUser(user) {
     return
   }
 
-  localStorage.setItem('user', JSON.stringify(user))
+  const previousUser = getStoredUser()
+  const nextUser =
+    previousUser?.csrfToken && typeof user.csrfToken === 'undefined'
+      ? { ...user, csrfToken: previousUser.csrfToken }
+      : user
+
+  localStorage.setItem('user', JSON.stringify(nextUser))
 }
 
 export function clearStoredSession() {
