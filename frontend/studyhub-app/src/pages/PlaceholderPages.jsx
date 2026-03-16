@@ -11,6 +11,7 @@ import AppSidebar from '../components/AppSidebar'
 import { IconUpload, IconEye, IconPlus, IconCheck } from '../components/Icons'
 import { pageColumns, pageShell } from '../lib/ui'
 import { getStoredUser, setStoredUser } from '../lib/session'
+import { useProtectedPage } from '../lib/useProtectedPage'
 
 import { API, SUPPORT_EMAIL } from '../config'
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
@@ -376,6 +377,7 @@ export function TestsPage() {
 // NOTES PAGE — full CRUD editor
 // ─────────────────────────────────────────────────────────────────
 export function NotesPage() {
+  const { status: authStatus, error: authError } = useProtectedPage()
   const [notes, setNotes] = useState([])
   const [activeNote, setActiveNote] = useState(null)
   const [editorTitle, setEditorTitle] = useState('')
@@ -477,8 +479,19 @@ export function NotesPage() {
     return true
   })
 
+  if (authStatus === 'loading') return (
+    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', color:'#64748b', fontFamily:FONT }}>
+      Loading…
+    </div>
+  )
+
   return (
     <PageShell nav={<Navbar crumbs={[{label:'My Notes',to:'/notes'}]} hideTabs/>} sidebar={<AppSidebar/>}>
+      {authError && (
+        <div style={{ background:'#fef9c3', border:'1px solid #fde68a', color:'#92400e', borderRadius:8, padding:'10px 14px', marginBottom:12, fontSize:13 }}>
+          {authError}
+        </div>
+      )}
       <div style={{ marginBottom:14, display:'flex', alignItems:'flex-start', justifyContent:'space-between', flexWrap:'wrap', gap:10 }}>
         <div>
           <h1 style={{ fontSize:20, fontWeight:800, color:'#0f172a', marginBottom:4 }}>My Notes</h1>

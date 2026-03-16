@@ -11,6 +11,44 @@ function extractCookie(response) {
   return rawCookie ? rawCookie.split(';')[0] : ''
 }
 
+function extractSixDigitCode(text) {
+  const match = String(text || '').match(/\b(\d{6})\b/)
+  if (!match) {
+    throw new Error('Could not find a 6-digit code in the captured email.')
+  }
+
+  return match[1]
+}
+
+async function waitForCapturedEmail(captureDir, kind, recipient) {
+  const normalizedRecipient = String(recipient || '').toLowerCase()
+
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    if (fs.existsSync(captureDir)) {
+      const matchingFile = fs.readdirSync(captureDir)
+        .filter((file) => file.endsWith('.json'))
+        .map((file) => path.join(captureDir, file))
+        .sort((left, right) => fs.statSync(right).mtimeMs - fs.statSync(left).mtimeMs)
+        .find((filePath) => {
+          try {
+            const payload = JSON.parse(fs.readFileSync(filePath, 'utf8'))
+            return payload.kind === kind && String(payload.to || '').toLowerCase() === normalizedRecipient
+          } catch {
+            return false
+          }
+        })
+
+      if (matchingFile) {
+        return JSON.parse(fs.readFileSync(matchingFile, 'utf8'))
+      }
+    }
+
+    await delay(250)
+  }
+
+  throw new Error(`No captured ${kind} email was found for ${recipient}.`)
+}
+
 async function waitForServer(url) {
   for (let attempt = 0; attempt < 30; attempt += 1) {
     try {
@@ -33,6 +71,11 @@ async function main() {
   const baseUrl = `http://127.0.0.1:${port}`
   const outputLog = path.join(repoRoot, '..', 'backend-smoke.out.log')
   const errorLog = path.join(repoRoot, '..', 'backend-smoke.err.log')
+  const emailCaptureDir = path.join(repoRoot, '..', '.tmp-email-capture')
+  const smokeId = Date.now().toString(36).slice(-8)
+  const studentUsername = `smoke_${smokeId}`
+  const studentPassword = 'Password1A'
+  const studentEmail = `${studentUsername}@example.com`
 
   try {
     fs.unlinkSync(outputLog)
@@ -42,12 +85,18 @@ async function main() {
     fs.unlinkSync(errorLog)
   } catch {}
 
+  try {
+    fs.rmSync(emailCaptureDir, { recursive: true, force: true })
+  } catch {}
+
   const child = spawn('node', ['src/index.js'], {
     cwd: backendDir,
     env: {
       ...process.env,
       PORT: port,
       NODE_ENV: process.env.NODE_ENV || 'production',
+      EMAIL_TRANSPORT: process.env.EMAIL_TRANSPORT || 'json',
+      EMAIL_CAPTURE_DIR: process.env.EMAIL_CAPTURE_DIR || emailCaptureDir,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
@@ -113,6 +162,8 @@ async function main() {
     let studentCookie = ''
     let createdSheetId = null
     let adminCookie = ''
+    let emailVerificationCode = ''
+    let twoFactorCode = ''
 
     await check('register-student', async () => {
       const school = requireCatalog()
@@ -121,8 +172,8 @@ async function main() {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          username: 'newstudent1',
-          password: 'Password1A',
+          username: studentUsername,
+          password: studentPassword,
           schoolId: school.id,
           courseIds,
           customCourses: [],
@@ -147,6 +198,63 @@ async function main() {
       return `${response.status} ${data.username}/${data.role}`
     })
 
+    await check('update-student-email', async () => {
+      const response = await fetch(`${baseUrl}/api/settings/email`, {
+        method: 'PATCH',
+        headers: {
+          'content-type': 'application/json',
+          cookie: studentCookie,
+        },
+        body: JSON.stringify({
+          email: studentEmail,
+          password: studentPassword,
+        }),
+      })
+      const data = await response.json()
+      if (response.status !== 200 || !data.verificationRequired) {
+        throw new Error(JSON.stringify(data))
+      }
+      return `${response.status} verificationRequired=${data.verificationRequired}`
+    })
+
+    await check('capture-email-verification', async () => {
+      const capturedEmail = await waitForCapturedEmail(emailCaptureDir, 'email-verification', studentEmail)
+      emailVerificationCode = extractSixDigitCode(`${capturedEmail.text}\n${capturedEmail.html}`)
+      return `code=${emailVerificationCode}`
+    })
+
+    await check('verify-student-email', async () => {
+      const response = await fetch(`${baseUrl}/api/settings/email/verify`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          cookie: studentCookie,
+        },
+        body: JSON.stringify({ code: emailVerificationCode }),
+      })
+      const data = await response.json()
+      if (response.status !== 200 || data.user?.emailVerified !== true) {
+        throw new Error(JSON.stringify(data))
+      }
+      return `${response.status} emailVerified=${data.user.emailVerified}`
+    })
+
+    await check('enable-student-2fa', async () => {
+      const response = await fetch(`${baseUrl}/api/settings/2fa/enable`, {
+        method: 'PATCH',
+        headers: {
+          'content-type': 'application/json',
+          cookie: studentCookie,
+        },
+        body: JSON.stringify({ password: studentPassword }),
+      })
+      const data = await response.json()
+      if (response.status !== 200 || data.twoFaEnabled !== true) {
+        throw new Error(JSON.stringify(data))
+      }
+      return `${response.status} twoFaEnabled=${data.twoFaEnabled}`
+    })
+
     await check('login-fake-user', async () => {
       const response = await fetch(`${baseUrl}/api/auth/login`, {
         method: 'POST',
@@ -158,6 +266,59 @@ async function main() {
         throw new Error(`Expected 401, got ${response.status}: ${JSON.stringify(data)}`)
       }
       return data.error
+    })
+
+    await check('login-student-2fa-start', async () => {
+      const response = await fetch(`${baseUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          username: studentUsername,
+          password: studentPassword,
+        }),
+      })
+      const data = await response.json()
+      if (response.status !== 200 || !data.requires2fa) {
+        throw new Error(JSON.stringify(data))
+      }
+      return `${response.status} hint=${data.deliveryHint || 'none'}`
+    })
+
+    await check('capture-2fa-email', async () => {
+      const capturedEmail = await waitForCapturedEmail(emailCaptureDir, 'two-factor', studentEmail)
+      twoFactorCode = extractSixDigitCode(`${capturedEmail.text}\n${capturedEmail.html}`)
+      return `code=${twoFactorCode}`
+    })
+
+    await check('verify-student-2fa', async () => {
+      const response = await fetch(`${baseUrl}/api/auth/verify-2fa`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          username: studentUsername,
+          code: twoFactorCode,
+        }),
+      })
+      const data = await response.json()
+      if (response.status !== 200 || !data.user?.twoFaEnabled) {
+        throw new Error(JSON.stringify(data))
+      }
+      studentCookie = extractCookie(response) || studentCookie
+      return `${response.status} twoFaEnabled=${data.user.twoFaEnabled}`
+    })
+
+    await check('forgot-password-verified-email', async () => {
+      const response = await fetch(`${baseUrl}/api/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ username: studentUsername }),
+      })
+      const data = await response.json()
+      if (response.status !== 200) {
+        throw new Error(JSON.stringify(data))
+      }
+      const capturedEmail = await waitForCapturedEmail(emailCaptureDir, 'password-reset', studentEmail)
+      return `${response.status} subject=${capturedEmail.subject}`
     })
 
     await check('login-admin', async () => {
@@ -331,7 +492,7 @@ async function main() {
     })
 
     await check('user-profile-public', async () => {
-      const response = await fetch(`${baseUrl}/api/users/newstudent1`, {
+      const response = await fetch(`${baseUrl}/api/users/${studentUsername}`, {
         headers: { cookie: adminCookie },
       })
       const data = await response.json()
@@ -342,7 +503,7 @@ async function main() {
     })
 
     await check('follow-student-admin', async () => {
-      const response = await fetch(`${baseUrl}/api/users/newstudent1/follow`, {
+      const response = await fetch(`${baseUrl}/api/users/${studentUsername}/follow`, {
         method: 'POST',
         headers: { cookie: adminCookie },
       })

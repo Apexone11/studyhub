@@ -444,7 +444,7 @@ export default function DashboardPage() {
               </p>
             </div>
             <Link
-              to="/register"
+              to="/settings?tab=courses"
               style={{
                 flexShrink: 0,
                 padding: '10px 20px',
@@ -459,6 +459,18 @@ export default function DashboardPage() {
               {courseCount > 0 ? 'Manage Courses' : 'Add Courses'}
             </Link>
           </div>
+
+          {/* Admin shortcut */}
+          {user?.role === 'admin' && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Link
+                to="/admin"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#3b82f6', fontWeight: 700, textDecoration: 'none', padding: '6px 14px', background: '#eff6ff', borderRadius: 8, border: '1px solid #bfdbfe' }}
+              >
+                ← Back to Admin Panel
+              </Link>
+            </div>
+          )}
 
           {/* Quick actions */}
           {loading ? (
@@ -502,7 +514,7 @@ export default function DashboardPage() {
               <section>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                   <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#0f172a' }}>My Courses</h2>
-                  <Link to="/register" style={{ fontSize: 13, color: '#3b82f6', textDecoration: 'none', fontWeight: 600 }}>Manage</Link>
+                  <Link to="/settings?tab=courses" style={{ fontSize: 13, color: '#3b82f6', textDecoration: 'none', fontWeight: 600 }}>Manage</Link>
                 </div>
 
                 {courses.length === 0 ? (
@@ -520,7 +532,7 @@ export default function DashboardPage() {
                     <IconSheets size={28} style={{ color: '#cbd5e1', marginBottom: 10 }} />
                     <p style={{ margin: '0 0 16px' }}>No courses added yet.</p>
                     <Link
-                      to="/register"
+                      to="/settings?tab=courses"
                       style={{
                         padding: '8px 20px',
                         background: '#3b82f6',

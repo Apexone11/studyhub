@@ -6,12 +6,14 @@ const { PrismaClient } = require('@prisma/client')
 const { captureError } = require('../monitoring/sentry')
 const { sendPasswordReset, sendTwoFaCode } = require('../lib/email')
 const { clearAuthCookie, hashStoredSecret, setAuthCookie, signAuthToken } = require('../lib/authTokens')
+const { generateSixDigitCode, maskEmailAddress } = require('../lib/verificationCodes')
 
 const router = express.Router()
 const prisma = new PrismaClient()
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,20}$/
 const PASSWORD_MIN_LENGTH = 8
+const TWO_FA_CODE_TTL_MS = 10 * 60 * 1000
 
 // Rate limiting for logout to prevent abuse of authorization-related endpoint
 const logoutLimiter = rateLimit({
@@ -255,8 +257,8 @@ router.post('/login', loginLimiter, async (req, res) => {
 
     // 2FA check — if enabled and email present, send OTP
     if (user.twoFaEnabled && user.email) {
-      const code = String(Math.floor(100000 + Math.random() * 900000))
-      const expiry = new Date(Date.now() + 10 * 60 * 1000) // 10 minutes
+      const code = generateSixDigitCode()
+      const expiry = new Date(Date.now() + TWO_FA_CODE_TTL_MS)
       await prisma.user.update({
         where: { id: user.id },
         data: { twoFaCode: hashStoredSecret(code), twoFaExpiry: expiry }
@@ -264,9 +266,24 @@ router.post('/login', loginLimiter, async (req, res) => {
       try {
         await sendTwoFaCode(user.email, user.username, code)
       } catch (emailErr) {
-        console.error('2FA email failed:', emailErr.message)
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { twoFaCode: null, twoFaExpiry: null }
+        })
+        captureError(emailErr, {
+          route: req.originalUrl,
+          method: req.method,
+          source: 'sendTwoFaCode'
+        })
+        return res.status(503).json({
+          error: 'We could not send your 2-step verification code. Please try again in a moment.'
+        })
       }
-      return res.json({ requires2fa: true, username: user.username })
+      return res.json({
+        requires2fa: true,
+        username: user.username,
+        deliveryHint: maskEmailAddress(user.email)
+      })
     }
 
     const token = signAuthToken(user)
@@ -298,7 +315,7 @@ router.post('/forgot-password', forgotLimiter, async (req, res) => {
   try {
     const user = await prisma.user.findUnique({ where: { username } })
 
-    if (user && user.email) {
+    if (user && user.email && user.emailVerified) {
       const token = crypto.randomBytes(32).toString('hex')
       const tokenHash = hashStoredSecret(token)
       const expiresAt = new Date(Date.now() + 60 * 60 * 1000) // 1 hour

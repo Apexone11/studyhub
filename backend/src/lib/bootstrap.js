@@ -8,6 +8,8 @@ const DEFAULT_ADMIN_EMAIL = 'abdulrfornah@getstudyhub.org'
 const SCHEMA_REPAIR_STATEMENTS = [
   'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "email" TEXT',
   'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "emailVerified" BOOLEAN NOT NULL DEFAULT false',
+  'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "emailVerificationCode" TEXT',
+  'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "emailVerificationExpiry" TIMESTAMP(3)',
   'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "failedAttempts" INTEGER NOT NULL DEFAULT 0',
   'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "lockedUntil" TIMESTAMP(3)',
   'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "avatarUrl" TEXT',
@@ -17,6 +19,15 @@ const SCHEMA_REPAIR_STATEMENTS = [
   `UPDATE "User"
    SET "email" = NULLIF(LOWER(BTRIM("email")), '')
    WHERE "email" IS NOT NULL`,
+  `UPDATE "User"
+   SET
+     "emailVerified" = false,
+     "emailVerificationCode" = NULL,
+     "emailVerificationExpiry" = NULL,
+     "twoFaEnabled" = false,
+     "twoFaCode" = NULL,
+     "twoFaExpiry" = NULL
+   WHERE "email" IS NULL`,
   `WITH "duplicateEmails" AS (
       SELECT
         "id",
@@ -28,6 +39,8 @@ const SCHEMA_REPAIR_STATEMENTS = [
     SET
       "email" = NULL,
       "emailVerified" = false,
+      "emailVerificationCode" = NULL,
+      "emailVerificationExpiry" = NULL,
       "twoFaEnabled" = false,
       "twoFaCode" = NULL,
       "twoFaExpiry" = NULL

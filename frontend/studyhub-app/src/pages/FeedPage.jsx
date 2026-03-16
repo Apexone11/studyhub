@@ -811,6 +811,7 @@ export default function FeedPage() {
             ))}
 
             <button
+              onClick={() => navigate('/settings?tab=courses')}
               style={{
                 marginTop: 10,
                 width: '100%',
@@ -1180,7 +1181,7 @@ export default function FeedPage() {
               { Icon: IconSheets, label: 'Browse All Sheets', to: '/sheets', ready: true },
               { Icon: IconUpload, label: 'Upload a Sheet', to: '/sheets/upload', ready: true },
               { Icon: IconTests, label: 'Take a Practice Test', to: '/tests', ready: false },
-              { Icon: IconNotes, label: 'My Notes', to: '/notes', ready: false },
+              { Icon: IconNotes, label: 'My Notes', to: '/notes', ready: true },
             ].map((action) => (
               <Link
                 key={action.label}
