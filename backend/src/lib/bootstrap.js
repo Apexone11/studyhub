@@ -1,5 +1,4 @@
 const bcrypt = require('bcryptjs')
-const crypto = require('crypto')
 const { PrismaClient } = require('@prisma/client')
 const { captureError } = require('../monitoring/sentry')
 const { SCHOOLS, COURSES } = require('./catalogData')
@@ -275,10 +274,17 @@ async function ensureAdminUser(prisma) {
     : null
 
   if (!existingUser) {
+    if (!nextPasswordHash) {
+      console.warn(
+        'Skipping admin bootstrap because ADMIN_PASSWORD is not set for a new admin account.'
+      )
+      return false
+    }
+
     await prisma.user.create({
       data: {
         username,
-        passwordHash: nextPasswordHash || (await bcrypt.hash(crypto.randomBytes(18).toString('base64url'), 12)),
+        passwordHash: nextPasswordHash,
         role: 'admin',
         email: email || null,
         emailVerified: Boolean(email),

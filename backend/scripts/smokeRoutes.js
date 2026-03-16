@@ -85,6 +85,13 @@ async function main() {
       return `${response.status} schools=${data.length} first=${data[0].short}`
     })
 
+    function requireCatalog() {
+      if (!catalog.length) {
+        throw new Error('Prerequisite failed: schools-catalog did not return any schools.')
+      }
+      return catalog[0]
+    }
+
     await check('announcements-public', async () => {
       const response = await fetch(`${baseUrl}/api/announcements`)
       const data = await response.json()
@@ -103,21 +110,20 @@ async function main() {
       return `${response.status} total=${data.total}`
     })
 
-    const school = catalog[0]
-    const courseIds = (school?.courses || []).slice(0, 2).map((course) => course.id)
-
     let studentCookie = ''
     let createdSheetId = null
     let adminCookie = ''
 
     await check('register-student', async () => {
+      const school = requireCatalog()
+      const courseIds = (school.courses || []).slice(0, 2).map((course) => course.id)
       const response = await fetch(`${baseUrl}/api/auth/register`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           username: 'newstudent1',
           password: 'Password1A',
-          schoolId: school?.id || null,
+          schoolId: school.id,
           courseIds,
           customCourses: [],
         }),
@@ -175,6 +181,8 @@ async function main() {
     })
 
     await check('create-sheet-student', async () => {
+      const school = requireCatalog()
+      const courseIds = (school.courses || []).slice(0, 2).map((course) => course.id)
       const response = await fetch(`${baseUrl}/api/sheets`, {
         method: 'POST',
         headers: {
@@ -346,6 +354,7 @@ async function main() {
     })
 
     await check('request-course-student', async () => {
+      const school = requireCatalog()
       const response = await fetch(`${baseUrl}/api/courses/request`, {
         method: 'POST',
         headers: {
