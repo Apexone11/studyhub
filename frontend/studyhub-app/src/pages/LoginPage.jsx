@@ -1,52 +1,160 @@
 import Navbar from '../components/Navbar'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
+import { identifyAuthenticatedUser } from '../lib/telemetry'
+import { setStoredUser } from '../lib/session'
+import { API } from '../config'
+
+function getPostLoginPath(user) {
+  return user?.role === 'admin' ? '/admin' : '/feed'
+}
 
 function LoginPage() {
+  const navigate = useNavigate()
   const [showPassword, setShowPassword] = useState(false)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [showForgot, setShowForgot] = useState(false)
+  const [locked, setLocked] = useState(false)
 
-  // Validate credentials, call backend login, then persist auth session locally.
+  // 2FA state
+  const [requires2fa, setRequires2fa] = useState(false)
+  const [twoFaUsername, setTwoFaUsername] = useState('')
+  const [twoFaDeliveryHint, setTwoFaDeliveryHint] = useState('')
+  const [twoFaCode, setTwoFaCode] = useState('')
+  const [twoFaError, setTwoFaError] = useState('')
+  const [twoFaLoading, setTwoFaLoading] = useState(false)
+
   async function handleLogin(e) {
     e.preventDefault()
-
     if (!username.trim() || !password.trim()) {
-      setError('Please fill in both fields.')
-      return
+      setError('Please fill in both fields.'); return
     }
-
     setError('')
-
     try {
-      const res = await fetch('http://localhost:4000/api/auth/login', {
+      const res = await fetch(`${API}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: username.trim(), password })
       })
-
       const data = await res.json()
-
       if (!res.ok) {
         setError(data.error || 'Something went wrong.')
+        if (data.showForgot) setShowForgot(true)
+        if (data.locked) setLocked(true)
         return
       }
-
-      // Save token and user to localStorage
-      localStorage.setItem('token', data.token)
-      localStorage.setItem('user', JSON.stringify(data.user))
-
-      // Redirect to feed
-      window.location.href = '/feed'
+      if (data.requires2fa) {
+        setTwoFaUsername(data.username)
+        setTwoFaDeliveryHint(data.deliveryHint || '')
+        setTwoFaCode('')
+        setTwoFaError('')
+        setRequires2fa(true)
+        return
+      }
+      setStoredUser(data.user)
+      identifyAuthenticatedUser(data.user)
+      navigate(getPostLoginPath(data.user))
     } catch {
       setError('Could not connect to server. Make sure the backend is running.')
     }
   }
 
+  async function handleVerify2fa(e) {
+    e.preventDefault()
+    if (!twoFaCode.trim()) { setTwoFaError('Please enter the code.'); return }
+    setTwoFaLoading(true)
+    setTwoFaError('')
+    try {
+      const res = await fetch(`${API}/api/auth/verify-2fa`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: twoFaUsername, code: twoFaCode.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setTwoFaError(data.error || 'Verification failed.'); return }
+      setStoredUser(data.user)
+      identifyAuthenticatedUser(data.user)
+      navigate(getPostLoginPath(data.user))
+    } catch {
+      setTwoFaError('Could not connect to server.')
+    } finally {
+      setTwoFaLoading(false)
+    }
+  }
+
+  // ── 2FA Code Entry Screen ──────────────────────────────────────
+  if (requires2fa) {
+    return (
+      <div style={styles.page}>
+        <Navbar variant="landing" />
+        <div style={styles.center}>
+          <div style={styles.card}>
+            <div style={styles.top}>
+              <div style={styles.iconWrap}>
+                <i className="fas fa-shield-halved" style={{ ...styles.icon, color: '#16a34a' }}></i>
+              </div>
+              <h1 style={styles.h1}>2-Step Verification</h1>
+              <p style={styles.sub}>
+                {twoFaDeliveryHint
+                  ? `Enter the 6-digit code sent to ${twoFaDeliveryHint}`
+                  : 'Enter the 6-digit code sent to your email'}
+              </p>
+            </div>
+            {twoFaError && (
+              <div style={styles.errorBox}>
+                <i className="fas fa-circle-exclamation" style={{ marginRight: 8 }}></i>
+                {twoFaError}
+              </div>
+            )}
+            <form onSubmit={handleVerify2fa}>
+              <div style={styles.formGroup}>
+                <label style={styles.label} htmlFor="twoFaCode">Verification Code</label>
+                <div style={styles.inputWrap}>
+                  <i className="fas fa-key" style={styles.inputIcon}></i>
+                  <input
+                    id="twoFaCode"
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    placeholder="000000"
+                    value={twoFaCode}
+                    onChange={e => { setTwoFaCode(e.target.value.replace(/\D/g, '')); setTwoFaError('') }}
+                    style={{ ...styles.input, letterSpacing: 8, fontSize: 22, textAlign: 'center' }}
+                    onFocus={e => e.target.style.borderColor = '#2563eb'}
+                    onBlur={e => e.target.style.borderColor = '#e5e7eb'}
+                    autoFocus
+                  />
+                </div>
+              </div>
+              <button type="submit" disabled={twoFaLoading} style={styles.submitBtn}>
+                {twoFaLoading ? 'Verifying…' : 'Verify Code'}
+              </button>
+            </form>
+            <p style={{ ...styles.forgotText, marginTop: 16 }}>
+              <button onClick={() => {
+                setRequires2fa(false)
+                setTwoFaCode('')
+                setTwoFaError('')
+                setTwoFaDeliveryHint('')
+              }}
+                style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: 13, textDecoration: 'underline' }}>
+                Back to sign in
+              </button>
+            </p>
+          </div>
+        </div>
+        <footer style={styles.footer}>
+          Built by students, for students · <span style={{ color: '#60a5fa' }}>StudyHub</span>
+        </footer>
+      </div>
+    )
+  }
+
   return (
     <div style={styles.page}>
-      <Navbar />
+      <Navbar variant="landing" />
 
       <div style={styles.center}>
         <div style={styles.card}>
@@ -62,9 +170,16 @@ function LoginPage() {
 
           {/* ERROR */}
           {error && (
-            <div style={styles.errorBox}>
-              <i className="fas fa-circle-exclamation" style={{ marginRight: '8px' }}></i>
+            <div style={locked ? styles.lockedBox : styles.errorBox}>
+              <i className={`fas ${locked ? 'fa-lock' : 'fa-circle-exclamation'}`} style={{ marginRight: '8px' }}></i>
               {error}
+              {showForgot && !locked && (
+                <div style={{ marginTop: 8 }}>
+                  <Link to="/forgot-password" style={{ color: '#dc2626', fontWeight: 'bold', fontSize: 13 }}>
+                    Forgot your password?
+                  </Link>
+                </div>
+              )}
             </div>
           )}
 
@@ -80,7 +195,7 @@ function LoginPage() {
                   placeholder="Enter your username"
                   autoComplete="username"
                   value={username}
-                  onChange={e => { setUsername(e.target.value); setError('') }}
+                  onChange={e => { setUsername(e.target.value); setError(''); setShowForgot(false); setLocked(false) }}
                   style={styles.input}
                   onFocus={e => e.target.style.borderColor = '#2563eb'}
                   onBlur={e => e.target.style.borderColor = '#e5e7eb'}
@@ -99,7 +214,7 @@ function LoginPage() {
                   placeholder="Enter your password"
                   autoComplete="current-password"
                   value={password}
-                  onChange={e => { setPassword(e.target.value); setError('') }}
+                  onChange={e => { setPassword(e.target.value); setError(''); setShowForgot(false); setLocked(false) }}
                   style={{ ...styles.input, paddingRight: '44px' }}
                   onFocus={e => e.target.style.borderColor = '#2563eb'}
                   onBlur={e => e.target.style.borderColor = '#e5e7eb'}
@@ -125,6 +240,11 @@ function LoginPage() {
               <i className="fas fa-arrow-right-to-bracket" style={{ marginRight: '8px' }}></i>
               Sign In
             </button>
+
+            {/* FORGOT PASSWORD */}
+            <p style={styles.forgotText}>
+              <Link to="/forgot-password" style={styles.forgotLink}>Forgot username or password?</Link>
+            </p>
           </form>
 
           {/* DIVIDER */}
@@ -286,6 +406,25 @@ const styles = {
   registerLink: {
     color: '#2563eb',
     fontWeight: 'bold',
+    textDecoration: 'none',
+  },
+  lockedBox: {
+    background: '#fff7ed',
+    border: '1px solid #fed7aa',
+    color: '#c2410c',
+    borderRadius: '8px',
+    padding: '10px 14px',
+    fontSize: '14px',
+    marginBottom: '20px',
+  },
+  forgotText: {
+    textAlign: 'center',
+    fontSize: '13px',
+    color: '#9ca3af',
+    margin: '12px 0 0',
+  },
+  forgotLink: {
+    color: '#6b7280',
     textDecoration: 'none',
   },
   footer: {

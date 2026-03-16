@@ -1,6 +1,9 @@
 import { Link } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import Navbar from '../components/Navbar'
+import { identifyAuthenticatedUser } from '../lib/telemetry'
+import { setStoredUser } from '../lib/session'
+import { API } from '../config'
 
 // ── SCHOOL DATA ──────────────────────────────────────────────
 const SCHOOLS = [
@@ -75,6 +78,29 @@ const DEFAULT_COURSES = [
   { code: 'PHYS101', name: 'Physics I'                         },
 ]
 
+const CAN_USE_LOCAL_CATALOG_FALLBACK =
+  typeof window !== 'undefined' &&
+  ['localhost', '127.0.0.1'].includes(window.location.hostname)
+
+function normalizeCatalogResponse(schools) {
+  const normalizedSchools = schools.map((school) => ({
+    id: school.id,
+    name: school.name,
+    short: school.short,
+  }))
+
+  const normalizedCourses = schools.reduce((coursesBySchool, school) => {
+    coursesBySchool[school.id] = (school.courses || []).map((course) => ({
+      id: course.id,
+      code: course.code,
+      name: course.name,
+    }))
+    return coursesBySchool
+  }, {})
+
+  return { normalizedSchools, normalizedCourses }
+}
+
 // ── VALIDATION ───────────────────────────────────────────────
 const RULES = {
   username: /^[a-zA-Z0-9_]{3,20}$/,
@@ -125,6 +151,12 @@ function RegisterScreen() {
   const [customCode, setCustomCode]       = useState('')
   const [customName, setCustomName]       = useState('')
   const [customCourses, setCustomCourses] = useState([])
+  const [catalogSchools, setCatalogSchools] = useState(
+    CAN_USE_LOCAL_CATALOG_FALLBACK ? SCHOOLS : []
+  )
+  const [catalogCoursesBySchool, setCatalogCoursesBySchool] = useState(
+    CAN_USE_LOCAL_CATALOG_FALLBACK ? COURSES_BY_SCHOOL : {}
+  )
 
   // UI state
   const [error, setError]                 = useState('')
@@ -167,6 +199,45 @@ function RegisterScreen() {
     }
   }, [])
 
+  useEffect(() => {
+    let isMounted = true
+
+    function clearCatalogFallback() {
+      if (!isMounted || CAN_USE_LOCAL_CATALOG_FALLBACK) return
+      setCatalogSchools([])
+      setCatalogCoursesBySchool({})
+    }
+
+    async function loadCatalog() {
+      try {
+        const response = await fetch(`${API}/api/courses/schools`)
+        if (!response.ok) {
+          clearCatalogFallback()
+          return
+        }
+
+        const schools = await response.json()
+        if (!isMounted || !Array.isArray(schools) || schools.length === 0) {
+          clearCatalogFallback()
+          return
+        }
+
+        const { normalizedSchools, normalizedCourses } = normalizeCatalogResponse(schools)
+        setCatalogSchools(normalizedSchools)
+        setCatalogCoursesBySchool(normalizedCourses)
+      } catch {
+        // In production, avoid sending local hardcoded IDs that may not exist in the live DB.
+        clearCatalogFallback()
+      }
+    }
+
+    loadCatalog()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
   // ── Step 1 → Step 2 ──────────────────────────────────────
   function goToStep2() {
     if (!username || !password || !confirm) { setError('Please fill in all fields.'); return }
@@ -182,7 +253,7 @@ function RegisterScreen() {
   function handleSchoolSearch(q) {
     setSchoolQuery(q)
     if (!q.trim()) { setSchoolResults([]); setShowSchoolDD(false); return }
-    const matches = SCHOOLS.filter(s =>
+    const matches = catalogSchools.filter(s =>
       s.name.toLowerCase().includes(q.toLowerCase()) ||
       s.short.toLowerCase().includes(q.toLowerCase())
     ).slice(0, 8)
@@ -218,7 +289,7 @@ function RegisterScreen() {
 
   // ── Course search ─────────────────────────────────────────
   function buildCourseResults(q, school, alreadyPicked) {
-    const pool = (school && COURSES_BY_SCHOOL[school.id]) || DEFAULT_COURSES
+    const pool = (school && catalogCoursesBySchool[school.id]) || DEFAULT_COURSES
     const taken = alreadyPicked.map(c => c.code)
     const matches = pool.filter(c =>
       !taken.includes(c.code) &&
@@ -343,7 +414,7 @@ function RegisterScreen() {
     const payloadCustomCourses = Array.from(customByCode.values())
 
     try {
-      const res = await fetch('http://localhost:4000/api/auth/register', {
+      const res = await fetch(`${API}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -362,9 +433,8 @@ function RegisterScreen() {
         return
       }
 
-      // Save token
-      localStorage.setItem('token', data.token)
-      localStorage.setItem('user', JSON.stringify(data.user))
+      setStoredUser(data.user)
+      identifyAuthenticatedUser(data.user)
 
       setError('')
       setSuccess(true)
@@ -377,7 +447,7 @@ function RegisterScreen() {
   // ── RENDER ────────────────────────────────────────────────
   return (
     <div style={s.page}>
-      <Navbar />
+      <Navbar variant="landing" />
 
       <div style={s.center}>
         <div style={s.card}>
@@ -567,7 +637,15 @@ function RegisterScreen() {
               <div style={s.formGroup}>
                 <label style={s.label}>School</label>
 
-                {!selectedSchool ? (
+                {selectedSchool ? (
+                  <div style={s.selectedSchoolBadge}>
+                    <i className="fas fa-university" style={{ color: '#2563eb' }}></i>
+                    <span style={{ flex: 1, fontWeight: 'bold', fontSize: '13px' }}>{selectedSchool.name}</span>
+                    <button onClick={clearSchool} style={s.clearBtn} title="Change school">
+                      <i className="fas fa-xmark"></i>
+                    </button>
+                  </div>
+                ) : (
                   <div ref={schoolSearchRef} style={{ position: 'relative' }}>
                     <div style={s.inputWrap}>
                       <i className="fas fa-university" style={s.inputIcon}></i>
@@ -599,14 +677,6 @@ function RegisterScreen() {
                         <div style={s.dropdownEmpty}>No schools found — try a different search</div>
                       </div>
                     )}
-                  </div>
-                ) : (
-                  <div style={s.selectedSchoolBadge}>
-                    <i className="fas fa-university" style={{ color: '#2563eb' }}></i>
-                    <span style={{ flex: 1, fontWeight: 'bold', fontSize: '13px' }}>{selectedSchool.name}</span>
-                    <button onClick={clearSchool} style={s.clearBtn} title="Change school">
-                      <i className="fas fa-xmark"></i>
-                    </button>
                   </div>
                 )}
               </div>

@@ -1,10 +1,11 @@
 const express = require('express')
-const { PrismaClient } = require('@prisma/client')
 const rateLimit = require('express-rate-limit')
 const requireAuth = require('../middleware/auth')
+const { sendCourseRequestNotice } = require('../lib/email')
+const { captureError } = require('../monitoring/sentry')
+const prisma = require('../lib/prisma')
 
 const router = express.Router()
-const prisma = new PrismaClient()
 
 const POPULAR_THRESHOLD = 3
 const RECOMMENDATION_LIMIT = 6
@@ -113,6 +114,11 @@ router.get('/recommendations', requireAuth, async (req, res) => {
 
     return res.json({ type: 'collaborative', recommendations: withScores })
   } catch (error) {
+    captureError(error, {
+      route: req.originalUrl,
+      method: req.method
+    })
+
     console.error(error)
     return res.status(500).json({ error: 'Server error.' })
   }
@@ -171,12 +177,49 @@ router.post('/request', requireAuth, async (req, res) => {
       ? `"${rawName}" has been flagged for review and will likely be added soon!`
       : `"${rawName}" has been requested. We'll add it when it's popular enough.`
 
+    try {
+      const [requester, school] = await Promise.all([
+        prisma.user.findUnique({
+          where: { id: req.user.userId },
+          select: { username: true, email: true }
+        }),
+        parsedSchoolId === null
+          ? Promise.resolve(null)
+          : prisma.school.findUnique({
+              where: { id: parsedSchoolId },
+              select: { name: true, short: true }
+            })
+      ])
+
+      await sendCourseRequestNotice({
+        courseName: rawName,
+        courseCode: rawCode || null,
+        schoolName: school ? `${school.short} - ${school.name}` : null,
+        requesterUsername: requester?.username || req.user.username,
+        requesterEmail: requester?.email || null,
+        requestCount: result.count,
+        flagged: result.flagged,
+      })
+    } catch (emailError) {
+      captureError(emailError, {
+        route: req.originalUrl,
+        method: req.method,
+        source: 'sendCourseRequestNotice',
+      })
+      console.error('Course request notification failed:', emailError)
+    }
+
     return res.status(201).json({
       message,
       request: result,
       threshold: POPULAR_THRESHOLD
     })
   } catch (error) {
+    captureError(error, {
+      route: req.originalUrl,
+      method: req.method
+    })
+
     console.error(error)
     return res.status(500).json({ error: 'Server error.' })
   }
@@ -199,6 +242,11 @@ router.get('/requested', requireAuth, async (req, res) => {
       courses: requested
     })
   } catch (error) {
+    captureError(error, {
+      route: req.originalUrl,
+      method: req.method
+    })
+
     console.error(error)
     return res.status(500).json({ error: 'Server error.' })
   }
@@ -226,6 +274,11 @@ router.get('/schools', schoolsLimiter, async (req, res) => {
 
     return res.json(schools)
   } catch (error) {
+    captureError(error, {
+      route: req.originalUrl,
+      method: req.method
+    })
+
     console.error(error)
     return res.status(500).json({ error: 'Server error.' })
   }

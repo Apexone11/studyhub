@@ -1,0 +1,17 @@
+# railway.toml — backend service
+# Place this file in: studyhub/backend/railway.toml
+
+[build]
+builder = "nixpacks"
+buildCommand = "npm install && npx prisma generate"
+
+[deploy]
+preDeployCommand = "npx prisma migrate deploy"
+startCommand = "npm start"
+healthcheckPath = "/health"
+healthcheckTimeout = 60
+restartPolicyType = "ALWAYS"
+restartPolicyMaxRetries = 10
+
+[[services]]
+name = "studyhub-api"
