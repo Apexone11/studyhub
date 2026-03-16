@@ -115,7 +115,7 @@ function ResetPasswordPage() {
               <button
                 type="submit"
                 disabled={loading || !token}
-                style={{ ...styles.submitBtn, opacity: !token ? 0.5 : 1 }}
+                style={{ ...styles.submitBtn, opacity: token ? 1 : 0.5 }}
                 onMouseEnter={e => { if (!loading && token) e.target.style.background = '#1d4ed8' }}
                 onMouseLeave={e => { if (!loading && token) e.target.style.background = '#2563eb' }}
               >
