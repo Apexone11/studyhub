@@ -60,9 +60,13 @@ function sendFile(filePath, res) {
 }
 
 function writeRuntimeConfig() {
-  const config = {
+const config = {
     API: process.env.VITE_API_URL || process.env.API_URL || 'http://localhost:4000',
     SUPPORT_EMAIL: process.env.VITE_SUPPORT_EMAIL || defaultSupportEmail,
+    CLARITY_PROJECT_ID: process.env.VITE_CLARITY_PROJECT_ID || '',
+    GOOGLE_ADS_ID: process.env.VITE_GOOGLE_ADS_ID || '',
+    GOOGLE_ADS_SIGNUP_CONVERSION_LABEL:
+      process.env.VITE_GOOGLE_ADS_SIGNUP_CONVERSION_LABEL || '',
   }
 
   writeFileSync(

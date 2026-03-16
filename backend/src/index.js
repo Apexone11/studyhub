@@ -1,5 +1,6 @@
 const express = require('express')
 const cors = require('cors')
+const rateLimit = require('express-rate-limit')
 require('dotenv').config()
 const { initSentry, captureError } = require('./monitoring/sentry')
 const { bootstrapRuntime } = require('./lib/bootstrap')
@@ -92,6 +93,16 @@ app.use((req, res, next) => {
 
   return res.status(403).json({ error: 'Origin not allowed.' })
 })
+
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 1000,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => req.path === '/' || req.path === '/health' || req.path.startsWith('/uploads/'),
+})
+
+app.use(globalLimiter)
 
 // Parse JSON request bodies for auth and future API routes.
 app.use(express.json())
