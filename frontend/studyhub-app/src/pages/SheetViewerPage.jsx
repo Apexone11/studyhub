@@ -524,6 +524,7 @@ export default function SheetViewerPage() {
   const [submittingContrib, setSubmittingContrib] = useState(false)
   const [reviewingContrib,  setReviewingContrib]  = useState(false)
   const contentRef = useRef()
+  const hasSession = hasStoredSession()
 
   // inject markdown styles once
   useEffect(() => {
@@ -655,10 +656,10 @@ export default function SheetViewerPage() {
 
   // reading progress bar
   useEffect(() => {
-    function onScroll() {
+    const onScroll = () => {
       const el  = contentRef.current
       if (!el) return
-      const top  = el.getBoundingClientRect().top
+      const { top } = el.getBoundingClientRect()
       const h    = el.offsetHeight
       const winH = window.innerHeight
       const pct  = Math.min(100, Math.max(0, ((winH - top) / h) * 100))
@@ -683,7 +684,7 @@ export default function SheetViewerPage() {
 
   // star handler
   async function handleStar() {
-    if (starring || !hasStoredSession()) return
+    if (starring || !hasSession) return
     setStarring(true)
     setHasStarred(v => !v)
     setLocalStars(n => n + (hasStarred ? -1 : 1))
@@ -798,6 +799,8 @@ export default function SheetViewerPage() {
       setReviewingContrib(false)
     }
   }
+
+  const canSubmitComment = Boolean(commentText.trim()) && !postingCmt
 
   const { html: mdHtml, headings } = sheet
     ? parseMarkdown(sheet.content)
@@ -1003,8 +1006,8 @@ export default function SheetViewerPage() {
 
                 {/* action buttons */}
                 <div style={{ display: 'flex', gap: 8, paddingTop: 16, flexWrap: 'wrap' }}>
-                  <button onClick={handleStar} disabled={starring || !hasStoredSession()}
-                    title={!hasStoredSession() ? 'Log in to star' : undefined}
+                  <button onClick={handleStar} disabled={starring || !hasSession}
+                    title={hasSession ? undefined : 'Log in to star'}
                     style={{
                       padding: '8px 16px', borderRadius: 9, border: '1px solid',
                       borderColor:  hasStarred ? '#fde68a' : '#e2e8f0',
@@ -1013,14 +1016,14 @@ export default function SheetViewerPage() {
                       fontSize: 13, fontWeight: 700, cursor: 'pointer',
                       fontFamily: 'inherit', transition: 'all .15s',
                       display: 'flex', alignItems: 'center', gap: 6,
-                      opacity: !hasStoredSession() ? 0.5 : 1,
+                      opacity: hasSession ? 1 : 0.5,
                     }}>
                     {hasStarred ? <IconStarFilled size={14} style={{ color: '#f59e0b' }} /> : <IconStar size={14} />}
                     {hasStarred ? 'Starred' : 'Star'} · {localStars}
                   </button>
 
                   <button
-                    onClick={() => hasStoredSession() ? setShowFork(true) : navigate('/login')}
+                    onClick={() => hasSession ? setShowFork(true) : navigate('/login')}
                     style={{
                       padding: '8px 16px', borderRadius: 9,
                       border: '1px solid #bbf7d0', background: '#f0fdf4',
@@ -1127,17 +1130,17 @@ export default function SheetViewerPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 32px', borderBottom: '1px solid #f1f5f9' }}>
                 <button
                   onClick={() => handleReact('like')}
-                  disabled={reacting || !hasStoredSession()}
-                  title={!hasStoredSession() ? 'Log in to react' : 'Like'}
+                  disabled={reacting || !hasSession}
+                  title={hasSession ? 'Like' : 'Log in to react'}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 6,
                     padding: '6px 14px', borderRadius: 8, border: '1px solid',
                     borderColor: userReaction === 'like' ? '#bfdbfe' : '#e2e8f0',
                     background: userReaction === 'like' ? '#eff6ff' : '#fff',
                     color: userReaction === 'like' ? '#1d4ed8' : '#64748b',
-                    fontSize: 13, fontWeight: 700, cursor: hasStoredSession() ? 'pointer' : 'default',
+                    fontSize: 13, fontWeight: 700, cursor: hasSession ? 'pointer' : 'default',
                     fontFamily: 'inherit', transition: 'all .15s',
-                    opacity: !hasStoredSession() ? 0.5 : 1,
+                    opacity: hasSession ? 1 : 0.5,
                   }}
                 >
                   <i className="fas fa-thumbs-up" style={{ fontSize: 13 }}></i>
@@ -1145,17 +1148,17 @@ export default function SheetViewerPage() {
                 </button>
                 <button
                   onClick={() => handleReact('dislike')}
-                  disabled={reacting || !hasStoredSession()}
-                  title={!hasStoredSession() ? 'Log in to react' : 'Dislike'}
+                  disabled={reacting || !hasSession}
+                  title={hasSession ? 'Dislike' : 'Log in to react'}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 6,
                     padding: '6px 14px', borderRadius: 8, border: '1px solid',
                     borderColor: userReaction === 'dislike' ? '#fecaca' : '#e2e8f0',
                     background: userReaction === 'dislike' ? '#fef2f2' : '#fff',
                     color: userReaction === 'dislike' ? '#dc2626' : '#64748b',
-                    fontSize: 13, fontWeight: 700, cursor: hasStoredSession() ? 'pointer' : 'default',
+                    fontSize: 13, fontWeight: 700, cursor: hasSession ? 'pointer' : 'default',
                     fontFamily: 'inherit', transition: 'all .15s',
-                    opacity: !hasStoredSession() ? 0.5 : 1,
+                    opacity: hasSession ? 1 : 0.5,
                   }}
                 >
                   <i className="fas fa-thumbs-down" style={{ fontSize: 13 }}></i>
@@ -1257,8 +1260,8 @@ export default function SheetViewerPage() {
                     <span style={{ fontSize: 12, color: '#9ca3af' }}>{commentText.length}/500</span>
                     <button
                       type="submit"
-                      disabled={postingCmt || !commentText.trim()}
-                      style={{ background: '#2563eb', color: '#fff', border: 'none', borderRadius: 7, padding: '8px 20px', fontSize: 13, fontWeight: 'bold', cursor: 'pointer', opacity: postingCmt || !commentText.trim() ? 0.6 : 1 }}
+                      disabled={!canSubmitComment}
+                      style={{ background: '#2563eb', color: '#fff', border: 'none', borderRadius: 7, padding: '8px 20px', fontSize: 13, fontWeight: 'bold', cursor: 'pointer', opacity: canSubmitComment ? 1 : 0.6 }}
                     >
                       {postingCmt ? 'Posting…' : 'Post Comment'}
                     </button>

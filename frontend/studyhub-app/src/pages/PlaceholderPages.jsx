@@ -675,17 +675,17 @@ export function NotesPage() {
               </div>
 
               {/* Delete */}
-              {!confirmDelete ? (
-                <button onClick={() => setConfirmDelete(true)}
-                  style={{ background:'#fef2f2', border:'1px solid #fecaca', color:'#dc2626', borderRadius:8, padding:'7px 16px', fontSize:12, cursor:'pointer', fontFamily:FONT }}>
-                  <i className="fas fa-trash" style={{ marginRight:6 }}></i>Delete Note
-                </button>
-              ) : (
+              {confirmDelete ? (
                 <div style={{ display:'flex', gap:10, alignItems:'center' }}>
                   <span style={{ fontSize:12, color:'#dc2626' }}>Delete this note permanently?</span>
                   <button onClick={deleteNote} style={{ background:'#dc2626', color:'#fff', border:'none', borderRadius:7, padding:'6px 14px', fontSize:12, cursor:'pointer', fontFamily:FONT }}>Yes, delete</button>
                   <button onClick={() => setConfirmDelete(false)} style={{ background:'none', border:'1px solid #e2e8f0', color:'#64748b', borderRadius:7, padding:'6px 12px', fontSize:12, cursor:'pointer', fontFamily:FONT }}>Cancel</button>
                 </div>
+              ) : (
+                <button onClick={() => setConfirmDelete(true)}
+                  style={{ background:'#fef2f2', border:'1px solid #fecaca', color:'#dc2626', borderRadius:8, padding:'7px 16px', fontSize:12, cursor:'pointer', fontFamily:FONT }}>
+                  <i className="fas fa-trash" style={{ marginRight:6 }}></i>Delete Note
+                </button>
               )}
             </div>
           )}

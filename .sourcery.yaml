@@ -1,0 +1,7 @@
+version: '1'
+
+rule_settings:
+  enable:
+    - default
+  disable:
+    - avoid-function-declarations-in-blocks

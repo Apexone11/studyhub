@@ -563,17 +563,7 @@ function SettingsPage() {
                   <i className="fas fa-triangle-exclamation" style={{ marginRight: 8 }} />
                   Danger Zone
                 </h3>
-                {!deleteOpen ? (
-                  <div>
-                    <p style={{ ...styles.formCardNote, marginBottom: 16 }}>
-                      Deleting your account is permanent. All your sheets, notes, and comments will be removed.
-                    </p>
-                    <button onClick={() => setDeleteOpen(true)}
-                      style={{ background: '#fee2e2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: 8, padding: '8px 18px', fontSize: 14, cursor: 'pointer', fontFamily: 'Arial, sans-serif', fontWeight: '600' }}>
-                      Delete My Account
-                    </button>
-                  </div>
-                ) : (
+                {deleteOpen ? (
                   <form onSubmit={handleDeleteAccount}>
                     <p style={{ fontSize: 14, color: '#374151', marginBottom: 16 }}>
                       We are sorry to see you go. Please tell us why you are leaving:
@@ -616,6 +606,16 @@ function SettingsPage() {
                       </button>
                     </div>
                   </form>
+                ) : (
+                  <div>
+                    <p style={{ ...styles.formCardNote, marginBottom: 16 }}>
+                      Deleting your account is permanent. All your sheets, notes, and comments will be removed.
+                    </p>
+                    <button onClick={() => setDeleteOpen(true)}
+                      style={{ background: '#fee2e2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: 8, padding: '8px 18px', fontSize: 14, cursor: 'pointer', fontFamily: 'Arial, sans-serif', fontWeight: '600' }}>
+                      Delete My Account
+                    </button>
+                  </div>
                 )}
               </div>
             </section>
