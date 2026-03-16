@@ -69,6 +69,7 @@ async function main() {
   const backendDir = repoRoot
   const port = process.env.SMOKE_PORT || '4010'
   const baseUrl = `http://127.0.0.1:${port}`
+  const adminUsername = process.env.ADMIN_USERNAME || 'studyhub_owner'
   const outputLog = path.join(repoRoot, '..', 'backend-smoke.out.log')
   const errorLog = path.join(repoRoot, '..', 'backend-smoke.err.log')
   const emailCaptureDir = path.join(repoRoot, '..', '.tmp-email-capture')
@@ -161,6 +162,10 @@ async function main() {
 
     let studentCookie = ''
     let createdSheetId = null
+    let forkedSheetId = null
+    let contributionId = null
+    let feedPostId = null
+    let lockedPostId = null
     let adminCookie = ''
     let emailVerificationCode = ''
     let twoFactorCode = ''
@@ -326,7 +331,7 @@ async function main() {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          username: process.env.ADMIN_USERNAME || 'studyhub_owner',
+          username: adminUsername,
           password: process.env.ADMIN_PASSWORD || 'AdminPass123',
         }),
       })
@@ -407,6 +412,134 @@ async function main() {
       return `${response.status} users=${data.totalUsers} sheets=${data.totalSheets}`
     })
 
+    await check('create-feed-post-student', async () => {
+      const response = await fetch(`${baseUrl}/api/feed/posts`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          cookie: studentCookie,
+        },
+        body: JSON.stringify({
+          content: `Smoke test post for @${adminUsername}`,
+          allowDownloads: true,
+        }),
+      })
+      const data = await response.json()
+      if (response.status !== 201) {
+        throw new Error(JSON.stringify(data))
+      }
+      feedPostId = data.id
+      return `${response.status} postId=${feedPostId}`
+    })
+
+    await check('feed-index-student', async () => {
+      const response = await fetch(`${baseUrl}/api/feed?limit=10`, {
+        headers: { cookie: studentCookie },
+      })
+      const data = await response.json()
+      if (response.status !== 200 || !Array.isArray(data.items)) {
+        throw new Error(JSON.stringify(data))
+      }
+      const hasCreatedPost = data.items.some((item) => item.type === 'post' && item.id === feedPostId)
+      if (!hasCreatedPost) {
+        throw new Error('Created feed post was not returned in the feed index.')
+      }
+      return `${response.status} items=${data.items.length}`
+    })
+
+    await check('admin-mention-notification', async () => {
+      const response = await fetch(`${baseUrl}/api/notifications?limit=20`, {
+        headers: { cookie: adminCookie },
+      })
+      const data = await response.json()
+      if (response.status !== 200 || !Array.isArray(data.notifications)) {
+        throw new Error(JSON.stringify(data))
+      }
+      const mention = data.notifications.find((notif) => notif.type === 'mention' && notif.linkPath === `/feed?post=${feedPostId}`)
+      if (!mention) {
+        throw new Error('Could not find the expected mention notification for the admin user.')
+      }
+      return `notificationId=${mention.id}`
+    })
+
+    await check('create-locked-post-student', async () => {
+      const response = await fetch(`${baseUrl}/api/feed/posts`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          cookie: studentCookie,
+        },
+        body: JSON.stringify({
+          content: 'Locked attachment post.',
+          allowDownloads: false,
+        }),
+      })
+      const data = await response.json()
+      if (response.status !== 201) {
+        throw new Error(JSON.stringify(data))
+      }
+      lockedPostId = data.id
+      return `${response.status} postId=${lockedPostId}`
+    })
+
+    await check('upload-locked-post-attachment', async () => {
+      const formData = new FormData()
+      formData.append('attachment', new Blob(['%PDF-1.4 smoke test'], { type: 'application/pdf' }), 'locked-post.pdf')
+      const response = await fetch(`${baseUrl}/api/upload/post-attachment/${lockedPostId}`, {
+        method: 'POST',
+        headers: { cookie: studentCookie },
+        body: formData,
+      })
+      const data = await response.json()
+      if (response.status !== 200 || !data.attachmentName) {
+        throw new Error(JSON.stringify(data))
+      }
+      return `${response.status} attachment=${data.attachmentName}`
+    })
+
+    await check('locked-post-attachment-blocked', async () => {
+      const response = await fetch(`${baseUrl}/api/feed/posts/${lockedPostId}/attachment`, {
+        headers: { cookie: adminCookie },
+      })
+      const data = await response.json()
+      if (response.status !== 403) {
+        throw new Error(`Expected 403, got ${response.status}: ${JSON.stringify(data)}`)
+      }
+      return data.error
+    })
+
+    await check('comment-feed-post-admin', async () => {
+      const response = await fetch(`${baseUrl}/api/feed/posts/${feedPostId}/comments`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          cookie: adminCookie,
+        },
+        body: JSON.stringify({ content: `Admin reply to @${studentUsername} on the feed post.` }),
+      })
+      const data = await response.json()
+      if (response.status !== 201) {
+        throw new Error(JSON.stringify(data))
+      }
+      return `${response.status} commentId=${data.id}`
+    })
+
+    await check('react-feed-post-admin', async () => {
+      const response = await fetch(`${baseUrl}/api/feed/posts/${feedPostId}/react`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          cookie: adminCookie,
+        },
+        body: JSON.stringify({ type: 'like' }),
+      })
+      const data = await response.json()
+      if (response.status !== 200 || typeof data.likes !== 'number') {
+        throw new Error(JSON.stringify(data))
+      }
+      return `${response.status} likes=${data.likes}`
+    })
+
     await check('comment-sheet-admin', async () => {
       const response = await fetch(`${baseUrl}/api/sheets/${createdSheetId}/comments`, {
         method: 'POST',
@@ -451,15 +584,109 @@ async function main() {
       return `${response.status} likes=${data.likes}`
     })
 
-    await check('download-sheet-public', async () => {
-      const response = await fetch(`${baseUrl}/api/sheets/${createdSheetId}/download`, {
+    await check('fork-sheet-admin', async () => {
+      const response = await fetch(`${baseUrl}/api/sheets/${createdSheetId}/fork`, {
         method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          cookie: adminCookie,
+        },
+        body: JSON.stringify({ title: 'Smoke Fork Sheet' }),
       })
       const data = await response.json()
-      if (response.status !== 200) {
+      if (response.status !== 201) {
         throw new Error(JSON.stringify(data))
       }
-      return `${response.status} downloads=${data.downloads}`
+      forkedSheetId = data.id
+      return `${response.status} forkId=${forkedSheetId}`
+    })
+
+    await check('edit-fork-admin', async () => {
+      const response = await fetch(`${baseUrl}/api/sheets/${forkedSheetId}`, {
+        method: 'PATCH',
+        headers: {
+          'content-type': 'application/json',
+          cookie: adminCookie,
+        },
+        body: JSON.stringify({
+          content: '# Smoke Fork Update\n\nFork edited before contribution.',
+          description: 'Fork updated during smoke test.',
+          allowDownloads: false,
+        }),
+      })
+      const data = await response.json()
+      if (response.status !== 200 || data.allowDownloads !== false) {
+        throw new Error(JSON.stringify(data))
+      }
+      return `${response.status} allowDownloads=${data.allowDownloads}`
+    })
+
+    await check('submit-contribution-admin', async () => {
+      const response = await fetch(`${baseUrl}/api/sheets/${forkedSheetId}/contributions`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          cookie: adminCookie,
+        },
+        body: JSON.stringify({ message: 'Improved the fork before contributing back.' }),
+      })
+      const data = await response.json()
+      if (response.status !== 201 || !data.contribution?.id) {
+        throw new Error(JSON.stringify(data))
+      }
+      contributionId = data.contribution.id
+      return `${response.status} contributionId=${contributionId}`
+    })
+
+    await check('incoming-contribution-student', async () => {
+      const response = await fetch(`${baseUrl}/api/sheets/${createdSheetId}`, {
+        headers: { cookie: studentCookie },
+      })
+      const data = await response.json()
+      if (response.status !== 200 || !Array.isArray(data.incomingContributions)) {
+        throw new Error(JSON.stringify(data))
+      }
+      const match = data.incomingContributions.find((contribution) => contribution.id === contributionId)
+      if (!match) {
+        throw new Error('Expected incoming contribution was not returned on the original sheet.')
+      }
+      return `incoming=${data.incomingContributions.length}`
+    })
+
+    await check('accept-contribution-student', async () => {
+      const response = await fetch(`${baseUrl}/api/sheets/contributions/${contributionId}`, {
+        method: 'PATCH',
+        headers: {
+          'content-type': 'application/json',
+          cookie: studentCookie,
+        },
+        body: JSON.stringify({ action: 'accept' }),
+      })
+      const data = await response.json()
+      if (response.status !== 200 || data.contribution?.status !== 'accepted') {
+        throw new Error(JSON.stringify(data))
+      }
+      return `${response.status} status=${data.contribution.status}`
+    })
+
+    await check('download-sheet-public', async () => {
+      const response = await fetch(`${baseUrl}/api/sheets/${createdSheetId}/download`)
+      const data = await response.json()
+      if (response.status !== 403) {
+        throw new Error(`Expected 403, got ${response.status}: ${JSON.stringify(data)}`)
+      }
+      return data.error
+    })
+
+    await check('sheet-after-accepted-contribution', async () => {
+      const response = await fetch(`${baseUrl}/api/sheets/${createdSheetId}`, {
+        headers: { cookie: studentCookie },
+      })
+      const data = await response.json()
+      if (response.status !== 200 || data.allowDownloads !== false || !String(data.content || '').includes('Smoke Fork Update')) {
+        throw new Error(JSON.stringify(data))
+      }
+      return `${response.status} allowDownloads=${data.allowDownloads}`
     })
 
     await check('create-announcement-admin', async () => {
@@ -565,12 +792,19 @@ async function main() {
       if (response.status !== 200 || !Array.isArray(data.notifications)) {
         throw new Error(JSON.stringify(data))
       }
+      const hasPostNotification = data.notifications.some((notification) => notification.linkPath === `/feed?post=${feedPostId}`)
+      if (!hasPostNotification) {
+        throw new Error('Expected a feed notification with a feed linkPath for the student user.')
+      }
       return `${response.status} total=${data.total} unread=${data.unreadCount}`
     })
 
     await check('live-burst-feed-read-model', async () => {
       const responses = await Promise.all([
         ...Array.from({ length: 3 }, () => fetch(`${baseUrl}/api/auth/me`, {
+          headers: { cookie: studentCookie },
+        })),
+        ...Array.from({ length: 3 }, () => fetch(`${baseUrl}/api/feed?limit=8`, {
           headers: { cookie: studentCookie },
         })),
         ...Array.from({ length: 3 }, () => fetch(`${baseUrl}/api/sheets?limit=5`, {
@@ -594,11 +828,16 @@ async function main() {
         }
       }
       for (const payload of payloads.slice(3, 6)) {
+        if (!Array.isArray(payload?.items)) {
+          throw new Error('Feed burst feed payload was malformed.')
+        }
+      }
+      for (const payload of payloads.slice(6, 9)) {
         if (!Array.isArray(payload?.sheets)) {
           throw new Error('Feed burst sheets payload was malformed.')
         }
       }
-      for (const payload of payloads.slice(6)) {
+      for (const payload of payloads.slice(9)) {
         if (!Array.isArray(payload)) {
           throw new Error('Feed burst leaderboard payload was malformed.')
         }
@@ -657,6 +896,9 @@ async function main() {
     await check('live-burst-comments-and-notifications', async () => {
       const responses = await Promise.all([
         ...Array.from({ length: 4 }, () => fetch(`${baseUrl}/api/sheets/${createdSheetId}/comments`)),
+        ...Array.from({ length: 4 }, () => fetch(`${baseUrl}/api/feed/posts/${feedPostId}/comments`, {
+          headers: { cookie: studentCookie },
+        })),
         ...Array.from({ length: 4 }, () => fetch(`${baseUrl}/api/notifications?limit=15`, {
           headers: { cookie: studentCookie },
         })),
@@ -676,11 +918,16 @@ async function main() {
         }
       }
       for (const payload of payloads.slice(4, 8)) {
+        if (!Array.isArray(payload?.comments)) {
+          throw new Error('Feed post comments burst payload was malformed.')
+        }
+      }
+      for (const payload of payloads.slice(8, 12)) {
         if (!Array.isArray(payload?.notifications)) {
           throw new Error('Notifications burst payload was malformed.')
         }
       }
-      for (const payload of payloads.slice(8)) {
+      for (const payload of payloads.slice(12)) {
         if (!Array.isArray(payload)) {
           throw new Error('Announcements burst payload was malformed.')
         }

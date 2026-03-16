@@ -69,6 +69,8 @@ const SCHEMA_REPAIR_STATEMENTS = [
   `ALTER TABLE "StudySheet" ADD COLUMN IF NOT EXISTS "description" TEXT NOT NULL DEFAULT ''`,
   'ALTER TABLE "StudySheet" ADD COLUMN IF NOT EXISTS "attachmentUrl" TEXT',
   'ALTER TABLE "StudySheet" ADD COLUMN IF NOT EXISTS "attachmentType" TEXT',
+  'ALTER TABLE "StudySheet" ADD COLUMN IF NOT EXISTS "attachmentName" TEXT',
+  'ALTER TABLE "StudySheet" ADD COLUMN IF NOT EXISTS "allowDownloads" BOOLEAN NOT NULL DEFAULT true',
 
   `CREATE TABLE IF NOT EXISTS "Note" (
     "id" SERIAL NOT NULL,
@@ -89,6 +91,7 @@ const SCHEMA_REPAIR_STATEMENTS = [
     "read" BOOLEAN NOT NULL DEFAULT false,
     "actorId" INTEGER,
     "sheetId" INTEGER,
+    "linkPath" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "Notification_pkey" PRIMARY KEY ("id")
   )`,
@@ -141,9 +144,51 @@ const SCHEMA_REPAIR_STATEMENTS = [
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "Announcement_pkey" PRIMARY KEY ("id")
   )`,
+  `CREATE TABLE IF NOT EXISTS "FeedPost" (
+    "id" SERIAL NOT NULL,
+    "content" TEXT NOT NULL,
+    "userId" INTEGER NOT NULL,
+    "courseId" INTEGER,
+    "attachmentUrl" TEXT,
+    "attachmentType" TEXT,
+    "attachmentName" TEXT,
+    "allowDownloads" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "FeedPost_pkey" PRIMARY KEY ("id")
+  )`,
+  `CREATE TABLE IF NOT EXISTS "FeedPostComment" (
+    "id" SERIAL NOT NULL,
+    "content" TEXT NOT NULL,
+    "postId" INTEGER NOT NULL,
+    "userId" INTEGER NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "FeedPostComment_pkey" PRIMARY KEY ("id")
+  )`,
+  `CREATE TABLE IF NOT EXISTS "FeedPostReaction" (
+    "userId" INTEGER NOT NULL,
+    "postId" INTEGER NOT NULL,
+    "type" TEXT NOT NULL,
+    CONSTRAINT "FeedPostReaction_pkey" PRIMARY KEY ("userId","postId")
+  )`,
+  `CREATE TABLE IF NOT EXISTS "SheetContribution" (
+    "id" SERIAL NOT NULL,
+    "targetSheetId" INTEGER NOT NULL,
+    "forkSheetId" INTEGER NOT NULL,
+    "proposerId" INTEGER NOT NULL,
+    "reviewerId" INTEGER,
+    "status" TEXT NOT NULL DEFAULT 'pending',
+    "message" TEXT NOT NULL DEFAULT '',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "reviewedAt" TIMESTAMP(3),
+    CONSTRAINT "SheetContribution_pkey" PRIMARY KEY ("id")
+  )`,
   'CREATE UNIQUE INDEX IF NOT EXISTS "PasswordResetToken_userId_key" ON "PasswordResetToken"("userId")',
   'CREATE UNIQUE INDEX IF NOT EXISTS "PasswordResetToken_token_key" ON "PasswordResetToken"("token")',
   'CREATE UNIQUE INDEX IF NOT EXISTS "StarredSheet_userId_sheetId_key" ON "StarredSheet"("userId", "sheetId")',
+  'CREATE INDEX IF NOT EXISTS "SheetContribution_targetSheetId_status_idx" ON "SheetContribution"("targetSheetId", "status")',
+  'CREATE INDEX IF NOT EXISTS "SheetContribution_proposerId_status_idx" ON "SheetContribution"("proposerId", "status")',
 
   'ALTER TABLE "Note" DROP CONSTRAINT IF EXISTS "Note_userId_fkey"',
   'ALTER TABLE "Note" ADD CONSTRAINT "Note_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE',
@@ -180,6 +225,30 @@ const SCHEMA_REPAIR_STATEMENTS = [
 
   'ALTER TABLE "Announcement" DROP CONSTRAINT IF EXISTS "Announcement_authorId_fkey"',
   'ALTER TABLE "Announcement" ADD CONSTRAINT "Announcement_authorId_fkey" FOREIGN KEY ("authorId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE',
+
+  'ALTER TABLE "FeedPost" DROP CONSTRAINT IF EXISTS "FeedPost_userId_fkey"',
+  'ALTER TABLE "FeedPost" ADD CONSTRAINT "FeedPost_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE',
+  'ALTER TABLE "FeedPost" DROP CONSTRAINT IF EXISTS "FeedPost_courseId_fkey"',
+  'ALTER TABLE "FeedPost" ADD CONSTRAINT "FeedPost_courseId_fkey" FOREIGN KEY ("courseId") REFERENCES "Course"("id") ON DELETE SET NULL ON UPDATE CASCADE',
+
+  'ALTER TABLE "FeedPostComment" DROP CONSTRAINT IF EXISTS "FeedPostComment_postId_fkey"',
+  'ALTER TABLE "FeedPostComment" ADD CONSTRAINT "FeedPostComment_postId_fkey" FOREIGN KEY ("postId") REFERENCES "FeedPost"("id") ON DELETE CASCADE ON UPDATE CASCADE',
+  'ALTER TABLE "FeedPostComment" DROP CONSTRAINT IF EXISTS "FeedPostComment_userId_fkey"',
+  'ALTER TABLE "FeedPostComment" ADD CONSTRAINT "FeedPostComment_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE',
+
+  'ALTER TABLE "FeedPostReaction" DROP CONSTRAINT IF EXISTS "FeedPostReaction_userId_fkey"',
+  'ALTER TABLE "FeedPostReaction" ADD CONSTRAINT "FeedPostReaction_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE',
+  'ALTER TABLE "FeedPostReaction" DROP CONSTRAINT IF EXISTS "FeedPostReaction_postId_fkey"',
+  'ALTER TABLE "FeedPostReaction" ADD CONSTRAINT "FeedPostReaction_postId_fkey" FOREIGN KEY ("postId") REFERENCES "FeedPost"("id") ON DELETE CASCADE ON UPDATE CASCADE',
+
+  'ALTER TABLE "SheetContribution" DROP CONSTRAINT IF EXISTS "SheetContribution_targetSheetId_fkey"',
+  'ALTER TABLE "SheetContribution" ADD CONSTRAINT "SheetContribution_targetSheetId_fkey" FOREIGN KEY ("targetSheetId") REFERENCES "StudySheet"("id") ON DELETE CASCADE ON UPDATE CASCADE',
+  'ALTER TABLE "SheetContribution" DROP CONSTRAINT IF EXISTS "SheetContribution_forkSheetId_fkey"',
+  'ALTER TABLE "SheetContribution" ADD CONSTRAINT "SheetContribution_forkSheetId_fkey" FOREIGN KEY ("forkSheetId") REFERENCES "StudySheet"("id") ON DELETE CASCADE ON UPDATE CASCADE',
+  'ALTER TABLE "SheetContribution" DROP CONSTRAINT IF EXISTS "SheetContribution_proposerId_fkey"',
+  'ALTER TABLE "SheetContribution" ADD CONSTRAINT "SheetContribution_proposerId_fkey" FOREIGN KEY ("proposerId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE',
+  'ALTER TABLE "SheetContribution" DROP CONSTRAINT IF EXISTS "SheetContribution_reviewerId_fkey"',
+  'ALTER TABLE "SheetContribution" ADD CONSTRAINT "SheetContribution_reviewerId_fkey" FOREIGN KEY ("reviewerId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE',
 ]
 
 async function repairRuntimeSchema(prisma) {

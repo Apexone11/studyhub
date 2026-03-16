@@ -2,16 +2,16 @@ PrismaClientInitializationError:
 Invalid `prisma.$executeRawUnsafe()` invocation:
 
 
-Authentication failed against database server, the provided database credentials for `studyhub` are not valid.
+Can't reach database server at `localhost:5433`
 
-Please make sure to provide valid database credentials for the database server at the configured address.
+Please make sure your database server is running at `localhost:5433`.
     at ei.handleRequestError (C:\Users\Abdul PC\OneDrive\Desktop\studyhub\backend\node_modules\@prisma\client\runtime\library.js:121:7568)
     at ei.handleAndLogRequestError (C:\Users\Abdul PC\OneDrive\Desktop\studyhub\backend\node_modules\@prisma\client\runtime\library.js:121:6593)
     at ei.request (C:\Users\Abdul PC\OneDrive\Desktop\studyhub\backend\node_modules\@prisma\client\runtime\library.js:121:6300)
     at async a (C:\Users\Abdul PC\OneDrive\Desktop\studyhub\backend\node_modules\@prisma\client\runtime\library.js:130:9551)
-    at async repairRuntimeSchema (C:\Users\Abdul PC\OneDrive\Desktop\studyhub\backend\src\lib\bootstrap.js:187:5)
-    at async bootstrapRuntime (C:\Users\Abdul PC\OneDrive\Desktop\studyhub\backend\src\lib\bootstrap.js:341:5)
-    at async startServer (C:\Users\Abdul PC\OneDrive\Desktop\studyhub\backend\src\index.js:107:3) {
+    at async repairRuntimeSchema (C:\Users\Abdul PC\OneDrive\Desktop\studyhub\backend\src\lib\bootstrap.js:256:5)
+    at async bootstrapRuntime (C:\Users\Abdul PC\OneDrive\Desktop\studyhub\backend\src\lib\bootstrap.js:410:5)
+    at async startServer (C:\Users\Abdul PC\OneDrive\Desktop\studyhub\backend\src\index.js:111:3) {
   clientVersion: '6.19.2',
   errorCode: undefined,
   retryable: undefined

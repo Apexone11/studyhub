@@ -108,6 +108,7 @@ router.post('/:username/follow', requireAuth, followLimiter, async (req, res) =>
       type: 'follow',
       message: `${req.user.username} started following you.`,
       actorId: req.user.userId,
+      linkPath: `/users/${req.user.username}`,
     })
 
     const followerCount = await prisma.userFollow.count({ where: { followingId: target.id } })

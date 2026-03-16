@@ -12,6 +12,7 @@ const PORT = process.env.PORT || 4000
 const authRoutes = require('./routes/auth')
 const courseRoutes = require('./routes/courses')
 const sheetRoutes = require('./routes/sheets')
+const feedRoutes = require('./routes/feed')
 const settingsRoutes = require('./routes/settings')
 const announcementRoutes = require('./routes/announcements')
 const adminRoutes = require('./routes/admin')
@@ -76,6 +77,9 @@ app.use('/api/courses', courseRoutes)
 
 // Mount study sheet endpoints under /api/sheets.
 app.use('/api/sheets', sheetRoutes)
+
+// Mount feed endpoints under /api/feed.
+app.use('/api/feed', feedRoutes)
 
 // Mount settings endpoints under /api/settings.
 app.use('/api/settings', settingsRoutes)

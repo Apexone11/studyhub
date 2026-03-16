@@ -4,7 +4,7 @@
 // SubmitPage / AdminPage / TestTakerPage: cleaned shells
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import DOMPurify from 'dompurify'
 import Navbar from '../components/Navbar'
 import AppSidebar from '../components/AppSidebar'
@@ -150,18 +150,24 @@ function validateAttachment(file) {
 
 export function UploadSheetPage() {
   const navigate=useNavigate()
+  const { id: sheetId } = useParams()
+  const isEditing = Boolean(sheetId)
   const [title,   setTitle]   = useState('')
   const [courseId,setCourseId]= useState('')
   const [content, setContent] = useState('# Sheet Title\n\n## Topic 1\n\nYour notes here…\n\n## Topic 2\n\n- Point one\n- Point two\n- Point three\n\n```java\n// Code example\npublic class Hello {\n  public static void main(String[] args) {\n    System.out.println("Hello!");\n  }\n}\n```\n')
   const [description, setDescription] = useState('')
+  const [allowDownloads, setAllowDownloads] = useState(true)
   const [courses, setCourses] = useState([])
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState('')
   const [saved,   setSaved]   = useState(false)
+  const [initializing, setInitializing] = useState(isEditing)
   // File attachment
   const [attachFile, setAttachFile] = useState(null)
   const [attachErr,  setAttachErr]  = useState('')
   const [attachUploading, setAttachUploading] = useState(false)
+  const [existingAttachment, setExistingAttachment] = useState(null)
+  const [removeExistingAttachment, setRemoveExistingAttachment] = useState(false)
   const fileInputRef = useRef()
   const autoTimer = useRef()
 
@@ -172,11 +178,40 @@ export function UploadSheetPage() {
       .catch(()=>{})
   },[])
 
+  useEffect(() => {
+    if (!isEditing) {
+      setInitializing(false)
+      return
+    }
+
+    fetch(`${API}/api/sheets/${sheetId}`, { headers: authHeaders() })
+      .then(async (response) => {
+        const data = await response.json()
+        if (!response.ok) throw new Error(data.error || 'Could not load this sheet.')
+        return data
+      })
+      .then((sheet) => {
+        setTitle(sheet.title || '')
+        setCourseId(sheet.courseId ? String(sheet.courseId) : '')
+        setContent(sheet.content || '')
+        setDescription(sheet.description || '')
+        setAllowDownloads(sheet.allowDownloads !== false)
+        setExistingAttachment(sheet.hasAttachment
+          ? {
+              name: sheet.attachmentName || 'Current attachment',
+            }
+          : null)
+        setRemoveExistingAttachment(false)
+      })
+      .catch((loadError) => setError(loadError.message || 'Could not load this sheet.'))
+      .finally(() => setInitializing(false))
+  }, [isEditing, sheetId])
+
   useEffect(()=>{
     setSaved(false); clearTimeout(autoTimer.current)
     autoTimer.current=setTimeout(()=>setSaved(true),1500)
     return ()=>clearTimeout(autoTimer.current)
-  },[title,content,courseId,description])
+  },[title,content,courseId,description,allowDownloads,removeExistingAttachment,attachFile])
 
   function handleFileSelect(e) {
     const file = e.target.files?.[0]
@@ -185,6 +220,7 @@ export function UploadSheetPage() {
     if (err) { setAttachErr(err); e.target.value=''; return }
     setAttachErr('')
     setAttachFile(file)
+    setRemoveExistingAttachment(false)
   }
 
   async function handlePublish() {
@@ -193,9 +229,16 @@ export function UploadSheetPage() {
     if(!content.trim()){setError('Content cannot be empty.');return}
     setLoading(true);setError('')
     try {
-      const res=await fetch(`${API}/api/sheets`,{
-        method:'POST',headers:authHeaders(),
-        body:JSON.stringify({title:title.trim(),courseId:parseInt(courseId),content,description:description.trim()}),
+      const res=await fetch(isEditing ? `${API}/api/sheets/${sheetId}` : `${API}/api/sheets`,{
+        method:isEditing ? 'PATCH' : 'POST',headers:authHeaders(),
+        body:JSON.stringify({
+          title:title.trim(),
+          courseId:parseInt(courseId),
+          content,
+          description:description.trim(),
+          allowDownloads,
+          removeAttachment: removeExistingAttachment && !attachFile,
+        }),
       })
       if(!res.ok) throw new Error((await res.json()).error||'Failed to publish.')
       const sheet=await res.json()
@@ -206,12 +249,17 @@ export function UploadSheetPage() {
         const fd = new FormData()
         fd.append('attachment', attachFile)
         try {
-          await fetch(`${API}/api/upload/attachment/${sheet.id}`, {
+          const uploadRes = await fetch(`${API}/api/upload/attachment/${sheet.id}`, {
             method: 'POST',
             body: fd,
           })
-        } catch { /* attachment upload failure is non-fatal */ }
-        setAttachUploading(false)
+          if (!uploadRes.ok) {
+            const uploadData = await uploadRes.json().catch(() => ({}))
+            throw new Error(uploadData.error || 'Attachment upload failed.')
+          }
+        } finally {
+          setAttachUploading(false)
+        }
       }
 
       navigate(`/sheets/${sheet.id}`)
@@ -224,14 +272,27 @@ export function UploadSheetPage() {
       {!saved&&<span style={{ fontSize:11, color:'#64748b' }}>Saving…</span>}
       <Link to="/sheets" style={{ fontSize:12, color:'#64748b', textDecoration:'none', padding:'5px 10px', border:'1px solid #334155', borderRadius:7 }}>Cancel</Link>
       <button onClick={handlePublish} disabled={loading||attachUploading} style={{ fontSize:12, fontWeight:700, color:'#fff', padding:'5px 15px', background:(loading||attachUploading)?'#93c5fd':'#3b82f6', border:'none', borderRadius:7, cursor:(loading||attachUploading)?'wait':'pointer', fontFamily:FONT, display:'flex', alignItems:'center', gap:5 }}>
-        {loading?'Publishing…':attachUploading?'Uploading…':<><IconUpload size={13}/>Publish Sheet</>}
+        {loading
+          ? (isEditing ? 'Saving…' : 'Publishing…')
+          : attachUploading
+            ? 'Uploading…'
+            : <><IconUpload size={13}/>{isEditing ? 'Save Changes' : 'Publish Sheet'}</>}
       </button>
     </div>
   )
 
+  if (initializing) {
+    return (
+      <div style={{ minHeight:'100vh', background:'#edf0f5', fontFamily:FONT }}>
+        <Navbar crumbs={[{label:'Study Sheets',to:'/sheets'},{label:isEditing?'Edit Sheet': 'New Sheet',to:null}]} hideTabs hideSearch />
+        <div style={{ ...pageShell('editor', 20, 60), color:'#64748b', fontSize:14 }}>Loading editor…</div>
+      </div>
+    )
+  }
+
   return (
     <div style={{ minHeight:'100vh', background:'#edf0f5', fontFamily:FONT }}>
-      <Navbar crumbs={[{label:'Study Sheets',to:'/sheets'},{label:'New Sheet',to:null}]} hideTabs actions={navActions} hideSearch/>
+      <Navbar crumbs={[{label:'Study Sheets',to:'/sheets'},{label:isEditing?'Edit Sheet':'New Sheet',to:null}]} hideTabs actions={navActions} hideSearch/>
       <div style={pageShell('editor', 20, 60)}>
         {/* meta row */}
         <div style={{ background:'#fff', borderRadius:14, border:'1px solid #e2e8f0', padding:'14px 20px', marginBottom:12, display:'grid', gridTemplateColumns:'1fr 1fr 180px', gap:12, alignItems:'end' }}>
@@ -251,8 +312,11 @@ export function UploadSheetPage() {
             </select>
           </div>
           <div>
-            <label style={{ fontSize:10, fontWeight:700, color:'#64748b', letterSpacing:'.06em', display:'block', marginBottom:5 }}>VISIBILITY</label>
-            <div style={{ padding:'8px 12px', border:'1.5px solid #e2e8f0', borderRadius:8, fontSize:13, color:'#64748b', background:'#f8fafc' }}>Public</div>
+            <label style={{ fontSize:10, fontWeight:700, color:'#64748b', letterSpacing:'.06em', display:'block', marginBottom:5 }}>DOWNLOADS</label>
+            <label style={{ padding:'8px 12px', border:'1.5px solid #e2e8f0', borderRadius:8, fontSize:13, color:'#64748b', background:'#f8fafc', display:'flex', alignItems:'center', gap:8, cursor:'pointer' }}>
+              <input type="checkbox" checked={allowDownloads} onChange={e=>setAllowDownloads(e.target.checked)} />
+              Allow download button in Version 1
+            </label>
           </div>
         </div>
         {/* description row */}
@@ -292,11 +356,23 @@ export function UploadSheetPage() {
                 </button>
               </div>
             )}
+            {!attachFile && existingAttachment && !removeExistingAttachment && (
+              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                <i className="fas fa-paperclip" style={{ color:'#3b82f6', fontSize:13 }}></i>
+                <span style={{ fontSize:12, color:'#334155', fontWeight:600 }}>{existingAttachment.name}</span>
+                <button type="button" onClick={()=>setRemoveExistingAttachment(true)} style={{ background:'none', border:'none', cursor:'pointer', color:'#dc2626', fontSize:12, fontFamily:FONT }}>
+                  Remove
+                </button>
+              </div>
+            )}
+            {!attachFile && removeExistingAttachment && (
+              <div style={{ fontSize:12, color:'#b91c1c' }}>Current attachment will be removed when you save.</div>
+            )}
           </div>
           {attachErr && <div style={{ marginTop:6, fontSize:12, color:'#dc2626' }}><i className="fas fa-circle-exclamation" style={{ marginRight:5 }}></i>{attachErr}</div>}
           <div style={{ marginTop:8, fontSize:11, color:'#94a3b8' }}>
             <i className="fas fa-shield-halved" style={{ marginRight:5, color:'#10b981' }}></i>
-            Files are scanned for allowed types. Executable files (.exe, .js, .sh, etc.) are blocked for security.
+            Files are scanned for allowed types. Executable files (.exe, .js, .sh, etc.) are blocked for security. If downloads are turned off, the download button will stay hidden from other users.
           </div>
         </div>
 

@@ -88,6 +88,7 @@ export default function App() {
         <Route path="/feed"          element={<PrivateRoute><FeedPage /></PrivateRoute>} />
         <Route path="/sheets"        element={<PrivateRoute><SheetsPage /></PrivateRoute>} />
         <Route path="/sheets/upload" element={<PrivateRoute><UploadSheetPage /></PrivateRoute>} />
+        <Route path="/sheets/:id/edit" element={<PrivateRoute><UploadSheetPage /></PrivateRoute>} />
         <Route path="/sheets/:id"    element={<PrivateRoute><SheetViewerPage /></PrivateRoute>} />
         <Route path="/tests"         element={<PrivateRoute><TestsPage /></PrivateRoute>} />
         <Route path="/tests/:id"     element={<PrivateRoute><TestTakerPage /></PrivateRoute>} />

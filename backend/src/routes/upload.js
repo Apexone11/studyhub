@@ -34,6 +34,29 @@ function safeName(original) {
   return `${base}-${Date.now()}${ext}`
 }
 
+function safeAttachmentLabel(original) {
+  return path.basename(String(original || 'attachment'))
+    .replace(/[^a-zA-Z0-9._() -]/g, '_')
+    .replace(/\s+/g, ' ')
+    .slice(0, 120)
+}
+
+async function deleteAttachmentIfUnused(attachmentUrl) {
+  if (!attachmentUrl || !attachmentUrl.startsWith('/uploads/attachments/')) return
+
+  const [sheetRefs, postRefs] = await Promise.all([
+    prisma.studySheet.count({ where: { attachmentUrl } }),
+    prisma.feedPost.count({ where: { attachmentUrl } }),
+  ])
+
+  if (sheetRefs > 0 || postRefs > 0) return
+
+  const localPath = path.join(UPLOADS_DIR, attachmentUrl.replace('/uploads/', ''))
+  if (fs.existsSync(localPath)) {
+    fs.unlinkSync(localPath)
+  }
+}
+
 // ── Avatar upload ─────────────────────────────────────────────
 const avatarStorage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, AVATARS_DIR),
@@ -135,12 +158,54 @@ router.post('/attachment/:sheetId', requireAuth, (req, res) => {
       const ext = path.extname(req.file.filename).toLowerCase()
       const attachmentType = ext === '.pdf' ? 'pdf' : 'image'
       const attachmentUrl = `/uploads/attachments/${req.file.filename}`
+      const attachmentName = safeAttachmentLabel(req.file.originalname)
 
       const updated = await prisma.studySheet.update({
         where: { id: sheetId },
-        data: { attachmentUrl, attachmentType },
-        select: { id: true, attachmentUrl: true, attachmentType: true },
+        data: { attachmentUrl, attachmentType, attachmentName },
+        select: { id: true, attachmentUrl: true, attachmentType: true, attachmentName: true },
       })
+      await deleteAttachmentIfUnused(sheet.attachmentUrl)
+      res.json(updated)
+    } catch (dbErr) {
+      captureError(dbErr, { route: req.originalUrl })
+      res.status(500).json({ error: 'Failed to save attachment.' })
+    }
+  })
+})
+
+// POST /api/upload/post-attachment/:postId
+router.post('/post-attachment/:postId', requireAuth, (req, res) => {
+  attachmentUpload.single('attachment')(req, res, async (err) => {
+    if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ error: 'Attachment must be 10 MB or smaller.' })
+    }
+    if (err) return res.status(400).json({ error: err.message })
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded.' })
+
+    const postId = parseInt(req.params.postId)
+    try {
+      const post = await prisma.feedPost.findUnique({
+        where: { id: postId },
+        select: { id: true, userId: true, attachmentUrl: true },
+      })
+      if (!post) return res.status(404).json({ error: 'Post not found.' })
+      if (post.userId !== req.user.userId && req.user.role !== 'admin') {
+        fs.unlinkSync(req.file.path)
+        return res.status(403).json({ error: 'Not your post.' })
+      }
+
+      const ext = path.extname(req.file.filename).toLowerCase()
+      const attachmentType = ext === '.pdf' ? 'pdf' : 'image'
+      const attachmentUrl = `/uploads/attachments/${req.file.filename}`
+      const attachmentName = safeAttachmentLabel(req.file.originalname)
+
+      const updated = await prisma.feedPost.update({
+        where: { id: postId },
+        data: { attachmentUrl, attachmentType, attachmentName },
+        select: { id: true, attachmentUrl: true, attachmentType: true, attachmentName: true },
+      })
+      await deleteAttachmentIfUnused(post.attachmentUrl)
       res.json(updated)
     } catch (dbErr) {
       captureError(dbErr, { route: req.originalUrl })

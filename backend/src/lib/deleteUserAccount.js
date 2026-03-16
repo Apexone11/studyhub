@@ -25,7 +25,37 @@ async function deleteUserAccount(prisma, { userId, username, reason = null, deta
       await tx.comment.deleteMany({ where: { sheetId: { in: sheetIds } } })
       await tx.starredSheet.deleteMany({ where: { sheetId: { in: sheetIds } } })
       await tx.reaction.deleteMany({ where: { sheetId: { in: sheetIds } } })
+      await tx.sheetContribution.deleteMany({
+        where: {
+          OR: [
+            { targetSheetId: { in: sheetIds } },
+            { forkSheetId: { in: sheetIds } },
+          ],
+        },
+      })
     }
+
+    const postIds = (await tx.feedPost.findMany({
+      where: { userId },
+      select: { id: true },
+    })).map((post) => post.id)
+
+    if (postIds.length > 0) {
+      await tx.feedPostComment.deleteMany({ where: { postId: { in: postIds } } })
+      await tx.feedPostReaction.deleteMany({ where: { postId: { in: postIds } } })
+    }
+
+    await tx.feedPostComment.deleteMany({ where: { userId } })
+    await tx.feedPostReaction.deleteMany({ where: { userId } })
+    await tx.sheetContribution.deleteMany({
+      where: {
+        OR: [
+          { proposerId: userId },
+          { reviewerId: userId },
+        ],
+      },
+    })
+    await tx.feedPost.deleteMany({ where: { userId } })
 
     await tx.studySheet.deleteMany({ where: { userId } })
     await tx.user.delete({ where: { id: userId } })

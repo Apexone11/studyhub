@@ -276,7 +276,8 @@ export default function Navbar({
       setUnreadCount(c => Math.max(0, c - 1))
     }
     setShowBell(false)
-    if (notif.sheetId) navigate(`/sheets/${notif.sheetId}`)
+    if (notif.linkPath) navigate(notif.linkPath)
+    else if (notif.sheetId) navigate(`/sheets/${notif.sheetId}`)
     else if (notif.actor?.username) navigate(`/users/${notif.actor.username}`)
   }
 
