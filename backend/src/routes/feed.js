@@ -2,17 +2,14 @@ const express = require('express')
 const rateLimit = require('express-rate-limit')
 const fs = require('node:fs')
 const path = require('node:path')
-const { PrismaClient } = require('@prisma/client')
 const requireAuth = require('../middleware/auth')
 const { captureError } = require('../monitoring/sentry')
 const { createNotification } = require('../lib/notify')
 const { notifyMentionedUsers } = require('../lib/mentions')
+const prisma = require('../lib/prisma')
+const { cleanupAttachmentIfUnused, resolveAttachmentPath } = require('../lib/storage')
 
 const router = express.Router()
-const prisma = new PrismaClient()
-
-const UPLOADS_DIR = path.join(__dirname, '../../uploads')
-const ATTACHMENTS_DIR = path.join(UPLOADS_DIR, 'attachments')
 
 const reactLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -53,20 +50,6 @@ function safeDownloadName(name) {
     .replace(/[^a-zA-Z0-9._-]/g, '_')
     .slice(0, 80) || 'attachment'
   return `${base}${ext}`.toLowerCase()
-}
-
-function resolveAttachmentPath(attachmentUrl) {
-  if (!attachmentUrl || !attachmentUrl.startsWith('/uploads/attachments/')) {
-    return null
-  }
-
-  const fileName = attachmentUrl.replace('/uploads/attachments/', '')
-  const resolved = path.resolve(ATTACHMENTS_DIR, fileName)
-  if (!resolved.startsWith(path.resolve(ATTACHMENTS_DIR))) {
-    return null
-  }
-
-  return resolved
 }
 
 function reactionSummary(rows, idKey, idValue, currentRows, currentKey) {
@@ -568,7 +551,7 @@ router.delete('/posts/:id', async (req, res) => {
   try {
     const post = await prisma.feedPost.findUnique({
       where: { id: postId },
-      select: { id: true, userId: true },
+      select: { id: true, userId: true, attachmentUrl: true },
     })
     if (!post) return res.status(404).json({ error: 'Post not found.' })
     if (post.userId !== req.user.userId && req.user.role !== 'admin') {
@@ -576,6 +559,10 @@ router.delete('/posts/:id', async (req, res) => {
     }
 
     await prisma.feedPost.delete({ where: { id: postId } })
+    await cleanupAttachmentIfUnused(prisma, post.attachmentUrl, {
+      route: req.originalUrl,
+      postId,
+    })
     res.json({ message: 'Post deleted.' })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })

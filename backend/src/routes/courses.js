@@ -1,12 +1,11 @@
 const express = require('express')
-const { PrismaClient } = require('@prisma/client')
 const rateLimit = require('express-rate-limit')
 const requireAuth = require('../middleware/auth')
 const { sendCourseRequestNotice } = require('../lib/email')
 const { captureError } = require('../monitoring/sentry')
+const prisma = require('../lib/prisma')
 
 const router = express.Router()
-const prisma = new PrismaClient()
 
 const POPULAR_THRESHOLD = 3
 const RECOMMENDATION_LIMIT = 6

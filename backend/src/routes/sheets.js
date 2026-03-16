@@ -2,18 +2,15 @@ const express = require('express')
 const rateLimit = require('express-rate-limit')
 const fs = require('node:fs')
 const path = require('node:path')
-const { PrismaClient } = require('@prisma/client')
 const requireAuth = require('../middleware/auth')
 const { captureError } = require('../monitoring/sentry')
 const { createNotification } = require('../lib/notify')
 const { notifyMentionedUsers } = require('../lib/mentions')
 const { getAuthTokenFromRequest, verifyAuthToken } = require('../lib/authTokens')
+const prisma = require('../lib/prisma')
+const { cleanupAttachmentIfUnused, resolveAttachmentPath } = require('../lib/storage')
 
 const router = express.Router()
-const prisma = new PrismaClient()
-
-const UPLOADS_DIR = path.join(__dirname, '../../uploads')
-const ATTACHMENTS_DIR = path.join(UPLOADS_DIR, 'attachments')
 
 const reactLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -57,20 +54,6 @@ function safeDownloadName(name, fallbackExt = '') {
     .slice(0, 80) || 'studyhub-sheet'
 
   return `${base}${ext}`.toLowerCase()
-}
-
-function resolveAttachmentPath(attachmentUrl) {
-  if (!attachmentUrl || !attachmentUrl.startsWith('/uploads/attachments/')) {
-    return null
-  }
-
-  const fileName = attachmentUrl.replace('/uploads/attachments/', '')
-  const resolved = path.resolve(ATTACHMENTS_DIR, fileName)
-  if (!resolved.startsWith(path.resolve(ATTACHMENTS_DIR))) {
-    return null
-  }
-
-  return resolved
 }
 
 function serializeContribution(contribution) {
@@ -256,7 +239,7 @@ router.patch('/contributions/:contributionId', requireAuth, async (req, res) => 
       where: { id: contributionId },
       include: {
         targetSheet: {
-          select: { id: true, userId: true, title: true },
+          select: { id: true, userId: true, title: true, attachmentUrl: true },
         },
         forkSheet: {
           select: {
@@ -296,6 +279,14 @@ router.patch('/contributions/:contributionId', requireAuth, async (req, res) => 
           allowDownloads: contribution.forkSheet.allowDownloads,
         },
       })
+
+      if (contribution.targetSheet.attachmentUrl !== contribution.forkSheet.attachmentUrl) {
+        await cleanupAttachmentIfUnused(prisma, contribution.targetSheet.attachmentUrl, {
+          route: req.originalUrl,
+          contributionId,
+          targetSheetId: contribution.targetSheetId,
+        })
+      }
     }
 
     const updatedContribution = await prisma.sheetContribution.update({
@@ -650,6 +641,7 @@ router.patch('/:id', requireAuth, async (req, res) => {
       select: {
         id: true,
         userId: true,
+        attachmentUrl: true,
       },
     })
 
@@ -699,6 +691,13 @@ router.patch('/:id', requireAuth, async (req, res) => {
         },
       },
     })
+
+    if (removeAttachment === true) {
+      await cleanupAttachmentIfUnused(prisma, sheet.attachmentUrl, {
+        route: req.originalUrl,
+        sheetId,
+      })
+    }
 
     res.json(serializeSheet(updated))
   } catch (error) {
@@ -939,7 +938,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
   try {
     const sheet = await prisma.studySheet.findUnique({
       where: { id: sheetId },
-      select: { id: true, userId: true },
+      select: { id: true, userId: true, attachmentUrl: true },
     })
 
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
@@ -948,6 +947,10 @@ router.delete('/:id', requireAuth, async (req, res) => {
     }
 
     await prisma.studySheet.delete({ where: { id: sheetId } })
+    await cleanupAttachmentIfUnused(prisma, sheet.attachmentUrl, {
+      route: req.originalUrl,
+      sheetId,
+    })
     res.json({ message: 'Sheet deleted.' })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })

@@ -1,5 +1,13 @@
+const { captureError } = require('../monitoring/sentry')
+const { cleanupAttachmentIfUnused, cleanupAvatarIfUnused } = require('./storage')
+
 async function deleteUserAccount(prisma, { userId, username, reason = null, details = null }) {
-  return prisma.$transaction(async (tx) => {
+  const deletedAssetRefs = await prisma.$transaction(async (tx) => {
+    const userRecord = await tx.user.findUnique({
+      where: { id: userId },
+      select: { avatarUrl: true },
+    })
+
     if (reason) {
       await tx.deletionReason.create({
         data: {
@@ -16,10 +24,11 @@ async function deleteUserAccount(prisma, { userId, username, reason = null, deta
     // Explicitly clean up study sheet dependents before deleting the sheets.
     // CASCADE on the FK is set, but in production transactions we delete
     // explicitly to avoid silent deadlocks or constraint failures.
-    const sheetIds = (await tx.studySheet.findMany({
+    const userSheets = await tx.studySheet.findMany({
       where: { userId },
-      select: { id: true },
-    })).map(s => s.id)
+      select: { id: true, attachmentUrl: true },
+    })
+    const sheetIds = userSheets.map((sheet) => sheet.id)
 
     if (sheetIds.length > 0) {
       await tx.comment.deleteMany({ where: { sheetId: { in: sheetIds } } })
@@ -35,10 +44,11 @@ async function deleteUserAccount(prisma, { userId, username, reason = null, deta
       })
     }
 
-    const postIds = (await tx.feedPost.findMany({
+    const userPosts = await tx.feedPost.findMany({
       where: { userId },
-      select: { id: true },
-    })).map((post) => post.id)
+      select: { id: true, attachmentUrl: true },
+    })
+    const postIds = userPosts.map((post) => post.id)
 
     if (postIds.length > 0) {
       await tx.feedPostComment.deleteMany({ where: { postId: { in: postIds } } })
@@ -59,6 +69,43 @@ async function deleteUserAccount(prisma, { userId, username, reason = null, deta
 
     await tx.studySheet.deleteMany({ where: { userId } })
     await tx.user.delete({ where: { id: userId } })
+
+    return {
+      avatarUrl: userRecord?.avatarUrl || null,
+      attachmentUrls: [
+        ...new Set(
+          [...userSheets, ...userPosts]
+            .map((entry) => entry.attachmentUrl)
+            .filter(Boolean)
+        ),
+      ],
+    }
+  })
+
+  const cleanupTasks = [
+    ...deletedAssetRefs.attachmentUrls.map((attachmentUrl) =>
+      cleanupAttachmentIfUnused(prisma, attachmentUrl, {
+        source: 'deleteUserAccount',
+        userId,
+      })
+    ),
+  ]
+
+  if (deletedAssetRefs.avatarUrl) {
+    cleanupTasks.push(cleanupAvatarIfUnused(prisma, deletedAssetRefs.avatarUrl, {
+      source: 'deleteUserAccount',
+      userId,
+    }))
+  }
+
+  const cleanupResults = await Promise.allSettled(cleanupTasks)
+  cleanupResults.forEach((result) => {
+    if (result.status === 'rejected') {
+      captureError(result.reason, {
+        source: 'deleteUserAccountCleanup',
+        userId,
+      })
+    }
   })
 }
 

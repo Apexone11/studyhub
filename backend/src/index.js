@@ -1,9 +1,9 @@
 const express = require('express')
 const cors = require('cors')
-const path = require('path')
 require('dotenv').config()
 const { initSentry, captureError } = require('./monitoring/sentry')
 const { bootstrapRuntime } = require('./lib/bootstrap')
+const { UPLOADS_DIR, validateUploadStorage } = require('./lib/storage')
 
 const sentryEnabled = initSentry()
 
@@ -62,7 +62,7 @@ app.use(cors({
 app.use(express.json())
 
 // Serve uploaded files (avatars, attachments) as static assets.
-app.use('/uploads', express.static(path.join(__dirname, '../uploads'), {
+app.use('/uploads', express.static(UPLOADS_DIR, {
   index: false,
   setHeaders: (res) => {
     res.setHeader('X-Content-Type-Options', 'nosniff')
@@ -108,6 +108,7 @@ app.get('/', (req, res) => {
 })
 
 async function startServer() {
+  validateUploadStorage()
   await bootstrapRuntime()
 
   app.listen(PORT, () => {

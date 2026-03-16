@@ -20,6 +20,14 @@ function extractSixDigitCode(text) {
   return match[1]
 }
 
+function uploadUrlToLocalPath(uploadRootDir, uploadUrl) {
+  if (!uploadUrl || !String(uploadUrl).startsWith('/uploads/')) {
+    throw new Error(`Unsupported upload URL: ${uploadUrl}`)
+  }
+
+  return path.join(uploadRootDir, String(uploadUrl).replace('/uploads/', ''))
+}
+
 async function waitForCapturedEmail(captureDir, kind, recipient) {
   const normalizedRecipient = String(recipient || '').toLowerCase()
 
@@ -73,6 +81,7 @@ async function main() {
   const outputLog = path.join(repoRoot, '..', 'backend-smoke.out.log')
   const errorLog = path.join(repoRoot, '..', 'backend-smoke.err.log')
   const emailCaptureDir = path.join(repoRoot, '..', '.tmp-email-capture')
+  const uploadRootDir = path.join(repoRoot, '..', 'tmp-uploads-smoke')
   const smokeId = Date.now().toString(36).slice(-8)
   const studentUsername = `smoke_${smokeId}`
   const studentPassword = 'Password1A'
@@ -90,6 +99,10 @@ async function main() {
     fs.rmSync(emailCaptureDir, { recursive: true, force: true })
   } catch {}
 
+  try {
+    fs.rmSync(uploadRootDir, { recursive: true, force: true })
+  } catch {}
+
   const child = spawn('node', ['src/index.js'], {
     cwd: backendDir,
     env: {
@@ -98,6 +111,7 @@ async function main() {
       NODE_ENV: process.env.NODE_ENV || 'production',
       EMAIL_TRANSPORT: process.env.EMAIL_TRANSPORT || 'json',
       EMAIL_CAPTURE_DIR: process.env.EMAIL_CAPTURE_DIR || emailCaptureDir,
+      UPLOADS_DIR: process.env.UPLOADS_DIR || uploadRootDir,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
@@ -169,6 +183,8 @@ async function main() {
     let adminCookie = ''
     let emailVerificationCode = ''
     let twoFactorCode = ''
+    let sheetAttachmentPath = ''
+    let lockedPostAttachmentPath = ''
 
     await check('register-student', async () => {
       const school = requireCatalog()
@@ -370,6 +386,31 @@ async function main() {
       return `${response.status} sheetId=${data.id}`
     })
 
+    await check('upload-sheet-attachment-student', async () => {
+      const formData = new FormData()
+      formData.append('attachment', new Blob(['%PDF-1.4 sheet smoke test'], { type: 'application/pdf' }), 'smoke-sheet.pdf')
+
+      const response = await fetch(`${baseUrl}/api/upload/attachment/${createdSheetId}`, {
+        method: 'POST',
+        headers: { cookie: studentCookie },
+        body: formData,
+      })
+      const data = await response.json()
+      if (response.status !== 200 || !data.attachmentUrl) {
+        throw new Error(JSON.stringify(data))
+      }
+
+      sheetAttachmentPath = uploadUrlToLocalPath(uploadRootDir, data.attachmentUrl)
+      if (!sheetAttachmentPath.startsWith(uploadRootDir)) {
+        throw new Error(`Attachment was stored outside the configured upload root: ${sheetAttachmentPath}`)
+      }
+      if (!fs.existsSync(sheetAttachmentPath)) {
+        throw new Error(`Attachment file was not created at ${sheetAttachmentPath}`)
+      }
+
+      return `${response.status} attachment=${path.basename(sheetAttachmentPath)}`
+    })
+
     await check('get-sheet-single', async () => {
       const response = await fetch(`${baseUrl}/api/sheets/${createdSheetId}`, {
         headers: { cookie: studentCookie },
@@ -379,6 +420,25 @@ async function main() {
         throw new Error(JSON.stringify(data))
       }
       return `${response.status} title=${data.title}`
+    })
+
+    await check('download-sheet-attachment', async () => {
+      const response = await fetch(`${baseUrl}/api/sheets/${createdSheetId}/attachment`)
+      if (response.status !== 200) {
+        throw new Error(await response.text())
+      }
+
+      const contentDisposition = response.headers.get('content-disposition') || ''
+      if (!contentDisposition.toLowerCase().includes('attachment')) {
+        throw new Error(`Unexpected content-disposition header: ${contentDisposition}`)
+      }
+
+      const attachmentBytes = Buffer.from(await response.arrayBuffer())
+      if (attachmentBytes.length === 0) {
+        throw new Error('Downloaded attachment was empty.')
+      }
+
+      return `${response.status} bytes=${attachmentBytes.length}`
     })
 
     await check('leaderboard-stars', async () => {
@@ -494,6 +554,10 @@ async function main() {
       if (response.status !== 200 || !data.attachmentName) {
         throw new Error(JSON.stringify(data))
       }
+      lockedPostAttachmentPath = uploadUrlToLocalPath(uploadRootDir, data.attachmentUrl)
+      if (!fs.existsSync(lockedPostAttachmentPath)) {
+        throw new Error(`Locked post attachment file was not created at ${lockedPostAttachmentPath}`)
+      }
       return `${response.status} attachment=${data.attachmentName}`
     })
 
@@ -506,6 +570,25 @@ async function main() {
         throw new Error(`Expected 403, got ${response.status}: ${JSON.stringify(data)}`)
       }
       return data.error
+    })
+
+    await check('delete-locked-post-student', async () => {
+      const response = await fetch(`${baseUrl}/api/feed/posts/${lockedPostId}`, {
+        method: 'DELETE',
+        headers: { cookie: studentCookie },
+      })
+      const data = await response.json()
+      if (response.status !== 200) {
+        throw new Error(JSON.stringify(data))
+      }
+      return data.message
+    })
+
+    await check('locked-post-attachment-cleaned-up', async () => {
+      if (fs.existsSync(lockedPostAttachmentPath)) {
+        throw new Error(`Locked post attachment still exists at ${lockedPostAttachmentPath}`)
+      }
+      return 'attachment removed'
     })
 
     await check('comment-feed-post-admin', async () => {
@@ -687,6 +770,53 @@ async function main() {
         throw new Error(JSON.stringify(data))
       }
       return `${response.status} allowDownloads=${data.allowDownloads}`
+    })
+
+    await check('remove-sheet-attachment-student', async () => {
+      const response = await fetch(`${baseUrl}/api/sheets/${createdSheetId}`, {
+        method: 'PATCH',
+        headers: {
+          'content-type': 'application/json',
+          cookie: studentCookie,
+        },
+        body: JSON.stringify({ removeAttachment: true }),
+      })
+      const data = await response.json()
+      if (response.status !== 200 || data.hasAttachment !== false) {
+        throw new Error(JSON.stringify(data))
+      }
+      if (!fs.existsSync(sheetAttachmentPath)) {
+        throw new Error('Shared attachment was removed even though the fork still references it.')
+      }
+      return `${response.status} hasAttachment=${data.hasAttachment}`
+    })
+
+    await check('sheet-attachment-removed-from-original', async () => {
+      const response = await fetch(`${baseUrl}/api/sheets/${createdSheetId}/attachment`)
+      const data = await response.json()
+      if (response.status !== 404) {
+        throw new Error(`Expected 404, got ${response.status}: ${JSON.stringify(data)}`)
+      }
+      return data.error
+    })
+
+    await check('delete-fork-admin', async () => {
+      const response = await fetch(`${baseUrl}/api/sheets/${forkedSheetId}`, {
+        method: 'DELETE',
+        headers: { cookie: adminCookie },
+      })
+      const data = await response.json()
+      if (response.status !== 200) {
+        throw new Error(JSON.stringify(data))
+      }
+      return data.message
+    })
+
+    await check('sheet-attachment-cleaned-up-after-last-reference', async () => {
+      if (fs.existsSync(sheetAttachmentPath)) {
+        throw new Error(`Sheet attachment still exists at ${sheetAttachmentPath}`)
+      }
+      return 'attachment removed'
     })
 
     await check('create-announcement-admin', async () => {

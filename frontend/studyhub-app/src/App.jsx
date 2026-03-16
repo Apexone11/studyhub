@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { Suspense, lazy, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import {
   trackPageView,
@@ -7,33 +7,37 @@ import {
 } from './lib/telemetry'
 import { getStoredUser, hasStoredSession } from './lib/session'
 
-// ── existing pages ────────────────────────────────────────────────
-import HomePage        from './pages/HomePage'
-import LoginPage       from './pages/LoginPage'
-import RegisterScreen  from './pages/RegisterScreen'
-import DashboardPage   from './pages/DashboardPage'
-import TermsPage       from './pages/TermsPage'
-import PrivacyPage     from './pages/PrivacyPage'
-import GuidelinesPage  from './pages/GuidelinesPage'
+const HomePage = lazy(() => import('./pages/HomePage'))
+const LoginPage = lazy(() => import('./pages/LoginPage'))
+const RegisterScreen = lazy(() => import('./pages/RegisterScreen'))
+const DashboardPage = lazy(() => import('./pages/DashboardPage'))
+const TermsPage = lazy(() => import('./pages/TermsPage'))
+const PrivacyPage = lazy(() => import('./pages/PrivacyPage'))
+const GuidelinesPage = lazy(() => import('./pages/GuidelinesPage'))
+const FeedPage = lazy(() => import('./pages/FeedPage'))
+const SheetsPage = lazy(() => import('./pages/SheetsPage'))
+const SheetViewerPage = lazy(() => import('./pages/SheetViewerPage'))
+const SettingsPage = lazy(() => import('./pages/SettingsPage'))
+const AboutPage = lazy(() => import('./pages/AboutPage'))
+const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'))
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'))
+const UserProfilePage = lazy(() => import('./pages/UserProfilePage'))
 
-// ── new pages ─────────────────────────────────────────────────────
-import FeedPage          from './pages/FeedPage'
-import SheetsPage        from './pages/SheetsPage'
-import SheetViewerPage   from './pages/SheetViewerPage'
-import SettingsPage      from './pages/SettingsPage'
-import AboutPage          from './pages/AboutPage'
-import ForgotPasswordPage from './pages/ForgotPasswordPage'
-import ResetPasswordPage  from './pages/ResetPasswordPage'
-import UserProfilePage    from './pages/UserProfilePage'
-import {
-  TestsPage,
-  TestTakerPage,
-  NotesPage,
-  AnnouncementsPage,
-  SubmitPage,
-  AdminPage,
-  UploadSheetPage,
-} from './pages/PlaceholderPages'
+function lazyNamedPage(name) {
+  return lazy(() =>
+    import('./pages/PlaceholderPages').then((module) => ({
+      default: module[name],
+    })),
+  )
+}
+
+const TestsPage = lazyNamedPage('TestsPage')
+const TestTakerPage = lazyNamedPage('TestTakerPage')
+const NotesPage = lazyNamedPage('NotesPage')
+const AnnouncementsPage = lazyNamedPage('AnnouncementsPage')
+const SubmitPage = lazyNamedPage('SubmitPage')
+const AdminPage = lazyNamedPage('AdminPage')
+const UploadSheetPage = lazyNamedPage('UploadSheetPage')
 
 // ── simple auth guard ─────────────────────────────────────────────
 // Redirects to /feed if the user is already logged in.
@@ -68,43 +72,55 @@ function RouteTelemetry() {
   return null
 }
 
+function RouteFallback() {
+  return (
+    <div className="page-shell" style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>
+      <div className="auth-card" style={{ width: 'min(92vw, 420px)', textAlign: 'center' }}>
+        <p style={{ margin: 0 }}>Loading page...</p>
+      </div>
+    </div>
+  )
+}
+
 export default function App() {
   return (
     <BrowserRouter>
       <RouteTelemetry />
-      <Routes>
-        {/* ── public (unauthenticated) ─────────────────────────── */}
-        <Route path="/"         element={<PublicRoute><HomePage /></PublicRoute>} />
-        <Route path="/login"    element={<PublicRoute><LoginPage /></PublicRoute>} />
-        <Route path="/register" element={<PublicRoute><RegisterScreen /></PublicRoute>} />
-        <Route path="/terms"            element={<TermsPage />} />
-        <Route path="/privacy"          element={<PrivacyPage />} />
-        <Route path="/guidelines"       element={<GuidelinesPage />} />
-        <Route path="/about"            element={<AboutPage />} />
-        <Route path="/forgot-password"  element={<ForgotPasswordPage />} />
-        <Route path="/reset-password"   element={<ResetPasswordPage />} />
+      <Suspense fallback={<RouteFallback />}>
+        <Routes>
+          {/* ── public (unauthenticated) ─────────────────────────── */}
+          <Route path="/"         element={<PublicRoute><HomePage /></PublicRoute>} />
+          <Route path="/login"    element={<PublicRoute><LoginPage /></PublicRoute>} />
+          <Route path="/register" element={<PublicRoute><RegisterScreen /></PublicRoute>} />
+          <Route path="/terms"            element={<TermsPage />} />
+          <Route path="/privacy"          element={<PrivacyPage />} />
+          <Route path="/guidelines"       element={<GuidelinesPage />} />
+          <Route path="/about"            element={<AboutPage />} />
+          <Route path="/forgot-password"  element={<ForgotPasswordPage />} />
+          <Route path="/reset-password"   element={<ResetPasswordPage />} />
 
-        {/* ── authenticated ────────────────────────────────────── */}
-        <Route path="/feed"          element={<PrivateRoute><FeedPage /></PrivateRoute>} />
-        <Route path="/sheets"        element={<PrivateRoute><SheetsPage /></PrivateRoute>} />
-        <Route path="/sheets/upload" element={<PrivateRoute><UploadSheetPage /></PrivateRoute>} />
-        <Route path="/sheets/:id/edit" element={<PrivateRoute><UploadSheetPage /></PrivateRoute>} />
-        <Route path="/sheets/:id"    element={<PrivateRoute><SheetViewerPage /></PrivateRoute>} />
-        <Route path="/tests"         element={<PrivateRoute><TestsPage /></PrivateRoute>} />
-        <Route path="/tests/:id"     element={<PrivateRoute><TestTakerPage /></PrivateRoute>} />
-        <Route path="/notes"         element={<PrivateRoute><NotesPage /></PrivateRoute>} />
-        <Route path="/announcements" element={<PrivateRoute><AnnouncementsPage /></PrivateRoute>} />
-        <Route path="/submit"        element={<PrivateRoute><SubmitPage /></PrivateRoute>} />
-        <Route path="/admin"         element={<PrivateRoute><AdminPage /></PrivateRoute>} />
-        <Route path="/dashboard"     element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
-        <Route path="/settings"      element={<PrivateRoute><SettingsPage /></PrivateRoute>} />
+          {/* ── authenticated ────────────────────────────────────── */}
+          <Route path="/feed"          element={<PrivateRoute><FeedPage /></PrivateRoute>} />
+          <Route path="/sheets"        element={<PrivateRoute><SheetsPage /></PrivateRoute>} />
+          <Route path="/sheets/upload" element={<PrivateRoute><UploadSheetPage /></PrivateRoute>} />
+          <Route path="/sheets/:id/edit" element={<PrivateRoute><UploadSheetPage /></PrivateRoute>} />
+          <Route path="/sheets/:id"    element={<PrivateRoute><SheetViewerPage /></PrivateRoute>} />
+          <Route path="/tests"         element={<PrivateRoute><TestsPage /></PrivateRoute>} />
+          <Route path="/tests/:id"     element={<PrivateRoute><TestTakerPage /></PrivateRoute>} />
+          <Route path="/notes"         element={<PrivateRoute><NotesPage /></PrivateRoute>} />
+          <Route path="/announcements" element={<PrivateRoute><AnnouncementsPage /></PrivateRoute>} />
+          <Route path="/submit"        element={<PrivateRoute><SubmitPage /></PrivateRoute>} />
+          <Route path="/admin"         element={<PrivateRoute><AdminPage /></PrivateRoute>} />
+          <Route path="/dashboard"     element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
+          <Route path="/settings"      element={<PrivateRoute><SettingsPage /></PrivateRoute>} />
 
-        {/* ── public user profiles ─────────────────────────────── */}
-        <Route path="/users/:username" element={<UserProfilePage />} />
+          {/* ── public user profiles ─────────────────────────────── */}
+          <Route path="/users/:username" element={<UserProfilePage />} />
 
-        {/* ── catch-all ────────────────────────────────────────── */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+          {/* ── catch-all ────────────────────────────────────────── */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   )
 }

@@ -1,22 +1,20 @@
 const express = require('express')
 const multer = require('multer')
 const path = require('path')
-const fs = require('fs')
-const { PrismaClient } = require('@prisma/client')
 const requireAuth = require('../middleware/auth')
 const { captureError } = require('../monitoring/sentry')
+const prisma = require('../lib/prisma')
+const {
+  ATTACHMENTS_DIR,
+  AVATARS_DIR,
+  buildAttachmentUrl,
+  buildAvatarUrl,
+  cleanupAttachmentIfUnused,
+  cleanupAvatarIfUnused,
+  safeUnlinkFile,
+} = require('../lib/storage')
 
 const router = express.Router()
-const prisma = new PrismaClient()
-
-// ── Directory setup ───────────────────────────────────────────
-const UPLOADS_DIR = path.join(__dirname, '../../uploads')
-const AVATARS_DIR = path.join(UPLOADS_DIR, 'avatars')
-const ATTACHMENTS_DIR = path.join(UPLOADS_DIR, 'attachments')
-
-;[UPLOADS_DIR, AVATARS_DIR, ATTACHMENTS_DIR].forEach(dir => {
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
-})
 
 // ── Allowed types ─────────────────────────────────────────────
 const AVATAR_ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
@@ -39,22 +37,6 @@ function safeAttachmentLabel(original) {
     .replace(/[^a-zA-Z0-9._() -]/g, '_')
     .replace(/\s+/g, ' ')
     .slice(0, 120)
-}
-
-async function deleteAttachmentIfUnused(attachmentUrl) {
-  if (!attachmentUrl || !attachmentUrl.startsWith('/uploads/attachments/')) return
-
-  const [sheetRefs, postRefs] = await Promise.all([
-    prisma.studySheet.count({ where: { attachmentUrl } }),
-    prisma.feedPost.count({ where: { attachmentUrl } }),
-  ])
-
-  if (sheetRefs > 0 || postRefs > 0) return
-
-  const localPath = path.join(UPLOADS_DIR, attachmentUrl.replace('/uploads/', ''))
-  if (fs.existsSync(localPath)) {
-    fs.unlinkSync(localPath)
-  }
 }
 
 // ── Avatar upload ─────────────────────────────────────────────
@@ -90,19 +72,22 @@ router.post('/avatar', requireAuth, (req, res) => {
         where: { id: req.user.userId },
         select: { avatarUrl: true },
       })
-      if (oldUser?.avatarUrl && oldUser.avatarUrl.startsWith('/uploads/avatars/')) {
-        const oldPath = path.join(UPLOADS_DIR, oldUser.avatarUrl.replace('/uploads/', ''))
-        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath)
-      }
 
-      const avatarUrl = `/uploads/avatars/${req.file.filename}`
+      const avatarUrl = buildAvatarUrl(req.file.filename)
       const user = await prisma.user.update({
         where: { id: req.user.userId },
         data: { avatarUrl },
         select: { id: true, username: true, role: true, avatarUrl: true },
       })
+
+      await cleanupAvatarIfUnused(prisma, oldUser?.avatarUrl, {
+        route: req.originalUrl,
+        userId: req.user.userId,
+      })
+
       res.json({ avatarUrl: user.avatarUrl })
     } catch (dbErr) {
+      safeUnlinkFile(req.file?.path)
       captureError(dbErr, { route: req.originalUrl })
       res.status(500).json({ error: 'Failed to save avatar.' })
     }
@@ -142,22 +127,19 @@ router.post('/attachment/:sheetId', requireAuth, (req, res) => {
         where: { id: sheetId },
         select: { id: true, userId: true, attachmentUrl: true },
       })
-      if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
+      if (!sheet) {
+        safeUnlinkFile(req.file.path)
+        return res.status(404).json({ error: 'Sheet not found.' })
+      }
       if (sheet.userId !== req.user.userId && req.user.role !== 'admin') {
         // Delete the just-uploaded file to avoid orphaned files
-        fs.unlinkSync(req.file.path)
+        safeUnlinkFile(req.file.path)
         return res.status(403).json({ error: 'Not your sheet.' })
-      }
-
-      // Delete old attachment if present locally
-      if (sheet.attachmentUrl && sheet.attachmentUrl.startsWith('/uploads/attachments/')) {
-        const oldPath = path.join(UPLOADS_DIR, sheet.attachmentUrl.replace('/uploads/', ''))
-        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath)
       }
 
       const ext = path.extname(req.file.filename).toLowerCase()
       const attachmentType = ext === '.pdf' ? 'pdf' : 'image'
-      const attachmentUrl = `/uploads/attachments/${req.file.filename}`
+      const attachmentUrl = buildAttachmentUrl(req.file.filename)
       const attachmentName = safeAttachmentLabel(req.file.originalname)
 
       const updated = await prisma.studySheet.update({
@@ -165,9 +147,15 @@ router.post('/attachment/:sheetId', requireAuth, (req, res) => {
         data: { attachmentUrl, attachmentType, attachmentName },
         select: { id: true, attachmentUrl: true, attachmentType: true, attachmentName: true },
       })
-      await deleteAttachmentIfUnused(sheet.attachmentUrl)
+
+      await cleanupAttachmentIfUnused(prisma, sheet.attachmentUrl, {
+        route: req.originalUrl,
+        sheetId,
+      })
+
       res.json(updated)
     } catch (dbErr) {
+      safeUnlinkFile(req.file?.path)
       captureError(dbErr, { route: req.originalUrl })
       res.status(500).json({ error: 'Failed to save attachment.' })
     }
@@ -189,15 +177,18 @@ router.post('/post-attachment/:postId', requireAuth, (req, res) => {
         where: { id: postId },
         select: { id: true, userId: true, attachmentUrl: true },
       })
-      if (!post) return res.status(404).json({ error: 'Post not found.' })
+      if (!post) {
+        safeUnlinkFile(req.file.path)
+        return res.status(404).json({ error: 'Post not found.' })
+      }
       if (post.userId !== req.user.userId && req.user.role !== 'admin') {
-        fs.unlinkSync(req.file.path)
+        safeUnlinkFile(req.file.path)
         return res.status(403).json({ error: 'Not your post.' })
       }
 
       const ext = path.extname(req.file.filename).toLowerCase()
       const attachmentType = ext === '.pdf' ? 'pdf' : 'image'
-      const attachmentUrl = `/uploads/attachments/${req.file.filename}`
+      const attachmentUrl = buildAttachmentUrl(req.file.filename)
       const attachmentName = safeAttachmentLabel(req.file.originalname)
 
       const updated = await prisma.feedPost.update({
@@ -205,9 +196,15 @@ router.post('/post-attachment/:postId', requireAuth, (req, res) => {
         data: { attachmentUrl, attachmentType, attachmentName },
         select: { id: true, attachmentUrl: true, attachmentType: true, attachmentName: true },
       })
-      await deleteAttachmentIfUnused(post.attachmentUrl)
+
+      await cleanupAttachmentIfUnused(prisma, post.attachmentUrl, {
+        route: req.originalUrl,
+        postId,
+      })
+
       res.json(updated)
     } catch (dbErr) {
+      safeUnlinkFile(req.file?.path)
       captureError(dbErr, { route: req.originalUrl })
       res.status(500).json({ error: 'Failed to save attachment.' })
     }

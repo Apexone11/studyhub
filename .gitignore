@@ -1,6 +1,7 @@
 # Dependencies
 node_modules/
 **/node_modules/
+frontend/studyhub-app/dist/
 
 # Environment files
 .env
@@ -9,3 +10,10 @@ node_modules/
 **/.env.*
 !**/.env.example
 !**/.env.sample
+
+# Local uploads and smoke artifacts
+backend/uploads/
+.tmp-email-capture/
+tmp-uploads-smoke/
+backend-smoke.out.log
+backend-smoke.err.log

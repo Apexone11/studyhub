@@ -2,14 +2,13 @@ const express = require('express')
 const bcrypt = require('bcryptjs')
 const crypto = require('crypto')
 const rateLimit = require('express-rate-limit')
-const { PrismaClient } = require('@prisma/client')
 const { captureError } = require('../monitoring/sentry')
 const { sendPasswordReset, sendTwoFaCode } = require('../lib/email')
 const { clearAuthCookie, hashStoredSecret, setAuthCookie, signAuthToken } = require('../lib/authTokens')
 const { generateSixDigitCode, maskEmailAddress } = require('../lib/verificationCodes')
+const prisma = require('../lib/prisma')
 
 const router = express.Router()
-const prisma = new PrismaClient()
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,20}$/
 const PASSWORD_MIN_LENGTH = 8

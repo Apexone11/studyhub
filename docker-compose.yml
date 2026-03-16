@@ -25,6 +25,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:-set_a_local_jwt_secret}
       DATABASE_URL: ${DATABASE_URL:-postgresql://studyhub:set_a_local_postgres_password@db:5432/studyhub?schema=public}
       SHADOW_DATABASE_URL: ${SHADOW_DATABASE_URL:-postgresql://studyhub:set_a_local_postgres_password@db:5432/studyhub_shadow?schema=public}
+      UPLOADS_DIR: ${UPLOADS_DIR:-/app/uploads}
       SENTRY_DSN: ${SENTRY_DSN:-}
       SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0.1}
     ports:
@@ -35,6 +36,7 @@ services:
     volumes:
       - ./backend:/app
       - backend_node_modules:/app/node_modules
+      - backend_uploads:/app/uploads
     command: sh -c "npx prisma generate && npx prisma migrate deploy && npm run dev"
 
   pgadmin:
@@ -77,3 +79,4 @@ volumes:
   pgadmin_data:
   backend_node_modules:
   frontend_node_modules:
+  backend_uploads:
