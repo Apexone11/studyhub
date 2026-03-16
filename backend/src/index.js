@@ -3,6 +3,7 @@ const cors = require('cors')
 const path = require('path')
 require('dotenv').config()
 const { initSentry, captureError } = require('./monitoring/sentry')
+const { bootstrapRuntime } = require('./lib/bootstrap')
 
 const sentryEnabled = initSentry()
 
@@ -102,9 +103,18 @@ app.get('/', (req, res) => {
     res.json({ message: 'StudyHub API is running ✅' })
 })
 
-// Start server
-app.listen(PORT, () => {
+async function startServer() {
+  await bootstrapRuntime()
+
+  app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`)
+  })
+}
+
+startServer().catch((error) => {
+  captureError(error, { source: 'serverStartup' })
+  console.error(error)
+  process.exit(1)
 })
 
 

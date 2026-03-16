@@ -78,6 +78,25 @@ const DEFAULT_COURSES = [
   { code: 'PHYS101', name: 'Physics I'                         },
 ]
 
+function normalizeCatalogResponse(schools) {
+  const normalizedSchools = schools.map((school) => ({
+    id: school.id,
+    name: school.name,
+    short: school.short,
+  }))
+
+  const normalizedCourses = schools.reduce((coursesBySchool, school) => {
+    coursesBySchool[school.id] = (school.courses || []).map((course) => ({
+      id: course.id,
+      code: course.code,
+      name: course.name,
+    }))
+    return coursesBySchool
+  }, {})
+
+  return { normalizedSchools, normalizedCourses }
+}
+
 // ── VALIDATION ───────────────────────────────────────────────
 const RULES = {
   username: /^[a-zA-Z0-9_]{3,20}$/,
@@ -128,6 +147,8 @@ function RegisterScreen() {
   const [customCode, setCustomCode]       = useState('')
   const [customName, setCustomName]       = useState('')
   const [customCourses, setCustomCourses] = useState([])
+  const [catalogSchools, setCatalogSchools] = useState(SCHOOLS)
+  const [catalogCoursesBySchool, setCatalogCoursesBySchool] = useState(COURSES_BY_SCHOOL)
 
   // UI state
   const [error, setError]                 = useState('')
@@ -170,6 +191,32 @@ function RegisterScreen() {
     }
   }, [])
 
+  useEffect(() => {
+    let isMounted = true
+
+    async function loadCatalog() {
+      try {
+        const response = await fetch(`${API}/api/courses/schools`)
+        if (!response.ok) return
+
+        const schools = await response.json()
+        if (!isMounted || !Array.isArray(schools) || schools.length === 0) return
+
+        const { normalizedSchools, normalizedCourses } = normalizeCatalogResponse(schools)
+        setCatalogSchools(normalizedSchools)
+        setCatalogCoursesBySchool(normalizedCourses)
+      } catch {
+        // Fall back to the baked-in catalog if the public course endpoint is unavailable.
+      }
+    }
+
+    loadCatalog()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
   // ── Step 1 → Step 2 ──────────────────────────────────────
   function goToStep2() {
     if (!username || !password || !confirm) { setError('Please fill in all fields.'); return }
@@ -185,7 +232,7 @@ function RegisterScreen() {
   function handleSchoolSearch(q) {
     setSchoolQuery(q)
     if (!q.trim()) { setSchoolResults([]); setShowSchoolDD(false); return }
-    const matches = SCHOOLS.filter(s =>
+    const matches = catalogSchools.filter(s =>
       s.name.toLowerCase().includes(q.toLowerCase()) ||
       s.short.toLowerCase().includes(q.toLowerCase())
     ).slice(0, 8)
@@ -221,7 +268,7 @@ function RegisterScreen() {
 
   // ── Course search ─────────────────────────────────────────
   function buildCourseResults(q, school, alreadyPicked) {
-    const pool = (school && COURSES_BY_SCHOOL[school.id]) || DEFAULT_COURSES
+    const pool = (school && catalogCoursesBySchool[school.id]) || DEFAULT_COURSES
     const taken = alreadyPicked.map(c => c.code)
     const matches = pool.filter(c =>
       !taken.includes(c.code) &&
