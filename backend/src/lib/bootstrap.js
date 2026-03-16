@@ -15,6 +15,26 @@ const SCHEMA_REPAIR_STATEMENTS = [
   'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "twoFaEnabled" BOOLEAN NOT NULL DEFAULT false',
   'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "twoFaCode" TEXT',
   'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "twoFaExpiry" TIMESTAMP(3)',
+  `UPDATE "User"
+   SET "email" = NULLIF(LOWER(BTRIM("email")), '')
+   WHERE "email" IS NOT NULL`,
+  `WITH "duplicateEmails" AS (
+      SELECT
+        "id",
+        ROW_NUMBER() OVER (PARTITION BY "email" ORDER BY "id") AS "rowNum"
+      FROM "User"
+      WHERE "email" IS NOT NULL
+    )
+    UPDATE "User" AS "target"
+    SET
+      "email" = NULL,
+      "emailVerified" = false,
+      "twoFaEnabled" = false,
+      "twoFaCode" = NULL,
+      "twoFaExpiry" = NULL
+    FROM "duplicateEmails" AS "dupe"
+    WHERE "target"."id" = "dupe"."id"
+      AND "dupe"."rowNum" > 1`,
   'CREATE UNIQUE INDEX IF NOT EXISTS "User_email_key" ON "User"("email")',
 
   `CREATE TABLE IF NOT EXISTS "RequestedCourse" (
