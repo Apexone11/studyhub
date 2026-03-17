@@ -1,12 +1,16 @@
 const express = require('express')
 const cors = require('cors')
 const rateLimit = require('express-rate-limit')
-require('dotenv').config()
+const path = require('node:path')
+require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') })
 const { initSentry, captureError } = require('./monitoring/sentry')
 const { bootstrapRuntime } = require('./lib/bootstrap')
-const { validatePrismaEnvironment } = require('./lib/prisma')
+const { validateEmailTransport } = require('./lib/email')
+const { startHtmlArchiveScheduler } = require('./lib/htmlArchiveScheduler')
 const { UPLOADS_DIR, validateUploadStorage } = require('./lib/storage')
 const csrfProtection = require('./middleware/csrf')
+const { guardedMode } = require('./middleware/guardedMode')
+const { ERROR_CODES, sendError } = require('./middleware/errorEnvelope')
 
 const sentryEnabled = initSentry()
 
@@ -16,6 +20,7 @@ const authRoutes = require('./routes/auth')
 const courseRoutes = require('./routes/courses')
 const sheetRoutes = require('./routes/sheets')
 const feedRoutes = require('./routes/feed')
+const dashboardRoutes = require('./routes/dashboard')
 const settingsRoutes = require('./routes/settings')
 const announcementRoutes = require('./routes/announcements')
 const adminRoutes = require('./routes/admin')
@@ -71,7 +76,10 @@ if (isProd) {
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true)
-    if (allowedOrigins.includes(origin)) return callback(null, true)
+    const normalizedOrigin = normalizeOrigin(origin)
+    if (normalizedOrigin && trustedOrigins.has(normalizedOrigin)) {
+      return callback(null, true)
+    }
     callback(new Error(`CORS: origin ${origin} not allowed`))
   },
   credentials: true,
@@ -91,7 +99,7 @@ app.use((req, res, next) => {
     return next()
   }
 
-  return res.status(403).json({ error: 'Origin not allowed.' })
+  return sendError(res, 403, 'Origin not allowed.', ERROR_CODES.FORBIDDEN)
 })
 
 const globalLimiter = rateLimit({
@@ -106,6 +114,9 @@ app.use(globalLimiter)
 
 // Parse JSON request bodies for auth and future API routes.
 app.use(express.json())
+
+// Optional emergency write-guard for non-admin requests.
+app.use(guardedMode)
 
 // CSRF protection for cookie-authenticated session mutations.
 app.use(csrfProtection)
@@ -129,6 +140,9 @@ app.use('/api/sheets', sheetRoutes)
 
 // Mount feed endpoints under /api/feed.
 app.use('/api/feed', feedRoutes)
+
+// Mount dashboard summary endpoints under /api/dashboard.
+app.use('/api/dashboard', dashboardRoutes)
 
 // Mount settings endpoints under /api/settings.
 app.use('/api/settings', settingsRoutes)
@@ -161,19 +175,25 @@ app.get('/health', (req, res) => {
 })
 
 async function startServer() {
-  validatePrismaEnvironment()
   validateUploadStorage()
   await bootstrapRuntime()
+  await validateEmailTransport({
+    strict: String(process.env.EMAIL_STARTUP_STRICT || '').toLowerCase() === 'true',
+  })
 
-  app.listen(PORT, () => {
+  return app.listen(PORT, () => {
+    startHtmlArchiveScheduler()
     console.log(`Server running on http://localhost:${PORT}`)
   })
 }
 
-startServer().catch((error) => {
-  captureError(error, { source: 'serverStartup' })
-  console.error(error)
-  process.exit(1)
-})
+if (require.main === module) {
+  startServer().catch((error) => {
+    captureError(error, { source: 'serverStartup' })
+    console.error(error)
+    process.exit(1)
+  })
+}
 
-
+module.exports = app
+module.exports.startServer = startServer

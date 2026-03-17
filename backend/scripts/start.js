@@ -1,7 +1,7 @@
 const path = require('node:path')
 const { spawn } = require('node:child_process')
 
-require('dotenv').config()
+require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') })
 
 const BACKEND_ROOT = path.resolve(__dirname, '..')
 
@@ -48,7 +48,14 @@ async function main() {
     await runPrismaMigrations()
   }
 
-  require(path.join(BACKEND_ROOT, 'src', 'index.js'))
+  const backendEntry = require(path.join(BACKEND_ROOT, 'src', 'index.js'))
+  const startServer = backendEntry?.startServer
+
+  if (typeof startServer !== 'function') {
+    throw new Error('Backend entrypoint does not export startServer().')
+  }
+
+  await startServer()
 }
 
 main().catch((error) => {

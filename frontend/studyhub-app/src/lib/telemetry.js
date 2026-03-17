@@ -181,3 +181,29 @@ export function trackSignupConversion() {
     send_to: `${GOOGLE_ADS_ID}/${GOOGLE_ADS_SIGNUP_CONVERSION_LABEL}`,
   })
 }
+
+function createFallbackEventId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+
+  return `route-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+}
+
+export function captureRouteCrash(error, context = {}) {
+  let eventId = ''
+
+  if (sentryInitialized) {
+    eventId = Sentry.captureException(error, {
+      tags: { surface: 'route-error-boundary' },
+      extra: context,
+    }) || ''
+  }
+
+  if (!eventId) {
+    eventId = createFallbackEventId()
+  }
+
+  console.error('Route render crashed.', { eventId, ...context, error })
+  return eventId
+}

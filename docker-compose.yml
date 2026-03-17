@@ -16,6 +16,12 @@ services:
       timeout: 5s
       retries: 20
 
+  clamav:
+    image: clamav/clamav:latest
+    restart: unless-stopped
+    ports:
+      - "3310:3310"
+
   backend:
     build:
       context: ./backend
@@ -27,16 +33,20 @@ services:
       JWT_SECRET: ${JWT_SECRET:-set_a_local_jwt_secret}
       DATABASE_URL: ${DATABASE_URL:-postgresql://studyhub:set_a_local_postgres_password@db:5432/studyhub?schema=public}
       SHADOW_DATABASE_URL: ${SHADOW_DATABASE_URL:-postgresql://studyhub:set_a_local_postgres_password@db:5432/studyhub_shadow?schema=public}
-      OPTIMIZE_ENABLE: ${OPTIMIZE_ENABLE:-false}
-      OPTIMIZE_API_KEY: ${OPTIMIZE_API_KEY:-}
       UPLOADS_DIR: ${UPLOADS_DIR:-/app/uploads}
       SENTRY_DSN: ${SENTRY_DSN:-}
       SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0.1}
+      CLAMAV_HOST: ${CLAMAV_HOST:-clamav}
+      CLAMAV_PORT: ${CLAMAV_PORT:-3310}
+      HTML_ARCHIVE_DAYS: ${HTML_ARCHIVE_DAYS:-20}
+      HTML_ARCHIVE_INTERVAL_MS: ${HTML_ARCHIVE_INTERVAL_MS:-21600000}
     ports:
       - "4000:4000"
     depends_on:
       db:
         condition: service_healthy
+      clamav:
+        condition: service_started
     volumes:
       - ./backend:/app
       - backend_node_modules:/app/node_modules
@@ -67,6 +77,7 @@ services:
       NODE_ENV: development
       PORT: 5173
       CHOKIDAR_USEPOLLING: "true"
+      VITE_API_URL: http://localhost:4000
       VITE_POSTHOG_KEY: ${VITE_POSTHOG_KEY:-}
       VITE_POSTHOG_HOST: ${VITE_POSTHOG_HOST:-https://us.i.posthog.com}
       VITE_CLARITY_PROJECT_ID: ${VITE_CLARITY_PROJECT_ID:-}

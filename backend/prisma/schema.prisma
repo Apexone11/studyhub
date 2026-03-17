@@ -37,10 +37,12 @@ model User {
   feedPostReactions  FeedPostReaction[]
   proposedContributions SheetContribution[] @relation("ContributionProposer")
   reviewedContributions SheetContribution[] @relation("ContributionReviewer")
+  verificationChallenges VerificationChallenge[]
   notificationsReceived Notification[] @relation("NotifRecipient")
   notificationsSent     Notification[] @relation("NotifActor")
   following          UserFollow[]   @relation("Following")
   followers          UserFollow[]   @relation("Followers")
+  htmlVersions       SheetHtmlVersion[]
 }
 
 model School {
@@ -76,6 +78,13 @@ model StudySheet {
   id        Int      @id @default(autoincrement())
   title     String
   content   String
+  contentFormat String @default("markdown")
+  status    String   @default("published")
+  htmlScanStatus String @default("queued")
+  htmlScanFindings Json?
+  htmlScanUpdatedAt DateTime?
+  htmlScanAcknowledgedAt DateTime?
+  htmlOriginalArchivedAt DateTime?
   courseId  Int
   userId    Int
   forkOf    Int?
@@ -99,6 +108,34 @@ model StudySheet {
   reactions    Reaction[]
   incomingContributions SheetContribution[] @relation("ContributionTarget")
   outgoingContributions SheetContribution[] @relation("ContributionFork")
+  htmlVersions SheetHtmlVersion[]
+
+  @@index([createdAt(sort: Desc)])
+  @@index([courseId, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([htmlScanStatus, updatedAt(sort: Desc)])
+}
+
+model SheetHtmlVersion {
+  id               Int       @id @default(autoincrement())
+  sheetId          Int
+  userId           Int
+  kind             String
+  sourceName       String?
+  content          String
+  checksum         String
+  compressionAlgo  String?
+  compressedContent Bytes?
+  archivedAt       DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  sheet            StudySheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  author           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([sheetId, kind])
+  @@index([kind, updatedAt(sort: Desc)])
+  @@index([archivedAt, updatedAt(sort: Desc)])
 }
 
 model RequestedCourse {
@@ -122,6 +159,8 @@ model Comment {
   createdAt DateTime   @default(now())
   sheet     StudySheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
   author    User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([sheetId, createdAt(sort: Desc)])
 }
 
 model StarredSheet {
@@ -150,6 +189,8 @@ model Announcement {
   pinned    Boolean  @default(false)
   createdAt DateTime @default(now())
   author    User     @relation(fields: [authorId], references: [id])
+
+  @@index([pinned, createdAt(sort: Desc)])
 }
 
 model Note {
@@ -177,6 +218,8 @@ model Notification {
   createdAt DateTime @default(now())
   user      User     @relation("NotifRecipient", fields: [userId], references: [id], onDelete: Cascade)
   actor     User?    @relation("NotifActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([userId, read, createdAt(sort: Desc)])
 }
 
 model UserFollow {
@@ -222,6 +265,10 @@ model FeedPost {
   course         Course?            @relation(fields: [courseId], references: [id], onDelete: SetNull)
   comments       FeedPostComment[]
   reactions      FeedPostReaction[]
+
+  @@index([createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([courseId, createdAt(sort: Desc)])
 }
 
 model FeedPostComment {
@@ -232,6 +279,8 @@ model FeedPostComment {
   createdAt DateTime @default(now())
   post      FeedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
   author    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([postId, createdAt(sort: Desc)])
 }
 
 model FeedPostReaction {
@@ -242,6 +291,7 @@ model FeedPostReaction {
   post   FeedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@id([userId, postId])
+  @@index([postId, type])
 }
 
 model SheetContribution {
@@ -262,4 +312,29 @@ model SheetContribution {
 
   @@index([targetSheetId, status])
   @@index([proposerId, status])
+}
+
+model VerificationChallenge {
+  id           Int       @id @default(autoincrement())
+  token        String    @unique
+  purpose      String
+  userId       Int?
+  username     String?
+  email        String?
+  passwordHash String?
+  payload      Json?
+  codeHash     String
+  expiresAt    DateTime
+  attemptCount Int       @default(0)
+  sendCount    Int       @default(1)
+  lastSentAt   DateTime  @default(now())
+  verifiedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  user         User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([purpose, userId, expiresAt])
+  @@index([purpose, username, expiresAt])
+  @@index([purpose, email, expiresAt])
+  @@index([purpose, verifiedAt, expiresAt])
 }

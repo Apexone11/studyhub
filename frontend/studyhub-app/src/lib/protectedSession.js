@@ -1,4 +1,5 @@
 import { API } from '../config'
+import { getApiErrorMessage, isAuthSessionFailure, readJsonSafely } from './http'
 import { clearStoredSession, getStoredUser, setStoredUser } from './session'
 
 export function authJsonHeaders() {
@@ -7,8 +8,8 @@ export function authJsonHeaders() {
   }
 }
 
-export function isAuthFailureStatus(status) {
-  return status === 401 || status === 403
+export function isAuthFailureStatus(status, data = {}) {
+  return status === 401 || data?.code === 'AUTH_REQUIRED' || data?.code === 'AUTH_EXPIRED'
 }
 
 export async function syncProtectedUser() {
@@ -19,7 +20,11 @@ export async function syncProtectedUser() {
 
   try {
     const response = await fetch(`${API}/api/auth/me`, { headers: authJsonHeaders() })
-    if (isAuthFailureStatus(response.status)) {
+    const data = response.ok
+      ? await readJsonSafely(response, null)
+      : await readJsonSafely(response, {})
+
+    if (isAuthSessionFailure(response, data) || isAuthFailureStatus(response.status, data)) {
       clearStoredSession()
       return { status: 'unauthorized', user: null, error: '' }
     }
@@ -27,11 +32,11 @@ export async function syncProtectedUser() {
       return {
         status: 'recoverable-error',
         user: storedUser,
-        error: 'Could not refresh your session. Showing cached data.',
+        error: getApiErrorMessage(data, 'Could not refresh your session. Showing cached data.'),
       }
     }
 
-    const user = await response.json()
+    const user = data
     setStoredUser(user)
     return { status: 'ready', user, error: '' }
   } catch {

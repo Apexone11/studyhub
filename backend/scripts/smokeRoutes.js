@@ -115,6 +115,7 @@ async function main() {
   const smokeId = Date.now().toString(36).slice(-8)
   const studentUsername = `smoke_${smokeId}`
   const studentPassword = 'Password1A'
+  const registrationEmail = `${studentUsername}@signup.example.com`
   const studentEmail = `${studentUsername}@example.com`
   const safeMethods = new Set(['GET', 'HEAD', 'OPTIONS'])
   const csrfTokenByCookie = new Map()
@@ -237,28 +238,87 @@ async function main() {
     let lockedPostId = null
     let adminCookie = ''
     let emailVerificationCode = ''
+    let registerVerificationToken = ''
+    let registerVerificationCode = ''
     let twoFactorCode = ''
     let sheetAttachmentPath = ''
     let lockedPostAttachmentPath = ''
 
-    await check('register-student', async () => {
-      const school = requireCatalog()
-      const courseIds = (school.courses || []).slice(0, 2).map((course) => course.id)
-      const response = await fetch(`${baseUrl}/api/auth/register`, {
+    await check('register-student-start', async () => {
+      const response = await fetch(`${baseUrl}/api/auth/register/start`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           username: studentUsername,
+          email: registrationEmail,
           password: studentPassword,
+          confirmPassword: studentPassword,
+          termsAccepted: true,
+        }),
+      })
+      const data = await response.json()
+      if (response.status !== 201 || !data.verificationToken) {
+        throw new Error(JSON.stringify(data))
+      }
+      registerVerificationToken = data.verificationToken
+      return `${response.status} token=${registerVerificationToken.slice(0, 8)}...`
+    })
+
+    await check('capture-register-email-code', async () => {
+      const capturedEmail = await waitForCapturedEmail(
+        emailCaptureDir,
+        'email-verification',
+        registrationEmail,
+      )
+      registerVerificationCode = extractSixDigitCode(`${capturedEmail.text}\n${capturedEmail.html}`)
+      return `code=${registerVerificationCode}`
+    })
+
+    await check('register-student-verify', async () => {
+      if (!registerVerificationToken) {
+        throw new Error('Registration verification token was not captured from register/start.')
+      }
+      if (!registerVerificationCode) {
+        throw new Error('Registration verification code was not captured from email output.')
+      }
+
+      const response = await fetch(`${baseUrl}/api/auth/register/verify`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          verificationToken: registerVerificationToken,
+          code: registerVerificationCode,
+        }),
+      })
+      const data = await response.json()
+      if (response.status !== 200 || data.verified !== true) {
+        throw new Error(JSON.stringify(data))
+      }
+      return `${response.status} verified=${data.verified}`
+    })
+
+    await check('register-student-complete', async () => {
+      const school = requireCatalog()
+      const courseIds = (school.courses || []).slice(0, 2).map((course) => course.id)
+      if (!registerVerificationToken) {
+        throw new Error('Registration verification token was not captured from register/start.')
+      }
+
+      const response = await fetch(`${baseUrl}/api/auth/register/complete`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          verificationToken: registerVerificationToken,
           schoolId: school.id,
           courseIds,
           customCourses: [],
         }),
       })
       const data = await response.json()
-      if (response.status !== 201) {
+      if (response.status !== 201 || !data.user) {
         throw new Error(JSON.stringify(data))
       }
+
       studentCookie = syncSessionCookie(studentCookie, response, data, csrfTokenByCookie)
       return `${response.status} role=${data.user.role}`
     })
@@ -1123,6 +1183,11 @@ async function main() {
     })
 
     console.log(JSON.stringify(results, null, 2))
+    const failedChecks = results.filter((result) => !result.ok)
+    if (failedChecks.length > 0) {
+      console.error(`Smoke route checks failed: ${failedChecks.length}`)
+      process.exitCode = 2
+    }
   } finally {
     child.kill('SIGTERM')
     await delay(800)

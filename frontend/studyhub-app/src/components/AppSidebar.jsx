@@ -2,13 +2,14 @@
 // Shared left navigation sidebar — same as FeedPage sidebar
 // Used by: TestsPage, NotesPage, AnnouncementsPage, SubmitPage, SheetsPage
 
+import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   IconFeed, IconSheets, IconTests, IconNotes,
   IconAnnouncements, IconProfile, IconPlus, IconSettings,
 } from './Icons'
 import { API } from '../config'
-import { getStoredUser } from '../lib/session'
+import { useSession } from '../lib/session-context'
 
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 
@@ -47,13 +48,18 @@ function Avatar({ name, size = 48, role }) {
   )
 }
 
-export default function AppSidebar() {
+export default function AppSidebar({ mode = 'fixed' }) {
   const { pathname } = useLocation()
   const navigate = useNavigate()
+  const [drawerOpen, setDrawerOpen] = useState(false)
 
-  const user = getStoredUser()
+  const { user } = useSession()
 
   if (!user) return null
+
+  useEffect(() => {
+    if (drawerOpen) setDrawerOpen(false)
+  }, [pathname])
 
   const enrollments = user.enrollments || []
   const courseCodes = enrollments.map(e => e.course?.code).filter(Boolean)
@@ -61,8 +67,8 @@ export default function AppSidebar() {
     ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
     : null
 
-  return (
-    <aside style={{ position: 'sticky', top: 74, alignSelf: 'start', fontFamily: FONT }}>
+  const shell = (
+    <>
       {/* Profile card */}
       <div style={{
         background: '#fff', borderRadius: 16,
@@ -187,6 +193,84 @@ export default function AppSidebar() {
           </Link>
         </div>
       )}
+    </>
+  )
+
+  if (mode === 'drawer') {
+    return (
+      <aside style={{ position: 'sticky', top: 74, alignSelf: 'start', fontFamily: FONT, zIndex: 25 }}>
+        <button
+          type="button"
+          onClick={() => setDrawerOpen(true)}
+          style={{
+            border: '1px solid #cbd5e1',
+            borderRadius: 12,
+            background: '#fff',
+            color: '#0f172a',
+            fontWeight: 700,
+            padding: '10px 14px',
+            fontSize: 13,
+            fontFamily: FONT,
+          }}
+        >
+          Open navigation
+        </button>
+        {drawerOpen ? (
+          <div
+            role="presentation"
+            onClick={() => setDrawerOpen(false)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(15, 23, 42, 0.45)',
+              zIndex: 50,
+              display: 'flex',
+              justifyContent: 'flex-start',
+            }}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Sidebar navigation"
+              onClick={(event) => event.stopPropagation()}
+              style={{
+                width: 'min(86vw, 320px)',
+                height: '100%',
+                overflowY: 'auto',
+                background: '#f1f5f9',
+                padding: 14,
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <div style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>Navigation</div>
+                <button
+                  type="button"
+                  onClick={() => setDrawerOpen(false)}
+                  style={{
+                    border: '1px solid #cbd5e1',
+                    borderRadius: 10,
+                    background: '#fff',
+                    color: '#475569',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    padding: '6px 10px',
+                    fontFamily: FONT,
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+              {shell}
+            </div>
+          </div>
+        ) : null}
+      </aside>
+    )
+  }
+
+  return (
+    <aside style={{ position: 'sticky', top: 74, alignSelf: 'start', fontFamily: FONT }}>
+      {shell}
     </aside>
   )
 }

@@ -3,11 +3,22 @@ const bcrypt = require('bcryptjs')
 const rateLimit = require('express-rate-limit')
 const requireAuth = require('../middleware/auth')
 const { captureError } = require('../monitoring/sentry')
-const { hashStoredSecret, setAuthCookie, signAuthToken } = require('../lib/authTokens')
+const { signAuthToken, setAuthCookie } = require('../lib/authTokens')
 const { sendEmailVerification } = require('../lib/email')
 const { deleteUserAccount } = require('../lib/deleteUserAccount')
-const { generateSixDigitCode } = require('../lib/verificationCodes')
+const {
+  VERIFICATION_PURPOSE,
+  VerificationError,
+  consumeChallenge,
+  createSettingsEmailChallenge,
+  getUserActiveChallenge,
+  mapChallengeForClient,
+  resendSettingsEmailChallenge,
+  verifyChallengeCode,
+} = require('../lib/verificationChallenges')
 const prisma = require('../lib/prisma')
+
+const router = express.Router()
 
 const twoFaLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -17,13 +28,9 @@ const twoFaLimiter = rateLimit({
   legacyHeaders: false,
 })
 
-const router = express.Router()
-
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,20}$/
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const COURSE_CODE_REGEX = /^[A-Z0-9-]{2,20}$/
-const EMAIL_VERIFICATION_CODE_REGEX = /^\d{6}$/
-const EMAIL_VERIFICATION_TTL_MS = 15 * 60 * 1000
 
 class AppError extends Error {
   constructor(statusCode, message) {
@@ -81,7 +88,18 @@ function parseCustomCourses(customCourses) {
 }
 
 async function validateCourseIds(courseIds, schoolId) {
+  if (schoolId !== null) {
+    const school = await prisma.school.findUnique({
+      where: { id: schoolId },
+      select: { id: true },
+    })
+    if (!school) {
+      throw new AppError(400, 'The selected school was not found.')
+    }
+  }
+
   if (courseIds.length === 0) return
+
   const where = { id: { in: courseIds } }
   if (schoolId !== null) where.schoolId = schoolId
   const courses = await prisma.course.findMany({ where, select: { id: true } })
@@ -116,48 +134,83 @@ async function resolveCourseIds(tx, courseIds, customCourses, schoolId) {
   return [...new Set(resolvedCourseIds)]
 }
 
+function normalizeEmail(value) {
+  const normalizedEmail = typeof value === 'string' ? value.trim().toLowerCase() : ''
+  if (!normalizedEmail) throw new AppError(400, 'Email and password confirmation are required.')
+  if (!EMAIL_REGEX.test(normalizedEmail)) {
+    throw new AppError(400, 'Please enter a valid email address.')
+  }
+  return normalizedEmail
+}
+
+function serializePendingEmailVerification(challenge) {
+  if (!challenge) return null
+  const mapped = mapChallengeForClient(challenge)
+  return {
+    email: mapped.email,
+    deliveryHint: mapped.deliveryHint,
+    expiresAt: mapped.expiresAt,
+    resendAvailableAt: mapped.resendAvailableAt,
+    verificationToken: mapped.verificationToken,
+  }
+}
+
+async function sendSettingsVerificationEmail(email, username, code, metadata = {}) {
+  try {
+    await sendEmailVerification(email, username, code)
+  } catch (error) {
+    captureError(error, {
+      source: 'sendEmailVerification',
+      ...metadata,
+    })
+    throw new AppError(503, 'We could not send a verification code to that email address. Please try again later.')
+  }
+}
+
 async function getSettingsUser(userId) {
-  return prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      username: true,
-      role: true,
-      email: true,
-      emailVerified: true,
-      twoFaEnabled: true,
-      avatarUrl: true,
-      createdAt: true,
-      enrollments: {
-        include: { course: { include: { school: true } } },
+  const [user, pendingChallenge] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        username: true,
+        role: true,
+        email: true,
+        emailVerified: true,
+        twoFaEnabled: true,
+        avatarUrl: true,
+        createdAt: true,
+        enrollments: {
+          include: { course: { include: { school: true } } },
+        },
+        _count: { select: { studySheets: true, enrollments: true } },
       },
-      _count: { select: { studySheets: true, enrollments: true } },
-    },
-  })
+    }),
+    getUserActiveChallenge(userId, VERIFICATION_PURPOSE.SETTINGS_EMAIL),
+  ])
+
+  if (!user) return null
+
+  return {
+    ...user,
+    pendingEmailVerification: serializePendingEmailVerification(pendingChallenge),
+  }
 }
 
 function sendError(req, res, error) {
-  if (error instanceof AppError) return res.status(error.statusCode).json({ error: error.message })
-  if (error.code === 'P2002') return res.status(409).json({ error: 'That username or email is already taken.' })
+  if (error instanceof AppError || error instanceof VerificationError) {
+    return res.status(error.statusCode).json({ error: error.message })
+  }
+  if (error && error.code === 'P2002') {
+    return res.status(409).json({ error: 'That username or email is already taken.' })
+  }
   captureError(error, { route: req.originalUrl, method: req.method })
   console.error(error)
   return res.status(500).json({ error: 'Server error. Please try again.' })
 }
 
-function buildEmailVerificationRecord() {
-  const code = generateSixDigitCode()
-
-  return {
-    code,
-    emailVerificationCode: hashStoredSecret(code),
-    emailVerificationExpiry: new Date(Date.now() + EMAIL_VERIFICATION_TTL_MS),
-  }
-}
-
-// All settings endpoints require authentication
 router.use(requireAuth)
 
-// ── GET /api/settings/me ──────────────────────────────────────
 router.get('/me', async (req, res) => {
   try {
     const user = await getSettingsUser(req.user.userId)
@@ -168,18 +221,15 @@ router.get('/me', async (req, res) => {
   }
 })
 
-// ── PATCH /api/settings/password ────────────────────────────
 router.patch('/password', twoFaLimiter, async (req, res) => {
   const { currentPassword, newPassword } = req.body || {}
 
   if (!currentPassword || !newPassword) {
     return res.status(400).json({ error: 'Current and new password are required.' })
   }
-
   if (newPassword.length < 8) {
     return res.status(400).json({ error: 'New password must be at least 8 characters.' })
   }
-
   if (currentPassword === newPassword) {
     return res.status(400).json({ error: 'New password must be different from current password.' })
   }
@@ -200,7 +250,6 @@ router.patch('/password', twoFaLimiter, async (req, res) => {
   }
 })
 
-// ── PATCH /api/settings/username ─────────────────────────────
 router.patch('/username', async (req, res) => {
   const { newUsername, password } = req.body || {}
 
@@ -219,18 +268,16 @@ router.patch('/username', async (req, res) => {
 
     const valid = await bcrypt.compare(password, user.passwordHash)
     if (!valid) return res.status(401).json({ error: 'Password is incorrect.' })
-
     if (trimmed === user.username) {
       return res.status(400).json({ error: 'New username must be different from current username.' })
     }
 
     const updatedTokenUser = await prisma.user.update({
       where: { id: user.id },
-      data: { username: trimmed }
+      data: { username: trimmed },
     })
     const updated = await getSettingsUser(user.id)
 
-    // Re-issue token with new username
     const token = signAuthToken(updatedTokenUser)
     setAuthCookie(res, token)
     return res.json({
@@ -242,7 +289,6 @@ router.patch('/username', async (req, res) => {
   }
 })
 
-// ── PATCH /api/settings/email ────────────────────────────────
 router.patch('/email', twoFaLimiter, async (req, res) => {
   const { email, password } = req.body || {}
 
@@ -250,112 +296,110 @@ router.patch('/email', twoFaLimiter, async (req, res) => {
     return res.status(400).json({ error: 'Email and password confirmation are required.' })
   }
 
-  const trimmedEmail = email.trim().toLowerCase()
-  if (!EMAIL_REGEX.test(trimmedEmail)) {
-    return res.status(400).json({ error: 'Please enter a valid email address.' })
-  }
-
   try {
+    const trimmedEmail = normalizeEmail(email)
     const user = await prisma.user.findUnique({ where: { id: req.user.userId } })
     if (!user) return res.status(404).json({ error: 'User not found.' })
 
     const valid = await bcrypt.compare(password, user.passwordHash)
     if (!valid) return res.status(401).json({ error: 'Password is incorrect.' })
-
     if (trimmedEmail === user.email) {
       return res.status(400).json({ error: 'New email must be different from current email.' })
     }
 
-    const verification = buildEmailVerificationRecord()
+    const conflictingUser = await prisma.user.findFirst({
+      where: {
+        email: trimmedEmail,
+        id: { not: user.id },
+      },
+      select: { id: true },
+    })
+    if (conflictingUser) {
+      return res.status(409).json({ error: 'That email is already in use.' })
+    }
+
+    const { challenge, code } = await createSettingsEmailChallenge({
+      user,
+      email: trimmedEmail,
+    })
+
+    try {
+      await sendSettingsVerificationEmail(trimmedEmail, user.username, code, {
+        route: req.originalUrl,
+        method: req.method,
+        purpose: VERIFICATION_PURPOSE.SETTINGS_EMAIL,
+      })
+    } catch (error) {
+      await consumeChallenge(challenge.id)
+      throw error
+    }
 
     await prisma.user.update({
       where: { id: user.id },
       data: {
-        email: trimmedEmail,
-        emailVerified: false,
-        emailVerificationCode: verification.emailVerificationCode,
-        emailVerificationExpiry: verification.emailVerificationExpiry,
         twoFaEnabled: false,
         twoFaCode: null,
         twoFaExpiry: null,
       },
     })
 
-    try {
-      await sendEmailVerification(trimmedEmail, user.username, verification.code)
-    } catch (emailError) {
-      await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          email: user.email,
-          emailVerified: user.emailVerified,
-          emailVerificationCode: user.emailVerificationCode,
-          emailVerificationExpiry: user.emailVerificationExpiry,
-          twoFaEnabled: user.twoFaEnabled,
-          twoFaCode: user.twoFaCode,
-          twoFaExpiry: user.twoFaExpiry,
-        },
-      })
-      captureError(emailError, {
-        route: req.originalUrl,
-        method: req.method,
-        source: 'sendEmailVerification',
-      })
-      return res.status(503).json({
-        error: 'We could not send a verification code to that email address. Please try again later.',
-      })
-    }
-
     const updated = await getSettingsUser(user.id)
 
     return res.json({
-      message: 'Email updated. Enter the verification code sent to your inbox to finish setup.',
+      message: 'Email update started. Enter the verification code sent to your inbox to finish setup.',
       verificationRequired: true,
       user: updated,
+      pendingEmailVerification: updated?.pendingEmailVerification || null,
     })
   } catch (error) {
     return sendError(req, res, error)
   }
 })
 
-// ── POST /api/settings/email/verify ───────────────────────────
 router.post('/email/verify', twoFaLimiter, async (req, res) => {
   const body = req.body || {}
   const code = typeof body.code === 'string' ? body.code.trim() : ''
 
-  if (!EMAIL_VERIFICATION_CODE_REGEX.test(code)) {
+  if (!/^\d{6}$/.test(code)) {
     return res.status(400).json({ error: 'Enter the 6-digit verification code.' })
   }
 
   try {
-    const user = await prisma.user.findUnique({ where: { id: req.user.userId } })
-    if (!user) return res.status(404).json({ error: 'User not found.' })
-    if (!user.email) return res.status(400).json({ error: 'Add an email address before verifying it.' })
-    if (user.emailVerified) return res.status(400).json({ error: 'Your email is already verified.' })
-    if (!user.emailVerificationCode || !user.emailVerificationExpiry) {
-      return res.status(400).json({ error: 'No verification code is active. Request a new code.' })
-    }
-    if (user.emailVerificationExpiry < new Date()) {
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { emailVerificationCode: null, emailVerificationExpiry: null },
-      })
-      return res.status(400).json({ error: 'That verification code has expired. Request a new one.' })
-    }
-    if (user.emailVerificationCode !== hashStoredSecret(code)) {
-      return res.status(400).json({ error: 'Incorrect verification code.' })
+    const activeChallenge = await getUserActiveChallenge(req.user.userId, VERIFICATION_PURPOSE.SETTINGS_EMAIL)
+    if (!activeChallenge) {
+      return res.status(400).json({ error: 'No email verification is currently in progress.' })
     }
 
+    const conflictingUser = await prisma.user.findFirst({
+      where: {
+        email: activeChallenge.email,
+        id: { not: req.user.userId },
+      },
+      select: { id: true },
+    })
+    if (conflictingUser) {
+      return res.status(409).json({ error: 'That email is already in use.' })
+    }
+
+    const verifiedChallenge = await verifyChallengeCode(
+      activeChallenge.token,
+      VERIFICATION_PURPOSE.SETTINGS_EMAIL,
+      code,
+    )
+
     await prisma.user.update({
-      where: { id: user.id },
+      where: { id: req.user.userId },
       data: {
+        email: verifiedChallenge.email,
         emailVerified: true,
         emailVerificationCode: null,
         emailVerificationExpiry: null,
       },
     })
 
-    const updated = await getSettingsUser(user.id)
+    await consumeChallenge(verifiedChallenge.id)
+    const updated = await getSettingsUser(req.user.userId)
+
     return res.json({
       message: 'Email verified successfully.',
       user: updated,
@@ -365,50 +409,58 @@ router.post('/email/verify', twoFaLimiter, async (req, res) => {
   }
 })
 
-// ── POST /api/settings/email/resend-verification ──────────────
 router.post('/email/resend-verification', twoFaLimiter, async (req, res) => {
   try {
-    const user = await prisma.user.findUnique({ where: { id: req.user.userId } })
-    if (!user) return res.status(404).json({ error: 'User not found.' })
-    if (!user.email) return res.status(400).json({ error: 'Add an email address before requesting a verification code.' })
-    if (user.emailVerified) return res.status(400).json({ error: 'Your email is already verified.' })
-
-    const verification = buildEmailVerificationRecord()
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        emailVerificationCode: verification.emailVerificationCode,
-        emailVerificationExpiry: verification.emailVerificationExpiry,
-      },
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: { id: true, username: true, email: true, emailVerified: true },
     })
+    if (!user) return res.status(404).json({ error: 'User not found.' })
 
-    try {
-      await sendEmailVerification(user.email, user.username, verification.code)
-    } catch (emailError) {
-      await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          emailVerificationCode: user.emailVerificationCode,
-          emailVerificationExpiry: user.emailVerificationExpiry,
-        },
-      })
-      captureError(emailError, {
-        route: req.originalUrl,
-        method: req.method,
-        source: 'resendEmailVerification',
-      })
-      return res.status(503).json({
-        error: 'We could not resend your verification code right now. Please try again later.',
-      })
+    let challenge = await getUserActiveChallenge(user.id, VERIFICATION_PURPOSE.SETTINGS_EMAIL)
+    let code
+
+    if (challenge) {
+      const refreshed = await resendSettingsEmailChallenge(user.id)
+      challenge = refreshed.challenge
+      code = refreshed.code
+    } else {
+      if (!user.email) {
+        return res.status(400).json({ error: 'Add an email address before requesting a verification code.' })
+      }
+      if (user.emailVerified) {
+        return res.status(400).json({ error: 'Your email is already verified.' })
+      }
+
+      const created = await createSettingsEmailChallenge({ user, email: user.email })
+      challenge = created.challenge
+      code = created.code
     }
 
-    return res.json({ message: 'A new verification code has been sent to your email.' })
+    try {
+      await sendSettingsVerificationEmail(challenge.email, user.username, code, {
+        route: req.originalUrl,
+        method: req.method,
+        purpose: VERIFICATION_PURPOSE.SETTINGS_EMAIL,
+      })
+    } catch (error) {
+      if (!challenge.verifiedAt && challenge.sendCount === 1) {
+        await consumeChallenge(challenge.id)
+      }
+      throw error
+    }
+
+    const updated = await getSettingsUser(user.id)
+    return res.json({
+      message: 'A new verification code has been sent to your email.',
+      pendingEmailVerification: updated?.pendingEmailVerification || serializePendingEmailVerification(challenge),
+      user: updated,
+    })
   } catch (error) {
     return sendError(req, res, error)
   }
 })
 
-// ── PATCH /api/settings/courses ──────────────────────────────
 router.patch('/courses', async (req, res) => {
   const { schoolId, courseIds, customCourses } = req.body || {}
 
@@ -447,7 +499,6 @@ router.patch('/courses', async (req, res) => {
   }
 })
 
-// ── PATCH /api/settings/2fa/enable ───────────────────────────
 router.patch('/2fa/enable', twoFaLimiter, async (req, res) => {
   const { password } = req.body || {}
   if (!password) return res.status(400).json({ error: 'Password is required.' })
@@ -459,6 +510,11 @@ router.patch('/2fa/enable', twoFaLimiter, async (req, res) => {
     if (!user.emailVerified) return res.status(400).json({ error: 'Verify your email address before enabling 2-step verification.' })
     if (user.twoFaEnabled) return res.status(400).json({ error: '2FA is already enabled.' })
 
+    const pendingChallenge = await getUserActiveChallenge(user.id, VERIFICATION_PURPOSE.SETTINGS_EMAIL)
+    if (pendingChallenge) {
+      return res.status(400).json({ error: 'Verify your pending email change before enabling 2-step verification.' })
+    }
+
     const valid = await bcrypt.compare(password, user.passwordHash)
     if (!valid) return res.status(401).json({ error: 'Password is incorrect.' })
 
@@ -469,7 +525,6 @@ router.patch('/2fa/enable', twoFaLimiter, async (req, res) => {
   }
 })
 
-// ── PATCH /api/settings/2fa/disable ──────────────────────────
 router.patch('/2fa/disable', twoFaLimiter, async (req, res) => {
   const { password } = req.body || {}
   if (!password) return res.status(400).json({ error: 'Password is required.' })
@@ -483,7 +538,7 @@ router.patch('/2fa/disable', twoFaLimiter, async (req, res) => {
 
     await prisma.user.update({
       where: { id: user.id },
-      data: { twoFaEnabled: false, twoFaCode: null, twoFaExpiry: null }
+      data: { twoFaEnabled: false, twoFaCode: null, twoFaExpiry: null },
     })
     return res.json({ twoFaEnabled: false, message: '2-step verification disabled.' })
   } catch (error) {
@@ -491,11 +546,10 @@ router.patch('/2fa/disable', twoFaLimiter, async (req, res) => {
   }
 })
 
-// ── DELETE /api/settings/account ─────────────────────────────
 router.delete('/account', twoFaLimiter, async (req, res) => {
   const { password, reason, details } = req.body || {}
   if (!password) return res.status(400).json({ error: 'Password is required to delete your account.' })
-  if (!reason)   return res.status(400).json({ error: 'Please select a reason for leaving.' })
+  if (!reason) return res.status(400).json({ error: 'Please select a reason for leaving.' })
 
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user.userId } })

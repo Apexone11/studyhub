@@ -17,6 +17,29 @@ export default defineConfig(async ({ mode }) => {
 
   return {
     plugins,
+    resolve: {
+      dedupe: ['react', 'react-dom', 'react-router', 'react-router-dom'],
+    },
+    test: {
+      environment: 'jsdom',
+      setupFiles: './src/test/setup.js',
+      css: false,
+      restoreMocks: true,
+      clearMocks: true,
+      include: ['src/**/*.test.{js,jsx}'],
+      exclude: ['tests/**'],
+      server: {
+        deps: {
+          inline: [
+            'react',
+            'react-dom',
+            'react-router',
+            'react-router-dom',
+            '@testing-library/react',
+          ],
+        },
+      },
+    },
     build: {
       rollupOptions: {
         output: {

@@ -4,16 +4,30 @@
 	"private": true,
 	"main": "src/index.js",
 	"scripts": {
+		"build": "node --check src/index.js",
 		"dev": "nodemon src/index.js",
+		"lint": "eslint . --ext .js",
 		"start": "node scripts/start.js",
+		"db:migrate": "prisma migrate deploy",
+		"db:push": "prisma db push",
+		"email:smoke": "node scripts/emailSmoke.js",
 		"seed": "node prisma/seed.js",
+		"seed:beta": "node scripts/seedBetaUsers.js",
+		"preview:fixture": "node scripts/ensurePreviewFixture.js",
 		"seed:admin": "node scripts/seedAdmin.js",
-		"load:test": "node scripts/loadTraffic.js"
+		"smoke:routes": "node scripts/smokeRoutes.js",
+		"migrate:readiness": "node scripts/checkMigrationReadiness.js",
+		"migrate:readiness:deploy": "node scripts/checkMigrationReadiness.js --deploy",
+		"migrate:readiness:smoke": "node scripts/checkMigrationReadiness.js --with-smoke",
+		"migrate:readiness:deploy:smoke": "node scripts/checkMigrationReadiness.js --deploy --with-smoke",
+		"capture:feed-network": "node scripts/captureFeedNetwork.js",
+		"load:test": "node scripts/loadTraffic.js",
+		"archive:html-originals": "node scripts/archiveHtmlOriginals.js",
+		"test": "vitest run",
+		"test:watch": "vitest"
 	},
 	"dependencies": {
 		"@prisma/client": "^6.19.2",
-		"@prisma/extension-accelerate": "^3.0.1",
-		"@prisma/extension-optimize": "^2.0.1",
 		"@sentry/node": "^10.43.0",
 		"bcryptjs": "^3.0.3",
 		"cors": "^2.8.6",
@@ -23,11 +37,17 @@
 		"jsonwebtoken": "^9.0.3",
 		"multer": "^2.1.1",
 		"nodemailer": "^8.0.2",
-		"prisma": "^6.19.2"
+		"prisma": "^6.19.2",
+		"sharp": "^0.34.5"
 	},
 	"devDependencies": {
+		"@eslint/js": "^9.39.1",
 		"autocannon": "^8.0.0",
-		"nodemon": "^3.1.14"
+		"eslint": "^9.39.1",
+		"globals": "^16.5.0",
+		"nodemon": "^3.1.14",
+		"supertest": "^7.1.4",
+		"vitest": "^4.0.4"
 	},
 	"engines": {
 		"node": ">=20.0.0"

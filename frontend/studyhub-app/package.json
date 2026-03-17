@@ -9,7 +9,14 @@
     "build:analyze": "vite build --mode analyze",
     "lint": "eslint .",
     "preview": "vite preview",
-    "start": "node scripts/start.js"
+    "start": "node scripts/start.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e:smoke": "playwright test --grep @smoke",
+    "test:e2e:responsive": "playwright test tests/app.responsive.smoke.spec.js",
+    "test:e2e": "playwright test",
+    "capture:feed-console": "node scripts/captureFeedConsole.mjs",
+    "beta:snapshots": "node scripts/captureBetaSnapshots.mjs"
   },
   "dependencies": {
     "@sentry/react": "^10.43.0",
@@ -21,7 +28,11 @@
     "serve": "^14.2.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.54.2",
     "@eslint/js": "^9.39.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
@@ -29,8 +40,11 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
+    "jsdom": "^27.0.1",
+    "msw": "^2.11.6",
     "rollup-plugin-visualizer": "^6.0.11",
-    "vite": "^8.0.0-beta.13"
+    "vite": "^8.0.0-beta.13",
+    "vitest": "^4.0.4"
   },
   "overrides": {
     "vite": "^8.0.0-beta.13"

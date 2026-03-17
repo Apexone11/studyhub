@@ -2,6 +2,28 @@ import { API } from '../config'
 import { clearStoredSession, getStoredUser, setStoredUser } from './session'
 
 let fetchShimInstalled = false
+export const AUTH_SESSION_EXPIRED_EVENT = 'studyhub:auth-expired'
+
+const AUTH_ERROR_CODES = new Set(['AUTH_REQUIRED', 'AUTH_EXPIRED'])
+
+export async function readJsonSafely(response, fallback = {}) {
+  try {
+    return await response.json()
+  } catch {
+    return fallback
+  }
+}
+
+export function isAuthSessionFailure(response, data = {}) {
+  return response.status === 401 || AUTH_ERROR_CODES.has(data?.code)
+}
+
+export function getApiErrorMessage(data, fallback) {
+  if (typeof data?.error === 'string' && data.error.trim()) {
+    return data.error.trim()
+  }
+  return fallback
+}
 
 export function installApiFetchShim() {
   if (fetchShimInstalled || typeof window === 'undefined') return
@@ -30,13 +52,18 @@ export function installApiFetchShim() {
       headers: { 'Content-Type': 'application/json' },
     })
       .then(async (response) => {
-        if (response.status === 401 || response.status === 403) {
+        const data = await readJsonSafely(response, {})
+
+        if (isAuthSessionFailure(response, data)) {
           clearStoredSession()
+          return ''
+        }
+        if (response.status === 403) {
           return ''
         }
         if (!response.ok) return ''
 
-        const user = await response.json()
+        const user = data
         setStoredUser(user)
         return user?.csrfToken || ''
       })
@@ -81,10 +108,20 @@ export function installApiFetchShim() {
     }
 
     if (input instanceof Request) {
-      return nativeFetch(new Request(input, nextInit))
+      const response = await nativeFetch(new Request(input, nextInit))
+      if (response.status === 401) {
+        clearStoredSession()
+        window.dispatchEvent(new CustomEvent(AUTH_SESSION_EXPIRED_EVENT))
+      }
+      return response
     }
 
-    return nativeFetch(input, nextInit)
+    const response = await nativeFetch(input, nextInit)
+    if (response.status === 401) {
+      clearStoredSession()
+      window.dispatchEvent(new CustomEvent(AUTH_SESSION_EXPIRED_EVENT))
+    }
+    return response
   }
 
   fetchShimInstalled = true

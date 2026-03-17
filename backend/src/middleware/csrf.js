@@ -3,6 +3,7 @@ const {
   verifyAuthToken,
   verifyCsrfToken,
 } = require('../lib/authTokens')
+const { ERROR_CODES, sendError } = require('./errorEnvelope')
 
 function csrfProtection(req, res, next) {
   if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') {
@@ -20,21 +21,21 @@ function csrfProtection(req, res, next) {
   try {
     authPayload = verifyAuthToken(authToken)
   } catch {
-    return res.status(403).json({ error: 'Invalid or expired session.' })
+    return sendError(res, 401, 'Invalid or expired session.', ERROR_CODES.AUTH_EXPIRED)
   }
 
   const csrfToken = req.get('x-csrf-token')
   if (!csrfToken) {
-    return res.status(403).json({ error: 'Missing CSRF token.' })
+    return sendError(res, 403, 'Missing CSRF token.', ERROR_CODES.CSRF_INVALID)
   }
 
   try {
     const csrfPayload = verifyCsrfToken(csrfToken)
     if (csrfPayload?.type !== 'csrf' || csrfPayload?.userId !== authPayload?.userId) {
-      return res.status(403).json({ error: 'Invalid CSRF token.' })
+      return sendError(res, 403, 'Invalid CSRF token.', ERROR_CODES.CSRF_INVALID)
     }
   } catch {
-    return res.status(403).json({ error: 'Invalid CSRF token.' })
+    return sendError(res, 403, 'Invalid CSRF token.', ERROR_CODES.CSRF_INVALID)
   }
 
   return next()

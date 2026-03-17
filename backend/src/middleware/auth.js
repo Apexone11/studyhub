@@ -1,18 +1,19 @@
 const { getAuthTokenFromRequest, verifyAuthToken } = require('../lib/authTokens')
+const { ERROR_CODES, sendError } = require('./errorEnvelope')
 
 function requireAuth(req, res, next) {
   const token = getAuthTokenFromRequest(req)
 
   if (!token) {
-    return res.status(401).json({ error: 'Login required.' })
+    return sendError(res, 401, 'Login required.', ERROR_CODES.AUTH_REQUIRED)
   }
 
   try {
     const decoded = verifyAuthToken(token)
     req.user = decoded // { userId, username, role }
     next()
-  } catch (err) {
-    return res.status(403).json({ error: 'Invalid or expired token.' })
+  } catch {
+    return sendError(res, 401, 'Invalid or expired token.', ERROR_CODES.AUTH_EXPIRED)
   }
 }
 

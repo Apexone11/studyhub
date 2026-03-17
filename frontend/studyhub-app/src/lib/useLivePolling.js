@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useRef } from 'react'
+import { startTransition as reactStartTransition, useEffect, useRef } from 'react'
 
 const HAS_WINDOW = typeof window !== 'undefined'
 const HAS_DOCUMENT = typeof document !== 'undefined'
@@ -30,6 +30,11 @@ export function useLivePolling(task, options = {}) {
     abortRef.current = controller
 
     try {
+      const startTransition =
+        typeof reactStartTransition === 'function'
+          ? reactStartTransition
+          : undefined
+
       await taskRef.current({
         signal: controller?.signal,
         startTransition,

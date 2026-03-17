@@ -1,0 +1,101 @@
+name: Nightly Regression
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '30 4 * * *'
+
+jobs:
+  full-playwright:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend/studyhub-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/studyhub-app/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - name: Upload Playwright Regression Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-regression-artifacts
+          path: |
+            frontend/studyhub-app/playwright-report
+            frontend/studyhub-app/test-results
+          if-no-files-found: ignore
+
+  backend-migration-and-performance:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: studyhub_test
+          POSTGRES_USER: studyhub
+          POSTGRES_PASSWORD: studyhub
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U studyhub -d studyhub_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://studyhub:studyhub@127.0.0.1:5432/studyhub_test?schema=public
+      JWT_SECRET: nightly-studyhub-secret
+      FRONTEND_URL: http://127.0.0.1:4173
+      EMAIL_TRANSPORT: json
+      EMAIL_CAPTURE_DIR: ${{ github.workspace }}/.nightly-email-capture
+      ADMIN_USERNAME: studyhub_owner
+      ADMIN_PASSWORD: AdminPass123
+      LOAD_TEST_BASE_URL: http://127.0.0.1:4000
+      LOAD_TEST_DURATION: 5
+      LOAD_TEST_OUTPUT_FILE: load-test-report.json
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npm run db:migrate
+      - run: npm run seed
+      - run: npm run seed:admin
+      - name: Start backend server
+        shell: bash
+        run: |
+          node src/index.js > ../backend-server.log 2>&1 &
+          echo $! > ../backend-server.pid
+      - name: Wait for backend health
+        shell: bash
+        run: |
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:4000/health > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Backend failed to start in time."
+          exit 1
+      - run: npm run load:test
+      - name: Upload Backend Nightly Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-nightly-artifacts
+          path: |
+            backend/load-test-report.json
+            backend-server.log
+          if-no-files-found: ignore
