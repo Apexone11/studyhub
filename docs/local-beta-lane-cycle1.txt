@@ -282,3 +282,63 @@ Cycle 6 Full Gate Result (Refreshed Rerun)
   - `0` failures
   - `502` throttled
 - High-volume read waves continued to produce expected `429` throttling under rate limits with no effective failures or resets.
+
+Cycle 7 Additions (Code Scanning + CI Security Hardening)
+Implemented in beta lane:
+- GitHub Actions least-privilege token permissions added at workflow scope:
+  - `.github/workflows/ci.yml`
+  - `.github/workflows/nightly-regression.yml`
+- Clear-text sensitive logging reduced in backend scripts:
+  - `backend/scripts/ensurePreviewFixture.js` now logs a generic failure message only
+  - `backend/scripts/seedBetaUsers.js` no longer prints plaintext passwords
+- Helmet configuration hardened in API bootstrap:
+  - removed explicit `contentSecurityPolicy: false`
+  - removed explicit `frameguard: false`
+  - existing custom CSP/frame header middleware remains active
+- Feed attachment preview now enforces `allowDownloads` parity with download endpoint:
+  - `GET /api/feed/posts/:id/attachment/preview` now returns forbidden when downloads are disabled
+- Preview policy error-code clarity improved:
+  - added `PREVIEW_HTML_BLOCKED` envelope code
+  - HTML policy rejection now uses `PREVIEW_HTML_BLOCKED` (instead of token-invalid code)
+- Admin middleware 500 response now uses stable envelope code:
+  - added `SERVER_ERROR` in shared error envelope constants
+- File signature detector made fail-safe for open/read/close errors:
+  - `backend/src/lib/fileSignatures.js`
+- HTML archival compression moved off synchronous event-loop blocking path:
+  - `backend/src/lib/htmlArchive.js` now uses async gzip
+- ReDoS-hardening updates:
+  - `backend/src/lib/htmlSecurity.js` regex-based scanning replaced with deterministic bounded parsers
+  - new deterministic email validator `backend/src/lib/emailValidation.js`
+  - `backend/src/routes/auth.js` and `backend/src/routes/settings.js` switched to deterministic email validation
+- CodeQL test-only missing-rate-limit finding addressed in stability middleware tests:
+  - `backend/test/releaseA.stability.middleware.test.js` now applies explicit rate limiting before auth/csrf middleware in the targeted test apps
+- Local compose deterministic image pin:
+  - `docker-compose.yml` pins ClamAV to `clamav/clamav:1.3.1`
+- Sidebar drawer accessibility improvements:
+  - `frontend/studyhub-app/src/components/AppSidebar.jsx`
+  - adds `aria-expanded`/`aria-controls`, dialog id wiring, Escape close, and focus transfer into dialog on open
+
+Cycle 7 Validation Commands (Executed)
+- `npm run beta:check`
+- `npm --prefix backend run lint`
+- `npm --prefix backend run build`
+- `npm --prefix frontend/studyhub-app run build`
+
+Cycle 7 Validation Result
+- `npm run beta:check` passed end-to-end on 2026-03-17:
+  - backend Vitest: `11` files, `35` tests passed
+  - frontend Vitest: `9` files, `19` tests passed
+  - frontend Playwright smoke: `15` tests passed
+  - backend route smoke checks passed
+- Backend lint passed.
+- Backend build check passed.
+- Frontend production build passed.
+- Feed diagnostics capture remained clean and regenerated artifacts:
+  - `beta-diagnostics/feed-network.json`
+  - `beta-diagnostics/frontend-console.json`
+
+Cycle 7 Follow-Up Notes
+- Frontend lint currently has pre-existing unrelated failures outside this cycle's security patch scope:
+  - `frontend/studyhub-app/src/pages/shared/pageScaffold.jsx` (`react-refresh/only-export-components`)
+  - warning in `frontend/studyhub-app/src/pages/sheets/SheetViewerPage.jsx` (`react-hooks/exhaustive-deps`)
+- Sourcery review bot diff-limit warning (`>20000` lines) is a PR-size/platform constraint; mitigation is to split future large releases into smaller reviewable PRs.

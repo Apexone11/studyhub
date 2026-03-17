@@ -28,6 +28,7 @@ const {
   sendOrRefreshLoginChallenge,
   verifyChallengeCode,
 } = require('../lib/verificationChallenges')
+const { isValidEmailAddress } = require('../lib/emailValidation')
 const prisma = require('../lib/prisma')
 
 const requireAuth = require('../middleware/auth')
@@ -35,7 +36,6 @@ const requireAuth = require('../middleware/auth')
 const router = express.Router()
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,20}$/
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const PASSWORD_MIN_LENGTH = 8
 const TWO_FA_CODE_TTL_MS = 10 * 60 * 1000
 const COURSE_CODE_REGEX = /^[A-Z0-9-]{2,20}$/
@@ -187,7 +187,7 @@ function normalizeEmail(value, allowEmpty = false) {
     if (allowEmpty) return ''
     throw new AppError(400, 'Email is required.')
   }
-  if (!EMAIL_REGEX.test(normalizedEmail)) {
+  if (!isValidEmailAddress(normalizedEmail)) {
     throw new AppError(400, 'Please enter a valid email address.')
   }
   return normalizedEmail

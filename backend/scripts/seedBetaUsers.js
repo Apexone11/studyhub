@@ -118,7 +118,7 @@ async function main() {
 
   console.log('Local beta users are ready:')
   for (const user of users) {
-    console.log(`- ${user.role.padEnd(7)} ${user.username} / ${user.password}`)
+    console.log(`- ${user.role.padEnd(7)} ${user.username} (password set)`)
   }
 }
 

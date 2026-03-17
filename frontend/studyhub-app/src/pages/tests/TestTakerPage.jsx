@@ -1,7 +1,7 @@
 // TestTakerPage keeps the reserved test-taking route explicit until the full practice runtime ships.
 import { Link } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
-import { PAGE_FONT } from '../shared/pageScaffold'
+import { PAGE_FONT } from '../shared/pageUtils'
 
 export default function TestTakerPage() {
   return (

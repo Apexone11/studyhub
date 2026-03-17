@@ -6,7 +6,8 @@ import { IconPlus } from '../../components/Icons'
 import { API } from '../../config'
 import { useSession } from '../../lib/session-context'
 import { useLivePolling } from '../../lib/useLivePolling'
-import { PageShell, PAGE_FONT, authHeaders, timeAgo } from '../shared/pageScaffold'
+import { PageShell } from '../shared/pageScaffold'
+import { PAGE_FONT, authHeaders, timeAgo } from '../shared/pageUtils'
 
 export default function AnnouncementsPage() {
   const { user } = useSession()

@@ -553,11 +553,15 @@ router.get('/posts/:id/attachment/preview', requireAuth, attachmentDownloadLimit
         attachmentUrl: true,
         attachmentName: true,
         attachmentType: true,
+        allowDownloads: true,
       },
     })
 
     if (!post) return res.status(404).json({ error: 'Post not found.' })
     if (!post.attachmentUrl) return res.status(404).json({ error: 'Attachment not found.' })
+    if (!post.allowDownloads) {
+      return sendForbidden(res, 'Downloads are disabled for this post.')
+    }
 
     const localPath = resolveAttachmentPath(post.attachmentUrl)
     if (!localPath || !fs.existsSync(localPath)) {

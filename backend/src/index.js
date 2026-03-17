@@ -107,10 +107,8 @@ if (isProd) {
 }
 
 app.use(helmet({
-  contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false,
   crossOriginResourcePolicy: false,
-  frameguard: false,
   hsts: isProd,
   referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
 }))

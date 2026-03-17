@@ -4,7 +4,8 @@ import Navbar from '../../components/Navbar'
 import AppSidebar from '../../components/AppSidebar'
 import { API } from '../../config'
 import { useProtectedPage } from '../../lib/useProtectedPage'
-import { MiniPreview, PageShell, PAGE_FONT, authHeaders, timeAgo } from '../shared/pageScaffold'
+import { MiniPreview, PageShell } from '../shared/pageScaffold'
+import { PAGE_FONT, authHeaders, timeAgo } from '../shared/pageUtils'
 
 export default function NotesPage() {
   const { status: authStatus, error: authError } = useProtectedPage()

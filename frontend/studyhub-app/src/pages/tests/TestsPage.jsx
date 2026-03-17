@@ -2,7 +2,8 @@
 import { useState } from 'react'
 import Navbar from '../../components/Navbar'
 import AppSidebar from '../../components/AppSidebar'
-import { PageShell, TeaserCard, PAGE_FONT } from '../shared/pageScaffold'
+import { PageShell, TeaserCard } from '../shared/pageScaffold'
+import { PAGE_FONT } from '../shared/pageUtils'
 
 export default function TestsPage() {
   const [browseTab, setBrowseTab] = useState('all')

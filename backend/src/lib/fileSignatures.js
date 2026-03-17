@@ -7,10 +7,11 @@ function bytesToAscii(buffer, start = 0, end = buffer.length) {
 
 function detectFileSignature(filePath) {
   const resolvedPath = path.resolve(String(filePath || ''))
-  const fd = fs.openSync(resolvedPath, 'r')
   const buffer = Buffer.alloc(32)
+  let fd
 
   try {
+    fd = fs.openSync(resolvedPath, 'r')
     const bytesRead = fs.readSync(fd, buffer, 0, buffer.length, 0)
     const head = buffer.subarray(0, bytesRead)
 
@@ -46,8 +47,16 @@ function detectFileSignature(filePath) {
     }
 
     return null
+  } catch {
+    return null
   } finally {
-    fs.closeSync(fd)
+    if (fd !== undefined) {
+      try {
+        fs.closeSync(fd)
+      } catch {
+        // Ignore close errors while returning best-effort signature detection.
+      }
+    }
   }
 }
 

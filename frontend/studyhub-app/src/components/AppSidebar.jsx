@@ -2,7 +2,7 @@
 // Shared left navigation sidebar — same as FeedPage sidebar
 // Used by: TestsPage, NotesPage, AnnouncementsPage, SubmitPage, SheetsPage
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   IconFeed, IconSheets, IconTests, IconNotes,
@@ -52,14 +52,29 @@ export default function AppSidebar({ mode = 'fixed' }) {
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const triggerButtonRef = useRef(null)
+  const drawerDialogRef = useRef(null)
+  const closeButtonRef = useRef(null)
+  const previouslyFocusedRef = useRef(null)
 
   const { user } = useSession()
 
-  if (!user) return null
-
   useEffect(() => {
-    if (drawerOpen) setDrawerOpen(false)
-  }, [pathname])
+    if (!drawerOpen) {
+      if (previouslyFocusedRef.current && typeof previouslyFocusedRef.current.focus === 'function') {
+        previouslyFocusedRef.current.focus()
+      }
+      return
+    }
+
+    previouslyFocusedRef.current = document.activeElement
+    const focusTarget = closeButtonRef.current || drawerDialogRef.current
+    if (focusTarget && typeof focusTarget.focus === 'function') {
+      focusTarget.focus()
+    }
+  }, [drawerOpen])
+
+  if (!user) return null
 
   const enrollments = user.enrollments || []
   const courseCodes = enrollments.map(e => e.course?.code).filter(Boolean)
@@ -202,6 +217,9 @@ export default function AppSidebar({ mode = 'fixed' }) {
         <button
           type="button"
           onClick={() => setDrawerOpen(true)}
+          ref={triggerButtonRef}
+          aria-expanded={drawerOpen}
+          aria-controls="app-sidebar-drawer"
           style={{
             border: '1px solid #cbd5e1',
             borderRadius: 12,
@@ -232,6 +250,15 @@ export default function AppSidebar({ mode = 'fixed' }) {
               role="dialog"
               aria-modal="true"
               aria-label="Sidebar navigation"
+              id="app-sidebar-drawer"
+              ref={drawerDialogRef}
+              tabIndex={-1}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') {
+                  event.stopPropagation()
+                  setDrawerOpen(false)
+                }
+              }}
               onClick={(event) => event.stopPropagation()}
               style={{
                 width: 'min(86vw, 320px)',
@@ -246,6 +273,7 @@ export default function AppSidebar({ mode = 'fixed' }) {
                 <button
                   type="button"
                   onClick={() => setDrawerOpen(false)}
+                  ref={closeButtonRef}
                   style={{
                     border: '1px solid #cbd5e1',
                     borderRadius: 10,

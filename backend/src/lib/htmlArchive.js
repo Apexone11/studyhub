@@ -1,4 +1,7 @@
 const zlib = require('node:zlib')
+const { promisify } = require('node:util')
+
+const gzipAsync = promisify(zlib.gzip)
 
 async function archiveExpiredOriginalVersions(prisma, options = {}) {
   const olderThanDays = Number.isFinite(options.olderThanDays) ? options.olderThanDays : 20
@@ -25,7 +28,10 @@ async function archiveExpiredOriginalVersions(prisma, options = {}) {
   let archived = 0
 
   for (const candidate of candidates) {
-    const compressed = zlib.gzipSync(Buffer.from(candidate.content, 'utf8'), { level: zlib.constants.Z_BEST_SPEED })
+    const compressed = await gzipAsync(
+      Buffer.from(candidate.content, 'utf8'),
+      { level: zlib.constants.Z_BEST_SPEED },
+    )
 
     await prisma.$transaction([
       prisma.sheetHtmlVersion.update({

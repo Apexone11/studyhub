@@ -1,4 +1,5 @@
 import express from 'express'
+import rateLimit from 'express-rate-limit'
 import request from 'supertest'
 import { afterEach, describe, expect, it } from 'vitest'
 import requireAuth from '../src/middleware/auth'
@@ -17,6 +18,15 @@ function csrfToken(user = { id: 100, username: 'test-user', role: 'student' }) {
   return signCsrfToken(user)
 }
 
+function buildTestRateLimiter() {
+  return rateLimit({
+    windowMs: 60 * 1000,
+    max: 1000,
+    standardHeaders: true,
+    legacyHeaders: false,
+  })
+}
+
 afterEach(() => {
   if (ORIGINAL_GUARDED_MODE === undefined) delete process.env.GUARDED_MODE
   else process.env.GUARDED_MODE = ORIGINAL_GUARDED_MODE
@@ -28,6 +38,7 @@ afterEach(() => {
 describe('release A middleware response envelope', () => {
   it('returns AUTH_REQUIRED for missing auth token', async () => {
     const app = express()
+    app.use(buildTestRateLimiter())
     app.use(requireAuth)
     app.get('/protected', (req, res) => res.status(200).json({ ok: true }))
 
@@ -42,6 +53,7 @@ describe('release A middleware response envelope', () => {
 
   it('returns AUTH_EXPIRED for invalid auth token', async () => {
     const app = express()
+    app.use(buildTestRateLimiter())
     app.use(requireAuth)
     app.get('/protected', (req, res) => res.status(200).json({ ok: true }))
 
@@ -58,6 +70,7 @@ describe('release A middleware response envelope', () => {
 
   it('returns CSRF_INVALID when csrf token is missing for cookie-authenticated request', async () => {
     const app = express()
+    app.use(buildTestRateLimiter())
     app.use(csrfProtection)
     app.post('/mutate', (req, res) => res.status(200).json({ ok: true }))
 
@@ -74,6 +87,7 @@ describe('release A middleware response envelope', () => {
 
   it('returns AUTH_EXPIRED when cookie session is invalid in csrf middleware', async () => {
     const app = express()
+    app.use(buildTestRateLimiter())
     app.use(csrfProtection)
     app.post('/mutate', (req, res) => res.status(200).json({ ok: true }))
 

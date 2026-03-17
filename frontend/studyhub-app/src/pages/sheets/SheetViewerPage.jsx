@@ -237,7 +237,7 @@ export default function SheetViewerPage() {
         setCommentsState({ comments: [], total: 0, loading: false, error: error.message || 'Could not load comments.' })
       })
     }
-  }, [sheetId])
+  }, [clearSession, navigate, sheetId])
 
   useLivePolling(loadSheet, {
     enabled: Number.isInteger(sheetId),

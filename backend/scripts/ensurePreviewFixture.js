@@ -68,8 +68,8 @@ async function main() {
 }
 
 main()
-  .catch((error) => {
-    console.error(error instanceof Error ? error.stack || error.message : String(error))
+  .catch(() => {
+    console.error('ensurePreviewFixture failed. Check internal diagnostics for details.')
     process.exitCode = 1
   })
   .finally(async () => {

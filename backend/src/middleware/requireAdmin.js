@@ -45,7 +45,7 @@ async function requireAdmin(req, res, next) {
     return next()
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
-    return res.status(500).json({ error: 'Server error.' })
+    return sendError(res, 500, 'Server error.', ERROR_CODES.SERVER_ERROR)
   }
 }
 

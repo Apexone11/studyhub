@@ -6,6 +6,8 @@ const ERROR_CODES = Object.freeze({
   CSRF_INVALID: 'CSRF_INVALID',
   GUARDED_MODE: 'GUARDED_MODE',
   PREVIEW_TOKEN_INVALID: 'PREVIEW_TOKEN_INVALID',
+  PREVIEW_HTML_BLOCKED: 'PREVIEW_HTML_BLOCKED',
+  SERVER_ERROR: 'SERVER_ERROR',
 })
 
 function sendError(res, status, error, code, extra = {}) {

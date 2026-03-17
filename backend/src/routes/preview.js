@@ -70,7 +70,7 @@ router.get('/html', async (req, res) => {
         res,
         400,
         'HTML preview blocked by security checks.',
-        ERROR_CODES.PREVIEW_TOKEN_INVALID,
+        ERROR_CODES.PREVIEW_HTML_BLOCKED,
         { issues: validation.issues },
       )
     }
@@ -85,7 +85,7 @@ router.get('/html', async (req, res) => {
     return res.status(200).send(previewHtml)
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
-    return sendError(res, 500, 'Could not render preview.', ERROR_CODES.PREVIEW_TOKEN_INVALID)
+    return sendError(res, 500, 'Could not render preview.', ERROR_CODES.SERVER_ERROR)
   }
 })
 
