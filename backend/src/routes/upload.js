@@ -3,7 +3,9 @@ const multer = require('multer')
 const path = require('path')
 const rateLimit = require('express-rate-limit')
 const requireAuth = require('../middleware/auth')
+const { assertOwnerOrAdmin } = require('../lib/accessControl')
 const { captureError } = require('../monitoring/sentry')
+const { signatureMatchesExpected } = require('../lib/fileSignatures')
 const prisma = require('../lib/prisma')
 const {
   ATTACHMENTS_DIR,
@@ -56,6 +58,11 @@ function safeAttachmentLabel(original) {
     .slice(0, 120)
 }
 
+function rejectSignatureMismatch(res, file, message) {
+  safeUnlinkFile(file?.path)
+  return res.status(400).json({ error: message })
+}
+
 // ── Avatar upload ─────────────────────────────────────────────
 const avatarStorage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, AVATARS_DIR),
@@ -82,6 +89,9 @@ router.post('/avatar', requireAuth, avatarUploadLimiter, (req, res) => {
     }
     if (err) return res.status(400).json({ error: err.message })
     if (!req.file) return res.status(400).json({ error: 'No file uploaded.' })
+    if (!signatureMatchesExpected(req.file.path, Array.from(AVATAR_ALLOWED_MIME)).ok) {
+      return rejectSignatureMismatch(res, req.file, 'Avatar contents do not match a supported image format.')
+    }
 
     try {
       // Delete old avatar file if it exists locally
@@ -137,6 +147,9 @@ router.post('/attachment/:sheetId', requireAuth, attachmentUploadLimiter, (req, 
     }
     if (err) return res.status(400).json({ error: err.message })
     if (!req.file) return res.status(400).json({ error: 'No file uploaded.' })
+    if (!signatureMatchesExpected(req.file.path, Array.from(ATTACHMENT_ALLOWED_MIME)).ok) {
+      return rejectSignatureMismatch(res, req.file, 'Attachment contents do not match a supported PDF or image format.')
+    }
 
     const sheetId = Number.parseInt(req.params.sheetId, 10)
     try {
@@ -148,10 +161,17 @@ router.post('/attachment/:sheetId', requireAuth, attachmentUploadLimiter, (req, 
         safeUnlinkFile(req.file.path)
         return res.status(404).json({ error: 'Sheet not found.' })
       }
-      if (sheet.userId !== req.user.userId && req.user.role !== 'admin') {
+      if (!assertOwnerOrAdmin({
+        res,
+        user: req.user,
+        ownerId: sheet.userId,
+        message: 'Not your sheet.',
+        targetType: 'sheet',
+        targetId: sheetId,
+      })) {
         // Delete the just-uploaded file to avoid orphaned files
         safeUnlinkFile(req.file.path)
-        return res.status(403).json({ error: 'Not your sheet.' })
+        return
       }
 
       const ext = path.extname(req.file.filename).toLowerCase()
@@ -187,6 +207,9 @@ router.post('/post-attachment/:postId', requireAuth, attachmentUploadLimiter, (r
     }
     if (err) return res.status(400).json({ error: err.message })
     if (!req.file) return res.status(400).json({ error: 'No file uploaded.' })
+    if (!signatureMatchesExpected(req.file.path, Array.from(ATTACHMENT_ALLOWED_MIME)).ok) {
+      return rejectSignatureMismatch(res, req.file, 'Attachment contents do not match a supported PDF or image format.')
+    }
 
     const postId = Number.parseInt(req.params.postId, 10)
     try {
@@ -198,9 +221,16 @@ router.post('/post-attachment/:postId', requireAuth, attachmentUploadLimiter, (r
         safeUnlinkFile(req.file.path)
         return res.status(404).json({ error: 'Post not found.' })
       }
-      if (post.userId !== req.user.userId && req.user.role !== 'admin') {
+      if (!assertOwnerOrAdmin({
+        res,
+        user: req.user,
+        ownerId: post.userId,
+        message: 'Not your post.',
+        targetType: 'feed-post',
+        targetId: postId,
+      })) {
         safeUnlinkFile(req.file.path)
-        return res.status(403).json({ error: 'Not your post.' })
+        return
       }
 
       const ext = path.extname(req.file.filename).toLowerCase()

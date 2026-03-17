@@ -23,9 +23,9 @@ Built by students, for students, StudyHub turns scattered notes, dead group chat
 3. Post updates, comment on work, mention other users, and build stronger materials together.
 4. Contribute your improvements back so the original creator can review and accept them.
 
-## Version 1
+## V1.0.0
 
-StudyHub Version 1 is the current live release.
+StudyHub V1.0.0 is the current live release.
 
 - Study sheet creation, uploads, and sharing
 - Feed posts, comments, reactions, and notifications

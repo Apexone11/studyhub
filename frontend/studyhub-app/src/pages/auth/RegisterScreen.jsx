@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
 import { API } from '../../config'
+import { getAuthenticatedHomePath } from '../../lib/authNavigation'
 import { trackSignupConversion } from '../../lib/telemetry'
 import { useSession } from '../../lib/session-context'
 
@@ -9,10 +10,6 @@ const RULES = {
   username: /^[a-zA-Z0-9_]{3,20}$/,
   email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
   password: /^(?=.*[A-Z])(?=.*\d).{8,}$/,
-}
-
-function getPostLoginPath(user) {
-  return user?.role === 'admin' ? '/admin' : '/feed'
 }
 
 function StageCard({ children }) {
@@ -419,7 +416,7 @@ export default function RegisterScreen() {
 
       completeAuthentication(data.user)
       trackSignupConversion()
-      navigate(getPostLoginPath(data.user), { replace: true })
+      navigate(getAuthenticatedHomePath(data.user), { replace: true })
     } catch {
       setError('Could not connect to the server.')
     } finally {

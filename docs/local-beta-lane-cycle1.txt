@@ -1,4 +1,4 @@
-Local Beta Lane (Cycle 1 Baseline)
+Local Beta Lane (Cycle 1 Baseline - V1.0.0)
 
 Purpose
 - Run all risky changes in local beta first, validate, then ship.
@@ -229,7 +229,7 @@ Cycle 6 Manual / Release Gate Notes
 - Keep Release B behind Release A gate:
   - no move to wider responsive/regression rollout until logout loop and white-screen artifacts are clean
 
-Cycle 6 Final Validation
+Cycle 6 Final Validation (V1.0.0)
 - Responsive Playwright smoke now covers desktop/tablet/mobile for:
   - `/feed`
   - `/sheets`
@@ -259,3 +259,26 @@ Cycle 6 Full Gate Result
   - `0` failures
   - `506` throttled
 - High-volume read waves produced `429` throttling as expected under rate limits, but no effective failures or resets.
+
+Cycle 6 Full Gate Result (Refreshed Rerun)
+- `npm run beta:cycle6` passed end-to-end again on 2026-03-17 after stabilization fixes.
+- Migration readiness and route smoke checks passed.
+- Backend test suite passed:
+  - `11` files
+  - `35` tests
+- Frontend unit/integration suite passed:
+  - `9` files
+  - `19` tests
+- Frontend smoke e2e suite passed:
+  - `15` tests
+- Diagnostics artifacts were regenerated cleanly:
+  - `beta-diagnostics/feed-network.json`
+  - `beta-diagnostics/frontend-console.json`
+  - `beta-diagnostics/backend-stack.log`
+- Snapshot capture completed and wrote:
+  - `beta-artifacts/playwright-snapshots/2026-03-17T21-18-49-392Z/snapshot-report.json`
+- Synthetic load completed with:
+  - `900` mixed actions
+  - `0` failures
+  - `502` throttled
+- High-volume read waves continued to produce expected `429` throttling under rate limits with no effective failures or resets.

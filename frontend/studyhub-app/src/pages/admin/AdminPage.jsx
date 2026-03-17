@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
 import AppSidebar from '../../components/AppSidebar'
 import { API, SUPPORT_EMAIL } from '../../config'
+import { getApiErrorMessage, readJsonSafely } from '../../lib/http'
 import { useSession } from '../../lib/session-context'
 import { pageShell, useResponsiveAppLayout } from '../../lib/ui'
 import { useLivePolling } from '../../lib/useLivePolling'
@@ -108,10 +109,69 @@ function pagerButton(disabled) {
   }
 }
 
+function AccessDeniedCard({ user }) {
+  return (
+    <section
+      style={{
+        background: '#fff',
+        borderRadius: 18,
+        border: '1px solid #fecaca',
+        padding: '26px 24px',
+        boxShadow: '0 8px 24px rgba(15, 23, 42, 0.06)',
+      }}
+    >
+      <div style={{ fontSize: 11, fontWeight: 800, color: '#b91c1c', letterSpacing: '.08em', marginBottom: 10 }}>
+        ACCESS DENIED
+      </div>
+      <h1 style={{ margin: '0 0 10px', fontSize: 24, color: '#0f172a' }}>Admin access required</h1>
+      <p style={{ margin: '0 0 16px', fontSize: 14, color: '#475569', lineHeight: 1.8, maxWidth: 720 }}>
+        You are signed in as <strong>{user?.username || 'this account'}</strong>, but admin tools are only available to admin accounts.
+        Your session is still active, and you can safely return to the regular app.
+      </p>
+      <Link to="/feed" style={primaryButtonLink}>
+        Back to feed
+      </Link>
+    </section>
+  )
+}
+
+function AdminMfaRequiredCard() {
+  return (
+    <section
+      style={{
+        background: '#fff',
+        borderRadius: 18,
+        border: '1px solid #fde68a',
+        padding: '26px 24px',
+        boxShadow: '0 8px 24px rgba(15, 23, 42, 0.06)',
+      }}
+    >
+      <div style={{ fontSize: 11, fontWeight: 800, color: '#b45309', letterSpacing: '.08em', marginBottom: 10 }}>
+        ADMIN SECURITY REQUIRED
+      </div>
+      <h1 style={{ margin: '0 0 10px', fontSize: 24, color: '#0f172a' }}>Enable 2-step verification first</h1>
+      <p style={{ margin: '0 0 16px', fontSize: 14, color: '#475569', lineHeight: 1.8, maxWidth: 720 }}>
+        Admin tools stay locked until this account enables 2-step verification. Your session is active, but admin routes
+        remain blocked until setup is completed in Settings.
+      </p>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <Link to="/settings" style={primaryButtonLink}>
+          Open settings
+        </Link>
+        <Link to="/feed" style={secondaryButtonLink}>
+          Back to feed
+        </Link>
+      </div>
+    </section>
+  )
+}
+
 export default function AdminPage() {
   const navigate = useNavigate()
   const { user, clearSession } = useSession()
   const layout = useResponsiveAppLayout()
+  const isAdmin = user?.role === 'admin'
+  const adminMfaRequired = isAdmin && !user?.twoFaEnabled
   const [activeTab, setActiveTab] = useState('overview')
   const [overview, setOverview] = useState({ loading: true, loaded: false, error: '', stats: null })
   const [usersState, setUsersState] = useState(createPageState)
@@ -129,30 +189,36 @@ export default function AdminPage() {
       headers: authHeaders(),
       ...options,
     })
+    const data = await readJsonSafely(response, {})
 
     if (response.status === 401) {
       clearSession()
       navigate('/login', { replace: true })
-      throw new Error('Your session expired.')
+      throw new Error(getApiErrorMessage(data, 'Your session expired.'))
     }
     if (response.status === 403) {
-      throw new Error('You do not have permission to run this admin action.')
+      throw new Error(getApiErrorMessage(data, 'You do not have permission to run this admin action.'))
     }
 
-    const data = await response.json().catch(() => ({}))
     if (!response.ok) {
-      throw new Error(data.error || 'Request failed.')
+      throw new Error(getApiErrorMessage(data, 'Request failed.'))
     }
     return data
   }, [clearSession, navigate])
 
   const loadOverview = useCallback(async ({ signal } = {}) => {
+    if (adminMfaRequired) {
+      setOverview({ loading: false, loaded: false, error: '', stats: null })
+      return
+    }
+
     try {
       setOverview((current) => ({ ...current, loading: true, error: '' }))
       const response = await fetch(`${API}/api/admin/stats`, {
         headers: authHeaders(),
         signal,
       })
+      const data = await readJsonSafely(response, {})
 
       if (response.status === 401) {
         clearSession()
@@ -164,13 +230,12 @@ export default function AdminPage() {
           ...current,
           loading: false,
           loaded: current.loaded,
-          error: 'You do not have permission to view admin statistics.',
+          error: getApiErrorMessage(data, 'You do not have permission to view admin statistics.'),
         }))
         return
       }
 
-      const data = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(data.error || 'Could not load admin stats.')
+      if (!response.ok) throw new Error(getApiErrorMessage(data, 'Could not load admin stats.'))
 
       setOverview({ loading: false, loaded: true, error: '', stats: data })
     } catch (error) {
@@ -182,9 +247,11 @@ export default function AdminPage() {
         stats: current.stats,
       }))
     }
-  }, [clearSession, navigate])
+  }, [adminMfaRequired, clearSession, navigate])
 
   const loadPagedData = useCallback(async (tab, page = 1) => {
+    if (adminMfaRequired) return
+
     const stateSetters = {
       users: setUsersState,
       sheets: setSheetsState,
@@ -229,7 +296,7 @@ export default function AdminPage() {
         error: error.message || 'Could not load this tab.',
       }))
     }
-  }, [apiJson, reviewStatus])
+  }, [adminMfaRequired, apiJson, reviewStatus])
 
   useEffect(() => {
     if (!user || user.role !== 'admin') return
@@ -317,7 +384,6 @@ export default function AdminPage() {
   }, [activeTab, announcementsState, deletionsState, reviewState, sheetsState, usersState])
 
   if (!user) return null
-  if (user.role !== 'admin') return <Navigate to="/feed" replace />
 
   async function patchRole(userId, role) {
     await apiJson(`/api/admin/users/${userId}/role`, {
@@ -426,39 +492,46 @@ export default function AdminPage() {
         <AppSidebar mode={layout.sidebarMode} />
 
         <main style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <section
-            style={{
-              background: '#fff',
-              borderRadius: 18,
-              border: '1px solid #e2e8f0',
-              padding: '18px 20px',
-            }}
-          >
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {TABS.map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setActiveTab(value)}
-                  style={{
-                    padding: '8px 14px',
-                    borderRadius: 10,
-                    border: activeTab === value ? '1px solid #2563eb' : '1px solid #e2e8f0',
-                    background: activeTab === value ? '#eff6ff' : '#fff',
-                    color: activeTab === value ? '#1d4ed8' : '#475569',
-                    fontSize: 13,
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    fontFamily: 'inherit',
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </section>
+          {!isAdmin ? (
+            // Keep the route shell mounted so non-admin users understand why /admin is unavailable without losing their session.
+            <AccessDeniedCard user={user} />
+          ) : adminMfaRequired ? (
+            <AdminMfaRequiredCard />
+          ) : (
+            <>
+              <section
+                style={{
+                  background: '#fff',
+                  borderRadius: 18,
+                  border: '1px solid #e2e8f0',
+                  padding: '18px 20px',
+                }}
+              >
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {TABS.map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setActiveTab(value)}
+                      style={{
+                        padding: '8px 14px',
+                        borderRadius: 10,
+                        border: activeTab === value ? '1px solid #2563eb' : '1px solid #e2e8f0',
+                        background: activeTab === value ? '#eff6ff' : '#fff',
+                        color: activeTab === value ? '#1d4ed8' : '#475569',
+                        fontSize: 13,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </section>
 
-          {activeTab === 'overview' ? (
+              {activeTab === 'overview' ? (
             <section
               style={{
                 background: '#fff',
@@ -505,9 +578,9 @@ export default function AdminPage() {
                 <StatsGrid stats={overview.stats} />
               ) : null}
             </section>
-          ) : null}
+              ) : null}
 
-          {activeTab !== 'overview' && activeTab !== 'settings' ? (
+              {activeTab !== 'overview' && activeTab !== 'settings' ? (
             <section
               style={{
                 background: '#fff',
@@ -755,9 +828,9 @@ export default function AdminPage() {
                 <div style={{ color: '#94a3b8', fontSize: 13, marginTop: 12 }}>Loading tab…</div>
               ) : null}
             </section>
-          ) : null}
+              ) : null}
 
-          {activeTab === 'settings' ? (
+              {activeTab === 'settings' ? (
             <section
               style={{
                 background: '#fff',
@@ -793,7 +866,9 @@ export default function AdminPage() {
                 </Link>
               </div>
             </section>
-          ) : null}
+              ) : null}
+            </>
+          )}
         </main>
       </div>
     </div>
@@ -853,6 +928,20 @@ const primaryButtonLink = {
   borderRadius: 10,
   background: '#3b82f6',
   color: '#fff',
+  fontSize: 13,
+  fontWeight: 700,
+  textDecoration: 'none',
+}
+
+const secondaryButtonLink = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '10px 16px',
+  borderRadius: 10,
+  border: '1px solid #cbd5e1',
+  background: '#fff',
+  color: '#334155',
   fontSize: 13,
   fontWeight: 700,
   textDecoration: 'none',

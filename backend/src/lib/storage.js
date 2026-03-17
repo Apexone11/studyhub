@@ -6,6 +6,7 @@ const BACKEND_ROOT = path.resolve(__dirname, '../..')
 const DEFAULT_UPLOADS_DIR = path.join(BACKEND_ROOT, 'uploads')
 const RAILWAY_VOLUME_ROOT = '/data'
 const UPLOADS_URL_PREFIX = '/uploads'
+const PRIVATE_ATTACHMENT_PREFIX = 'attachment://'
 
 function detectPersistentUploadsDir() {
   if (process.platform === 'win32') return null
@@ -72,7 +73,7 @@ function buildAvatarUrl(fileName) {
 }
 
 function buildAttachmentUrl(fileName) {
-  return buildUploadUrl('attachments', fileName)
+  return `${PRIVATE_ATTACHMENT_PREFIX}${fileName}`
 }
 
 function isPathWithinRoot(candidatePath, rootDirectory) {
@@ -95,6 +96,7 @@ function resolveManagedUploadPath(uploadUrl) {
   const prefixes = [
     { prefix: `${UPLOADS_URL_PREFIX}/avatars/`, directory: AVATARS_DIR },
     { prefix: `${UPLOADS_URL_PREFIX}/attachments/`, directory: ATTACHMENTS_DIR },
+    { prefix: PRIVATE_ATTACHMENT_PREFIX, directory: ATTACHMENTS_DIR },
   ]
 
   for (const entry of prefixes) {
@@ -120,7 +122,13 @@ function resolveAvatarPath(avatarUrl) {
 }
 
 function resolveAttachmentPath(attachmentUrl) {
-  if (!String(attachmentUrl || '').startsWith(`${UPLOADS_URL_PREFIX}/attachments/`)) return null
+  const normalizedUrl = String(attachmentUrl || '')
+  if (
+    !normalizedUrl.startsWith(`${UPLOADS_URL_PREFIX}/attachments/`)
+    && !normalizedUrl.startsWith(PRIVATE_ATTACHMENT_PREFIX)
+  ) {
+    return null
+  }
   return resolveManagedUploadPath(attachmentUrl)
 }
 
@@ -206,6 +214,7 @@ async function cleanupAvatarIfUnused(prisma, avatarUrl, context = {}) {
 module.exports = {
   ATTACHMENTS_DIR,
   AVATARS_DIR,
+  PRIVATE_ATTACHMENT_PREFIX,
   UPLOADS_DIR,
   buildAttachmentUrl,
   buildAvatarUrl,

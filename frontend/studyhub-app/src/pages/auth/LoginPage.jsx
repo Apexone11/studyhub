@@ -2,11 +2,8 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
 import { API } from '../../config'
+import { getAuthenticatedHomePath } from '../../lib/authNavigation'
 import { useSession } from '../../lib/session-context'
-
-function getPostLoginPath(user) {
-  return user?.role === 'admin' ? '/admin' : '/feed'
-}
 
 function Card({ children }) {
   return (
@@ -169,7 +166,7 @@ export default function LoginPage() {
       }
 
       completeAuthentication(data.user)
-      navigate(getPostLoginPath(data.user), { replace: true })
+      navigate(getAuthenticatedHomePath(data.user), { replace: true })
     } catch {
       setError('Could not connect to the server.')
     } finally {
@@ -244,7 +241,7 @@ export default function LoginPage() {
       }
 
       completeAuthentication(data.user)
-      navigate(getPostLoginPath(data.user), { replace: true })
+      navigate(getAuthenticatedHomePath(data.user), { replace: true })
     } catch {
       setError('Could not connect to the server.')
     } finally {
@@ -279,7 +276,7 @@ export default function LoginPage() {
       }
 
       completeAuthentication(data.user)
-      navigate(getPostLoginPath(data.user), { replace: true })
+      navigate(getAuthenticatedHomePath(data.user), { replace: true })
     } catch {
       setError('Could not connect to the server.')
     } finally {

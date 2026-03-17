@@ -6,7 +6,7 @@ const frontendBaseUrl = String(process.env.BETA_FRONTEND_BASE_URL || 'http://loc
 const apiBaseUrl = String(process.env.BETA_API_BASE_URL || 'http://localhost:4000').replace(/\/$/, '')
 const username = String(process.env.BETA_DIAG_USERNAME || process.env.BETA_OWNER_USERNAME || 'studyhub_owner')
 const password = String(process.env.BETA_DIAG_PASSWORD || process.env.BETA_OWNER_PASSWORD || 'AdminPass123')
-const snapshotSheetId = Number.parseInt(process.env.BETA_SNAPSHOT_SHEET_ID || '111', 10)
+const configuredSnapshotSheetId = Number.parseInt(process.env.BETA_SNAPSHOT_SHEET_ID || '111', 10)
 const runId = new Date().toISOString().replace(/[:.]/g, '-')
 const outputDir = path.resolve(
   process.env.BETA_SNAPSHOT_DIR
@@ -19,56 +19,68 @@ const viewports = [
   { name: 'mobile', width: 390, height: 844, compact: true },
 ]
 
-const routeChecks = [
-  {
-    path: '/feed',
-    label: 'feed',
-    usesSidebar: true,
-    assert: async (page) => page.getByText('Share an update').first().waitFor({ state: 'visible', timeout: 15000 }),
-  },
-  {
-    path: '/sheets',
-    label: 'sheets',
-    usesSidebar: true,
-    assert: async (page) => page.getByRole('heading', { name: 'Study Sheets' }).waitFor({ state: 'visible', timeout: 15000 }),
-  },
-  {
-    path: `/sheets/${snapshotSheetId}`,
-    label: 'sheet-viewer',
-    usesSidebar: true,
-    assert: async (page) => page.locator('h1').first().waitFor({ state: 'visible', timeout: 15000 }),
-  },
-  {
-    path: '/dashboard',
-    label: 'dashboard',
-    usesSidebar: true,
-    assert: async (page) => page.getByText('Welcome back,').first().waitFor({ state: 'visible', timeout: 15000 }),
-  },
-  {
-    path: '/notes',
-    label: 'notes',
-    usesSidebar: true,
-    assert: async (page) => page.getByRole('heading', { name: 'My Notes' }).waitFor({ state: 'visible', timeout: 15000 }),
-  },
-  {
-    path: '/announcements',
-    label: 'announcements',
-    usesSidebar: true,
-    assert: async (page) => page.getByRole('heading', { name: 'Announcements' }).waitFor({ state: 'visible', timeout: 15000 }),
-  },
-  {
-    path: '/settings',
-    label: 'settings',
-    usesSidebar: false,
-    assert: async (page) => page.getByRole('button', { name: 'Sign Out' }).waitFor({ state: 'visible', timeout: 15000 }),
-  },
-  {
-    path: '/admin',
-    label: 'admin',
-    usesSidebar: true,
-    assert: async (page) => page.getByRole('heading', { name: 'Admin Overview' }).waitFor({ state: 'visible', timeout: 15000 }),
-  },
-]
+function buildRouteChecks(sheetPath) {
+  const checks = [
+    {
+      path: '/feed',
+      label: 'feed',
+      usesSidebar: true,
+      assert: async (page) => page.getByText('Share an update').first().waitFor({ state: 'visible', timeout: 15000 }),
+    },
+    {
+      path: '/sheets',
+      label: 'sheets',
+      usesSidebar: true,
+      assert: async (page) => page.getByRole('heading', { name: 'Study Sheets' }).waitFor({ state: 'visible', timeout: 15000 }),
+    },
+    {
+      path: '/dashboard',
+      label: 'dashboard',
+      usesSidebar: true,
+      assert: async (page) => page.getByText('Welcome back,').first().waitFor({ state: 'visible', timeout: 15000 }),
+    },
+    {
+      path: '/notes',
+      label: 'notes',
+      usesSidebar: true,
+      assert: async (page) => page.getByRole('heading', { name: 'My Notes' }).waitFor({ state: 'visible', timeout: 15000 }),
+    },
+    {
+      path: '/announcements',
+      label: 'announcements',
+      usesSidebar: true,
+      assert: async (page) => page.getByRole('heading', { name: 'Announcements' }).waitFor({ state: 'visible', timeout: 15000 }),
+    },
+    {
+      path: '/settings',
+      label: 'settings',
+      usesSidebar: false,
+      assert: async (page) => page.getByRole('button', { name: 'Sign Out' }).waitFor({ state: 'visible', timeout: 15000 }),
+    },
+    {
+      path: '/admin',
+      label: 'admin',
+      usesSidebar: true,
+      assert: async (page) => {
+        await Promise.any([
+          page.getByRole('heading', { name: 'Admin Overview' }).waitFor({ state: 'visible', timeout: 15000 }),
+          page.getByRole('heading', { name: 'Enable 2-step verification first' }).waitFor({ state: 'visible', timeout: 15000 }),
+        ])
+      },
+    },
+  ]
+
+  if (sheetPath) {
+    checks.splice(2, 0, {
+      path: sheetPath,
+      label: 'sheet-viewer',
+      usesSidebar: true,
+      assert: async (page) => page.locator('h1').first().waitFor({ state: 'visible', timeout: 15000 }),
+    })
+  }
+
+  return checks
+}
 
 const payload = {
   capturedAt: new Date().toISOString(),
@@ -144,6 +156,31 @@ async function resolvePreviewPath(context, sessionCookie) {
   return previewItem.type === 'sheet'
     ? `/preview/sheet/${previewItem.id}`
     : `/preview/feed-post/${previewItem.id}`
+}
+
+async function resolveSheetPath(context, sessionCookie) {
+  const headers = sessionCookie ? { Cookie: `studyhub_session=${sessionCookie}` } : undefined
+
+  if (Number.isInteger(configuredSnapshotSheetId) && configuredSnapshotSheetId > 0) {
+    const configuredResponse = await context.request.get(`${apiBaseUrl}/api/sheets/${configuredSnapshotSheetId}`, {
+      headers,
+    })
+    if (configuredResponse.ok()) {
+      return `/sheets/${configuredSnapshotSheetId}`
+    }
+  }
+
+  const response = await context.request.get(`${apiBaseUrl}/api/sheets?limit=50`, { headers })
+  const data = await response.json().catch(() => ({}))
+
+  if (!response.ok()) {
+    throw new Error(`Could not resolve sheet route (${response.status()}).`)
+  }
+
+  const sheets = Array.isArray(data?.sheets) ? data.sheets : []
+  const firstSheet = sheets.find((entry) => Number.isInteger(Number(entry?.id)))
+
+  return firstSheet ? `/sheets/${firstSheet.id}` : null
 }
 
 async function authenticate(context) {
@@ -291,6 +328,12 @@ try {
 
   const sessionCookie = await authenticate(context)
   const previewPath = await resolvePreviewPath(context, sessionCookie)
+  const sheetPath = await resolveSheetPath(context, sessionCookie)
+  const routeChecks = buildRouteChecks(sheetPath)
+
+  if (!sheetPath) {
+    payload.errors.push('Missing sheet route for snapshot capture.')
+  }
 
   for (const viewport of viewports) {
     for (const routeCheck of routeChecks) {

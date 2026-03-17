@@ -6,6 +6,7 @@ import {
   clearAuthenticatedUser
 } from './lib/telemetry'
 import RouteErrorBoundary from './components/RouteErrorBoundary'
+import { getAuthenticatedHomePath } from './lib/authNavigation'
 import { SessionProvider, useSession } from './lib/session-context'
 
 const HomePage = lazy(() => import('./pages/home/HomePage'))
@@ -38,7 +39,7 @@ function PublicRoute({ children }) {
 
   if (isBootstrapping) return <RouteFallback />
   if (!isAuthenticated || !user) return children
-  return <Navigate to={user.role === 'admin' ? '/admin' : '/feed'} replace />
+  return <Navigate to={getAuthenticatedHomePath(user)} replace />
 }
 
 function PrivateRoute({ children }) {

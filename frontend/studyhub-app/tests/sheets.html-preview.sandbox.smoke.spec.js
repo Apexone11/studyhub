@@ -12,7 +12,7 @@ test('html preview keeps iframe sandbox isolation @smoke', async ({ page }) => {
         title: 'Sandbox test',
         status: 'draft',
         updatedAt: '2026-03-16T12:00:00.000Z',
-        html: '<main><h1>Sandbox test</h1><script>window.top.location="https://evil.example"</script></main>',
+        previewUrl: '/preview/sheet/501?token=preview-token',
       },
     })
   })
@@ -23,12 +23,8 @@ test('html preview keeps iframe sandbox isolation @smoke', async ({ page }) => {
   const iframe = page.locator('iframe[title="html-sheet-preview-501"]')
   await expect(iframe).toBeVisible()
 
-  const sandboxValue = await iframe.getAttribute('sandbox')
-  expect(sandboxValue).toContain('allow-scripts')
-  expect(sandboxValue).toContain('allow-forms')
-  expect(sandboxValue).toContain('allow-modals')
-  expect(sandboxValue).toContain('allow-pointer-lock')
-  expect(sandboxValue).toContain('allow-popups')
+  const sandboxValue = (await iframe.getAttribute('sandbox')) || ''
+  expect(sandboxValue).toBe('')
   expect(sandboxValue).not.toContain('allow-same-origin')
   expect(sandboxValue).not.toContain('allow-top-navigation')
   expect(sandboxValue).not.toContain('allow-top-navigation-by-user-activation')

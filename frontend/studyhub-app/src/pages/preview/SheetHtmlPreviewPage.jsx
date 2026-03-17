@@ -58,6 +58,11 @@ export default function SheetHtmlPreviewPage() {
       if (!response.ok) {
         throw new Error(getApiErrorMessage(data, 'Could not load HTML preview.'))
       }
+
+      if (!data?.previewUrl || typeof data.previewUrl !== 'string') {
+        throw new Error('Could not start isolated HTML preview session.')
+      }
+
       setState({ loading: false, error: '', preview: data })
     } catch (error) {
       setState({ loading: false, error: error.message || 'Could not load HTML preview.', preview: null })
@@ -79,7 +84,7 @@ export default function SheetHtmlPreviewPage() {
               <div>
                 <h1 style={{ margin: 0, fontSize: 22, color: '#0f172a' }}>Sandbox HTML Preview</h1>
                 <div style={{ marginTop: 4, fontSize: 12, color: '#64748b' }}>
-                  Full-page draft testing in an isolated iframe sandbox.
+                  Full-page draft testing via short-lived preview session on an isolated surface.
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -117,8 +122,9 @@ export default function SheetHtmlPreviewPage() {
               <section style={{ ...panelStyle(), padding: 0, overflow: 'hidden' }}>
                 <iframe
                   title={`html-sheet-preview-${sheetId}`}
-                  sandbox="allow-forms allow-modals allow-pointer-lock allow-popups allow-scripts"
-                  srcDoc={state.preview.html || ''}
+                  sandbox=""
+                  referrerPolicy="no-referrer"
+                  src={state.preview.previewUrl || ''}
                   style={{ width: '100%', height: '80vh', border: 'none', background: '#fff' }}
                 />
               </section>

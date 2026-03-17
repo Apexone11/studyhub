@@ -1,5 +1,11 @@
 import { API } from '../config'
-import { clearStoredSession, getStoredUser, setStoredUser } from './session'
+import {
+  clearStoredSession,
+  getCachedCsrfToken,
+  getStoredUser,
+  setCachedCsrfToken,
+  setStoredUser,
+} from './session'
 
 let fetchShimInstalled = false
 export const AUTH_SESSION_EXPIRED_EVENT = 'studyhub:auth-expired'
@@ -44,7 +50,7 @@ export function installApiFetchShim() {
   async function getOrBootstrapCsrfToken() {
     const storedUser = getStoredUser()
     if (!storedUser) return ''
-    if (storedUser.csrfToken) return storedUser.csrfToken
+    if (getCachedCsrfToken()) return getCachedCsrfToken()
     if (csrfBootstrapPromise) return csrfBootstrapPromise
 
     csrfBootstrapPromise = nativeFetch(`${API}/api/auth/me`, {
@@ -65,7 +71,9 @@ export function installApiFetchShim() {
 
         const user = data
         setStoredUser(user)
-        return user?.csrfToken || ''
+        const csrfToken = user?.csrfToken || ''
+        setCachedCsrfToken(csrfToken)
+        return csrfToken
       })
       .catch(() => '')
       .finally(() => {
@@ -96,7 +104,7 @@ export function installApiFetchShim() {
 
       headers.set('X-Requested-With', 'XMLHttpRequest')
 
-      let csrfToken = getStoredUser()?.csrfToken || ''
+      let csrfToken = getCachedCsrfToken()
       if (!csrfToken && getStoredUser()) {
         csrfToken = await getOrBootstrapCsrfToken()
       }

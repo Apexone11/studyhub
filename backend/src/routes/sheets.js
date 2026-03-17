@@ -2,6 +2,7 @@ const express = require('express')
 const rateLimit = require('express-rate-limit')
 const fs = require('node:fs')
 const path = require('node:path')
+const { assertOwnerOrAdmin, sendForbidden } = require('../lib/accessControl')
 const requireAuth = require('../middleware/auth')
 const { captureError } = require('../monitoring/sentry')
 const { createNotification } = require('../lib/notify')
@@ -11,6 +12,7 @@ const prisma = require('../lib/prisma')
 const { cleanupAttachmentIfUnused, resolveAttachmentPath } = require('../lib/storage')
 const { sendAttachmentPreview } = require('../lib/attachmentPreview')
 const { normalizeContentFormat, validateHtmlForSubmission } = require('../lib/htmlSecurity')
+const { HTML_PREVIEW_TOKEN_TTL_SECONDS, signHtmlPreviewToken } = require('../lib/previewTokens')
 const {
   SCAN_STATUS,
   HTML_VERSION_KIND,
@@ -141,6 +143,20 @@ function safeDownloadName(name, fallbackExt = '') {
     .slice(0, 80) || 'studyhub-sheet'
 
   return `${base}${ext}`.toLowerCase()
+}
+
+function resolvePreviewOrigin(req) {
+  const configuredOrigin = String(process.env.HTML_PREVIEW_ORIGIN || '').trim()
+
+  if (configuredOrigin) {
+    try {
+      return new URL(configuredOrigin).origin
+    } catch {
+      // Fall back to the current request origin when misconfigured.
+    }
+  }
+
+  return `${req.protocol}://${req.get('host')}`
 }
 
 function serializeContribution(contribution) {
@@ -374,7 +390,7 @@ router.patch('/contributions/:contributionId', contributionReviewLimiter, requir
       return res.status(409).json({ error: 'This contribution has already been reviewed.' })
     }
     if (req.user.role !== 'admin' && req.user.userId !== contribution.targetSheet.userId) {
-      return res.status(403).json({ error: 'Only the original author can review this contribution.' })
+      return sendForbidden(res, 'Only the original author can review this contribution.')
     }
 
     if (action === 'accept') {
@@ -647,7 +663,7 @@ router.post('/drafts/autosave', requireAuth, sheetWriteLimiter, async (req, res)
 
       if (!existingDraft) return res.status(404).json({ error: 'Draft not found.' })
       if (existingDraft.userId !== req.user.userId && req.user.role !== 'admin') {
-        return res.status(403).json({ error: 'Not your draft.' })
+        return sendForbidden(res, 'Not your draft.')
       }
 
       draft = await prisma.studySheet.update({
@@ -865,7 +881,7 @@ router.post('/:id/submit-review', requireAuth, sheetWriteLimiter, async (req, re
   }
 })
 
-router.get('/:id/html-preview', optionalAuth, async (req, res) => {
+router.get('/:id/html-preview', requireAuth, async (req, res) => {
   const sheetId = Number.parseInt(req.params.id, 10)
 
   try {
@@ -893,12 +909,22 @@ router.get('/:id/html-preview', optionalAuth, async (req, res) => {
       return res.status(400).json({ error: 'HTML preview blocked by security checks.', issues: validation.issues })
     }
 
+    const previewVersion = sheet.updatedAt ? new Date(sheet.updatedAt).toISOString() : '0'
+    const previewToken = signHtmlPreviewToken({
+      sheetId: sheet.id,
+      userId: req.user.userId,
+      version: previewVersion,
+      allowUnpublished: canModerateOrOwnSheet(sheet, req.user),
+    })
+    const previewUrl = `${resolvePreviewOrigin(req)}/preview/html?token=${encodeURIComponent(previewToken)}`
+
     res.json({
       id: sheet.id,
       title: sheet.title,
       status: sheet.status,
       updatedAt: sheet.updatedAt,
-      html: sheet.content,
+      previewUrl,
+      expiresInSeconds: HTML_PREVIEW_TOKEN_TTL_SECONDS,
     })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
@@ -924,10 +950,10 @@ router.get('/:id/download', attachmentDownloadLimiter, async (req, res) => {
 
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
     if (sheet.status !== SHEET_STATUS.PUBLISHED) {
-      return res.status(403).json({ error: 'Downloads are unavailable for this sheet.' })
+      return sendForbidden(res, 'Downloads are unavailable for this sheet.')
     }
     if (!sheet.allowDownloads) {
-      return res.status(403).json({ error: 'Downloads are disabled for this sheet.' })
+      return sendForbidden(res, 'Downloads are disabled for this sheet.')
     }
 
     await prisma.studySheet.update({
@@ -948,7 +974,7 @@ router.get('/:id/download', attachmentDownloadLimiter, async (req, res) => {
   }
 })
 
-router.get('/:id/attachment', attachmentDownloadLimiter, async (req, res) => {
+router.get('/:id/attachment', requireAuth, attachmentDownloadLimiter, async (req, res) => {
   const sheetId = Number.parseInt(req.params.id, 10)
 
   try {
@@ -965,11 +991,11 @@ router.get('/:id/attachment', attachmentDownloadLimiter, async (req, res) => {
 
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
     if (sheet.status !== SHEET_STATUS.PUBLISHED) {
-      return res.status(403).json({ error: 'Downloads are unavailable for this sheet.' })
+      return sendForbidden(res, 'Downloads are unavailable for this sheet.')
     }
     if (!sheet.attachmentUrl) return res.status(404).json({ error: 'Attachment not found.' })
     if (!sheet.allowDownloads) {
-      return res.status(403).json({ error: 'Downloads are disabled for this sheet.' })
+      return sendForbidden(res, 'Downloads are disabled for this sheet.')
     }
 
     const localPath = resolveAttachmentPath(sheet.attachmentUrl)
@@ -989,7 +1015,7 @@ router.get('/:id/attachment', attachmentDownloadLimiter, async (req, res) => {
   }
 })
 
-router.get('/:id/attachment/preview', attachmentDownloadLimiter, async (req, res) => {
+router.get('/:id/attachment/preview', requireAuth, attachmentDownloadLimiter, async (req, res) => {
   const sheetId = Number.parseInt(req.params.id, 10)
 
   try {
@@ -1006,7 +1032,7 @@ router.get('/:id/attachment/preview', attachmentDownloadLimiter, async (req, res
 
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
     if (sheet.status !== SHEET_STATUS.PUBLISHED) {
-      return res.status(403).json({ error: 'Preview unavailable for this sheet.' })
+      return sendForbidden(res, 'Preview unavailable for this sheet.')
     }
     if (!sheet.attachmentUrl) return res.status(404).json({ error: 'Attachment not found.' })
 
@@ -1155,9 +1181,14 @@ router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
     })
 
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
-    if (sheet.userId !== req.user.userId && req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Not your sheet.' })
-    }
+    if (!assertOwnerOrAdmin({
+      res,
+      user: req.user,
+      ownerId: sheet.userId,
+      message: 'Not your sheet.',
+      targetType: 'sheet',
+      targetId: sheetId,
+    })) return
 
     const data = {}
     const requestedContentFormat = req.body && Object.hasOwn(req.body, 'contentFormat')
@@ -1351,7 +1382,7 @@ router.post('/:id/contributions', requireAuth, contributionRateLimiter, async (r
       return res.status(400).json({ error: 'Only forked sheets can be contributed back.' })
     }
     if (forkSheet.userId !== req.user.userId && req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Only the fork owner can contribute changes.' })
+      return sendForbidden(res, 'Only the fork owner can contribute changes.')
     }
 
     const targetSheet = await prisma.studySheet.findUnique({
@@ -1428,7 +1459,7 @@ router.post('/:id/star', requireAuth, reactLimiter, async (req, res) => {
     if (!visibility) return res.status(404).json({ error: 'Sheet not found.' })
     if (!canReadSheet(visibility, req.user)) return res.status(404).json({ error: 'Sheet not found.' })
     if (visibility.status !== SHEET_STATUS.PUBLISHED) {
-      return res.status(403).json({ error: 'You can only star published sheets.' })
+      return sendForbidden(res, 'You can only star published sheets.')
     }
 
     let createdStar = false
@@ -1494,10 +1525,10 @@ router.post('/:id/download', attachmentDownloadLimiter, async (req, res) => {
     })
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
     if (sheet.status !== SHEET_STATUS.PUBLISHED) {
-      return res.status(403).json({ error: 'Downloads are unavailable for this sheet.' })
+      return sendForbidden(res, 'Downloads are unavailable for this sheet.')
     }
     if (!sheet.allowDownloads) {
-      return res.status(403).json({ error: 'Downloads are disabled for this sheet.' })
+      return sendForbidden(res, 'Downloads are disabled for this sheet.')
     }
 
     const updated = await prisma.studySheet.update({
@@ -1523,9 +1554,14 @@ router.delete('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
     })
 
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
-    if (sheet.userId !== req.user.userId && req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Not your sheet.' })
-    }
+    if (!assertOwnerOrAdmin({
+      res,
+      user: req.user,
+      ownerId: sheet.userId,
+      message: 'Not your sheet.',
+      targetType: 'sheet',
+      targetId: sheetId,
+    })) return
 
     await prisma.studySheet.delete({ where: { id: sheetId } })
     await cleanupAttachmentIfUnused(prisma, sheet.attachmentUrl, {
@@ -1634,7 +1670,7 @@ router.post('/:id/react', requireAuth, reactLimiter, async (req, res) => {
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
     if (!canReadSheet(sheet, req.user || null)) return res.status(404).json({ error: 'Sheet not found.' })
     if (sheet.status !== SHEET_STATUS.PUBLISHED) {
-      return res.status(403).json({ error: 'Reactions are disabled until the sheet is published.' })
+      return sendForbidden(res, 'Reactions are disabled until the sheet is published.')
     }
 
     const existing = await prisma.reaction.findUnique({
@@ -1680,9 +1716,14 @@ router.delete('/:id/comments/:commentId', requireAuth, commentLimiter, async (re
   try {
     const comment = await prisma.comment.findUnique({ where: { id: commentId } })
     if (!comment) return res.status(404).json({ error: 'Comment not found.' })
-    if (comment.userId !== req.user.userId && req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Not your comment.' })
-    }
+    if (!assertOwnerOrAdmin({
+      res,
+      user: req.user,
+      ownerId: comment.userId,
+      message: 'Not your comment.',
+      targetType: 'sheet-comment',
+      targetId: commentId,
+    })) return
 
     await prisma.comment.delete({ where: { id: comment.id } })
     res.json({ message: 'Comment deleted.' })

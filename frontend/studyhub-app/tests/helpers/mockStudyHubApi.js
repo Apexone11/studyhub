@@ -5,7 +5,7 @@ export function createSessionUser(overrides = {}) {
     role: 'admin',
     email: 'regression_admin@studyhub.test',
     emailVerified: true,
-    twoFaEnabled: false,
+    twoFaEnabled: true,
     avatarUrl: null,
     createdAt: '2026-03-16T12:00:00.000Z',
     enrollments: [

@@ -2,6 +2,7 @@ const express = require('express')
 const rateLimit = require('express-rate-limit')
 const fs = require('node:fs')
 const path = require('node:path')
+const { assertOwnerOrAdmin, sendForbidden } = require('../lib/accessControl')
 const requireAuth = require('../middleware/auth')
 const { captureError } = require('../monitoring/sentry')
 const { createNotification } = require('../lib/notify')
@@ -509,7 +510,7 @@ router.get('/posts/:id', async (req, res) => {
   }
 })
 
-router.get('/posts/:id/attachment', attachmentDownloadLimiter, async (req, res) => {
+router.get('/posts/:id/attachment', requireAuth, attachmentDownloadLimiter, async (req, res) => {
   const postId = Number.parseInt(req.params.id, 10)
 
   try {
@@ -526,7 +527,7 @@ router.get('/posts/:id/attachment', attachmentDownloadLimiter, async (req, res) 
     if (!post) return res.status(404).json({ error: 'Post not found.' })
     if (!post.attachmentUrl) return res.status(404).json({ error: 'Attachment not found.' })
     if (!post.allowDownloads) {
-      return res.status(403).json({ error: 'Downloads are disabled for this post.' })
+      return sendForbidden(res, 'Downloads are disabled for this post.')
     }
 
     const localPath = resolveAttachmentPath(post.attachmentUrl)
@@ -541,7 +542,7 @@ router.get('/posts/:id/attachment', attachmentDownloadLimiter, async (req, res) 
   }
 })
 
-router.get('/posts/:id/attachment/preview', attachmentDownloadLimiter, async (req, res) => {
+router.get('/posts/:id/attachment/preview', requireAuth, attachmentDownloadLimiter, async (req, res) => {
   const postId = Number.parseInt(req.params.id, 10)
 
   try {
@@ -705,9 +706,14 @@ router.delete('/posts/:id/comments/:commentId', feedWriteLimiter, async (req, re
   try {
     const comment = await prisma.feedPostComment.findUnique({ where: { id: commentId } })
     if (!comment) return res.status(404).json({ error: 'Comment not found.' })
-    if (comment.userId !== req.user.userId && req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Not your comment.' })
-    }
+    if (!assertOwnerOrAdmin({
+      res,
+      user: req.user,
+      ownerId: comment.userId,
+      message: 'Not your comment.',
+      targetType: 'feed-comment',
+      targetId: commentId,
+    })) return
 
     await prisma.feedPostComment.delete({ where: { id: commentId } })
     res.json({ message: 'Comment deleted.' })
@@ -726,9 +732,14 @@ router.delete('/posts/:id', feedWriteLimiter, async (req, res) => {
       select: { id: true, userId: true, attachmentUrl: true },
     })
     if (!post) return res.status(404).json({ error: 'Post not found.' })
-    if (post.userId !== req.user.userId && req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Not your post.' })
-    }
+    if (!assertOwnerOrAdmin({
+      res,
+      user: req.user,
+      ownerId: post.userId,
+      message: 'Not your post.',
+      targetType: 'feed-post',
+      targetId: postId,
+    })) return
 
     await prisma.feedPost.delete({ where: { id: postId } })
     await cleanupAttachmentIfUnused(prisma, post.attachmentUrl, {

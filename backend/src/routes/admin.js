@@ -1,5 +1,6 @@
 const express = require('express')
 const requireAuth = require('../middleware/auth')
+const requireAdmin = require('../middleware/requireAdmin')
 const { captureError } = require('../monitoring/sentry')
 const { deleteUserAccount } = require('../lib/deleteUserAccount')
 const { validateHtmlForSubmission } = require('../lib/htmlSecurity')
@@ -9,10 +10,7 @@ const router = express.Router()
 
 // All admin routes require auth + admin role
 router.use(requireAuth)
-router.use((req, res, next) => {
-  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin access required.' })
-  next()
-})
+router.use(requireAdmin)
 
 const PAGE_SIZE = 20
 

@@ -9,8 +9,8 @@ const adminRoutePath = require.resolve('../src/routes/admin')
 
 const mocks = vi.hoisted(() => {
   const users = [
-    { id: 101, username: 'student_owner', role: 'student' },
-    { id: 1, username: 'beta_admin', role: 'admin' },
+    { id: 101, username: 'student_owner', role: 'student', twoFaEnabled: false },
+    { id: 1, username: 'beta_admin', role: 'admin', twoFaEnabled: true },
   ]
   const courses = [
     {
@@ -202,6 +202,20 @@ const mocks = vi.hoisted(() => {
       },
       user: {
         count: vi.fn(async () => users.length),
+        findUnique: vi.fn(async ({ where, select } = {}) => {
+          const id = Number(where?.id)
+          const user = users.find((entry) => entry.id === id)
+          if (!user) return null
+          if (!select || typeof select !== 'object') return { ...user }
+
+          const selected = {}
+          for (const [key, enabled] of Object.entries(select)) {
+            if (enabled) {
+              selected[key] = user[key]
+            }
+          }
+          return selected
+        }),
       },
       comment: { count: vi.fn(async () => 0) },
       requestedCourse: { count: vi.fn(async () => 0) },

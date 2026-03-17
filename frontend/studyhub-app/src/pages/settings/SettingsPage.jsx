@@ -559,6 +559,12 @@ export default function SettingsPage() {
                 </Button>
               </SectionCard>
 
+              {user?.role === 'admin' && !user?.twoFaEnabled && (
+                <Message tone="info">
+                  Admin tools stay locked until this account enables 2-step verification.
+                </Message>
+              )}
+
               <SectionCard title="2-Step Verification" subtitle="Email verification happens before 2FA. Password reset and 2FA both depend on a verified email.">
                 {user?.pendingEmailVerification && (
                   <Message tone="info">
