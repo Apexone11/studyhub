@@ -6,72 +6,15 @@ const repoRoot = path.resolve(__dirname, '..')
 const diagnosticsDir = path.join(repoRoot, 'beta-diagnostics')
 
 function npmCommand() {
-  return 'npm'
-}
-
-function quoteWindowsArg(text) {
-  // Always quote empty strings so they are preserved as arguments
-  if (text === '') {
-    return '""'
-  }
-
-  // If no whitespace, double quotes, or cmd metacharacters, return as-is
-  // Cmd metacharacters: & | < > ( ) ^ %
-  if (!/[\s"&|<>()[\]^%]/u.test(text)) {
-    return text
-  }
-
-  // Escape backslashes and double quotes according to Windows/CRT rules
-  let result = '"'
-  let backslashCount = 0
-
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i]
-
-    if (ch === '\\') {
-      backslashCount += 1
-    } else if (ch === '"') {
-      // Escape all backslashes before a quote, then the quote itself
-      result += '\\'.repeat(backslashCount * 2 + 1)
-      result += '"'
-      backslashCount = 0
-    } else {
-      if (backslashCount > 0) {
-        result += '\\'.repeat(backslashCount)
-        backslashCount = 0
-      }
-      result += ch
-    }
-  }
-
-  // Escape trailing backslashes before the closing quote
-  if (backslashCount > 0) {
-    result += '\\'.repeat(backslashCount * 2)
-  }
-
-  result += '"'
-  return result
+  return process.platform === 'win32' ? 'npm.cmd' : 'npm'
 }
 
 function runCommand(command, args, extraEnv = {}) {
-  const baseOptions = {
+  const result = spawnSync(command, args, {
     cwd: repoRoot,
     env: { ...process.env, ...extraEnv },
     encoding: 'utf8',
-  }
-
-  let result
-  if (process.platform === 'win32') {
-    const cmd = [command, ...args]
-      .map((part) => {
-        const text = String(part)
-        return quoteWindowsArg(text)
-      })
-      .join(' ')
-    result = spawnSync(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', cmd], baseOptions)
-  } else {
-    result = spawnSync(command, args, baseOptions)
-  }
+  })
 
   if (result.stdout) process.stdout.write(result.stdout)
   if (result.stderr) process.stderr.write(result.stderr)
