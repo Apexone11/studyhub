@@ -152,6 +152,19 @@ function PasswordHint({ password, confirmPassword }) {
   )
 }
 
+function parseTimestampToMs(value) {
+  if (!value) return null
+  const parsed = Date.parse(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function formatResendCountdown(totalSeconds) {
+  const safeSeconds = Math.max(0, Math.floor(totalSeconds))
+  const minutes = Math.floor(safeSeconds / 60)
+  const seconds = safeSeconds % 60
+  return `${minutes}:${String(seconds).padStart(2, '0')}`
+}
+
 export default function RegisterScreen() {
   const navigate = useNavigate()
   const { completeAuthentication } = useSession()
@@ -168,6 +181,7 @@ export default function RegisterScreen() {
   const [customCourseDraft, setCustomCourseDraft] = useState({ code: '', name: '' })
   const [verification, setVerification] = useState(null)
   const [verificationCode, setVerificationCode] = useState('')
+  const [clockNowMs, setClockNowMs] = useState(() => Date.now())
 
   const [form, setForm] = useState({
     username: '',
@@ -211,12 +225,32 @@ export default function RegisterScreen() {
     }
   }, [catalogLoading, schools.length, step])
 
+  useEffect(() => {
+    const timerId = window.setInterval(() => {
+      setClockNowMs(Date.now())
+    }, 1000)
+
+    return () => {
+      window.clearInterval(timerId)
+    }
+  }, [])
+
   const selectedSchool = useMemo(
     () => schools.find((school) => String(school.id) === String(form.schoolId)) || null,
     [form.schoolId, schools],
   )
 
   const availableCourses = selectedSchool?.courses || []
+
+  const resendAvailableAtMs = useMemo(
+    () => parseTimestampToMs(verification?.resendAvailableAt),
+    [verification?.resendAvailableAt],
+  )
+
+  const resendCooldownSeconds = useMemo(() => {
+    if (!resendAvailableAtMs) return 0
+    return Math.max(0, Math.ceil((resendAvailableAtMs - clockNowMs) / 1000))
+  }, [clockNowMs, resendAvailableAtMs])
 
   function setField(key, value) {
     setForm((current) => ({ ...current, [key]: value }))
@@ -327,6 +361,8 @@ export default function RegisterScreen() {
   }
 
   async function handleResendCode() {
+    if (resendCooldownSeconds > 0) return
+
     setLoading(true)
     setError('')
     setSuccess('')
@@ -587,8 +623,15 @@ export default function RegisterScreen() {
                 <Button type="submit" disabled={loading || verificationCode.trim().length !== 6}>
                   {loading ? 'Verifying…' : 'Verify Code'}
                 </Button>
-                <Button type="button" secondary onClick={handleResendCode} disabled={loading}>
-                  Resend Code
+                <Button
+                  type="button"
+                  secondary
+                  onClick={handleResendCode}
+                  disabled={loading || resendCooldownSeconds > 0}
+                >
+                  {resendCooldownSeconds > 0
+                    ? `Resend in ${formatResendCountdown(resendCooldownSeconds)}`
+                    : 'Resend Code'}
                 </Button>
                 <Button
                   type="button"
@@ -602,6 +645,12 @@ export default function RegisterScreen() {
                   Back
                 </Button>
               </div>
+
+              {resendCooldownSeconds > 0 && (
+                <div style={{ marginTop: 10, fontSize: 12, color: '#64748b' }}>
+                  You can request another verification code in {formatResendCountdown(resendCooldownSeconds)}.
+                </div>
+              )}
             </form>
           )}
 

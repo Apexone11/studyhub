@@ -33,6 +33,9 @@ describe('RegisterScreen', () => {
     let completePayload = null
 
     server.use(
+      http.get('http://localhost:4000/api/auth/me', () => (
+        HttpResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      )),
       http.post('http://localhost:4000/api/auth/register/start', async ({ request }) => {
         startPayload = await request.json()
         return HttpResponse.json({
@@ -122,5 +125,38 @@ describe('RegisterScreen', () => {
     })
 
     await screen.findByText('Feed ready')
+  })
+
+  it('disables verification resend while cooldown is active', async () => {
+    const user = userEvent.setup()
+
+    server.use(
+      http.get('http://localhost:4000/api/auth/me', () => (
+        HttpResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      )),
+      http.post('http://localhost:4000/api/auth/register/start', () => (
+        HttpResponse.json({
+          verificationToken: 'cooldown-register-token',
+          deliveryHint: 'co***@studyhub.test',
+          expiresAt: '2099-03-16T12:15:00.000Z',
+          resendAvailableAt: '2099-03-16T12:01:00.000Z',
+        }, { status: 201 })
+      )),
+    )
+
+    renderRegisterScreen()
+
+    await user.type(screen.getByLabelText('Username'), 'cooldown_user')
+    await user.type(screen.getByLabelText('Email'), 'cooldown_user@studyhub.test')
+    await user.type(screen.getByLabelText('Password'), 'Password123')
+    await user.type(screen.getByLabelText('Confirm Password'), 'Password123')
+    await user.click(screen.getByRole('checkbox'))
+    await user.click(screen.getByRole('button', { name: 'Continue To Email Verification' }))
+
+    await screen.findByRole('heading', { name: 'Verify your email' })
+
+    const resendButton = screen.getByRole('button', { name: /Resend in/i })
+    expect(resendButton).toBeDisabled()
+    expect(screen.getByText(/You can request another verification code in/i)).toBeInTheDocument()
   })
 })

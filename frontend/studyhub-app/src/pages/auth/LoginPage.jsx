@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
 import { API } from '../../config'
@@ -100,6 +100,19 @@ function Message({ tone = 'error', children }) {
   )
 }
 
+function parseTimestampToMs(value) {
+  if (!value) return null
+  const parsed = Date.parse(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function formatResendCountdown(totalSeconds) {
+  const safeSeconds = Math.max(0, Math.floor(totalSeconds))
+  const minutes = Math.floor(safeSeconds / 60)
+  const seconds = safeSeconds % 60
+  return `${minutes}:${String(seconds).padStart(2, '0')}`
+}
+
 export default function LoginPage() {
   const navigate = useNavigate()
   const { completeAuthentication } = useSession()
@@ -111,6 +124,7 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [showForgot, setShowForgot] = useState(false)
+  const [clockNowMs, setClockNowMs] = useState(() => Date.now())
 
   const [twoFactor, setTwoFactor] = useState({
     active: false,
@@ -119,6 +133,26 @@ export default function LoginPage() {
   })
 
   const [verificationGate, setVerificationGate] = useState(null)
+
+  useEffect(() => {
+    const timerId = window.setInterval(() => {
+      setClockNowMs(Date.now())
+    }, 1000)
+
+    return () => {
+      window.clearInterval(timerId)
+    }
+  }, [])
+
+  const resendAvailableAtMs = useMemo(
+    () => parseTimestampToMs(verificationGate?.resendAvailableAt),
+    [verificationGate?.resendAvailableAt],
+  )
+
+  const resendCooldownSeconds = useMemo(() => {
+    if (!resendAvailableAtMs) return 0
+    return Math.max(0, Math.ceil((resendAvailableAtMs - clockNowMs) / 1000))
+  }, [clockNowMs, resendAvailableAtMs])
 
   async function handleLogin(event) {
     event.preventDefault()
@@ -175,6 +209,8 @@ export default function LoginPage() {
   }
 
   async function handleSendVerificationEmail() {
+    if (resendCooldownSeconds > 0) return
+
     setLoading(true)
     setError('')
 
@@ -400,10 +436,12 @@ export default function LoginPage() {
                 <Button
                   type="button"
                   secondary
-                  disabled={loading || (verificationGate.emailRequired && !verificationEmail.trim())}
+                  disabled={loading || resendCooldownSeconds > 0 || (verificationGate.emailRequired && !verificationEmail.trim())}
                   onClick={handleSendVerificationEmail}
                 >
-                  Send / Resend Code
+                  {resendCooldownSeconds > 0
+                    ? `Resend in ${formatResendCountdown(resendCooldownSeconds)}`
+                    : 'Send / Resend Code'}
                 </Button>
                 <Button
                   type="button"
@@ -417,6 +455,12 @@ export default function LoginPage() {
                   Back
                 </Button>
               </div>
+
+              {resendCooldownSeconds > 0 && (
+                <div style={{ marginTop: 10, fontSize: 12, color: '#64748b' }}>
+                  You can request another verification code in {formatResendCountdown(resendCooldownSeconds)}.
+                </div>
+              )}
             </form>
           )}
 

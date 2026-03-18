@@ -129,6 +129,48 @@ beforeEach(() => {
 })
 
 describe('auth routes', () => {
+  it('returns 503 when login verification email cannot be delivered', async () => {
+    const passwordHash = await bcrypt.hash('Password123', 4)
+
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      id: 11,
+      username: 'delivery_down',
+      passwordHash,
+      email: 'delivery_down@studyhub.test',
+      emailVerified: false,
+      failedAttempts: 0,
+      lockedUntil: null,
+      twoFaEnabled: false,
+    })
+
+    mocks.verification.createOrRefreshLoginChallenge.mockResolvedValue({
+      challenge: {
+        id: 801,
+        token: 'delivery-down-token',
+        email: 'delivery_down@studyhub.test',
+        expiresAt: new Date('2026-03-16T12:15:00.000Z'),
+      },
+      code: '123456',
+      didSend: true,
+    })
+
+    const deliveryError = new Error('smtp unavailable')
+    mocks.email.sendEmailVerification.mockRejectedValue(deliveryError)
+
+    const response = await request(app)
+      .post('/login')
+      .send({ username: 'delivery_down', password: 'Password123' })
+
+    expect(response.status).toBe(503)
+    expect(response.body).toEqual({
+      error: 'We could not send your verification code right now. Please try again later.',
+    })
+    expect(mocks.sentry.captureError).toHaveBeenCalledWith(deliveryError, expect.objectContaining({
+      source: 'sendEmailVerification',
+      purpose: 'login-email',
+    }))
+  })
+
   it('gates unverified users behind email verification before creating a session', async () => {
     const passwordHash = await bcrypt.hash('Password123', 4)
 
@@ -171,6 +213,45 @@ describe('auth routes', () => {
       'legacy_user',
       '654321',
     )
+  })
+
+  it('cleans up signup challenge when verification email delivery fails', async () => {
+    mocks.prisma.user.findUnique.mockResolvedValueOnce(null)
+    mocks.prisma.user.findUnique.mockResolvedValueOnce(null)
+
+    mocks.verification.createSignupChallenge.mockResolvedValue({
+      challenge: {
+        id: 901,
+        token: 'signup-token',
+        username: 'signup_user',
+        email: 'signup_user@studyhub.test',
+        expiresAt: new Date('2026-03-16T12:15:00.000Z'),
+      },
+      code: '654321',
+    })
+
+    const deliveryError = new Error('provider outage')
+    mocks.email.sendEmailVerification.mockRejectedValue(deliveryError)
+
+    const response = await request(app)
+      .post('/register/start')
+      .send({
+        username: 'signup_user',
+        email: 'signup_user@studyhub.test',
+        password: 'Password123',
+        confirmPassword: 'Password123',
+        termsAccepted: true,
+      })
+
+    expect(response.status).toBe(503)
+    expect(response.body).toEqual({
+      error: 'We could not send your verification code right now. Please try again later.',
+    })
+    expect(mocks.verification.consumeChallenge).toHaveBeenCalledWith(901)
+    expect(mocks.sentry.captureError).toHaveBeenCalledWith(deliveryError, expect.objectContaining({
+      source: 'sendEmailVerification',
+      purpose: 'signup',
+    }))
   })
 
   it('returns an email-required verification gate for legacy users without an email address', async () => {

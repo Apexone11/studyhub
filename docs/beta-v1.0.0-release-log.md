@@ -548,3 +548,269 @@ Cycle 11 Deep Scan Summary
 Cycle 11 Deferred-Risk Notes
 - CI beta-log enforcement rule in `.github/workflows/ci.yml` remains intentionally strict to versioned release logs; this cycle keeps that policy unchanged.
 - Full end-to-end beta gate (`npm run beta:check`) was not rerun in this targeted pass.
+
+Cycle 12 Additions (Resend Email Transport + Verification Cooldown UX) [2026-03-17]
+Implemented in beta lane:
+- Resend API transport support was added as a first-class backend email mode:
+  - `backend/src/lib/email.js`
+  - new mode detection supports `EMAIL_TRANSPORT=resend` (or `EMAIL_PROVIDER=resend`) and automatic fallback selection when only `RESEND_API_KEY` is configured.
+  - startup validation now checks Resend API key reachability through the domains endpoint and honors strict startup mode behavior.
+  - outbound email delivery now supports Resend API send flow, preserving existing SMTP/json transport behavior.
+- Verification resend cooldown UX was added to auth/settings surfaces:
+  - `frontend/studyhub-app/src/pages/auth/LoginPage.jsx`
+  - `frontend/studyhub-app/src/pages/auth/RegisterScreen.jsx`
+  - `frontend/studyhub-app/src/pages/settings/SettingsPage.jsx`
+  - resend actions are disabled during cooldown windows and display a live countdown timer.
+- Test coverage expanded for email delivery reliability and cooldown behavior:
+  - `backend/test/auth.routes.test.js`
+  - `frontend/studyhub-app/src/pages/auth/LoginPage.test.jsx`
+  - `frontend/studyhub-app/src/pages/auth/RegisterScreen.test.jsx`
+  - backend now covers login/signup verification email send failures and challenge cleanup behavior; frontend now covers cooldown-disabled resend state.
+- Deployment documentation updated for Railway + Resend rollout:
+  - `backend/.env.example`
+  - `docs/railway-deployment-checklist.md`
+  - production guidance now prefers Resend with strict startup validation and includes SMTP fallback variables only when needed.
+
+Cycle 12 Validation Commands (Executed)
+- `npm --prefix backend run test -- test/auth.routes.test.js`
+- `npm --prefix frontend/studyhub-app run test -- src/pages/auth/LoginPage.test.jsx src/pages/auth/RegisterScreen.test.jsx`
+- `npm --prefix backend run lint`
+- `npm --prefix frontend/studyhub-app run lint`
+
+Cycle 12 Validation Result
+- Targeted backend auth tests passed:
+  - `1` file
+  - `6` tests
+- Targeted frontend auth tests passed:
+  - `2` files
+  - `4` tests
+- Backend lint passed.
+- Frontend lint passed.
+
+Cycle 12 Deep Scan Summary
+- Focused scan before implementation confirmed these operational gaps:
+  - email provider lock-in on SMTP/gmail and fragile production delivery path for strict verification login gates.
+  - missing user-facing resend cooldown feedback despite backend cooldown enforcement.
+  - missing automated coverage for verification email send-failure handling in critical auth paths.
+- All three gaps were addressed in this cycle with code and tests.
+
+Cycle 12 Deferred-Risk Notes
+- Full end-to-end beta gate (`npm run beta:check`) was not rerun in this targeted cycle.
+- Resend webhook ingestion, delivery-event persistence, and outbox/retry worker are still pending in follow-up cycles for full delivery observability and asynchronous retry resilience.
+
+Cycle 13 Additions (Resend Webhook Ingestion + Delivery Event Logging) [2026-03-17]
+Implemented in beta lane:
+- Signed Resend webhook ingestion route added with strict verification controls:
+  - `backend/src/routes/webhooks.js`
+  - endpoint: `POST /api/webhooks/resend`
+  - verifies `svix-*` headers with `RESEND_WEBHOOK_SECRET` when configured.
+  - strict mode fails closed when secret is missing (`RESEND_WEBHOOK_STRICT=true`).
+  - duplicate webhook replays are handled idempotently.
+- Webhook route boot order wired for raw-body signature verification:
+  - `backend/src/index.js`
+  - mounted webhook routes before global JSON parsing, guarded-mode write blocks, and CSRF middleware so signed payload verification remains deterministic.
+- Durable event logging schema added for delivery analytics and incident triage:
+  - `backend/prisma/schema.prisma`
+  - new model: `EmailDeliveryEvent`
+  - migration: `backend/prisma/migrations/20260317193000_add_email_delivery_events/migration.sql`
+  - stores provider, event type, provider message ID, recipient, subject, event timestamp, full payload, and receive time.
+- Resend webhook configuration guidance expanded:
+  - `backend/.env.example`
+  - `docs/railway-deployment-checklist.md`
+  - added `RESEND_WEBHOOK_SECRET` and `RESEND_WEBHOOK_STRICT` guidance plus production registration note for `/api/webhooks/resend`.
+- Route-level test coverage added for webhook safety behavior:
+  - `backend/test/webhooks.routes.test.js`
+  - covers successful signed ingest, invalid signature rejection, strict-mode missing secret rejection, unsigned ingest in non-strict mode, and duplicate replay idempotency.
+
+Cycle 13 Validation Commands (Executed)
+- `npm --prefix backend run test -- test/webhooks.routes.test.js test/auth.routes.test.js`
+- `npm --prefix backend run test -- test/webhooks.routes.test.js`
+- `npm --prefix backend run lint`
+- `npm --prefix backend run build`
+- `npx prisma validate --schema prisma/schema.prisma` (from `backend/`)
+
+Cycle 13 Validation Result
+- Webhook + auth targeted backend tests passed:
+  - `2` files
+  - `10` tests
+- Webhook route targeted backend tests passed:
+  - `1` file
+  - `5` tests
+- Backend lint passed.
+- Backend build check passed.
+- Prisma schema validation passed.
+
+Cycle 13 Deep Scan Summary
+- Focused scan of middleware order and route protections confirmed webhook risks were handled by:
+  - raw-body verification before JSON parsing.
+  - strict-mode fail-closed behavior when signing secrets are missing.
+  - idempotent replay handling via unique provider webhook IDs.
+
+Cycle 13 Deferred-Risk Notes
+- Webhook ingestion currently stores delivery events but does not yet trigger automated bounce/suppression actions.
+- End-to-end Railway webhook replay testing against a live Resend endpoint is still pending and should be completed during production cutover validation.
+
+Cycle 14 Additions (Automatic Suppression Actions from Webhook Events) [2026-03-17]
+Implemented in beta lane:
+- Automatic suppression persistence was added for delivery-risk events:
+  - `backend/src/routes/webhooks.js`
+  - permanent bounce events (`email.bounced` with permanent classification) now upsert suppression state.
+  - complaint events (`email.complained`) now upsert suppression state.
+  - transient bounces are logged but do not trigger suppression.
+- Durable suppression schema added:
+  - `backend/prisma/schema.prisma`
+  - new model: `EmailSuppression`
+  - migration: `backend/prisma/migrations/20260317200000_add_email_suppressions/migration.sql`
+  - stores recipient email, reason, provider source metadata, status, and suppression timestamps.
+- Outbound email delivery now enforces suppression state:
+  - `backend/src/lib/email.js`
+  - before send, recipient list is checked against active suppressions.
+  - suppressed recipients fail fast with explicit `EMAIL_RECIPIENT_SUPPRESSED` delivery error.
+- Suppression behavior test coverage added/expanded:
+  - `backend/test/webhooks.routes.test.js`
+  - `backend/test/email.suppression.test.js`
+  - webhook tests now cover complaint suppression, permanent-bounce suppression, and transient-bounce no-suppress behavior.
+  - email tests now cover blocked delivery for suppressed recipients and normal delivery for unsuppressed recipients.
+- Deployment checklist now includes suppression-action verification at go-live:
+  - `docs/railway-deployment-checklist.md`
+
+Cycle 14 Validation Commands (Executed)
+- `npm --prefix backend run test -- test/webhooks.routes.test.js test/email.suppression.test.js test/auth.routes.test.js`
+- `npm --prefix backend run lint`
+- `npm --prefix backend run build`
+- `npx prisma validate --schema prisma/schema.prisma` (from `backend/`)
+
+Cycle 14 Validation Result
+- Targeted backend tests passed:
+  - `3` files
+  - `15` tests
+- Backend lint passed.
+- Backend build check passed.
+- Prisma schema validation passed.
+
+Cycle 14 Deep Scan Summary
+- Focused scan of webhook processing and outbound send flow confirmed:
+  - suppression actions are now tied directly to logged webhook events.
+  - replayed webhook events remain idempotent through unique provider webhook IDs.
+  - outbound email checks now prevent repeated sends to known-bad recipients.
+
+Cycle 14 Deferred-Risk Notes
+- No unsuppress admin workflow has been added yet; suppression lifecycle is currently write-only from webhook events.
+- End-to-end production replay tests for complaint/bounce flows on Railway should still be run before final cutover sign-off.
+
+Cycle 15 Additions (Admin Unsuppress Workflow + Suppression Audit Trail) [2026-03-17]
+Implemented in beta lane:
+- Admin suppression management workflow API added:
+  - `backend/src/routes/admin.js`
+  - `GET /api/admin/email-suppressions?status=active|inactive|all&page=1&q=email`
+  - `PATCH /api/admin/email-suppressions/:id/unsuppress` (requires reason >= 8 chars)
+  - `GET /api/admin/email-suppressions/:id/audit?page=1`
+  - all routes inherit existing admin role + admin 2FA gate via `requireAdmin` middleware.
+- Durable suppression audit trail schema added:
+  - `backend/prisma/schema.prisma`
+  - new model: `EmailSuppressionAudit`
+  - migration: `backend/prisma/migrations/20260317203000_add_email_suppression_audits/migration.sql`
+  - captures action type, reason, actor, context metadata, and timestamps.
+- Webhook auto-suppression now writes audit entries:
+  - `backend/src/routes/webhooks.js`
+  - automatic suppression decisions now produce `auto-suppress` audit records tied to each suppression row.
+- Existing outbound suppression guard remains enforced:
+  - `backend/src/lib/email.js`
+  - recipients stay blocked while suppression is active; manual unsuppress now provides a controlled recovery path.
+- Test coverage expanded for admin workflow and audit lifecycle:
+  - `backend/test/admin.routes.test.js`
+  - `backend/test/webhooks.routes.test.js`
+  - admin tests now cover suppression listing, unsuppress with required reason, and audit retrieval.
+  - webhook tests now assert suppression audit writes for auto-suppress events.
+- Deployment checklist expanded for recovery operations:
+  - `docs/railway-deployment-checklist.md`
+  - includes explicit validation steps for list/unsuppress/audit endpoints.
+
+Cycle 15 Validation Commands (Executed)
+- `npm --prefix backend run test -- test/admin.routes.test.js test/webhooks.routes.test.js test/email.suppression.test.js test/auth.routes.test.js`
+- `npm --prefix backend run lint`
+- `npm --prefix backend run build`
+- `npx prisma validate --schema prisma/schema.prisma` (from `backend/`)
+
+Cycle 15 Validation Result
+- Targeted backend tests passed:
+  - `4` files
+  - `22` tests
+- Backend lint passed.
+- Backend build check passed.
+- Prisma schema validation passed.
+
+Cycle 15 Deep Scan Summary
+- Focused scan confirmed suppression lifecycle is now complete for operations:
+  - webhook events can auto-suppress risky recipients.
+  - admin operators can manually unsuppress after mailbox recovery.
+  - all unsuppress actions and auto-suppress actions are audit-tracked.
+
+Cycle 15 Deferred-Risk Notes
+- A dedicated frontend admin UI for suppression review/unsuppress actions is not yet implemented; current workflow is API-driven.
+- Optional future hardening: add reason enums/workflow states for support-team policy consistency across manual unsuppress decisions.
+
+Cycle 16 Additions (Admin Suppression Frontend Panel) [2026-03-18]
+Implemented in beta lane:
+- Admin suppression operations are now available in frontend admin UI:
+  - `frontend/studyhub-app/src/pages/admin/AdminPage.jsx`
+  - new `Email Suppressions` tab added to existing admin tab shell.
+  - suppression list now loads from `GET /api/admin/email-suppressions` with status filter (`active|inactive|all`) and email query search.
+  - per-recipient unsuppress action wired to `PATCH /api/admin/email-suppressions/:id/unsuppress` with client-side reason validation (minimum 8 chars).
+  - suppression audit timeline drawer wired to `GET /api/admin/email-suppressions/:id/audit` with paged entries.
+  - panel includes row-level error messaging, success confirmation, and active/inactive status pill rendering.
+- Frontend regression coverage expanded for suppression workflow:
+  - `frontend/studyhub-app/src/pages/admin/AdminPage.test.jsx`
+  - adds tests for suppression list/audit rendering and unsuppress validation + success path behavior.
+
+Cycle 16 Validation Commands (Executed)
+- `npm --prefix frontend/studyhub-app run test -- src/pages/admin/AdminPage.test.jsx`
+- `npm --prefix frontend/studyhub-app run lint`
+- `npm --prefix frontend/studyhub-app run build`
+
+Cycle 16 Validation Result
+- Targeted frontend admin tests passed:
+  - `1` file
+  - `5` tests
+- Frontend lint passed.
+- Frontend production build passed.
+
+Cycle 16 Deep Scan Summary
+- Focused scan of existing admin tab architecture confirmed reuse of stable patterns:
+  - shared paged tab loading (`createPageState` + `loadPagedData`) was extended rather than forked.
+  - existing admin auth/session error handling (`apiJson`) remains the single transport path.
+  - suppression audit is isolated to explicit user action and does not alter existing overview/users/sheets behavior.
+
+Cycle 16 Deferred-Risk Notes
+- Suppression table currently renders raw provider/source labels with light formatting; future UX pass may introduce richer event taxonomy badges.
+- Full e2e admin suppression workflow (UI + API + real webhook-produced records) is still pending and should be added before final production cutover.
+
+Cycle 17 Additions (Admin Suppression Playwright Flow) [2026-03-17]
+Implemented in beta lane:
+- Added a dedicated Playwright smoke scenario for the admin suppression lifecycle:
+  - `frontend/studyhub-app/tests/admin.email-suppressions.smoke.spec.js`
+  - covers end-to-end UI flow in one test:
+    - suppression list rendering in `Email Suppressions` tab
+    - audit timeline open and event visibility
+    - unsuppress action with reason
+    - post-unsuppress filter transition from active to inactive
+    - audit timeline includes manual-unsuppress actor/reason after action
+- Route-mocked e2e harness was used to match current frontend smoke test strategy and keep execution deterministic in CI/local beta checks.
+
+Cycle 17 Validation Commands (Executed)
+- `npm --prefix frontend/studyhub-app run test:e2e -- tests/admin.email-suppressions.smoke.spec.js`
+- `npm --prefix frontend/studyhub-app run lint`
+
+Cycle 17 Validation Result
+- Targeted Playwright e2e test passed:
+  - `1` file
+  - `1` test
+- Frontend lint passed.
+
+Cycle 17 Deep Scan Summary
+- Focused scan verified selector and route stability for the new flow:
+  - replaced one ambiguous text assertion with a strict table-cell role assertion to avoid duplicate-text strict-mode collisions.
+  - API route mocks now exercise status/query filtering and suppression state transitions across list/audit/unsuppress endpoints.
+
+Cycle 17 Deferred-Risk Notes
+- This e2e uses mocked admin APIs (consistent with existing smoke strategy); an additional live-stack validation run with real webhook-produced suppression records remains recommended before final production cutover.
