@@ -6,7 +6,7 @@ const repoRoot = path.resolve(__dirname, '..')
 const diagnosticsDir = path.join(repoRoot, 'beta-diagnostics')
 
 function npmCommand() {
-  return 'npm'
+  return process.platform === 'win32' ? 'npm.cmd' : 'npm'
 }
 
 function runCommand(command, args, extraEnv = {}) {
@@ -16,18 +16,7 @@ function runCommand(command, args, extraEnv = {}) {
     encoding: 'utf8',
   }
 
-  let result
-  if (process.platform === 'win32') {
-    const cmd = [command, ...args]
-      .map((part) => {
-        const text = String(part)
-        return /\s/.test(text) ? `"${text.replace(/"/g, '\\"')}"` : text
-      })
-      .join(' ')
-    result = spawnSync(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', cmd], baseOptions)
-  } else {
-    result = spawnSync(command, args, baseOptions)
-  }
+  const result = spawnSync(command, args, baseOptions)
 
   if (result.stdout) process.stdout.write(result.stdout)
   if (result.stderr) process.stderr.write(result.stderr)

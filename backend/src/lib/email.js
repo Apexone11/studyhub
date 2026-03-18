@@ -54,7 +54,7 @@ function getEmailMode() {
   if (shouldUseResend()) return 'resend'
   if (process.env.EMAIL_CAPTURE_DIR) return 'capture'
   if (process.env.EMAIL_USER && process.env.EMAIL_PASS) return process.env.EMAIL_HOST ? 'smtp-host' : 'provider'
-  return 'disabled'
+  return 'json'
 }
 
 // Create transporter lazily so missing env vars don't crash on startup
@@ -306,7 +306,7 @@ async function deliverMail(mailOptions, kind) {
   } else {
     const transporter = getTransporter(mode)
     if (!transporter) {
-      throw new Error('Email delivery is not configured. Configure Resend, SMTP, or EMAIL_TRANSPORT=json.')
+      throw new Error('Email delivery is not configured. Configure Resend (EMAIL_TRANSPORT=resend + RESEND_API_KEY), SMTP, or EMAIL_TRANSPORT=json.')
     }
 
     result = await transporter.sendMail(mailOptions)
