@@ -6,7 +6,6 @@ const AUTH_WRITE_ALLOWLIST = new Set([
   'POST /api/auth/login',
   'POST /api/auth/login/verification/send',
   'POST /api/auth/login/verification/verify',
-  'POST /api/auth/verify-2fa',
   'POST /api/auth/logout',
   'POST /api/auth/forgot-password',
   'POST /api/auth/reset-password',

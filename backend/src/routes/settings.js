@@ -184,7 +184,6 @@ async function getSettingsUser(userId) {
         role: true,
         email: true,
         emailVerified: true,
-        twoFaEnabled: true,
         avatarUrl: true,
         authProvider: true,
         googleId: true,
@@ -342,15 +341,6 @@ router.patch('/email', twoFaLimiter, async (req, res) => {
       await consumeChallenge(challenge.id)
       throw error
     }
-
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        twoFaEnabled: false,
-        twoFaCode: null,
-        twoFaExpiry: null,
-      },
-    })
 
     const updated = await getSettingsUser(user.id)
 
@@ -561,53 +551,6 @@ router.patch('/courses', async (req, res) => {
       message: updated?._count?.enrollments ? 'Courses updated successfully.' : 'Courses cleared successfully.',
       user: updated,
     })
-  } catch (error) {
-    return sendError(req, res, error)
-  }
-})
-
-router.patch('/2fa/enable', twoFaLimiter, async (req, res) => {
-  const { password } = req.body || {}
-  if (!password) return res.status(400).json({ error: 'Password is required.' })
-
-  try {
-    const user = await prisma.user.findUnique({ where: { id: req.user.userId } })
-    if (!user) return res.status(404).json({ error: 'User not found.' })
-    if (!user.email) return res.status(400).json({ error: 'You must add an email address before enabling 2FA.' })
-    if (!user.emailVerified) return res.status(400).json({ error: 'Verify your email address before enabling 2-step verification.' })
-    if (user.twoFaEnabled) return res.status(400).json({ error: '2FA is already enabled.' })
-
-    const pendingChallenge = await getUserActiveChallenge(user.id, VERIFICATION_PURPOSE.SETTINGS_EMAIL)
-    if (pendingChallenge) {
-      return res.status(400).json({ error: 'Verify your pending email change before enabling 2-step verification.' })
-    }
-
-    const valid = await bcrypt.compare(password, user.passwordHash)
-    if (!valid) return res.status(401).json({ error: 'Password is incorrect.' })
-
-    await prisma.user.update({ where: { id: user.id }, data: { twoFaEnabled: true } })
-    return res.json({ twoFaEnabled: true, message: '2-step verification enabled.' })
-  } catch (error) {
-    return sendError(req, res, error)
-  }
-})
-
-router.patch('/2fa/disable', twoFaLimiter, async (req, res) => {
-  const { password } = req.body || {}
-  if (!password) return res.status(400).json({ error: 'Password is required.' })
-
-  try {
-    const user = await prisma.user.findUnique({ where: { id: req.user.userId } })
-    if (!user) return res.status(404).json({ error: 'User not found.' })
-
-    const valid = await bcrypt.compare(password, user.passwordHash)
-    if (!valid) return res.status(401).json({ error: 'Password is incorrect.' })
-
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { twoFaEnabled: false, twoFaCode: null, twoFaExpiry: null },
-    })
-    return res.json({ twoFaEnabled: false, message: '2-step verification disabled.' })
   } catch (error) {
     return sendError(req, res, error)
   }

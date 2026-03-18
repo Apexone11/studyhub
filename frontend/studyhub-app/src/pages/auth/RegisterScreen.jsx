@@ -14,106 +14,29 @@ const RULES = {
   password: /^(?=.*[A-Z])(?=.*\d).{8,}$/,
 }
 
-function StageCard({ children }) {
-  return (
-    <div
-      style={{
-        width: 'min(92vw, 620px)',
-        background: '#fff',
-        borderRadius: 18,
-        border: '1px solid #e2e8f0',
-        boxShadow: '0 10px 40px rgba(15, 23, 42, 0.08)',
-        padding: '32px',
-      }}
-    >
-      {children}
-    </div>
-  )
+const inputStyle = {
+  width: '100%',
+  boxSizing: 'border-box',
+  padding: '13px 16px',
+  borderRadius: 12,
+  border: '1px solid #e2e8f0',
+  fontSize: 14,
+  color: '#0f172a',
+  outline: 'none',
+  background: '#f8fafc',
+  fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+  transition: 'border-color 0.15s, box-shadow 0.15s',
 }
 
-function Field({ label, children, hint, htmlFor }) {
-  return (
-    <div style={{ marginBottom: 16 }}>
-      <label htmlFor={htmlFor} style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 700, color: '#334155' }}>
-        {label}
-      </label>
-      {children}
-      {hint && (
-        <div style={{ marginTop: 5, fontSize: 12, color: '#94a3b8' }}>
-          {hint}
-        </div>
-      )}
-    </div>
-  )
+function focusInput(e) {
+  e.target.style.borderColor = '#3b82f6'
+  e.target.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.1)'
+  e.target.style.background = '#fff'
 }
-
-function Input(props) {
-  return (
-    <input
-      {...props}
-      style={{
-        width: '100%',
-        boxSizing: 'border-box',
-        padding: '12px 14px',
-        borderRadius: 10,
-        border: '1px solid #cbd5e1',
-        fontSize: 14,
-        color: '#0f172a',
-        outline: 'none',
-        fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
-        ...(props.style || {}),
-      }}
-    />
-  )
-}
-
-function Button({ children, secondary = false, ...props }) {
-  return (
-    <button
-      {...props}
-      style={{
-        padding: '12px 18px',
-        borderRadius: 10,
-        border: secondary ? '1px solid #cbd5e1' : 'none',
-        background: secondary ? '#fff' : '#3b82f6',
-        color: secondary ? '#475569' : '#fff',
-        fontSize: 14,
-        fontWeight: 700,
-        cursor: props.disabled ? 'not-allowed' : 'pointer',
-        opacity: props.disabled ? 0.7 : 1,
-        fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
-        ...(props.style || {}),
-      }}
-    >
-      {children}
-    </button>
-  )
-}
-
-function Message({ tone = 'error', children }) {
-  const palette =
-    tone === 'success'
-      ? { bg: '#f0fdf4', border: '#bbf7d0', text: '#166534' }
-      : tone === 'info'
-        ? { bg: '#eff6ff', border: '#bfdbfe', text: '#1d4ed8' }
-        : { bg: '#fef2f2', border: '#fecaca', text: '#b91c1c' }
-
-  return (
-    <div
-      style={{
-        marginBottom: 16,
-        padding: '12px 14px',
-        borderRadius: 10,
-        border: `1px solid ${palette.border}`,
-        background: palette.bg,
-        color: palette.text,
-        fontSize: 13,
-        lineHeight: 1.6,
-      }}
-    >
-      {children}
-    </div>
-  )
+function blurInput(e) {
+  e.target.style.borderColor = '#e2e8f0'
+  e.target.style.boxShadow = 'none'
+  e.target.style.background = '#f8fafc'
 }
 
 function PasswordHint({ password, confirmPassword }) {
@@ -127,24 +50,18 @@ function PasswordHint({ password, confirmPassword }) {
   ]
 
   return (
-    <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-        gap: 8,
-        marginTop: 10,
-      }}
-    >
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8, marginTop: 10 }}>
       {checks.map((check) => (
         <div
           key={check.label}
           style={{
             padding: '8px 10px',
-            borderRadius: 8,
+            borderRadius: 10,
             background: check.ok ? '#f0fdf4' : '#f8fafc',
             border: `1px solid ${check.ok ? '#bbf7d0' : '#e2e8f0'}`,
             fontSize: 12,
             color: check.ok ? '#166534' : '#64748b',
+            fontWeight: 600,
           }}
         >
           {check.ok ? '✓' : '○'} {check.label}
@@ -523,26 +440,45 @@ export default function RegisterScreen() {
     }
   }
 
+  const steps = googleCredential
+    ? [['courses', 'Courses']]
+    : [['account', 'Account'], ['verify', 'Verify'], ['courses', 'Courses']]
+  const stepOrder = steps.map(([key]) => key)
+
   return (
     <div
       style={{
         minHeight: '100vh',
-        background: '#edf0f5',
+        background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #1e40af 100%)',
         fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
         color: '#0f172a',
+        position: 'relative',
+        overflow: 'hidden',
       }}
     >
       <Navbar variant="landing" />
-      <div ref={cardRef} style={{ padding: '48px 20px 80px', display: 'grid', placeItems: 'center' }}>
-        <StageCard>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
-            {(googleCredential
-              ? [['courses', 'Courses']]
-              : [['account', 'Account'], ['verify', 'Verify Email'], ['courses', 'Courses']]
-            ).map(([key, label], index) => {
-              const order = googleCredential ? ['courses'] : ['account', 'verify', 'courses']
-              const currentIndex = order.indexOf(step)
-              const thisIndex = order.indexOf(key)
+
+      {/* Decorative background */}
+      <div style={{ position: 'absolute', top: -120, right: -120, width: 400, height: 400, borderRadius: '50%', background: 'rgba(59, 130, 246, 0.08)', filter: 'blur(80px)', pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', bottom: -100, left: -100, width: 350, height: 350, borderRadius: '50%', background: 'rgba(139, 92, 246, 0.06)', filter: 'blur(80px)', pointerEvents: 'none' }} />
+
+      <div ref={cardRef} style={{ padding: '48px 20px 80px', display: 'grid', placeItems: 'center', position: 'relative', zIndex: 1 }}>
+        <div
+          style={{
+            width: 'min(92vw, 580px)',
+            background: 'rgba(255, 255, 255, 0.97)',
+            backdropFilter: 'blur(20px)',
+            borderRadius: 24,
+            border: '1px solid rgba(226, 232, 240, 0.8)',
+            boxShadow: '0 25px 60px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.1)',
+            padding: '40px 36px',
+          }}
+        >
+          {/* Step indicator */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 28 }}>
+            {steps.map(([key, label], index) => {
+              const currentIndex = stepOrder.indexOf(step)
+              const thisIndex = stepOrder.indexOf(key)
               const complete = thisIndex < currentIndex
               const active = key === step
 
@@ -551,149 +487,220 @@ export default function RegisterScreen() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <div
                       style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: '50%',
-                        background: active || complete ? '#3b82f6' : '#e2e8f0',
-                        color: active || complete ? '#fff' : '#64748b',
-                        display: 'grid',
-                        placeItems: 'center',
-                        fontSize: 13,
-                        fontWeight: 700,
+                        width: 34, height: 34, borderRadius: '50%',
+                        background: active || complete ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : '#f1f5f9',
+                        color: active || complete ? '#fff' : '#94a3b8',
+                        display: 'grid', placeItems: 'center',
+                        fontSize: 13, fontWeight: 700,
+                        boxShadow: active ? '0 4px 12px rgba(59, 130, 246, 0.3)' : 'none',
+                        transition: 'all 0.2s',
                       }}
                     >
                       {complete ? '✓' : index + 1}
                     </div>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: active ? '#0f172a' : '#64748b' }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: active ? '#0f172a' : '#94a3b8' }}>
                       {label}
                     </span>
                   </div>
+                  {/* Progress line */}
+                  <div style={{
+                    marginTop: 8, height: 3, borderRadius: 999,
+                    background: complete || active ? 'linear-gradient(90deg, #3b82f6, #60a5fa)' : '#f1f5f9',
+                    transition: 'background 0.3s',
+                  }} />
                 </div>
               )
             })}
           </div>
 
-          {error && <Message>{error}</Message>}
-          {success && <Message tone="success">{success}</Message>}
+          {error && (
+            <div style={{
+              marginBottom: 16, padding: '12px 14px', borderRadius: 12,
+              border: '1px solid #fecaca', background: '#fef2f2', color: '#b91c1c',
+              fontSize: 13, lineHeight: 1.6,
+            }}>
+              {error}
+            </div>
+          )}
+          {success && (
+            <div style={{
+              marginBottom: 16, padding: '12px 14px', borderRadius: 12,
+              border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#166534',
+              fontSize: 13, lineHeight: 1.6,
+            }}>
+              {success}
+            </div>
+          )}
 
           {step === 'account' && (
             <form onSubmit={handleStartVerification}>
-              <h1 style={{ margin: '0 0 8px', fontSize: 28 }}>Create your account</h1>
-              <p style={{ margin: '0 0 24px', fontSize: 14, color: '#64748b', lineHeight: 1.7 }}>
-                Email is required now. We'll send a verification code before course selection and account creation.
-              </p>
+              <div style={{ textAlign: 'center', marginBottom: 24 }}>
+                <div style={{
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  width: 52, height: 52, borderRadius: 14,
+                  background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                  boxShadow: '0 8px 24px rgba(59, 130, 246, 0.3)',
+                  marginBottom: 14,
+                }}>
+                  <svg width="24" height="24" viewBox="0 0 36 36" fill="none">
+                    <path d="M18 6 L18 30 M10 14 L18 6 L26 14 M10 22 L18 14 L26 22" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+                <h1 style={{ margin: '0 0 6px', fontSize: 24, fontWeight: 800, color: '#0f172a' }}>Create your account</h1>
+                <p style={{ margin: 0, fontSize: 14, color: '#64748b', lineHeight: 1.7 }}>
+                  Join thousands of students studying smarter together.
+                </p>
+              </div>
 
               {GOOGLE_CLIENT_ID && (
                 <>
-                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
                     <GoogleLogin
                       onSuccess={handleGoogleSuccess}
                       onError={() => setError('Google sign-up was cancelled or failed.')}
                       size="large"
-                      width="320"
+                      width="380"
                       text="signup_with"
                       shape="rectangular"
                       theme="outline"
                     />
                   </div>
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 12,
-                      marginBottom: 20,
-                    }}
-                  >
-                    <div style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
-                    <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600 }}>OR</span>
-                    <div style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
+                    <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, transparent, #e2e8f0)' }} />
+                    <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>or sign up with email</span>
+                    <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, #e2e8f0, transparent)' }} />
                   </div>
                 </>
               )}
 
-              <Field label="Username" htmlFor="register-username" hint="3-20 characters. Letters, numbers, and underscores only.">
-                <Input
-                  id="register-username"
-                  value={form.username}
-                  onChange={(event) => setField('username', event.target.value)}
-                  placeholder="Choose a username"
-                  autoComplete="username"
-                />
-              </Field>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <div>
+                  <label htmlFor="register-username" style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 700, color: '#334155' }}>Username</label>
+                  <input
+                    id="register-username"
+                    value={form.username}
+                    onChange={(event) => setField('username', event.target.value)}
+                    placeholder="Choose a username"
+                    autoComplete="username"
+                    style={inputStyle}
+                    onFocus={focusInput}
+                    onBlur={blurInput}
+                  />
+                  <div style={{ marginTop: 4, fontSize: 11, color: '#94a3b8' }}>3-20 chars, letters/numbers/_</div>
+                </div>
 
-              <Field label="Email" htmlFor="register-email" hint="This email will receive your verification code and future account recovery emails.">
-                <Input
-                  id="register-email"
-                  type="email"
-                  value={form.email}
-                  onChange={(event) => setField('email', event.target.value)}
-                  placeholder="you@example.com"
-                  autoComplete="email"
-                />
-              </Field>
+                <div>
+                  <label htmlFor="register-email" style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 700, color: '#334155' }}>Email</label>
+                  <input
+                    id="register-email"
+                    type="email"
+                    value={form.email}
+                    onChange={(event) => setField('email', event.target.value)}
+                    placeholder="you@example.com"
+                    autoComplete="email"
+                    style={inputStyle}
+                    onFocus={focusInput}
+                    onBlur={blurInput}
+                  />
+                  <div style={{ marginTop: 4, fontSize: 11, color: '#94a3b8' }}>We'll verify this email</div>
+                </div>
+              </div>
 
-              <Field label="Password" htmlFor="register-password">
-                <Input
-                  id="register-password"
-                  type="password"
-                  value={form.password}
-                  onChange={(event) => setField('password', event.target.value)}
-                  placeholder="Create a password"
-                  autoComplete="new-password"
-                />
-              </Field>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 14 }}>
+                <div>
+                  <label htmlFor="register-password" style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 700, color: '#334155' }}>Password</label>
+                  <input
+                    id="register-password"
+                    type="password"
+                    value={form.password}
+                    onChange={(event) => setField('password', event.target.value)}
+                    placeholder="Create a password"
+                    autoComplete="new-password"
+                    style={inputStyle}
+                    onFocus={focusInput}
+                    onBlur={blurInput}
+                  />
+                </div>
 
-              <Field label="Confirm Password" htmlFor="register-confirm-password">
-                <Input
-                  id="register-confirm-password"
-                  type="password"
-                  value={form.confirmPassword}
-                  onChange={(event) => setField('confirmPassword', event.target.value)}
-                  placeholder="Re-enter your password"
-                  autoComplete="new-password"
-                />
-                <PasswordHint password={form.password} confirmPassword={form.confirmPassword} />
-              </Field>
+                <div>
+                  <label htmlFor="register-confirm-password" style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 700, color: '#334155' }}>Confirm Password</label>
+                  <input
+                    id="register-confirm-password"
+                    type="password"
+                    value={form.confirmPassword}
+                    onChange={(event) => setField('confirmPassword', event.target.value)}
+                    placeholder="Re-enter password"
+                    autoComplete="new-password"
+                    style={inputStyle}
+                    onFocus={focusInput}
+                    onBlur={blurInput}
+                  />
+                </div>
+              </div>
+
+              <PasswordHint password={form.password} confirmPassword={form.confirmPassword} />
 
               <label
                 style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: 10,
-                  fontSize: 13,
-                  color: '#64748b',
-                  lineHeight: 1.7,
-                  marginBottom: 24,
+                  display: 'flex', alignItems: 'flex-start', gap: 10,
+                  fontSize: 13, color: '#64748b', lineHeight: 1.7,
+                  marginTop: 18, marginBottom: 20,
                 }}
               >
                 <input
                   type="checkbox"
                   checked={form.termsAccepted}
                   onChange={(event) => setField('termsAccepted', event.target.checked)}
-                  style={{ marginTop: 3 }}
+                  style={{ marginTop: 3, accentColor: '#3b82f6' }}
                 />
                 <span>
                   I agree to the <Link to="/terms">Terms of Use</Link> and <Link to="/guidelines">Community Guidelines</Link>.
-                  I understand that verified email is required before I can finish registering.
                 </span>
               </label>
 
-              <Button type="submit" disabled={loading} style={{ width: '100%' }}>
-                {loading ? 'Sending code…' : 'Continue To Email Verification'}
-              </Button>
+              <button
+                type="submit"
+                disabled={loading}
+                style={{
+                  width: '100%', padding: '14px 18px', borderRadius: 12, border: 'none',
+                  background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                  color: '#fff', fontSize: 15, fontWeight: 700,
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  opacity: loading ? 0.7 : 1,
+                  fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+                  boxShadow: '0 4px 14px rgba(59, 130, 246, 0.4)',
+                }}
+              >
+                {loading ? 'Sending code...' : 'Continue To Email Verification'}
+              </button>
             </form>
           )}
 
           {step === 'verify' && (
             <form onSubmit={handleVerifyCode}>
-              <h1 style={{ margin: '0 0 8px', fontSize: 28 }}>Verify your email</h1>
-              <p style={{ margin: '0 0 20px', fontSize: 14, color: '#64748b', lineHeight: 1.7 }}>
-                We sent a 6-digit code to <strong>{verification?.deliveryHint || form.email.trim()}</strong>.
-                Enter it here before you choose courses and create the account.
-              </p>
+              <div style={{ textAlign: 'center', marginBottom: 20 }}>
+                <div style={{
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  width: 52, height: 52, borderRadius: '50%',
+                  background: '#eff6ff', border: '2px solid #bfdbfe',
+                  marginBottom: 14,
+                }}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                    <polyline points="22,6 12,13 2,6"/>
+                  </svg>
+                </div>
+                <h1 style={{ margin: '0 0 6px', fontSize: 24, fontWeight: 800, color: '#0f172a' }}>Verify your email</h1>
+                <p style={{ margin: 0, fontSize: 14, color: '#64748b', lineHeight: 1.7 }}>
+                  We sent a 6-digit code to <strong>{verification?.deliveryHint || form.email.trim()}</strong>.
+                </p>
+              </div>
 
-              <Field label="Verification Code" htmlFor="register-verification-code" hint="Codes expire after 15 minutes.">
-                <Input
+              <div style={{ marginBottom: 16 }}>
+                <label htmlFor="register-verification-code" style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 700, color: '#334155' }}>
+                  Verification Code
+                </label>
+                <input
                   id="register-verification-code"
                   value={verificationCode}
                   onChange={(event) => {
@@ -704,36 +711,68 @@ export default function RegisterScreen() {
                   placeholder="000000"
                   inputMode="numeric"
                   maxLength={6}
-                  style={{ letterSpacing: '0.35em', textAlign: 'center', fontSize: 22 }}
                   autoFocus
+                  style={{
+                    ...inputStyle,
+                    letterSpacing: '0.35em', textAlign: 'center', fontSize: 24,
+                    padding: '16px',
+                  }}
+                  onFocus={focusInput}
+                  onBlur={blurInput}
                 />
-              </Field>
+                <div style={{ marginTop: 5, fontSize: 11, color: '#94a3b8', textAlign: 'center' }}>Codes expire after 15 minutes.</div>
+              </div>
 
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                <Button type="submit" disabled={loading || verificationCode.trim().length !== 6}>
-                  {loading ? 'Verifying…' : 'Verify Code'}
-                </Button>
-                <Button
+                <button
+                  type="submit"
+                  disabled={loading || verificationCode.trim().length !== 6}
+                  style={{
+                    padding: '12px 22px', borderRadius: 12, border: 'none',
+                    background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                    color: '#fff', fontSize: 14, fontWeight: 700,
+                    cursor: (loading || verificationCode.trim().length !== 6) ? 'not-allowed' : 'pointer',
+                    opacity: (loading || verificationCode.trim().length !== 6) ? 0.7 : 1,
+                    fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+                    boxShadow: '0 4px 14px rgba(59, 130, 246, 0.3)',
+                  }}
+                >
+                  {loading ? 'Verifying...' : 'Verify Code'}
+                </button>
+                <button
                   type="button"
-                  secondary
                   onClick={handleResendCode}
                   disabled={loading || resendCooldownSeconds > 0}
+                  style={{
+                    padding: '12px 22px', borderRadius: 12,
+                    border: '1px solid #e2e8f0', background: '#fff',
+                    color: '#475569', fontSize: 14, fontWeight: 700,
+                    cursor: (loading || resendCooldownSeconds > 0) ? 'not-allowed' : 'pointer',
+                    opacity: (loading || resendCooldownSeconds > 0) ? 0.7 : 1,
+                    fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+                  }}
                 >
                   {resendCooldownSeconds > 0
                     ? `Resend in ${formatResendCountdown(resendCooldownSeconds)}`
                     : 'Resend Code'}
-                </Button>
-                <Button
+                </button>
+                <button
                   type="button"
-                  secondary
                   onClick={() => {
                     setStep('account')
                     setError('')
                     setSuccess('')
                   }}
+                  style={{
+                    padding: '12px 22px', borderRadius: 12,
+                    border: '1px solid #e2e8f0', background: '#fff',
+                    color: '#475569', fontSize: 14, fontWeight: 700,
+                    cursor: 'pointer',
+                    fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+                  }}
                 >
                   Back
-                </Button>
+                </button>
               </div>
 
               {resendCooldownSeconds > 0 && (
@@ -746,14 +785,32 @@ export default function RegisterScreen() {
 
           {step === 'courses' && (
             <div>
-              <h1 style={{ margin: '0 0 8px', fontSize: 28 }}>Choose your courses</h1>
-              <p style={{ margin: '0 0 20px', fontSize: 14, color: '#64748b', lineHeight: 1.7 }}>
-                Your email is verified. Add your school and courses now, or skip and finish later from settings.
-              </p>
+              <div style={{ textAlign: 'center', marginBottom: 20 }}>
+                <div style={{
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  width: 52, height: 52, borderRadius: '50%',
+                  background: '#f0fdf4', border: '2px solid #bbf7d0',
+                  marginBottom: 14,
+                }}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                  </svg>
+                </div>
+                <h1 style={{ margin: '0 0 6px', fontSize: 24, fontWeight: 800, color: '#0f172a' }}>Choose your courses</h1>
+                <p style={{ margin: 0, fontSize: 14, color: '#64748b', lineHeight: 1.7 }}>
+                  Add your school and courses, or skip and set up later.
+                </p>
+              </div>
 
-              {catalogError && <Message tone="info">{catalogError}</Message>}
+              {catalogError && (
+                <div style={{ marginBottom: 16, padding: '12px 14px', borderRadius: 12, border: '1px solid #bfdbfe', background: '#eff6ff', color: '#1d4ed8', fontSize: 13, lineHeight: 1.6 }}>
+                  {catalogError}
+                </div>
+              )}
 
-              <Field label="School" htmlFor="register-school">
+              <div style={{ marginBottom: 16 }}>
+                <label htmlFor="register-school" style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 700, color: '#334155' }}>School</label>
                 <select
                   id="register-school"
                   value={form.schoolId}
@@ -763,13 +820,8 @@ export default function RegisterScreen() {
                     setCustomCourses([])
                   }}
                   style={{
-                    width: '100%',
-                    padding: '12px 14px',
-                    borderRadius: 10,
-                    border: '1px solid #cbd5e1',
-                    fontSize: 14,
-                    color: '#0f172a',
-                    fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+                    ...inputStyle,
+                    cursor: 'pointer',
                   }}
                 >
                   <option value="">Skip school selection for now</option>
@@ -779,11 +831,11 @@ export default function RegisterScreen() {
                     </option>
                   ))}
                 </select>
-              </Field>
+              </div>
 
               {catalogLoading && (
                 <div style={{ marginBottom: 16, fontSize: 13, color: '#64748b' }}>
-                  Loading course catalog…
+                  Loading course catalog...
                 </div>
               )}
 
@@ -792,34 +844,27 @@ export default function RegisterScreen() {
                   <div style={{ marginBottom: 8, fontSize: 13, fontWeight: 700, color: '#334155' }}>
                     Course Catalog
                   </div>
-                  <div
-                    style={{
-                      maxHeight: 220,
-                      overflowY: 'auto',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: 12,
-                      background: '#f8fafc',
-                    }}
-                  >
+                  <div style={{
+                    maxHeight: 220, overflowY: 'auto',
+                    border: '1px solid #e2e8f0', borderRadius: 14, background: '#f8fafc',
+                  }}>
                     {availableCourses.map((course) => {
                       const checked = selectedCourseIds.includes(course.id)
                       return (
                         <label
                           key={course.id}
                           style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 10,
-                            padding: '12px 14px',
-                            borderBottom: '1px solid #e2e8f0',
+                            display: 'flex', alignItems: 'center', gap: 10,
+                            padding: '12px 14px', borderBottom: '1px solid #e2e8f0',
                             background: checked ? '#eff6ff' : 'transparent',
-                            cursor: 'pointer',
+                            cursor: 'pointer', transition: 'background 0.15s',
                           }}
                         >
                           <input
                             type="checkbox"
                             checked={checked}
                             onChange={() => toggleCourse(course.id)}
+                            style={{ accentColor: '#3b82f6' }}
                           />
                           <div>
                             <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{course.code}</div>
@@ -832,32 +877,43 @@ export default function RegisterScreen() {
                 </div>
               )}
 
-              <div
-                style={{
-                  marginBottom: 18,
-                  padding: '14px',
-                  borderRadius: 12,
-                  border: '1px dashed #cbd5e1',
-                  background: '#f8fafc',
-                }}
-              >
+              <div style={{
+                marginBottom: 18, padding: '14px', borderRadius: 14,
+                border: '1px dashed #cbd5e1', background: '#f8fafc',
+              }}>
                 <div style={{ marginBottom: 10, fontSize: 13, fontWeight: 700, color: '#334155' }}>
                   Add a custom course
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr auto', gap: 8 }}>
-                  <Input
+                  <input
                     value={customCourseDraft.code}
                     onChange={(event) => setCustomCourseDraft((current) => ({ ...current, code: event.target.value.toUpperCase() }))}
                     placeholder="Code"
+                    style={inputStyle}
+                    onFocus={focusInput}
+                    onBlur={blurInput}
                   />
-                  <Input
+                  <input
                     value={customCourseDraft.name}
                     onChange={(event) => setCustomCourseDraft((current) => ({ ...current, name: event.target.value }))}
                     placeholder="Course name"
+                    style={inputStyle}
+                    onFocus={focusInput}
+                    onBlur={blurInput}
                   />
-                  <Button type="button" secondary onClick={addCustomCourse}>
+                  <button
+                    type="button"
+                    onClick={addCustomCourse}
+                    style={{
+                      padding: '12px 18px', borderRadius: 12,
+                      border: '1px solid #e2e8f0', background: '#fff',
+                      color: '#475569', fontSize: 14, fontWeight: 700,
+                      cursor: 'pointer',
+                      fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+                    }}
+                  >
                     Add
-                  </Button>
+                  </button>
                 </div>
                 {customCourses.length > 0 && (
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
@@ -865,15 +921,10 @@ export default function RegisterScreen() {
                       <span
                         key={course.code}
                         style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 6,
-                          padding: '6px 10px',
-                          borderRadius: 999,
-                          background: '#eff6ff',
-                          color: '#1d4ed8',
-                          fontSize: 12,
-                          fontWeight: 700,
+                          display: 'inline-flex', alignItems: 'center', gap: 6,
+                          padding: '6px 12px', borderRadius: 999,
+                          background: 'linear-gradient(135deg, #eff6ff, #dbeafe)',
+                          color: '#1d4ed8', fontSize: 12, fontWeight: 700,
                         }}
                       >
                         {course.code}
@@ -881,15 +932,11 @@ export default function RegisterScreen() {
                           type="button"
                           onClick={() => setCustomCourses((current) => current.filter((item) => item.code !== course.code))}
                           style={{
-                            background: 'none',
-                            border: 'none',
-                            color: '#1d4ed8',
-                            cursor: 'pointer',
-                            padding: 0,
-                            fontSize: 12,
+                            background: 'none', border: 'none', color: '#1d4ed8',
+                            cursor: 'pointer', padding: 0, fontSize: 14, lineHeight: 1,
                           }}
                         >
-                          ×
+                          x
                         </button>
                       </span>
                     ))}
@@ -898,25 +945,67 @@ export default function RegisterScreen() {
               </div>
 
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                <Button type="button" onClick={() => handleCompleteRegistration(false)} disabled={loading}>
-                  {loading ? 'Creating account…' : 'Create Account'}
-                </Button>
-                <Button type="button" secondary onClick={() => handleCompleteRegistration(true)} disabled={loading}>
+                <button
+                  type="button"
+                  onClick={() => handleCompleteRegistration(false)}
+                  disabled={loading}
+                  style={{
+                    padding: '13px 24px', borderRadius: 12, border: 'none',
+                    background: 'linear-gradient(135deg, #10b981, #059669)',
+                    color: '#fff', fontSize: 14, fontWeight: 700,
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    opacity: loading ? 0.7 : 1,
+                    fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+                    boxShadow: '0 4px 14px rgba(16, 185, 129, 0.3)',
+                  }}
+                >
+                  {loading ? 'Creating account...' : 'Create Account'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleCompleteRegistration(true)}
+                  disabled={loading}
+                  style={{
+                    padding: '13px 24px', borderRadius: 12,
+                    border: '1px solid #e2e8f0', background: '#fff',
+                    color: '#475569', fontSize: 14, fontWeight: 700,
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    opacity: loading ? 0.7 : 1,
+                    fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+                  }}
+                >
                   Skip For Now
-                </Button>
+                </button>
                 {!googleCredential && (
-                  <Button type="button" secondary onClick={() => setStep('verify')} disabled={loading}>
+                  <button
+                    type="button"
+                    onClick={() => setStep('verify')}
+                    disabled={loading}
+                    style={{
+                      padding: '13px 24px', borderRadius: 12,
+                      border: '1px solid #e2e8f0', background: '#fff',
+                      color: '#475569', fontSize: 14, fontWeight: 700,
+                      cursor: 'pointer',
+                      fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+                    }}
+                  >
                     Back
-                  </Button>
+                  </button>
                 )}
               </div>
             </div>
           )}
 
-          <div style={{ marginTop: 24, textAlign: 'center', fontSize: 13, color: '#64748b' }}>
-            Already have an account? <Link to="/login">Sign in here</Link>
+          <div style={{
+            marginTop: 28, paddingTop: 20, borderTop: '1px solid #f1f5f9',
+            textAlign: 'center', fontSize: 14, color: '#64748b',
+          }}>
+            Already have an account?{' '}
+            <Link to="/login" style={{ color: '#3b82f6', fontWeight: 700, textDecoration: 'none' }}>
+              Sign in here
+            </Link>
           </div>
-        </StageCard>
+        </div>
       </div>
     </div>
   )
