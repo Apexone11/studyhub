@@ -84,7 +84,7 @@ const S = {
     height: 56,
     display: 'flex',
     alignItems: 'center',
-    padding: '0 24px',
+    padding: '0 clamp(12px, 3vw, 24px)',
     gap: 10,
     maxWidth: 1400,
     margin: '0 auto',
@@ -369,7 +369,7 @@ export default function Navbar({
         {extraCrumb && (
           <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={S.sep}>/</span>
-            <span style={{ ...S.crumbActive, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <span style={{ ...S.crumbActive, maxWidth: 'clamp(120px, 30vw, 220px)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {extraCrumb}
             </span>
           </span>
@@ -441,7 +441,7 @@ export default function Navbar({
             {showBell && (
               <div style={{
                 position: 'absolute', top: 'calc(100% + 8px)', right: 0,
-                width: 320, background: '#fff', borderRadius: 12,
+                width: 'clamp(280px, 90vw, 320px)', background: '#fff', borderRadius: 12,
                 border: '1px solid #e2e8f0',
                 boxShadow: '0 8px 32px rgba(15,23,42,0.18)',
                 zIndex: 200, overflow: 'hidden',

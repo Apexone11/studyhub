@@ -440,3 +440,305 @@ Cycle 8 Deferred-Risk Notes
 - `sendTwoFaCode` function still exists in `backend/src/lib/email.js` (exported but never called). Can be removed in a cleanup pass.
 - Bootstrap repair SQL statements still create 2FA columns with `ADD COLUMN IF NOT EXISTS` (harmless — ensures schema consistency for existing deploys).
 - Test files (`auth.routes.test.js`, `admin.routes.test.js`, `LoginPage.test.jsx`) still reference 2FA patterns. Tests should be updated in a dedicated test maintenance pass.
+
+---
+
+Cycle 9 — Responsive Redesign + Tutorial System + Bug Fixes [2026-03-18]
+
+Goal
+
+- Make every page responsive across phone (≤767px), tablet (768–1179px), and desktop (≥1180px).
+- Add first-visit tutorial popups on major pages via react-joyride.
+- Remove email verification from auth flow.
+- Add unsaved-changes warning on Upload Sheet page.
+- Deep scan and fix bugs introduced by changes.
+
+Added:
+
+- react-joyride tutorial popup system:
+  - `frontend/studyhub-app/src/lib/useTutorial.js` — shared hook managing Joyride state, localStorage persistence (`tutorial_{pageKey}_seen`), auto-start on first visit (800ms delay), styled tooltips matching Clean Academic Pro design (blue primary, 14px border-radius, Plus Jakarta Sans font).
+  - `frontend/studyhub-app/src/lib/tutorialSteps.js` — per-page step definitions: `FEED_STEPS` (4 steps: composer, filters, search, leaderboards), `SHEETS_STEPS` (4 steps: search, filters, upload, toggles), `DASHBOARD_STEPS` (4 steps: hero, stats, sheets, actions), `NOTES_STEPS` (2 steps: filters, create).
+  - Joyride integrated on FeedPage, SheetsPage, DashboardPage, NotesPage with `data-tutorial` attribute targets.
+  - Floating "?" re-trigger button (fixed position, bottom-right) on all tutorial-enabled pages to replay the tutorial.
+- Responsive CSS framework (`frontend/studyhub-app/src/styles/responsive.css`):
+  - `app-three-col-grid`: 3-column desktop (auto 1fr 280px) → 2-column tablet (auto 1fr 260px) → 1-column phone.
+  - `app-two-col-grid`: 2-column desktop → 1-column phone.
+  - `dashboard-stats-grid`: 3-column → 2-column tablet → 1-column phone.
+  - `dashboard-content-grid`: 2-column → 1-column tablet.
+  - `notes-split-panel`: 300px+1fr desktop → 260px+1fr tablet → 1-column phone.
+  - `sheets-filter-grid`, `sheets-card-grid`: responsive filter bar and card grid.
+  - `tests-card-grid`: 2-column → 1-column responsive.
+  - `profile-columns`, `profile-stats-row`: responsive profile layout.
+  - Utility classes: `hide-on-phone`, `hide-on-compact`.
+- Unsaved-changes warning on UploadSheetPage:
+  - `beforeunload` event listener warns when user tries to close/navigate away with form data.
+  - Tracks dirty state across title, description, file, and course selection fields.
+
+Changed:
+
+- **FeedPage** — replaced inline grid styles with CSS class `app-three-col-grid`; added tutorial integration.
+- **SheetsPage** — replaced inline grid with `app-three-col-grid`; added `sheets-filter-grid` and `sheets-card-grid` classes; updated description text to user-friendly copy; added tutorial integration.
+- **DashboardPage** — replaced inline grid with `app-two-col-grid`, `dashboard-stats-grid`, `dashboard-content-grid` classes; added tutorial integration.
+- **NotesPage** — full structural redesign: split-panel layout on desktop (list 300px | editor flex), on phone shows list OR editor with back button; uses `notes-split-panel` CSS class; added abort cleanup in useEffect; added tutorial integration.
+- **AnnouncementsPage** — improved card design with author avatar initials, pinned announcement badges, better form styling, `<article>` semantic tags.
+- **TestsPage** — cards use `tests-card-grid` for responsive 2-column layout; improved tab and promo banner styling.
+- **UserProfilePage** — now uses shared `<Navbar>` component; replaced Font Awesome icons with shared Icon components; responsive avatar via `clamp()`; two-column `profile-columns` layout; removed ~200 lines of inline `styles` object.
+- **SettingsPage** — replaced custom header with shared `<Navbar>` component; cleaned up imports.
+- **LoginPage** — removed email verification flow; simplified to username + password + Google OAuth only.
+- **RegisterScreen** — removed email verification step; simplified to account details + course selection (2 steps).
+- **Auth backend** (`backend/src/routes/auth.js`) — removed email verification endpoints (`/register/start`, `/register/verify`, `/register/resend`, `/register/complete`); simplified to single `POST /register` endpoint that creates the user and returns JWT directly.
+
+Fixed:
+
+- **NotesPage fetch cleanup (HIGH)** — useEffect did not cancel in-flight fetches on unmount. Added `let active = true` flag pattern with cleanup `return () => { active = false }` and guarded all state updates with `if (active)` checks to prevent React state updates on unmounted components.
+- **Dashboard stale email verification text (MEDIUM)** — hero text still referenced `hero.emailVerified` conditional. Replaced with static text "Your study sheets, notes, and practice tests are ready."
+
+Cycle 9 Validation Commands (Executed)
+
+- `npm --prefix frontend/studyhub-app run build`
+
+Cycle 9 Validation Result
+
+- Frontend production build passed in 413ms.
+- 0 errors, 0 warnings.
+- All chunks generated: FeedPage 20.86kB, DashboardPage 10.87kB, NotesPage 10.75kB, SheetsPage 10.73kB, UserProfilePage 8.54kB, TestsPage (included in main bundle).
+
+Cycle 9 Deep Scan Summary
+
+- Scan method: automated bug scan across all 15 modified files.
+- 8 issues found total: 1 high (NotesPage fetch cleanup — fixed), 3 medium (dashboard stale text — fixed; Google OAuth code duplication — pre-existing; dead email verification endpoints — removed in this cycle), 4 low (pre-existing issues).
+- No new security vulnerabilities introduced.
+- All auth flow changes verified: email verification fully removed from both frontend and backend, JWT issued directly on registration.
+
+Cycle 9 Deferred-Risk Notes
+
+- `react-joyride` adds ~100kB gzipped to the tutorial chunk (`tutorialSteps-DEdYIjMa.js`: 101.42kB / 31.55kB gzip). Consider lazy-loading the Joyride component only when tutorial is active.
+- Tutorial `data-tutorial` attribute selectors depend on DOM elements being present when Joyride mounts. If elements render conditionally or late, steps targeting them will be skipped silently.
+- Notes split-panel on tablet uses 260px for the list panel — may feel cramped with long note titles. Monitor user feedback.
+- Pre-existing Google OAuth code duplication between `/google` and `/google/complete` endpoints still exists (deferred from Cycle 7).
+- `beforeunload` warning on UploadSheetPage cannot be customized in modern browsers (Chrome shows generic "Changes you made may not be saved" message regardless of the custom string).
+
+---
+
+Cycle 10 — Moderation Engine + Settings Enforcement + Google Link [2026-03-18]
+
+Week 2 of the v1.5 roadmap. Builds the moderation runtime on top of the database schema provisioned in Cycle 5, enforces user preferences, and connects the Google link flow.
+
+Added:
+
+- **Content moderation engine** (`backend/src/lib/moderationEngine.js` ~220 lines):
+  - Lazy-initialized OpenAI client; feature-gated by `OPENAI_API_KEY` env var presence.
+  - `scanContent()`: fire-and-forget async scan via OpenAI Moderation API. Never blocks content creation.
+  - Confidence routing: score >= 0.85 → high confidence case, 0.5–0.84 → medium, < 0.5 → no case.
+  - `issueStrike()`: creates strike with 90-day expiry; auto-restricts user at >= 4 active strikes.
+  - `reviewCase()`: admin dismiss/confirm workflow.
+  - `countActiveStrikes()`, `hasActiveRestriction()` utility functions.
+  - All errors captured via Sentry, never thrown to callers.
+
+- **Restriction enforcement middleware** (`backend/src/middleware/checkRestrictions.js` ~55 lines):
+  - Global middleware mounted after CSRF; blocks restricted users from write operations (POST/PATCH/DELETE).
+  - Skips GET/HEAD/OPTIONS, unauthenticated requests, and admin users.
+  - Fail-open pattern: DB errors allow the request through (never block all users on a DB blip).
+  - Returns 403 with `{ restricted: true, restrictionType }` for restricted users.
+
+- **Moderation admin + user routes** (`backend/src/routes/moderation.js` ~370 lines):
+  - Admin endpoints at `/api/admin/moderation`: cases (list/detail/review), strikes (list/create), restrictions (list/lift), appeals (list/review).
+  - User endpoints at `/api/moderation`: my-strikes, my-appeals, submit appeal (rate limited, min 20 chars, 1 pending per case).
+  - Appeal approval cascades: decays linked strike, dismisses case, lifts restriction if no remaining active strikes.
+
+- **Admin ModerationTab** (`frontend/.../admin/ModerationTab.jsx` ~470 lines):
+  - Extracted component with sub-tabs: Cases, Strikes, Appeals, Restrictions.
+  - Each sub-tab has independent pagination state, status filters, and action buttons.
+  - Includes "Issue New Strike" form in Strikes sub-tab.
+  - Follows existing AdminPage inline-style and confirm-dialog patterns.
+
+Changed:
+
+- **Feed routes** (`backend/src/routes/feed.js`):
+  - POST `/posts`: async moderation scan on content after response sent.
+  - POST `/posts/:id/comments`: same fire-and-forget scan pattern.
+
+- **Sheet routes** (`backend/src/routes/sheets.js`):
+  - POST `/`: reads `UserPreferences.defaultDownloads` when `allowDownloads` not explicitly set.
+  - POST `/` and PATCH `/:id`: async moderation scan on title + description + markdown content.
+
+- **User profile route** (`backend/src/routes/users.js`):
+  - GET `/:username`: enforces `UserPreferences.profileVisibility` setting.
+  - `private` → 403 for all non-owner, non-admin viewers.
+  - `enrolled` → 403 unless viewer shares at least one course with the profile owner.
+  - Own profile and admin viewers always bypass visibility checks.
+
+- **AdminPage** (`frontend/.../admin/AdminPage.jsx`):
+  - Added 'Moderation' to TABS array; renders `<ModerationTab>` when active.
+  - Excluded 'moderation' from generic paged-data rendering block.
+
+- **SecurityTab** (`frontend/.../settings/SecurityTab.jsx`):
+  - Replaced placeholder Google link handler with real `GoogleLogin` popup flow.
+  - Calls `POST /api/settings/google/link` with credential from Google One Tap.
+  - Toggle pattern: "Link Google Account" button reveals `<GoogleLogin>` component with Cancel option.
+
+- **Backend entry** (`backend/src/index.js`):
+  - Mounted `checkRestrictions` middleware globally after CSRF.
+  - Mounted moderation admin routes at `/api/admin/moderation`.
+  - Mounted moderation user routes at `/api/moderation`.
+
+- **Environment** (`backend/.env.example`):
+  - Added `OPENAI_API_KEY=` with documentation comment.
+
+Cycle 10 Validation Commands (Executed)
+
+- `npm --prefix frontend/studyhub-app run build`
+- `npx prisma validate` (from backend/)
+
+Cycle 10 Validation Result
+
+- Frontend build: 0 errors, 0 warnings. 39 output chunks. `AdminPage-BgUCuE-Z.js` grew to 43.08kB (includes ModerationTab import).
+- Prisma schema: valid (no schema changes this cycle — runtime only).
+
+Cycle 10 Deep Scan Summary
+
+- `checkRestrictions` uses fail-open pattern matching `guardedMode.js` — DB errors never block users.
+- `scanContent` is always `void`-called (fire-and-forget) — never awaited, never blocks response.
+- Strike auto-restriction checks for existing active restriction before creating duplicate.
+- Appeal approval cascade runs in a transaction-like sequence: decay strike → dismiss case → check remaining strikes → lift restriction.
+- Profile visibility enforcement added `UserPreferences` query per profile view — consider caching if profile views spike.
+- GoogleLogin credential flows through the existing `verifyGoogleIdToken` + `linkGoogleToUser` backend pipeline.
+- All new admin endpoints are behind `requireAuth` + `requireAdmin` middleware chain.
+
+Cycle 10 Deferred-Risk Notes
+
+- OpenAI Moderation API latency is unbounded; `scanContent` has no timeout. If the API is slow, fire-and-forget calls accumulate in memory. Consider adding a 10s `AbortController` timeout in a future cycle.
+- Profile visibility `enrolled` check performs two sequential Prisma queries (target enrollments + viewer enrollment match). Could be optimized to a single raw SQL query with `EXISTS` subquery if performance becomes an issue.
+- ModerationTab "Issue New Strike" form accepts raw user IDs — no autocomplete or user search. Admin must know the user ID. Consider adding a user search dropdown in a future cycle.
+- The `GoogleLogin` popup in SecurityTab inherits the `GoogleOAuthProvider` from App.jsx. If the provider is ever removed or conditionally rendered, the popup will fail silently.
+- Content moderation only scans text — attachments (images, PDFs) are not scanned by the OpenAI Moderation API. ClamAV covers malware but not inappropriate image content.
+
+---
+
+Cycle 11 — Responsive Polish Pass [2026-03-18]
+
+Audit and fix of responsive design issues across the frontend. Addresses inline style overrides that prevented CSS media queries from working, plus missing tablet breakpoints.
+
+Fixed:
+
+- **Navbar notification dropdown** (`Navbar.jsx`): Fixed-width `320px` → `clamp(280px, 90vw, 320px)` so it fits on narrow phones without overflow.
+- **Navbar padding** (`Navbar.jsx`): Hard-coded `24px` horizontal padding → `clamp(12px, 3vw, 24px)` to give more room on small screens.
+- **Navbar breadcrumb truncation** (`Navbar.jsx`): Fixed `maxWidth: 220` → `clamp(120px, 30vw, 220px)` so long sheet titles are readable on mobile.
+- **Admin stats grid** (`AdminPage.jsx` + `responsive.css`): Removed inline `gridTemplateColumns: 'repeat(4, ...)'` that was overriding the CSS media queries. Moved 4-column default into `.admin-stats-grid` class with proper tablet (2-col) and phone (2-col / 1-col) breakpoints.
+- **Register password hints** (`RegisterScreen.jsx` + `responsive.css`): Replaced inline 2-column grid with `.password-hints-grid` CSS class. Stacks to 1-column on very narrow screens (<=340px).
+- **ModerationTab strike form** (`ModerationTab.jsx` + `responsive.css`): Replaced inline 2-column grid with `.mod-strike-form-grid` class. Stacks to 1-column on phone.
+- **Home testimonials grid** (`index.css`): Added missing tablet breakpoint — 3 columns → 2 columns on 768–1024px screens instead of jumping straight to 1 column.
+
+Cycle 11 Validation Commands (Executed)
+
+- `npm --prefix frontend/studyhub-app run build`
+
+Cycle 11 Validation Result
+
+- Frontend build: 0 errors, 0 warnings. 39 output chunks. CSS grew from 25.78kB to 26.38kB (new responsive rules).
+
+Cycle 11 Deep Scan Summary
+
+- All responsive fixes use CSS classes or `clamp()` instead of hard-coded inline values.
+- No JavaScript logic changes — all fixes are CSS-only or inline-style-to-class migrations.
+- Admin stats grid `!important` overrides removed; proper cascade now works via class specificity.
+- Existing responsive patterns in `responsive.css` are now consistent in structure (desktop default in class, then tablet + phone overrides in media queries).
+
+Cycle 11 Deferred-Risk Notes
+
+- Notes split panel on phone stacks list above editor with no toggle affordance — user may not realize they can scroll past the list. Consider adding a "Back to list" collapse mechanism.
+- Admin moderation tables use `overflowX: 'auto'` for horizontal scroll, which works but isn't ideal on phones with 7+ columns. Consider hiding non-critical columns on phone in a future pass.
+- Sheets filter bar on tablet (2-col wrapping) can look uneven with 5 inputs. A 3-column tablet layout could be better.
+
+---
+
+Cycle 12 — Security Audit + Bug Fixes [2026-03-18]
+
+Deep scan of all Week 2 code (moderation engine, routes, middleware, frontend components) to identify and fix security vulnerabilities, logic bugs, and connection issues.
+
+Fixed:
+
+- **CRITICAL — Missing moderation scan on sheet fork** (`sheets.js`): Forked sheets bypassed content moderation entirely. Added `scanContent()` hook after fork creation, matching the pattern used in POST `/` and PATCH `/:id`.
+
+- **CRITICAL — Race condition in auto-restriction** (`moderationEngine.js`): Two concurrent strikes could both see "no restriction exists" and create duplicate UserRestriction records. Wrapped the check-and-create logic in a `prisma.$transaction()` to ensure atomicity.
+
+- **HIGH — Silent error swallowing in appeal approval** (`moderation.js`): Three `.catch(() => {})` calls silently discarded errors during case dismissal, strike decay, and restriction lifting. Replaced with `.catch((err) => captureError(err, { context }))` to log failures to Sentry.
+
+- **HIGH — Missing credential validation in SecurityTab** (`SecurityTab.jsx`): `handleGoogleLinkSuccess` sent `credentialResponse.credential` without checking if it exists. Added null check before API call to prevent sending `{credential: undefined}`.
+
+- **HIGH — Uncleared password after Google unlink** (`SecurityTab.jsx`): Password remained in component state after successful unlink. Added `setGoogleUnlinkPassword('')` to clear it immediately.
+
+- **HIGH — N+1 query in profile visibility check** (`users.js`): The `enrolled` visibility check ran two sequential queries (fetch all target enrollments, then match against viewer). Replaced with single Prisma relational filter using `course: { enrollments: { some: { userId } } }` which generates an efficient EXISTS subquery. Also strengthened the unauthenticated check from `!req.user` to `!req.user?.userId`.
+
+- **MEDIUM — No upper bound on pagination** (`moderation.js`): `parsePage()` accepted any positive integer, allowing `?page=999999999` to force expensive DB skips. Added `page <= 10000` cap.
+
+- **MEDIUM — No max length on strike reason** (`moderation.js`): Admin could submit arbitrarily long strike reasons causing DB bloat. Added 1000-character limit.
+
+Cycle 12 Validation Commands (Executed)
+
+- `npm --prefix frontend/studyhub-app run build`
+
+Cycle 12 Validation Result
+
+- Frontend build: 0 errors, 0 warnings. 39 output chunks.
+
+Cycle 12 Deep Scan Summary
+
+- Auto-restriction now uses `prisma.$transaction()` — eliminates the TOCTOU race window.
+- Appeal approval cascade errors are now logged to Sentry with context (appealId, operation type).
+- Profile visibility `enrolled` check reduced from 2 DB queries to 1 relational filter.
+- All moderation content creation paths now have scan hooks: POST `/` (create), PATCH `/:id` (update), POST `/:id/fork` (fork).
+- Input validation bounds: parsePage capped at 10000, strike reason capped at 1000 chars, appeal reason already capped at 2000 chars.
+
+---
+
+Cycle 13 — Registration Simplification (Email Removal)
+Date: 2025-03-18
+
+Changed
+
+- **Registration flow now uses username + password only** — email field removed from the account creation form. Users can optionally add an email later in Settings for password recovery.
+- **Backend `validateRegistrationInput()`** now calls `normalizeEmail(email, true)` making email optional; returns `null` when not provided.
+- **Backend email uniqueness check** skipped when email is `null` — prevents unnecessary DB query on registration.
+- **Frontend `RegisterScreen.jsx`**: removed email from form state, validation, API request body, and JSX. Username field is now full-width. Divider text changed from "or sign up with email" to "or create an account".
+- **Cleaned up unused `email` regex** from `RULES` constant in RegisterScreen.
+
+Cycle 13 Validation Commands (Executed)
+
+- `npm --prefix frontend/studyhub-app run build`
+
+Cycle 13 Validation Result
+
+- Frontend build: 0 errors, 0 warnings. 39 output chunks.
+
+Cycle 13 Notes
+
+- Login page already uses username + password + Google button only — no changes needed.
+- Prisma schema already has `email String?` (nullable) — no migration required.
+- Google OAuth registration flow is unaffected (email comes from Google token, not user input).
+
+---
+
+Cycle 14 — Resend Email Integration
+Date: 2025-03-18
+
+Added
+
+- **Resend email transport** configured for `getstudyhub.org` — emails now deliver to real inboxes via Resend API.
+- Domain verified with DKIM, SPF, and DMARC DNS records on Squarespace.
+
+Fixed
+
+- **Double-wrapped `from` address** (`email.js`): `getFromAddress()` returned the full `Name <email>` string from `EMAIL_FROM`, then callers wrapped it again as `"StudyHub" <Name <email>>` — invalid format rejected by Resend. Fixed by extracting the bare email from angle brackets when present.
+- **Transport validation rejected send-only API keys** (`email.js`): `validateEmailTransport()` called `/domains` endpoint which returns 401 for send-restricted keys. Now recognizes `restricted_api_key` response as valid (key works, just limited scope).
+
+Cycle 14 Validation Commands (Executed)
+
+- `node -r dotenv/config -e "validateEmailTransport()"` — returns `{ ok: true, mode: 'resend' }`
+- `node -r dotenv/config scripts/emailSmoke.js` equivalent — smoke test email delivered to abdulrfornah@gmail.com
+
+Cycle 14 Notes
+
+- Env vars required: `EMAIL_TRANSPORT=resend`, `RESEND_API_KEY`, `EMAIL_FROM`
+- Resend free tier: 100 emails/day, sufficient for beta
+- All email functions (password reset, email verification, 2FA codes, course request notices) now route through Resend

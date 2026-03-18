@@ -1,4 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+/* ═══════════════════════════════════════════════════════════════════════════
+ * LoginPage.jsx — StudyHub sign-in page
+ *
+ * Layout: Centered glass-morphism card on dark gradient background.
+ * Auth options: Username/password form OR Google Sign-In button.
+ * No email verification gate — Google handles its own verification,
+ * and local accounts are verified at registration time.
+ *
+ * Design: Clean Academic Pro — subtle animations, accessible focus rings.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { GoogleLogin } from '@react-oauth/google'
 import Navbar from '../../components/Navbar'
@@ -7,17 +18,34 @@ import { fadeInUp } from '../../lib/animations'
 import { getAuthenticatedHomePath } from '../../lib/authNavigation'
 import { useSession } from '../../lib/session-context'
 
-function parseTimestampToMs(value) {
-  if (!value) return null
-  const parsed = Date.parse(value)
-  return Number.isFinite(parsed) ? parsed : null
+/* ── Shared constants ──────────────────────────────────────────────────── */
+const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
+
+/* ── Input focus/blur style helpers ────────────────────────────────────── */
+function handleInputFocus(e) {
+  e.target.style.borderColor = '#3b82f6'
+  e.target.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.1)'
+  e.target.style.background = '#fff'
+}
+function handleInputBlur(e) {
+  e.target.style.borderColor = '#e2e8f0'
+  e.target.style.boxShadow = 'none'
+  e.target.style.background = '#f8fafc'
 }
 
-function formatResendCountdown(totalSeconds) {
-  const safeSeconds = Math.max(0, Math.floor(totalSeconds))
-  const minutes = Math.floor(safeSeconds / 60)
-  const seconds = safeSeconds % 60
-  return `${minutes}:${String(seconds).padStart(2, '0')}`
+/* ── Shared input style ────────────────────────────────────────────────── */
+const inputStyle = {
+  width: '100%',
+  boxSizing: 'border-box',
+  padding: '13px 16px',
+  borderRadius: 12,
+  border: '1px solid #e2e8f0',
+  fontSize: 14,
+  color: '#0f172a',
+  outline: 'none',
+  background: '#f8fafc',
+  fontFamily: FONT,
+  transition: 'border-color 0.15s, box-shadow 0.15s',
 }
 
 export default function LoginPage() {
@@ -25,40 +53,19 @@ export default function LoginPage() {
   const { completeAuthentication } = useSession()
   const cardRef = useRef(null)
 
+  /* ── State ─────────────────────────────────────────────────────────── */
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [code, setCode] = useState('')
-  const [verificationEmail, setVerificationEmail] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [showForgot, setShowForgot] = useState(false)
-  const [clockNowMs, setClockNowMs] = useState(() => Date.now())
-  const [verificationGate, setVerificationGate] = useState(null)
 
-  useEffect(() => {
-    const timerId = window.setInterval(() => {
-      setClockNowMs(Date.now())
-    }, 1000)
-
-    return () => {
-      window.clearInterval(timerId)
-    }
-  }, [])
-
+  /* ── Card entrance animation ───────────────────────────────────────── */
   useEffect(() => {
     if (cardRef.current) fadeInUp(cardRef.current, { duration: 450, y: 20 })
   }, [])
 
-  const resendAvailableAtMs = useMemo(
-    () => parseTimestampToMs(verificationGate?.resendAvailableAt),
-    [verificationGate?.resendAvailableAt],
-  )
-
-  const resendCooldownSeconds = useMemo(() => {
-    if (!resendAvailableAtMs) return 0
-    return Math.max(0, Math.ceil((resendAvailableAtMs - clockNowMs) / 1000))
-  }, [clockNowMs, resendAvailableAtMs])
-
+  /* ── Username + password login handler ─────────────────────────────── */
   async function handleLogin(event) {
     event.preventDefault()
     if (!username.trim() || !password.trim()) {
@@ -87,13 +94,7 @@ export default function LoginPage() {
         return
       }
 
-      if (data.requiresEmailVerification) {
-        setVerificationGate(data)
-        setVerificationEmail(data.email || '')
-        setCode('')
-        return
-      }
-
+      /* Successful login — navigate to authenticated home */
       completeAuthentication(data.user)
       navigate(getAuthenticatedHomePath(data.user), { replace: true })
     } catch {
@@ -103,6 +104,7 @@ export default function LoginPage() {
     }
   }
 
+  /* ── Google OAuth success handler ──────────────────────────────────── */
   async function handleGoogleSuccess(credentialResponse) {
     if (!credentialResponse?.credential) {
       setError('Google sign-in did not return a valid credential.')
@@ -125,6 +127,7 @@ export default function LoginPage() {
         return
       }
 
+      /* New Google user — redirect to course selection on register page */
       if (data.requiresCourseSelection) {
         navigate('/register', {
           replace: true,
@@ -138,6 +141,7 @@ export default function LoginPage() {
         return
       }
 
+      /* Existing Google user — go to authenticated home */
       completeAuthentication(data.user)
       navigate(getAuthenticatedHomePath(data.user), { replace: true })
     } catch {
@@ -147,80 +151,13 @@ export default function LoginPage() {
     }
   }
 
-  async function handleSendVerificationEmail() {
-    if (resendCooldownSeconds > 0) return
-
-    setLoading(true)
-    setError('')
-
-    try {
-      const response = await fetch(`${API}/api/auth/login/verification/send`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          verificationToken: verificationGate?.verificationToken,
-          email: verificationGate?.emailRequired ? verificationEmail.trim() : undefined,
-        }),
-      })
-      const data = await response.json()
-
-      if (!response.ok) {
-        setError(data.error || 'Could not send a verification code.')
-        return
-      }
-
-      setVerificationGate(data)
-      setVerificationEmail(data.email || verificationEmail)
-    } catch {
-      setError('Could not connect to the server.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function handleVerifyLoginCode(event) {
-    event.preventDefault()
-    if (!code.trim()) {
-      setError('Enter the verification code.')
-      return
-    }
-
-    setLoading(true)
-    setError('')
-
-    try {
-      const response = await fetch(`${API}/api/auth/login/verification/verify`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          verificationToken: verificationGate?.verificationToken,
-          code: code.trim(),
-        }),
-      })
-      const data = await response.json()
-
-      if (!response.ok) {
-        setError(data.error || 'Could not verify that code.')
-        return
-      }
-
-      completeAuthentication(data.user)
-      navigate(getAuthenticatedHomePath(data.user), { replace: true })
-    } catch {
-      setError('Could not connect to the server.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const isVerifying = Boolean(verificationGate)
-
+  /* ── Render ────────────────────────────────────────────────────────── */
   return (
     <div
       style={{
         minHeight: '100vh',
         background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #1e40af 100%)',
-        fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+        fontFamily: FONT,
         color: '#0f172a',
         position: 'relative',
         overflow: 'hidden',
@@ -228,11 +165,12 @@ export default function LoginPage() {
     >
       <Navbar variant="landing" />
 
-      {/* Decorative background elements */}
+      {/* Decorative background orbs (purely visual) */}
       <div style={{ position: 'absolute', top: -120, left: -120, width: 400, height: 400, borderRadius: '50%', background: 'rgba(59, 130, 246, 0.08)', filter: 'blur(80px)', pointerEvents: 'none' }} />
       <div style={{ position: 'absolute', bottom: -100, right: -100, width: 350, height: 350, borderRadius: '50%', background: 'rgba(139, 92, 246, 0.06)', filter: 'blur(80px)', pointerEvents: 'none' }} />
       <div style={{ position: 'absolute', top: '40%', left: '50%', transform: 'translate(-50%, -50%)', width: 600, height: 600, borderRadius: '50%', background: 'rgba(16, 185, 129, 0.04)', filter: 'blur(100px)', pointerEvents: 'none' }} />
 
+      {/* ── Main card ────────────────────────────────────────────────── */}
       <div ref={cardRef} style={{ padding: '48px 20px 80px', display: 'grid', placeItems: 'center', position: 'relative', zIndex: 1 }}>
         <div
           style={{
@@ -245,7 +183,7 @@ export default function LoginPage() {
             padding: '40px 36px',
           }}
         >
-          {/* Logo mark */}
+          {/* ── Logo mark + heading ──────────────────────────────────── */}
           <div style={{ textAlign: 'center', marginBottom: 28 }}>
             <div style={{
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -259,15 +197,14 @@ export default function LoginPage() {
               </svg>
             </div>
             <h1 style={{ margin: '0 0 6px', fontSize: 26, fontWeight: 800, letterSpacing: '-0.5px', color: '#0f172a' }}>
-              {isVerifying ? 'Verify your email' : 'Welcome back'}
+              Welcome back
             </h1>
             <p style={{ margin: 0, fontSize: 14, color: '#64748b', lineHeight: 1.7 }}>
-              {isVerifying
-                ? 'Confirm your email to continue signing in.'
-                : 'Sign in to your study sheets, dashboard, and more.'}
+              Sign in to your study sheets, dashboard, and more.
             </p>
           </div>
 
+          {/* ── Error message ────────────────────────────────────────── */}
           {error && (
             <div style={{
               marginBottom: 16, padding: '12px 14px', borderRadius: 12,
@@ -278,236 +215,95 @@ export default function LoginPage() {
             </div>
           )}
 
-          {!isVerifying && (
+          {/* ── Google Sign-In button (shown when client ID configured) ─ */}
+          {GOOGLE_CLIENT_ID && (
             <>
-              {GOOGLE_CLIENT_ID && (
-                <>
-                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
-                    <GoogleLogin
-                      onSuccess={handleGoogleSuccess}
-                      onError={() => setError('Google sign-in was cancelled or failed.')}
-                      size="large"
-                      width="368"
-                      text="signin_with"
-                      shape="rectangular"
-                      theme="outline"
-                    />
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
-                    <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, transparent, #e2e8f0)' }} />
-                    <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>or continue with</span>
-                    <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, #e2e8f0, transparent)' }} />
-                  </div>
-                </>
-              )}
-
-              <form onSubmit={handleLogin}>
-                <div style={{ marginBottom: 16 }}>
-                  <label htmlFor="login-username" style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 700, color: '#334155' }}>
-                    Username
-                  </label>
-                  <input
-                    id="login-username"
-                    value={username}
-                    onChange={(event) => {
-                      setUsername(event.target.value)
-                      setError('')
-                      setShowForgot(false)
-                    }}
-                    autoComplete="username"
-                    placeholder="Enter your username"
-                    style={{
-                      width: '100%', boxSizing: 'border-box', padding: '13px 16px',
-                      borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 14,
-                      color: '#0f172a', outline: 'none', background: '#f8fafc',
-                      fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
-                      transition: 'border-color 0.15s, box-shadow 0.15s',
-                    }}
-                    onFocus={(e) => { e.target.style.borderColor = '#3b82f6'; e.target.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.1)'; e.target.style.background = '#fff' }}
-                    onBlur={(e) => { e.target.style.borderColor = '#e2e8f0'; e.target.style.boxShadow = 'none'; e.target.style.background = '#f8fafc' }}
-                  />
-                </div>
-
-                <div style={{ marginBottom: 20 }}>
-                  <label htmlFor="login-password" style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 700, color: '#334155' }}>
-                    Password
-                  </label>
-                  <input
-                    id="login-password"
-                    type="password"
-                    value={password}
-                    onChange={(event) => {
-                      setPassword(event.target.value)
-                      setError('')
-                      setShowForgot(false)
-                    }}
-                    autoComplete="current-password"
-                    placeholder="Enter your password"
-                    style={{
-                      width: '100%', boxSizing: 'border-box', padding: '13px 16px',
-                      borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 14,
-                      color: '#0f172a', outline: 'none', background: '#f8fafc',
-                      fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
-                      transition: 'border-color 0.15s, box-shadow 0.15s',
-                    }}
-                    onFocus={(e) => { e.target.style.borderColor = '#3b82f6'; e.target.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.1)'; e.target.style.background = '#fff' }}
-                    onBlur={(e) => { e.target.style.borderColor = '#e2e8f0'; e.target.style.boxShadow = 'none'; e.target.style.background = '#f8fafc' }}
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  style={{
-                    width: '100%', padding: '14px 18px', borderRadius: 12, border: 'none',
-                    background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-                    color: '#fff', fontSize: 15, fontWeight: 700,
-                    cursor: loading ? 'not-allowed' : 'pointer',
-                    opacity: loading ? 0.7 : 1,
-                    fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
-                    boxShadow: '0 4px 14px rgba(59, 130, 246, 0.4)',
-                    transition: 'all 0.2s',
-                  }}
-                >
-                  {loading ? 'Signing in...' : 'Sign In'}
-                </button>
-
-                <div style={{ marginTop: 16, textAlign: 'center', fontSize: 13 }}>
-                  <Link to="/forgot-password" style={{ color: '#3b82f6', fontWeight: 600, textDecoration: 'none' }}>
-                    Forgot username or password?
-                  </Link>
-                  {showForgot && (
-                    <div style={{ marginTop: 8, color: '#64748b', fontSize: 12 }}>
-                      If you still remember your username, use password reset after your email is verified.
-                    </div>
-                  )}
-                </div>
-              </form>
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
+                <GoogleLogin
+                  onSuccess={handleGoogleSuccess}
+                  onError={() => setError('Google sign-in was cancelled or failed.')}
+                  size="large"
+                  width="368"
+                  text="signin_with"
+                  shape="rectangular"
+                  theme="outline"
+                />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
+                <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, transparent, #e2e8f0)' }} />
+                <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>or continue with</span>
+                <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, #e2e8f0, transparent)' }} />
+              </div>
             </>
           )}
 
-          {isVerifying && (
-            <form onSubmit={handleVerifyLoginCode}>
-              <div style={{
-                marginBottom: 16, padding: '12px 14px', borderRadius: 12,
-                border: '1px solid #bfdbfe', background: '#eff6ff', color: '#1d4ed8',
-                fontSize: 13, lineHeight: 1.6,
-              }}>
-                {verificationGate.emailHint
-                  ? <>Verification code destination: <strong>{verificationGate.emailHint}</strong></>
-                  : 'This account does not have a verified email on file yet.'}
-              </div>
+          {/* ── Username + Password form ─────────────────────────────── */}
+          <form onSubmit={handleLogin}>
+            <div style={{ marginBottom: 16 }}>
+              <label htmlFor="login-username" style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 700, color: '#334155' }}>
+                Username
+              </label>
+              <input
+                id="login-username"
+                value={username}
+                onChange={(event) => { setUsername(event.target.value); setError(''); setShowForgot(false) }}
+                autoComplete="username"
+                placeholder="Enter your username"
+                style={inputStyle}
+                onFocus={handleInputFocus}
+                onBlur={handleInputBlur}
+              />
+            </div>
 
-              {verificationGate.emailRequired && (
-                <div style={{ marginBottom: 16 }}>
-                  <label htmlFor="login-verification-email" style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 700, color: '#334155' }}>
-                    Email Address
-                  </label>
-                  <input
-                    id="login-verification-email"
-                    type="email"
-                    value={verificationEmail}
-                    onChange={(event) => {
-                      setVerificationEmail(event.target.value)
-                      setError('')
-                    }}
-                    placeholder="you@example.com"
-                    autoComplete="email"
-                    style={{
-                      width: '100%', boxSizing: 'border-box', padding: '13px 16px',
-                      borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 14,
-                      color: '#0f172a', outline: 'none', background: '#f8fafc',
-                      fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
-                    }}
-                  />
+            <div style={{ marginBottom: 20 }}>
+              <label htmlFor="login-password" style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 700, color: '#334155' }}>
+                Password
+              </label>
+              <input
+                id="login-password"
+                type="password"
+                value={password}
+                onChange={(event) => { setPassword(event.target.value); setError(''); setShowForgot(false) }}
+                autoComplete="current-password"
+                placeholder="Enter your password"
+                style={inputStyle}
+                onFocus={handleInputFocus}
+                onBlur={handleInputBlur}
+              />
+            </div>
+
+            {/* ── Submit button ───────────────────────────────────────── */}
+            <button
+              type="submit"
+              disabled={loading}
+              style={{
+                width: '100%', padding: '14px 18px', borderRadius: 12, border: 'none',
+                background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                color: '#fff', fontSize: 15, fontWeight: 700,
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.7 : 1,
+                fontFamily: FONT,
+                boxShadow: '0 4px 14px rgba(59, 130, 246, 0.4)',
+                transition: 'all 0.2s',
+              }}
+            >
+              {loading ? 'Signing in...' : 'Sign In'}
+            </button>
+
+            {/* ── Forgot password link ────────────────────────────────── */}
+            <div style={{ marginTop: 16, textAlign: 'center', fontSize: 13 }}>
+              <Link to="/forgot-password" style={{ color: '#3b82f6', fontWeight: 600, textDecoration: 'none' }}>
+                Forgot username or password?
+              </Link>
+              {showForgot && (
+                <div style={{ marginTop: 8, color: '#64748b', fontSize: 12 }}>
+                  Use the link above to reset your password.
                 </div>
               )}
+            </div>
+          </form>
 
-              <div style={{ marginBottom: 16 }}>
-                <label htmlFor="login-verification-code" style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 700, color: '#334155' }}>
-                  Verification Code
-                </label>
-                <input
-                  id="login-verification-code"
-                  value={code}
-                  onChange={(event) => {
-                    setCode(event.target.value.replace(/\D/g, '').slice(0, 6))
-                    setError('')
-                  }}
-                  placeholder="000000"
-                  inputMode="numeric"
-                  maxLength={6}
-                  autoFocus
-                  style={{
-                    width: '100%', boxSizing: 'border-box', padding: '14px 16px',
-                    borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 24,
-                    color: '#0f172a', outline: 'none', background: '#f8fafc',
-                    fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
-                    letterSpacing: '0.35em', textAlign: 'center',
-                  }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                <button
-                  type="submit"
-                  disabled={loading || code.trim().length !== 6}
-                  style={{
-                    padding: '12px 20px', borderRadius: 12, border: 'none',
-                    background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-                    color: '#fff', fontSize: 14, fontWeight: 700,
-                    cursor: (loading || code.trim().length !== 6) ? 'not-allowed' : 'pointer',
-                    opacity: (loading || code.trim().length !== 6) ? 0.7 : 1,
-                    fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
-                    boxShadow: '0 4px 14px rgba(59, 130, 246, 0.3)',
-                  }}
-                >
-                  {loading ? 'Verifying...' : 'Verify Email'}
-                </button>
-                <button
-                  type="button"
-                  disabled={loading || resendCooldownSeconds > 0 || (verificationGate.emailRequired && !verificationEmail.trim())}
-                  onClick={handleSendVerificationEmail}
-                  style={{
-                    padding: '12px 20px', borderRadius: 12,
-                    border: '1px solid #e2e8f0', background: '#fff',
-                    color: '#475569', fontSize: 14, fontWeight: 700,
-                    cursor: (loading || resendCooldownSeconds > 0) ? 'not-allowed' : 'pointer',
-                    opacity: (loading || resendCooldownSeconds > 0) ? 0.7 : 1,
-                    fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
-                  }}
-                >
-                  {resendCooldownSeconds > 0
-                    ? `Resend in ${formatResendCountdown(resendCooldownSeconds)}`
-                    : 'Send / Resend Code'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setVerificationGate(null)
-                    setCode('')
-                    setError('')
-                  }}
-                  style={{
-                    padding: '12px 20px', borderRadius: 12,
-                    border: '1px solid #e2e8f0', background: '#fff',
-                    color: '#475569', fontSize: 14, fontWeight: 700,
-                    cursor: 'pointer',
-                    fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
-                  }}
-                >
-                  Back
-                </button>
-              </div>
-
-              {resendCooldownSeconds > 0 && (
-                <div style={{ marginTop: 10, fontSize: 12, color: '#64748b' }}>
-                  You can request another verification code in {formatResendCountdown(resendCooldownSeconds)}.
-                </div>
-              )}
-            </form>
-          )}
-
+          {/* ── Register link ────────────────────────────────────────── */}
           <div style={{
             marginTop: 28, paddingTop: 20, borderTop: '1px solid #f1f5f9',
             textAlign: 'center', fontSize: 14, color: '#64748b',

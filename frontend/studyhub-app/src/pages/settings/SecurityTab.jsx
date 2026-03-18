@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { GoogleLogin } from '@react-oauth/google'
 import { API, GOOGLE_CLIENT_ID } from '../../config'
 import { Button, FormField, Input, Message, MsgList, SectionCard } from './settingsShared'
 
@@ -12,12 +13,34 @@ export default function SecurityTab({ user, sessionUser, busyKey, setBusyKey, ha
   const [googleMsg, setGoogleMsg] = useState(null)
 
   const isGoogleOnly = user?.authProvider === 'google'
+  const [showGooglePopup, setShowGooglePopup] = useState(false)
 
-  async function handleGoogleLink() {
+  async function handleGoogleLinkSuccess(credentialResponse) {
+    if (!credentialResponse?.credential) {
+      setGoogleMsg({ type: 'error', text: 'Google sign-in did not return a valid credential.' })
+      return
+    }
     setGoogleMsg(null)
-    // Google link uses a credential from the Google Sign-In popup
-    // For now, show info — actual linking requires the GoogleLogin component flow
-    setGoogleMsg({ type: 'info', text: 'Use the Google button on the login page to link your account, or contact support.' })
+    setBusyKey('google-link')
+    try {
+      const response = await fetch(`${API}/api/settings/google/link`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential: credentialResponse.credential }),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        setGoogleMsg({ type: 'error', text: data.error || 'Could not link Google account.' })
+        return
+      }
+      if (data.user) syncUser(data.user)
+      setGoogleMsg({ type: 'success', text: data.message || 'Google account linked successfully.' })
+      setShowGooglePopup(false)
+    } catch {
+      setGoogleMsg({ type: 'error', text: 'Could not connect to the server.' })
+    } finally {
+      setBusyKey('')
+    }
   }
 
   async function handleGoogleUnlink() {
@@ -42,6 +65,7 @@ export default function SecurityTab({ user, sessionUser, busyKey, setBusyKey, ha
       }
 
       if (data.user) syncUser(data.user)
+      setGoogleUnlinkPassword('')
       setGoogleMsg({ type: 'success', text: data.message || 'Google account unlinked.' })
     } catch {
       setGoogleMsg({ type: 'error', text: 'Could not connect to the server.' })
@@ -126,8 +150,24 @@ export default function SecurityTab({ user, sessionUser, busyKey, setBusyKey, ha
                 </div>
               )}
             </div>
+          ) : showGooglePopup ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
+                <GoogleLogin
+                  onSuccess={handleGoogleLinkSuccess}
+                  onError={() => setGoogleMsg({ type: 'error', text: 'Google sign-in was cancelled or failed.' })}
+                  size="large"
+                  text="signin_with"
+                  shape="rectangular"
+                  theme="outline"
+                />
+              </div>
+              <Button secondary onClick={() => setShowGooglePopup(false)}>Cancel</Button>
+            </div>
           ) : (
-            <Button onClick={handleGoogleLink}>Link Google Account</Button>
+            <Button disabled={busyKey === 'google-link'} onClick={() => setShowGooglePopup(true)}>
+              Link Google Account
+            </Button>
           )}
         </SectionCard>
       )}

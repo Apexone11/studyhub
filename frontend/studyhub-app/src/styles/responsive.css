@@ -1,11 +1,195 @@
-/* ─── Shared responsive patterns ───────────────────────────────── */
-/* Breakpoints align with src/lib/ui.js:
-   phone:  <= 767px
-   tablet: <= 1179px
-   desktop: > 1179px
-*/
+/* ═══════════════════════════════════════════════════════════════════════════
+ * responsive.css — Shared responsive patterns for StudyHub
+ *
+ * Breakpoints align with src/lib/ui.js:
+ *   phone:   <= 767px
+ *   tablet:  768px – 1179px
+ *   desktop: >= 1180px
+ *
+ * Grid classes enable tablet-aware layouts that inline styles alone can't
+ * achieve (media queries require CSS classes).
+ * ═══════════════════════════════════════════════════════════════════════════ */
 
-/* Settings page: stack sidebar tabs on small screens */
+/* ── 3-column app grid (Feed, Sheets) ──────────────────────────────────── */
+/* Desktop: sidebar (240px) | main (flex) | aside (280px)
+ * Tablet:  sidebar trigger (auto) | main (flex) | aside (260px)
+ * Phone:   single column, everything stacked                               */
+.app-three-col-grid {
+  display: grid;
+  gap: 22px;
+  align-items: start;
+  grid-template-columns: minmax(220px, 250px) minmax(0, 1fr) minmax(260px, 300px);
+}
+
+@media (min-width: 768px) and (max-width: 1179px) {
+  .app-three-col-grid {
+    grid-template-columns: auto minmax(0, 1fr) minmax(240px, 280px);
+  }
+}
+
+@media (max-width: 767px) {
+  .app-three-col-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* On phone, right-side panels collapse into a toggleable section */
+  .app-three-col-grid > .feed-aside {
+    border-top: 1px solid #e2e8f0;
+    padding-top: 16px;
+  }
+}
+
+/* ── 2-column app grid (Dashboard, Notes, Announcements, Tests) ────────── */
+/* Desktop: sidebar (240px) | main (flex)
+ * Compact: single column                                                   */
+.app-two-col-grid {
+  display: grid;
+  gap: 20px;
+  align-items: start;
+  grid-template-columns: minmax(220px, 250px) minmax(0, 1fr);
+}
+
+@media (max-width: 1179px) {
+  .app-two-col-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Dashboard stat cards ──────────────────────────────────────────────── */
+/* Desktop: 3 cards in a row
+ * Tablet:  2 + 1 (wrapping)
+ * Phone:   stacked                                                         */
+.dashboard-stats-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (min-width: 768px) and (max-width: 1179px) {
+  .dashboard-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .dashboard-stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Dashboard content 2-column (Recent Sheets | Course Focus + Actions) ─ */
+.dashboard-content-grid {
+  display: grid;
+  gap: 16px;
+  align-items: start;
+  grid-template-columns: 1.1fr 0.9fr;
+}
+
+@media (max-width: 1179px) {
+  .dashboard-content-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Notes split panel ─────────────────────────────────────────────────── */
+/* Desktop: notes list (300px) | editor (flex)
+ * Tablet:  same but tighter list (260px)
+ * Phone:   single column, show list OR editor                              */
+.notes-split-panel {
+  display: grid;
+  gap: 16px;
+  align-items: start;
+  grid-template-columns: 300px minmax(0, 1fr);
+}
+
+@media (min-width: 768px) and (max-width: 1179px) {
+  .notes-split-panel {
+    grid-template-columns: 260px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 767px) {
+  .notes-split-panel {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Sheets filter bar ─────────────────────────────────────────────────── */
+/* Desktop: search (1.6fr) | school | course | sort | toggles
+ * Tablet:  2-column wrapping
+ * Phone:   stacked                                                         */
+.sheets-filter-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1.6fr) repeat(3, minmax(0, 1fr)) auto;
+}
+
+@media (min-width: 768px) and (max-width: 1179px) {
+  .sheets-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .sheets-filter-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Sheets card grid (tablet: 2-col) ──────────────────────────────────── */
+.sheets-card-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 768px) and (max-width: 1179px) {
+  .sheets-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ── Practice tests card grid ──────────────────────────────────────────── */
+.tests-card-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 767px) {
+  .tests-card-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Profile page ──────────────────────────────────────────────────────── */
+.profile-columns {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1.5fr 1fr;
+  align-items: start;
+}
+
+@media (max-width: 767px) {
+  .profile-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+.profile-stats-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 767px) {
+  .profile-stats-row {
+    justify-content: center;
+  }
+}
+
+/* ── Settings page ─────────────────────────────────────────────────────── */
 .settings-layout {
   display: grid;
   grid-template-columns: 200px 1fr;
@@ -40,24 +224,78 @@
   }
 }
 
-/* Admin stat cards: 2-col on tablet, 1-col on phone */
+/* ── Admin stat cards ──────────────────────────────────────────────────── */
+.admin-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+@media (min-width: 768px) and (max-width: 1179px) {
+  .admin-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 767px) {
   .admin-stats-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 400px) {
   .admin-stats-grid {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: 1fr;
   }
 }
 
-/* Home steps: 3-col -> 1-col already handled in index.css at 1024px */
+/* ── Password strength hints (auth pages) ─────────────────────────────── */
+.password-hints-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
 
-/* Feed composer: tighter spacing on mobile */
+@media (max-width: 340px) {
+  .password-hints-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Moderation tab: strike form inputs ───────────────────────────────── */
+.mod-strike-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+@media (max-width: 767px) {
+  .mod-strike-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Admin tables: constrain width on phone so horizontal scroll works ── */
+@media (max-width: 767px) {
+  .admin-stats-grid ~ section table {
+    font-size: 12px;
+  }
+}
+
+/* ── Feed composer ─────────────────────────────────────────────────────── */
 @media (max-width: 767px) {
   .feed-composer-actions {
     flex-wrap: wrap;
+  }
+}
+
+/* ── Responsive utility: hide on phone ─────────────────────────────────── */
+@media (max-width: 767px) {
+  .hide-on-phone {
+    display: none !important;
+  }
+}
+
+/* ── Responsive utility: hide on tablet and phone ──────────────────────── */
+@media (max-width: 1179px) {
+  .hide-on-compact {
+    display: none !important;
   }
 }

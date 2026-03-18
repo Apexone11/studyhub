@@ -204,7 +204,8 @@ function validateRegistrationInput({ username, email, password, confirmPassword,
     throw new AppError(400, 'Username must be 3-20 characters using only letters, numbers, and underscores.')
   }
 
-  const normalizedEmail = normalizeEmail(email)
+  /* Email is optional — users can add one later in Settings for password recovery. */
+  const normalizedEmail = normalizeEmail(email, true)
   if (typeof password !== 'string' || password.length < PASSWORD_MIN_LENGTH) {
     throw new AppError(400, `Password must be at least ${PASSWORD_MIN_LENGTH} characters.`)
   }
@@ -220,7 +221,7 @@ function validateRegistrationInput({ username, email, password, confirmPassword,
 
   return {
     username: normalizedUsername,
-    email: normalizedEmail,
+    email: normalizedEmail || null,
     password,
   }
 }
@@ -320,10 +321,61 @@ function sendError(req, res, error) {
   return res.status(500).json({ error: 'Server error. Please try again.' })
 }
 
+/* ── Direct registration (no email verification) ────────────────────────
+ * Creates account in a single step: validate fields -> create user -> issue session.
+ * Email is stored but not verified at signup time. Google handles its own
+ * verification, and local users can verify later via settings.
+ *
+ * Flow:
+ * 1. POST /api/auth/register { username, email, password, confirmPassword, termsAccepted }
+ *    -> 201 { user, message: 'Account created!' }
+ *
+ * 2. Frontend then shows course selection step, which calls:
+ *    PATCH /api/settings/courses { schoolId, courseIds, customCourses }
+ *    (using the auth token from step 1)
+ * ─────────────────────────────────────────────────────────────────────── */
 router.post('/register', registerLimiter, async (req, res) => {
-  res.status(410).json({
-    error: 'Registration now requires email verification before account creation. Use the new registration flow.',
-  })
+  try {
+    const { username, email, password } = validateRegistrationInput(req.body || {})
+
+    /* Check for existing username or email (parallel queries for speed).
+     * Skip email check when email is null (optional registration). */
+    const existingUsername = await prisma.user.findUnique({ where: { username }, select: { id: true } })
+    if (existingUsername) {
+      return res.status(409).json({ error: 'That username is already taken.' })
+    }
+
+    if (email) {
+      const existingEmail = await prisma.user.findUnique({ where: { email }, select: { id: true } })
+      if (existingEmail) {
+        return res.status(409).json({ error: 'That email is already in use.' })
+      }
+    }
+
+    /* Hash password and create user in a single transaction */
+    const passwordHash = await bcrypt.hash(password, 12)
+
+    const createdUser = await prisma.user.create({
+      data: {
+        username,
+        passwordHash,
+        email,
+        emailVerified: false,
+        emailVerificationCode: null,
+        emailVerificationExpiry: null,
+      },
+      select: { id: true },
+    })
+
+    /* Issue authenticated session and return user payload */
+    const user = await issueAuthenticatedSession(res, createdUser.id)
+    res.status(201).json({
+      message: 'Account created!',
+      user,
+    })
+  } catch (error) {
+    return sendError(req, res, error)
+  }
 })
 
 router.post('/register/start', registerLimiter, async (req, res) => {
@@ -543,24 +595,10 @@ router.post('/login', loginLimiter, async (req, res) => {
       data: { failedAttempts: 0, lockedUntil: null },
     })
 
-    if (user.role !== 'admin' && (!user.emailVerified || !user.email)) {
-      const { challenge, code, didSend } = await createOrRefreshLoginChallenge({
-        user,
-        email: user.email || null,
-      })
-
-      if (didSend && code) {
-        await sendVerificationCodeEmail(challenge.email, user.username, code, {
-          route: req.originalUrl,
-          method: req.method,
-          purpose: VERIFICATION_PURPOSE.LOGIN_EMAIL,
-        })
-      }
-
-      return res.json(loginVerificationResponse(challenge, {
-        codeSent: didSend,
-      }))
-    }
+    /* Email verification gate removed in v1.5.0 — Google handles its own
+     * verification, and local accounts no longer require verified email to log in.
+     * The old verification challenge flow is preserved in the /login/verification/*
+     * endpoints for backwards compatibility but is no longer triggered. */
 
     const authenticatedUser = await issueAuthenticatedSession(res, user.id)
     return res.json({

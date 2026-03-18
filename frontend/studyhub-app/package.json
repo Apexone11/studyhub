@@ -26,6 +26,7 @@
     "posthog-js": "^1.360.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-joyride": "^2.9.3",
     "react-router-dom": "^7.13.1",
     "serve": "^14.2.5"
   },

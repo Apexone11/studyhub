@@ -1,4 +1,17 @@
-// DashboardPage owns the authenticated summary surface for the current user and keeps dashboard polling local.
+/* ═══════════════════════════════════════════════════════════════════════════
+ * DashboardPage.jsx — Authenticated user's personal study hub
+ *
+ * Layout (responsive via CSS classes in responsive.css):
+ *   `app-two-col-grid`:        sidebar (250px) | main (flex), stacked on phone
+ *   `dashboard-stats-grid`:    3 stat cards → 2 on tablet → 1 on phone
+ *   `dashboard-content-grid`:  Recent Sheets + Course Focus (2-col → stacked)
+ *
+ * Features: welcome hero with streak display, animated stat cards (countUp),
+ * recent sheets from enrolled courses, course focus picker, quick actions.
+ *
+ * Animations: fadeInUp hero, staggerEntrance stats/content, countUp values.
+ * Tutorial: First-visit Joyride highlights hero, stats, sheets, quick actions.
+ * ═══════════════════════════════════════════════════════════════════════════ */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
@@ -17,7 +30,11 @@ import { useSession } from '../../lib/session-context'
 import { pageShell, useResponsiveAppLayout } from '../../lib/ui'
 import { useLivePolling } from '../../lib/useLivePolling'
 import { countUp, fadeInUp, staggerEntrance } from '../../lib/animations'
+import Joyride from 'react-joyride'
+import { useTutorial } from '../../lib/useTutorial'
+import { DASHBOARD_STEPS } from '../../lib/tutorialSteps'
 
+/* ── Shared constants ──────────────────────────────────────────────────── */
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 
 function authHeaders() {
@@ -95,13 +112,16 @@ export default function DashboardPage() {
   const navigate = useNavigate()
   const { user, clearSession, signOut } = useSession()
   const layout = useResponsiveAppLayout()
-  const [summary, setSummary] = useState(null)
+  const [summary, setSummary] = useState(null)     // aggregated dashboard data from API
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const heroRef = useRef(null)
-  const statsRef = useRef(null)
-  const contentRef = useRef(null)
-  const animatedRef = useRef(false)
+  const heroRef = useRef(null)                     // DOM ref for fadeInUp animation
+  const statsRef = useRef(null)                    // DOM ref for staggerEntrance animation
+  const contentRef = useRef(null)                  // DOM ref for staggerEntrance animation
+  const animatedRef = useRef(false)                // guard: only animate once
+
+  /* Tutorial popup — first-visit or re-trigger via floating "?" button */
+  const tutorial = useTutorial('dashboard', DASHBOARD_STEPS)
 
   const loadSummary = async ({ signal, startTransition } = {}) => {
     const apply = startTransition || ((fn) => fn())
@@ -208,19 +228,15 @@ export default function DashboardPage() {
   return (
     <div style={{ minHeight: '100vh', background: '#edf0f5', fontFamily: FONT }}>
       <Navbar crumbs={[{ label: 'Dashboard', to: '/dashboard' }]} hideTabs actions={navActions} />
-      <div
-        style={{
-          ...pageShell('app'),
-          display: 'grid',
-          gridTemplateColumns: layout.columns.appTwoColumn,
-          gap: 20,
-        }}
-      >
+      {/* 2-column responsive grid: sidebar | dashboard content
+       * Desktop: sidebar visible, Compact: sidebar as drawer */}
+      <div className="app-two-col-grid" style={pageShell('app')}>
         <AppSidebar mode={layout.sidebarMode} />
 
         <main style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
           <section
             ref={heroRef}
+            data-tutorial="dashboard-hero"
             style={{
               background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%)',
               borderRadius: 18,
@@ -244,9 +260,7 @@ export default function DashboardPage() {
               <p style={{ margin: '10px 0 0', fontSize: 14, lineHeight: 1.7, color: '#cbd5e1' }}>
                 Joined {formatJoinedDate(hero.createdAt || user?.createdAt)}.
                 {' '}
-                {hero.emailVerified
-                  ? 'Your email is verified and your account is fully protected.'
-                  : 'Finish verifying your email in Settings to unlock password reset and 2-step verification.'}
+                Your study sheets, notes, and practice tests are ready.
               </p>
             </div>
 
@@ -327,7 +341,8 @@ export default function DashboardPage() {
             <DashboardSkeleton />
           ) : (
             <>
-              <section ref={statsRef} style={{ display: 'grid', gridTemplateColumns: layout.isCompact ? 'minmax(0, 1fr)' : 'repeat(3, minmax(0, 1fr))', gap: 16 }}>
+              {/* Stat cards: 3-col desktop, 2-col tablet, 1-col phone */}
+              <section ref={statsRef} className="dashboard-stats-grid" data-tutorial="dashboard-stats">
                 {cards.map((card) => (
                   <div
                     key={card.label}
@@ -350,15 +365,8 @@ export default function DashboardPage() {
                 ))}
               </section>
 
-              <section
-                ref={contentRef}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: layout.isCompact ? 'minmax(0, 1fr)' : '1.1fr 0.9fr',
-                  gap: 16,
-                  alignItems: 'start',
-                }}
-              >
+              {/* Content: Recent Sheets (wider) | Course Focus + Quick Actions */}
+              <section ref={contentRef} className="dashboard-content-grid" data-tutorial="dashboard-sheets">
                 <div
                   style={{
                     background: '#fff',
@@ -481,6 +489,7 @@ export default function DashboardPage() {
                   </div>
 
                   <div
+                    data-tutorial="dashboard-actions"
                     style={{
                       background: '#fff',
                       borderRadius: 18,
@@ -528,6 +537,12 @@ export default function DashboardPage() {
           )}
         </main>
       </div>
+
+      {/* Tutorial popup */}
+      <Joyride {...tutorial.joyrideProps} />
+      {tutorial.seen && (
+        <button type="button" onClick={tutorial.restart} title="Show tutorial" style={{ position: 'fixed', bottom: 24, right: 24, width: 44, height: 44, borderRadius: '50%', border: 'none', background: '#3b82f6', color: '#fff', fontSize: 18, fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 14px rgba(59,130,246,0.4)', zIndex: 50, display: 'grid', placeItems: 'center' }}>?</button>
+      )}
     </div>
   )
 }

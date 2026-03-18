@@ -1,3 +1,19 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+ * SheetsPage.jsx — Browse, star, and download study sheets
+ *
+ * Layout (responsive via CSS class `app-three-col-grid` in responsive.css):
+ *   Desktop: sidebar (250px) | main content (flex) | quick-view aside (300px)
+ *   Tablet:  sidebar trigger (auto) | main + aside (280px)
+ *   Phone:   single column
+ *
+ * Filter bar uses `sheets-filter-grid` class for responsive wrapping.
+ * Card grid uses `sheets-card-grid` class (2-col on tablet, 1-col phone).
+ *
+ * Features: search, school/course/sort filters, Mine/Starred toggles,
+ * star/download actions, live polling, sheet quick-view panel.
+ *
+ * Tutorial: First-visit Joyride highlights search, filters, upload, toggles.
+ * ═══════════════════════════════════════════════════════════════════════════ */
 import { useCallback, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
@@ -15,7 +31,11 @@ import { getApiErrorMessage, isAuthSessionFailure, readJsonSafely } from '../../
 import { useSession } from '../../lib/session-context'
 import { pageShell, useResponsiveAppLayout } from '../../lib/ui'
 import { useLivePolling } from '../../lib/useLivePolling'
+import Joyride from 'react-joyride'
+import { useTutorial } from '../../lib/useTutorial'
+import { SHEETS_STEPS } from '../../lib/tutorialSteps'
 
+/* ── Shared constants ──────────────────────────────────────────────────── */
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 
 function authHeaders() {
@@ -164,16 +184,20 @@ export default function SheetsPage() {
   const { user, clearSession } = useSession()
   const layout = useResponsiveAppLayout()
   const [searchParams, setSearchParams] = useSearchParams()
-  const [catalog, setCatalog] = useState([])
+  const [catalog, setCatalog] = useState([])             // school+course catalog for filters
   const [sheetsState, setSheetsState] = useState({ sheets: [], total: 0, loading: true, error: '' })
   const [catalogError, setCatalogError] = useState('')
 
+  /* ── Query parameters drive the filter state (URL-as-truth) ──────────── */
   const search = searchParams.get('search') || ''
   const schoolId = searchParams.get('schoolId') || ''
   const courseId = searchParams.get('courseId') || ''
   const mine = searchParams.get('mine') === '1'
   const starred = searchParams.get('starred') === '1'
   const orderBy = searchParams.get('sort') || 'createdAt'
+
+  /* Tutorial popup — first-visit or re-trigger via floating "?" button */
+  const tutorial = useTutorial('sheets', SHEETS_STEPS)
 
   const setQueryParam = useCallback((key, value) => {
     const next = new URLSearchParams(searchParams)
@@ -302,14 +326,11 @@ export default function SheetsPage() {
       <Navbar />
       <div style={{ background: '#edf0f5', minHeight: '100vh', fontFamily: FONT }}>
         <div style={pageShell('app', 26, 48)}>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: layout.columns.appThreeColumn,
-              gap: 22,
-              alignItems: 'start',
-            }}
-          >
+          {/* 3-column responsive grid: sidebar | sheets list | quick view
+           * Desktop: all 3 columns visible
+           * Tablet:  sidebar trigger (auto) + sheets + quick view
+           * Phone:   single column, everything stacked */}
+          <div className="app-three-col-grid">
             <AppSidebar mode={layout.sidebarMode} />
 
             <main style={{ display: 'grid', gap: 16 }}>
@@ -318,17 +339,18 @@ export default function SheetsPage() {
                   <div>
                     <h1 style={{ margin: 0, fontSize: 28, color: '#0f172a' }}>Study Sheets</h1>
                     <p style={{ margin: '6px 0 0', fontSize: 13, color: '#64748b' }}>
-                      Browse sheets without forcing the rest of the app to reload when one request goes bad.
+                      Browse, star, and download study sheets shared by your classmates.
                     </p>
                   </div>
-                  <Link to="/sheets/upload" style={linkButton()}>
+                  <Link data-tutorial="sheets-upload" to="/sheets/upload" style={linkButton()}>
                     <IconUpload size={14} />
                     Upload a sheet
                   </Link>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: layout.isCompact ? 'minmax(0, 1fr)' : 'minmax(0, 1.6fr) repeat(3, minmax(0, 1fr)) auto', gap: 12 }}>
-                  <label style={{ position: 'relative' }}>
+                {/* Filter bar: responsive via CSS class sheets-filter-grid */}
+                <div className="sheets-filter-grid" data-tutorial="sheets-filters">
+                  <label data-tutorial="sheets-search" style={{ position: 'relative' }}>
                     <IconSearch size={15} style={{ position: 'absolute', left: 12, top: 12, color: '#94a3b8' }} />
                     <input
                       value={search}
@@ -356,7 +378,7 @@ export default function SheetsPage() {
                     <option value="downloads">Most downloaded</option>
                     <option value="forks">Most forked</option>
                   </select>
-                  <div style={{ display: 'flex', gap: 8 }}>
+                  <div data-tutorial="sheets-toggles" style={{ display: 'flex', gap: 8 }}>
                     <button type="button" onClick={() => setQueryParam('mine', mine ? '' : '1')} style={togglePill(mine)}>Mine</button>
                     <button type="button" onClick={() => setQueryParam('starred', starred ? '' : '1')} style={togglePill(starred)}>Starred</button>
                   </div>
@@ -375,7 +397,7 @@ export default function SheetsPage() {
                   No sheets matched your filters.
                 </section>
               ) : (
-                <div style={{ display: 'grid', gap: 14 }}>
+                <div className="sheets-card-grid">
                   {sheetsState.sheets.map((sheet) => (
                     <SheetCard key={sheet.id} sheet={sheet} onStar={toggleStar} />
                   ))}
@@ -403,6 +425,12 @@ export default function SheetsPage() {
           </div>
         </div>
       </div>
+
+      {/* Tutorial popup */}
+      <Joyride {...tutorial.joyrideProps} />
+      {tutorial.seen && (
+        <button type="button" onClick={tutorial.restart} title="Show tutorial" style={{ position: 'fixed', bottom: 24, right: 24, width: 44, height: 44, borderRadius: '50%', border: 'none', background: '#3b82f6', color: '#fff', fontSize: 18, fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 14px rgba(59,130,246,0.4)', zIndex: 50, display: 'grid', placeItems: 'center' }}>?</button>
+      )}
     </>
   )
 }

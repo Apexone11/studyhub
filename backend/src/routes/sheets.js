@@ -23,6 +23,7 @@ const {
   submitHtmlDraftForReview,
   upsertHtmlVersion,
 } = require('../lib/htmlDraftWorkflow')
+const { isModerationEnabled, scanContent } = require('../lib/moderationEngine')
 
 const router = express.Router()
 const SHEET_STATUS = {
@@ -1112,6 +1113,18 @@ router.get('/:id', optionalAuth, async (req, res) => {
   }
 })
 
+/**
+ * Reads the user's defaultDownloads preference from UserPreferences.
+ * Returns true if no preference record exists (safe default).
+ */
+async function getUserDefaultDownloads(userId) {
+  const prefs = await prisma.userPreferences.findUnique({
+    where: { userId },
+    select: { defaultDownloads: true },
+  })
+  return prefs?.defaultDownloads !== false
+}
+
 router.post('/', requireAuth, sheetWriteLimiter, async (req, res) => {
   const { title, content, courseId, forkOf, description, allowDownloads } = req.body || {}
   const contentFormat = normalizeContentFormat(req.body?.contentFormat)
@@ -1132,6 +1145,11 @@ router.post('/', requireAuth, sheetWriteLimiter, async (req, res) => {
       }
     }
 
+    /* Use user's defaultDownloads preference when not explicitly set in request */
+    const resolvedAllowDownloads = typeof allowDownloads === 'boolean'
+      ? allowDownloads
+      : await getUserDefaultDownloads(req.user.userId)
+
     const sheet = await prisma.studySheet.create({
       data: {
         title: title.trim().slice(0, 160),
@@ -1142,7 +1160,7 @@ router.post('/', requireAuth, sheetWriteLimiter, async (req, res) => {
         courseId: Number.parseInt(courseId, 10),
         userId: req.user.userId,
         forkOf: forkOf ? Number.parseInt(forkOf, 10) : null,
-        allowDownloads: allowDownloads !== false,
+        allowDownloads: resolvedAllowDownloads,
       },
       include: {
         author: { select: { id: true, username: true } },
@@ -1157,6 +1175,12 @@ router.post('/', requireAuth, sheetWriteLimiter, async (req, res) => {
         ? 'HTML sheet submitted for admin review.'
         : 'Sheet published.',
     })
+
+    /* Async content moderation — scan title + description + markdown content */
+    if (isModerationEnabled()) {
+      const textToScan = `${title} ${description || ''} ${contentFormat === 'markdown' ? content : ''}`.trim()
+      void scanContent({ contentType: 'sheet', contentId: sheet.id, text: textToScan, userId: req.user.userId })
+    }
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
@@ -1279,6 +1303,18 @@ router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
           ? 'Draft saved.'
           : 'Sheet updated.',
     })
+
+    /* Async content moderation — scan updated title + description + markdown */
+    if (isModerationEnabled()) {
+      const textToScan = [
+        data.title || '',
+        data.description || '',
+        nextFormat === 'markdown' && typeof content === 'string' ? content : '',
+      ].join(' ').trim()
+      if (textToScan) {
+        void scanContent({ contentType: 'sheet', contentId: sheetId, text: textToScan, userId: req.user.userId })
+      }
+    }
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
@@ -1356,6 +1392,14 @@ router.post('/:id/fork', requireAuth, sheetWriteLimiter, async (req, res) => {
     })
 
     res.status(201).json(serializeSheet(forked))
+
+    /* Async content moderation — scan forked content under new author */
+    if (isModerationEnabled()) {
+      const textToScan = `${forkTitle} ${original.description || ''} ${original.contentFormat === 'markdown' ? original.content : ''}`.trim()
+      if (textToScan) {
+        void scanContent({ contentType: 'sheet', contentId: forked.id, text: textToScan, userId: req.user.userId })
+      }
+    }
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })

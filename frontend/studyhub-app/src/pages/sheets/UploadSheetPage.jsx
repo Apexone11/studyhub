@@ -1,6 +1,23 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+ * UploadSheetPage.jsx — Create and edit study sheets
+ *
+ * Supports two content modes:
+ *   - HTML mode: WYSIWYG editing with security scan workflow (import HTML,
+ *     scan for XSS/phishing, acknowledge findings, submit for review).
+ *   - Legacy Markdown mode: plain-text editor with live preview.
+ *
+ * Unsaved-changes protection:
+ *   - Browser `beforeunload` event: warns on tab/window close.
+ *   - React Router `useBlocker`: intercepts in-app navigation with custom
+ *     ConfirmDialog instead of browser default.
+ *   - `hasUnsavedChanges` flag tracks mutations; reset on save.
+ *
+ * Attachment: Single file (PDF or image), max 10MB, validated client-side.
+ * ═══════════════════════════════════════════════════════════════════════════ */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useBlocker, useNavigate, useParams } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
+import ConfirmDialog from '../../components/ConfirmDialog'
 import { IconCheck, IconEye, IconUpload } from '../../components/Icons'
 import { API } from '../../config'
 import { pageShell } from '../../lib/ui'
@@ -11,11 +28,13 @@ import {
   reduceScanState,
 } from './uploadSheetWorkflow'
 
+/* ── Shared constants ──────────────────────────────────────────────────── */
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 
+/* Allowed attachment types — validated on both client and server */
 const ATTACH_ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'image/webp']
 const ATTACH_ALLOWED_EXT = ['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.webp']
-const ATTACH_MAX_BYTES = 10 * 1024 * 1024
+const ATTACH_MAX_BYTES = 10 * 1024 * 1024 // 10 MB
 
 function authHeaders() {
   return {
@@ -102,6 +121,15 @@ export default function UploadSheetPage() {
   const [attachUploading, setAttachUploading] = useState(false)
   const [existingAttachment, setExistingAttachment] = useState(null)
   const [removeExistingAttachment, setRemoveExistingAttachment] = useState(false)
+
+  /* ── Unsaved-changes tracking ────────────────────────────────────────────
+   * Tracks whether the user has modified any content since the last save.
+   * Used by beforeunload (browser nav) and useBlocker (in-app nav) to warn
+   * before losing work. Set to true on any content mutation, reset on save.
+   * ─────────────────────────────────────────────────────────────────────── */
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [showLeaveDialog, setShowLeaveDialog] = useState(false)
+  const pendingBlockerRef = useRef(null)
 
   const htmlImportInputRef = useRef(null)
   const attachmentInputRef = useRef(null)
@@ -232,6 +260,50 @@ export default function UploadSheetPage() {
     setShowTutorial(false)
   }
 
+  /* ── Browser beforeunload: warns when closing tab/browser with unsaved work ── */
+  useEffect(() => {
+    if (!hasUnsavedChanges) return
+    const handler = (e) => {
+      e.preventDefault()
+      // Modern browsers show their own generic message; returnValue is required by spec
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [hasUnsavedChanges])
+
+  /* ── React Router blocker: intercepts in-app navigation with unsaved changes ── */
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      hasUnsavedChanges && currentLocation.pathname !== nextLocation.pathname,
+  )
+
+  /* When the blocker fires, show our custom confirmation dialog */
+  useEffect(() => {
+    if (blocker.state === 'blocked') {
+      pendingBlockerRef.current = blocker
+      setShowLeaveDialog(true)
+    }
+  }, [blocker.state])
+
+  /* User confirmed leaving — proceed with blocked navigation */
+  const confirmLeave = useCallback(() => {
+    setShowLeaveDialog(false)
+    if (pendingBlockerRef.current?.proceed) {
+      pendingBlockerRef.current.proceed()
+    }
+    pendingBlockerRef.current = null
+  }, [])
+
+  /* User cancelled leaving — stay on the page */
+  const cancelLeave = useCallback(() => {
+    setShowLeaveDialog(false)
+    if (pendingBlockerRef.current?.reset) {
+      pendingBlockerRef.current.reset()
+    }
+    pendingBlockerRef.current = null
+  }, [])
+
   useEffect(() => {
     if (initializing || legacyMarkdownMode || !isHtmlMode || !Number.isInteger(activeSheetId)) return
 
@@ -358,6 +430,7 @@ export default function UploadSheetPage() {
     setAttachErr('')
     setAttachFile(file)
     setRemoveExistingAttachment(false)
+    setHasUnsavedChanges(true)
   }
 
   async function handleHtmlImport(event) {
@@ -503,6 +576,7 @@ export default function UploadSheetPage() {
         if (!response.ok) throw new Error(data.error || 'Failed to save sheet.')
 
         await uploadAttachment(data.id)
+        setHasUnsavedChanges(false) // Clear before navigating so blocker doesn't fire
         navigate(`/sheets/${data.id}`)
       } catch (publishError) {
         setError(publishError.message || 'Failed to save sheet.')
@@ -540,6 +614,7 @@ export default function UploadSheetPage() {
         await uploadAttachment(data.id)
       }
 
+      setHasUnsavedChanges(false) // Clear before navigating so blocker doesn't fire
       navigate(`/sheets/${data.id}`)
     } catch (submitError) {
       setError(submitError.message || 'Could not submit for review.')
@@ -651,7 +726,7 @@ export default function UploadSheetPage() {
             <label style={{ fontSize: 10, fontWeight: 700, color: '#64748b', letterSpacing: '.06em', display: 'block', marginBottom: 5 }}>SHEET TITLE</label>
             <input
               value={title}
-              onChange={(event) => setTitle(event.target.value)}
+              onChange={(event) => { setTitle(event.target.value); setHasUnsavedChanges(true) }}
               placeholder='e.g. "CMSC131 Final Exam Cheatsheet"'
               style={{ width: '100%', padding: '8px 12px', border: `1.5px solid ${error && !title.trim() ? '#fca5a5' : '#e2e8f0'}`, borderRadius: 8, fontSize: 13, fontFamily: FONT, outline: 'none', color: '#0f172a', boxSizing: 'border-box' }}
             />
@@ -661,7 +736,7 @@ export default function UploadSheetPage() {
             <label style={{ fontSize: 10, fontWeight: 700, color: '#64748b', letterSpacing: '.06em', display: 'block', marginBottom: 5 }}>COURSE</label>
             <select
               value={courseId}
-              onChange={(event) => setCourseId(event.target.value)}
+              onChange={(event) => { setCourseId(event.target.value); setHasUnsavedChanges(true) }}
               style={{ width: '100%', padding: '8px 12px', border: `1.5px solid ${error && !courseId ? '#fca5a5' : '#e2e8f0'}`, borderRadius: 8, fontSize: 13, fontFamily: FONT, outline: 'none', color: courseId ? '#0f172a' : '#94a3b8', boxSizing: 'border-box' }}
             >
               <option value="">Select a course…</option>
@@ -674,7 +749,7 @@ export default function UploadSheetPage() {
           <div>
             <label style={{ fontSize: 10, fontWeight: 700, color: '#64748b', letterSpacing: '.06em', display: 'block', marginBottom: 5 }}>DOWNLOADS</label>
             <label style={{ padding: '8px 12px', border: '1.5px solid #e2e8f0', borderRadius: 8, fontSize: 13, color: '#64748b', background: '#f8fafc', display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-              <input type="checkbox" checked={allowDownloads} onChange={(event) => setAllowDownloads(event.target.checked)} />
+              <input type="checkbox" checked={allowDownloads} onChange={(event) => { setAllowDownloads(event.target.checked); setHasUnsavedChanges(true) }} />
               Allow downloads
             </label>
           </div>
@@ -686,7 +761,7 @@ export default function UploadSheetPage() {
           </label>
           <textarea
             value={description}
-            onChange={(event) => setDescription(event.target.value.slice(0, 300))}
+            onChange={(event) => { setDescription(event.target.value.slice(0, 300)); setHasUnsavedChanges(true) }}
             rows={2}
             maxLength={300}
             placeholder="Brief summary of what this sheet covers…"
@@ -789,7 +864,7 @@ export default function UploadSheetPage() {
             <div style={{ borderRight: '1px solid #1e293b', background: '#0f172a' }}>
               <textarea
                 value={content}
-                onChange={(event) => setContent(event.target.value)}
+                onChange={(event) => { setContent(event.target.value); setHasUnsavedChanges(true) }}
                 spellCheck={!isHtmlMode}
                 disabled={isHtmlMode && !canEditHtml}
                 placeholder={isHtmlMode && !canEditHtml ? 'Import HTML file to unlock editor...' : 'Start writing...'}
@@ -882,6 +957,21 @@ export default function UploadSheetPage() {
           </div>
         </div>
       ) : null}
+
+      {/* ── Unsaved changes confirmation dialog ─────────────────────────────
+       * Shown when the user tries to navigate away (in-app) with pending edits.
+       * Browser navigation is handled by the beforeunload event above.
+       * ────────────────────────────────────────────────────────────────── */}
+      <ConfirmDialog
+        open={showLeaveDialog}
+        title="Discard unsaved changes?"
+        message="You have unsaved changes on this sheet. If you leave now, your pending work will be lost. Would you like to stay and finish?"
+        confirmLabel="Leave"
+        cancelLabel="Stay"
+        variant="danger"
+        onConfirm={confirmLeave}
+        onCancel={cancelLeave}
+      />
     </div>
   )
 }

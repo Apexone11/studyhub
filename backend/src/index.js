@@ -11,6 +11,7 @@ const { startHtmlArchiveScheduler } = require('./lib/htmlArchiveScheduler')
 const { AVATARS_DIR, validateUploadStorage } = require('./lib/storage')
 const csrfProtection = require('./middleware/csrf')
 const { guardedMode, isGuardedModeEnabled } = require('./middleware/guardedMode')
+const checkRestrictions = require('./middleware/checkRestrictions')
 const { ERROR_CODES, sendError } = require('./middleware/errorEnvelope')
 
 const sentryEnabled = initSentry()
@@ -32,6 +33,7 @@ const usersRoutes = require('./routes/users')
 const previewRoutes = require('./routes/preview')
 const searchRoutes = require('./routes/search')
 const webhookRoutes = require('./routes/webhooks')
+const { adminRouter: moderationAdminRoutes, userRouter: moderationUserRoutes } = require('./routes/moderation')
 
 if (sentryEnabled) {
     console.log('Sentry monitoring enabled for backend.')
@@ -198,6 +200,10 @@ app.use(guardedMode)
 // CSRF protection for cookie-authenticated session mutations.
 app.use(csrfProtection)
 
+// Block restricted users from write operations (posting, commenting, uploading).
+// Skips GET/HEAD/OPTIONS, unauthenticated requests, and admin users.
+app.use(checkRestrictions)
+
 // Only avatars remain publicly retrievable. Study attachments now stay behind
 // auth-checked preview/download handlers.
 app.use('/uploads/avatars', express.static(AVATARS_DIR, {
@@ -234,6 +240,12 @@ app.use('/api/announcements', announcementRoutes)
 
 // Mount admin endpoints under /api/admin.
 app.use('/api/admin', adminRoutes)
+
+// Mount moderation admin routes under /api/admin/moderation.
+app.use('/api/admin/moderation', moderationAdminRoutes)
+
+// Mount moderation user-facing routes under /api/moderation.
+app.use('/api/moderation', moderationUserRoutes)
 
 // Mount upload endpoints under /api/upload.
 app.use('/api/upload', uploadRoutes)

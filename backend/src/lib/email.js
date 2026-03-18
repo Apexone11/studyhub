@@ -19,7 +19,10 @@ function escapeHtml(value) {
 }
 
 function getFromAddress() {
-  return (process.env.EMAIL_FROM || process.env.EMAIL_USER || DEFAULT_ADMIN_EMAIL).trim()
+  const raw = (process.env.EMAIL_FROM || process.env.EMAIL_USER || DEFAULT_ADMIN_EMAIL).trim()
+  // Extract bare email if the value already includes a display name (e.g. "Name <email>")
+  const match = raw.match(/<([^>]+)>/)
+  return match ? match[1] : raw
 }
 
 function getAdminEmail() {
@@ -222,6 +225,8 @@ async function validateEmailTransport({ logger = console, strict = false } = {})
     }
 
     try {
+      /* Try /domains as a health check. Send-only API keys lack permission
+       * for this endpoint — treat 403 as "key is valid, just restricted". */
       const response = await fetch(`${resendConfig.baseUrl}/domains`, {
         method: 'GET',
         headers: {
@@ -229,16 +234,17 @@ async function validateEmailTransport({ logger = console, strict = false } = {})
         },
       })
 
-      if (!response.ok) {
-        const responsePayload = await parseJsonSafely(response)
-        const errorMessage = responsePayload?.message
-          || responsePayload?.error
-          || `${response.status} ${response.statusText}`.trim()
-        throw new Error(`Resend API validation failed: ${errorMessage}`)
+      const isRestrictedKey = !response.ok && (await parseJsonSafely(response.clone()))?.name === 'restricted_api_key'
+      if (response.ok || isRestrictedKey) {
+        logger.info?.('[email] transport ready (resend)')
+        return { ok: true, mode }
       }
 
-      logger.info?.('[email] transport ready (resend)')
-      return { ok: true, mode }
+      const responsePayload = await parseJsonSafely(response)
+      const errorMessage = responsePayload?.message
+        || responsePayload?.error
+        || `${response.status} ${response.statusText}`.trim()
+      throw new Error(`Resend API validation failed: ${errorMessage}`)
     } catch (error) {
       const message = `Email transport validation failed (${mode}): ${error.message}`
       if (strict) throw new Error(message)

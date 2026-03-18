@@ -10,6 +10,7 @@ const { notifyMentionedUsers } = require('../lib/mentions')
 const prisma = require('../lib/prisma')
 const { cleanupAttachmentIfUnused, resolveAttachmentPath } = require('../lib/storage')
 const { sendAttachmentPreview } = require('../lib/attachmentPreview')
+const { isModerationEnabled, scanContent } = require('../lib/moderationEngine')
 
 const router = express.Router()
 
@@ -471,6 +472,11 @@ router.post('/posts', feedWriteLimiter, async (req, res) => {
     })
 
     res.status(201).json(formatFeedPostDetail(post, 0, [], []))
+
+    /* Async content moderation — fire-and-forget after response is sent */
+    if (isModerationEnabled()) {
+      void scanContent({ contentType: 'feed_post', contentId: post.id, text: content, userId: req.user.userId })
+    }
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
@@ -643,6 +649,11 @@ router.post('/posts/:id/comments', commentLimiter, async (req, res) => {
     })
 
     res.status(201).json(comment)
+
+    /* Async content moderation — fire-and-forget after response is sent */
+    if (isModerationEnabled()) {
+      void scanContent({ contentType: 'feed_comment', contentId: comment.id, text: content, userId: req.user.userId })
+    }
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
