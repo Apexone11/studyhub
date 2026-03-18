@@ -32,6 +32,7 @@ Cycle 1 Additions (Search + Confirm Modals + HTML Scanner) [2026-03-18]
 Implemented in beta lane:
 
 Added:
+
 - Unified search endpoint with parallel Prisma queries across sheets, courses, and users:
   - `backend/src/routes/search.js`
   - `GET /api/search?q=term&type=all|sheets|courses|users&limit=10`
@@ -50,12 +51,14 @@ Added:
 - App icon (`frontend/studyhub-app/public/icon-256.png`).
 
 Changed:
+
 - Navbar search bar (`Navbar.jsx:386`) now opens SearchModal instead of being a dead span.
 - Feed post delete actions now use ConfirmDialog instead of `window.confirm()`.
 - Admin announcement delete now uses ConfirmDialog.
 - Feed composer "Upload sheet" renamed to "Attach file", "General post" renamed to "All courses", "Post to Feed" renamed to "Post".
 
 Security:
+
 - `form` tag added to forbidden tags in HTML security scanner (`backend/src/lib/htmlSecurity.js`) to prevent phishing forms in sheets.
 
 Cycle 1 Validation Commands (Executed)
@@ -76,6 +79,7 @@ Cycle 2 Additions (Google OAuth + Anime.js Animations + Responsive Baseline) [20
 Implemented in beta lane:
 
 Added:
+
 - Google OAuth backend integration:
   - `backend/src/lib/googleAuth.js` — token verification via `google-auth-library`.
   - `POST /api/auth/google` — Login/register via Google ID token.
@@ -104,6 +108,7 @@ Added:
   - Settings layout responsive breakpoints, admin stat card grid, sidebar/nav mobile patterns.
 
 Changed:
+
 - `animejs` dependency added to frontend (`package.json`).
 - `google-auth-library` dependency added to backend (`package.json`).
 
@@ -131,6 +136,7 @@ Cycle 3 Additions (CORS Auto-Expansion + Typo Fix + CSS Cleanup) [2026-03-18]
 Implemented in beta lane:
 
 Fixed:
+
 - CORS production error where `https://www.getstudyhub.net` was blocked because `FRONTEND_URL` was `https://getstudyhub.net`:
   - `backend/src/index.js`
   - Added auto www/non-www expansion logic for allowed origins in production mode.
@@ -138,6 +144,7 @@ Fixed:
 - Smart quote typo in LoginPage.jsx line 584: Unicode curly apostrophe (U+2019) replaced with ASCII apostrophe.
 
 Changed:
+
 - Removed deprecated `-webkit-overflow-scrolling: touch` from `responsive.css` `.settings-nav` media query.
 
 Cycle 3 Validation Commands (Executed)
@@ -158,6 +165,7 @@ Cycle 4 Additions (Settings Page Rework + UserPreferences Model) [2026-03-18]
 Implemented in beta lane:
 
 Added:
+
 - `UserPreferences` Prisma model with all notification, privacy, and appearance settings:
   - `backend/prisma/schema.prisma`
   - Fields: `emailDigest`, `emailMentions`, `emailContributions`, `inAppNotifications`, `profileVisibility`, `defaultDownloads`, `defaultContributions`, `theme`, `fontSize`.
@@ -179,6 +187,7 @@ Added:
   - `AccountTab.jsx` — email change + verification code flow, resend cooldown timer, account deletion with reasons.
 
 Changed:
+
 - `SettingsPage.jsx` rewritten from 854 lines to ~170 lines as thin shell with 7-tab navigation.
 - Tab navigation: profile, security, notifications, privacy, courses, appearance, account.
 - `renderTab()` switch delegates to individual tab components with shared props.
@@ -206,3 +215,55 @@ Cycle 4 Deferred-Risk Notes
 - `prisma db push --accept-data-loss` was used for schema push; formal migration file not yet created.
 - Full end-to-end beta gate (`npm run beta:check`) not yet rerun on v1.5.0 branch.
 - Lock files regenerated with `--no-workspaces` flag to bypass workspace resolution for Railway Docker builds.
+
+---
+
+Cycle 5 Additions (Moderation Database Schema) [2026-03-18]
+Implemented in beta lane:
+
+Added:
+
+- `ModerationCase` model for tracking flagged content:
+  - `backend/prisma/schema.prisma`
+  - Fields: `contentType`, `contentId`, `status` (pending/approved/rejected/escalated), `confidence`, `category`, `provider`, `evidence` (JSON), `reviewedBy`, `reviewNote`.
+  - Indexed on `[status, createdAt]` and `[contentType, contentId]`.
+  - Linked to reviewer User via `ModerationReviewer` relation.
+- `Strike` model for tracking user violations:
+  - Fields: `userId`, `reason`, `caseId` (optional link to ModerationCase), `issuedAt`, `expiresAt` (90-day window), `decayedAt`.
+  - Indexed on `[userId, decayedAt, expiresAt]` for efficient active-strike queries.
+  - Cascade delete on User, SetNull on ModerationCase deletion.
+- `Appeal` model for user strike appeals:
+  - Fields: `caseId`, `userId`, `reason`, `status` (pending/accepted/rejected), `reviewedBy`, `reviewNote`.
+  - Indexed on `[caseId]` and `[userId, status]`.
+  - Cascade delete on ModerationCase and User.
+- `UserRestriction` model for posting/commenting restrictions:
+  - Fields: `userId`, `type` (posting/commenting/uploading/full), `startsAt`, `endsAt`, `reason`.
+  - Indexed on `[userId, endsAt]` for efficient active-restriction queries.
+  - Cascade delete on User.
+- User model relations added: `strikes`, `appeals`, `restrictions`, `moderationReviews`.
+
+Cycle 5 Validation Commands (Executed)
+- `npx prisma validate` (from backend/)
+- `npx prisma generate` (from backend/)
+- `npx prisma db push --accept-data-loss` (from backend/)
+- `npm --prefix frontend/studyhub-app run build`
+
+Cycle 5 Validation Result
+
+- Prisma schema validation passed.
+- Prisma client generated successfully with 4 new moderation models.
+- Database schema pushed and synced.
+- Frontend production build passed (no changes to frontend in this cycle).
+
+Cycle 5 Deep Scan Summary
+
+- Schema-only change with no runtime impact. No new endpoints, middleware, or frontend code.
+- All new models use additive columns/tables only (no drops, no renames).
+- Cascade delete rules follow existing patterns: User deletion cascades to strikes/appeals/restrictions; ModerationCase deletion cascades to appeals, sets null on strikes.
+- Strike `expiresAt` field enforces 90-day decay window at the application layer (not database constraint).
+
+Cycle 5 Deferred-Risk Notes
+
+- No runtime moderation engine yet — schema is pre-provisioned for Week 4 implementation.
+- `prisma db push --accept-data-loss` used; formal migration file should be created before production deploy.
+- No API endpoints for moderation cases, strikes, appeals, or restrictions yet.

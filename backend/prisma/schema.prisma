@@ -47,6 +47,10 @@ model User {
   htmlVersions       SheetHtmlVersion[]
   suppressionAuditsPerformed EmailSuppressionAudit[] @relation("EmailSuppressionAuditActor")
   preferences                UserPreferences?
+  strikes                    Strike[]
+  appeals                    Appeal[]
+  restrictions               UserRestriction[]
+  moderationReviews          ModerationCase[] @relation("ModerationReviewer")
 }
 
 model School {
@@ -409,4 +413,68 @@ model UserPreferences {
   theme                String  @default("system")
   fontSize             String  @default("medium")
   user                 User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ModerationCase {
+  id          Int       @id @default(autoincrement())
+  contentType String
+  contentId   Int
+  status      String    @default("pending")
+  confidence  Float?
+  category    String?
+  provider    String?
+  evidence    Json?
+  reviewedBy  Int?
+  reviewNote  String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  reviewer    User?     @relation("ModerationReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  strikes     Strike[]
+  appeals     Appeal[]
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([contentType, contentId])
+}
+
+model Strike {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  reason    String
+  caseId    Int?
+  issuedAt  DateTime  @default(now())
+  expiresAt DateTime
+  decayedAt DateTime?
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  case      ModerationCase? @relation(fields: [caseId], references: [id], onDelete: SetNull)
+
+  @@index([userId, decayedAt, expiresAt])
+}
+
+model Appeal {
+  id         Int       @id @default(autoincrement())
+  caseId     Int
+  userId     Int
+  reason     String
+  status     String    @default("pending")
+  reviewedBy Int?
+  reviewNote String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  case       ModerationCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+  @@index([userId, status])
+}
+
+model UserRestriction {
+  id       Int       @id @default(autoincrement())
+  userId   Int
+  type     String
+  startsAt DateTime  @default(now())
+  endsAt   DateTime?
+  reason   String?
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, endsAt])
 }
