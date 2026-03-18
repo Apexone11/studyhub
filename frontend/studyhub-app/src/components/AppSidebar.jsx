@@ -68,7 +68,7 @@ export default function AppSidebar({ mode = 'fixed' }) {
       return
     }
 
-    previouslyFocusedRef.current = document.activeElement
+    previouslyFocusedRef.current = triggerButtonRef.current || document.activeElement
     const focusTarget = closeButtonRef.current || drawerDialogRef.current
     if (focusTarget && typeof focusTarget.focus === 'function') {
       focusTarget.focus()
