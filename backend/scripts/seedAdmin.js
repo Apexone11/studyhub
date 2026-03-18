@@ -1,6 +1,13 @@
+const path = require('node:path')
 const { DEFAULT_ADMIN_EMAIL, ensureAdminUser, repairRuntimeSchema } = require('../src/lib/bootstrap')
 const { createPrismaClient } = require('../src/lib/prisma')
-const prisma = createPrismaClient({ preferDirectUrl: true })
+const { assertLocalDatabase } = require('./assertLocalDatabase')
+
+require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') })
+
+assertLocalDatabase('admin seed script')
+
+const prisma = createPrismaClient()
 
 async function main() {
   if (!(process.env.ADMIN_USERNAME || '').trim()) {

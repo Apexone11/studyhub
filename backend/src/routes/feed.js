@@ -2,12 +2,14 @@ const express = require('express')
 const rateLimit = require('express-rate-limit')
 const fs = require('node:fs')
 const path = require('node:path')
+const { assertOwnerOrAdmin, sendForbidden } = require('../lib/accessControl')
 const requireAuth = require('../middleware/auth')
 const { captureError } = require('../monitoring/sentry')
 const { createNotification } = require('../lib/notify')
 const { notifyMentionedUsers } = require('../lib/mentions')
 const prisma = require('../lib/prisma')
 const { cleanupAttachmentIfUnused, resolveAttachmentPath } = require('../lib/storage')
+const { sendAttachmentPreview } = require('../lib/attachmentPreview')
 
 const router = express.Router()
 
@@ -68,6 +70,27 @@ function parsePositiveInt(value, fallback) {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback
 }
 
+async function settleSection(label, loader) {
+  const startedAt = Date.now()
+
+  try {
+    const data = await loader()
+    return {
+      ok: true,
+      label,
+      data,
+      durationMs: Date.now() - startedAt,
+    }
+  } catch (error) {
+    return {
+      ok: false,
+      label,
+      error,
+      durationMs: Date.now() - startedAt,
+    }
+  }
+}
+
 function summarizeText(text = '', max = 180) {
   const plain = String(text)
     .replace(/\s+/g, ' ')
@@ -125,6 +148,7 @@ function formatSheet(item, starredIds, commentCounts, reactionRows, currentReact
     reactions: reactionSummary(reactionRows, 'sheetId', item.id, currentReactions, 'sheetId'),
     hasAttachment: Boolean(item.attachmentUrl),
     attachmentName: item.attachmentName || null,
+    attachmentType: item.attachmentType || null,
     allowDownloads: item.allowDownloads !== false,
     forkSource: item.forkSource
       ? {
@@ -179,6 +203,7 @@ function formatFeedPostDetail(item, commentCount, reactionRows, currentReactions
 }
 
 router.get('/', async (req, res) => {
+  const startedAt = Date.now()
   const limit = parsePositiveInt(req.query.limit, 20)
   const offset = Math.max(0, Number.parseInt(req.query.offset, 10) || 0)
   const take = limit + offset + 8
@@ -187,13 +212,14 @@ router.get('/', async (req, res) => {
 
   const sheetWhere = search
     ? {
+        status: 'published',
         OR: [
           { title: { contains: search, mode: 'insensitive' } },
           { content: { contains: search, mode: 'insensitive' } },
           { description: { contains: search, mode: 'insensitive' } },
         ],
       }
-    : undefined
+    : { status: 'published' }
   const postWhere = search
     ? { content: { contains: search, mode: 'insensitive' } }
     : undefined
@@ -207,14 +233,14 @@ router.get('/', async (req, res) => {
     : undefined
 
   try {
-    const [announcements, sheets, posts] = await Promise.all([
-      prisma.announcement.findMany({
+    const primarySections = await Promise.all([
+      settleSection('announcements', () => prisma.announcement.findMany({
         where: announcementWhere,
         include: { author: { select: { id: true, username: true } } },
         orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
         take: announcementTake,
-      }),
-      prisma.studySheet.findMany({
+      })),
+      settleSection('sheets', () => prisma.studySheet.findMany({
         where: sheetWhere,
         include: {
           author: { select: { id: true, username: true } },
@@ -229,8 +255,8 @@ router.get('/', async (req, res) => {
         },
         orderBy: { createdAt: 'desc' },
         take,
-      }),
-      prisma.feedPost.findMany({
+      })),
+      settleSection('posts', () => prisma.feedPost.findMany({
         where: postWhere,
         include: {
           author: { select: { id: true, username: true } },
@@ -238,68 +264,124 @@ router.get('/', async (req, res) => {
         },
         orderBy: { createdAt: 'desc' },
         take,
-      }),
+      })),
     ])
+
+    const announcements = primarySections.find((section) => section.label === 'announcements' && section.ok)?.data || []
+    const sheets = primarySections.find((section) => section.label === 'sheets' && section.ok)?.data || []
+    const posts = primarySections.find((section) => section.label === 'posts' && section.ok)?.data || []
+
+    const degradedSections = primarySections
+      .filter((section) => !section.ok)
+      .map((section) => `${section.label} temporarily unavailable`)
+
+    primarySections
+      .filter((section) => !section.ok)
+      .forEach((section) => {
+        captureError(section.error, {
+          route: req.originalUrl,
+          method: req.method,
+          feedSection: section.label,
+        })
+      })
+
+    if (!announcements.length && !sheets.length && !posts.length) {
+      console.error('[feed] all primary sections failed', {
+        userId: req.user.userId,
+        search,
+        durations: primarySections.map((section) => ({
+          label: section.label,
+          ok: section.ok,
+          durationMs: section.durationMs,
+        })),
+      })
+      return res.status(500).json({ error: 'Could not load the feed right now.' })
+    }
 
     const sheetIds = sheets.map((sheet) => sheet.id)
     const postIds = posts.map((post) => post.id)
 
-    const [
-      starredRows,
-      sheetCommentRows,
-      postCommentRows,
-      sheetReactionRows,
-      postReactionRows,
-      currentSheetReactions,
-      currentPostReactions,
-    ] = await Promise.all([
-      sheetIds.length > 0
-        ? prisma.starredSheet.findMany({
-            where: { userId: req.user.userId, sheetId: { in: sheetIds } },
-            select: { sheetId: true },
-          })
-        : [],
-      sheetIds.length > 0
-        ? prisma.comment.groupBy({
-            by: ['sheetId'],
-            where: { sheetId: { in: sheetIds } },
-            _count: { _all: true },
-          })
-        : [],
-      postIds.length > 0
-        ? prisma.feedPostComment.groupBy({
-            by: ['postId'],
-            where: { postId: { in: postIds } },
-            _count: { _all: true },
-          })
-        : [],
-      sheetIds.length > 0
-        ? prisma.reaction.groupBy({
-            by: ['sheetId', 'type'],
-            where: { sheetId: { in: sheetIds } },
-            _count: { _all: true },
-          })
-        : [],
-      postIds.length > 0
-        ? prisma.feedPostReaction.groupBy({
-            by: ['postId', 'type'],
-            where: { postId: { in: postIds } },
-            _count: { _all: true },
-          })
-        : [],
-      sheetIds.length > 0
-        ? prisma.reaction.findMany({
-            where: { userId: req.user.userId, sheetId: { in: sheetIds } },
-            select: { sheetId: true, type: true },
-          })
-        : [],
-      postIds.length > 0
-        ? prisma.feedPostReaction.findMany({
-            where: { userId: req.user.userId, postId: { in: postIds } },
-            select: { postId: true, type: true },
-          })
-        : [],
+    const secondarySections = await Promise.all([
+      settleSection('starredRows', () => (
+        sheetIds.length > 0
+          ? prisma.starredSheet.findMany({
+              where: { userId: req.user.userId, sheetId: { in: sheetIds } },
+              select: { sheetId: true },
+            })
+          : []
+      )),
+      settleSection('sheetCommentRows', () => (
+        sheetIds.length > 0
+          ? prisma.comment.groupBy({
+              by: ['sheetId'],
+              where: { sheetId: { in: sheetIds } },
+              _count: { _all: true },
+            })
+          : []
+      )),
+      settleSection('postCommentRows', () => (
+        postIds.length > 0
+          ? prisma.feedPostComment.groupBy({
+              by: ['postId'],
+              where: { postId: { in: postIds } },
+              _count: { _all: true },
+            })
+          : []
+      )),
+      settleSection('sheetReactionRows', () => (
+        sheetIds.length > 0
+          ? prisma.reaction.groupBy({
+              by: ['sheetId', 'type'],
+              where: { sheetId: { in: sheetIds } },
+              _count: { _all: true },
+            })
+          : []
+      )),
+      settleSection('postReactionRows', () => (
+        postIds.length > 0
+          ? prisma.feedPostReaction.groupBy({
+              by: ['postId', 'type'],
+              where: { postId: { in: postIds } },
+              _count: { _all: true },
+            })
+          : []
+      )),
+      settleSection('currentSheetReactions', () => (
+        sheetIds.length > 0
+          ? prisma.reaction.findMany({
+              where: { userId: req.user.userId, sheetId: { in: sheetIds } },
+              select: { sheetId: true, type: true },
+            })
+          : []
+      )),
+      settleSection('currentPostReactions', () => (
+        postIds.length > 0
+          ? prisma.feedPostReaction.findMany({
+              where: { userId: req.user.userId, postId: { in: postIds } },
+              select: { postId: true, type: true },
+            })
+          : []
+      )),
     ])
+
+    secondarySections
+      .filter((section) => !section.ok)
+      .forEach((section) => {
+        degradedSections.push(`${section.label} temporarily unavailable`)
+        captureError(section.error, {
+          route: req.originalUrl,
+          method: req.method,
+          feedSection: section.label,
+        })
+      })
+
+    const starredRows = secondarySections.find((section) => section.label === 'starredRows' && section.ok)?.data || []
+    const sheetCommentRows = secondarySections.find((section) => section.label === 'sheetCommentRows' && section.ok)?.data || []
+    const postCommentRows = secondarySections.find((section) => section.label === 'postCommentRows' && section.ok)?.data || []
+    const sheetReactionRows = secondarySections.find((section) => section.label === 'sheetReactionRows' && section.ok)?.data || []
+    const postReactionRows = secondarySections.find((section) => section.label === 'postReactionRows' && section.ok)?.data || []
+    const currentSheetReactions = secondarySections.find((section) => section.label === 'currentSheetReactions' && section.ok)?.data || []
+    const currentPostReactions = secondarySections.find((section) => section.label === 'currentPostReactions' && section.ok)?.data || []
 
     const starredIds = new Set(starredRows.map((row) => row.sheetId))
     const sheetCommentCounts = new Map(sheetCommentRows.map((row) => [row.sheetId, row._count._all]))
@@ -322,12 +404,34 @@ router.get('/', async (req, res) => {
         return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
       })
 
-    res.json({
+    const payload = {
       items: items.slice(offset, offset + limit),
       total: items.length,
       limit,
       offset,
+      partial: degradedSections.length > 0,
+      degradedSections,
+    }
+
+    console.info('[feed] loaded', {
+      userId: req.user.userId,
+      search,
+      durationMs: Date.now() - startedAt,
+      partial: payload.partial,
+      counts: {
+        announcements: announcements.length,
+        posts: posts.length,
+        sheets: sheets.length,
+        returned: payload.items.length,
+      },
+      timings: [...primarySections, ...secondarySections].map((section) => ({
+        label: section.label,
+        ok: section.ok,
+        durationMs: section.durationMs,
+      })),
     })
+
+    res.json(payload)
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
@@ -406,7 +510,7 @@ router.get('/posts/:id', async (req, res) => {
   }
 })
 
-router.get('/posts/:id/attachment', attachmentDownloadLimiter, async (req, res) => {
+router.get('/posts/:id/attachment', requireAuth, attachmentDownloadLimiter, async (req, res) => {
   const postId = Number.parseInt(req.params.id, 10)
 
   try {
@@ -423,7 +527,7 @@ router.get('/posts/:id/attachment', attachmentDownloadLimiter, async (req, res) 
     if (!post) return res.status(404).json({ error: 'Post not found.' })
     if (!post.attachmentUrl) return res.status(404).json({ error: 'Attachment not found.' })
     if (!post.allowDownloads) {
-      return res.status(403).json({ error: 'Downloads are disabled for this post.' })
+      return sendForbidden(res, 'Downloads are disabled for this post.')
     }
 
     const localPath = resolveAttachmentPath(post.attachmentUrl)
@@ -432,6 +536,44 @@ router.get('/posts/:id/attachment', attachmentDownloadLimiter, async (req, res) 
     }
 
     res.download(localPath, safeDownloadName(post.attachmentName || path.basename(localPath)))
+  } catch (error) {
+    captureError(error, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+router.get('/posts/:id/attachment/preview', requireAuth, attachmentDownloadLimiter, async (req, res) => {
+  const postId = Number.parseInt(req.params.id, 10)
+
+  try {
+    const post = await prisma.feedPost.findUnique({
+      where: { id: postId },
+      select: {
+        id: true,
+        attachmentUrl: true,
+        attachmentName: true,
+        attachmentType: true,
+        allowDownloads: true,
+      },
+    })
+
+    if (!post) return res.status(404).json({ error: 'Post not found.' })
+    if (!post.attachmentUrl) return res.status(404).json({ error: 'Attachment not found.' })
+    if (!post.allowDownloads) {
+      return sendForbidden(res, 'Downloads are disabled for this post.')
+    }
+
+    const localPath = resolveAttachmentPath(post.attachmentUrl)
+    if (!localPath || !fs.existsSync(localPath)) {
+      return res.status(404).json({ error: 'Attachment file is missing.' })
+    }
+
+    await sendAttachmentPreview({
+      res,
+      localPath,
+      attachmentName: post.attachmentName || path.basename(localPath),
+      attachmentType: post.attachmentType || '',
+    })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
@@ -568,9 +710,14 @@ router.delete('/posts/:id/comments/:commentId', feedWriteLimiter, async (req, re
   try {
     const comment = await prisma.feedPostComment.findUnique({ where: { id: commentId } })
     if (!comment) return res.status(404).json({ error: 'Comment not found.' })
-    if (comment.userId !== req.user.userId && req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Not your comment.' })
-    }
+    if (!assertOwnerOrAdmin({
+      res,
+      user: req.user,
+      ownerId: comment.userId,
+      message: 'Not your comment.',
+      targetType: 'feed-comment',
+      targetId: commentId,
+    })) return
 
     await prisma.feedPostComment.delete({ where: { id: commentId } })
     res.json({ message: 'Comment deleted.' })
@@ -589,9 +736,14 @@ router.delete('/posts/:id', feedWriteLimiter, async (req, res) => {
       select: { id: true, userId: true, attachmentUrl: true },
     })
     if (!post) return res.status(404).json({ error: 'Post not found.' })
-    if (post.userId !== req.user.userId && req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Not your post.' })
-    }
+    if (!assertOwnerOrAdmin({
+      res,
+      user: req.user,
+      ownerId: post.userId,
+      message: 'Not your post.',
+      targetType: 'feed-post',
+      targetId: postId,
+    })) return
 
     await prisma.feedPost.delete({ where: { id: postId } })
     await cleanupAttachmentIfUnused(prisma, post.attachmentUrl, {

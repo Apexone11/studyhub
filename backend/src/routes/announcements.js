@@ -1,4 +1,5 @@
 const express = require('express')
+const { sendForbidden } = require('../lib/accessControl')
 const requireAuth = require('../middleware/auth')
 const { captureError } = require('../monitoring/sentry')
 const prisma = require('../lib/prisma')
@@ -23,7 +24,7 @@ router.get('/', async (req, res) => {
 // ── POST /api/announcements — admin only ──────────────────────
 router.post('/', requireAuth, async (req, res) => {
   if (req.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Admin access required.' })
+    return sendForbidden(res, 'Admin access required.')
   }
 
   const title  = typeof req.body.title === 'string' ? req.body.title.trim() : ''
@@ -49,7 +50,7 @@ router.post('/', requireAuth, async (req, res) => {
 // ── DELETE /api/announcements/:id — admin only ───────────────
 router.delete('/:id', requireAuth, async (req, res) => {
   if (req.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Admin access required.' })
+    return sendForbidden(res, 'Admin access required.')
   }
 
   try {

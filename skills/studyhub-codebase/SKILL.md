@@ -28,7 +28,7 @@ StudyHub Version 1 is a full-stack student collaboration platform with course-ba
 - When changing auth or account settings, inspect both backend routes and frontend session or HTTP helpers before editing.
 - When changing uploads, downloads, or attachment cleanup, update the storage helpers and every consuming route together.
 - When changing database-backed behavior, check whether the change also requires Prisma schema, migration, seed, smoke, or load-test updates.
-- Prefer small, behavior-preserving edits in `frontend/studyhub-app/src/pages/PlaceholderPages.jsx`; it is a large shared module and style-only churn is noisy.
+- Prefer small, behavior-preserving edits in shared frontend modules such as `frontend/studyhub-app/src/pages/shared/pageScaffold.jsx` and `frontend/studyhub-app/src/components/AppSidebar.jsx`; style-only churn there can create noisy diffs.
 
 ## Task Map
 
@@ -41,11 +41,11 @@ StudyHub Version 1 is a full-stack student collaboration platform with course-ba
   - `backend/src/lib/verificationCodes.js`
   - `backend/src/lib/authTokens.js`
 - Frontend:
-  - `frontend/studyhub-app/src/pages/LoginPage.jsx`
-  - `frontend/studyhub-app/src/pages/SettingsPage.jsx`
+  - `frontend/studyhub-app/src/pages/auth/LoginPage.jsx`
+  - `frontend/studyhub-app/src/pages/settings/SettingsPage.jsx`
   - `frontend/studyhub-app/src/lib/http.js`
-  - `frontend/studyhub-app/src/lib/session.js`
-  - `frontend/studyhub-app/src/lib/protectedSession.js`
+  - `frontend/studyhub-app/src/lib/session-context.jsx`
+  - `frontend/studyhub-app/src/lib/useProtectedPage.js`
 
 ### Feed posts, comments, reactions, mentions, and notifications
 
@@ -55,9 +55,9 @@ StudyHub Version 1 is a full-stack student collaboration platform with course-ba
   - `backend/src/lib/mentions.js`
   - `backend/src/lib/notify.js`
 - Frontend:
-  - `frontend/studyhub-app/src/pages/FeedPage.jsx`
+  - `frontend/studyhub-app/src/pages/feed/FeedPage.jsx`
   - `frontend/studyhub-app/src/components/Navbar.jsx`
-  - `frontend/studyhub-app/src/pages/UserProfilePage.jsx`
+  - `frontend/studyhub-app/src/pages/profile/UserProfilePage.jsx`
 
 ### Study sheets, forks, contributions, downloads, and attachments
 
@@ -67,9 +67,9 @@ StudyHub Version 1 is a full-stack student collaboration platform with course-ba
   - `backend/src/lib/storage.js`
   - `backend/src/lib/deleteUserAccount.js`
 - Frontend:
-  - `frontend/studyhub-app/src/pages/SheetsPage.jsx`
-  - `frontend/studyhub-app/src/pages/SheetViewerPage.jsx`
-  - `frontend/studyhub-app/src/pages/PlaceholderPages.jsx`
+  - `frontend/studyhub-app/src/pages/sheets/SheetsPage.jsx`
+  - `frontend/studyhub-app/src/pages/sheets/SheetViewerPage.jsx`
+  - `frontend/studyhub-app/src/pages/sheets/UploadSheetPage.jsx`
 
 ### Admin and live-refresh behavior
 
@@ -77,8 +77,8 @@ StudyHub Version 1 is a full-stack student collaboration platform with course-ba
   - `backend/src/routes/admin.js`
   - `backend/src/routes/announcements.js`
 - Frontend:
-  - `frontend/studyhub-app/src/pages/PlaceholderPages.jsx`
-  - `frontend/studyhub-app/src/pages/DashboardPage.jsx`
+  - `frontend/studyhub-app/src/pages/admin/AdminPage.jsx`
+  - `frontend/studyhub-app/src/pages/dashboard/DashboardPage.jsx`
   - `frontend/studyhub-app/src/lib/useLivePolling.js`
 
 ### Deployment, runtime, and testing

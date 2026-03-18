@@ -17,4 +17,6 @@ backend/uploads/
 tmp-uploads-smoke/
 backend-smoke.out.log
 backend-smoke.err.log
+beta-diagnostics/
+beta-artifacts/
 *.enc.txt

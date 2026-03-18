@@ -1,7 +1,9 @@
 const fs = require('node:fs/promises')
 const path = require('node:path')
 const nodemailer = require('nodemailer')
+const prisma = require('./prisma')
 const DEFAULT_ADMIN_EMAIL = 'abdulrfornah@getstudyhub.org'
+const RESEND_API_BASE_URL = 'https://api.resend.com'
 
 function getPublicAppUrl() {
   return process.env.FRONTEND_URL || 'http://localhost:5173'
@@ -24,9 +26,40 @@ function getAdminEmail() {
   return (process.env.ADMIN_EMAIL || process.env.EMAIL_USER || DEFAULT_ADMIN_EMAIL).trim().toLowerCase()
 }
 
+function getResendConfig() {
+  const apiKey = String(process.env.RESEND_API_KEY || '').trim()
+  if (!apiKey) return null
+
+  const configuredBaseUrl = String(process.env.RESEND_API_BASE_URL || '').trim()
+  const baseUrl = (configuredBaseUrl || RESEND_API_BASE_URL).replace(/\/+$/, '')
+
+  return {
+    apiKey,
+    baseUrl,
+  }
+}
+
+function shouldUseResend() {
+  const transport = String(process.env.EMAIL_TRANSPORT || '').toLowerCase()
+  const provider = String(process.env.EMAIL_PROVIDER || '').toLowerCase()
+
+  if (transport === 'resend' || provider === 'resend') return true
+
+  return Boolean(getResendConfig()) && !process.env.EMAIL_USER && !process.env.EMAIL_PASS
+}
+
+function getEmailMode() {
+  const transport = String(process.env.EMAIL_TRANSPORT || '').toLowerCase()
+  if (transport === 'json') return 'json'
+  if (shouldUseResend()) return 'resend'
+  if (process.env.EMAIL_CAPTURE_DIR) return 'capture'
+  if (process.env.EMAIL_USER && process.env.EMAIL_PASS) return process.env.EMAIL_HOST ? 'smtp-host' : 'provider'
+  return 'json'
+}
+
 // Create transporter lazily so missing env vars don't crash on startup
-function getTransporter() {
-  if (String(process.env.EMAIL_TRANSPORT || '').toLowerCase() === 'json') {
+function getTransporter(mode = getEmailMode()) {
+  if (mode === 'json') {
     return nodemailer.createTransport({ jsonTransport: true })
   }
 
@@ -49,6 +82,193 @@ function getTransporter() {
     service: process.env.EMAIL_SERVICE || 'gmail',
     auth,
   })
+}
+
+function normalizeEmailRecipients(value) {
+  if (Array.isArray(value)) {
+    return value
+      .map((entry) => String(entry || '').trim())
+      .filter(Boolean)
+  }
+
+  const single = String(value || '').trim()
+  return single ? [single] : []
+}
+
+function normalizeRecipientLookupEmail(value) {
+  const normalized = String(value || '').trim().toLowerCase()
+  return normalized || null
+}
+
+function getRecipientLookupEmails(value) {
+  const recipients = normalizeEmailRecipients(value)
+  if (recipients.length === 0) return []
+
+  return [...new Set(recipients
+    .map((recipient) => normalizeRecipientLookupEmail(recipient))
+    .filter(Boolean))]
+}
+
+async function getSuppressedRecipients(toValue) {
+  const lookupEmails = getRecipientLookupEmails(toValue)
+  if (lookupEmails.length === 0) return []
+
+  try {
+    return prisma.emailSuppression.findMany({
+      where: {
+        active: true,
+        email: { in: lookupEmails },
+      },
+      select: {
+        email: true,
+        reason: true,
+      },
+    })
+  } catch (error) {
+    console.warn(`[email] suppression lookup failed: ${error.message}`)
+    return []
+  }
+}
+
+async function assertRecipientsAllowed(toValue) {
+  const suppressedRecipients = await getSuppressedRecipients(toValue)
+  if (suppressedRecipients.length === 0) return
+
+  const blockedAddresses = suppressedRecipients
+    .map((entry) => entry.email)
+    .filter(Boolean)
+  const blockedReasons = [...new Set(
+    suppressedRecipients
+      .map((entry) => entry.reason)
+      .filter(Boolean),
+  )]
+
+  const error = new Error(`Email delivery blocked for suppressed recipient(s): ${blockedAddresses.join(', ')}`)
+  error.code = 'EMAIL_RECIPIENT_SUPPRESSED'
+  error.suppressedRecipients = blockedAddresses
+  error.suppressionReasons = blockedReasons
+  throw error
+}
+
+async function parseJsonSafely(response) {
+  const rawBody = await response.text()
+  if (!rawBody) return null
+
+  try {
+    return JSON.parse(rawBody)
+  } catch {
+    return null
+  }
+}
+
+async function sendWithResend(mailOptions) {
+  const resendConfig = getResendConfig()
+  if (!resendConfig) {
+    throw new Error('Resend delivery is not configured. Set RESEND_API_KEY and EMAIL_TRANSPORT=resend.')
+  }
+
+  const recipients = normalizeEmailRecipients(mailOptions.to)
+  if (recipients.length === 0) {
+    throw new Error('Resend delivery requires at least one recipient email address.')
+  }
+
+  const payload = {
+    from: mailOptions.from,
+    to: recipients,
+    subject: mailOptions.subject,
+  }
+
+  if (mailOptions.text) payload.text = mailOptions.text
+  if (mailOptions.html) payload.html = mailOptions.html
+
+  const replyTo = normalizeEmailRecipients(mailOptions.replyTo)
+  if (replyTo.length > 0) {
+    payload.reply_to = replyTo
+  }
+
+  const response = await fetch(`${resendConfig.baseUrl}/emails`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${resendConfig.apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  })
+
+  const responsePayload = await parseJsonSafely(response)
+  if (!response.ok) {
+    const errorMessage = responsePayload?.message
+      || responsePayload?.error
+      || `${response.status} ${response.statusText}`.trim()
+    throw new Error(`Resend API request failed: ${errorMessage}`)
+  }
+
+  return {
+    messageId: responsePayload?.id || null,
+    accepted: recipients,
+    rejected: [],
+  }
+}
+
+async function validateEmailTransport({ logger = console, strict = false } = {}) {
+  const mode = getEmailMode()
+  if (mode === 'resend') {
+    const resendConfig = getResendConfig()
+    if (!resendConfig) {
+      const message = 'Resend transport is selected but RESEND_API_KEY is missing.'
+      if (strict) throw new Error(message)
+      logger.warn?.(`[email] ${message}`)
+      return { ok: false, mode, message }
+    }
+
+    try {
+      const response = await fetch(`${resendConfig.baseUrl}/domains`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${resendConfig.apiKey}`,
+        },
+      })
+
+      if (!response.ok) {
+        const responsePayload = await parseJsonSafely(response)
+        const errorMessage = responsePayload?.message
+          || responsePayload?.error
+          || `${response.status} ${response.statusText}`.trim()
+        throw new Error(`Resend API validation failed: ${errorMessage}`)
+      }
+
+      logger.info?.('[email] transport ready (resend)')
+      return { ok: true, mode }
+    } catch (error) {
+      const message = `Email transport validation failed (${mode}): ${error.message}`
+      if (strict) throw new Error(message)
+      logger.error?.(`[email] ${message}`)
+      return { ok: false, mode, message }
+    }
+  }
+
+  const transporter = getTransporter(mode)
+
+  if (!transporter) {
+    const message = 'Email delivery is not configured. Configure Resend (EMAIL_TRANSPORT=resend + RESEND_API_KEY), SMTP, or EMAIL_TRANSPORT=json.'
+    if (strict) throw new Error(message)
+    logger.warn?.(`[email] ${message}`)
+    return { ok: false, mode, message }
+  }
+
+  try {
+    if (typeof transporter.verify === 'function' && mode !== 'json') {
+      await transporter.verify()
+    }
+
+    logger.info?.(`[email] transport ready (${mode})`)
+    return { ok: true, mode }
+  } catch (error) {
+    const message = `Email transport validation failed (${mode}): ${error.message}`
+    if (strict) throw new Error(message)
+    logger.error?.(`[email] ${message}`)
+    return { ok: false, mode, message }
+  }
 }
 
 async function captureEmail(mailOptions, result, kind) {
@@ -76,14 +296,53 @@ async function captureEmail(mailOptions, result, kind) {
 }
 
 async function deliverMail(mailOptions, kind) {
-  const transporter = getTransporter()
-  if (!transporter) {
-    throw new Error('Email delivery is not configured. Set EMAIL_USER/EMAIL_PASS or EMAIL_TRANSPORT=json.')
+  await assertRecipientsAllowed(mailOptions.to)
+
+  const mode = getEmailMode()
+
+  let result
+  if (mode === 'resend') {
+    result = await sendWithResend(mailOptions)
+  } else {
+    const transporter = getTransporter(mode)
+    if (!transporter) {
+      throw new Error('Email delivery is not configured. Configure Resend (EMAIL_TRANSPORT=resend + RESEND_API_KEY), SMTP, or EMAIL_TRANSPORT=json.')
+    }
+
+    result = await transporter.sendMail(mailOptions)
   }
 
-  const result = await transporter.sendMail(mailOptions)
   await captureEmail(mailOptions, result, kind)
   return result
+}
+
+async function sendEmailSmoke(toEmail = getAdminEmail()) {
+  if (!toEmail) {
+    throw new Error('No smoke-test recipient is configured. Set ADMIN_EMAIL or pass EMAIL_SMOKE_TO.')
+  }
+
+  const sentAt = new Date().toISOString()
+  return deliverMail({
+    from: `"StudyHub" <${getFromAddress()}>`,
+    to: toEmail,
+    subject: 'StudyHub email smoke test',
+    text: [
+      'This is a StudyHub email smoke test.',
+      '',
+      `Sent at: ${sentAt}`,
+      `Mode: ${getEmailMode()}`,
+    ].join('\n'),
+    html: htmlWrap('StudyHub Email Smoke Test', `
+      <h2 style="margin:0 0 8px;color:#1e3a5f;font-size:22px;">Email smoke test</h2>
+      <p style="margin:0 0 16px;color:#6b7280;font-size:15px;">
+        This message confirms that the StudyHub email transport can send mail.
+      </p>
+      <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px;padding:16px 18px;">
+        <p style="margin:0 0 6px;color:#334155;font-size:14px;"><strong>Sent at:</strong> ${escapeHtml(sentAt)}</p>
+        <p style="margin:0;color:#334155;font-size:14px;"><strong>Mode:</strong> ${escapeHtml(getEmailMode())}</p>
+      </div>
+    `),
+  }, 'email-smoke')
 }
 
 // Shared HTML email wrapper with StudyHub branding
@@ -309,4 +568,12 @@ async function sendCourseRequestNotice({
   await deliverMail(mailOptions, 'course-request')
 }
 
-module.exports = { sendPasswordReset, sendEmailVerification, sendTwoFaCode, sendCourseRequestNotice }
+module.exports = {
+  getAdminEmail,
+  sendPasswordReset,
+  sendEmailVerification,
+  sendTwoFaCode,
+  sendCourseRequestNotice,
+  sendEmailSmoke,
+  validateEmailTransport,
+}

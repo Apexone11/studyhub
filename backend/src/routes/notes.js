@@ -1,5 +1,6 @@
 const express = require('express')
 const rateLimit = require('express-rate-limit')
+const { assertOwnerOrAdmin } = require('../lib/accessControl')
 const requireAuth = require('../middleware/auth')
 const { captureError } = require('../monitoring/sentry')
 const prisma = require('../lib/prisma')
@@ -70,7 +71,14 @@ router.patch('/:id', mutateLimiter, async (req, res) => {
   try {
     const note = await prisma.note.findUnique({ where: { id: noteId } })
     if (!note) return res.status(404).json({ error: 'Note not found.' })
-    if (note.userId !== req.user.userId) return res.status(403).json({ error: 'Not your note.' })
+    if (!assertOwnerOrAdmin({
+      res,
+      user: req.user,
+      ownerId: note.userId,
+      message: 'Not your note.',
+      targetType: 'note',
+      targetId: noteId,
+    })) return
 
     const { title, content, courseId, private: priv } = req.body || {}
     const data = {}
@@ -102,9 +110,14 @@ router.delete('/:id', async (req, res) => {
   try {
     const note = await prisma.note.findUnique({ where: { id: noteId } })
     if (!note) return res.status(404).json({ error: 'Note not found.' })
-    if (note.userId !== req.user.userId && req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Not your note.' })
-    }
+    if (!assertOwnerOrAdmin({
+      res,
+      user: req.user,
+      ownerId: note.userId,
+      message: 'Not your note.',
+      targetType: 'note',
+      targetId: noteId,
+    })) return
     await prisma.note.delete({ where: { id: noteId } })
     res.json({ message: 'Note deleted.' })
   } catch (err) {

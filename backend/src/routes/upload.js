@@ -3,7 +3,10 @@ const multer = require('multer')
 const path = require('path')
 const rateLimit = require('express-rate-limit')
 const requireAuth = require('../middleware/auth')
+const { ERROR_CODES, sendError } = require('../middleware/errorEnvelope')
+const { assertOwnerOrAdmin } = require('../lib/accessControl')
 const { captureError } = require('../monitoring/sentry')
+const { signatureMatchesExpected } = require('../lib/fileSignatures')
 const prisma = require('../lib/prisma')
 const {
   ATTACHMENTS_DIR,
@@ -56,6 +59,11 @@ function safeAttachmentLabel(original) {
     .slice(0, 120)
 }
 
+function rejectSignatureMismatch(res, file, message) {
+  safeUnlinkFile(file?.path)
+  return sendError(res, 400, message, ERROR_CODES.UPLOAD_SIGNATURE_MISMATCH)
+}
+
 // ── Avatar upload ─────────────────────────────────────────────
 const avatarStorage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, AVATARS_DIR),
@@ -78,10 +86,13 @@ const avatarUpload = multer({
 router.post('/avatar', requireAuth, avatarUploadLimiter, (req, res) => {
   avatarUpload.single('avatar')(req, res, async (err) => {
     if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({ error: 'Avatar must be 2 MB or smaller.' })
+      return sendError(res, 400, 'Avatar must be 2 MB or smaller.', ERROR_CODES.UPLOAD_INVALID)
     }
-    if (err) return res.status(400).json({ error: err.message })
-    if (!req.file) return res.status(400).json({ error: 'No file uploaded.' })
+    if (err) return sendError(res, 400, err.message, ERROR_CODES.UPLOAD_INVALID)
+    if (!req.file) return sendError(res, 400, 'No file uploaded.', ERROR_CODES.UPLOAD_MISSING_FILE)
+    if (!signatureMatchesExpected(req.file.path, Array.from(AVATAR_ALLOWED_MIME)).ok) {
+      return rejectSignatureMismatch(res, req.file, 'Avatar contents do not match a supported image format.')
+    }
 
     try {
       // Delete old avatar file if it exists locally
@@ -106,7 +117,7 @@ router.post('/avatar', requireAuth, avatarUploadLimiter, (req, res) => {
     } catch (dbErr) {
       safeUnlinkFile(req.file?.path)
       captureError(dbErr, { route: req.originalUrl })
-      res.status(500).json({ error: 'Failed to save avatar.' })
+      return sendError(res, 500, 'Failed to save avatar.', ERROR_CODES.UPLOAD_SAVE_FAILED)
     }
   })
 })
@@ -133,10 +144,13 @@ const attachmentUpload = multer({
 router.post('/attachment/:sheetId', requireAuth, attachmentUploadLimiter, (req, res) => {
   attachmentUpload.single('attachment')(req, res, async (err) => {
     if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({ error: 'Attachment must be 10 MB or smaller.' })
+      return sendError(res, 400, 'Attachment must be 10 MB or smaller.', ERROR_CODES.UPLOAD_INVALID)
     }
-    if (err) return res.status(400).json({ error: err.message })
-    if (!req.file) return res.status(400).json({ error: 'No file uploaded.' })
+    if (err) return sendError(res, 400, err.message, ERROR_CODES.UPLOAD_INVALID)
+    if (!req.file) return sendError(res, 400, 'No file uploaded.', ERROR_CODES.UPLOAD_MISSING_FILE)
+    if (!signatureMatchesExpected(req.file.path, Array.from(ATTACHMENT_ALLOWED_MIME)).ok) {
+      return rejectSignatureMismatch(res, req.file, 'Attachment contents do not match a supported PDF or image format.')
+    }
 
     const sheetId = Number.parseInt(req.params.sheetId, 10)
     try {
@@ -148,10 +162,17 @@ router.post('/attachment/:sheetId', requireAuth, attachmentUploadLimiter, (req, 
         safeUnlinkFile(req.file.path)
         return res.status(404).json({ error: 'Sheet not found.' })
       }
-      if (sheet.userId !== req.user.userId && req.user.role !== 'admin') {
+      if (!assertOwnerOrAdmin({
+        res,
+        user: req.user,
+        ownerId: sheet.userId,
+        message: 'Not your sheet.',
+        targetType: 'sheet',
+        targetId: sheetId,
+      })) {
         // Delete the just-uploaded file to avoid orphaned files
         safeUnlinkFile(req.file.path)
-        return res.status(403).json({ error: 'Not your sheet.' })
+        return
       }
 
       const ext = path.extname(req.file.filename).toLowerCase()
@@ -174,7 +195,7 @@ router.post('/attachment/:sheetId', requireAuth, attachmentUploadLimiter, (req, 
     } catch (dbErr) {
       safeUnlinkFile(req.file?.path)
       captureError(dbErr, { route: req.originalUrl })
-      res.status(500).json({ error: 'Failed to save attachment.' })
+      return sendError(res, 500, 'Failed to save attachment.', ERROR_CODES.UPLOAD_SAVE_FAILED)
     }
   })
 })
@@ -183,10 +204,13 @@ router.post('/attachment/:sheetId', requireAuth, attachmentUploadLimiter, (req, 
 router.post('/post-attachment/:postId', requireAuth, attachmentUploadLimiter, (req, res) => {
   attachmentUpload.single('attachment')(req, res, async (err) => {
     if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({ error: 'Attachment must be 10 MB or smaller.' })
+      return sendError(res, 400, 'Attachment must be 10 MB or smaller.', ERROR_CODES.UPLOAD_INVALID)
     }
-    if (err) return res.status(400).json({ error: err.message })
-    if (!req.file) return res.status(400).json({ error: 'No file uploaded.' })
+    if (err) return sendError(res, 400, err.message, ERROR_CODES.UPLOAD_INVALID)
+    if (!req.file) return sendError(res, 400, 'No file uploaded.', ERROR_CODES.UPLOAD_MISSING_FILE)
+    if (!signatureMatchesExpected(req.file.path, Array.from(ATTACHMENT_ALLOWED_MIME)).ok) {
+      return rejectSignatureMismatch(res, req.file, 'Attachment contents do not match a supported PDF or image format.')
+    }
 
     const postId = Number.parseInt(req.params.postId, 10)
     try {
@@ -198,9 +222,16 @@ router.post('/post-attachment/:postId', requireAuth, attachmentUploadLimiter, (r
         safeUnlinkFile(req.file.path)
         return res.status(404).json({ error: 'Post not found.' })
       }
-      if (post.userId !== req.user.userId && req.user.role !== 'admin') {
+      if (!assertOwnerOrAdmin({
+        res,
+        user: req.user,
+        ownerId: post.userId,
+        message: 'Not your post.',
+        targetType: 'feed-post',
+        targetId: postId,
+      })) {
         safeUnlinkFile(req.file.path)
-        return res.status(403).json({ error: 'Not your post.' })
+        return
       }
 
       const ext = path.extname(req.file.filename).toLowerCase()
@@ -223,7 +254,7 @@ router.post('/post-attachment/:postId', requireAuth, attachmentUploadLimiter, (r
     } catch (dbErr) {
       safeUnlinkFile(req.file?.path)
       captureError(dbErr, { route: req.originalUrl })
-      res.status(500).json({ error: 'Failed to save attachment.' })
+      return sendError(res, 500, 'Failed to save attachment.', ERROR_CODES.UPLOAD_SAVE_FAILED)
     }
   })
 })

@@ -2,15 +2,24 @@
 // Shared left navigation sidebar — same as FeedPage sidebar
 // Used by: TestsPage, NotesPage, AnnouncementsPage, SubmitPage, SheetsPage
 
+import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   IconFeed, IconSheets, IconTests, IconNotes,
   IconAnnouncements, IconProfile, IconPlus, IconSettings,
 } from './Icons'
 import { API } from '../config'
-import { getStoredUser } from '../lib/session'
+import { useSession } from '../lib/session-context'
 
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
+const FOCUSABLE_DRAWER_SELECTORS = [
+  'a[href]',
+  'button:not([disabled])',
+  'textarea:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',')
 
 const NAV_LINKS = [
   { icon: IconFeed,          label: 'Feed',           to: '/feed' },
@@ -47,11 +56,32 @@ function Avatar({ name, size = 48, role }) {
   )
 }
 
-export default function AppSidebar() {
+export default function AppSidebar({ mode = 'fixed' }) {
   const { pathname } = useLocation()
   const navigate = useNavigate()
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const triggerButtonRef = useRef(null)
+  const drawerDialogRef = useRef(null)
+  const closeButtonRef = useRef(null)
+  const previouslyFocusedRef = useRef(null)
 
-  const user = getStoredUser()
+  const { user } = useSession()
+
+  useEffect(() => {
+    if (!drawerOpen) {
+      const focusTarget = triggerButtonRef.current || previouslyFocusedRef.current
+      if (focusTarget && typeof focusTarget.focus === 'function') {
+        focusTarget.focus()
+      }
+      return
+    }
+
+    previouslyFocusedRef.current = triggerButtonRef.current || document.activeElement
+    const focusTarget = closeButtonRef.current || drawerDialogRef.current
+    if (focusTarget && typeof focusTarget.focus === 'function') {
+      focusTarget.focus()
+    }
+  }, [drawerOpen])
 
   if (!user) return null
 
@@ -61,8 +91,8 @@ export default function AppSidebar() {
     ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
     : null
 
-  return (
-    <aside style={{ position: 'sticky', top: 74, alignSelf: 'start', fontFamily: FONT }}>
+  const shell = (
+    <>
       {/* Profile card */}
       <div style={{
         background: '#fff', borderRadius: 16,
@@ -187,6 +217,144 @@ export default function AppSidebar() {
           </Link>
         </div>
       )}
+    </>
+  )
+
+  if (mode === 'drawer') {
+    return (
+      <aside style={{ position: 'sticky', top: 74, alignSelf: 'start', fontFamily: FONT, zIndex: 25 }}>
+        <button
+          type="button"
+          onClick={() => setDrawerOpen(true)}
+          ref={triggerButtonRef}
+          aria-haspopup="dialog"
+          aria-expanded={drawerOpen}
+          aria-controls="app-sidebar-drawer"
+          style={{
+            border: '1px solid #cbd5e1',
+            borderRadius: 12,
+            background: '#fff',
+            color: '#0f172a',
+            fontWeight: 700,
+            padding: '10px 14px',
+            fontSize: 13,
+            fontFamily: FONT,
+          }}
+        >
+          Open navigation
+        </button>
+        {drawerOpen ? (
+          <div
+            role="presentation"
+            onClick={() => setDrawerOpen(false)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(15, 23, 42, 0.45)',
+              zIndex: 50,
+              display: 'flex',
+              justifyContent: 'flex-start',
+            }}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Sidebar navigation"
+              id="app-sidebar-drawer"
+              ref={drawerDialogRef}
+              tabIndex={-1}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') {
+                  event.stopPropagation()
+                  setDrawerOpen(false)
+                  return
+                }
+
+                if (event.key !== 'Tab') {
+                  return
+                }
+
+                const dialog = drawerDialogRef.current
+                if (!dialog) {
+                  return
+                }
+
+                const focusableElements = Array.from(dialog.querySelectorAll(FOCUSABLE_DRAWER_SELECTORS)).filter((element) => {
+                  if (!(element instanceof HTMLElement)) return false
+                  if (element.tabIndex === -1 || element.hasAttribute('disabled')) return false
+
+                  const style = window.getComputedStyle(element)
+                  return style.visibility !== 'hidden' && style.display !== 'none'
+                })
+
+                if (focusableElements.length === 0) {
+                  event.preventDefault()
+                  dialog.focus()
+                  return
+                }
+
+                const firstElement = focusableElements[0]
+                const lastElement = focusableElements[focusableElements.length - 1]
+                const { activeElement } = document
+                const shiftPressed = event.shiftKey
+
+                if (!dialog.contains(activeElement)) {
+                  event.preventDefault()
+                  ;(shiftPressed ? lastElement : firstElement).focus()
+                  return
+                }
+
+                if (!shiftPressed && activeElement === lastElement) {
+                  event.preventDefault()
+                  firstElement.focus()
+                  return
+                }
+
+                if (shiftPressed && (activeElement === firstElement || activeElement === dialog)) {
+                  event.preventDefault()
+                  lastElement.focus()
+                }
+              }}
+              onClick={(event) => event.stopPropagation()}
+              style={{
+                width: 'min(86vw, 320px)',
+                height: '100%',
+                overflowY: 'auto',
+                background: '#f1f5f9',
+                padding: 14,
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <div style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>Navigation</div>
+                <button
+                  type="button"
+                  onClick={() => setDrawerOpen(false)}
+                  ref={closeButtonRef}
+                  style={{
+                    border: '1px solid #cbd5e1',
+                    borderRadius: 10,
+                    background: '#fff',
+                    color: '#475569',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    padding: '6px 10px',
+                    fontFamily: FONT,
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+              {shell}
+            </div>
+          </div>
+        ) : null}
+      </aside>
+    )
+  }
+
+  return (
+    <aside style={{ position: 'sticky', top: 74, alignSelf: 'start', fontFamily: FONT }}>
+      {shell}
     </aside>
   )
 }

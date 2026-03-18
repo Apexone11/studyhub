@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { syncProtectedUser } from './protectedSession'
+import { useSession } from './session-context'
 
 /**
  * Shared hook for all authenticated pages.
@@ -14,18 +14,32 @@ import { syncProtectedUser } from './protectedSession'
  */
 export function useProtectedPage() {
   const navigate = useNavigate()
-  const [authState, setAuthState] = useState({ status: 'loading', user: null, error: '' })
+  const {
+    user,
+    error,
+    isBootstrapping,
+    isAuthenticated,
+  } = useSession()
 
   useEffect(() => {
-    syncProtectedUser().then(result => {
-      if (result.status === 'unauthorized') {
-        navigate('/login', { replace: true })
-      } else {
-        setAuthState(result)
-      }
-    })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    if (!isBootstrapping && !isAuthenticated) {
+      navigate('/login', { replace: true })
+    }
+  }, [isAuthenticated, isBootstrapping, navigate])
 
-  return authState
+  return useMemo(() => {
+    if (isBootstrapping) {
+      return { status: 'loading', user: null, error: '' }
+    }
+
+    if (!isAuthenticated || !user) {
+      return { status: 'unauthorized', user: null, error: '' }
+    }
+
+    return {
+      status: error ? 'recoverable-error' : 'ready',
+      user,
+      error,
+    }
+  }, [error, isAuthenticated, isBootstrapping, user])
 }

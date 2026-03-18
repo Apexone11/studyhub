@@ -32,4 +32,9 @@ export const CLARITY_PROJECT_ID =
   import.meta.env.VITE_CLARITY_PROJECT_ID ||
   ''
 
+export const GOOGLE_CLIENT_ID =
+  runtimeConfig.GOOGLE_CLIENT_ID ||
+  import.meta.env.VITE_GOOGLE_CLIENT_ID ||
+  ''
+
 export const SUPPORT_MAILTO = `mailto:${SUPPORT_EMAIL}`

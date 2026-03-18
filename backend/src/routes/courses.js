@@ -1,5 +1,6 @@
 const express = require('express')
 const rateLimit = require('express-rate-limit')
+const { sendForbidden } = require('../lib/accessControl')
 const requireAuth = require('../middleware/auth')
 const { sendCourseRequestNotice } = require('../lib/email')
 const { captureError } = require('../monitoring/sentry')
@@ -229,7 +230,7 @@ router.post('/request', requireAuth, async (req, res) => {
 router.get('/requested', requireAuth, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Admins only.' })
+      return sendForbidden(res, 'Admins only.')
     }
 
     const requested = await prisma.requestedCourse.findMany({

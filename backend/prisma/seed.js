@@ -1,8 +1,15 @@
+const path = require('node:path')
 const bcrypt = require('bcryptjs')
 const crypto = require('crypto')
 const { SCHOOLS, COURSES } = require('../src/lib/catalogData')
 const { createPrismaClient } = require('../src/lib/prisma')
-const prisma = createPrismaClient({ preferDirectUrl: true })
+const { assertLocalDatabase } = require('../scripts/assertLocalDatabase')
+
+require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') })
+
+assertLocalDatabase('primary seed script')
+
+const prisma = createPrismaClient()
 
 async function main() {
   console.log('🌱 Seeding database...')
@@ -17,7 +24,7 @@ async function main() {
   for (const school of SCHOOLS) {
     const courses = COURSES[school.short] || COURSES['DEFAULT']
 
-    const created = await prisma.school.create({
+    await prisma.school.create({
       data: {
         name:    school.name,
         short:   school.short,
