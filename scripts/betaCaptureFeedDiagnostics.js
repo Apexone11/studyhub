@@ -10,8 +10,14 @@ function npmCommand() {
 }
 
 function quoteWindowsArg(text) {
-  // If no whitespace or double quotes, return as-is
-  if (!/[\s"]/u.test(text)) {
+  // Always quote empty strings so they are preserved as arguments
+  if (text === '') {
+    return '""'
+  }
+
+  // If no whitespace, double quotes, or cmd metacharacters, return as-is
+  // Cmd metacharacters: & | < > ( ) ^ %
+  if (!/[\s"&|<>()[\]^%]/u.test(text)) {
     return text
   }
 
