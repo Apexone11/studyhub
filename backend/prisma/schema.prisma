@@ -46,6 +46,7 @@ model User {
   followers          UserFollow[]   @relation("Followers")
   htmlVersions       SheetHtmlVersion[]
   suppressionAuditsPerformed EmailSuppressionAudit[] @relation("EmailSuppressionAuditActor")
+  preferences                UserPreferences?
 }
 
 model School {
@@ -393,4 +394,19 @@ model EmailSuppressionAudit {
   @@index([suppressionId, createdAt(sort: Desc)])
   @@index([performedByUserId, createdAt(sort: Desc)])
   @@index([action, createdAt(sort: Desc)])
+}
+
+model UserPreferences {
+  id                   Int     @id @default(autoincrement())
+  userId               Int     @unique
+  emailDigest          Boolean @default(true)
+  emailMentions        Boolean @default(true)
+  emailContributions   Boolean @default(true)
+  inAppNotifications   Boolean @default(true)
+  profileVisibility    String  @default("public")
+  defaultDownloads     Boolean @default(true)
+  defaultContributions Boolean @default(true)
+  theme                String  @default("system")
+  fontSize             String  @default("medium")
+  user                 User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
