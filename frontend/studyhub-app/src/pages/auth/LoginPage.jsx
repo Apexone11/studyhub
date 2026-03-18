@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { GoogleLogin } from '@react-oauth/google'
 import Navbar from '../../components/Navbar'
-import { API } from '../../config'
+import { API, GOOGLE_CLIENT_ID } from '../../config'
+import { fadeInUp } from '../../lib/animations'
 import { getAuthenticatedHomePath } from '../../lib/authNavigation'
 import { useSession } from '../../lib/session-context'
 
@@ -116,6 +118,7 @@ function formatResendCountdown(totalSeconds) {
 export default function LoginPage() {
   const navigate = useNavigate()
   const { completeAuthentication } = useSession()
+  const cardRef = useRef(null)
 
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -142,6 +145,10 @@ export default function LoginPage() {
     return () => {
       window.clearInterval(timerId)
     }
+  }, [])
+
+  useEffect(() => {
+    if (cardRef.current) fadeInUp(cardRef.current, { duration: 450, y: 20 })
   }, [])
 
   const resendAvailableAtMs = useMemo(
@@ -196,6 +203,50 @@ export default function LoginPage() {
           deliveryHint: data.deliveryHint || '',
         })
         setCode('')
+        return
+      }
+
+      completeAuthentication(data.user)
+      navigate(getAuthenticatedHomePath(data.user), { replace: true })
+    } catch {
+      setError('Could not connect to the server.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleGoogleSuccess(credentialResponse) {
+    if (!credentialResponse?.credential) {
+      setError('Google sign-in did not return a valid credential.')
+      return
+    }
+
+    setLoading(true)
+    setError('')
+
+    try {
+      const response = await fetch(`${API}/api/auth/google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential: credentialResponse.credential }),
+      })
+      const data = await response.json()
+
+      if (!response.ok) {
+        setError(data.error || 'Google sign-in failed.')
+        return
+      }
+
+      if (data.requiresCourseSelection) {
+        navigate('/register', {
+          replace: true,
+          state: {
+            googleCourseSelection: true,
+            tempCredential: data.tempCredential,
+            googleEmail: data.googleEmail,
+            googleName: data.googleName,
+          },
+        })
         return
       }
 
@@ -330,7 +381,7 @@ export default function LoginPage() {
       }}
     >
       <Navbar variant="landing" />
-      <div style={{ padding: '48px 20px 80px', display: 'grid', placeItems: 'center' }}>
+      <div ref={cardRef} style={{ padding: '48px 20px 80px', display: 'grid', placeItems: 'center' }}>
         <Card>
           <h1 style={{ margin: '0 0 8px', fontSize: 28 }}>
             {verificationGate ? 'Verify your email' : twoFactor.active ? 'Two-step verification' : 'Welcome back'}
@@ -344,6 +395,34 @@ export default function LoginPage() {
           </p>
 
           {error && <Message>{error}</Message>}
+
+          {!verificationGate && !twoFactor.active && GOOGLE_CLIENT_ID && (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+                <GoogleLogin
+                  onSuccess={handleGoogleSuccess}
+                  onError={() => setError('Google sign-in was cancelled or failed.')}
+                  size="large"
+                  width="320"
+                  text="signin_with"
+                  shape="rectangular"
+                  theme="outline"
+                />
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  marginBottom: 20,
+                }}
+              >
+                <div style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
+                <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600 }}>OR</span>
+                <div style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
+              </div>
+            </>
+          )}
 
           {!verificationGate && !twoFactor.active && (
             <form onSubmit={handleLogin}>
@@ -502,7 +581,7 @@ export default function LoginPage() {
           )}
 
           <div style={{ marginTop: 24, textAlign: 'center', fontSize: 13, color: '#64748b' }}>
-            Don’t have an account? <Link to="/register">Create one here</Link>
+            Don't have an account? <Link to="/register">Create one here</Link>
           </div>
         </Card>
       </div>

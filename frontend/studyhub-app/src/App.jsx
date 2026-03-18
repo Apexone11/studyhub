@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { GoogleOAuthProvider } from '@react-oauth/google'
 import {
   trackPageView,
   identifyAuthenticatedUser,
@@ -8,6 +9,7 @@ import {
 import RouteErrorBoundary from './components/RouteErrorBoundary'
 import { getAuthenticatedHomePath } from './lib/authNavigation'
 import { SessionProvider, useSession } from './lib/session-context'
+import { GOOGLE_CLIENT_ID } from './config'
 
 const HomePage = lazy(() => import('./pages/home/HomePage'))
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'))
@@ -81,7 +83,7 @@ function RouteFallback() {
   )
 }
 
-export default function App() {
+function AppRoutes() {
   return (
     <BrowserRouter>
       <SessionProvider>
@@ -125,5 +127,15 @@ export default function App() {
         </Suspense>
       </SessionProvider>
     </BrowserRouter>
+  )
+}
+
+export default function App() {
+  if (!GOOGLE_CLIENT_ID) return <AppRoutes />
+
+  return (
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+      <AppRoutes />
+    </GoogleOAuthProvider>
   )
 }

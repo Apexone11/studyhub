@@ -22,6 +22,8 @@ model User {
   twoFaEnabled   Boolean   @default(false)
   twoFaCode      String?
   twoFaExpiry    DateTime?
+  googleId       String?   @unique
+  authProvider   String    @default("local")
   createdAt      DateTime  @default(now())
 
   studySheets        StudySheet[]

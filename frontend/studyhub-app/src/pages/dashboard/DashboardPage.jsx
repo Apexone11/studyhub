@@ -1,5 +1,5 @@
 // DashboardPage owns the authenticated summary surface for the current user and keeps dashboard polling local.
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
 import AppSidebar from '../../components/AppSidebar'
@@ -16,6 +16,7 @@ import { getApiErrorMessage, isAuthSessionFailure, readJsonSafely } from '../../
 import { useSession } from '../../lib/session-context'
 import { pageShell, useResponsiveAppLayout } from '../../lib/ui'
 import { useLivePolling } from '../../lib/useLivePolling'
+import { countUp, fadeInUp, staggerEntrance } from '../../lib/animations'
 
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 
@@ -97,6 +98,10 @@ export default function DashboardPage() {
   const [summary, setSummary] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const heroRef = useRef(null)
+  const statsRef = useRef(null)
+  const contentRef = useRef(null)
+  const animatedRef = useRef(false)
 
   const loadSummary = async ({ signal, startTransition } = {}) => {
     const apply = startTransition || ((fn) => fn())
@@ -156,6 +161,25 @@ export default function DashboardPage() {
     ]
   }, [summary])
 
+  // Animate dashboard sections on first data load
+  useEffect(() => {
+    if (!summary || animatedRef.current) return
+    animatedRef.current = true
+    if (heroRef.current) fadeInUp(heroRef.current, { duration: 450, y: 16 })
+    if (statsRef.current) {
+      staggerEntrance(statsRef.current.children, { staggerMs: 80, duration: 450, y: 14 })
+      // Count-up stat values
+      const statEls = statsRef.current.querySelectorAll('[data-stat-value]')
+      statEls.forEach((el) => {
+        const end = parseInt(el.getAttribute('data-stat-value'), 10)
+        if (!isNaN(end) && end > 0) countUp(el, end, { duration: 700 })
+      })
+    }
+    if (contentRef.current) {
+      staggerEntrance(contentRef.current.children, { staggerMs: 100, duration: 450, y: 14 })
+    }
+  }, [summary])
+
   const hero = summary?.hero || {}
   const courses = summary?.courses || []
   const recentSheets = summary?.recentSheets || []
@@ -196,6 +220,7 @@ export default function DashboardPage() {
 
         <main style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
           <section
+            ref={heroRef}
             style={{
               background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%)',
               borderRadius: 18,
@@ -302,7 +327,7 @@ export default function DashboardPage() {
             <DashboardSkeleton />
           ) : (
             <>
-              <section style={{ display: 'grid', gridTemplateColumns: layout.isCompact ? 'minmax(0, 1fr)' : 'repeat(3, minmax(0, 1fr))', gap: 16 }}>
+              <section ref={statsRef} style={{ display: 'grid', gridTemplateColumns: layout.isCompact ? 'minmax(0, 1fr)' : 'repeat(3, minmax(0, 1fr))', gap: 16 }}>
                 {cards.map((card) => (
                   <div
                     key={card.label}
@@ -317,7 +342,7 @@ export default function DashboardPage() {
                     <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '.08em', marginBottom: 10 }}>
                       {card.label.toUpperCase()}
                     </div>
-                    <div style={{ fontSize: 32, fontWeight: 800, color: card.accent, marginBottom: 4 }}>
+                    <div data-stat-value={card.value} style={{ fontSize: 32, fontWeight: 800, color: card.accent, marginBottom: 4 }}>
                       {card.value}
                     </div>
                     <div style={{ fontSize: 13, color: '#64748b' }}>{card.helper}</div>
@@ -326,6 +351,7 @@ export default function DashboardPage() {
               </section>
 
               <section
+                ref={contentRef}
                 style={{
                   display: 'grid',
                   gridTemplateColumns: layout.isCompact ? 'minmax(0, 1fr)' : '1.1fr 0.9fr',

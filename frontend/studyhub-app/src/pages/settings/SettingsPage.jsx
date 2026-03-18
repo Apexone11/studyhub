@@ -489,13 +489,14 @@ export default function SettingsPage() {
         </div>
       </header>
 
-      <div style={{ maxWidth: 1180, margin: '0 auto', padding: '28px 24px 60px', display: 'grid', gridTemplateColumns: '200px 1fr', gap: 28 }}>
+      <div className="settings-layout" style={{ maxWidth: 1180, margin: '0 auto', padding: '28px 24px 60px' }}>
         <aside>
-          <nav>
+          <nav className="settings-nav">
             {NAV_TABS.map((item) => (
               <button
                 key={item.id}
                 type="button"
+                className="settings-nav-btn"
                 onClick={() => setTab(item.id)}
                 style={{
                   display: 'block',

@@ -1,5 +1,5 @@
 // HomePage renders the public landing experience and routes anonymous users into discovery flows.
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
 import {
@@ -15,6 +15,7 @@ import {
   IconTests,
   LogoMark,
 } from '../../components/Icons'
+import { fadeInOnScroll, staggerEntrance } from '../../lib/animations'
 
 const FEATURES = [
   {
@@ -96,6 +97,25 @@ export default function HomePage() {
   const currentYear = new Date().getFullYear()
   const navigate = useNavigate()
   const [heroSearch, setHeroSearch] = useState('')
+  const featuresRef = useRef(null)
+  const stepsRef = useRef(null)
+
+  useEffect(() => {
+    // Staggered entrance for feature cards when they scroll into view
+    if (featuresRef.current) {
+      fadeInOnScroll(featuresRef.current.querySelectorAll('.home-feature-card'), {
+        staggerMs: 60,
+        y: 20,
+      })
+    }
+    // Staggered entrance for step cards
+    if (stepsRef.current) {
+      fadeInOnScroll(stepsRef.current.querySelectorAll('.home-step-card'), {
+        staggerMs: 100,
+        y: 20,
+      })
+    }
+  }, [])
 
   function handleHeroSearch(e) {
     e.preventDefault()
@@ -208,7 +228,7 @@ export default function HomePage() {
             <h2 className="home-section-title">Built to Help You Succeed</h2>
           </div>
 
-          <div className="home-features-grid">
+          <div className="home-features-grid" ref={featuresRef}>
             {FEATURES.map((feature) => (
               <article key={feature.title} className={`home-feature-card ${feature.toneClass}`}>
                 {feature.badge && <span className="home-feature-badge">{feature.badge}</span>}
@@ -298,7 +318,7 @@ export default function HomePage() {
             <h2 className="home-section-title">Up and Running in 60 Seconds</h2>
           </div>
 
-          <div className="home-steps-grid">
+          <div className="home-steps-grid" ref={stepsRef}>
             {STEPS.map((step) => (
               <article key={step.n} className="home-step-card">
                 <div className="home-step-number">{step.n}</div>

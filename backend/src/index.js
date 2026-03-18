@@ -57,6 +57,20 @@ const allowedOrigins = isProd
     ].filter(Boolean)
   : ['http://localhost:5173', 'http://localhost:4173']
 
+// In production, also allow www / non-www variants of each origin automatically.
+if (isProd) {
+  for (const url of [...allowedOrigins]) {
+    try {
+      const parsed = new URL(url)
+      if (parsed.hostname.startsWith('www.')) {
+        allowedOrigins.push(url.replace('www.', ''))
+      } else {
+        allowedOrigins.push(`${parsed.protocol}//www.${parsed.hostname}${parsed.port ? ':' + parsed.port : ''}`)
+      }
+    } catch { /* skip malformed */ }
+  }
+}
+
 function normalizeOrigin(value) {
   if (!value) return null
 
