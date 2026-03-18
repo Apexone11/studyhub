@@ -6,7 +6,6 @@ const { captureError } = require('../monitoring/sentry')
 const {
   sendEmailVerification,
   sendPasswordReset,
-  sendTwoFaCode,
 } = require('../lib/email')
 const {
   clearAuthCookie,
@@ -43,7 +42,6 @@ const router = express.Router()
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,20}$/
 const PASSWORD_MIN_LENGTH = 8
-const TWO_FA_CODE_TTL_MS = 10 * 60 * 1000
 const COURSE_CODE_REGEX = /^[A-Z0-9-]{2,20}$/
 
 const loginLimiter = rateLimit({
@@ -236,7 +234,6 @@ async function getAuthenticatedUser(userId) {
       role: true,
       email: true,
       emailVerified: true,
-      twoFaEnabled: true,
       avatarUrl: true,
       authProvider: true,
       createdAt: true,
@@ -265,7 +262,6 @@ function buildAuthenticatedUserPayload(user, extraFields = {}) {
     role: user.role,
     email: user.email ?? null,
     emailVerified: Boolean(user.emailVerified),
-    twoFaEnabled: Boolean(user.twoFaEnabled),
     avatarUrl: user.avatarUrl || null,
     authProvider: user.authProvider || 'local',
     createdAt: user.createdAt,
@@ -291,39 +287,6 @@ async function sendVerificationCodeEmail(email, username, code, metadata = {}) {
       ...metadata,
     })
     throw new AppError(503, 'We could not send your verification code right now. Please try again later.')
-  }
-}
-
-async function sendTwoFactorChallenge(user, metadata = {}) {
-  const code = generateSixDigitCode()
-  const expiry = new Date(Date.now() + TWO_FA_CODE_TTL_MS)
-
-  await prisma.user.update({
-    where: { id: user.id },
-    data: {
-      twoFaCode: hashStoredSecret(code),
-      twoFaExpiry: expiry,
-    },
-  })
-
-  try {
-    await sendTwoFaCode(user.email, user.username, code)
-  } catch (error) {
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { twoFaCode: null, twoFaExpiry: null },
-    })
-    captureError(error, {
-      source: 'sendTwoFaCode',
-      ...metadata,
-    })
-    throw new AppError(503, 'We could not send your 2-step verification code. Please try again in a moment.')
-  }
-
-  return {
-    requires2fa: true,
-    username: user.username,
-    deliveryHint: maskEmailAddress(user.email),
   }
 }
 
@@ -599,13 +562,6 @@ router.post('/login', loginLimiter, async (req, res) => {
       }))
     }
 
-    if (user.twoFaEnabled && user.email) {
-      return res.json(await sendTwoFactorChallenge(user, {
-        route: req.originalUrl,
-        method: req.method,
-      }))
-    }
-
     const authenticatedUser = await issueAuthenticatedSession(res, user.id)
     return res.json({
       message: 'Login successful!',
@@ -712,18 +668,10 @@ router.post('/login/verification/verify', verificationLimiter, async (req, res) 
         id: true,
         username: true,
         email: true,
-        twoFaEnabled: true,
       },
     })
 
     await consumeChallenge(challenge.id)
-
-    if (updatedUser.twoFaEnabled && updatedUser.email) {
-      return res.json(await sendTwoFactorChallenge(updatedUser, {
-        route: req.originalUrl,
-        method: req.method,
-      }))
-    }
 
     const authenticatedUser = await issueAuthenticatedSession(res, updatedUser.id)
     res.json({
@@ -813,48 +761,6 @@ router.post('/reset-password', forgotLimiter, async (req, res) => {
     await prisma.passwordResetToken.delete({ where: { token: tokenHash } })
 
     return res.json({ message: 'Password updated successfully.' })
-  } catch (error) {
-    return sendError(req, res, error)
-  }
-})
-
-router.post('/verify-2fa', loginLimiter, async (req, res) => {
-  const body = req.body || {}
-  const username = typeof body.username === 'string' ? body.username.trim() : ''
-  const code = typeof body.code === 'string' ? body.code.trim() : ''
-
-  if (!username || !code) {
-    return res.status(400).json({ error: 'Username and code are required.' })
-  }
-
-  try {
-    const user = await prisma.user.findUnique({ where: { username } })
-    if (!user || !user.twoFaCode) {
-      return res.status(400).json({ error: 'Invalid or expired code.' })
-    }
-
-    if (user.twoFaExpiry && user.twoFaExpiry < new Date()) {
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { twoFaCode: null, twoFaExpiry: null },
-      })
-      return res.status(400).json({ error: 'Code has expired. Please sign in again.' })
-    }
-
-    if (user.twoFaCode !== hashStoredSecret(code)) {
-      return res.status(400).json({ error: 'Incorrect code.' })
-    }
-
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { twoFaCode: null, twoFaExpiry: null },
-    })
-
-    const authenticatedUser = await issueAuthenticatedSession(res, user.id)
-    return res.json({
-      message: 'Login successful!',
-      user: authenticatedUser,
-    })
   } catch (error) {
     return sendError(req, res, error)
   }

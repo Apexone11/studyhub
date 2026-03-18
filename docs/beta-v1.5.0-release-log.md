@@ -382,3 +382,61 @@ Cycle 7 Deferred-Risk Notes
 - `tempCredential` (raw Google JWT) sent back to frontend for course selection flow expires in ~5 minutes. If user takes longer, the `/google/complete` call will fail silently. Consider server-side session approach.
 - Near-identical code in `/google` and `/google/complete` endpoints should be extracted to a shared helper function.
 - SearchModal does not show error feedback to user on 400 responses (shows "No results found" instead). LOW priority.
+
+---
+
+Cycle 8 — Remove 2FA, Redesign Auth Pages & Homepage [2026-03-18]
+
+Changed:
+
+- Removed 2-step verification (2FA) system-wide:
+  - Backend: removed `/api/auth/verify-2fa` route, `sendTwoFactorChallenge` function, 2FA checks in login flow, `sendTwoFaCode` import from auth routes.
+  - Backend: removed `/api/settings/2fa/enable` and `/api/settings/2fa/disable` endpoints from settings routes.
+  - Backend: removed `twoFaEnabled` from `getAuthenticatedUser` select and `buildAuthenticatedUserPayload`.
+  - Backend: removed 2FA check from `requireAdmin` middleware (admins no longer blocked by missing 2FA).
+  - Backend: removed `verify-2fa` from `guardedMode.js` AUTH_WRITE_ALLOWLIST.
+  - Backend: removed `twoFaEnabled` from settings route user select and email-change 2FA disable logic.
+  - Frontend: removed 2FA state, UI, and handlers from `LoginPage.jsx`.
+  - Frontend: removed 2FA section (enable/disable toggle, password confirm) from `SecurityTab.jsx`.
+  - Frontend: removed `AdminMfaRequiredCard` component and `adminMfaRequired` checks from `AdminPage.jsx`.
+  - Frontend: updated `authNavigation.js` to remove 2FA-based admin redirect to settings.
+  - Prisma schema fields (`twoFaEnabled`, `twoFaCode`, `twoFaExpiry`) left in place to avoid migration risk; they are simply unused.
+
+- Redesigned Login page (`LoginPage.jsx`):
+  - Dark gradient background with frosted-glass card and decorative orbs.
+  - Prominent Google Sign-In button with "or continue with" divider.
+  - Gradient primary button, focus ring animations on inputs, `#f8fafc` input backgrounds.
+  - Logo mark icon at top of card.
+  - Rounded 24px card with backdrop-filter blur.
+
+- Redesigned Registration page (`RegisterScreen.jsx`):
+  - Matching dark gradient background with glass-morphism card.
+  - Google Sign-Up button prominently placed in account step.
+  - 2-column layout for username/email and password/confirm fields.
+  - Gradient step indicators with progress bars.
+  - Step-specific icons (logo, email envelope, book) for visual context.
+  - Green gradient "Create Account" button on courses step.
+
+- Enhanced Homepage (`HomePage.jsx`, `index.css`):
+  - Improved fork-tree SVG with extra branches, gradient node fills, and leaf nodes for depth.
+  - Added social proof banner below hero: "No credit card required", "No ads, ever", "Open source", "Sign up in 60 seconds".
+  - Added testimonials section with 3 student testimonial cards (star ratings, avatars, school names).
+  - Added section subtitle support for features section.
+  - Enhanced CTA section with gradient background matching hero and dual-button layout.
+  - Improved hero search bar with `backdrop-filter: blur`, focus-within border glow, styled search button.
+  - Enhanced fork-tree in how-it-works section with animated pulse rings on key nodes, additional sub-branches, and more leaf nodes.
+  - New CSS: `.home-proof-banner`, `.home-testimonials-section`, `.home-testimonial-card`, `.home-hero-search`, `.home-cta-buttons`, `.home-cta-glow-orb`, `.home-section-subtitle`.
+  - Responsive: testimonials grid collapses to single column at 1024px, proof banner stacks vertically at 768px.
+
+Validation:
+
+- `npx vite build` — passed, 0 errors, all chunks generated successfully.
+- Deep scan confirmed no remaining `adminMfaRequired`, `AdminMfaRequired`, or active 2FA runtime references in frontend source.
+- Backend 2FA routes removed; only Prisma schema columns remain (inert, no migration needed).
+
+Cycle 8 Deferred-Risk Notes
+
+- Prisma schema still has `twoFaEnabled`, `twoFaCode`, `twoFaExpiry` fields on User model. These are unused but left to avoid requiring a database migration. Can be cleaned up in a future migration cycle.
+- `sendTwoFaCode` function still exists in `backend/src/lib/email.js` (exported but never called). Can be removed in a cleanup pass.
+- Bootstrap repair SQL statements still create 2FA columns with `ADD COLUMN IF NOT EXISTS` (harmless — ensures schema consistency for existing deploys).
+- Test files (`auth.routes.test.js`, `admin.routes.test.js`, `LoginPage.test.jsx`) still reference 2FA patterns. Tests should be updated in a dedicated test maintenance pass.

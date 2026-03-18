@@ -7,101 +7,6 @@ import { fadeInUp } from '../../lib/animations'
 import { getAuthenticatedHomePath } from '../../lib/authNavigation'
 import { useSession } from '../../lib/session-context'
 
-function Card({ children }) {
-  return (
-    <div
-      style={{
-        width: 'min(92vw, 480px)',
-        background: '#fff',
-        borderRadius: 18,
-        border: '1px solid #e2e8f0',
-        boxShadow: '0 10px 40px rgba(15, 23, 42, 0.08)',
-        padding: '32px',
-      }}
-    >
-      {children}
-    </div>
-  )
-}
-
-function Field({ label, children, htmlFor }) {
-  return (
-    <div style={{ marginBottom: 16 }}>
-      <label htmlFor={htmlFor} style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 700, color: '#334155' }}>
-        {label}
-      </label>
-      {children}
-    </div>
-  )
-}
-
-function Input(props) {
-  return (
-    <input
-      {...props}
-      style={{
-        width: '100%',
-        boxSizing: 'border-box',
-        padding: '12px 14px',
-        borderRadius: 10,
-        border: '1px solid #cbd5e1',
-        fontSize: 14,
-        color: '#0f172a',
-        outline: 'none',
-        fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
-        ...(props.style || {}),
-      }}
-    />
-  )
-}
-
-function Button({ children, secondary = false, ...props }) {
-  return (
-    <button
-      {...props}
-      style={{
-        padding: '12px 18px',
-        borderRadius: 10,
-        border: secondary ? '1px solid #cbd5e1' : 'none',
-        background: secondary ? '#fff' : '#3b82f6',
-        color: secondary ? '#475569' : '#fff',
-        fontSize: 14,
-        fontWeight: 700,
-        cursor: props.disabled ? 'not-allowed' : 'pointer',
-        opacity: props.disabled ? 0.7 : 1,
-        fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
-        ...(props.style || {}),
-      }}
-    >
-      {children}
-    </button>
-  )
-}
-
-function Message({ tone = 'error', children }) {
-  const palette =
-    tone === 'info'
-      ? { bg: '#eff6ff', border: '#bfdbfe', text: '#1d4ed8' }
-      : { bg: '#fef2f2', border: '#fecaca', text: '#b91c1c' }
-
-  return (
-    <div
-      style={{
-        marginBottom: 16,
-        padding: '12px 14px',
-        borderRadius: 10,
-        border: `1px solid ${palette.border}`,
-        background: palette.bg,
-        color: palette.text,
-        fontSize: 13,
-        lineHeight: 1.6,
-      }}
-    >
-      {children}
-    </div>
-  )
-}
-
 function parseTimestampToMs(value) {
   if (!value) return null
   const parsed = Date.parse(value)
@@ -128,13 +33,6 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [showForgot, setShowForgot] = useState(false)
   const [clockNowMs, setClockNowMs] = useState(() => Date.now())
-
-  const [twoFactor, setTwoFactor] = useState({
-    active: false,
-    username: '',
-    deliveryHint: '',
-  })
-
   const [verificationGate, setVerificationGate] = useState(null)
 
   useEffect(() => {
@@ -192,16 +90,6 @@ export default function LoginPage() {
       if (data.requiresEmailVerification) {
         setVerificationGate(data)
         setVerificationEmail(data.email || '')
-        setCode('')
-        return
-      }
-
-      if (data.requires2fa) {
-        setTwoFactor({
-          active: true,
-          username: data.username,
-          deliveryHint: data.deliveryHint || '',
-        })
         setCode('')
         return
       }
@@ -316,17 +204,6 @@ export default function LoginPage() {
         return
       }
 
-      if (data.requires2fa) {
-        setVerificationGate(null)
-        setTwoFactor({
-          active: true,
-          username: data.username,
-          deliveryHint: data.deliveryHint || '',
-        })
-        setCode('')
-        return
-      }
-
       completeAuthentication(data.user)
       navigate(getAuthenticatedHomePath(data.user), { replace: true })
     } catch {
@@ -336,149 +213,197 @@ export default function LoginPage() {
     }
   }
 
-  async function handleVerifyTwoFactor(event) {
-    event.preventDefault()
-    if (!code.trim()) {
-      setError('Enter the sign-in code.')
-      return
-    }
-
-    setLoading(true)
-    setError('')
-
-    try {
-      const response = await fetch(`${API}/api/auth/verify-2fa`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: twoFactor.username,
-          code: code.trim(),
-        }),
-      })
-      const data = await response.json()
-
-      if (!response.ok) {
-        setError(data.error || 'Could not verify the sign-in code.')
-        return
-      }
-
-      completeAuthentication(data.user)
-      navigate(getAuthenticatedHomePath(data.user), { replace: true })
-    } catch {
-      setError('Could not connect to the server.')
-    } finally {
-      setLoading(false)
-    }
-  }
+  const isVerifying = Boolean(verificationGate)
 
   return (
     <div
       style={{
         minHeight: '100vh',
-        background: '#edf0f5',
+        background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #1e40af 100%)',
         fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
         color: '#0f172a',
+        position: 'relative',
+        overflow: 'hidden',
       }}
     >
       <Navbar variant="landing" />
-      <div ref={cardRef} style={{ padding: '48px 20px 80px', display: 'grid', placeItems: 'center' }}>
-        <Card>
-          <h1 style={{ margin: '0 0 8px', fontSize: 28 }}>
-            {verificationGate ? 'Verify your email' : twoFactor.active ? 'Two-step verification' : 'Welcome back'}
-          </h1>
-          <p style={{ margin: '0 0 24px', fontSize: 14, color: '#64748b', lineHeight: 1.7 }}>
-            {verificationGate
-              ? 'Unverified accounts must confirm email before they can sign in again.'
-              : twoFactor.active
-                ? `Enter the 6-digit code sent to ${twoFactor.deliveryHint || 'your email address'}.`
-                : 'Sign in to continue to your feed, sheets, dashboard, and admin tools.'}
-          </p>
 
-          {error && <Message>{error}</Message>}
+      {/* Decorative background elements */}
+      <div style={{ position: 'absolute', top: -120, left: -120, width: 400, height: 400, borderRadius: '50%', background: 'rgba(59, 130, 246, 0.08)', filter: 'blur(80px)', pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', bottom: -100, right: -100, width: 350, height: 350, borderRadius: '50%', background: 'rgba(139, 92, 246, 0.06)', filter: 'blur(80px)', pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', top: '40%', left: '50%', transform: 'translate(-50%, -50%)', width: 600, height: 600, borderRadius: '50%', background: 'rgba(16, 185, 129, 0.04)', filter: 'blur(100px)', pointerEvents: 'none' }} />
 
-          {!verificationGate && !twoFactor.active && GOOGLE_CLIENT_ID && (
+      <div ref={cardRef} style={{ padding: '48px 20px 80px', display: 'grid', placeItems: 'center', position: 'relative', zIndex: 1 }}>
+        <div
+          style={{
+            width: 'min(92vw, 440px)',
+            background: 'rgba(255, 255, 255, 0.97)',
+            backdropFilter: 'blur(20px)',
+            borderRadius: 24,
+            border: '1px solid rgba(226, 232, 240, 0.8)',
+            boxShadow: '0 25px 60px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.1)',
+            padding: '40px 36px',
+          }}
+        >
+          {/* Logo mark */}
+          <div style={{ textAlign: 'center', marginBottom: 28 }}>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              width: 56, height: 56, borderRadius: 16,
+              background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+              boxShadow: '0 8px 24px rgba(59, 130, 246, 0.35)',
+              marginBottom: 16,
+            }}>
+              <svg width="28" height="28" viewBox="0 0 36 36" fill="none">
+                <path d="M18 6 L18 30 M10 14 L18 6 L26 14 M10 22 L18 14 L26 22" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+            <h1 style={{ margin: '0 0 6px', fontSize: 26, fontWeight: 800, letterSpacing: '-0.5px', color: '#0f172a' }}>
+              {isVerifying ? 'Verify your email' : 'Welcome back'}
+            </h1>
+            <p style={{ margin: 0, fontSize: 14, color: '#64748b', lineHeight: 1.7 }}>
+              {isVerifying
+                ? 'Confirm your email to continue signing in.'
+                : 'Sign in to your study sheets, dashboard, and more.'}
+            </p>
+          </div>
+
+          {error && (
+            <div style={{
+              marginBottom: 16, padding: '12px 14px', borderRadius: 12,
+              border: '1px solid #fecaca', background: '#fef2f2', color: '#b91c1c',
+              fontSize: 13, lineHeight: 1.6,
+            }}>
+              {error}
+            </div>
+          )}
+
+          {!isVerifying && (
             <>
-              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
-                <GoogleLogin
-                  onSuccess={handleGoogleSuccess}
-                  onError={() => setError('Google sign-in was cancelled or failed.')}
-                  size="large"
-                  width="320"
-                  text="signin_with"
-                  shape="rectangular"
-                  theme="outline"
-                />
-              </div>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  marginBottom: 20,
-                }}
-              >
-                <div style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
-                <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600 }}>OR</span>
-                <div style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
-              </div>
+              {GOOGLE_CLIENT_ID && (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
+                    <GoogleLogin
+                      onSuccess={handleGoogleSuccess}
+                      onError={() => setError('Google sign-in was cancelled or failed.')}
+                      size="large"
+                      width="368"
+                      text="signin_with"
+                      shape="rectangular"
+                      theme="outline"
+                    />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
+                    <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, transparent, #e2e8f0)' }} />
+                    <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>or continue with</span>
+                    <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, #e2e8f0, transparent)' }} />
+                  </div>
+                </>
+              )}
+
+              <form onSubmit={handleLogin}>
+                <div style={{ marginBottom: 16 }}>
+                  <label htmlFor="login-username" style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 700, color: '#334155' }}>
+                    Username
+                  </label>
+                  <input
+                    id="login-username"
+                    value={username}
+                    onChange={(event) => {
+                      setUsername(event.target.value)
+                      setError('')
+                      setShowForgot(false)
+                    }}
+                    autoComplete="username"
+                    placeholder="Enter your username"
+                    style={{
+                      width: '100%', boxSizing: 'border-box', padding: '13px 16px',
+                      borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 14,
+                      color: '#0f172a', outline: 'none', background: '#f8fafc',
+                      fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+                      transition: 'border-color 0.15s, box-shadow 0.15s',
+                    }}
+                    onFocus={(e) => { e.target.style.borderColor = '#3b82f6'; e.target.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.1)'; e.target.style.background = '#fff' }}
+                    onBlur={(e) => { e.target.style.borderColor = '#e2e8f0'; e.target.style.boxShadow = 'none'; e.target.style.background = '#f8fafc' }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: 20 }}>
+                  <label htmlFor="login-password" style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 700, color: '#334155' }}>
+                    Password
+                  </label>
+                  <input
+                    id="login-password"
+                    type="password"
+                    value={password}
+                    onChange={(event) => {
+                      setPassword(event.target.value)
+                      setError('')
+                      setShowForgot(false)
+                    }}
+                    autoComplete="current-password"
+                    placeholder="Enter your password"
+                    style={{
+                      width: '100%', boxSizing: 'border-box', padding: '13px 16px',
+                      borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 14,
+                      color: '#0f172a', outline: 'none', background: '#f8fafc',
+                      fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+                      transition: 'border-color 0.15s, box-shadow 0.15s',
+                    }}
+                    onFocus={(e) => { e.target.style.borderColor = '#3b82f6'; e.target.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.1)'; e.target.style.background = '#fff' }}
+                    onBlur={(e) => { e.target.style.borderColor = '#e2e8f0'; e.target.style.boxShadow = 'none'; e.target.style.background = '#f8fafc' }}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  style={{
+                    width: '100%', padding: '14px 18px', borderRadius: 12, border: 'none',
+                    background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                    color: '#fff', fontSize: 15, fontWeight: 700,
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    opacity: loading ? 0.7 : 1,
+                    fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+                    boxShadow: '0 4px 14px rgba(59, 130, 246, 0.4)',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  {loading ? 'Signing in...' : 'Sign In'}
+                </button>
+
+                <div style={{ marginTop: 16, textAlign: 'center', fontSize: 13 }}>
+                  <Link to="/forgot-password" style={{ color: '#3b82f6', fontWeight: 600, textDecoration: 'none' }}>
+                    Forgot username or password?
+                  </Link>
+                  {showForgot && (
+                    <div style={{ marginTop: 8, color: '#64748b', fontSize: 12 }}>
+                      If you still remember your username, use password reset after your email is verified.
+                    </div>
+                  )}
+                </div>
+              </form>
             </>
           )}
 
-          {!verificationGate && !twoFactor.active && (
-            <form onSubmit={handleLogin}>
-              <Field label="Username" htmlFor="login-username">
-                <Input
-                  id="login-username"
-                  value={username}
-                  onChange={(event) => {
-                    setUsername(event.target.value)
-                    setError('')
-                    setShowForgot(false)
-                  }}
-                  autoComplete="username"
-                />
-              </Field>
-
-              <Field label="Password" htmlFor="login-password">
-                <Input
-                  id="login-password"
-                  type="password"
-                  value={password}
-                  onChange={(event) => {
-                    setPassword(event.target.value)
-                    setError('')
-                    setShowForgot(false)
-                  }}
-                  autoComplete="current-password"
-                />
-              </Field>
-
-              <Button type="submit" disabled={loading} style={{ width: '100%' }}>
-                {loading ? 'Signing in…' : 'Sign In'}
-              </Button>
-
-              <div style={{ marginTop: 16, textAlign: 'center', fontSize: 13 }}>
-                <Link to="/forgot-password">Forgot username or password?</Link>
-                {showForgot && (
-                  <div style={{ marginTop: 8, color: '#64748b' }}>
-                    If you still remember your username, use password reset after your email is verified.
-                  </div>
-                )}
-              </div>
-            </form>
-          )}
-
-          {verificationGate && (
+          {isVerifying && (
             <form onSubmit={handleVerifyLoginCode}>
-              <Message tone="info">
+              <div style={{
+                marginBottom: 16, padding: '12px 14px', borderRadius: 12,
+                border: '1px solid #bfdbfe', background: '#eff6ff', color: '#1d4ed8',
+                fontSize: 13, lineHeight: 1.6,
+              }}>
                 {verificationGate.emailHint
                   ? <>Verification code destination: <strong>{verificationGate.emailHint}</strong></>
                   : 'This account does not have a verified email on file yet.'}
-              </Message>
+              </div>
 
               {verificationGate.emailRequired && (
-                <Field label="Email Address" htmlFor="login-verification-email">
-                  <Input
+                <div style={{ marginBottom: 16 }}>
+                  <label htmlFor="login-verification-email" style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 700, color: '#334155' }}>
+                    Email Address
+                  </label>
+                  <input
                     id="login-verification-email"
                     type="email"
                     value={verificationEmail}
@@ -488,12 +413,21 @@ export default function LoginPage() {
                     }}
                     placeholder="you@example.com"
                     autoComplete="email"
+                    style={{
+                      width: '100%', boxSizing: 'border-box', padding: '13px 16px',
+                      borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 14,
+                      color: '#0f172a', outline: 'none', background: '#f8fafc',
+                      fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+                    }}
                   />
-                </Field>
+                </div>
               )}
 
-              <Field label="Verification Code" htmlFor="login-verification-code">
-                <Input
+              <div style={{ marginBottom: 16 }}>
+                <label htmlFor="login-verification-code" style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 700, color: '#334155' }}>
+                  Verification Code
+                </label>
+                <input
                   id="login-verification-code"
                   value={code}
                   onChange={(event) => {
@@ -503,36 +437,67 @@ export default function LoginPage() {
                   placeholder="000000"
                   inputMode="numeric"
                   maxLength={6}
-                  style={{ letterSpacing: '0.35em', textAlign: 'center', fontSize: 22 }}
                   autoFocus
+                  style={{
+                    width: '100%', boxSizing: 'border-box', padding: '14px 16px',
+                    borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 24,
+                    color: '#0f172a', outline: 'none', background: '#f8fafc',
+                    fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+                    letterSpacing: '0.35em', textAlign: 'center',
+                  }}
                 />
-              </Field>
+              </div>
 
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                <Button type="submit" disabled={loading || code.trim().length !== 6}>
-                  {loading ? 'Verifying…' : 'Verify Email'}
-                </Button>
-                <Button
+                <button
+                  type="submit"
+                  disabled={loading || code.trim().length !== 6}
+                  style={{
+                    padding: '12px 20px', borderRadius: 12, border: 'none',
+                    background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                    color: '#fff', fontSize: 14, fontWeight: 700,
+                    cursor: (loading || code.trim().length !== 6) ? 'not-allowed' : 'pointer',
+                    opacity: (loading || code.trim().length !== 6) ? 0.7 : 1,
+                    fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+                    boxShadow: '0 4px 14px rgba(59, 130, 246, 0.3)',
+                  }}
+                >
+                  {loading ? 'Verifying...' : 'Verify Email'}
+                </button>
+                <button
                   type="button"
-                  secondary
                   disabled={loading || resendCooldownSeconds > 0 || (verificationGate.emailRequired && !verificationEmail.trim())}
                   onClick={handleSendVerificationEmail}
+                  style={{
+                    padding: '12px 20px', borderRadius: 12,
+                    border: '1px solid #e2e8f0', background: '#fff',
+                    color: '#475569', fontSize: 14, fontWeight: 700,
+                    cursor: (loading || resendCooldownSeconds > 0) ? 'not-allowed' : 'pointer',
+                    opacity: (loading || resendCooldownSeconds > 0) ? 0.7 : 1,
+                    fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+                  }}
                 >
                   {resendCooldownSeconds > 0
                     ? `Resend in ${formatResendCountdown(resendCooldownSeconds)}`
                     : 'Send / Resend Code'}
-                </Button>
-                <Button
+                </button>
+                <button
                   type="button"
-                  secondary
                   onClick={() => {
                     setVerificationGate(null)
                     setCode('')
                     setError('')
                   }}
+                  style={{
+                    padding: '12px 20px', borderRadius: 12,
+                    border: '1px solid #e2e8f0', background: '#fff',
+                    color: '#475569', fontSize: 14, fontWeight: 700,
+                    cursor: 'pointer',
+                    fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+                  }}
                 >
                   Back
-                </Button>
+                </button>
               </div>
 
               {resendCooldownSeconds > 0 && (
@@ -543,47 +508,16 @@ export default function LoginPage() {
             </form>
           )}
 
-          {twoFactor.active && (
-            <form onSubmit={handleVerifyTwoFactor}>
-              <Field label="Sign-in Code" htmlFor="login-2fa-code">
-                <Input
-                  id="login-2fa-code"
-                  value={code}
-                  onChange={(event) => {
-                    setCode(event.target.value.replace(/\D/g, '').slice(0, 6))
-                    setError('')
-                  }}
-                  placeholder="000000"
-                  inputMode="numeric"
-                  maxLength={6}
-                  style={{ letterSpacing: '0.35em', textAlign: 'center', fontSize: 22 }}
-                  autoFocus
-                />
-              </Field>
-
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                <Button type="submit" disabled={loading || code.trim().length !== 6}>
-                  {loading ? 'Verifying…' : 'Verify Code'}
-                </Button>
-                <Button
-                  type="button"
-                  secondary
-                  onClick={() => {
-                    setTwoFactor({ active: false, username: '', deliveryHint: '' })
-                    setCode('')
-                    setError('')
-                  }}
-                >
-                  Back
-                </Button>
-              </div>
-            </form>
-          )}
-
-          <div style={{ marginTop: 24, textAlign: 'center', fontSize: 13, color: '#64748b' }}>
-            Don't have an account? <Link to="/register">Create one here</Link>
+          <div style={{
+            marginTop: 28, paddingTop: 20, borderTop: '1px solid #f1f5f9',
+            textAlign: 'center', fontSize: 14, color: '#64748b',
+          }}>
+            Don't have an account?{' '}
+            <Link to="/register" style={{ color: '#3b82f6', fontWeight: 700, textDecoration: 'none' }}>
+              Create one here
+            </Link>
           </div>
-        </Card>
+        </div>
       </div>
     </div>
   )

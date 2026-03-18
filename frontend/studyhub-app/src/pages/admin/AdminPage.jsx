@@ -163,43 +163,12 @@ function AccessDeniedCard({ user }) {
   )
 }
 
-function AdminMfaRequiredCard() {
-  return (
-    <section
-      style={{
-        background: '#fff',
-        borderRadius: 18,
-        border: '1px solid #fde68a',
-        padding: '26px 24px',
-        boxShadow: '0 8px 24px rgba(15, 23, 42, 0.06)',
-      }}
-    >
-      <div style={{ fontSize: 11, fontWeight: 800, color: '#b45309', letterSpacing: '.08em', marginBottom: 10 }}>
-        ADMIN SECURITY REQUIRED
-      </div>
-      <h1 style={{ margin: '0 0 10px', fontSize: 24, color: '#0f172a' }}>Enable 2-step verification first</h1>
-      <p style={{ margin: '0 0 16px', fontSize: 14, color: '#475569', lineHeight: 1.8, maxWidth: 720 }}>
-        Admin tools stay locked until this account enables 2-step verification. Your session is active, but admin routes
-        remain blocked until setup is completed in Settings.
-      </p>
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-        <Link to="/settings" style={primaryButtonLink}>
-          Open settings
-        </Link>
-        <Link to="/feed" style={secondaryButtonLink}>
-          Back to feed
-        </Link>
-      </div>
-    </section>
-  )
-}
 
 export default function AdminPage() {
   const navigate = useNavigate()
   const { user, clearSession } = useSession()
   const layout = useResponsiveAppLayout()
   const isAdmin = user?.role === 'admin'
-  const adminMfaRequired = isAdmin && !user?.twoFaEnabled
   const [activeTab, setActiveTab] = useState('overview')
   const [overview, setOverview] = useState({ loading: true, loaded: false, error: '', stats: null })
   const [usersState, setUsersState] = useState(createPageState)
@@ -245,10 +214,6 @@ export default function AdminPage() {
   }, [clearSession, navigate])
 
   const loadOverview = useCallback(async ({ signal } = {}) => {
-    if (adminMfaRequired) {
-      setOverview({ loading: false, loaded: false, error: '', stats: null })
-      return
-    }
 
     try {
       setOverview((current) => ({ ...current, loading: true, error: '' }))
@@ -285,11 +250,9 @@ export default function AdminPage() {
         stats: current.stats,
       }))
     }
-  }, [adminMfaRequired, clearSession, navigate])
+  }, [clearSession, navigate])
 
   const loadPagedData = useCallback(async (tab, page = 1) => {
-    if (adminMfaRequired) return
-
     const stateSetters = {
       users: setUsersState,
       sheets: setSheetsState,
@@ -337,7 +300,7 @@ export default function AdminPage() {
         error: error.message || 'Could not load this tab.',
       }))
     }
-  }, [adminMfaRequired, apiJson, reviewStatus, suppressionQuery, suppressionStatus])
+  }, [apiJson, reviewStatus, suppressionQuery, suppressionStatus])
 
   useEffect(() => {
     if (!user || user.role !== 'admin') return
@@ -656,8 +619,6 @@ export default function AdminPage() {
           {!isAdmin ? (
             // Keep the route shell mounted so non-admin users understand why /admin is unavailable without losing their session.
             <AccessDeniedCard user={user} />
-          ) : adminMfaRequired ? (
-            <AdminMfaRequiredCard />
           ) : (
             <>
               <section
