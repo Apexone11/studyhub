@@ -450,6 +450,8 @@ async function ensureAdminUser(prisma) {
   if (email && existingUser.email !== email) {
     updates.email = email
     updates.emailVerified = true
+  } else if (email && !existingUser.emailVerified) {
+    updates.emailVerified = true
   }
 
   if (nextPasswordHash) {
