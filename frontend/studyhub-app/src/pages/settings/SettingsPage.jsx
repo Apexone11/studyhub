@@ -1,9 +1,16 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+ * SettingsPage.jsx — Account settings with tabbed navigation
+ *
+ * Layout: Sticky header + 2-column (tabs sidebar | tab content).
+ * Responsive: On phone, tabs become a horizontal scrollable row.
+ * 7 tabs: Profile, Security, Notifications, Privacy, Courses, Appearance, Account
+ * ═══════════════════════════════════════════════════════════════════════════ */
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { LogoMark } from '../../components/Icons'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import Navbar from '../../components/Navbar'
 import { API } from '../../config'
 import { useSession } from '../../lib/session-context'
-import { Button, FONT } from './settingsShared'
+import { FONT } from './settingsShared'
 import ProfileTab from './ProfileTab'
 import SecurityTab from './SecurityTab'
 import CoursesTab from './CoursesTab'
@@ -134,22 +141,23 @@ export default function SettingsPage() {
     }
   }
 
+  /* Sign out action button for navbar */
+  const navActions = (
+    <button
+      onClick={() => signOut().then(() => navigate('/login', { replace: true }))}
+      style={{
+        padding: '6px 14px', borderRadius: 8, border: '1px solid #334155',
+        background: 'transparent', color: '#94a3b8', fontSize: 12, fontWeight: 700,
+        cursor: 'pointer', fontFamily: FONT,
+      }}
+    >
+      Sign Out
+    </button>
+  )
+
   return (
     <div style={{ minHeight: '100vh', background: '#edf0f5', fontFamily: FONT }}>
-      <header style={{ position: 'sticky', top: 0, zIndex: 20, background: '#0f172a', borderBottom: '1px solid #1e293b' }}>
-        <div style={{ maxWidth: 1180, margin: '0 auto', padding: '0 24px', height: 64, display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Link to="/feed" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
-            <LogoMark size={28} />
-            <span style={{ fontSize: 20, fontWeight: 800, color: '#fff' }}>StudyHub</span>
-          </Link>
-          <span style={{ fontSize: 15, fontWeight: 700, color: '#94a3b8' }}>Settings</span>
-          <div style={{ marginLeft: 'auto' }}>
-            <Button secondary onClick={() => signOut().then(() => navigate('/login', { replace: true }))}>
-              Sign Out
-            </Button>
-          </div>
-        </div>
-      </header>
+      <Navbar crumbs={[{ label: 'Settings', to: '/settings' }]} hideTabs actions={navActions} />
 
       <div className="settings-layout" style={{ maxWidth: 1180, margin: '0 auto', padding: '28px 24px 60px' }}>
         <aside>

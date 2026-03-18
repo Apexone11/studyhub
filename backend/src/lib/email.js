@@ -19,7 +19,10 @@ function escapeHtml(value) {
 }
 
 function getFromAddress() {
-  return (process.env.EMAIL_FROM || process.env.EMAIL_USER || DEFAULT_ADMIN_EMAIL).trim()
+  const raw = (process.env.EMAIL_FROM || process.env.EMAIL_USER || DEFAULT_ADMIN_EMAIL).trim()
+  // Extract bare email if the value already includes a display name (e.g. "Name <email>")
+  const match = raw.match(/<([^>]+)>/)
+  return match ? match[1] : raw
 }
 
 function getAdminEmail() {
@@ -114,7 +117,7 @@ async function getSuppressedRecipients(toValue) {
   if (lookupEmails.length === 0) return []
 
   try {
-    return prisma.emailSuppression.findMany({
+    return await prisma.emailSuppression.findMany({
       where: {
         active: true,
         email: { in: lookupEmails },
@@ -222,6 +225,8 @@ async function validateEmailTransport({ logger = console, strict = false } = {})
     }
 
     try {
+      /* Try /domains as a health check. Send-only API keys lack permission
+       * for this endpoint — treat 403 as "key is valid, just restricted". */
       const response = await fetch(`${resendConfig.baseUrl}/domains`, {
         method: 'GET',
         headers: {
@@ -229,16 +234,17 @@ async function validateEmailTransport({ logger = console, strict = false } = {})
         },
       })
 
-      if (!response.ok) {
-        const responsePayload = await parseJsonSafely(response)
-        const errorMessage = responsePayload?.message
-          || responsePayload?.error
-          || `${response.status} ${response.statusText}`.trim()
-        throw new Error(`Resend API validation failed: ${errorMessage}`)
+      const isRestrictedKey = !response.ok && (await parseJsonSafely(response.clone()))?.name === 'restricted_api_key'
+      if (response.ok || isRestrictedKey) {
+        logger.info?.('[email] transport ready (resend)')
+        return { ok: true, mode }
       }
 
-      logger.info?.('[email] transport ready (resend)')
-      return { ok: true, mode }
+      const responsePayload = await parseJsonSafely(response)
+      const errorMessage = responsePayload?.message
+        || responsePayload?.error
+        || `${response.status} ${response.statusText}`.trim()
+      throw new Error(`Resend API validation failed: ${errorMessage}`)
     } catch (error) {
       const message = `Email transport validation failed (${mode}): ${error.message}`
       if (strict) throw new Error(message)
@@ -461,38 +467,6 @@ async function sendEmailVerification(toEmail, username, code) {
   }, 'email-verification')
 }
 
-/**
- * Send a 2FA verification code via email.
- * @param {string} toEmail  - Recipient email address
- * @param {string} username - Recipient username
- * @param {string} code     - 6-digit 2FA code
- */
-async function sendTwoFaCode(toEmail, username, code) {
-  const body = `
-    <h2 style="margin:0 0 8px;color:#1e3a5f;font-size:22px;">Two-Step Verification</h2>
-    <p style="margin:0 0 24px;color:#6b7280;font-size:15px;">Hi <strong>${escapeHtml(username)}</strong>, here is your sign-in code. It expires in 10 minutes.</p>
-    <div style="text-align:center;margin:0 0 24px;">
-      <div style="display:inline-block;background:#f0f4f8;border:2px solid #3b82f6;border-radius:12px;padding:20px 40px;">
-        <span style="font-size:36px;font-weight:bold;letter-spacing:8px;color:#1e3a5f;">${escapeHtml(code)}</span>
-      </div>
-    </div>
-    <p style="margin:0;color:#9ca3af;font-size:13px;">If you did not attempt to sign in, change your password immediately.</p>
-  `
-
-  await deliverMail({
-    from: `"StudyHub" <${getFromAddress()}>`,
-    to: toEmail,
-    subject: 'Your StudyHub sign-in code',
-    text: [
-      `Hi ${username},`,
-      '',
-      `Your StudyHub sign-in code is: ${code}`,
-      '',
-      'It expires in 10 minutes. If you did not try to sign in, change your password immediately.',
-    ].join('\n'),
-    html: htmlWrap('Your StudyHub Sign-In Code', body),
-  }, 'two-factor')
-}
 
 /**
  * Send a course request notification to the company/admin inbox.
@@ -572,7 +546,6 @@ module.exports = {
   getAdminEmail,
   sendPasswordReset,
   sendEmailVerification,
-  sendTwoFaCode,
   sendCourseRequestNotice,
   sendEmailSmoke,
   validateEmailTransport,

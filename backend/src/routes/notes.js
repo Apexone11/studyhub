@@ -24,15 +24,24 @@ router.get('/', async (req, res) => {
   try {
     const where = { userId: req.user.userId }
     if (q) where.title = { contains: q, mode: 'insensitive' }
-    if (courseId) where.courseId = parseInt(courseId)
+    if (courseId) where.courseId = parseInt(courseId, 10)
     if (priv !== undefined) where.private = priv === 'true'
 
-    const notes = await prisma.note.findMany({
-      where,
-      include: { course: { select: { id: true, code: true } } },
-      orderBy: { updatedAt: 'desc' },
-    })
-    res.json(notes)
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1)
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 50))
+    const skip = (page - 1) * limit
+
+    const [notes, total] = await Promise.all([
+      prisma.note.findMany({
+        where,
+        include: { course: { select: { id: true, code: true } } },
+        orderBy: { updatedAt: 'desc' },
+        take: limit,
+        skip,
+      }),
+      prisma.note.count({ where }),
+    ])
+    res.json({ notes, total, page, limit })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })

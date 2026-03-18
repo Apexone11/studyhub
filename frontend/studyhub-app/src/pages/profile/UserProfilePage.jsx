@@ -1,151 +1,176 @@
-// UserProfilePage loads a public profile while preserving the authenticated user's follow controls.
+/* ═══════════════════════════════════════════════════════════════════════════
+ * UserProfilePage.jsx — Public user profile with follow controls
+ *
+ * Layout (responsive):
+ *   Desktop: Profile header + 2-column (Recent Sheets | Enrolled Courses)
+ *   Phone:   Stacked single column, stats wrap, responsive avatar
+ *
+ * Uses the shared Navbar for navigation consistency across the app.
+ * ═══════════════════════════════════════════════════════════════════════════ */
 import { useState, useEffect } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
+import Navbar from '../../components/Navbar'
+import { IconSheets, IconStar } from '../../components/Icons'
 import { API } from '../../config'
 import { useSession } from '../../lib/session-context'
 
-const authHeaders = () => ({
-  'Content-Type': 'application/json',
-})
+const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
+
+function authHeaders() {
+  return { 'Content-Type': 'application/json' }
+}
 
 export default function UserProfilePage() {
   const { username } = useParams()
   const navigate = useNavigate()
   const { user: currentUser, isAuthenticated } = useSession()
 
-  const [profile,   setProfile]   = useState(null)
-  const [loading,   setLoading]   = useState(true)
-  const [error,     setError]     = useState(null)
+  /* ── State ───────────────────────────────────────────────────────────── */
+  const [profile, setProfile] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [following, setFollowing] = useState(false)
   const [followers, setFollowers] = useState(0)
-  const [toggling,  setToggling]  = useState(false)
+  const [toggling, setToggling] = useState(false)
 
   const isOwnProfile = currentUser?.username === username
 
+  /* ── Load profile data ───────────────────────────────────────────────── */
   useEffect(() => {
-    setLoading(true); setError(null)
+    setLoading(true)
+    setError(null)
     fetch(`${API}/api/users/${username}`, { headers: authHeaders() })
-      .then(r => { if (!r.ok) throw new Error(`${r.status}`); return r.json() })
-      .then(data => {
+      .then(async (r) => {
+        if (!r.ok) {
+          const body = await r.json().catch(() => ({}))
+          throw new Error(body.error || (r.status === 404 ? 'This user does not exist.' : 'Could not load this profile.'))
+        }
+        return r.json()
+      })
+      .then((data) => {
         setProfile(data)
         setFollowing(data.isFollowing || false)
         setFollowers(data.followerCount || 0)
       })
-      .catch(err => setError(err.message))
+      .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
   }, [username])
 
+  /* ── Follow/Unfollow toggle ──────────────────────────────────────────── */
   async function handleFollowToggle() {
     if (!isAuthenticated) { navigate('/login'); return }
     setToggling(true)
     try {
       const method = following ? 'DELETE' : 'POST'
       const res = await fetch(`${API}/api/users/${username}/follow`, {
-        method, headers: authHeaders(),
+        method,
+        headers: authHeaders(),
       })
+      const data = await res.json()
       if (res.ok) {
-        const data = await res.json()
         setFollowing(data.following)
         setFollowers(data.followerCount)
+      } else {
+        setError(data.error || 'Could not update follow status.')
       }
-    } catch { /* ignore */ }
+    } catch {
+      setError('Could not connect to the server.')
+    }
     finally { setToggling(false) }
   }
 
-  const fmtDate = d => d ? new Date(d).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : ''
+  /* ── Helpers ─────────────────────────────────────────────────────────── */
+  const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : ''
   const initials = username ? username.slice(0, 2).toUpperCase() : '??'
 
+  /* ── Loading state ───────────────────────────────────────────────────── */
   if (loading) return (
-    <div style={styles.page}>
-      <header style={styles.header}>
-        <Link to="/feed" style={styles.logoLink}>
-          <span style={styles.logoText}>Study<span style={{ color: '#3b82f6' }}>Hub</span></span>
-        </Link>
-      </header>
-      <div style={styles.shell}>
-        <div style={{ ...styles.card, textAlign: 'center', padding: 48, color: '#94a3b8' }}>
-          <i className="fas fa-circle-notch fa-spin" style={{ fontSize: 28, marginBottom: 12, display: 'block' }}></i>
+    <div style={{ minHeight: '100vh', background: '#edf0f5', fontFamily: FONT }}>
+      <Navbar crumbs={[{ label: username, to: `/user/${username}` }]} hideTabs />
+      <div style={{ maxWidth: 900, margin: '0 auto', padding: 'clamp(20px, 3vw, 40px) clamp(16px, 2vw, 24px)' }}>
+        <div style={{ background: '#fff', borderRadius: 18, border: '1px solid #e2e8f0', padding: 48, textAlign: 'center', color: '#94a3b8' }}>
           Loading profile…
         </div>
       </div>
     </div>
   )
 
+  /* ── Error state ─────────────────────────────────────────────────────── */
   if (error) return (
-    <div style={styles.page}>
-      <header style={styles.header}>
-        <Link to="/feed" style={styles.logoLink}>
-          <span style={styles.logoText}>Study<span style={{ color: '#3b82f6' }}>Hub</span></span>
-        </Link>
-      </header>
-      <div style={styles.shell}>
-        <div style={{ ...styles.card, textAlign: 'center', padding: 48 }}>
-          <i className="fas fa-user-slash" style={{ fontSize: 36, color: '#cbd5e1', marginBottom: 14, display: 'block' }}></i>
-          <div style={{ fontWeight: 700, fontSize: 18, color: '#1e3a5f', marginBottom: 8 }}>User not found</div>
-          <div style={{ fontSize: 14, color: '#94a3b8', marginBottom: 20 }}>
-            {error === '404' ? 'This user does not exist.' : `Error ${error}`}
+    <div style={{ minHeight: '100vh', background: '#edf0f5', fontFamily: FONT }}>
+      <Navbar crumbs={[{ label: 'Profile', to: '#' }]} hideTabs />
+      <div style={{ maxWidth: 900, margin: '0 auto', padding: 'clamp(20px, 3vw, 40px) clamp(16px, 2vw, 24px)' }}>
+        <div style={{ background: '#fff', borderRadius: 18, border: '1px solid #e2e8f0', padding: 48, textAlign: 'center' }}>
+          <div style={{ fontSize: 36, color: '#cbd5e1', marginBottom: 14 }}>{/private|classmates/i.test(error) ? '🔒' : '👤'}</div>
+          <div style={{ fontWeight: 700, fontSize: 18, color: '#0f172a', marginBottom: 8 }}>
+            {/private|classmates/i.test(error) ? 'Profile not available' : 'User not found'}
           </div>
-          <Link to="/sheets" style={styles.btnPrimary}>Browse Sheets</Link>
+          <div style={{ fontSize: 14, color: '#94a3b8', marginBottom: 20 }}>
+            {error}
+          </div>
+          <Link to="/sheets" style={{ display: 'inline-flex', padding: '10px 22px', borderRadius: 10, background: '#3b82f6', color: '#fff', fontWeight: 700, fontSize: 14, textDecoration: 'none' }}>
+            Browse Sheets
+          </Link>
         </div>
       </div>
     </div>
   )
 
+  /* ── Main profile view ───────────────────────────────────────────────── */
   return (
-    <div style={styles.page}>
-      <header style={styles.header}>
-        <Link to="/feed" style={styles.logoLink}>
-          <span style={styles.logoText}>Study<span style={{ color: '#3b82f6' }}>Hub</span></span>
-        </Link>
-        <Link to="/feed" style={styles.backLink}>
-          <i className="fas fa-arrow-left" style={{ marginRight: 6 }}></i>Back to Feed
-        </Link>
-      </header>
+    <div style={{ minHeight: '100vh', background: '#edf0f5', fontFamily: FONT }}>
+      <Navbar crumbs={[{ label: profile.username, to: `/user/${username}` }]} hideTabs />
 
-      <div style={styles.shell}>
-        {/* Profile Card */}
-        <div style={{ ...styles.card, marginBottom: 20 }}>
-          <div style={styles.profileHeader}>
-            {/* Avatar */}
-            <div style={styles.avatar}>
+      <div style={{ maxWidth: 900, margin: '0 auto', padding: 'clamp(20px, 3vw, 40px) clamp(16px, 2vw, 24px)' }}>
+        {/* ── Profile card ─────────────────────────────────────────────── */}
+        <div style={{ background: '#fff', borderRadius: 18, border: '1px solid #e2e8f0', padding: 'clamp(20px, 3vw, 28px)', marginBottom: 20, boxShadow: '0 2px 10px rgba(15,23,42,0.05)' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'clamp(14px, 2vw, 20px)', flexWrap: 'wrap' }}>
+            {/* Avatar — responsive sizing via clamp */}
+            <div style={{
+              width: 'clamp(56px, 8vw, 80px)',
+              height: 'clamp(56px, 8vw, 80px)',
+              borderRadius: '50%',
+              background: '#0f172a',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              overflow: 'hidden',
+            }}>
               {profile.avatarUrl
                 ? <img src={profile.avatarUrl.startsWith('http') ? profile.avatarUrl : `${API}${profile.avatarUrl}`} alt={profile.username} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
-                : <span style={styles.avatarInitials}>{initials}</span>
+                : <span style={{ fontSize: 'clamp(20px, 3vw, 28px)', fontWeight: 800, color: '#fff' }}>{initials}</span>
               }
             </div>
 
-            {/* Info */}
+            {/* Info column */}
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
-                <h1 style={styles.username}>{profile.username}</h1>
+                <h1 style={{ margin: 0, fontSize: 'clamp(18px, 2.5vw, 22px)', fontWeight: 800, color: '#0f172a' }}>{profile.username}</h1>
                 {profile.role === 'admin'
-                  ? <span style={styles.adminBadge}>
-                      <i className="fas fa-crown" style={{ color: '#f59e0b', marginRight: 4 }}></i>Admin
-                    </span>
-                  : <span style={styles.studentBadge}>
-                      <i className="fas fa-graduation-cap" style={{ color: '#3b82f6', marginRight: 4 }}></i>Student
-                    </span>
+                  ? <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 99, background: '#fef9ec', color: '#92400e', border: '1px solid #fde68a' }}>Admin</span>
+                  : <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 99, background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>Student</span>
                 }
               </div>
               <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 16 }}>
                 Joined {fmtDate(profile.createdAt)}
               </div>
 
-              {/* Stats */}
-              <div style={styles.statsRow}>
-                <div style={styles.stat}>
-                  <div style={styles.statValue}>{profile.sheetCount || 0}</div>
-                  <div style={styles.statLabel}>Sheets</div>
+              {/* Stats — flex-wrap for responsive */}
+              <div className="profile-stats-row">
+                <div style={{ textAlign: 'center', padding: '8px 20px' }}>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: '#0f172a' }}>{profile.sheetCount || 0}</div>
+                  <div style={{ fontSize: 12, color: '#94a3b8' }}>Sheets</div>
                 </div>
-                <div style={styles.statDivider} />
-                <div style={styles.stat}>
-                  <div style={styles.statValue}>{followers}</div>
-                  <div style={styles.statLabel}>Followers</div>
+                <div style={{ width: 1, height: 36, background: '#e8ecf0' }} />
+                <div style={{ textAlign: 'center', padding: '8px 20px' }}>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: '#0f172a' }}>{followers}</div>
+                  <div style={{ fontSize: 12, color: '#94a3b8' }}>Followers</div>
                 </div>
-                <div style={styles.statDivider} />
-                <div style={styles.stat}>
-                  <div style={styles.statValue}>{profile.followingCount || 0}</div>
-                  <div style={styles.statLabel}>Following</div>
+                <div style={{ width: 1, height: 36, background: '#e8ecf0' }} />
+                <div style={{ textAlign: 'center', padding: '8px 20px' }}>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: '#0f172a' }}>{profile.followingCount || 0}</div>
+                  <div style={{ fontSize: 12, color: '#94a3b8' }}>Following</div>
                 </div>
               </div>
             </div>
@@ -153,21 +178,23 @@ export default function UserProfilePage() {
             {/* Action buttons */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignSelf: 'flex-start' }}>
               {isOwnProfile
-                ? <Link to="/settings" style={styles.btnGhost}>
-                    <i className="fas fa-pen" style={{ marginRight: 6 }}></i>Edit Profile
+                ? <Link to="/settings" style={{ display: 'inline-flex', alignItems: 'center', padding: '8px 16px', borderRadius: 10, background: '#fff', color: '#475569', fontWeight: 700, fontSize: 13, textDecoration: 'none', border: '1px solid #e2e8f0' }}>
+                    Edit Profile
                   </Link>
                 : currentUser && (
                     <button
                       onClick={handleFollowToggle}
                       disabled={toggling}
-                      style={following ? styles.btnFollowing : styles.btnFollow}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center',
+                        padding: '8px 18px', borderRadius: 10, fontWeight: 700, fontSize: 13,
+                        border: following ? '1px solid #bbf7d0' : 'none',
+                        background: following ? '#f0fdf4' : '#3b82f6',
+                        color: following ? '#166534' : '#fff',
+                        cursor: toggling ? 'wait' : 'pointer', fontFamily: 'inherit',
+                      }}
                     >
-                      {toggling
-                        ? <i className="fas fa-circle-notch fa-spin"></i>
-                        : following
-                          ? <><i className="fas fa-user-check" style={{ marginRight: 6 }}></i>Following</>
-                          : <><i className="fas fa-user-plus" style={{ marginRight: 6 }}></i>Follow</>
-                      }
+                      {toggling ? '...' : following ? 'Following' : 'Follow'}
                     </button>
                   )
               }
@@ -175,296 +202,67 @@ export default function UserProfilePage() {
           </div>
         </div>
 
-        {/* Two-column layout */}
-        <div style={styles.columns}>
+        {/* ── Two-column content: sheets | courses ─────────────────────── */}
+        <div className="profile-columns">
           {/* Recent Sheets */}
-          <div style={{ flex: 2, minWidth: 0 }}>
-            <div style={styles.card}>
-              <h2 style={styles.sectionTitle}>
-                <i className="fas fa-file-lines" style={{ marginRight: 8, color: '#3b82f6' }}></i>
-                Recent Sheets
-              </h2>
-              {profile.recentSheets && profile.recentSheets.length > 0
-                ? profile.recentSheets.map(sheet => (
-                    <Link key={sheet.id} to={`/sheets/${sheet.id}`} style={styles.sheetRow}>
-                      <div style={styles.sheetRowTitle}>{sheet.title}</div>
-                      <div style={styles.sheetRowMeta}>
-                        {sheet.course?.code && (
-                          <span style={styles.courseChip}>{sheet.course.code}</span>
-                        )}
-                        <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 'auto' }}>
-                          <i className="fas fa-star" style={{ marginRight: 4, color: '#f59e0b' }}></i>{sheet.stars || 0}
-                          <i className="fas fa-code-fork" style={{ marginLeft: 10, marginRight: 4, color: '#10b981' }}></i>{sheet.forks || 0}
+          <div style={{ background: '#fff', borderRadius: 18, border: '1px solid #e2e8f0', padding: '24px 28px', boxShadow: '0 2px 10px rgba(15,23,42,0.05)' }}>
+            <h2 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <IconSheets size={16} style={{ color: '#3b82f6' }} />
+              Recent Sheets
+            </h2>
+            {profile.recentSheets && profile.recentSheets.length > 0
+              ? profile.recentSheets.map((sheet) => (
+                  <Link key={sheet.id} to={`/sheets/${sheet.id}`} style={{ display: 'block', padding: '12px 0', borderBottom: '1px solid #f1f5f9', textDecoration: 'none' }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: '#0f172a', marginBottom: 6 }}>{sheet.title}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {sheet.course?.code && (
+                        <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>
+                          {sheet.course.code}
                         </span>
-                      </div>
-                    </Link>
-                  ))
-                : (
-                    <div style={styles.emptyState}>
-                      <i className="fas fa-file-lines" style={{ fontSize: 28, color: '#cbd5e1', marginBottom: 10, display: 'block' }}></i>
-                      No public sheets yet
+                      )}
+                      <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <IconStar size={12} /> {sheet.stars || 0}
+                      </span>
                     </div>
-                  )
-              }
-            </div>
+                  </Link>
+                ))
+              : (
+                  <div style={{ textAlign: 'center', padding: '28px 0', fontSize: 14, color: '#94a3b8' }}>
+                    <div style={{ fontSize: 28, color: '#cbd5e1', marginBottom: 10 }}>📄</div>
+                    No public sheets yet
+                  </div>
+                )
+            }
           </div>
 
-          {/* Courses */}
-          <div style={{ flex: 1, minWidth: 240 }}>
-            <div style={styles.card}>
-              <h2 style={styles.sectionTitle}>
-                <i className="fas fa-book" style={{ marginRight: 8, color: '#8b5cf6' }}></i>
-                Enrolled Courses
-              </h2>
-              {profile.enrollments && profile.enrollments.length > 0
-                ? (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                      {profile.enrollments.map(e => (
-                        <span key={e.id} style={styles.enrollChip}>
-                          <span style={{ fontWeight: 700 }}>{e.course?.code}</span>
-                          {e.course?.school?.name && (
-                            <span style={{ color: '#94a3b8', marginLeft: 4, fontSize: 11 }}>· {e.course.school.name}</span>
-                          )}
-                        </span>
-                      ))}
-                    </div>
-                  )
-                : (
-                    <div style={styles.emptyState}>
-                      <i className="fas fa-book-open" style={{ fontSize: 24, color: '#cbd5e1', marginBottom: 8, display: 'block' }}></i>
-                      No enrolled courses
-                    </div>
-                  )
-              }
-            </div>
+          {/* Enrolled Courses */}
+          <div style={{ background: '#fff', borderRadius: 18, border: '1px solid #e2e8f0', padding: '24px 28px', boxShadow: '0 2px 10px rgba(15,23,42,0.05)' }}>
+            <h2 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
+              📚 Enrolled Courses
+            </h2>
+            {profile.enrollments && profile.enrollments.length > 0
+              ? (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {profile.enrollments.map((e) => (
+                      <span key={e.id} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 99, background: '#f8fafc', border: '1px solid #e2e8f0', color: '#334155', display: 'inline-flex', alignItems: 'center' }}>
+                        <span style={{ fontWeight: 700 }}>{e.course?.code}</span>
+                        {e.course?.school?.name && (
+                          <span style={{ color: '#94a3b8', marginLeft: 4, fontSize: 11 }}>· {e.course.school.name}</span>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                )
+              : (
+                  <div style={{ textAlign: 'center', padding: '28px 0', fontSize: 14, color: '#94a3b8' }}>
+                    <div style={{ fontSize: 24, color: '#cbd5e1', marginBottom: 8 }}>📚</div>
+                    No enrolled courses
+                  </div>
+                )
+            }
           </div>
         </div>
       </div>
     </div>
   )
-}
-
-const styles = {
-  page: {
-    minHeight: '100vh',
-    background: '#edf0f5',
-    fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
-  },
-  header: {
-    background: '#0f172a',
-    height: 62,
-    display: 'flex',
-    alignItems: 'center',
-    padding: '0 clamp(16px, 2.5vw, 40px)',
-    gap: 16,
-    borderBottom: '1px solid #1e293b',
-    position: 'sticky',
-    top: 0,
-    zIndex: 100,
-  },
-  logoLink: { textDecoration: 'none' },
-  logoText: { fontWeight: 800, fontSize: 18, color: '#fff' },
-  backLink: {
-    marginLeft: 'auto',
-    fontSize: 13,
-    color: '#94a3b8',
-    textDecoration: 'none',
-  },
-  shell: {
-    maxWidth: 860,
-    margin: '0 auto',
-    padding: 'clamp(20px, 3vw, 40px) clamp(16px, 2vw, 24px)',
-  },
-  card: {
-    background: '#fff',
-    borderRadius: 14,
-    border: '1px solid #e8ecf0',
-    padding: '24px 28px',
-    boxShadow: '0 2px 10px rgba(15,23,42,0.05)',
-  },
-  profileHeader: {
-    display: 'flex',
-    alignItems: 'flex-start',
-    gap: 20,
-    flexWrap: 'wrap',
-  },
-  avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: '50%',
-    background: '#0f172a',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-    overflow: 'hidden',
-  },
-  avatarInitials: {
-    fontSize: 26,
-    fontWeight: 800,
-    color: '#fff',
-  },
-  username: {
-    margin: 0,
-    fontSize: 22,
-    fontWeight: 800,
-    color: '#0f172a',
-  },
-  adminBadge: {
-    fontSize: 12,
-    fontWeight: 700,
-    padding: '3px 10px',
-    borderRadius: 99,
-    background: '#fef9ec',
-    color: '#92400e',
-    border: '1px solid #fde68a',
-    display: 'flex',
-    alignItems: 'center',
-  },
-  studentBadge: {
-    fontSize: 12,
-    fontWeight: 700,
-    padding: '3px 10px',
-    borderRadius: 99,
-    background: '#eff6ff',
-    color: '#1d4ed8',
-    border: '1px solid #bfdbfe',
-    display: 'flex',
-    alignItems: 'center',
-  },
-  statsRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 0,
-  },
-  stat: {
-    textAlign: 'center',
-    padding: '8px 20px',
-  },
-  statValue: {
-    fontSize: 20,
-    fontWeight: 800,
-    color: '#0f172a',
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#94a3b8',
-    fontWeight: 500,
-  },
-  statDivider: {
-    width: 1,
-    height: 36,
-    background: '#e8ecf0',
-  },
-  btnPrimary: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    padding: '10px 22px',
-    borderRadius: 9,
-    background: '#3b82f6',
-    color: '#fff',
-    fontWeight: 700,
-    fontSize: 14,
-    textDecoration: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    fontFamily: 'inherit',
-  },
-  btnGhost: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    padding: '8px 16px',
-    borderRadius: 9,
-    background: '#fff',
-    color: '#475569',
-    fontWeight: 700,
-    fontSize: 13,
-    textDecoration: 'none',
-    border: '1px solid #e2e8f0',
-    cursor: 'pointer',
-    fontFamily: 'inherit',
-  },
-  btnFollow: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    padding: '8px 18px',
-    borderRadius: 9,
-    background: '#3b82f6',
-    color: '#fff',
-    fontWeight: 700,
-    fontSize: 13,
-    border: 'none',
-    cursor: 'pointer',
-    fontFamily: 'inherit',
-  },
-  btnFollowing: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    padding: '8px 18px',
-    borderRadius: 9,
-    background: '#f0fdf4',
-    color: '#166534',
-    fontWeight: 700,
-    fontSize: 13,
-    border: '1px solid #bbf7d0',
-    cursor: 'pointer',
-    fontFamily: 'inherit',
-  },
-  columns: {
-    display: 'flex',
-    gap: 16,
-    alignItems: 'flex-start',
-    flexWrap: 'wrap',
-  },
-  sectionTitle: {
-    margin: '0 0 16px',
-    fontSize: 15,
-    fontWeight: 700,
-    color: '#1e3a5f',
-    display: 'flex',
-    alignItems: 'center',
-  },
-  sheetRow: {
-    display: 'block',
-    padding: '12px 0',
-    borderBottom: '1px solid #f1f5f9',
-    textDecoration: 'none',
-    cursor: 'pointer',
-  },
-  sheetRowTitle: {
-    fontSize: 14,
-    fontWeight: 600,
-    color: '#0f172a',
-    marginBottom: 6,
-  },
-  sheetRowMeta: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-  },
-  courseChip: {
-    fontSize: 11,
-    fontWeight: 700,
-    padding: '2px 8px',
-    borderRadius: 99,
-    background: '#eff6ff',
-    color: '#1d4ed8',
-    border: '1px solid #bfdbfe',
-  },
-  emptyState: {
-    textAlign: 'center',
-    padding: '28px 0',
-    fontSize: 14,
-    color: '#94a3b8',
-  },
-  enrollChip: {
-    fontSize: 12,
-    padding: '4px 12px',
-    borderRadius: 99,
-    background: '#f8fafc',
-    border: '1px solid #e2e8f0',
-    color: '#334155',
-    display: 'inline-flex',
-    alignItems: 'center',
-  },
 }

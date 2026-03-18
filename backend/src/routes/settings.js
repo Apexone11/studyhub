@@ -238,6 +238,9 @@ router.patch('/password', twoFaLimiter, async (req, res) => {
   if (newPassword.length < 8) {
     return res.status(400).json({ error: 'New password must be at least 8 characters.' })
   }
+  if (!/[A-Z]/.test(newPassword) || !/\d/.test(newPassword)) {
+    return res.status(400).json({ error: 'New password must include at least one capital letter and one number.' })
+  }
   if (currentPassword === newPassword) {
     return res.status(400).json({ error: 'New password must be different from current password.' })
   }

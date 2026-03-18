@@ -8,6 +8,7 @@ import { getApiErrorMessage, readJsonSafely } from '../../lib/http'
 import { useSession } from '../../lib/session-context'
 import { pageShell, useResponsiveAppLayout } from '../../lib/ui'
 import { useLivePolling } from '../../lib/useLivePolling'
+import ModerationTab from './ModerationTab'
 
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 const PAGE_SIZE = 20
@@ -20,6 +21,7 @@ const TABS = [
   ['announcements', 'Announcements'],
   ['deletion-reasons', 'Deletion Reasons'],
   ['email-suppressions', 'Email Suppressions'],
+  ['moderation', 'Moderation'],
   ['settings', 'Admin Settings'],
 ]
 
@@ -77,7 +79,7 @@ function StatsGrid({ stats }) {
   ]
 
   return (
-    <div className="admin-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 14 }}>
+    <div className="admin-stats-grid" style={{ gap: 14 }}>
       {cards.map(([label, value, tone]) => (
         <div
           key={label}
@@ -702,7 +704,11 @@ export default function AdminPage() {
             </section>
               ) : null}
 
-              {activeTab !== 'overview' && activeTab !== 'settings' ? (
+              {activeTab === 'moderation' ? (
+                <ModerationTab apiJson={apiJson} setConfirmAction={setConfirmAction} formatDateTime={formatDateTime} />
+              ) : null}
+
+              {activeTab !== 'overview' && activeTab !== 'settings' && activeTab !== 'moderation' ? (
             <section
               style={{
                 background: '#fff',

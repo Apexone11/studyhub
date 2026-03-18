@@ -1,3 +1,17 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+ * FeedPage.jsx — Social feed with posts, sheet shares, and announcements
+ *
+ * Layout (responsive via CSS class `app-three-col-grid` in responsive.css):
+ *   Desktop: sidebar (250px) | feed column (flex) | leaderboard aside (300px)
+ *   Tablet:  sidebar trigger (auto) | feed | aside (280px)
+ *   Phone:   single stacked column
+ *
+ * Features: live polling, post composer with attachments, per-course filters,
+ * inline search, leaderboard panels, like/star/helpful reactions (anime.js).
+ *
+ * Tutorial: First-visit Joyride walkthrough highlights composer, filters,
+ * search, and leaderboards. Re-trigger via floating "?" button.
+ * ═══════════════════════════════════════════════════════════════════════════ */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
@@ -20,7 +34,11 @@ import { useSession } from '../../lib/session-context'
 import { pageShell, useResponsiveAppLayout } from '../../lib/ui'
 import { useLivePolling } from '../../lib/useLivePolling'
 import { staggerEntrance, popScale } from '../../lib/animations'
+import Joyride from 'react-joyride'
+import { useTutorial } from '../../lib/useTutorial'
+import { FEED_STEPS } from '../../lib/tutorialSteps'
 
+/* ── Shared constants ──────────────────────────────────────────────────── */
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 const FILTERS = ['all', 'posts', 'sheets', 'announcements']
 
@@ -436,6 +454,9 @@ export default function FeedPage() {
   const [openPostMenuId, setOpenPostMenuId] = useState(null)
   const [deletingPostIds, setDeletingPostIds] = useState({})
 
+  /* Tutorial popup — first-visit or re-trigger via button */
+  const tutorial = useTutorial('feed', FEED_STEPS)
+
   const activeFilter = FILTERS.includes(searchParams.get('filter')) ? searchParams.get('filter') : 'all'
   const search = searchParams.get('search') || ''
 
@@ -582,12 +603,14 @@ export default function FeedPage() {
         throw new Error(data.error || 'Could not post to the feed.')
       }
 
-      // Upload attachment if one was selected
+      /* Upload attachment if one was selected.
+       * Field name MUST be 'attachment' to match the multer config in
+       * backend/src/routes/upload.js → attachmentUpload.single('attachment'). */
       let finalPost = data
       if (attachedFile && data.id) {
         try {
           const formData = new FormData()
-          formData.append('file', attachedFile)
+          formData.append('attachment', attachedFile)
           const uploadRes = await fetch(`${API}/api/upload/post-attachment/${data.id}`, {
             method: 'POST',
             body: formData,
@@ -732,17 +755,15 @@ export default function FeedPage() {
       <Navbar />
       <div style={{ background: '#edf0f5', minHeight: '100vh', fontFamily: FONT }}>
         <div style={pageShell('app', 26, 48)}>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: layout.columns.appThreeColumn,
-              gap: 22,
-              alignItems: 'start',
-            }}
-          >
+          {/* 3-column responsive grid: sidebar | feed | right panels
+           * Desktop: all 3 columns visible
+           * Tablet:  sidebar trigger (auto) + feed + right panels
+           * Phone:   single column, everything stacked */}
+          <div className="app-three-col-grid">
             <AppSidebar mode={layout.sidebarMode} />
 
             <main style={{ display: 'grid', gap: 18 }}>
+              <div data-tutorial="feed-composer">
               <Panel title="Share with your classmates" helper="Post class notes, course questions, or links to your latest sheet.">
                 <form onSubmit={submitPost} style={{ display: 'grid', gap: 12 }}>
                   <textarea
@@ -825,9 +846,10 @@ export default function FeedPage() {
                   {composeState.error ? <div style={{ color: '#dc2626', fontSize: 13 }}>{composeState.error}</div> : null}
                 </form>
               </Panel>
+              </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <div data-tutorial="feed-filters" style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                   {FILTERS.map((filter) => (
                     <button
                       key={filter}
@@ -851,6 +873,7 @@ export default function FeedPage() {
                   ))}
                 </div>
                 <input
+                  data-tutorial="feed-search"
                   value={search}
                   onChange={(event) => setQueryParam('search', event.target.value)}
                   placeholder="Search the feed..."
@@ -920,7 +943,7 @@ export default function FeedPage() {
               )}
             </main>
 
-            <aside style={{ display: 'grid', gap: 16 }}>
+            <aside className="feed-aside" data-tutorial="feed-leaderboards" style={{ display: 'grid', gap: 16 }}>
               <LeaderboardPanel
                 title="Top Starred"
                 items={leaderboards.stars}
@@ -953,6 +976,39 @@ export default function FeedPage() {
           </div>
         </div>
       </div>
+      {/* Tutorial popup — first-visit auto-start or re-trigger */}
+      <Joyride {...tutorial.joyrideProps} />
+
+      {/* Floating re-trigger button for tutorial */}
+      {tutorial.seen && (
+        <button
+          type="button"
+          onClick={tutorial.restart}
+          title="Show tutorial"
+          style={{
+            position: 'fixed',
+            bottom: 24,
+            right: 24,
+            width: 44,
+            height: 44,
+            borderRadius: '50%',
+            border: 'none',
+            background: '#3b82f6',
+            color: '#fff',
+            fontSize: 18,
+            fontWeight: 800,
+            cursor: 'pointer',
+            boxShadow: '0 4px 14px rgba(59,130,246,0.4)',
+            zIndex: 50,
+            display: 'grid',
+            placeItems: 'center',
+            fontFamily: FONT,
+          }}
+        >
+          ?
+        </button>
+      )}
+
       <ConfirmDialog
         open={deleteTarget !== null}
         title="Delete this post?"
