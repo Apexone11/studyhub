@@ -10,7 +10,7 @@ const { validateEmailTransport } = require('./lib/email')
 const { startHtmlArchiveScheduler } = require('./lib/htmlArchiveScheduler')
 const { AVATARS_DIR, validateUploadStorage } = require('./lib/storage')
 const csrfProtection = require('./middleware/csrf')
-const { guardedMode } = require('./middleware/guardedMode')
+const { guardedMode, isGuardedModeEnabled } = require('./middleware/guardedMode')
 const { ERROR_CODES, sendError } = require('./middleware/errorEnvelope')
 
 const sentryEnabled = initSentry()
@@ -242,6 +242,15 @@ async function startServer() {
   await validateEmailTransport({
     strict: String(process.env.EMAIL_STARTUP_STRICT || '').toLowerCase() === 'true',
   })
+
+  const clamAvDisabled = String(process.env.CLAMAV_DISABLED || '').toLowerCase() === 'true'
+  if (process.env.NODE_ENV !== 'test' && clamAvDisabled) {
+    console.warn('[security-warning] CLAMAV_DISABLED=true; attachment malware scanning is bypassed.')
+  }
+
+  if (isGuardedModeEnabled()) {
+    console.warn('[ops-warning] Guarded mode is enabled; non-admin write actions are temporarily blocked.')
+  }
 
   return app.listen(PORT, () => {
     startHtmlArchiveScheduler()

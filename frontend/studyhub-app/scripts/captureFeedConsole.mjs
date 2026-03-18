@@ -5,8 +5,20 @@ import { chromium } from '@playwright/test'
 const frontendBaseUrl = String(process.env.BETA_FRONTEND_BASE_URL || 'http://localhost:5173').replace(/\/$/, '')
 const apiBaseUrl = String(process.env.BETA_API_BASE_URL || 'http://localhost:4000').replace(/\/$/, '')
 const username = process.env.BETA_DIAG_USERNAME || process.env.BETA_OWNER_USERNAME || 'studyhub_owner'
-const password = process.env.BETA_DIAG_PASSWORD || process.env.BETA_OWNER_PASSWORD || 'AdminPass123'
-const providedSessionCookie = String(process.env.BETA_DIAG_SESSION_COOKIE || '').trim()
+const password = String(process.env.BETA_DIAG_PASSWORD || process.env.BETA_OWNER_PASSWORD || '').trim()
+
+function normalizeSessionCookie(value) {
+  const raw = String(value || '').trim()
+  if (!raw) return ''
+
+  if (raw.startsWith('studyhub_session=')) {
+    return raw.split(';')[0].slice('studyhub_session='.length).trim()
+  }
+
+  return raw
+}
+
+const providedSessionCookie = normalizeSessionCookie(process.env.BETA_DIAG_SESSION_COOKIE)
 const outputPath = process.env.BETA_CONSOLE_OUTPUT
   ? path.resolve(process.env.BETA_CONSOLE_OUTPUT)
   : path.resolve(process.cwd(), '..', '..', 'beta-diagnostics', 'frontend-console.json')
@@ -44,6 +56,10 @@ try {
   const context = await browser.newContext()
   let sessionCookie = providedSessionCookie
   if (!sessionCookie) {
+    if (!password) {
+      throw new Error('Missing diagnostic password. Set BETA_DIAG_PASSWORD or BETA_OWNER_PASSWORD, or pass BETA_DIAG_SESSION_COOKIE.')
+    }
+
     const authResponse = await context.request.post(`${apiBaseUrl}/api/auth/login`, {
       data: { username, password },
     })

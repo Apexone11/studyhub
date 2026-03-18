@@ -30,6 +30,7 @@ const runTransition = typeof startTransition === 'function'
 async function fetchSessionUser() {
   const response = await fetch(`${API}/api/auth/me`, {
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
   })
 
   const data = response.ok

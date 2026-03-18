@@ -3,6 +3,7 @@ const multer = require('multer')
 const path = require('path')
 const rateLimit = require('express-rate-limit')
 const requireAuth = require('../middleware/auth')
+const { ERROR_CODES, sendError } = require('../middleware/errorEnvelope')
 const { assertOwnerOrAdmin } = require('../lib/accessControl')
 const { captureError } = require('../monitoring/sentry')
 const { signatureMatchesExpected } = require('../lib/fileSignatures')
@@ -60,7 +61,7 @@ function safeAttachmentLabel(original) {
 
 function rejectSignatureMismatch(res, file, message) {
   safeUnlinkFile(file?.path)
-  return res.status(400).json({ error: message })
+  return sendError(res, 400, message, ERROR_CODES.UPLOAD_SIGNATURE_MISMATCH)
 }
 
 // ── Avatar upload ─────────────────────────────────────────────

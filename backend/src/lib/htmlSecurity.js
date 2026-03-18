@@ -129,7 +129,11 @@ function containsDangerousHrefOrSrc(value) {
         const { value: rawValue, nextIndex } = readAttributeValue(value, index + attribute.length)
         if (rawValue) {
           const normalized = stripAsciiWhitespace(rawValue).trim().toLowerCase()
-          if (normalized.startsWith('javascript:') || normalized.startsWith('data:text/html')) {
+          if (
+            normalized.startsWith('javascript:')
+            || normalized.startsWith('vbscript:')
+            || normalized.startsWith('data:')
+          ) {
             return true
           }
         }
@@ -167,7 +171,7 @@ function validateHtmlForSubmission(html) {
   }
 
   if (containsInlineEventHandler(lowered) || containsDangerousHrefOrSrc(lowered)) {
-    issues.push('HTML includes blocked inline scripting. Remove inline handlers and javascript/data:text/html URLs.')
+    issues.push('HTML includes blocked inline scripting. Remove inline handlers and javascript/vbscript/data URLs.')
   }
 
   return {

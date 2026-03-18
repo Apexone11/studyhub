@@ -22,6 +22,8 @@ describe('htmlSecurity', () => {
       '<iframe src="https://evil.example"></iframe>',
       '<img src="x" onerror="alert(1)" />',
       '<a href="javascript:alert(1)">click</a>',
+      '<a href="vbscript:msgbox(1)">click</a>',
+      '<img src="data:image/svg+xml;base64,PHN2Zy8+" />',
       '<iframe src="data:text/html;base64,SGk="></iframe>',
       '<meta http-equiv="refresh" content="0;url=https://evil.example">',
       '<base href="https://evil.example/">',

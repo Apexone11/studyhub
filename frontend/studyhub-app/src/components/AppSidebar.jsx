@@ -61,8 +61,9 @@ export default function AppSidebar({ mode = 'fixed' }) {
 
   useEffect(() => {
     if (!drawerOpen) {
-      if (previouslyFocusedRef.current && typeof previouslyFocusedRef.current.focus === 'function') {
-        previouslyFocusedRef.current.focus()
+      const focusTarget = triggerButtonRef.current || previouslyFocusedRef.current
+      if (focusTarget && typeof focusTarget.focus === 'function') {
+        focusTarget.focus()
       }
       return
     }

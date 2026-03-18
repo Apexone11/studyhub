@@ -5,7 +5,7 @@ import { chromium } from '@playwright/test'
 const frontendBaseUrl = String(process.env.BETA_FRONTEND_BASE_URL || 'http://localhost:5173').replace(/\/$/, '')
 const apiBaseUrl = String(process.env.BETA_API_BASE_URL || 'http://localhost:4000').replace(/\/$/, '')
 const username = String(process.env.BETA_DIAG_USERNAME || process.env.BETA_OWNER_USERNAME || 'studyhub_owner')
-const password = String(process.env.BETA_DIAG_PASSWORD || process.env.BETA_OWNER_PASSWORD || 'AdminPass123')
+const password = String(process.env.BETA_DIAG_PASSWORD || process.env.BETA_OWNER_PASSWORD || '').trim()
 const configuredSnapshotSheetId = Number.parseInt(process.env.BETA_SNAPSHOT_SHEET_ID || '111', 10)
 const runId = new Date().toISOString().replace(/[:.]/g, '-')
 const outputDir = path.resolve(
@@ -184,6 +184,10 @@ async function resolveSheetPath(context, sessionCookie) {
 }
 
 async function authenticate(context) {
+  if (!password) {
+    throw new Error('Missing diagnostic password. Set BETA_DIAG_PASSWORD or BETA_OWNER_PASSWORD before capturing snapshots.')
+  }
+
   const response = await context.request.post(`${apiBaseUrl}/api/auth/login`, {
     data: { username, password },
   })

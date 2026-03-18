@@ -41,7 +41,7 @@ async function buildLocalSessionCookie(username) {
 async function main() {
   const apiBase = String(process.env.BETA_API_BASE_URL || 'http://127.0.0.1:4000').replace(/\/$/, '')
   const username = process.env.BETA_DIAG_USERNAME || process.env.BETA_OWNER_USERNAME || 'studyhub_owner'
-  const password = process.env.BETA_DIAG_PASSWORD || process.env.BETA_OWNER_PASSWORD || 'AdminPass123'
+  const password = String(process.env.BETA_DIAG_PASSWORD || process.env.BETA_OWNER_PASSWORD || '').trim()
   const outputPath = process.env.BETA_DIAG_OUTPUT
     ? path.resolve(process.env.BETA_DIAG_OUTPUT)
     : path.resolve(__dirname, '..', '..', 'beta-diagnostics', 'feed-network.json')
@@ -56,25 +56,38 @@ async function main() {
   }
 
   try {
-    const loginResponse = await fetch(`${apiBase}/api/auth/login`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ username, password }),
-    })
-    const loginBody = await parseResponseBody(loginResponse)
-    let cookie = extractCookie(loginResponse)
+    let cookie = ''
 
-    payload.login = {
-      status: loginResponse.status,
-      body: loginBody,
-      hasCookie: Boolean(cookie),
-      cookie: cookie || '',
-    }
+    if (password) {
+      const loginResponse = await fetch(`${apiBase}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      })
+      const loginBody = await parseResponseBody(loginResponse)
+      cookie = extractCookie(loginResponse)
 
-    if (!cookie && loginResponse.status === 429) {
+      payload.login = {
+        status: loginResponse.status,
+        body: loginBody,
+        hasCookie: Boolean(cookie),
+        cookie: cookie || '',
+      }
+
+      if (!cookie && loginResponse.status === 429) {
+        cookie = await buildLocalSessionCookie(username)
+        payload.login = {
+          ...payload.login,
+          hasCookie: true,
+          cookie,
+          usedLocalTokenFallback: true,
+        }
+      }
+    } else {
       cookie = await buildLocalSessionCookie(username)
       payload.login = {
-        ...payload.login,
+        status: 200,
+        body: { message: 'Using local token fallback because diagnostic password is not configured.' },
         hasCookie: true,
         cookie,
         usedLocalTokenFallback: true,

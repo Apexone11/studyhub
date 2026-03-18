@@ -121,6 +121,20 @@ describe('admin routes', () => {
     expect(mocks.prisma.user.count).not.toHaveBeenCalled()
   })
 
+  it('returns ADMIN_MFA_REQUIRED for admins without 2FA enabled', async () => {
+    mocks.state.role = 'admin'
+    mocks.state.twoFaEnabled = false
+
+    const response = await request(app).get('/stats')
+
+    expect(response.status).toBe(403)
+    expect(response.body).toMatchObject({
+      error: 'Enable 2-step verification in Settings before using admin tools.',
+      code: 'ADMIN_MFA_REQUIRED',
+    })
+    expect(mocks.prisma.user.count).not.toHaveBeenCalled()
+  })
+
   it('still returns admin stats for authenticated admins', async () => {
     mocks.state.role = 'admin'
 

@@ -66,16 +66,20 @@
 
 ### Main pages
 
-- `frontend/studyhub-app/src/pages/HomePage.jsx` - marketing and landing page
-- `frontend/studyhub-app/src/pages/LoginPage.jsx` - login and 2FA entry
-- `frontend/studyhub-app/src/pages/RegisterScreen.jsx` - registration flow
-- `frontend/studyhub-app/src/pages/DashboardPage.jsx` - student dashboard
-- `frontend/studyhub-app/src/pages/FeedPage.jsx` - feed posts and reactions
-- `frontend/studyhub-app/src/pages/SheetsPage.jsx` - sheet directory and browse
-- `frontend/studyhub-app/src/pages/SheetViewerPage.jsx` - sheet detail, downloads, fork and contribution review
-- `frontend/studyhub-app/src/pages/SettingsPage.jsx` - account settings and verified-email flows
-- `frontend/studyhub-app/src/pages/UserProfilePage.jsx` - public profile
-- `frontend/studyhub-app/src/pages/PlaceholderPages.jsx` - admin, uploads, tests, notes, announcements, and submit placeholders
+- `frontend/studyhub-app/src/pages/home/HomePage.jsx` - marketing and landing page
+- `frontend/studyhub-app/src/pages/auth/LoginPage.jsx` - login and 2FA entry
+- `frontend/studyhub-app/src/pages/auth/RegisterScreen.jsx` - registration flow
+- `frontend/studyhub-app/src/pages/dashboard/DashboardPage.jsx` - student dashboard
+- `frontend/studyhub-app/src/pages/feed/FeedPage.jsx` - feed posts and reactions
+- `frontend/studyhub-app/src/pages/sheets/SheetsPage.jsx` - sheet directory and browse
+- `frontend/studyhub-app/src/pages/sheets/SheetViewerPage.jsx` - sheet detail, downloads, fork and contribution review
+- `frontend/studyhub-app/src/pages/settings/SettingsPage.jsx` - account settings and verified-email flows
+- `frontend/studyhub-app/src/pages/profile/UserProfilePage.jsx` - public profile
+- `frontend/studyhub-app/src/pages/admin/AdminPage.jsx` - admin stats, users, announcements, and review queue
+- `frontend/studyhub-app/src/pages/notes/NotesPage.jsx` - personal note CRUD and preview
+- `frontend/studyhub-app/src/pages/announcements/AnnouncementsPage.jsx` - announcements feed and admin posting
+- `frontend/studyhub-app/src/pages/tests/TestsPage.jsx` - tests landing and teaser experience
+- `frontend/studyhub-app/src/pages/submit/SubmitPage.jsx` - request/submit feature surface
 
 ### Build and deploy
 

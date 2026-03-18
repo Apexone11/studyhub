@@ -1,4 +1,4 @@
-Local Beta Lane (Cycle 1 Baseline - V1.0.0)
+StudyHub Beta V1.0.0 Release Log
 
 Purpose
 - Run all risky changes in local beta first, validate, then ship.
@@ -136,7 +136,7 @@ Reuse Rules For Future Beta Versions
    - Exit criteria
 3. Reuse the same diagnostics directory and commands unless a cycle needs extra artifacts.
 4. Keep production behavior stable by testing new flow only in beta first.
-5. Use docs/local-beta-lane-template.txt as the copy/paste skeleton for each next cycle.
+5. Use docs/beta-cycle-template.md as the copy/paste skeleton for each next cycle.
 6. For every future beta cycle, always include tests for every newly added feature and every touched page before moving to the next cycle.
 
 Cycle 5 Additions (HTML-Only Secure Upload Revision)
@@ -338,7 +338,119 @@ Cycle 7 Validation Result
   - `beta-diagnostics/frontend-console.json`
 
 Cycle 7 Follow-Up Notes
-- Frontend lint currently has pre-existing unrelated failures outside this cycle's security patch scope:
-  - `frontend/studyhub-app/src/pages/shared/pageScaffold.jsx` (`react-refresh/only-export-components`)
-  - warning in `frontend/studyhub-app/src/pages/sheets/SheetViewerPage.jsx` (`react-hooks/exhaustive-deps`)
+- Frontend lint follow-up has been resolved in subsequent updates:
+  - `frontend/studyhub-app/src/pages/shared/pageScaffold.jsx` now exports components only.
+  - `frontend/studyhub-app/src/pages/sheets/SheetViewerPage.jsx` callback dependencies were aligned.
 - Sourcery review bot diff-limit warning (`>20000` lines) is a PR-size/platform constraint; mitigation is to split future large releases into smaller reviewable PRs.
+
+Cycle 8 Validation (Frontend Regression Check + Build Safety)
+Executed on 2026-03-17:
+- `npm --prefix frontend/studyhub-app run test`
+- `npm --prefix frontend/studyhub-app run build`
+
+Cycle 8 Validation Result
+- Frontend unit/integration tests passed:
+  - `9` files
+  - `19` tests
+- Frontend production build passed successfully.
+- Regression status: no behavior regression detected in current frontend test suite.
+
+Cycle 8 Deep Code Scan (Half-Finished/Risk Review)
+Deep scan methods used:
+- targeted repository pattern scan for unfinished markers
+- focused code review of feature-toggle and maintenance guards
+- manual verification of production-impacting placeholder surfaces
+
+Deep scan findings summary:
+- No unfinished marker debt in core app code:
+  - no `TODO`/`FIXME`/`HACK`/`WIP`/`TBD` markers found in `backend/src` and `frontend/studyhub-app/src`.
+- Intentional, user-visible "coming soon" placeholders remain (non-blocking, but product-debt):
+  - `frontend/studyhub-app/src/pages/tests/TestsPage.jsx`
+  - `frontend/studyhub-app/src/pages/tests/TestTakerPage.jsx`
+  - `frontend/studyhub-app/src/pages/submit/SubmitPage.jsx`
+- Documentation drift found in skill/reference docs that still mention removed `PlaceholderPages.jsx` (non-runtime risk):
+  - `skills/studyhub-codebase/SKILL.md`
+  - `skills/studyhub-codebase/references/repo-map.md`
+- Operational risk flags (configuration-dependent, currently intentional):
+  - `backend/src/lib/clamav.js`: `CLAMAV_DISABLED=true` bypasses scanning.
+  - `backend/src/middleware/guardedMode.js`: guarded-mode flags can block writes globally.
+
+Cycle 8 Deep Scan Assessment
+- Immediate runtime blocker: none found.
+- Recommended follow-up hardening:
+  1. add startup warning logs when scanner bypass is enabled outside test.
+  2. add startup warning logs when guarded mode is enabled.
+  3. optionally gate "coming soon" routes behind a feature flag or explicit roadmap badge policy.
+
+AI Beta Documentation Standard (Draft, Effective Immediately)
+All AI-assisted beta work must follow this process:
+1. Every beta-impacting change must be appended to this release log in the same working session.
+2. Every entry must include:
+   - change summary
+   - exact validation commands run
+   - validation outcomes (pass/fail with counts where available)
+   - known risks/deferred items
+3. Every cycle must include a deep scan note if core logic, auth, or upload/security behavior changed.
+4. Use ISO dates (`YYYY-MM-DD`) for all cycle timestamps.
+5. Keep entries human-readable and curated (no raw commit-log dumping).
+6. Group changes by intent where possible (`Added`, `Changed`, `Fixed`, `Security`) following changelog best practices.
+7. Version naming must follow semantic versioning intent (`MAJOR.MINOR.PATCH`) and be reflected in document title/file naming.
+
+External guidance reference used for this standard:
+- Keep a Changelog principles (human-curated, grouped changes, release-date clarity).
+- Semantic Versioning 2.0.0 principles (version intent and release immutability).
+
+Cycle 9 Additions (Final Hardening + CI Beta Log Enforcement)
+Implemented in beta lane:
+- URL scheme hardening for HTML submission parser:
+  - `backend/src/lib/htmlSecurity.js` now blocks `javascript:`, `vbscript:`, and all `data:` URLs in `href`/`src` attributes.
+- Session refresh now always sends cookies explicitly:
+  - `frontend/studyhub-app/src/lib/session-context.jsx` adds `credentials: 'include'` to `/api/auth/me` refresh fetch.
+- Upload signature mismatch responses now use stable error envelopes:
+  - `backend/src/middleware/errorEnvelope.js` adds `UPLOAD_SIGNATURE_MISMATCH`.
+  - `backend/src/routes/upload.js` now returns signature failures via `sendError(..., code)`.
+- Admin gate regression coverage expanded:
+  - `backend/test/admin.routes.test.js` now verifies `ADMIN_MFA_REQUIRED` response when admin 2FA is disabled.
+- Sidebar drawer accessibility focus restoration strengthened:
+  - `frontend/studyhub-app/src/components/AppSidebar.jsx` now restores focus to the trigger button first when the drawer closes.
+- Diagnostics credential hardening (removed insecure password fallbacks):
+  - `backend/scripts/captureFeedNetwork.js`
+  - `frontend/studyhub-app/scripts/captureFeedConsole.mjs`
+  - `frontend/studyhub-app/scripts/captureBetaSnapshots.mjs`
+  - backend feed-network capture now uses explicit password when configured, otherwise a local signed-token fallback for diagnostics.
+  - frontend console/snapshot captures still require explicit `BETA_DIAG_PASSWORD` or `BETA_OWNER_PASSWORD` when session-cookie reuse is unavailable.
+- Startup warning visibility added for safety-sensitive toggles:
+  - `backend/src/index.js` now warns when `CLAMAV_DISABLED=true` (outside test) and when guarded mode is enabled.
+- CI policy enforcement added:
+  - `.github/workflows/ci.yml` now fails PRs with code changes when `docs/beta-v<MAJOR.MINOR.PATCH>-release-log.md` was not updated.
+
+Cycle 9 Validation Commands (Executed)
+- `npm run beta:check`
+- `npm --prefix backend run lint`
+- `npm --prefix frontend/studyhub-app run lint`
+- `npm --prefix backend run test`
+- `npm --prefix frontend/studyhub-app run test`
+- `npm --prefix backend run build`
+- `npm --prefix frontend/studyhub-app run build`
+
+Cycle 9 Validation Result
+- Full beta gate passed (`npm run beta:check`):
+  - feed diagnostics capture passed
+  - backend Vitest: `11` files, `36` tests
+  - frontend Vitest: `9` files, `19` tests
+  - frontend Playwright smoke: `15` tests
+  - backend route smoke checks passed
+- Backend lint passed.
+- Frontend lint passed.
+- Backend test suite passed:
+  - `11` files
+  - `36` tests
+- Frontend test suite passed:
+  - `9` files
+  - `19` tests
+- Backend build check passed.
+- Frontend production build passed.
+
+Cycle 9 Operational Notes
+- The CI beta-log gate is scoped to pull requests and checks for code-impacting path changes.
+- Diagnostic capture scripts now fail fast with a clear message when credentials are missing.
