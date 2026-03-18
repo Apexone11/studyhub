@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
 import AppSidebar from '../../components/AppSidebar'
+import ConfirmDialog from '../../components/ConfirmDialog'
 import { API, SUPPORT_EMAIL } from '../../config'
 import { getApiErrorMessage, readJsonSafely } from '../../lib/http'
 import { useSession } from '../../lib/session-context'
@@ -219,6 +220,7 @@ export default function AdminPage() {
   const [announceForm, setAnnounceForm] = useState({ title: '', body: '', pinned: false })
   const [announceSaving, setAnnounceSaving] = useState(false)
   const [announceError, setAnnounceError] = useState('')
+  const [confirmAction, setConfirmAction] = useState(null) // { title, message, variant, onConfirm }
 
   const apiJson = useCallback(async (url, options = {}) => {
     const response = await fetch(`${API}${url}`, {
@@ -442,37 +444,52 @@ export default function AdminPage() {
     await Promise.all([loadPagedData('users', usersState.page), loadOverview()])
   }
 
-  async function deleteUser(userId) {
-    const confirmed = window.confirm('Delete this user permanently?')
-    if (!confirmed) return
-
-    await apiJson(`/api/admin/users/${userId}`, { method: 'DELETE' })
-    await Promise.all([loadPagedData('users', usersState.page), loadOverview()])
-  }
-
-  async function deleteSheet(sheetId) {
-    const confirmed = window.confirm('Delete this sheet?')
-    if (!confirmed) return
-
-    await apiJson(`/api/admin/sheets/${sheetId}`, { method: 'DELETE' })
-    await Promise.all([loadPagedData('sheets', sheetsState.page), loadOverview()])
-  }
-
-  async function reviewSheet(sheetId, action) {
-    const confirmed = window.confirm(action === 'approve'
-      ? 'Approve and publish this sheet?'
-      : 'Reject this sheet?')
-    if (!confirmed) return
-
-    await apiJson(`/api/admin/sheets/${sheetId}/review`, {
-      method: 'PATCH',
-      body: JSON.stringify({ action }),
+  function deleteUser(userId) {
+    setConfirmAction({
+      title: 'Delete this user?',
+      message: 'This will permanently remove the user and all their data. This cannot be undone.',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmAction(null)
+        await apiJson(`/api/admin/users/${userId}`, { method: 'DELETE' })
+        await Promise.all([loadPagedData('users', usersState.page), loadOverview()])
+      },
     })
-    await Promise.all([
-      loadPagedData('sheet-reviews', reviewState.page),
-      loadPagedData('sheets', sheetsState.page),
-      loadOverview(),
-    ])
+  }
+
+  function deleteSheet(sheetId) {
+    setConfirmAction({
+      title: 'Delete this sheet?',
+      message: 'The sheet and all associated data will be permanently removed.',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmAction(null)
+        await apiJson(`/api/admin/sheets/${sheetId}`, { method: 'DELETE' })
+        await Promise.all([loadPagedData('sheets', sheetsState.page), loadOverview()])
+      },
+    })
+  }
+
+  function reviewSheet(sheetId, action) {
+    setConfirmAction({
+      title: action === 'approve' ? 'Approve this sheet?' : 'Reject this sheet?',
+      message: action === 'approve'
+        ? 'This will publish the sheet and make it visible to all users.'
+        : 'This will reject the sheet submission.',
+      variant: action === 'approve' ? 'default' : 'danger',
+      onConfirm: async () => {
+        setConfirmAction(null)
+        await apiJson(`/api/admin/sheets/${sheetId}/review`, {
+          method: 'PATCH',
+          body: JSON.stringify({ action }),
+        })
+        await Promise.all([
+          loadPagedData('sheet-reviews', reviewState.page),
+          loadPagedData('sheets', sheetsState.page),
+          loadOverview(),
+        ])
+      },
+    })
   }
 
   async function saveAnnouncement(event) {
@@ -499,12 +516,17 @@ export default function AdminPage() {
     await loadPagedData('announcements', announcementsState.page)
   }
 
-  async function deleteAnnouncement(announcementId) {
-    const confirmed = window.confirm('Delete this announcement?')
-    if (!confirmed) return
-
-    await apiJson(`/api/admin/announcements/${announcementId}`, { method: 'DELETE' })
-    await loadPagedData('announcements', announcementsState.page)
+  function deleteAnnouncement(announcementId) {
+    setConfirmAction({
+      title: 'Delete this announcement?',
+      message: 'This will permanently remove the announcement.',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmAction(null)
+        await apiJson(`/api/admin/announcements/${announcementId}`, { method: 'DELETE' })
+        await loadPagedData('announcements', announcementsState.page)
+      },
+    })
   }
 
   async function loadSuppressionAudit(suppressionId, page = 1) {
@@ -617,6 +639,7 @@ export default function AdminPage() {
   )
 
   return (
+  <>
     <div style={{ minHeight: '100vh', background: '#edf0f5', fontFamily: FONT }}>
       <Navbar crumbs={[{ label: 'Admin', to: '/admin' }]} hideTabs actions={navActions} />
       <div
@@ -1211,6 +1234,17 @@ export default function AdminPage() {
         </main>
       </div>
     </div>
+    <ConfirmDialog
+      open={confirmAction !== null}
+      title={confirmAction?.title}
+      message={confirmAction?.message}
+      confirmLabel={confirmAction?.variant === 'danger' ? 'Delete' : 'Confirm'}
+      cancelLabel="Cancel"
+      variant={confirmAction?.variant || 'default'}
+      onConfirm={confirmAction?.onConfirm}
+      onCancel={() => setConfirmAction(null)}
+    />
+  </>
   )
 }
 

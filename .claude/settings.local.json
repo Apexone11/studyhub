@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx vite:*)",
+      "Bash(node -e \"require\\(''./src/routes/search.js''\\); console.log\\(''search.js OK''\\)\")"
+    ]
+  }
+}

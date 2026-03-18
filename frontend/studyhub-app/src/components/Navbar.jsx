@@ -15,6 +15,7 @@ import {
   IconBell,
   IconChevronDown,
 } from './Icons'
+import SearchModal from './SearchModal'
 import { pageWidths } from '../lib/ui'
 import { useSession } from '../lib/session-context'
 import { useLivePolling } from '../lib/useLivePolling'
@@ -214,6 +215,9 @@ export default function Navbar({
   const { user } = useSession()
   const initials = user?.username?.slice(0, 2).toUpperCase() || '??'
 
+  // search modal state
+  const [searchOpen, setSearchOpen] = useState(false)
+
   // notification bell state
   const [notifications, setNotifications] = useState([])
   const [unreadCount,   setUnreadCount]   = useState(0)
@@ -383,11 +387,12 @@ export default function Navbar({
         {/* search box — hide on auth pages where it's irrelevant */}
         {!hideSearch && location.pathname !== '/login' && location.pathname !== '/register'
           && location.pathname !== '/forgot-password' && location.pathname !== '/reset-password' && (
-          <div className={isLanding ? 'sh-landing-search' : undefined} style={searchBoxStyle} onClick={() => {}}>
+          <div className={isLanding ? 'sh-landing-search' : undefined} style={searchBoxStyle} onClick={() => setSearchOpen(true)}>
             <IconSearch size={13} style={{ color: '#475569', flexShrink: 0 }} />
             <span style={searchTextStyle}>Search sheets, courses...</span>
           </div>
         )}
+        <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
 
         {!user && isLanding && <div style={{ flex: 1 }} />}
 

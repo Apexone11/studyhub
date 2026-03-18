@@ -1,6 +1,6 @@
 const MAX_HTML_CHARS = 350_000
 
-const FORBIDDEN_TAG_NAMES = ['script', 'iframe', 'object', 'embed', 'meta', 'base']
+const FORBIDDEN_TAG_NAMES = ['script', 'iframe', 'object', 'embed', 'meta', 'base', 'form']
 
 function isAsciiWhitespace(char) {
   return char === ' ' || char === '\n' || char === '\r' || char === '\t' || char === '\f'

@@ -30,6 +30,7 @@ const notesRoutes = require('./routes/notes')
 const notificationsRoutes = require('./routes/notifications')
 const usersRoutes = require('./routes/users')
 const previewRoutes = require('./routes/preview')
+const searchRoutes = require('./routes/search')
 const webhookRoutes = require('./routes/webhooks')
 
 if (sentryEnabled) {
@@ -231,6 +232,9 @@ app.use('/api/notifications', notificationsRoutes)
 
 // Mount user profile endpoints under /api/users.
 app.use('/api/users', usersRoutes)
+
+// Mount unified search endpoints under /api/search.
+app.use('/api/search', searchRoutes)
 
 // Basic API health check.
 app.get('/', (req, res) => {
