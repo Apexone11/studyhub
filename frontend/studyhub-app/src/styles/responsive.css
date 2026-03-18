@@ -1,0 +1,64 @@
+/* ─── Shared responsive patterns ───────────────────────────────── */
+/* Breakpoints align with src/lib/ui.js:
+   phone:  <= 767px
+   tablet: <= 1179px
+   desktop: > 1179px
+*/
+
+/* Settings page: stack sidebar tabs on small screens */
+.settings-layout {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 28px;
+}
+
+.settings-nav {
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 767px) {
+  .settings-layout {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .settings-nav {
+    flex-direction: row;
+    overflow-x: auto;
+    gap: 4px;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .settings-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .settings-nav-btn {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+}
+
+/* Admin stat cards: 2-col on tablet, 1-col on phone */
+@media (max-width: 767px) {
+  .admin-stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 400px) {
+  .admin-stats-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Home steps: 3-col -> 1-col already handled in index.css at 1024px */
+
+/* Feed composer: tighter spacing on mobile */
+@media (max-width: 767px) {
+  .feed-composer-actions {
+    flex-wrap: wrap;
+  }
+}

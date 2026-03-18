@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
+import { GoogleLogin } from '@react-oauth/google'
 import Navbar from '../../components/Navbar'
-import { API } from '../../config'
+import { API, GOOGLE_CLIENT_ID } from '../../config'
+import { fadeInUp } from '../../lib/animations'
 import { getAuthenticatedHomePath } from '../../lib/authNavigation'
 import { trackSignupConversion } from '../../lib/telemetry'
 import { useSession } from '../../lib/session-context'
@@ -167,12 +169,17 @@ function formatResendCountdown(totalSeconds) {
 
 export default function RegisterScreen() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { completeAuthentication } = useSession()
+  const cardRef = useRef(null)
 
-  const [step, setStep] = useState('account')
+  const googleState = location.state
+  const isGoogleCourseFlow = Boolean(googleState?.googleCourseSelection && googleState?.tempCredential)
+
+  const [step, setStep] = useState(isGoogleCourseFlow ? 'courses' : 'account')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
+  const [success, setSuccess] = useState(isGoogleCourseFlow ? `Signed in as ${googleState.googleEmail}. Choose your courses to finish setup.` : '')
   const [catalogError, setCatalogError] = useState('')
   const [catalogLoading, setCatalogLoading] = useState(false)
   const [schools, setSchools] = useState([])
@@ -182,6 +189,7 @@ export default function RegisterScreen() {
   const [verification, setVerification] = useState(null)
   const [verificationCode, setVerificationCode] = useState('')
   const [clockNowMs, setClockNowMs] = useState(() => Date.now())
+  const [googleCredential, setGoogleCredential] = useState(isGoogleCourseFlow ? googleState.tempCredential : null)
 
   const [form, setForm] = useState({
     username: '',
@@ -191,6 +199,10 @@ export default function RegisterScreen() {
     termsAccepted: false,
     schoolId: '',
   })
+
+  useEffect(() => {
+    if (cardRef.current) fadeInUp(cardRef.current, { duration: 450, y: 20 })
+  }, [])
 
   useEffect(() => {
     if (step !== 'courses' || schools.length > 0 || catalogLoading) return
@@ -427,21 +439,72 @@ export default function RegisterScreen() {
     setError('')
   }
 
+  async function handleGoogleSuccess(credentialResponse) {
+    if (!credentialResponse?.credential) {
+      setError('Google sign-up did not return a valid credential.')
+      return
+    }
+
+    setLoading(true)
+    setError('')
+
+    try {
+      const response = await fetch(`${API}/api/auth/google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential: credentialResponse.credential }),
+      })
+      const data = await response.json()
+
+      if (!response.ok) {
+        setError(data.error || 'Google sign-up failed.')
+        return
+      }
+
+      if (data.requiresCourseSelection) {
+        setGoogleCredential(data.tempCredential)
+        setStep('courses')
+        setSuccess(`Signed in as ${data.googleEmail}. Choose your courses to finish setup.`)
+        return
+      }
+
+      completeAuthentication(data.user)
+      trackSignupConversion()
+      navigate(getAuthenticatedHomePath(data.user), { replace: true })
+    } catch {
+      setError('Could not connect to the server.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   async function handleCompleteRegistration(skipCourses = false) {
     setLoading(true)
     setError('')
     setSuccess('')
 
     try {
-      const response = await fetch(`${API}/api/auth/register/complete`, {
+      const isGoogle = Boolean(googleCredential)
+      const endpoint = isGoogle ? `${API}/api/auth/google/complete` : `${API}/api/auth/register/complete`
+
+      const body = isGoogle
+        ? {
+            credential: googleCredential,
+            schoolId: skipCourses ? null : (form.schoolId ? Number(form.schoolId) : null),
+            courseIds: skipCourses ? [] : selectedCourseIds,
+            customCourses: skipCourses ? [] : customCourses,
+          }
+        : {
+            verificationToken: verification?.verificationToken,
+            schoolId: skipCourses ? null : (form.schoolId ? Number(form.schoolId) : null),
+            courseIds: skipCourses ? [] : selectedCourseIds,
+            customCourses: skipCourses ? [] : customCourses,
+          }
+
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          verificationToken: verification?.verificationToken,
-          schoolId: skipCourses ? null : (form.schoolId ? Number(form.schoolId) : null),
-          courseIds: skipCourses ? [] : selectedCourseIds,
-          customCourses: skipCourses ? [] : customCourses,
-        }),
+        body: JSON.stringify(body),
       })
       const data = await response.json()
 
@@ -470,15 +533,14 @@ export default function RegisterScreen() {
       }}
     >
       <Navbar variant="landing" />
-      <div style={{ padding: '48px 20px 80px', display: 'grid', placeItems: 'center' }}>
+      <div ref={cardRef} style={{ padding: '48px 20px 80px', display: 'grid', placeItems: 'center' }}>
         <StageCard>
           <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
-            {[
-              ['account', 'Account'],
-              ['verify', 'Verify Email'],
-              ['courses', 'Courses'],
-            ].map(([key, label], index) => {
-              const order = ['account', 'verify', 'courses']
+            {(googleCredential
+              ? [['courses', 'Courses']]
+              : [['account', 'Account'], ['verify', 'Verify Email'], ['courses', 'Courses']]
+            ).map(([key, label], index) => {
+              const order = googleCredential ? ['courses'] : ['account', 'verify', 'courses']
               const currentIndex = order.indexOf(step)
               const thisIndex = order.indexOf(key)
               const complete = thisIndex < currentIndex
@@ -518,8 +580,36 @@ export default function RegisterScreen() {
             <form onSubmit={handleStartVerification}>
               <h1 style={{ margin: '0 0 8px', fontSize: 28 }}>Create your account</h1>
               <p style={{ margin: '0 0 24px', fontSize: 14, color: '#64748b', lineHeight: 1.7 }}>
-                Email is required now. We’ll send a verification code before course selection and account creation.
+                Email is required now. We'll send a verification code before course selection and account creation.
               </p>
+
+              {GOOGLE_CLIENT_ID && (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+                    <GoogleLogin
+                      onSuccess={handleGoogleSuccess}
+                      onError={() => setError('Google sign-up was cancelled or failed.')}
+                      size="large"
+                      width="320"
+                      text="signup_with"
+                      shape="rectangular"
+                      theme="outline"
+                    />
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 12,
+                      marginBottom: 20,
+                    }}
+                  >
+                    <div style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
+                    <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600 }}>OR</span>
+                    <div style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
+                  </div>
+                </>
+              )}
 
               <Field label="Username" htmlFor="register-username" hint="3-20 characters. Letters, numbers, and underscores only.">
                 <Input
@@ -814,9 +904,11 @@ export default function RegisterScreen() {
                 <Button type="button" secondary onClick={() => handleCompleteRegistration(true)} disabled={loading}>
                   Skip For Now
                 </Button>
-                <Button type="button" secondary onClick={() => setStep('verify')} disabled={loading}>
-                  Back
-                </Button>
+                {!googleCredential && (
+                  <Button type="button" secondary onClick={() => setStep('verify')} disabled={loading}>
+                    Back
+                  </Button>
+                )}
               </div>
             </div>
           )}

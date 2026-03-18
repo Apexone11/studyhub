@@ -77,7 +77,7 @@ function StatsGrid({ stats }) {
   ]
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 14 }}>
+    <div className="admin-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 14 }}>
       {cards.map(([label, value, tone]) => (
         <div
           key={label}

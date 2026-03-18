@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
 import AppSidebar from '../../components/AppSidebar'
@@ -19,6 +19,7 @@ import { getApiErrorMessage, isAuthSessionFailure, readJsonSafely } from '../../
 import { useSession } from '../../lib/session-context'
 import { pageShell, useResponsiveAppLayout } from '../../lib/ui'
 import { useLivePolling } from '../../lib/useLivePolling'
+import { staggerEntrance, popScale } from '../../lib/animations'
 
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 const FILTERS = ['all', 'posts', 'sheets', 'announcements']
@@ -330,7 +331,7 @@ function FeedCard({
 
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 14 }}>
             {isSheet ? (
-              <button type="button" onClick={() => onStar(item)} style={actionButton(item.starred ? '#f59e0b' : '#475569')}>
+              <button type="button" onClick={(e) => { popScale(e.currentTarget); onStar(item) }} style={actionButton(item.starred ? '#f59e0b' : '#475569')}>
                 {item.starred ? <IconStarFilled size={14} /> : <IconStar size={14} />}
                 {item.stars || 0} stars
               </button>
@@ -342,22 +343,22 @@ function FeedCard({
               </Link>
             ) : null}
             {isPost ? (
-              <button type="button" onClick={() => onReact(item, 'like')} style={actionButton(reaction.userReaction === 'like' ? '#16a34a' : '#475569')}>
+              <button type="button" onClick={(e) => { popScale(e.currentTarget); onReact(item, 'like') }} style={actionButton(reaction.userReaction === 'like' ? '#16a34a' : '#475569')}>
                 Like {reaction.likes || 0}
               </button>
             ) : null}
             {isPost ? (
-              <button type="button" onClick={() => onReact(item, 'dislike')} style={actionButton(reaction.userReaction === 'dislike' ? '#dc2626' : '#475569')}>
+              <button type="button" onClick={(e) => { popScale(e.currentTarget); onReact(item, 'dislike') }} style={actionButton(reaction.userReaction === 'dislike' ? '#dc2626' : '#475569')}>
                 Dislike {reaction.dislikes || 0}
               </button>
             ) : null}
             {isSheet ? (
-              <button type="button" onClick={() => onReact(item, 'like')} style={actionButton(reaction.userReaction === 'like' ? '#16a34a' : '#475569')}>
+              <button type="button" onClick={(e) => { popScale(e.currentTarget); onReact(item, 'like') }} style={actionButton(reaction.userReaction === 'like' ? '#16a34a' : '#475569')}>
                 Helpful {reaction.likes || 0}
               </button>
             ) : null}
             {isSheet ? (
-              <button type="button" onClick={() => onReact(item, 'dislike')} style={actionButton(reaction.userReaction === 'dislike' ? '#dc2626' : '#475569')}>
+              <button type="button" onClick={(e) => { popScale(e.currentTarget); onReact(item, 'dislike') }} style={actionButton(reaction.userReaction === 'dislike' ? '#dc2626' : '#475569')}>
                 Needs work {reaction.dislikes || 0}
               </button>
             ) : null}
@@ -429,6 +430,8 @@ export default function FeedPage() {
   const [composeState, setComposeState] = useState({ saving: false, error: '' })
   const [attachedFile, setAttachedFile] = useState(null)
   const fileInputRef = useRef(null)
+  const feedListRef = useRef(null)
+  const feedAnimatedRef = useRef(false)
   const [deleteTarget, setDeleteTarget] = useState(null) // item to confirm-delete
   const [openPostMenuId, setOpenPostMenuId] = useState(null)
   const [deletingPostIds, setDeletingPostIds] = useState({})
@@ -546,6 +549,14 @@ export default function FeedPage() {
     const nextType = activeFilter === 'announcements' ? 'announcement' : activeFilter.slice(0, -1)
     return feedState.items.filter((item) => item.type === nextType)
   }, [activeFilter, feedState.items])
+
+  // Animate feed cards on first load
+  useEffect(() => {
+    if (!feedState.loading && visibleItems.length > 0 && feedListRef.current && !feedAnimatedRef.current) {
+      feedAnimatedRef.current = true
+      staggerEntrance(feedListRef.current.children, { staggerMs: 50, duration: 450, y: 16 })
+    }
+  }, [feedState.loading, visibleItems.length])
 
   const submitPost = async (event) => {
     event.preventDefault()
@@ -891,7 +902,7 @@ export default function FeedPage() {
               ) : visibleItems.length === 0 ? (
                 <EmptyFeed message="No feed items matched this filter." />
               ) : (
-                <div style={{ display: 'grid', gap: 14 }}>
+                <div ref={feedListRef} style={{ display: 'grid', gap: 14 }}>
                   {visibleItems.map((item) => (
                     <FeedCard
                       key={item.feedKey}
