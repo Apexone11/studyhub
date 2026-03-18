@@ -25,10 +25,19 @@ Why this matters:
 - `FRONTEND_URL=<your frontend production URL>`
 - `FRONTEND_URL_ALT=<optional second frontend URL>`
 - `UPLOADS_DIR=/data/uploads`
-- `EMAIL_USER=<your SMTP username>`
-- `EMAIL_PASS=<your SMTP password or app password>`
-- `EMAIL_FROM=<the sender email>`
-- `EMAIL_SERVICE=<for example gmail>`
+- `EMAIL_TRANSPORT=resend`
+- `RESEND_API_KEY=<your Resend API key>`
+- `EMAIL_FROM=StudyHub <no-reply@your-domain>`
+- `EMAIL_STARTUP_STRICT=true`
+- `RESEND_WEBHOOK_SECRET=<your Resend webhook signing secret>`
+- `RESEND_WEBHOOK_STRICT=true`
+- Optional SMTP fallback variables (only if using SMTP transport):
+	- `EMAIL_USER=<your SMTP username>`
+	- `EMAIL_PASS=<your SMTP password or app password>`
+	- `EMAIL_SERVICE=<for example gmail>`
+	- `EMAIL_HOST=<optional custom SMTP host>`
+	- `EMAIL_PORT=587`
+	- `EMAIL_SECURE=false`
 - `SENTRY_DSN=<optional>`
 - `SENTRY_TRACES_SAMPLE_RATE=0.1`
 - `ADMIN_USERNAME=<your admin username>`
@@ -61,7 +70,9 @@ If the frontend is hosted separately, make sure it points to the deployed backen
 - Keep `ALLOW_EPHEMERAL_UPLOADS` unset in production.
 - Limit CORS to the real frontend domains.
 - Turn on Sentry for backend and frontend if possible.
-- Make sure the email inbox used for auth emails has app-password or SMTP security configured.
+- Verify your sending domain has SPF, DKIM, and DMARC configured before launch.
+- Rotate email API keys during rollout and keep `EMAIL_STARTUP_STRICT=true` so bad email config fails fast.
+- Register a Resend webhook endpoint for delivery events at `/api/webhooks/resend` and confirm signed requests validate in production.
 
 ## 8. Prisma Accelerate on Railway
 - Keep `DATABASE_URL` as the normal PostgreSQL URL unless you are intentionally enabling Accelerate.
@@ -98,3 +109,11 @@ If the frontend is hosted separately, make sure it points to the deployed backen
 - Expand the post, verify reactions/comments are visible, and confirm the download button only appears when downloads are allowed.
 - Fork a sheet, submit a contribution, review it, and confirm notifications appear.
 - Confirm account deletion and sheet/post deletion do not leave broken download links behind.
+- Trigger a Resend bounce/complaint test event and confirm:
+	- `/api/webhooks/resend` receives and accepts the signed event.
+	- an `EmailSuppression` record is created/updated for the recipient.
+	- future auth-email sends to that recipient are blocked until unsuppressed.
+- Verify admin recovery workflow:
+	- `GET /api/admin/email-suppressions?status=active` lists the suppressed recipient.
+	- `PATCH /api/admin/email-suppressions/:id/unsuppress` with a reason restores delivery eligibility.
+	- `GET /api/admin/email-suppressions/:id/audit` includes both auto-suppress and manual-unsuppress trail entries.

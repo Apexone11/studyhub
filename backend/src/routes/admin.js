@@ -14,6 +14,18 @@ router.use(requireAdmin)
 
 const PAGE_SIZE = 20
 
+function parsePage(value, defaultValue = 1) {
+  const parsed = parseInt(value || String(defaultValue), 10)
+  if (!Number.isInteger(parsed) || parsed <= 0) return defaultValue
+  return parsed
+}
+
+function parseSuppressionStatus(rawStatus) {
+  const value = String(rawStatus || 'active').trim().toLowerCase()
+  if (value === 'all' || value === 'inactive') return value
+  return 'active'
+}
+
 // ── GET /api/admin/stats ──────────────────────────────────────
 router.get('/stats', async (req, res) => {
   try {
@@ -43,9 +55,163 @@ router.get('/stats', async (req, res) => {
   }
 })
 
+// ── GET /api/admin/email-suppressions?status=active|inactive|all&page=1&q=mail ──
+router.get('/email-suppressions', async (req, res) => {
+  const page = parsePage(req.query.page)
+  const status = parseSuppressionStatus(req.query.status)
+  const query = typeof req.query.q === 'string' ? req.query.q.trim().toLowerCase() : ''
+
+  const where = {}
+  if (status === 'active') where.active = true
+  if (status === 'inactive') where.active = false
+  if (query) {
+    where.email = {
+      contains: query,
+      mode: 'insensitive',
+    }
+  }
+
+  try {
+    const [suppressions, total] = await Promise.all([
+      prisma.emailSuppression.findMany({
+        where,
+        orderBy: [{ active: 'desc' }, { updatedAt: 'desc' }],
+        take: PAGE_SIZE,
+        skip: (page - 1) * PAGE_SIZE,
+      }),
+      prisma.emailSuppression.count({ where }),
+    ])
+
+    return res.json({
+      suppressions,
+      total,
+      page,
+      pages: Math.ceil(total / PAGE_SIZE),
+      status,
+      query,
+    })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    return res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── PATCH /api/admin/email-suppressions/:id/unsuppress ───────────────────────
+router.patch('/email-suppressions/:id/unsuppress', async (req, res) => {
+  const suppressionId = parseInt(req.params.id, 10)
+  if (!Number.isInteger(suppressionId)) {
+    return res.status(400).json({ error: 'Suppression id must be an integer.' })
+  }
+
+  const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : ''
+  if (reason.length < 8) {
+    return res.status(400).json({ error: 'Provide an unsuppress reason with at least 8 characters.' })
+  }
+
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      const current = await tx.emailSuppression.findUnique({
+        where: { id: suppressionId },
+      })
+
+      if (!current) {
+        return { notFound: true }
+      }
+
+      if (!current.active) {
+        return { alreadyUnsuppressed: true, suppression: current }
+      }
+
+      const updated = await tx.emailSuppression.update({
+        where: { id: suppressionId },
+        data: { active: false },
+      })
+
+      await tx.emailSuppressionAudit.create({
+        data: {
+          suppressionId,
+          action: 'manual-unsuppress',
+          reason,
+          performedByUserId: req.user.userId,
+          context: {
+            previousReason: current.reason,
+            previousSourceEventType: current.sourceEventType,
+            previousSourceEventId: current.sourceEventId,
+          },
+        },
+      })
+
+      return { suppression: updated }
+    })
+
+    if (result.notFound) {
+      return res.status(404).json({ error: 'Suppression record not found.' })
+    }
+
+    if (result.alreadyUnsuppressed) {
+      return res.status(400).json({ error: 'Suppression is already inactive.' })
+    }
+
+    return res.json({
+      message: 'Recipient unsuppressed successfully.',
+      suppression: result.suppression,
+    })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    return res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── GET /api/admin/email-suppressions/:id/audit?page=1 ───────────────────────
+router.get('/email-suppressions/:id/audit', async (req, res) => {
+  const suppressionId = parseInt(req.params.id, 10)
+  if (!Number.isInteger(suppressionId)) {
+    return res.status(400).json({ error: 'Suppression id must be an integer.' })
+  }
+
+  const page = parsePage(req.query.page)
+
+  try {
+    const suppression = await prisma.emailSuppression.findUnique({
+      where: { id: suppressionId },
+      select: { id: true, email: true, active: true },
+    })
+
+    if (!suppression) {
+      return res.status(404).json({ error: 'Suppression record not found.' })
+    }
+
+    const [entries, total] = await Promise.all([
+      prisma.emailSuppressionAudit.findMany({
+        where: { suppressionId },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          performedBy: {
+            select: { id: true, username: true },
+          },
+        },
+        take: PAGE_SIZE,
+        skip: (page - 1) * PAGE_SIZE,
+      }),
+      prisma.emailSuppressionAudit.count({ where: { suppressionId } }),
+    ])
+
+    return res.json({
+      suppression,
+      entries,
+      total,
+      page,
+      pages: Math.ceil(total / PAGE_SIZE),
+    })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    return res.status(500).json({ error: 'Server error.' })
+  }
+})
+
 // ── GET /api/admin/users?page=1 ───────────────────────────────
 router.get('/users', async (req, res) => {
-  const page = Math.max(1, parseInt(req.query.page || '1'))
+  const page = parsePage(req.query.page)
   try {
     const [users, total] = await Promise.all([
       prisma.user.findMany({
@@ -72,7 +238,7 @@ router.get('/users', async (req, res) => {
 
 // ── GET /api/admin/sheets?page=1 ─────────────────────────────
 router.get('/sheets', async (req, res) => {
-  const page = Math.max(1, parseInt(req.query.page || '1'))
+  const page = parsePage(req.query.page)
   try {
     const [sheets, total] = await Promise.all([
       prisma.studySheet.findMany({
@@ -95,7 +261,7 @@ router.get('/sheets', async (req, res) => {
 
 // ── GET /api/admin/sheets/review?status=pending_review&page=1 ───────────────
 router.get('/sheets/review', async (req, res) => {
-  const page = Math.max(1, parseInt(req.query.page || '1', 10))
+  const page = parsePage(req.query.page)
   const rawStatus = String(req.query.status || 'pending_review').trim().toLowerCase()
   const status = ['pending_review', 'rejected', 'draft', 'published'].includes(rawStatus)
     ? rawStatus
@@ -179,7 +345,7 @@ router.patch('/sheets/:id/review', async (req, res) => {
 
 // ── PATCH /api/admin/users/:id/role ──────────────────────────
 router.patch('/users/:id/role', async (req, res) => {
-  const role = req.body.role
+  const { role } = req.body || {}
   if (!['admin', 'student'].includes(role)) {
     return res.status(400).json({ error: 'Role must be "admin" or "student".' })
   }
@@ -245,7 +411,7 @@ router.delete('/users/:id', async (req, res) => {
 
 // ── GET /api/admin/deletion-reasons?page=1 ───────────────────
 router.get('/deletion-reasons', async (req, res) => {
-  const page = Math.max(1, parseInt(req.query.page || '1'))
+  const page = parsePage(req.query.page)
   try {
     const [reasons, total] = await Promise.all([
       prisma.deletionReason.findMany({
@@ -264,7 +430,7 @@ router.get('/deletion-reasons', async (req, res) => {
 
 // ── GET /api/admin/announcements ─────────────────────────────
 router.get('/announcements', async (req, res) => {
-  const page = Math.max(1, parseInt(req.query.page || '1'))
+  const page = parsePage(req.query.page)
   try {
     const [announcements, total] = await Promise.all([
       prisma.announcement.findMany({

@@ -32,6 +32,18 @@ const mocks = vi.hoisted(() => {
     reaction: {
       count: vi.fn(),
     },
+    emailSuppression: {
+      count: vi.fn(),
+      findMany: vi.fn(),
+      findUnique: vi.fn(),
+      update: vi.fn(),
+    },
+    emailSuppressionAudit: {
+      create: vi.fn(),
+      findMany: vi.fn(),
+      count: vi.fn(),
+    },
+    $transaction: vi.fn(),
   }
 
   return {
@@ -107,6 +119,66 @@ beforeEach(() => {
   mocks.prisma.note.count.mockResolvedValue(0)
   mocks.prisma.userFollow.count.mockResolvedValue(28)
   mocks.prisma.reaction.count.mockResolvedValue(4)
+
+  mocks.prisma.emailSuppression.count.mockResolvedValue(1)
+  mocks.prisma.emailSuppression.findMany.mockResolvedValue([
+    {
+      id: 7,
+      email: 'suppressed_user@studyhub.test',
+      active: true,
+      reason: 'bounced',
+      provider: 'resend',
+      sourceEventType: 'email.bounced',
+      sourceEventId: 'svix:msg_abc',
+      sourceMessageId: 'email_123',
+      details: null,
+      firstSuppressedAt: new Date('2026-03-17T20:05:00.000Z'),
+      lastSuppressedAt: new Date('2026-03-17T20:05:00.000Z'),
+      createdAt: new Date('2026-03-17T20:05:00.000Z'),
+      updatedAt: new Date('2026-03-17T20:05:00.000Z'),
+    },
+  ])
+  mocks.prisma.emailSuppression.findUnique.mockResolvedValue({
+    id: 7,
+    email: 'suppressed_user@studyhub.test',
+    active: true,
+    reason: 'bounced',
+    provider: 'resend',
+    sourceEventType: 'email.bounced',
+    sourceEventId: 'svix:msg_abc',
+    sourceMessageId: 'email_123',
+  })
+  mocks.prisma.emailSuppression.update.mockResolvedValue({
+    id: 7,
+    email: 'suppressed_user@studyhub.test',
+    active: false,
+    reason: 'bounced',
+    provider: 'resend',
+    sourceEventType: 'email.bounced',
+    sourceEventId: 'svix:msg_abc',
+    sourceMessageId: 'email_123',
+  })
+
+  mocks.prisma.emailSuppressionAudit.create.mockResolvedValue({ id: 31 })
+  mocks.prisma.emailSuppressionAudit.count.mockResolvedValue(1)
+  mocks.prisma.emailSuppressionAudit.findMany.mockResolvedValue([
+    {
+      id: 31,
+      suppressionId: 7,
+      action: 'manual-unsuppress',
+      reason: 'Mailbox recovered and confirmed by support.',
+      context: {
+        previousReason: 'bounced',
+      },
+      createdAt: new Date('2026-03-17T21:00:00.000Z'),
+      performedBy: {
+        id: 42,
+        username: 'studyhub_owner',
+      },
+    },
+  ])
+
+  mocks.prisma.$transaction.mockImplementation(async (operation) => operation(mocks.prisma))
 })
 
 describe('admin routes', () => {
@@ -152,5 +224,88 @@ describe('admin routes', () => {
       totalReactions: 4,
     })
     expect(mocks.sentry.captureError).not.toHaveBeenCalled()
+  })
+
+  it('lists active email suppressions for admins', async () => {
+    mocks.state.role = 'admin'
+
+    const response = await request(app).get('/email-suppressions?status=active&page=1')
+
+    expect(response.status).toBe(200)
+    expect(response.body).toMatchObject({
+      total: 1,
+      page: 1,
+      status: 'active',
+    })
+    expect(response.body.suppressions).toHaveLength(1)
+    expect(mocks.prisma.emailSuppression.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { active: true },
+    }))
+  })
+
+  it('unsuppresses a recipient and records an audit entry', async () => {
+    mocks.state.role = 'admin'
+
+    const response = await request(app)
+      .patch('/email-suppressions/7/unsuppress')
+      .send({ reason: 'Mailbox recovered and confirmed by support.' })
+
+    expect(response.status).toBe(200)
+    expect(response.body).toMatchObject({
+      message: 'Recipient unsuppressed successfully.',
+      suppression: {
+        id: 7,
+        active: false,
+      },
+    })
+
+    expect(mocks.prisma.emailSuppression.update).toHaveBeenCalledWith({
+      where: { id: 7 },
+      data: { active: false },
+    })
+
+    expect(mocks.prisma.emailSuppressionAudit.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        suppressionId: 7,
+        action: 'manual-unsuppress',
+        reason: 'Mailbox recovered and confirmed by support.',
+        performedByUserId: 42,
+      }),
+    })
+  })
+
+  it('rejects unsuppress requests without a meaningful reason', async () => {
+    mocks.state.role = 'admin'
+
+    const response = await request(app)
+      .patch('/email-suppressions/7/unsuppress')
+      .send({ reason: 'short' })
+
+    expect(response.status).toBe(400)
+    expect(response.body).toMatchObject({
+      error: 'Provide an unsuppress reason with at least 8 characters.',
+    })
+    expect(mocks.prisma.emailSuppression.update).not.toHaveBeenCalled()
+    expect(mocks.prisma.emailSuppressionAudit.create).not.toHaveBeenCalled()
+  })
+
+  it('returns suppression audit history for admins', async () => {
+    mocks.state.role = 'admin'
+
+    const response = await request(app).get('/email-suppressions/7/audit?page=1')
+
+    expect(response.status).toBe(200)
+    expect(response.body).toMatchObject({
+      suppression: {
+        id: 7,
+        email: 'suppressed_user@studyhub.test',
+      },
+      total: 1,
+      page: 1,
+    })
+    expect(response.body.entries).toHaveLength(1)
+    expect(mocks.prisma.emailSuppressionAudit.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { suppressionId: 7 },
+    }))
   })
 })
