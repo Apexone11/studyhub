@@ -12,11 +12,7 @@
 name: Jscrambler Code Integrity
 
 on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    # The branches below must be a subset of the branches above
-    branches: [ "main" ]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -28,20 +24,36 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
+      - name: Check Jscrambler frontend config
+        id: jscrambler_config
+        shell: bash
+        run: |
+          if [ -f frontend/studyhub-app/jscrambler.json ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "frontend/studyhub-app/jscrambler.json is missing. Skipping Jscrambler protection run."
+          fi
       - uses: actions/setup-node@v4
+        if: steps.jscrambler_config.outputs.exists == 'true'
         with:
           node-version: 20
       - run: npm ci
+        if: steps.jscrambler_config.outputs.exists == 'true'
+        working-directory: frontend/studyhub-app
       - run: npm run build
+        if: steps.jscrambler_config.outputs.exists == 'true'
+        working-directory: frontend/studyhub-app
       - name: Jscrambler Code Integrity
         id: jscrambler
+        if: steps.jscrambler_config.outputs.exists == 'true'
         # the complete list of inputs can be found here: https://github.com/marketplace/actions/jscrambler#inputs
         uses: jscrambler/code-integrity-actions/protect@ab65962a2ecffcc362b75a997e24a181d0bde5fb
         with:
-          application-id: ${{ secrets.JSCRAMBLER_APPLICATION_ID }}  # This value should be created within your Jscrambler account
-          secret-key: ${{ secrets.JSCRAMBLER_SECRET_KEY }}          # This value can be found in your Jscrambler account
-          access-key: ${{ secrets.JSCRAMBLER_ACCESS_KEY }}          # This value can be found in your Jscrambler account
-          jscrambler-config-path: jscrambler.json                   # Download from your Jscrambler account
+          application-id: ${{ secrets['JSCRAMBLER_APPLICATION_ID'] }}  # This value should be created within your Jscrambler account
+          secret-key: ${{ secrets['JSCRAMBLER_SECRET_KEY'] }}          # This value can be found in your Jscrambler account
+          access-key: ${{ secrets['JSCRAMBLER_ACCESS_KEY'] }}          # This value can be found in your Jscrambler account
+          jscrambler-config-path: frontend/studyhub-app/jscrambler.json
           files-src: |                                              # List of Files to be protected
-            dist/**/*
+            frontend/studyhub-app/dist/**/*
           files-dest: .

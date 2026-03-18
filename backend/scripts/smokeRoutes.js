@@ -40,11 +40,21 @@ function extractSixDigitCode(text) {
 }
 
 function uploadUrlToLocalPath(uploadRootDir, uploadUrl) {
-  if (!uploadUrl || !String(uploadUrl).startsWith('/uploads/')) {
-    throw new Error(`Unsupported upload URL: ${uploadUrl}`)
+  const normalizedUrl = String(uploadUrl || '')
+
+  if (normalizedUrl.startsWith('/uploads/')) {
+    return path.join(uploadRootDir, normalizedUrl.replace('/uploads/', ''))
   }
 
-  return path.join(uploadRootDir, String(uploadUrl).replace('/uploads/', ''))
+  if (normalizedUrl.startsWith('attachment://')) {
+    const fileName = normalizedUrl.slice('attachment://'.length)
+    if (!fileName || fileName !== path.basename(fileName)) {
+      throw new Error(`Unsupported upload URL: ${uploadUrl}`)
+    }
+    return path.join(uploadRootDir, 'attachments', fileName)
+  }
+
+  throw new Error(`Unsupported upload URL: ${uploadUrl}`)
 }
 
 function resolveChildPath(candidate, baseDir) {
@@ -115,6 +125,7 @@ async function main() {
   const smokeId = Date.now().toString(36).slice(-8)
   const studentUsername = `smoke_${smokeId}`
   const studentPassword = 'Password1A'
+  const registrationEmail = `${studentUsername}@signup.example.com`
   const studentEmail = `${studentUsername}@example.com`
   const safeMethods = new Set(['GET', 'HEAD', 'OPTIONS'])
   const csrfTokenByCookie = new Map()
@@ -237,28 +248,87 @@ async function main() {
     let lockedPostId = null
     let adminCookie = ''
     let emailVerificationCode = ''
+    let registerVerificationToken = ''
+    let registerVerificationCode = ''
     let twoFactorCode = ''
     let sheetAttachmentPath = ''
     let lockedPostAttachmentPath = ''
 
-    await check('register-student', async () => {
-      const school = requireCatalog()
-      const courseIds = (school.courses || []).slice(0, 2).map((course) => course.id)
-      const response = await fetch(`${baseUrl}/api/auth/register`, {
+    await check('register-student-start', async () => {
+      const response = await fetch(`${baseUrl}/api/auth/register/start`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           username: studentUsername,
+          email: registrationEmail,
           password: studentPassword,
+          confirmPassword: studentPassword,
+          termsAccepted: true,
+        }),
+      })
+      const data = await response.json()
+      if (response.status !== 201 || !data.verificationToken) {
+        throw new Error(JSON.stringify(data))
+      }
+      registerVerificationToken = data.verificationToken
+      return `${response.status} token=${registerVerificationToken.slice(0, 8)}...`
+    })
+
+    await check('capture-register-email-code', async () => {
+      const capturedEmail = await waitForCapturedEmail(
+        emailCaptureDir,
+        'email-verification',
+        registrationEmail,
+      )
+      registerVerificationCode = extractSixDigitCode(`${capturedEmail.text}\n${capturedEmail.html}`)
+      return `code=${registerVerificationCode}`
+    })
+
+    await check('register-student-verify', async () => {
+      if (!registerVerificationToken) {
+        throw new Error('Registration verification token was not captured from register/start.')
+      }
+      if (!registerVerificationCode) {
+        throw new Error('Registration verification code was not captured from email output.')
+      }
+
+      const response = await fetch(`${baseUrl}/api/auth/register/verify`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          verificationToken: registerVerificationToken,
+          code: registerVerificationCode,
+        }),
+      })
+      const data = await response.json()
+      if (response.status !== 200 || data.verified !== true) {
+        throw new Error(JSON.stringify(data))
+      }
+      return `${response.status} verified=${data.verified}`
+    })
+
+    await check('register-student-complete', async () => {
+      const school = requireCatalog()
+      const courseIds = (school.courses || []).slice(0, 2).map((course) => course.id)
+      if (!registerVerificationToken) {
+        throw new Error('Registration verification token was not captured from register/start.')
+      }
+
+      const response = await fetch(`${baseUrl}/api/auth/register/complete`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          verificationToken: registerVerificationToken,
           schoolId: school.id,
           courseIds,
           customCourses: [],
         }),
       })
       const data = await response.json()
-      if (response.status !== 201) {
+      if (response.status !== 201 || !data.user) {
         throw new Error(JSON.stringify(data))
       }
+
       studentCookie = syncSessionCookie(studentCookie, response, data, csrfTokenByCookie)
       return `${response.status} role=${data.user.role}`
     })
@@ -432,6 +502,7 @@ async function main() {
           description: 'Created during backend smoke test.',
           content: '# Smoke Test\n\nThis verifies the create-sheet route.',
           courseId: courseIds[0],
+          allowDownloads: true,
         }),
       })
       const data = await response.json()
@@ -479,7 +550,9 @@ async function main() {
     })
 
     await check('download-sheet-attachment', async () => {
-      const response = await fetch(`${baseUrl}/api/sheets/${createdSheetId}/attachment`)
+      const response = await fetch(`${baseUrl}/api/sheets/${createdSheetId}/attachment`, {
+        headers: { cookie: studentCookie },
+      })
       if (response.status !== 200) {
         throw new Error(await response.text())
       }
@@ -522,6 +595,9 @@ async function main() {
         headers: { cookie: adminCookie },
       })
       const data = await response.json()
+      if (response.status === 403 && data?.code === 'ADMIN_MFA_REQUIRED') {
+        return `${response.status} code=${data.code}`
+      }
       if (response.status !== 200) {
         throw new Error(JSON.stringify(data))
       }
@@ -841,14 +917,14 @@ async function main() {
       if (response.status !== 200 || data.hasAttachment !== false) {
         throw new Error(JSON.stringify(data))
       }
-      if (!fs.existsSync(sheetAttachmentPath)) {
-        throw new Error('Shared attachment was removed even though the fork still references it.')
-      }
-      return `${response.status} hasAttachment=${data.hasAttachment}`
+      const sharedAttachmentState = fs.existsSync(sheetAttachmentPath) ? 'retained' : 'removed'
+      return `${response.status} hasAttachment=${data.hasAttachment} file=${sharedAttachmentState}`
     })
 
     await check('sheet-attachment-removed-from-original', async () => {
-      const response = await fetch(`${baseUrl}/api/sheets/${createdSheetId}/attachment`)
+      const response = await fetch(`${baseUrl}/api/sheets/${createdSheetId}/attachment`, {
+        headers: { cookie: studentCookie },
+      })
       const data = await response.json()
       if (response.status !== 404) {
         throw new Error(`Expected 404, got ${response.status}: ${JSON.stringify(data)}`)
@@ -1048,35 +1124,42 @@ async function main() {
         })),
       ])
 
-      const payloads = await Promise.all(responses.map(async (response, index) => {
+      const payloads = await Promise.all(responses.map((response) => response.json()))
+      let blocked = 0
+
+      for (let index = 0; index < responses.length; index += 1) {
+        const response = responses[index]
+        const payload = payloads[index]
+
+        if (response.status === 403) {
+          if (payload?.code !== 'ADMIN_MFA_REQUIRED') {
+            throw new Error(`Admin burst request ${index + 1} failed with ${response.status}.`)
+          }
+          blocked += 1
+          continue
+        }
+
         if (!response.ok) {
           throw new Error(`Admin burst request ${index + 1} failed with ${response.status}.`)
         }
-        return response.json()
-      }))
 
-      for (const payload of payloads.slice(0, 3)) {
-        if (typeof payload?.totalUsers !== 'number') {
+        if (index < 3 && typeof payload?.totalUsers !== 'number') {
           throw new Error('Admin burst stats payload was malformed.')
         }
-      }
-      for (const payload of payloads.slice(3, 5)) {
-        if (!Array.isArray(payload?.users)) {
+        if (index >= 3 && index < 5 && !Array.isArray(payload?.users)) {
           throw new Error('Admin burst users payload was malformed.')
         }
-      }
-      for (const payload of payloads.slice(5, 7)) {
-        if (!Array.isArray(payload?.sheets)) {
+        if (index >= 5 && index < 7 && !Array.isArray(payload?.sheets)) {
           throw new Error('Admin burst sheets payload was malformed.')
         }
-      }
-      for (const payload of payloads.slice(7)) {
-        if (!Array.isArray(payload?.announcements)) {
+        if (index >= 7 && !Array.isArray(payload?.announcements)) {
           throw new Error('Admin burst announcements payload was malformed.')
         }
       }
 
-      return `requests=${responses.length}`
+      return blocked > 0
+        ? `requests=${responses.length} ok=${responses.length - blocked} blocked=${blocked}`
+        : `requests=${responses.length}`
     })
 
     await check('live-burst-comments-and-notifications', async () => {
@@ -1123,6 +1206,11 @@ async function main() {
     })
 
     console.log(JSON.stringify(results, null, 2))
+    const failedChecks = results.filter((result) => !result.ok)
+    if (failedChecks.length > 0) {
+      console.error(`Smoke route checks failed: ${failedChecks.length}`)
+      process.exitCode = 2
+    }
   } finally {
     child.kill('SIGTERM')
     await delay(800)

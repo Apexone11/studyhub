@@ -2,6 +2,7 @@ const express = require('express')
 const rateLimit = require('express-rate-limit')
 const fs = require('node:fs')
 const path = require('node:path')
+const { assertOwnerOrAdmin, sendForbidden } = require('../lib/accessControl')
 const requireAuth = require('../middleware/auth')
 const { captureError } = require('../monitoring/sentry')
 const { createNotification } = require('../lib/notify')
@@ -9,8 +10,27 @@ const { notifyMentionedUsers } = require('../lib/mentions')
 const { getAuthTokenFromRequest, verifyAuthToken } = require('../lib/authTokens')
 const prisma = require('../lib/prisma')
 const { cleanupAttachmentIfUnused, resolveAttachmentPath } = require('../lib/storage')
+const { sendAttachmentPreview } = require('../lib/attachmentPreview')
+const { normalizeContentFormat, validateHtmlForSubmission } = require('../lib/htmlSecurity')
+const { HTML_PREVIEW_TOKEN_TTL_SECONDS, signHtmlPreviewToken } = require('../lib/previewTokens')
+const {
+  SCAN_STATUS,
+  HTML_VERSION_KIND,
+  importHtmlDraft,
+  updateWorkingHtmlDraft,
+  getHtmlScanStatus,
+  acknowledgeHtmlScanWarning,
+  submitHtmlDraftForReview,
+  upsertHtmlVersion,
+} = require('../lib/htmlDraftWorkflow')
 
 const router = express.Router()
+const SHEET_STATUS = {
+  DRAFT: 'draft',
+  PENDING_REVIEW: 'pending_review',
+  PUBLISHED: 'published',
+  REJECTED: 'rejected',
+}
 
 const reactLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -84,6 +104,35 @@ function parsePositiveInt(value, fallback) {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback
 }
 
+function normalizeSheetStatus(value, fallback = SHEET_STATUS.PUBLISHED) {
+  const normalized = String(value || '').trim().toLowerCase()
+  if (normalized === SHEET_STATUS.DRAFT) return SHEET_STATUS.DRAFT
+  if (normalized === SHEET_STATUS.PENDING_REVIEW) return SHEET_STATUS.PENDING_REVIEW
+  if (normalized === SHEET_STATUS.PUBLISHED) return SHEET_STATUS.PUBLISHED
+  if (normalized === SHEET_STATUS.REJECTED) return SHEET_STATUS.REJECTED
+  return fallback
+}
+
+function canModerateOrOwnSheet(sheet, user) {
+  return Boolean(user && (user.role === 'admin' || user.userId === sheet.userId))
+}
+
+function canReadSheet(sheet, user) {
+  if (sheet.status === SHEET_STATUS.PUBLISHED) return true
+  return canModerateOrOwnSheet(sheet, user)
+}
+
+function resolveNextSheetStatus({ requestedStatus, contentFormat, isDraftAutosave = false }) {
+  const normalizedRequested = normalizeSheetStatus(requestedStatus, '')
+  if (normalizedRequested === SHEET_STATUS.DRAFT || isDraftAutosave) {
+    return SHEET_STATUS.DRAFT
+  }
+  if (contentFormat === 'html') {
+    return SHEET_STATUS.PENDING_REVIEW
+  }
+  return SHEET_STATUS.PUBLISHED
+}
+
 function safeDownloadName(name, fallbackExt = '') {
   const ext = fallbackExt || path.extname(name || '')
   const base = String(name || 'studyhub-sheet')
@@ -94,6 +143,20 @@ function safeDownloadName(name, fallbackExt = '') {
     .slice(0, 80) || 'studyhub-sheet'
 
   return `${base}${ext}`.toLowerCase()
+}
+
+function resolvePreviewOrigin(req) {
+  const configuredOrigin = String(process.env.HTML_PREVIEW_ORIGIN || '').trim()
+
+  if (configuredOrigin) {
+    try {
+      return new URL(configuredOrigin).origin
+    } catch {
+      // Fall back to the current request origin when misconfigured.
+    }
+  }
+
+  return `${req.protocol}://${req.get('host')}`
 }
 
 function serializeContribution(contribution) {
@@ -137,6 +200,13 @@ function serializeContribution(contribution) {
 }
 
 function serializeSheet(sheet, { starred = false, reactions = null, commentCount = 0 } = {}) {
+  const originalVersion = Array.isArray(sheet.htmlVersions)
+    ? sheet.htmlVersions.find((entry) => entry.kind === HTML_VERSION_KIND.ORIGINAL)
+    : null
+  const workingVersion = Array.isArray(sheet.htmlVersions)
+    ? sheet.htmlVersions.find((entry) => entry.kind === HTML_VERSION_KIND.WORKING)
+    : null
+
   const response = {
     ...sheet,
     starred,
@@ -145,6 +215,15 @@ function serializeSheet(sheet, { starred = false, reactions = null, commentCount
     attachmentName: sheet.attachmentName || null,
     attachmentUrl: null,
     commentCount,
+    htmlWorkflow: {
+      scanStatus: sheet.htmlScanStatus || SCAN_STATUS.QUEUED,
+      scanFindings: Array.isArray(sheet.htmlScanFindings) ? sheet.htmlScanFindings : [],
+      scanUpdatedAt: sheet.htmlScanUpdatedAt || null,
+      scanAcknowledgedAt: sheet.htmlScanAcknowledgedAt || null,
+      hasOriginalVersion: Boolean(originalVersion),
+      hasWorkingVersion: Boolean(workingVersion),
+      originalSourceName: originalVersion?.sourceName || null,
+    },
   }
 
   if (reactions) {
@@ -230,6 +309,11 @@ router.get('/leaderboard', leaderboardLimiter, async (req, res) => {
           avatarUrl: true,
           _count: { select: { studySheets: true } },
         },
+        where: {
+          studySheets: {
+            some: { status: SHEET_STATUS.PUBLISHED },
+          },
+        },
         orderBy: { studySheets: { _count: 'desc' } },
         take: 5,
       })
@@ -252,6 +336,7 @@ router.get('/leaderboard', leaderboardLimiter, async (req, res) => {
         author: { select: { id: true, username: true } },
         course: { select: { code: true } },
       },
+      where: { status: SHEET_STATUS.PUBLISHED },
       orderBy: { [orderField]: 'desc' },
       take: 5,
     })
@@ -287,6 +372,7 @@ router.patch('/contributions/:contributionId', contributionReviewLimiter, requir
             title: true,
             description: true,
             content: true,
+            contentFormat: true,
             attachmentUrl: true,
             attachmentType: true,
             attachmentName: true,
@@ -304,15 +390,24 @@ router.patch('/contributions/:contributionId', contributionReviewLimiter, requir
       return res.status(409).json({ error: 'This contribution has already been reviewed.' })
     }
     if (req.user.role !== 'admin' && req.user.userId !== contribution.targetSheet.userId) {
-      return res.status(403).json({ error: 'Only the original author can review this contribution.' })
+      return sendForbidden(res, 'Only the original author can review this contribution.')
     }
 
     if (action === 'accept') {
+      if (contribution.forkSheet.contentFormat === 'html') {
+        const validation = validateHtmlForSubmission(contribution.forkSheet.content)
+        if (!validation.ok) {
+          return res.status(400).json({ error: validation.issues[0], issues: validation.issues })
+        }
+      }
+
       await prisma.studySheet.update({
         where: { id: contribution.targetSheetId },
         data: {
           description: contribution.forkSheet.description,
           content: contribution.forkSheet.content,
+          contentFormat: contribution.forkSheet.contentFormat || 'markdown',
+          status: SHEET_STATUS.PUBLISHED,
           attachmentUrl: contribution.forkSheet.attachmentUrl,
           attachmentType: contribution.forkSheet.attachmentType,
           attachmentName: contribution.forkSheet.attachmentName,
@@ -380,15 +475,19 @@ router.get('/', optionalAuth, async (req, res) => {
     starred,
     limit = 20,
     offset = 0,
-    orderBy = 'createdAt',
+    orderBy: orderByParam = 'createdAt',
+    sort,
   } = req.query
 
   try {
     const where = {}
+    const includeUnpublishedMine = mine === '1'
 
-    if (mine === '1') {
+    if (includeUnpublishedMine) {
       if (!req.user) return res.status(401).json({ error: 'Login required.' })
       where.userId = req.user.userId
+    } else {
+      where.status = SHEET_STATUS.PUBLISHED
     }
 
     if (courseId) where.courseId = Number.parseInt(courseId, 10)
@@ -402,7 +501,8 @@ router.get('/', optionalAuth, async (req, res) => {
     }
 
     const allowedSort = ['createdAt', 'stars', 'downloads', 'forks', 'updatedAt']
-    const sortField = allowedSort.includes(orderBy) ? orderBy : 'createdAt'
+    const sortCandidate = typeof sort === 'string' && sort.trim() ? sort : orderByParam
+    const sortField = allowedSort.includes(sortCandidate) ? sortCandidate : 'createdAt'
     const take = parsePositiveInt(limit, 20)
     const skip = Math.max(0, Number.parseInt(offset, 10) || 0)
 
@@ -410,17 +510,17 @@ router.get('/', optionalAuth, async (req, res) => {
       if (!req.user) return res.status(401).json({ error: 'Login required.' })
 
       const starredRows = await prisma.starredSheet.findMany({
-        where: { userId: req.user.userId },
+        where: { userId: req.user.userId, sheet: where },
         select: { sheetId: true },
         orderBy: { createdAt: 'desc' },
         take,
         skip,
       })
       const starredSheetIds = starredRows.map((row) => row.sheetId)
-      const totalStarred = await prisma.starredSheet.count({ where: { userId: req.user.userId } })
+      const totalStarred = await prisma.starredSheet.count({ where: { userId: req.user.userId, sheet: where } })
 
       const sheets = await prisma.studySheet.findMany({
-        where: { id: { in: starredSheetIds }, ...where },
+        where: { id: { in: starredSheetIds } },
         include: {
           author: { select: { id: true, username: true } },
           course: { include: { school: true } },
@@ -510,6 +610,328 @@ router.get('/', optionalAuth, async (req, res) => {
   }
 })
 
+router.get('/drafts/latest', requireAuth, async (req, res) => {
+  try {
+    const draft = await prisma.studySheet.findFirst({
+      where: {
+        userId: req.user.userId,
+        status: SHEET_STATUS.DRAFT,
+      },
+      include: {
+        author: { select: { id: true, username: true } },
+        course: { include: { school: true } },
+        htmlVersions: true,
+      },
+      orderBy: { updatedAt: 'desc' },
+    })
+
+    res.json({ draft: draft ? serializeSheet(draft) : null })
+  } catch (error) {
+    captureError(error, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+router.post('/drafts/autosave', requireAuth, sheetWriteLimiter, async (req, res) => {
+  const draftId = Number.parseInt(req.body?.id, 10)
+  const parsedCourseId = Number.parseInt(req.body?.courseId, 10)
+  const contentFormat = normalizeContentFormat(req.body?.contentFormat)
+
+  if (!Number.isInteger(parsedCourseId) || parsedCourseId <= 0) {
+    return res.status(400).json({ error: 'Course is required for autosave drafts.' })
+  }
+
+  const title = String(req.body?.title || '').trim().slice(0, 160) || 'Untitled draft'
+  const content = String(req.body?.content || '')
+  const description = String(req.body?.description || '').trim().slice(0, 300)
+  const allowDownloads = req.body?.allowDownloads !== false
+
+  try {
+    if (contentFormat === 'html' && content.trim()) {
+      const validation = validateHtmlForSubmission(content)
+      if (!validation.ok) {
+        return res.status(400).json({ error: validation.issues[0], issues: validation.issues })
+      }
+    }
+
+    let draft
+    if (Number.isInteger(draftId)) {
+      const existingDraft = await prisma.studySheet.findUnique({
+        where: { id: draftId },
+        select: { id: true, userId: true, status: true },
+      })
+
+      if (!existingDraft) return res.status(404).json({ error: 'Draft not found.' })
+      if (existingDraft.userId !== req.user.userId && req.user.role !== 'admin') {
+        return sendForbidden(res, 'Not your draft.')
+      }
+
+      draft = await prisma.studySheet.update({
+        where: { id: draftId },
+        data: {
+          title,
+          content,
+          description,
+          courseId: parsedCourseId,
+          contentFormat,
+          status: SHEET_STATUS.DRAFT,
+          allowDownloads,
+        },
+        include: {
+          author: { select: { id: true, username: true } },
+          course: { include: { school: true } },
+          htmlVersions: true,
+        },
+      })
+    } else {
+      draft = await prisma.studySheet.create({
+        data: {
+          title,
+          content,
+          description,
+          courseId: parsedCourseId,
+          userId: req.user.userId,
+          contentFormat,
+          status: SHEET_STATUS.DRAFT,
+          allowDownloads,
+        },
+        include: {
+          author: { select: { id: true, username: true } },
+          course: { include: { school: true } },
+          htmlVersions: true,
+        },
+      })
+    }
+
+    if (contentFormat === 'html' && content.trim()) {
+      await upsertHtmlVersion(prisma, {
+        sheetId: draft.id,
+        userId: req.user.userId,
+        kind: HTML_VERSION_KIND.WORKING,
+        content,
+        sourceName: 'working.html',
+      })
+      draft = await prisma.studySheet.findUnique({
+        where: { id: draft.id },
+        include: {
+          author: { select: { id: true, username: true } },
+          course: { include: { school: true } },
+          htmlVersions: true,
+        },
+      })
+    }
+
+    res.json({
+      message: 'Draft autosaved.',
+      draft: serializeSheet(draft),
+    })
+  } catch (error) {
+    captureError(error, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+router.post('/drafts/import-html', requireAuth, sheetWriteLimiter, async (req, res) => {
+  const draftId = Number.parseInt(req.body?.id, 10)
+  const courseId = Number.parseInt(req.body?.courseId, 10)
+
+  try {
+    const nextDraftId = await importHtmlDraft(prisma, {
+      sheetId: Number.isInteger(draftId) ? draftId : null,
+      user: req.user,
+      title: req.body?.title,
+      courseId,
+      description: req.body?.description,
+      allowDownloads: req.body?.allowDownloads !== false,
+      html: req.body?.html,
+      sourceName: String(req.body?.sourceName || '').trim().slice(0, 120) || 'upload.html',
+    })
+
+    const draft = await prisma.studySheet.findUnique({
+      where: { id: nextDraftId },
+      include: {
+        author: { select: { id: true, username: true } },
+        course: { include: { school: true } },
+        htmlVersions: true,
+      },
+    })
+
+    const scan = await getHtmlScanStatus(prisma, { sheetId: nextDraftId, user: req.user })
+
+    res.status(201).json({
+      message: 'HTML file imported into draft workflow.',
+      draft: serializeSheet(draft),
+      scan,
+    })
+  } catch (error) {
+    const statusCode = Number.isInteger(error.statusCode) ? error.statusCode : 500
+    if (statusCode >= 500) {
+      captureError(error, { route: req.originalUrl, method: req.method })
+    }
+    res.status(statusCode).json({ error: error.message || 'Could not import HTML draft.' })
+  }
+})
+
+router.patch('/drafts/:id/working-html', requireAuth, sheetWriteLimiter, async (req, res) => {
+  const sheetId = Number.parseInt(req.params.id, 10)
+
+  if (!Number.isInteger(sheetId)) {
+    return res.status(400).json({ error: 'Draft id must be an integer.' })
+  }
+
+  try {
+    await updateWorkingHtmlDraft(prisma, {
+      sheetId,
+      user: req.user,
+      title: req.body?.title,
+      courseId: req.body?.courseId,
+      description: req.body?.description,
+      allowDownloads: req.body?.allowDownloads !== false,
+      html: req.body?.html,
+    })
+
+    const draft = await prisma.studySheet.findUnique({
+      where: { id: sheetId },
+      include: {
+        author: { select: { id: true, username: true } },
+        course: { include: { school: true } },
+        htmlVersions: true,
+      },
+    })
+    const scan = await getHtmlScanStatus(prisma, { sheetId, user: req.user })
+
+    res.json({
+      message: 'Working HTML draft saved.',
+      draft: serializeSheet(draft),
+      scan,
+    })
+  } catch (error) {
+    const statusCode = Number.isInteger(error.statusCode) ? error.statusCode : 500
+    if (statusCode >= 500) {
+      captureError(error, { route: req.originalUrl, method: req.method })
+    }
+    res.status(statusCode).json({
+      error: error.message || 'Could not save working HTML draft.',
+      findings: error.findings || [],
+    })
+  }
+})
+
+router.get('/drafts/:id/scan-status', requireAuth, async (req, res) => {
+  const sheetId = Number.parseInt(req.params.id, 10)
+  if (!Number.isInteger(sheetId)) {
+    return res.status(400).json({ error: 'Draft id must be an integer.' })
+  }
+
+  try {
+    const scan = await getHtmlScanStatus(prisma, { sheetId, user: req.user })
+    res.json(scan)
+  } catch (error) {
+    const statusCode = Number.isInteger(error.statusCode) ? error.statusCode : 500
+    if (statusCode >= 500) {
+      captureError(error, { route: req.originalUrl, method: req.method })
+    }
+    res.status(statusCode).json({ error: error.message || 'Could not fetch scan status.' })
+  }
+})
+
+router.post('/drafts/:id/scan-status/acknowledge', requireAuth, async (req, res) => {
+  const sheetId = Number.parseInt(req.params.id, 10)
+  if (!Number.isInteger(sheetId)) {
+    return res.status(400).json({ error: 'Draft id must be an integer.' })
+  }
+
+  try {
+    await acknowledgeHtmlScanWarning(prisma, { sheetId, user: req.user })
+    const scan = await getHtmlScanStatus(prisma, { sheetId, user: req.user })
+    res.json({
+      message: 'Scan warning acknowledged.',
+      scan,
+    })
+  } catch (error) {
+    const statusCode = Number.isInteger(error.statusCode) ? error.statusCode : 500
+    if (statusCode >= 500) {
+      captureError(error, { route: req.originalUrl, method: req.method })
+    }
+    res.status(statusCode).json({ error: error.message || 'Could not acknowledge warning.' })
+  }
+})
+
+router.post('/:id/submit-review', requireAuth, sheetWriteLimiter, async (req, res) => {
+  const sheetId = Number.parseInt(req.params.id, 10)
+  if (!Number.isInteger(sheetId)) {
+    return res.status(400).json({ error: 'Sheet id must be an integer.' })
+  }
+
+  try {
+    const sheet = await submitHtmlDraftForReview(prisma, { sheetId, user: req.user })
+    res.json({
+      ...serializeSheet(sheet),
+      message: 'HTML sheet submitted for admin review.',
+    })
+  } catch (error) {
+    const statusCode = Number.isInteger(error.statusCode) ? error.statusCode : 500
+    if (statusCode >= 500) {
+      captureError(error, { route: req.originalUrl, method: req.method })
+    }
+    res.status(statusCode).json({
+      error: error.message || 'Could not submit for review.',
+      findings: error.findings || [],
+    })
+  }
+})
+
+router.get('/:id/html-preview', requireAuth, async (req, res) => {
+  const sheetId = Number.parseInt(req.params.id, 10)
+
+  try {
+    const sheet = await prisma.studySheet.findUnique({
+      where: { id: sheetId },
+      select: {
+        id: true,
+        title: true,
+        userId: true,
+        content: true,
+        contentFormat: true,
+        status: true,
+        updatedAt: true,
+      },
+    })
+
+    if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
+    if (!canReadSheet(sheet, req.user || null)) return res.status(404).json({ error: 'Sheet not found.' })
+    if (sheet.contentFormat !== 'html') {
+      return res.status(400).json({ error: 'This sheet is not in HTML mode.' })
+    }
+
+    const validation = validateHtmlForSubmission(sheet.content)
+    if (!validation.ok) {
+      return res.status(400).json({ error: 'HTML preview blocked by security checks.', issues: validation.issues })
+    }
+
+    const previewVersion = sheet.updatedAt ? new Date(sheet.updatedAt).toISOString() : '0'
+    const previewToken = signHtmlPreviewToken({
+      sheetId: sheet.id,
+      userId: req.user.userId,
+      version: previewVersion,
+      allowUnpublished: canModerateOrOwnSheet(sheet, req.user),
+    })
+    const previewUrl = `${resolvePreviewOrigin(req)}/preview/html?token=${encodeURIComponent(previewToken)}`
+
+    res.json({
+      id: sheet.id,
+      title: sheet.title,
+      status: sheet.status,
+      updatedAt: sheet.updatedAt,
+      previewUrl,
+      expiresInSeconds: HTML_PREVIEW_TOKEN_TTL_SECONDS,
+    })
+  } catch (error) {
+    captureError(error, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
 router.get('/:id/download', attachmentDownloadLimiter, async (req, res) => {
   const sheetId = Number.parseInt(req.params.id, 10)
 
@@ -520,13 +942,18 @@ router.get('/:id/download', attachmentDownloadLimiter, async (req, res) => {
         id: true,
         title: true,
         content: true,
+        contentFormat: true,
+        status: true,
         allowDownloads: true,
       },
     })
 
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
+    if (sheet.status !== SHEET_STATUS.PUBLISHED) {
+      return sendForbidden(res, 'Downloads are unavailable for this sheet.')
+    }
     if (!sheet.allowDownloads) {
-      return res.status(403).json({ error: 'Downloads are disabled for this sheet.' })
+      return sendForbidden(res, 'Downloads are disabled for this sheet.')
     }
 
     await prisma.studySheet.update({
@@ -534,10 +961,11 @@ router.get('/:id/download', attachmentDownloadLimiter, async (req, res) => {
       data: { downloads: { increment: 1 } },
     })
 
-    res.setHeader('Content-Type', 'text/markdown; charset=utf-8')
+    const downloadAsHtml = sheet.contentFormat === 'html'
+    res.setHeader('Content-Type', downloadAsHtml ? 'text/html; charset=utf-8' : 'text/markdown; charset=utf-8')
     res.setHeader(
       'Content-Disposition',
-      `attachment; filename="${safeDownloadName(sheet.title, '.md')}"`
+      `attachment; filename="${safeDownloadName(sheet.title, downloadAsHtml ? '.html' : '.md')}"`
     )
     res.send(sheet.content)
   } catch (error) {
@@ -546,7 +974,7 @@ router.get('/:id/download', attachmentDownloadLimiter, async (req, res) => {
   }
 })
 
-router.get('/:id/attachment', attachmentDownloadLimiter, async (req, res) => {
+router.get('/:id/attachment', requireAuth, attachmentDownloadLimiter, async (req, res) => {
   const sheetId = Number.parseInt(req.params.id, 10)
 
   try {
@@ -554,6 +982,7 @@ router.get('/:id/attachment', attachmentDownloadLimiter, async (req, res) => {
       where: { id: sheetId },
       select: {
         id: true,
+        status: true,
         attachmentUrl: true,
         attachmentName: true,
         allowDownloads: true,
@@ -561,9 +990,12 @@ router.get('/:id/attachment', attachmentDownloadLimiter, async (req, res) => {
     })
 
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
+    if (sheet.status !== SHEET_STATUS.PUBLISHED) {
+      return sendForbidden(res, 'Downloads are unavailable for this sheet.')
+    }
     if (!sheet.attachmentUrl) return res.status(404).json({ error: 'Attachment not found.' })
     if (!sheet.allowDownloads) {
-      return res.status(403).json({ error: 'Downloads are disabled for this sheet.' })
+      return sendForbidden(res, 'Downloads are disabled for this sheet.')
     }
 
     const localPath = resolveAttachmentPath(sheet.attachmentUrl)
@@ -583,6 +1015,44 @@ router.get('/:id/attachment', attachmentDownloadLimiter, async (req, res) => {
   }
 })
 
+router.get('/:id/attachment/preview', requireAuth, attachmentDownloadLimiter, async (req, res) => {
+  const sheetId = Number.parseInt(req.params.id, 10)
+
+  try {
+    const sheet = await prisma.studySheet.findUnique({
+      where: { id: sheetId },
+      select: {
+        id: true,
+        status: true,
+        attachmentUrl: true,
+        attachmentName: true,
+        attachmentType: true,
+      },
+    })
+
+    if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
+    if (sheet.status !== SHEET_STATUS.PUBLISHED) {
+      return sendForbidden(res, 'Preview unavailable for this sheet.')
+    }
+    if (!sheet.attachmentUrl) return res.status(404).json({ error: 'Attachment not found.' })
+
+    const localPath = resolveAttachmentPath(sheet.attachmentUrl)
+    if (!localPath || !fs.existsSync(localPath)) {
+      return res.status(404).json({ error: 'Attachment file is missing.' })
+    }
+
+    await sendAttachmentPreview({
+      res,
+      localPath,
+      attachmentName: sheet.attachmentName || path.basename(localPath),
+      attachmentType: sheet.attachmentType || '',
+    })
+  } catch (error) {
+    captureError(error, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
 router.get('/:id', optionalAuth, async (req, res) => {
   const sheetId = Number.parseInt(req.params.id, 10)
 
@@ -592,6 +1062,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
       include: {
         author: { select: { id: true, username: true } },
         course: { include: { school: true } },
+        htmlVersions: true,
         forkSource: {
           select: {
             id: true,
@@ -604,6 +1075,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
     })
 
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
+    if (!canReadSheet(sheet, req.user || null)) return res.status(404).json({ error: 'Sheet not found.' })
 
     const [likeCount, dislikeCount, commentCount, starredRow, reactionRow, contributionCollections] = await Promise.all([
       prisma.reaction.count({ where: { sheetId, type: 'like' } }),
@@ -642,17 +1114,31 @@ router.get('/:id', optionalAuth, async (req, res) => {
 
 router.post('/', requireAuth, sheetWriteLimiter, async (req, res) => {
   const { title, content, courseId, forkOf, description, allowDownloads } = req.body || {}
+  const contentFormat = normalizeContentFormat(req.body?.contentFormat)
+  const nextStatus = resolveNextSheetStatus({
+    requestedStatus: req.body?.status,
+    contentFormat,
+  })
 
   if (!title?.trim()) return res.status(400).json({ error: 'Title is required.' })
   if (!content?.trim()) return res.status(400).json({ error: 'Content is required.' })
   if (!courseId) return res.status(400).json({ error: 'Course is required.' })
 
   try {
+    if (contentFormat === 'html') {
+      const validation = validateHtmlForSubmission(content)
+      if (!validation.ok) {
+        return res.status(400).json({ error: validation.issues[0], issues: validation.issues })
+      }
+    }
+
     const sheet = await prisma.studySheet.create({
       data: {
         title: title.trim().slice(0, 160),
         description: description?.trim().slice(0, 300) || '',
         content: content.trim(),
+        contentFormat,
+        status: nextStatus,
         courseId: Number.parseInt(courseId, 10),
         userId: req.user.userId,
         forkOf: forkOf ? Number.parseInt(forkOf, 10) : null,
@@ -661,10 +1147,16 @@ router.post('/', requireAuth, sheetWriteLimiter, async (req, res) => {
       include: {
         author: { select: { id: true, username: true } },
         course: { include: { school: true } },
+        htmlVersions: true,
       },
     })
 
-    res.status(201).json(serializeSheet(sheet))
+    res.status(201).json({
+      ...serializeSheet(sheet),
+      message: nextStatus === SHEET_STATUS.PENDING_REVIEW
+        ? 'HTML sheet submitted for admin review.'
+        : 'Sheet published.',
+    })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
@@ -681,16 +1173,30 @@ router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
       select: {
         id: true,
         userId: true,
+        content: true,
+        contentFormat: true,
+        status: true,
         attachmentUrl: true,
       },
     })
 
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
-    if (sheet.userId !== req.user.userId && req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Not your sheet.' })
-    }
+    if (!assertOwnerOrAdmin({
+      res,
+      user: req.user,
+      ownerId: sheet.userId,
+      message: 'Not your sheet.',
+      targetType: 'sheet',
+      targetId: sheetId,
+    })) return
 
     const data = {}
+    const requestedContentFormat = req.body && Object.hasOwn(req.body, 'contentFormat')
+      ? normalizeContentFormat(req.body.contentFormat)
+      : sheet.contentFormat
+    const requestedStatus = req.body && Object.hasOwn(req.body, 'status')
+      ? normalizeSheetStatus(req.body.status, '')
+      : ''
 
     if (typeof title === 'string') {
       if (!title.trim()) return res.status(400).json({ error: 'Title is required.' })
@@ -702,6 +1208,9 @@ router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
     if (typeof content === 'string') {
       if (!content.trim()) return res.status(400).json({ error: 'Content is required.' })
       data.content = content.trim()
+    }
+    if (requestedContentFormat) {
+      data.contentFormat = requestedContentFormat
     }
     if (courseId) {
       data.courseId = Number.parseInt(courseId, 10)
@@ -715,12 +1224,35 @@ router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
       data.attachmentName = null
     }
 
+    const nextContent = typeof data.content === 'string' ? data.content : null
+    const nextFormat = data.contentFormat || sheet.contentFormat
+    const wantsDraft = requestedStatus === SHEET_STATUS.DRAFT
+    const nextStatus = wantsDraft
+      ? SHEET_STATUS.DRAFT
+      : resolveNextSheetStatus({
+          requestedStatus,
+          contentFormat: nextFormat,
+        })
+
+    if (nextFormat === 'html') {
+      const htmlToValidate = typeof nextContent === 'string' ? nextContent : String(sheet.content || '')
+      if (nextStatus !== SHEET_STATUS.DRAFT || htmlToValidate.trim()) {
+        const validation = validateHtmlForSubmission(htmlToValidate)
+        if (!validation.ok) {
+          return res.status(400).json({ error: validation.issues[0], issues: validation.issues })
+        }
+      }
+    }
+
+    data.status = nextStatus
+
     const updated = await prisma.studySheet.update({
       where: { id: sheetId },
       data,
       include: {
         author: { select: { id: true, username: true } },
         course: { include: { school: true } },
+        htmlVersions: true,
         forkSource: {
           select: {
             id: true,
@@ -739,7 +1271,14 @@ router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
       })
     }
 
-    res.json(serializeSheet(updated))
+    res.json({
+      ...serializeSheet(updated),
+      message: updated.status === SHEET_STATUS.PENDING_REVIEW
+        ? 'Sheet submitted for admin review.'
+        : updated.status === SHEET_STATUS.DRAFT
+          ? 'Draft saved.'
+          : 'Sheet updated.',
+    })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
@@ -757,6 +1296,7 @@ router.post('/:id/fork', requireAuth, sheetWriteLimiter, async (req, res) => {
         title: true,
         description: true,
         content: true,
+        contentFormat: true,
         courseId: true,
         userId: true,
         attachmentUrl: true,
@@ -777,6 +1317,8 @@ router.post('/:id/fork', requireAuth, sheetWriteLimiter, async (req, res) => {
         title: forkTitle,
         description: original.description || '',
         content: original.content,
+        contentFormat: original.contentFormat || 'markdown',
+        status: SHEET_STATUS.PUBLISHED,
         courseId: original.courseId,
         userId: req.user.userId,
         forkOf: original.id,
@@ -840,7 +1382,7 @@ router.post('/:id/contributions', requireAuth, contributionRateLimiter, async (r
       return res.status(400).json({ error: 'Only forked sheets can be contributed back.' })
     }
     if (forkSheet.userId !== req.user.userId && req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Only the fork owner can contribute changes.' })
+      return sendForbidden(res, 'Only the fork owner can contribute changes.')
     }
 
     const targetSheet = await prisma.studySheet.findUnique({
@@ -910,36 +1452,63 @@ router.post('/:id/star', requireAuth, reactLimiter, async (req, res) => {
       where: { userId_sheetId: { userId, sheetId } },
     })
 
-    if (existing) {
-      await prisma.starredSheet.delete({
-        where: { userId_sheetId: { userId, sheetId } },
-      })
-
-      const updatedSheet = await prisma.studySheet.update({
-        where: { id: sheetId },
-        data: { stars: { decrement: 1 } },
-      })
-
-      return res.json({ stars: Math.max(0, updatedSheet.stars), starred: false })
+    const visibility = await prisma.studySheet.findUnique({
+      where: { id: sheetId },
+      select: { id: true, userId: true, status: true },
+    })
+    if (!visibility) return res.status(404).json({ error: 'Sheet not found.' })
+    if (!canReadSheet(visibility, req.user)) return res.status(404).json({ error: 'Sheet not found.' })
+    if (visibility.status !== SHEET_STATUS.PUBLISHED) {
+      return sendForbidden(res, 'You can only star published sheets.')
     }
 
-    await prisma.starredSheet.create({ data: { userId, sheetId } })
-    const updatedSheet = await prisma.studySheet.update({
+    let createdStar = false
+
+    if (existing) {
+      try {
+        await prisma.starredSheet.delete({
+          where: { userId_sheetId: { userId, sheetId } },
+        })
+      } catch (error) {
+        if (error?.code !== 'P2025') {
+          throw error
+        }
+      }
+    } else {
+      try {
+        await prisma.starredSheet.create({ data: { userId, sheetId } })
+        createdStar = true
+      } catch (error) {
+        if (error?.code !== 'P2002') {
+          throw error
+        }
+      }
+    }
+
+    const [starCount, currentStar] = await Promise.all([
+      prisma.starredSheet.count({ where: { sheetId } }),
+      prisma.starredSheet.findUnique({
+        where: { userId_sheetId: { userId, sheetId } },
+      }),
+    ])
+
+    await prisma.studySheet.update({
       where: { id: sheetId },
-      data: { stars: { increment: 1 } },
-      include: { author: { select: { id: true } } },
+      data: { stars: starCount },
     })
 
-    await createNotification(prisma, {
-      userId: updatedSheet.author.id,
-      type: 'star',
-      message: `${req.user.username} starred your sheet "${updatedSheet.title}".`,
-      actorId: userId,
-      sheetId,
-      linkPath: `/sheets/${sheetId}`,
-    })
+    if (createdStar) {
+      await createNotification(prisma, {
+        userId: visibility.userId,
+        type: 'star',
+        message: `${req.user.username} starred your sheet "${visibility.title || 'sheet'}".`,
+        actorId: userId,
+        sheetId,
+        linkPath: `/sheets/${sheetId}`,
+      })
+    }
 
-    return res.json({ stars: updatedSheet.stars, starred: true })
+    return res.json({ stars: starCount, starred: Boolean(currentStar) })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
@@ -952,11 +1521,14 @@ router.post('/:id/download', attachmentDownloadLimiter, async (req, res) => {
   try {
     const sheet = await prisma.studySheet.findUnique({
       where: { id: sheetId },
-      select: { id: true, allowDownloads: true },
+      select: { id: true, status: true, allowDownloads: true },
     })
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
+    if (sheet.status !== SHEET_STATUS.PUBLISHED) {
+      return sendForbidden(res, 'Downloads are unavailable for this sheet.')
+    }
     if (!sheet.allowDownloads) {
-      return res.status(403).json({ error: 'Downloads are disabled for this sheet.' })
+      return sendForbidden(res, 'Downloads are disabled for this sheet.')
     }
 
     const updated = await prisma.studySheet.update({
@@ -982,9 +1554,14 @@ router.delete('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
     })
 
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
-    if (sheet.userId !== req.user.userId && req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Not your sheet.' })
-    }
+    if (!assertOwnerOrAdmin({
+      res,
+      user: req.user,
+      ownerId: sheet.userId,
+      message: 'Not your sheet.',
+      targetType: 'sheet',
+      targetId: sheetId,
+    })) return
 
     await prisma.studySheet.delete({ where: { id: sheetId } })
     await cleanupAttachmentIfUnused(prisma, sheet.attachmentUrl, {
@@ -1004,6 +1581,13 @@ router.get('/:id/comments', async (req, res) => {
   const offset = Math.max(0, Number.parseInt(req.query.offset, 10) || 0)
 
   try {
+    const sheet = await prisma.studySheet.findUnique({
+      where: { id: sheetId },
+      select: { id: true, status: true, userId: true },
+    })
+    if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
+    if (!canReadSheet(sheet, req.user || null)) return res.status(404).json({ error: 'Sheet not found.' })
+
     const [comments, total] = await Promise.all([
       prisma.comment.findMany({
         where: { sheetId },
@@ -1034,9 +1618,10 @@ router.post('/:id/comments', requireAuth, commentLimiter, async (req, res) => {
   try {
     const sheet = await prisma.studySheet.findUnique({
       where: { id: sheetId },
-      select: { id: true, userId: true, title: true },
+      select: { id: true, userId: true, title: true, status: true },
     })
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
+    if (!canReadSheet(sheet, req.user || null)) return res.status(404).json({ error: 'Sheet not found.' })
 
     const comment = await prisma.comment.create({
       data: { content, sheetId, userId: req.user.userId },
@@ -1080,9 +1665,13 @@ router.post('/:id/react', requireAuth, reactLimiter, async (req, res) => {
   try {
     const sheet = await prisma.studySheet.findUnique({
       where: { id: sheetId },
-      select: { id: true },
+      select: { id: true, userId: true, status: true },
     })
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
+    if (!canReadSheet(sheet, req.user || null)) return res.status(404).json({ error: 'Sheet not found.' })
+    if (sheet.status !== SHEET_STATUS.PUBLISHED) {
+      return sendForbidden(res, 'Reactions are disabled until the sheet is published.')
+    }
 
     const existing = await prisma.reaction.findUnique({
       where: { userId_sheetId: { userId, sheetId } },
@@ -1090,15 +1679,20 @@ router.post('/:id/react', requireAuth, reactLimiter, async (req, res) => {
 
     if (!type || (existing && existing.type === type)) {
       if (existing) {
-        await prisma.reaction.delete({ where: { userId_sheetId: { userId, sheetId } } })
+        try {
+          await prisma.reaction.delete({ where: { userId_sheetId: { userId, sheetId } } })
+        } catch (error) {
+          if (error?.code !== 'P2025') {
+            throw error
+          }
+        }
       }
-    } else if (existing) {
-      await prisma.reaction.update({
-        where: { userId_sheetId: { userId, sheetId } },
-        data: { type },
-      })
     } else {
-      await prisma.reaction.create({ data: { userId, sheetId, type } })
+      await prisma.reaction.upsert({
+        where: { userId_sheetId: { userId, sheetId } },
+        update: { type },
+        create: { userId, sheetId, type },
+      })
     }
 
     const [likes, dislikes, current] = await Promise.all([
@@ -1122,9 +1716,14 @@ router.delete('/:id/comments/:commentId', requireAuth, commentLimiter, async (re
   try {
     const comment = await prisma.comment.findUnique({ where: { id: commentId } })
     if (!comment) return res.status(404).json({ error: 'Comment not found.' })
-    if (comment.userId !== req.user.userId && req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Not your comment.' })
-    }
+    if (!assertOwnerOrAdmin({
+      res,
+      user: req.user,
+      ownerId: comment.userId,
+      message: 'Not your comment.',
+      targetType: 'sheet-comment',
+      targetId: commentId,
+    })) return
 
     await prisma.comment.delete({ where: { id: comment.id } })
     res.json({ message: 'Comment deleted.' })

@@ -1,17 +1,16 @@
 const express = require('express')
 const requireAuth = require('../middleware/auth')
+const requireAdmin = require('../middleware/requireAdmin')
 const { captureError } = require('../monitoring/sentry')
 const { deleteUserAccount } = require('../lib/deleteUserAccount')
+const { validateHtmlForSubmission } = require('../lib/htmlSecurity')
 const prisma = require('../lib/prisma')
 
 const router = express.Router()
 
 // All admin routes require auth + admin role
 router.use(requireAuth)
-router.use((req, res, next) => {
-  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin access required.' })
-  next()
-})
+router.use(requireAdmin)
 
 const PAGE_SIZE = 20
 
@@ -89,6 +88,90 @@ router.get('/sheets', async (req, res) => {
     ])
     res.json({ sheets, total, page, pages: Math.ceil(total / PAGE_SIZE) })
   } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── GET /api/admin/sheets/review?status=pending_review&page=1 ───────────────
+router.get('/sheets/review', async (req, res) => {
+  const page = Math.max(1, parseInt(req.query.page || '1', 10))
+  const rawStatus = String(req.query.status || 'pending_review').trim().toLowerCase()
+  const status = ['pending_review', 'rejected', 'draft', 'published'].includes(rawStatus)
+    ? rawStatus
+    : 'pending_review'
+
+  try {
+    const [sheets, total] = await Promise.all([
+      prisma.studySheet.findMany({
+        where: { status },
+        include: {
+          author: { select: { id: true, username: true } },
+          course: { include: { school: true } },
+        },
+        orderBy: { updatedAt: 'desc' },
+        take: PAGE_SIZE,
+        skip: (page - 1) * PAGE_SIZE,
+      }),
+      prisma.studySheet.count({ where: { status } }),
+    ])
+    res.json({ sheets, total, page, pages: Math.ceil(total / PAGE_SIZE), status })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── PATCH /api/admin/sheets/:id/review ─────────────────────────────
+router.patch('/sheets/:id/review', async (req, res) => {
+  const sheetId = parseInt(req.params.id, 10)
+  const action = String(req.body?.action || '').trim().toLowerCase()
+
+  if (!Number.isInteger(sheetId)) {
+    return res.status(400).json({ error: 'Sheet id must be an integer.' })
+  }
+  if (!['approve', 'reject'].includes(action)) {
+    return res.status(400).json({ error: 'Action must be "approve" or "reject".' })
+  }
+
+  try {
+    const current = await prisma.studySheet.findUnique({
+      where: { id: sheetId },
+      select: {
+        id: true,
+        status: true,
+        contentFormat: true,
+        content: true,
+      },
+    })
+    if (!current) return res.status(404).json({ error: 'Sheet not found.' })
+
+    if (current.contentFormat === 'html' && action === 'approve') {
+      const validation = validateHtmlForSubmission(current.content)
+      if (!validation.ok) {
+        return res.status(400).json({
+          error: validation.issues[0],
+          issues: validation.issues,
+        })
+      }
+    }
+
+    const nextStatus = action === 'approve' ? 'published' : 'rejected'
+    const updated = await prisma.studySheet.update({
+      where: { id: sheetId },
+      data: { status: nextStatus },
+      include: {
+        author: { select: { id: true, username: true } },
+        course: { include: { school: true } },
+      },
+    })
+
+    res.json({
+      message: action === 'approve' ? 'Sheet approved and published.' : 'Sheet rejected.',
+      sheet: updated,
+    })
+  } catch (err) {
+    if (err.code === 'P2025') return res.status(404).json({ error: 'Sheet not found.' })
     captureError(err, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
   }

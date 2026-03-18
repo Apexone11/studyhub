@@ -5,69 +5,68 @@ import {
   identifyAuthenticatedUser,
   clearAuthenticatedUser
 } from './lib/telemetry'
-import { getStoredUser, hasStoredSession } from './lib/session'
+import RouteErrorBoundary from './components/RouteErrorBoundary'
+import { getAuthenticatedHomePath } from './lib/authNavigation'
+import { SessionProvider, useSession } from './lib/session-context'
 
-const HomePage = lazy(() => import('./pages/HomePage'))
-const LoginPage = lazy(() => import('./pages/LoginPage'))
-const RegisterScreen = lazy(() => import('./pages/RegisterScreen'))
-const DashboardPage = lazy(() => import('./pages/DashboardPage'))
-const TermsPage = lazy(() => import('./pages/TermsPage'))
-const PrivacyPage = lazy(() => import('./pages/PrivacyPage'))
-const GuidelinesPage = lazy(() => import('./pages/GuidelinesPage'))
-const FeedPage = lazy(() => import('./pages/FeedPage'))
-const SheetsPage = lazy(() => import('./pages/SheetsPage'))
-const SheetViewerPage = lazy(() => import('./pages/SheetViewerPage'))
-const SettingsPage = lazy(() => import('./pages/SettingsPage'))
-const AboutPage = lazy(() => import('./pages/AboutPage'))
-const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'))
-const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'))
-const UserProfilePage = lazy(() => import('./pages/UserProfilePage'))
+const HomePage = lazy(() => import('./pages/home/HomePage'))
+const LoginPage = lazy(() => import('./pages/auth/LoginPage'))
+const RegisterScreen = lazy(() => import('./pages/auth/RegisterScreen'))
+const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage'))
+const TermsPage = lazy(() => import('./pages/legal/TermsPage'))
+const PrivacyPage = lazy(() => import('./pages/legal/PrivacyPage'))
+const GuidelinesPage = lazy(() => import('./pages/legal/GuidelinesPage'))
+const FeedPage = lazy(() => import('./pages/feed/FeedPage'))
+const SheetsPage = lazy(() => import('./pages/sheets/SheetsPage'))
+const SheetViewerPage = lazy(() => import('./pages/sheets/SheetViewerPage'))
+const AttachmentPreviewPage = lazy(() => import('./pages/preview/AttachmentPreviewPage'))
+const SheetHtmlPreviewPage = lazy(() => import('./pages/preview/SheetHtmlPreviewPage'))
+const UploadSheetPage = lazy(() => import('./pages/sheets/UploadSheetPage'))
+const SettingsPage = lazy(() => import('./pages/settings/SettingsPage'))
+const AdminPage = lazy(() => import('./pages/admin/AdminPage'))
+const AboutPage = lazy(() => import('./pages/legal/AboutPage'))
+const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPasswordPage'))
+const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPasswordPage'))
+const UserProfilePage = lazy(() => import('./pages/profile/UserProfilePage'))
+const TestsPage = lazy(() => import('./pages/tests/TestsPage'))
+const TestTakerPage = lazy(() => import('./pages/tests/TestTakerPage'))
+const NotesPage = lazy(() => import('./pages/notes/NotesPage'))
+const AnnouncementsPage = lazy(() => import('./pages/announcements/AnnouncementsPage'))
+const SubmitPage = lazy(() => import('./pages/submit/SubmitPage'))
 
-function lazyNamedPage(name) {
-  return lazy(() =>
-    import('./pages/PlaceholderPages').then((module) => ({
-      default: module[name],
-    })),
-  )
-}
-
-const TestsPage = lazyNamedPage('TestsPage')
-const TestTakerPage = lazyNamedPage('TestTakerPage')
-const NotesPage = lazyNamedPage('NotesPage')
-const AnnouncementsPage = lazyNamedPage('AnnouncementsPage')
-const SubmitPage = lazyNamedPage('SubmitPage')
-const AdminPage = lazyNamedPage('AdminPage')
-const UploadSheetPage = lazyNamedPage('UploadSheetPage')
-
-// ── simple auth guard ─────────────────────────────────────────────
-// Redirects to /feed if the user is already logged in.
-// Prevents authenticated users from seeing the marketing/auth pages.
 function PublicRoute({ children }) {
-  const user = getStoredUser()
-  if (!hasStoredSession() || !user) return children
-  return <Navigate to={user.role === 'admin' ? '/admin' : '/feed'} replace />
+  const { user, isBootstrapping, isAuthenticated } = useSession()
+
+  if (isBootstrapping) return <RouteFallback />
+  if (!isAuthenticated || !user) return children
+  return <Navigate to={getAuthenticatedHomePath(user)} replace />
 }
 
-// Redirects to /login if the user is not logged in.
 function PrivateRoute({ children }) {
-  return hasStoredSession() ? children : <Navigate to="/login" replace />
+  const { isBootstrapping, isAuthenticated } = useSession()
+
+  if (isBootstrapping) return <RouteFallback />
+  if (!isAuthenticated) return <Navigate to="/login" replace />
+
+  return <RouteErrorBoundary>{children}</RouteErrorBoundary>
 }
 
 function RouteTelemetry() {
   const location = useLocation()
+  const { user } = useSession()
 
   useEffect(() => {
     const nextPath = `${location.pathname}${location.search}`
     trackPageView(nextPath)
+  }, [location.pathname, location.search])
 
-    const user = getStoredUser()
-
+  useEffect(() => {
     if (!user) {
       clearAuthenticatedUser()
       return
     }
     identifyAuthenticatedUser(user)
-  }, [location.pathname, location.search])
+  }, [user])
 
   return null
 }
@@ -85,42 +84,46 @@ function RouteFallback() {
 export default function App() {
   return (
     <BrowserRouter>
-      <RouteTelemetry />
-      <Suspense fallback={<RouteFallback />}>
-        <Routes>
-          {/* ── public (unauthenticated) ─────────────────────────── */}
-          <Route path="/"         element={<PublicRoute><HomePage /></PublicRoute>} />
-          <Route path="/login"    element={<PublicRoute><LoginPage /></PublicRoute>} />
-          <Route path="/register" element={<PublicRoute><RegisterScreen /></PublicRoute>} />
-          <Route path="/terms"            element={<TermsPage />} />
-          <Route path="/privacy"          element={<PrivacyPage />} />
-          <Route path="/guidelines"       element={<GuidelinesPage />} />
-          <Route path="/about"            element={<AboutPage />} />
-          <Route path="/forgot-password"  element={<ForgotPasswordPage />} />
-          <Route path="/reset-password"   element={<ResetPasswordPage />} />
+      <SessionProvider>
+        <RouteTelemetry />
+        <Suspense fallback={<RouteFallback />}>
+          <Routes>
+            {/* ── public (unauthenticated) ─────────────────────────── */}
+            <Route path="/"         element={<PublicRoute><HomePage /></PublicRoute>} />
+            <Route path="/login"    element={<PublicRoute><LoginPage /></PublicRoute>} />
+            <Route path="/register" element={<PublicRoute><RegisterScreen /></PublicRoute>} />
+            <Route path="/terms"            element={<TermsPage />} />
+            <Route path="/privacy"          element={<PrivacyPage />} />
+            <Route path="/guidelines"       element={<GuidelinesPage />} />
+            <Route path="/about"            element={<AboutPage />} />
+            <Route path="/forgot-password"  element={<ForgotPasswordPage />} />
+            <Route path="/reset-password"   element={<ResetPasswordPage />} />
 
-          {/* ── authenticated ────────────────────────────────────── */}
-          <Route path="/feed"          element={<PrivateRoute><FeedPage /></PrivateRoute>} />
-          <Route path="/sheets"        element={<PrivateRoute><SheetsPage /></PrivateRoute>} />
-          <Route path="/sheets/upload" element={<PrivateRoute><UploadSheetPage /></PrivateRoute>} />
-          <Route path="/sheets/:id/edit" element={<PrivateRoute><UploadSheetPage /></PrivateRoute>} />
-          <Route path="/sheets/:id"    element={<PrivateRoute><SheetViewerPage /></PrivateRoute>} />
-          <Route path="/tests"         element={<PrivateRoute><TestsPage /></PrivateRoute>} />
-          <Route path="/tests/:id"     element={<PrivateRoute><TestTakerPage /></PrivateRoute>} />
-          <Route path="/notes"         element={<PrivateRoute><NotesPage /></PrivateRoute>} />
-          <Route path="/announcements" element={<PrivateRoute><AnnouncementsPage /></PrivateRoute>} />
-          <Route path="/submit"        element={<PrivateRoute><SubmitPage /></PrivateRoute>} />
-          <Route path="/admin"         element={<PrivateRoute><AdminPage /></PrivateRoute>} />
-          <Route path="/dashboard"     element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
-          <Route path="/settings"      element={<PrivateRoute><SettingsPage /></PrivateRoute>} />
+            {/* ── authenticated ────────────────────────────────────── */}
+            <Route path="/feed"          element={<PrivateRoute><FeedPage /></PrivateRoute>} />
+            <Route path="/sheets"        element={<PrivateRoute><SheetsPage /></PrivateRoute>} />
+            <Route path="/sheets/upload" element={<PrivateRoute><UploadSheetPage /></PrivateRoute>} />
+            <Route path="/sheets/:id/edit" element={<PrivateRoute><UploadSheetPage /></PrivateRoute>} />
+            <Route path="/sheets/:id"    element={<PrivateRoute><SheetViewerPage /></PrivateRoute>} />
+            <Route path="/sheets/preview/html/:id" element={<PrivateRoute><SheetHtmlPreviewPage /></PrivateRoute>} />
+            <Route path="/preview/:scope/:id" element={<PrivateRoute><AttachmentPreviewPage /></PrivateRoute>} />
+            <Route path="/tests"         element={<PrivateRoute><TestsPage /></PrivateRoute>} />
+            <Route path="/tests/:id"     element={<PrivateRoute><TestTakerPage /></PrivateRoute>} />
+            <Route path="/notes"         element={<PrivateRoute><NotesPage /></PrivateRoute>} />
+            <Route path="/announcements" element={<PrivateRoute><AnnouncementsPage /></PrivateRoute>} />
+            <Route path="/submit"        element={<PrivateRoute><SubmitPage /></PrivateRoute>} />
+            <Route path="/admin"         element={<PrivateRoute><AdminPage /></PrivateRoute>} />
+            <Route path="/dashboard"     element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
+            <Route path="/settings"      element={<PrivateRoute><SettingsPage /></PrivateRoute>} />
 
-          {/* ── public user profiles ─────────────────────────────── */}
-          <Route path="/users/:username" element={<UserProfilePage />} />
+            {/* ── public user profiles ─────────────────────────────── */}
+            <Route path="/users/:username" element={<UserProfilePage />} />
 
-          {/* ── catch-all ────────────────────────────────────────── */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Suspense>
+            {/* ── catch-all ────────────────────────────────────────── */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
+      </SessionProvider>
     </BrowserRouter>
   )
 }

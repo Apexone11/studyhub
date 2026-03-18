@@ -1,4 +1,5 @@
 const express = require('express')
+const { assertOwnerOrAdmin } = require('../lib/accessControl')
 const requireAuth = require('../middleware/auth')
 const { captureError } = require('../monitoring/sentry')
 const prisma = require('../lib/prisma')
@@ -51,7 +52,14 @@ router.patch('/:id/read', async (req, res) => {
   try {
     const notif = await prisma.notification.findUnique({ where: { id: notifId } })
     if (!notif) return res.status(404).json({ error: 'Notification not found.' })
-    if (notif.userId !== req.user.userId) return res.status(403).json({ error: 'Not your notification.' })
+    if (!assertOwnerOrAdmin({
+      res,
+      user: req.user,
+      ownerId: notif.userId,
+      message: 'Not your notification.',
+      targetType: 'notification',
+      targetId: notifId,
+    })) return
 
     const updated = await prisma.notification.update({
       where: { id: notifId },
@@ -70,7 +78,14 @@ router.delete('/:id', async (req, res) => {
   try {
     const notif = await prisma.notification.findUnique({ where: { id: notifId } })
     if (!notif) return res.status(404).json({ error: 'Notification not found.' })
-    if (notif.userId !== req.user.userId) return res.status(403).json({ error: 'Not your notification.' })
+    if (!assertOwnerOrAdmin({
+      res,
+      user: req.user,
+      ownerId: notif.userId,
+      message: 'Not your notification.',
+      targetType: 'notification',
+      targetId: notifId,
+    })) return
 
     await prisma.notification.delete({ where: { id: notifId } })
     res.json({ message: 'Notification deleted.' })

@@ -16,7 +16,7 @@ import {
   IconChevronDown,
 } from './Icons'
 import { pageWidths } from '../lib/ui'
-import { getStoredUser } from '../lib/session'
+import { useSession } from '../lib/session-context'
 import { useLivePolling } from '../lib/useLivePolling'
 import { API } from '../config'
 
@@ -204,14 +204,14 @@ export default function Navbar({
   const navigate  = useNavigate()
   const config    = getConfig(location.pathname)
 
-  const crumbs    = crumbsProp ?? config.crumbs ?? []
-  const tabs      = (!hideTabs && (tabsProp ?? config.tabs)) || null
-  const backTo    = config.backTo
+  const { crumbs: configCrumbs, tabs: configTabs, backTo } = config
+  const crumbs    = crumbsProp ?? configCrumbs ?? []
+  const tabs      = (!hideTabs && (tabsProp ?? configTabs)) || null
   const isLanding = variant === 'landing'
   const shellWidth = isLanding ? pageWidths.landing : pageWidths.app
 
   // user info from localStorage (set on login)
-  const user = getStoredUser()
+  const { user } = useSession()
   const initials = user?.username?.slice(0, 2).toUpperCase() || '??'
 
   // notification bell state
