@@ -3,7 +3,68 @@
  * Extracted from the original monolithic SettingsPage.jsx.
  */
 
+import { useEffect, useState } from 'react'
+import { API } from '../../config'
+
 export const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
+
+/**
+ * Shared hook for the Notifications, Privacy, and Appearance preference tabs.
+ * Fetches user preferences on mount and exposes helpers to toggle and save.
+ */
+export function usePreferences() {
+  const [prefs, setPrefs] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [msg, setMsg] = useState(null)
+
+  useEffect(() => {
+    let active = true
+    fetch(`${API}/api/settings/preferences`, {
+      headers: { 'Content-Type': 'application/json' },
+    })
+      .then(async (r) => {
+        if (!r.ok) throw new Error('Could not load preferences.')
+        return r.json()
+      })
+      .then((data) => { if (active) setPrefs(data) })
+      .catch(() => { if (active) setMsg({ type: 'error', text: 'Could not load preferences.' }) })
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [])
+
+  function toggle(key) {
+    setPrefs((c) => ({ ...c, [key]: !c[key] }))
+  }
+
+  async function save(fields, successText) {
+    setSaving(true)
+    setMsg(null)
+    try {
+      const body = {}
+      for (const key of fields) {
+        body[key] = prefs[key]
+      }
+      const response = await fetch(`${API}/api/settings/preferences`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        setMsg({ type: 'error', text: data.error || 'Could not save.' })
+        return
+      }
+      setMsg({ type: 'success', text: successText })
+    } catch {
+      setMsg({ type: 'error', text: 'Could not connect to the server.' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return { prefs, setPrefs, loading, saving, msg, toggle, save }
+}
 
 export function Input(props) {
   return (
@@ -93,10 +154,10 @@ export function Message({ tone = 'error', children }) {
 export function FormField({ label, children, hint }) {
   return (
     <div style={{ marginBottom: 16 }}>
-      <label style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 700, color: '#334155' }}>
-        {label}
+      <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#334155' }}>
+        <span style={{ display: 'block', marginBottom: 6 }}>{label}</span>
+        {children}
       </label>
-      {children}
       {hint && (
         <div style={{ marginTop: 5, fontSize: 12, color: '#94a3b8' }}>
           {hint}

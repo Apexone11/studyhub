@@ -267,3 +267,47 @@ Cycle 5 Deferred-Risk Notes
 - No runtime moderation engine yet — schema is pre-provisioned for Week 4 implementation.
 - `prisma db push --accept-data-loss` used; formal migration file should be created before production deploy.
 - No API endpoints for moderation cases, strikes, appeals, or restrictions yet.
+
+---
+
+Cycle 6 Additions (Code Review Fixes — Sourcery + Copilot + Codex) [2026-03-18]
+Implemented in beta lane:
+
+Fixed:
+
+- **P1 Critical:** `req.user.id` → `req.user.userId` in both GET and PATCH `/api/settings/preferences` endpoints. The auth middleware stores `{ userId, username, role }` on `req.user`, not `id`. This made preferences endpoints fail for all authenticated users.
+- **P1 Critical:** Google unlink (`handleGoogleUnlink` in SecurityTab) now sends `password` in the request body. Backend requires password verification before unlinking.
+- **P1 Critical:** Username change password field is now always visible (was hidden for Google-only users, but backend requires password for all username changes).
+- **P2:** usePreferences fetch now checks `response.ok` before parsing JSON, and sets error message on failure instead of silently swallowing errors.
+- **P2:** FormField accessibility — children are now nested inside the `<label>` element so screen readers associate labels with controls and clicking labels focuses the input.
+
+Changed:
+
+- Extracted shared `usePreferences` hook into `settingsShared.jsx` to deduplicate preferences fetch/save logic across NotificationsTab, PrivacyTab, and AppearanceTab (Sourcery recommendation).
+- Refactored preferences PATCH endpoint to use `Object.create(null)` for the updates object and `Object.hasOwn` checks before reading `req.body` properties (Sourcery security: remote-property-injection).
+- Replaced all hardcoded font family strings with shared `FONT` constant from `settingsShared.jsx` in CoursesTab, AccountTab, and SettingsPage.
+
+Security:
+
+- Backend preferences endpoint uses prototype-free object (`Object.create(null)`) to eliminate any risk of prototype pollution via bracket notation.
+
+Cycle 6 Validation Commands (Executed)
+
+- `npm --prefix frontend/studyhub-app run build`
+
+Cycle 6 Validation Result
+
+- Frontend production build passed.
+
+Cycle 6 Deep Scan Summary
+
+- Auth flow fix: preferences endpoints now correctly read `req.user.userId` matching all other settings routes.
+- Google unlink now requires password, consistent with backend enforcement.
+- usePreferences hook centralizes all preferences fetch/save logic — single point of failure/fix for future issues.
+
+Cycle 6 Deferred-Risk Notes
+
+- Google link flow is still placeholder (shows info message instead of actual OAuth popup). Requires `@react-oauth/google` GoogleLogin component integration in SecurityTab — deferred to next cycle.
+- Profile visibility setting is persisted but not yet enforced by backend user profile routes. Backend enforcement needed before these options have real effect.
+- `defaultDownloads`/`defaultContributions` toggles are persisted but not yet read during sheet creation. Upload flow needs to check user preferences for defaults.
+- Formal Prisma migration files still needed for UserPreferences and moderation tables before production deploy.

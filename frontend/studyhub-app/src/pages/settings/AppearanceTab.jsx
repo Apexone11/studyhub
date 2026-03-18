@@ -1,49 +1,7 @@
-import { useEffect, useState } from 'react'
-import { API } from '../../config'
-import { Button, FormField, MsgList, SectionCard, Select } from './settingsShared'
+import { Button, FormField, MsgList, SectionCard, Select, usePreferences } from './settingsShared'
 
 export default function AppearanceTab() {
-  const [prefs, setPrefs] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [msg, setMsg] = useState(null)
-
-  useEffect(() => {
-    let active = true
-    fetch(`${API}/api/settings/preferences`, {
-      headers: { 'Content-Type': 'application/json' },
-    })
-      .then((r) => r.json())
-      .then((data) => { if (active) setPrefs(data) })
-      .catch(() => {})
-      .finally(() => { if (active) setLoading(false) })
-    return () => { active = false }
-  }, [])
-
-  async function save() {
-    setSaving(true)
-    setMsg(null)
-    try {
-      const response = await fetch(`${API}/api/settings/preferences`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          theme: prefs.theme,
-          fontSize: prefs.fontSize,
-        }),
-      })
-      const data = await response.json()
-      if (!response.ok) {
-        setMsg({ type: 'error', text: data.error || 'Could not save.' })
-        return
-      }
-      setMsg({ type: 'success', text: 'Appearance preferences saved.' })
-    } catch {
-      setMsg({ type: 'error', text: 'Could not connect to the server.' })
-    } finally {
-      setSaving(false)
-    }
-  }
+  const { prefs, setPrefs, loading, saving, msg, save } = usePreferences()
 
   if (loading || !prefs) {
     return <SectionCard title="Appearance"><div style={{ color: '#64748b', fontSize: 13 }}>Loading preferences...</div></SectionCard>
@@ -111,7 +69,10 @@ export default function AppearanceTab() {
       </SectionCard>
 
       <MsgList msg={msg} />
-      <Button disabled={saving} onClick={save}>
+      <Button disabled={saving} onClick={() => save(
+        ['theme', 'fontSize'],
+        'Appearance preferences saved.',
+      )}>
         {saving ? 'Saving...' : 'Save Appearance Preferences'}
       </Button>
     </>

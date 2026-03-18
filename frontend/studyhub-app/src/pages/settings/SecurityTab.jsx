@@ -49,6 +49,10 @@ export default function SecurityTab({ user, sessionUser, busyKey, setBusyKey, ha
   }
 
   async function handleGoogleUnlink() {
+    if (!twoFaPassword) {
+      setGoogleMsg({ type: 'error', text: 'Enter your password to unlink Google.' })
+      return
+    }
     setBusyKey('google-unlink')
     setGoogleMsg(null)
 
@@ -56,6 +60,7 @@ export default function SecurityTab({ user, sessionUser, busyKey, setBusyKey, ha
       const response = await fetch(`${API}/api/settings/google/unlink`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: twoFaPassword }),
       })
       const data = await response.json()
 
@@ -111,11 +116,9 @@ export default function SecurityTab({ user, sessionUser, busyKey, setBusyKey, ha
         <FormField label="New Username">
           <Input value={usernameForm.newUsername} onChange={(e) => setUsernameForm((c) => ({ ...c, newUsername: e.target.value }))} />
         </FormField>
-        {!isGoogleOnly && (
-          <FormField label="Confirm with Password">
-            <Input type="password" value={usernameForm.password} onChange={(e) => setUsernameForm((c) => ({ ...c, password: e.target.value }))} />
-          </FormField>
-        )}
+        <FormField label="Confirm with Password">
+          <Input type="password" value={usernameForm.password} onChange={(e) => setUsernameForm((c) => ({ ...c, password: e.target.value }))} />
+        </FormField>
         <MsgList msg={usernameMsg} />
         <Button
           disabled={busyKey === 'username'}
@@ -180,9 +183,14 @@ export default function SecurityTab({ user, sessionUser, busyKey, setBusyKey, ha
                 Google account is linked (provider: {user.authProvider})
               </div>
               {user.authProvider !== 'google' && (
-                <Button secondary disabled={busyKey === 'google-unlink'} onClick={handleGoogleUnlink}>
-                  {busyKey === 'google-unlink' ? 'Unlinking...' : 'Unlink Google'}
-                </Button>
+                <>
+                  <FormField label="Confirm with Password">
+                    <Input type="password" value={twoFaPassword} onChange={(e) => setTwoFaPassword(e.target.value)} placeholder="Enter your password to unlink" />
+                  </FormField>
+                  <Button secondary disabled={busyKey === 'google-unlink' || !twoFaPassword} onClick={handleGoogleUnlink}>
+                    {busyKey === 'google-unlink' ? 'Unlinking...' : 'Unlink Google'}
+                  </Button>
+                </>
               )}
               {user.authProvider === 'google' && (
                 <div style={{ fontSize: 12, color: '#94a3b8' }}>

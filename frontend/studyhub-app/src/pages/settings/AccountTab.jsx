@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { API } from '../../config'
-import { Button, FormField, Input, Message, MsgList, SectionCard } from './settingsShared'
+import { Button, FONT, FormField, Input, Message, MsgList, SectionCard } from './settingsShared'
 
 const DELETION_REASONS = [
   { value: 'better_platform', label: 'Found a better platform' },
@@ -225,7 +225,7 @@ export default function AccountTab({ user, busyKey, setBusyKey, handlePatch, syn
                 borderRadius: 10,
                 border: '1px solid #cbd5e1',
                 fontSize: 14,
-                fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+                fontFamily: FONT,
                 color: '#0f172a',
               }}
             >
@@ -246,7 +246,7 @@ export default function AccountTab({ user, busyKey, setBusyKey, handlePatch, syn
                 borderRadius: 10,
                 border: '1px solid #cbd5e1',
                 fontSize: 14,
-                fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+                fontFamily: FONT,
                 color: '#0f172a',
                 resize: 'vertical',
                 boxSizing: 'border-box',

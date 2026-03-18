@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { API } from '../../config'
-import { Button, FormField, MsgList, SectionCard } from './settingsShared'
+import { Button, FONT, FormField, MsgList, SectionCard } from './settingsShared'
 
 export default function CoursesTab({ user, busyKey, setBusyKey, syncUser }) {
   const [catalog, setCatalog] = useState([])
@@ -88,7 +88,7 @@ export default function CoursesTab({ user, busyKey, setBusyKey, syncUser }) {
             borderRadius: 10,
             border: '1px solid #cbd5e1',
             fontSize: 14,
-            fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+            fontFamily: FONT,
             color: '#0f172a',
           }}
         >

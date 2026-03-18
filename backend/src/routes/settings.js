@@ -484,7 +484,7 @@ const PREF_ENUM_KEYS = {
 
 router.get('/preferences', async (req, res) => {
   try {
-    const userId = req.user.id
+    const { userId } = req.user
     let prefs = await prisma.userPreferences.findUnique({ where: { userId } })
     if (!prefs) {
       prefs = await prisma.userPreferences.create({ data: { userId } })
@@ -498,14 +498,16 @@ router.get('/preferences', async (req, res) => {
 
 router.patch('/preferences', async (req, res) => {
   try {
-    const userId = req.user.id
-    const updates = {}
+    const { userId } = req.user
+    const updates = Object.create(null)
 
     for (const key of PREF_BOOLEAN_KEYS) {
-      if (typeof req.body[key] === 'boolean') updates[key] = req.body[key]
+      if (Object.hasOwn(req.body, key) && typeof req.body[key] === 'boolean') {
+        updates[key] = req.body[key]
+      }
     }
     for (const [key, allowed] of Object.entries(PREF_ENUM_KEYS)) {
-      if (typeof req.body[key] === 'string' && allowed.includes(req.body[key])) {
+      if (Object.hasOwn(req.body, key) && typeof req.body[key] === 'string' && allowed.includes(req.body[key])) {
         updates[key] = req.body[key]
       }
     }

@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { LogoMark } from '../../components/Icons'
 import { API } from '../../config'
 import { useSession } from '../../lib/session-context'
-import { Button } from './settingsShared'
+import { Button, FONT } from './settingsShared'
 import ProfileTab from './ProfileTab'
 import SecurityTab from './SecurityTab'
 import CoursesTab from './CoursesTab'
@@ -135,7 +135,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#edf0f5', fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
+    <div style={{ minHeight: '100vh', background: '#edf0f5', fontFamily: FONT }}>
       <header style={{ position: 'sticky', top: 0, zIndex: 20, background: '#0f172a', borderBottom: '1px solid #1e293b' }}>
         <div style={{ maxWidth: 1180, margin: '0 auto', padding: '0 24px', height: 64, display: 'flex', alignItems: 'center', gap: 12 }}>
           <Link to="/feed" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
