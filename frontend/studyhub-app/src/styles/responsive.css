@@ -28,7 +28,6 @@
     overflow-x: auto;
     gap: 4px;
     padding-bottom: 4px;
-    -webkit-overflow-scrolling: touch;
   }
 
   .settings-nav::-webkit-scrollbar {

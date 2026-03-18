@@ -581,7 +581,7 @@ export default function LoginPage() {
           )}
 
           <div style={{ marginTop: 24, textAlign: 'center', fontSize: 13, color: '#64748b' }}>
-            Don’t have an account? <Link to="/register">Create one here</Link>
+            Don't have an account? <Link to="/register">Create one here</Link>
           </div>
         </Card>
       </div>
