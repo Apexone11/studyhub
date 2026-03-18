@@ -323,7 +323,7 @@ export default function SheetsPage() {
                   </div>
                   <Link to="/sheets/upload" style={linkButton()}>
                     <IconUpload size={14} />
-                    Upload sheet
+                    Upload a sheet
                   </Link>
                 </div>
 

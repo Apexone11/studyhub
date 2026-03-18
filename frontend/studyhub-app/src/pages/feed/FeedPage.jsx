@@ -1,7 +1,8 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
 import AppSidebar from '../../components/AppSidebar'
+import ConfirmDialog from '../../components/ConfirmDialog'
 import {
   IconDownload,
   IconEye,
@@ -10,6 +11,7 @@ import {
   IconStar,
   IconStarFilled,
   IconUpload,
+  IconX,
 } from '../../components/Icons'
 import { API } from '../../config'
 import { attachmentEndpoints, attachmentPreviewKind, canUserDeletePost } from './feedHelpers'
@@ -425,6 +427,9 @@ export default function FeedPage() {
   const [leaderboards, setLeaderboards] = useState({ stars: [], downloads: [], contributors: [], error: '' })
   const [composer, setComposer] = useState({ content: '', courseId: '' })
   const [composeState, setComposeState] = useState({ saving: false, error: '' })
+  const [attachedFile, setAttachedFile] = useState(null)
+  const fileInputRef = useRef(null)
+  const [deleteTarget, setDeleteTarget] = useState(null) // item to confirm-delete
   const [openPostMenuId, setOpenPostMenuId] = useState(null)
   const [deletingPostIds, setDeletingPostIds] = useState({})
 
@@ -566,11 +571,31 @@ export default function FeedPage() {
         throw new Error(data.error || 'Could not post to the feed.')
       }
 
+      // Upload attachment if one was selected
+      let finalPost = data
+      if (attachedFile && data.id) {
+        try {
+          const formData = new FormData()
+          formData.append('file', attachedFile)
+          const uploadRes = await fetch(`${API}/api/upload/post-attachment/${data.id}`, {
+            method: 'POST',
+            body: formData,
+          })
+          if (uploadRes.ok) {
+            const uploadData = await uploadRes.json().catch(() => ({}))
+            finalPost = { ...data, ...uploadData }
+          }
+        } catch {
+          // Post was created successfully, attachment upload failed silently
+        }
+      }
+
       setComposer({ content: '', courseId: '' })
+      setAttachedFile(null)
       setComposeState({ saving: false, error: '' })
       setFeedState((current) => ({
         ...current,
-        items: [data, ...current.items],
+        items: [finalPost, ...current.items],
         total: current.total + 1,
       }))
     } catch (error) {
@@ -633,11 +658,14 @@ export default function FeedPage() {
 
   const canDeletePost = useCallback((item) => canUserDeletePost(user, item), [user])
 
-  const deletePost = async (item) => {
+  const confirmDeletePost = (item) => {
     if (!canDeletePost(item)) return
-    if (!window.confirm('Delete this post? This action cannot be undone.')) return
-
     setOpenPostMenuId(null)
+    setDeleteTarget(item)
+  }
+
+  const deletePost = async (item) => {
+    setDeleteTarget(null)
 
     const previousItems = feedState.items
     const previousTotal = feedState.total
@@ -704,7 +732,7 @@ export default function FeedPage() {
             <AppSidebar mode={layout.sidebarMode} />
 
             <main style={{ display: 'grid', gap: 18 }}>
-              <Panel title="Share an update" helper="Post class notes, course questions, or links to your latest sheet.">
+              <Panel title="Share with your classmates" helper="Post class notes, course questions, or links to your latest sheet.">
                 <form onSubmit={submitPost} style={{ display: 'grid', gap: 12 }}>
                   <textarea
                     value={composer.content}
@@ -727,7 +755,7 @@ export default function FeedPage() {
                       onChange={(event) => setComposer((current) => ({ ...current, courseId: event.target.value }))}
                       style={{ minWidth: 180, borderRadius: 10, border: '1px solid #cbd5e1', padding: '10px 12px', font: 'inherit' }}
                     >
-                      <option value="">General post</option>
+                      <option value="">All courses</option>
                       {(user?.enrollments || []).map((enrollment) => (
                         <option key={enrollment.course.id} value={enrollment.course.id}>
                           {enrollment.course.code}
@@ -735,10 +763,27 @@ export default function FeedPage() {
                       ))}
                     </select>
                     <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                      <Link to="/sheets/upload" style={linkButton()}>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png,.gif,.webp"
+                        style={{ display: 'none' }}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0]
+                          if (file) {
+                            if (file.size > 10 * 1024 * 1024) {
+                              setComposeState((s) => ({ ...s, error: 'File must be under 10 MB.' }))
+                              return
+                            }
+                            setAttachedFile(file)
+                          }
+                          e.target.value = ''
+                        }}
+                      />
+                      <button type="button" onClick={() => fileInputRef.current?.click()} style={linkButton()}>
                         <IconUpload size={14} />
-                        Upload sheet
-                      </Link>
+                        Attach file
+                      </button>
                       <button
                         type="submit"
                         disabled={composeState.saving}
@@ -754,10 +799,18 @@ export default function FeedPage() {
                           fontFamily: FONT,
                         }}
                       >
-                        {composeState.saving ? 'Posting...' : 'Post to Feed'}
+                        {composeState.saving ? 'Posting...' : 'Post'}
                       </button>
                     </div>
                   </div>
+                  {attachedFile && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: '#f8fafc', borderRadius: 8, fontSize: 12, color: '#475569' }}>
+                      <IconUpload size={12} />
+                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{attachedFile.name}</span>
+                      <span style={{ color: '#94a3b8', flexShrink: 0 }}>{(attachedFile.size / 1024).toFixed(0)} KB</span>
+                      <button type="button" onClick={() => setAttachedFile(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', padding: 2 }}><IconX size={12} /></button>
+                    </div>
+                  )}
                   {composeState.error ? <div style={{ color: '#dc2626', fontSize: 13 }}>{composeState.error}</div> : null}
                 </form>
               </Panel>
@@ -845,7 +898,7 @@ export default function FeedPage() {
                       item={item}
                       onReact={toggleReaction}
                       onStar={toggleStar}
-                      onDeletePost={deletePost}
+                      onDeletePost={confirmDeletePost}
                       canDeletePost={canDeletePost(item)}
                       isPostMenuOpen={openPostMenuId === item.id}
                       onTogglePostMenu={setOpenPostMenuId}
@@ -889,6 +942,16 @@ export default function FeedPage() {
           </div>
         </div>
       </div>
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Delete this post?"
+        message="This action cannot be undone. The post and any attachments will be permanently removed."
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="danger"
+        onConfirm={() => deleteTarget && deletePost(deleteTarget)}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </>
   )
 }

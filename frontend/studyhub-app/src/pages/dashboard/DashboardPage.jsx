@@ -253,7 +253,7 @@ export default function DashboardPage() {
                   textDecoration: 'none',
                 }}
               >
-                Upload Sheet
+                Upload a Sheet
               </Link>
             </div>
           </section>
