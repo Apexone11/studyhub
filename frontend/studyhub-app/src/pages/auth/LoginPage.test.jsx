@@ -29,6 +29,9 @@ describe('LoginPage', () => {
     let verifyPayload = null
 
     server.use(
+      http.get('http://localhost:4000/api/auth/me', () => (
+        HttpResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      )),
       http.post('http://localhost:4000/api/auth/login', () => (
         HttpResponse.json({
           requiresEmailVerification: true,
@@ -96,5 +99,38 @@ describe('LoginPage', () => {
     })
 
     await screen.findByText('Feed ready')
+  })
+
+  it('disables resend while verification cooldown is active', async () => {
+    const user = userEvent.setup()
+
+    server.use(
+      http.get('http://localhost:4000/api/auth/me', () => (
+        HttpResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      )),
+      http.post('http://localhost:4000/api/auth/login', () => (
+        HttpResponse.json({
+          requiresEmailVerification: true,
+          verificationToken: 'cooldown-token',
+          emailRequired: false,
+          emailHint: 'co***@studyhub.test',
+          email: 'cooldown_user@studyhub.test',
+          expiresAt: '2099-03-16T12:15:00.000Z',
+          resendAvailableAt: '2099-03-16T12:01:00.000Z',
+        })
+      )),
+    )
+
+    renderLoginPage()
+
+    await user.type(screen.getByLabelText('Username'), 'cooldown_user')
+    await user.type(screen.getByLabelText('Password'), 'Password123')
+    await user.click(screen.getByRole('button', { name: 'Sign In' }))
+
+    await screen.findByRole('heading', { name: 'Verify your email' })
+
+    const resendButton = screen.getByRole('button', { name: /Resend in/i })
+    expect(resendButton).toBeDisabled()
+    expect(screen.getByText(/You can request another verification code in/i)).toBeInTheDocument()
   })
 })

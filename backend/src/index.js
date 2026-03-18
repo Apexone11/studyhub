@@ -30,6 +30,7 @@ const notesRoutes = require('./routes/notes')
 const notificationsRoutes = require('./routes/notifications')
 const usersRoutes = require('./routes/users')
 const previewRoutes = require('./routes/preview')
+const webhookRoutes = require('./routes/webhooks')
 
 if (sentryEnabled) {
     console.log('Sentry monitoring enabled for backend.')
@@ -168,6 +169,10 @@ const globalLimiter = rateLimit({
 })
 
 app.use(globalLimiter)
+
+// Webhook routes must stay ahead of JSON parsing/CSRF middleware because
+// signature verification depends on the raw request body.
+app.use('/api/webhooks', webhookRoutes)
 
 // Parse JSON request bodies for auth and future API routes.
 app.use(express.json())

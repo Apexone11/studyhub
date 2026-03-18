@@ -19,6 +19,19 @@ const DELETION_REASONS = [
   { value: 'other', label: 'Other' },
 ]
 
+function parseTimestampToMs(value) {
+  if (!value) return null
+  const parsed = Date.parse(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function formatResendCountdown(totalSeconds) {
+  const safeSeconds = Math.max(0, Math.floor(totalSeconds))
+  const minutes = Math.floor(safeSeconds / 60)
+  const seconds = safeSeconds % 60
+  return `${minutes}:${String(seconds).padStart(2, '0')}`
+}
+
 function Input(props) {
   return (
     <input
@@ -172,6 +185,7 @@ export default function SettingsPage() {
   const [deleteMsg, setDeleteMsg] = useState(null)
   const [twoFaMsg, setTwoFaMsg] = useState(null)
   const [busyKey, setBusyKey] = useState('')
+  const [clockNowMs, setClockNowMs] = useState(() => Date.now())
 
   useEffect(() => {
     let active = true
@@ -234,10 +248,30 @@ export default function SettingsPage() {
     }
   }, [catalog.length, catalogLoading, tab])
 
+  useEffect(() => {
+    const timerId = window.setInterval(() => {
+      setClockNowMs(Date.now())
+    }, 1000)
+
+    return () => {
+      window.clearInterval(timerId)
+    }
+  }, [])
+
   const selectedSchool = useMemo(
     () => catalog.find((school) => String(school.id) === String(courseSchoolId)) || null,
     [catalog, courseSchoolId],
   )
+
+  const pendingResendAvailableAtMs = useMemo(
+    () => parseTimestampToMs(user?.pendingEmailVerification?.resendAvailableAt),
+    [user?.pendingEmailVerification?.resendAvailableAt],
+  )
+
+  const pendingResendCooldownSeconds = useMemo(() => {
+    if (!pendingResendAvailableAtMs) return 0
+    return Math.max(0, Math.ceil((pendingResendAvailableAtMs - clockNowMs) / 1000))
+  }, [clockNowMs, pendingResendAvailableAtMs])
 
   function syncUser(nextUser) {
     if (!nextUser) return
@@ -307,6 +341,8 @@ export default function SettingsPage() {
   }
 
   async function handleResendEmailVerification() {
+    if (pendingResendCooldownSeconds > 0) return
+
     setBusyKey('resend-email')
     setEmailMsg(null)
 
@@ -700,6 +736,9 @@ export default function SettingsPage() {
                 {user?.pendingEmailVerification && (
                   <Message tone="info">
                     Verification is pending for <strong>{user.pendingEmailVerification.deliveryHint || user.pendingEmailVerification.email}</strong>.
+                    {pendingResendCooldownSeconds > 0 && (
+                      <> You can request another code in {formatResendCountdown(pendingResendCooldownSeconds)}.</>
+                    )}
                   </Message>
                 )}
 
@@ -736,8 +775,16 @@ export default function SettingsPage() {
                       <Button disabled={busyKey === 'verify-email' || verificationCode.trim().length !== 6} onClick={handleVerifyEmail}>
                         {busyKey === 'verify-email' ? 'Verifying…' : 'Verify Email'}
                       </Button>
-                      <Button secondary disabled={busyKey === 'resend-email'} onClick={handleResendEmailVerification}>
-                        {busyKey === 'resend-email' ? 'Sending…' : 'Resend Code'}
+                      <Button
+                        secondary
+                        disabled={busyKey === 'resend-email' || pendingResendCooldownSeconds > 0}
+                        onClick={handleResendEmailVerification}
+                      >
+                        {busyKey === 'resend-email'
+                          ? 'Sending…'
+                          : pendingResendCooldownSeconds > 0
+                            ? `Resend in ${formatResendCountdown(pendingResendCooldownSeconds)}`
+                            : 'Resend Code'}
                       </Button>
                     </div>
                   </div>

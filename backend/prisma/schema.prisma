@@ -43,6 +43,7 @@ model User {
   following          UserFollow[]   @relation("Following")
   followers          UserFollow[]   @relation("Followers")
   htmlVersions       SheetHtmlVersion[]
+  suppressionAuditsPerformed EmailSuppressionAudit[] @relation("EmailSuppressionAuditActor")
 }
 
 model School {
@@ -337,4 +338,57 @@ model VerificationChallenge {
   @@index([purpose, username, expiresAt])
   @@index([purpose, email, expiresAt])
   @@index([purpose, verifiedAt, expiresAt])
+}
+
+model EmailDeliveryEvent {
+  id                Int      @id @default(autoincrement())
+  provider          String
+  eventType         String
+  providerWebhookId String?  @unique
+  providerMessageId String?
+  recipient         String?
+  subject           String?
+  eventCreatedAt    DateTime?
+  payload           Json
+  receivedAt        DateTime @default(now())
+
+  @@index([provider, eventType, receivedAt(sort: Desc)])
+  @@index([providerMessageId, receivedAt(sort: Desc)])
+  @@index([recipient, receivedAt(sort: Desc)])
+}
+
+model EmailSuppression {
+  id                Int      @id @default(autoincrement())
+  email             String   @unique
+  active            Boolean  @default(true)
+  reason            String
+  provider          String
+  sourceEventType   String
+  sourceEventId     String?
+  sourceMessageId   String?
+  details           Json?
+  firstSuppressedAt DateTime @default(now())
+  lastSuppressedAt  DateTime @default(now())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  audits            EmailSuppressionAudit[]
+
+  @@index([active, updatedAt(sort: Desc)])
+  @@index([provider, active, updatedAt(sort: Desc)])
+}
+
+model EmailSuppressionAudit {
+  id                Int      @id @default(autoincrement())
+  suppressionId     Int
+  action            String
+  reason            String
+  performedByUserId Int?
+  context           Json?
+  createdAt         DateTime @default(now())
+  suppression       EmailSuppression @relation(fields: [suppressionId], references: [id], onDelete: Cascade)
+  performedBy       User?    @relation("EmailSuppressionAuditActor", fields: [performedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([suppressionId, createdAt(sort: Desc)])
+  @@index([performedByUserId, createdAt(sort: Desc)])
+  @@index([action, createdAt(sort: Desc)])
 }
