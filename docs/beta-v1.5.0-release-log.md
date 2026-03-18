@@ -741,4 +741,85 @@ Cycle 14 Notes
 
 - Env vars required: `EMAIL_TRANSPORT=resend`, `RESEND_API_KEY`, `EMAIL_FROM`
 - Resend free tier: 100 emails/day, sufficient for beta
-- All email functions (password reset, email verification, 2FA codes, course request notices) now route through Resend
+- All email functions (password reset, email verification, course request notices) now route through Resend
+
+---
+
+Cycle 15 — Pre-Release Quality Audit & Bug Fixes
+Date: 2025-03-18
+
+Fixed (CRITICAL)
+
+- **`/register/start` crashes with null email** (`auth.js`): Since email is now optional, `prisma.user.findUnique({ where: { email: null } })` threw a runtime error. Added guard rejecting null email at the top of the verified registration flow — this path inherently requires email.
+
+Fixed (HIGH)
+
+- **Password change bypassed strength rules** (`settings.js`): `PATCH /settings/password` only checked length (8 chars) but not uppercase/digit requirements enforced at registration. Added matching validation.
+- **Star notification showed "undefined" title** (`sheets.js`): `visibility` query selected `id`, `userId`, `status` but not `title`. Notification message rendered `"starred your sheet 'undefined'"`. Added `title: true` to the SELECT.
+- **Missing `await` in email suppression check** (`email.js`): `getSuppressedRecipients` returned the Prisma promise without awaiting, so the `catch` block for DB errors never fired — errors propagated as unhandled rejections. Added `await`.
+- **UserProfilePage showed raw HTTP status codes** (`UserProfilePage.jsx`): Error display showed `"Error 403"` or `"Error 500"` instead of the backend's user-friendly message. Now reads the JSON error body from the response.
+- **Follow/unfollow errors silently ignored** (`UserProfilePage.jsx`): `catch { /* ignore */ }` replaced with user-visible error feedback.
+- **HTML sheet download XSS risk** (`sheets.js`): Downloaded HTML files served as `text/html` could execute scripts if opened in-browser. Added `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'` and `X-Content-Type-Options: nosniff` headers.
+- **Unbounded similar-user query in recommendations** (`courses.js`): Collaborative filtering loaded ALL users sharing any course with no limit. At scale (popular course with 10,000 enrollments), this caused massive memory usage. Added `take: 500` cap.
+
+Fixed (MEDIUM)
+
+- **Notes endpoint had no pagination** (`notes.js`): `GET /api/notes` returned ALL notes with no `take` limit. Added `page` + `limit` params with `take: 50` default (capped at 100). Frontend updated to handle both old array and new `{ notes, total }` response shape.
+- **Course request name had no max length** (`courses.js`): `rawName` accepted arbitrarily long strings. Added 200-character cap.
+- **Starred sheet ordering used O(n^2) lookup** (`sheets.js`): `starredSheetIds.map(id => sheets.find(...))` replaced with `Map`-based O(n) lookup.
+- **Google-only users saw broken "Change Username" form** (`SecurityTab.jsx`): Username change requires password confirmation, which Google-only accounts don't have. Now shows an informational message instead of an always-failing form.
+
+Cleaned Up
+
+- **Removed dead `sendTwoFaCode` function** (`email.js`): 2FA was removed in a prior cycle but the email function and export remained as dead code.
+
+Cycle 15 Validation Commands (Executed)
+
+- `npm --prefix frontend/studyhub-app run build`
+
+Cycle 15 Validation Result
+
+- Frontend build: 0 errors, 0 warnings. 39 output chunks.
+
+Cycle 15 Deep Scan Summary
+
+- 30 issues identified across backend routes, frontend pages, email system, data model, and security
+- 1 CRITICAL, 7 HIGH, 4 MEDIUM fixed in this cycle
+- Remaining items deferred (LOW severity): `parseInt` radix consistency, Announcement cascade delete, admin stats caching, RequestedCourse NULL uniqueness, Avatar aria-labels
+
+---
+
+Cycle 16 — Code Review Fixes (Sourcery, Codex, Copilot)
+Date: 2025-03-18
+
+Fixed (CRITICAL)
+
+- **`checkRestrictions` middleware was dead code** (`index.js`): Mounted globally before any auth middleware populated `req.user`, so `if (!req.user?.userId) return next()` always fired — restricted users could post, comment, and upload freely. Fixed by adding an optional auth decode middleware before `checkRestrictions` that reads the JWT token (Bearer header or cookie) non-fatally.
+
+Fixed (HIGH)
+
+- **ModerationCase didn't store author userId** (`schema.prisma`, `moderationEngine.js`, `moderation.js`): Cases were created without linking to the flagged user, so the admin moderation queue showed `undefined` in the User column and admins couldn't tell who posted flagged content. Added `userId Int?` column with relation, migration, and `include: { user }` on case queries.
+- **OpenAI moderation call missing explicit `model`** (`moderationEngine.js`): SDK v6 requires `model` parameter. Without it, calls would fail with `invalid_request_error`, silently disabling moderation. Added `model: 'omni-moderation-latest'` (configurable via `OPENAI_MODERATION_MODEL` env var).
+
+Fixed (MEDIUM)
+
+- **ModerationTab displayed `c.topScore` but schema has `c.confidence`** (`ModerationTab.jsx`): Score column always showed "—". Changed to read `c.confidence`.
+- **UserProfilePage showed "User not found" for private profiles** (`UserProfilePage.jsx`): 403 privacy errors now show a lock icon and "Profile not available" heading instead of the generic "User not found".
+- **HTML import didn't mark unsaved changes** (`UploadSheetPage.jsx`): Importing an HTML file didn't set `hasUnsavedChanges`, so the beforeunload guard wouldn't fire if the user navigated away without saving.
+
+Fixed (LOW)
+
+- **Dependency tracker listed react-joyride as "TBD"** (`dependency-tracker.md`): Updated to `^2.9.3`.
+- **LoginPage comment referenced removed email verification** (`LoginPage.jsx`): Updated comment to match current flow.
+- **Security doc typo** (`security-overview.md`): "anonymized evidence 90 days" → "kept for 90 days".
+
+Cycle 16 Validation Commands (Executed)
+
+- `npm --prefix frontend/studyhub-app run build`
+- `npx prisma generate` (after schema change)
+
+Cycle 16 Validation Result
+
+- Frontend build: 0 errors, 0 warnings. 39 output chunks.
+- Prisma client regenerated successfully.
+- Migration `20260318160000_add_userid_to_moderation_case` applied.

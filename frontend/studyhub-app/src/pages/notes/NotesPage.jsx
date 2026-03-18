@@ -50,7 +50,8 @@ export default function NotesPage() {
       .then((response) => response.json())
       .then((data) => {
         if (active) {
-          setNotes(Array.isArray(data) ? data : [])
+          const list = Array.isArray(data) ? data : (Array.isArray(data?.notes) ? data.notes : [])
+          setNotes(list)
           setLoadingNotes(false)
         }
       })

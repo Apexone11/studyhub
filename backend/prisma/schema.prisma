@@ -50,6 +50,7 @@ model User {
   strikes                    Strike[]
   appeals                    Appeal[]
   restrictions               UserRestriction[]
+  moderationCases            ModerationCase[] @relation("ModerationCaseAuthor")
   moderationReviews          ModerationCase[] @relation("ModerationReviewer")
   appealReviews              Appeal[]         @relation("AppealReviewer")
 }
@@ -420,6 +421,7 @@ model ModerationCase {
   id          Int       @id @default(autoincrement())
   contentType String
   contentId   Int
+  userId      Int?
   status      String    @default("pending")
   confidence  Float?
   category    String?
@@ -429,12 +431,14 @@ model ModerationCase {
   reviewNote  String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+  user        User?     @relation("ModerationCaseAuthor", fields: [userId], references: [id], onDelete: SetNull)
   reviewer    User?     @relation("ModerationReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
   strikes     Strike[]
   appeals     Appeal[]
 
   @@index([status, createdAt(sort: Desc)])
   @@index([contentType, contentId])
+  @@index([userId])
 }
 
 model Strike {

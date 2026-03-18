@@ -109,21 +109,27 @@ export default function SecurityTab({ user, sessionUser, busyKey, setBusyKey, ha
       )}
 
       <SectionCard title="Change Username" subtitle={`Current username: ${user?.username || sessionUser?.username || 'unknown'}`}>
-        <FormField label="New Username">
-          <Input value={usernameForm.newUsername} onChange={(e) => setUsernameForm((c) => ({ ...c, newUsername: e.target.value }))} />
-        </FormField>
-        <FormField label="Confirm with Password">
-          <Input type="password" value={usernameForm.password} onChange={(e) => setUsernameForm((c) => ({ ...c, password: e.target.value }))} />
-        </FormField>
-        <MsgList msg={usernameMsg} />
-        <Button
-          disabled={busyKey === 'username'}
-          onClick={() => void handlePatch('username', usernameForm, setUsernameMsg, () => {
-            setUsernameForm({ newUsername: '', password: '' })
-          })}
-        >
-          {busyKey === 'username' ? 'Saving...' : 'Update Username'}
-        </Button>
+        {isGoogleOnly ? (
+          <Message type="info" text="Google-only accounts must set a password in the Account tab before changing their username." />
+        ) : (
+          <>
+            <FormField label="New Username">
+              <Input value={usernameForm.newUsername} onChange={(e) => setUsernameForm((c) => ({ ...c, newUsername: e.target.value }))} />
+            </FormField>
+            <FormField label="Confirm with Password">
+              <Input type="password" value={usernameForm.password} onChange={(e) => setUsernameForm((c) => ({ ...c, password: e.target.value }))} />
+            </FormField>
+            <MsgList msg={usernameMsg} />
+            <Button
+              disabled={busyKey === 'username'}
+              onClick={() => void handlePatch('username', usernameForm, setUsernameMsg, () => {
+                setUsernameForm({ newUsername: '', password: '' })
+              })}
+            >
+              {busyKey === 'username' ? 'Saving...' : 'Update Username'}
+            </Button>
+          </>
+        )}
       </SectionCard>
 
       {GOOGLE_CLIENT_ID && (

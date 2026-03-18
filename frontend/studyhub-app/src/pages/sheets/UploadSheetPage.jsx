@@ -481,6 +481,7 @@ export default function UploadSheetPage() {
       setShowScanModal(true)
       setScanModalDismissed(false)
       setSaved(true)
+      setHasUnsavedChanges(true)
     } catch (importError) {
       setError(importError.message || 'Could not import HTML file.')
     } finally {

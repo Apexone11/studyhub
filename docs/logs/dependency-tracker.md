@@ -16,7 +16,7 @@ Tracks all third-party libraries, their purpose, and update status.
 | dompurify | ^3.3.3 | HTML sanitization | v1.0.0 |
 | @sentry/react | ^10.43.0 | Error tracking | v1.0.0 |
 | posthog-js | ^1.360.2 | Product analytics | v1.0.0 |
-| react-joyride | TBD | Tutorial/onboarding popups | v1.5.0 (planned) |
+| react-joyride | ^2.9.3 | Tutorial/onboarding popups | v1.5.0 |
 
 ## Backend Dependencies
 

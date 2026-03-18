@@ -4,7 +4,7 @@
  * Layout: Centered glass-morphism card on dark gradient background.
  * Auth options: Username/password form OR Google Sign-In button.
  * No email verification gate — Google handles its own verification,
- * and local accounts are verified at registration time.
+ * and local accounts can sign in immediately with username + password.
  *
  * Design: Clean Academic Pro — subtle animations, accessible focus rings.
  * ═══════════════════════════════════════════════════════════════════════════ */

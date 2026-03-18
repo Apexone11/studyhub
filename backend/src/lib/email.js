@@ -117,7 +117,7 @@ async function getSuppressedRecipients(toValue) {
   if (lookupEmails.length === 0) return []
 
   try {
-    return prisma.emailSuppression.findMany({
+    return await prisma.emailSuppression.findMany({
       where: {
         active: true,
         email: { in: lookupEmails },
@@ -467,38 +467,6 @@ async function sendEmailVerification(toEmail, username, code) {
   }, 'email-verification')
 }
 
-/**
- * Send a 2FA verification code via email.
- * @param {string} toEmail  - Recipient email address
- * @param {string} username - Recipient username
- * @param {string} code     - 6-digit 2FA code
- */
-async function sendTwoFaCode(toEmail, username, code) {
-  const body = `
-    <h2 style="margin:0 0 8px;color:#1e3a5f;font-size:22px;">Two-Step Verification</h2>
-    <p style="margin:0 0 24px;color:#6b7280;font-size:15px;">Hi <strong>${escapeHtml(username)}</strong>, here is your sign-in code. It expires in 10 minutes.</p>
-    <div style="text-align:center;margin:0 0 24px;">
-      <div style="display:inline-block;background:#f0f4f8;border:2px solid #3b82f6;border-radius:12px;padding:20px 40px;">
-        <span style="font-size:36px;font-weight:bold;letter-spacing:8px;color:#1e3a5f;">${escapeHtml(code)}</span>
-      </div>
-    </div>
-    <p style="margin:0;color:#9ca3af;font-size:13px;">If you did not attempt to sign in, change your password immediately.</p>
-  `
-
-  await deliverMail({
-    from: `"StudyHub" <${getFromAddress()}>`,
-    to: toEmail,
-    subject: 'Your StudyHub sign-in code',
-    text: [
-      `Hi ${username},`,
-      '',
-      `Your StudyHub sign-in code is: ${code}`,
-      '',
-      'It expires in 10 minutes. If you did not try to sign in, change your password immediately.',
-    ].join('\n'),
-    html: htmlWrap('Your StudyHub Sign-In Code', body),
-  }, 'two-factor')
-}
 
 /**
  * Send a course request notification to the company/admin inbox.
@@ -578,7 +546,6 @@ module.exports = {
   getAdminEmail,
   sendPasswordReset,
   sendEmailVerification,
-  sendTwoFaCode,
   sendCourseRequestNotice,
   sendEmailSmoke,
   validateEmailTransport,

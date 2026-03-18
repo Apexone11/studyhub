@@ -40,7 +40,13 @@ export default function UserProfilePage() {
     setLoading(true)
     setError(null)
     fetch(`${API}/api/users/${username}`, { headers: authHeaders() })
-      .then((r) => { if (!r.ok) throw new Error(`${r.status}`); return r.json() })
+      .then(async (r) => {
+        if (!r.ok) {
+          const body = await r.json().catch(() => ({}))
+          throw new Error(body.error || (r.status === 404 ? 'This user does not exist.' : 'Could not load this profile.'))
+        }
+        return r.json()
+      })
       .then((data) => {
         setProfile(data)
         setFollowing(data.isFollowing || false)
@@ -60,12 +66,16 @@ export default function UserProfilePage() {
         method,
         headers: authHeaders(),
       })
+      const data = await res.json()
       if (res.ok) {
-        const data = await res.json()
         setFollowing(data.following)
         setFollowers(data.followerCount)
+      } else {
+        setError(data.error || 'Could not update follow status.')
       }
-    } catch { /* ignore */ }
+    } catch {
+      setError('Could not connect to the server.')
+    }
     finally { setToggling(false) }
   }
 
@@ -91,10 +101,12 @@ export default function UserProfilePage() {
       <Navbar crumbs={[{ label: 'Profile', to: '#' }]} hideTabs />
       <div style={{ maxWidth: 900, margin: '0 auto', padding: 'clamp(20px, 3vw, 40px) clamp(16px, 2vw, 24px)' }}>
         <div style={{ background: '#fff', borderRadius: 18, border: '1px solid #e2e8f0', padding: 48, textAlign: 'center' }}>
-          <div style={{ fontSize: 36, color: '#cbd5e1', marginBottom: 14 }}>👤</div>
-          <div style={{ fontWeight: 700, fontSize: 18, color: '#0f172a', marginBottom: 8 }}>User not found</div>
+          <div style={{ fontSize: 36, color: '#cbd5e1', marginBottom: 14 }}>{/private|classmates/i.test(error) ? '🔒' : '👤'}</div>
+          <div style={{ fontWeight: 700, fontSize: 18, color: '#0f172a', marginBottom: 8 }}>
+            {/private|classmates/i.test(error) ? 'Profile not available' : 'User not found'}
+          </div>
           <div style={{ fontSize: 14, color: '#94a3b8', marginBottom: 20 }}>
-            {error === '404' ? 'This user does not exist.' : `Error ${error}`}
+            {error}
           </div>
           <Link to="/sheets" style={{ display: 'inline-flex', padding: '10px 22px', borderRadius: 10, background: '#3b82f6', color: '#fff', fontWeight: 700, fontSize: 14, textDecoration: 'none' }}>
             Browse Sheets

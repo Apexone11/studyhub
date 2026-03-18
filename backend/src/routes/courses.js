@@ -79,7 +79,8 @@ router.get('/recommendations', requireAuth, async (req, res) => {
         userId: { not: userId }
       },
       select: { userId: true },
-      distinct: ['userId']
+      distinct: ['userId'],
+      take: 500,
     })
 
     const similarUserIds = similarUsers.map((user) => user.userId)
@@ -133,6 +134,9 @@ router.post('/request', requireAuth, async (req, res) => {
 
   if (rawName.length < 2) {
     return res.status(400).json({ error: 'Course name is required.' })
+  }
+  if (rawName.length > 200) {
+    return res.status(400).json({ error: 'Course name must be 200 characters or fewer.' })
   }
 
   let parsedSchoolId

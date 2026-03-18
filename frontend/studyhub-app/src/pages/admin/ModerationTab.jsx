@@ -384,8 +384,8 @@ export default function ModerationTab({ apiJson, setConfirmAction, formatDateTim
                   <tr key={c.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                     <td style={tableCellStrong}>{c.id}</td>
                     <td style={tableCell}>{c.contentType || '—'}</td>
-                    <td style={tableCell}>{c.user?.username || c.userId}</td>
-                    <td style={tableCell}>{typeof c.topScore === 'number' ? c.topScore.toFixed(2) : '—'}</td>
+                    <td style={tableCell}>{c.user?.username || c.userId || '—'}</td>
+                    <td style={tableCell}>{typeof c.confidence === 'number' ? c.confidence.toFixed(2) : '—'}</td>
                     <td style={tableCell}><span style={statusPill(c.status)}>{c.status}</span></td>
                     <td style={tableCell}>{formatDateTime(c.createdAt)}</td>
                     <td style={{ ...tableCell, display: 'flex', gap: 6, flexWrap: 'wrap' }}>

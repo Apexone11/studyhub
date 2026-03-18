@@ -44,7 +44,10 @@ function isModerationEnabled() {
 async function callOpenAiModeration(text) {
   try {
     const client = getOpenAiClient()
-    const response = await client.moderations.create({ input: text })
+    const response = await client.moderations.create({
+      model: process.env.OPENAI_MODERATION_MODEL || 'omni-moderation-latest',
+      input: text,
+    })
     const result = response.results?.[0]
     if (!result) return null
     return {
@@ -106,6 +109,7 @@ async function scanContent({ contentType, contentId, text, userId }) {
       data: {
         contentType,
         contentId,
+        userId,
         status: 'pending',
         confidence: Math.round(topScore * 1000) / 1000,
         category: topCategory,

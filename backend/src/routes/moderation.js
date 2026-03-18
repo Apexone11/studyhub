@@ -51,6 +51,7 @@ adminRouter.get('/cases', async (req, res) => {
         skip,
         take: PAGE_SIZE,
         include: {
+          user: { select: { id: true, username: true } },
           reviewer: { select: { id: true, username: true } },
         },
       }),
@@ -78,6 +79,7 @@ adminRouter.get('/cases/:id', async (req, res) => {
     const modCase = await prisma.moderationCase.findUnique({
       where: { id: caseId },
       include: {
+        user: { select: { id: true, username: true } },
         reviewer: { select: { id: true, username: true } },
         strikes: {
           include: { user: { select: { id: true, username: true } } },

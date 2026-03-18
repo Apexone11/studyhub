@@ -543,8 +543,9 @@ router.get('/', optionalAuth, async (req, res) => {
       })
       const commentCountBySheetId = new Map(comments.map((row) => [row.sheetId, row._count._all]))
 
+      const sheetById = new Map(sheets.map((sheet) => [sheet.id, sheet]))
       const ordered = starredSheetIds
-        .map((sheetId) => sheets.find((sheet) => sheet.id === sheetId))
+        .map((sheetId) => sheetById.get(sheetId))
         .filter(Boolean)
         .map((sheet) => serializeSheet(sheet, {
           starred: true,
@@ -968,6 +969,9 @@ router.get('/:id/download', attachmentDownloadLimiter, async (req, res) => {
       'Content-Disposition',
       `attachment; filename="${safeDownloadName(sheet.title, downloadAsHtml ? '.html' : '.md')}"`
     )
+    /* Security headers — prevent script execution if browser opens the file inline */
+    res.setHeader('X-Content-Type-Options', 'nosniff')
+    res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'")
     res.send(sheet.content)
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
@@ -1498,7 +1502,7 @@ router.post('/:id/star', requireAuth, reactLimiter, async (req, res) => {
 
     const visibility = await prisma.studySheet.findUnique({
       where: { id: sheetId },
-      select: { id: true, userId: true, status: true },
+      select: { id: true, userId: true, status: true, title: true },
     })
     if (!visibility) return res.status(404).json({ error: 'Sheet not found.' })
     if (!canReadSheet(visibility, req.user)) return res.status(404).json({ error: 'Sheet not found.' })

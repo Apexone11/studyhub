@@ -382,6 +382,11 @@ router.post('/register/start', registerLimiter, async (req, res) => {
   try {
     const { username, email, password } = validateRegistrationInput(req.body || {})
 
+    /* This flow requires email for verification — reject if none provided */
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required for the verified registration flow.' })
+    }
+
     const [existingUsername, existingEmail] = await Promise.all([
       prisma.user.findUnique({ where: { username }, select: { id: true } }),
       prisma.user.findUnique({ where: { email }, select: { id: true } }),

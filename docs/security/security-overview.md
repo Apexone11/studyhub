@@ -71,7 +71,7 @@ The StudyHub algorithms (moderation, provenance, recommendation) are proprietary
 - Strike 1: Warning
 - Strike 2: Warning + 12-hour restriction
 - Strike 3: Quarantine content + admin review
-- Strike 4: Auto-delete account + admin incident report (hard delete + anonymized evidence 90 days)
+- Strike 4: Auto-delete account + admin incident report (hard delete + anonymized evidence kept for 90 days)
 
 ### Content Scanning
 - Primary: OpenAI Moderation API

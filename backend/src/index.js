@@ -12,6 +12,7 @@ const { AVATARS_DIR, validateUploadStorage } = require('./lib/storage')
 const csrfProtection = require('./middleware/csrf')
 const { guardedMode, isGuardedModeEnabled } = require('./middleware/guardedMode')
 const checkRestrictions = require('./middleware/checkRestrictions')
+const { getAuthTokenFromRequest, verifyAuthToken } = require('./lib/authTokens')
 const { ERROR_CODES, sendError } = require('./middleware/errorEnvelope')
 
 const sentryEnabled = initSentry()
@@ -199,6 +200,19 @@ app.use(guardedMode)
 
 // CSRF protection for cookie-authenticated session mutations.
 app.use(csrfProtection)
+
+// Attempt to decode auth token early so downstream global middleware
+// (checkRestrictions) can see req.user. Non-fatal — if no valid token is
+// present the request continues as unauthenticated.
+app.use((req, _res, next) => {
+  if (req.user) return next()
+  const token = getAuthTokenFromRequest(req)
+  if (!token) return next()
+  try {
+    req.user = verifyAuthToken(token)
+  } catch { /* invalid/expired — proceed unauthenticated */ }
+  next()
+})
 
 // Block restricted users from write operations (posting, commenting, uploading).
 // Skips GET/HEAD/OPTIONS, unauthenticated requests, and admin users.
