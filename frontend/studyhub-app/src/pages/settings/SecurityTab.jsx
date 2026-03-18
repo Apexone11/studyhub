@@ -6,6 +6,7 @@ export default function SecurityTab({ user, sessionUser, busyKey, setBusyKey, ha
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
   const [usernameForm, setUsernameForm] = useState({ newUsername: '', password: '' })
   const [twoFaPassword, setTwoFaPassword] = useState('')
+  const [googleUnlinkPassword, setGoogleUnlinkPassword] = useState('')
 
   const [passwordMsg, setPasswordMsg] = useState(null)
   const [usernameMsg, setUsernameMsg] = useState(null)
@@ -49,7 +50,7 @@ export default function SecurityTab({ user, sessionUser, busyKey, setBusyKey, ha
   }
 
   async function handleGoogleUnlink() {
-    if (!twoFaPassword) {
+    if (!googleUnlinkPassword) {
       setGoogleMsg({ type: 'error', text: 'Enter your password to unlink Google.' })
       return
     }
@@ -60,7 +61,7 @@ export default function SecurityTab({ user, sessionUser, busyKey, setBusyKey, ha
       const response = await fetch(`${API}/api/settings/google/unlink`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: twoFaPassword }),
+        body: JSON.stringify({ password: googleUnlinkPassword }),
       })
       const data = await response.json()
 
@@ -185,9 +186,9 @@ export default function SecurityTab({ user, sessionUser, busyKey, setBusyKey, ha
               {user.authProvider !== 'google' && (
                 <>
                   <FormField label="Confirm with Password">
-                    <Input type="password" value={twoFaPassword} onChange={(e) => setTwoFaPassword(e.target.value)} placeholder="Enter your password to unlink" />
+                    <Input type="password" value={googleUnlinkPassword} onChange={(e) => setGoogleUnlinkPassword(e.target.value)} placeholder="Enter your password to unlink" />
                   </FormField>
-                  <Button secondary disabled={busyKey === 'google-unlink' || !twoFaPassword} onClick={handleGoogleUnlink}>
+                  <Button secondary disabled={busyKey === 'google-unlink' || !googleUnlinkPassword} onClick={handleGoogleUnlink}>
                     {busyKey === 'google-unlink' ? 'Unlinking...' : 'Unlink Google'}
                   </Button>
                 </>

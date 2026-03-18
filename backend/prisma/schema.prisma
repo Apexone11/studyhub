@@ -51,6 +51,7 @@ model User {
   appeals                    Appeal[]
   restrictions               UserRestriction[]
   moderationReviews          ModerationCase[] @relation("ModerationReviewer")
+  appealReviews              Appeal[]         @relation("AppealReviewer")
 }
 
 model School {
@@ -462,6 +463,7 @@ model Appeal {
   updatedAt  DateTime  @updatedAt
   case       ModerationCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewer   User?     @relation("AppealReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
 
   @@index([caseId])
   @@index([userId, status])
