@@ -314,6 +314,11 @@ const SCHEMA_REPAIR_STATEMENTS = [
   'ALTER TABLE "SheetHtmlVersion" ADD CONSTRAINT "SheetHtmlVersion_sheetId_fkey" FOREIGN KEY ("sheetId") REFERENCES "StudySheet"("id") ON DELETE CASCADE ON UPDATE CASCADE',
   'ALTER TABLE "SheetHtmlVersion" DROP CONSTRAINT IF EXISTS "SheetHtmlVersion_userId_fkey"',
   'ALTER TABLE "SheetHtmlVersion" ADD CONSTRAINT "SheetHtmlVersion_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE',
+
+  // v1.5.0 — Google OAuth columns
+  'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "googleId" TEXT',
+  `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "authProvider" TEXT NOT NULL DEFAULT 'local'`,
+  'CREATE UNIQUE INDEX IF NOT EXISTS "User_googleId_key" ON "User"("googleId")',
 ]
 
 async function repairRuntimeSchema(prisma) {
@@ -413,6 +418,7 @@ async function ensureAdminUser(prisma) {
       id: true,
       role: true,
       email: true,
+      emailVerified: true,
     },
   })
 
@@ -436,6 +442,7 @@ async function ensureAdminUser(prisma) {
         email: email || null,
         emailVerified: Boolean(email),
       },
+      select: { id: true },
     })
     console.log('Admin bootstrap created the admin account.')
     return true
@@ -462,6 +469,7 @@ async function ensureAdminUser(prisma) {
     await prisma.user.update({
       where: { id: existingUser.id },
       data: updates,
+      select: { id: true },
     })
     console.log('Admin bootstrap synced the admin account.')
     return true

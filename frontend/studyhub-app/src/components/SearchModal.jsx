@@ -15,15 +15,27 @@ export default function SearchModal({ open, onClose }) {
   const abortRef = useRef(null)
   const navigate = useNavigate()
 
-  // Focus input when modal opens
+  // Reset state when modal opens, cancel pending work when it closes
   useEffect(() => {
     if (open) {
       setQuery('')
       setResults({ sheets: [], courses: [], users: [] })
       setActiveIndex(-1)
-      setTimeout(() => inputRef.current?.focus(), 50)
+      const focusTimer = setTimeout(() => inputRef.current?.focus(), 50)
+      return () => clearTimeout(focusTimer)
     }
+    // Modal closing — cancel any pending debounce timer and in-flight fetch
+    clearTimeout(timerRef.current)
+    if (abortRef.current) abortRef.current.abort()
   }, [open])
+
+  // Cleanup timer and abort controller on unmount
+  useEffect(() => {
+    return () => {
+      clearTimeout(timerRef.current)
+      if (abortRef.current) abortRef.current.abort()
+    }
+  }, [])
 
   // Close on Escape
   useEffect(() => {
@@ -57,12 +69,12 @@ export default function SearchModal({ open, onClose }) {
     }
   }, [])
 
-  function handleChange(e) {
-    const value = e.target.value
+  function handleChange({ target: { value } }) {
     setQuery(value)
     clearTimeout(timerRef.current)
 
     if (value.trim().length < 2) {
+      if (abortRef.current) abortRef.current.abort()
       setResults({ sheets: [], courses: [], users: [] })
       setLoading(false)
       return

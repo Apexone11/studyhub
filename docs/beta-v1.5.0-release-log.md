@@ -311,3 +311,74 @@ Cycle 6 Deferred-Risk Notes
 - Profile visibility setting is persisted but not yet enforced by backend user profile routes. Backend enforcement needed before these options have real effect.
 - `defaultDownloads`/`defaultContributions` toggles are persisted but not yet read during sheet creation. Upload flow needs to check user preferences for defaults.
 - Formal Prisma migration files still needed for UserPreferences and moderation tables before production deploy.
+
+---
+
+Cycle 7 Additions (Production Crash Fix + Security Hardening + Deep Scan) [2026-03-18]
+Implemented in beta lane:
+
+Fixed:
+
+- **P0 Production crash:** Backend crash-looping on Railway because `User.googleId` column did not exist in production database. Root cause: all v1.5.0 schema changes were applied locally with `prisma db push` but no migration files existed. Production runs `prisma migrate` which requires migration files.
+  - Created formal migration `20260318040000_add_v150_google_oauth_preferences_moderation` covering all v1.5.0 schema additions.
+  - All statements use `IF NOT EXISTS` / `DROP CONSTRAINT IF EXISTS` guards matching existing migration patterns for idempotency.
+  - Added `DEFAULT CURRENT_TIMESTAMP` on `ModerationCase.updatedAt` and `Appeal.updatedAt` (were missing, inconsistent with all other migrations).
+- **P0 Bootstrap crash amplifier:** `ensureAdminUser` in `bootstrap.js` selected `{ id, role, email }` but checked `existingUser.emailVerified` — always `undefined`, causing an unnecessary `update()` on every startup. Prisma's default `RETURNING *` on `update()` then asked PostgreSQL for the missing `googleId` column.
+  - Fixed: added `emailVerified: true` to the select clause.
+  - Added `select: { id: true }` to both `create()` and `update()` calls to avoid `RETURNING *` issues with future schema changes.
+  - Added `googleId` and `authProvider` to `SCHEMA_REPAIR_STATEMENTS` as a safety net — if migration fails, repair runs before bootstrap.
+- **SearchModal stale state on close:** Closing the modal did not cancel pending debounce timers or abort in-flight fetch requests. Reopening could show stale results.
+  - Fixed: modal close now clears `timerRef` and aborts `abortRef`.
+  - Short-query branch (`< 2 chars`) now also aborts any in-flight request to prevent loading state flicker.
+  - Focus `setTimeout` now cleaned up properly via effect return.
+
+Security:
+
+- **CRITICAL: Account takeover via Google OAuth email auto-linking** — Both `POST /api/auth/google` and `POST /api/auth/google/complete` automatically linked a Google account to any existing StudyHub user if the email matched, without requiring authentication from the account owner. An attacker controlling a Google account with a victim's email could take over their StudyHub account in one request.
+  - Fixed: removed auto-link behavior from both endpoints. Now returns `409 Conflict` with context-aware error message (different message for Google-only accounts vs password accounts).
+  - Response shape matches existing 409 patterns in auth.js (simple `{ error: '...' }`).
+- **Google token verification error handling** — `verifyGoogleIdToken` errors (expired token, invalid signature, malformed payload) fell through to the generic 500 handler, showing "Server error" instead of a descriptive message.
+  - Fixed: both `/google` and `/google/complete` now catch token verification errors and return `401` with "Google sign-in failed. Please try again."
+- **Username generation runaway loop guard** — Google OAuth username generation had no upper bound on the while-loop. Added `suffix > 100` safety check with `AppError(500)` to prevent infinite loops.
+
+Changed:
+
+- **Search endpoint hardened (`backend/src/routes/search.js`):**
+  - Added `message: { error: '...' }` to rate limiter (was returning plain text when rate limited).
+  - Added 200-character max length check on `q` parameter.
+  - Added explicit `type` parameter validation against `['all', 'sheets', 'courses', 'users']`.
+  - Normalized `q`, `type`, `limit` query params for array safety (`?q=foo&q=bar` edge case).
+  - Replaced `console.error` with `captureError` from Sentry (search errors were not being reported).
+  - Changed 500 error message from `'Search failed.'` to `'Server error.'` matching all other routes.
+  - Moved `VALID_TYPES` to module scope (was recreated per request).
+- **SearchModal destructuring:** Applied Sourcery suggestion — `handleChange(e)` → `handleChange({ target: { value } })`.
+
+Cycle 7 Validation Commands (Executed)
+
+- `npx prisma validate` (from backend/)
+- `npx prisma generate` (from backend/)
+- `npm --prefix frontend/studyhub-app run build`
+
+Cycle 7 Validation Result
+
+- Prisma schema validation passed.
+- Prisma client generated successfully.
+- Frontend production build passed.
+
+Cycle 7 Deep Scan Summary
+
+- 4 parallel audit agents scanned: migration SQL patterns, auth.js Google OAuth, search.js + SearchModal, bootstrap.js crash path.
+- Migration audit found 22 SQL statements not matching existing patterns (missing IF NOT EXISTS, DROP CONSTRAINT IF EXISTS, DEFAULT CURRENT_TIMESTAMP). All fixed.
+- Bootstrap audit found the root cause amplifier: missing `emailVerified` in select + Prisma's implicit `RETURNING *`. Both fixed with select clause additions and repair statement safety net.
+- Search endpoint audit found 5 consistency issues (rate limiter message, captureError, error message, array params, module scope). All fixed.
+- SearchModal audit found 4 issues (close cleanup, short-query abort, focus timer cleanup, destructuring). All fixed.
+- Auth.js audit found 9 issues: dead `existingAccount` field (fixed), misleading error for Google-only accounts (fixed with context-aware message), token verification errors surfacing as 500 (fixed with AppError 401), username loop no guard (fixed), truncated comment (fixed). Deferred: tempCredential JWT expiry, TOCTOU race conditions, code duplication between /google and /google/complete.
+
+Cycle 7 Deferred-Risk Notes
+
+- VS Code MSSQL linter shows false positives on migration SQL (project uses PostgreSQL, not MSSQL). Safe to ignore.
+- Google OAuth `nonce` validation not yet implemented (LOW — google-auth-library handles audience validation).
+- Username generation TOCTOU race condition in Google signup still exists (MEDIUM — uniqueness check outside transaction). P2002 is caught by `sendError` but message is generic.
+- `tempCredential` (raw Google JWT) sent back to frontend for course selection flow expires in ~5 minutes. If user takes longer, the `/google/complete` call will fail silently. Consider server-side session approach.
+- Near-identical code in `/google` and `/google/complete` endpoints should be extracted to a shared helper function.
+- SearchModal does not show error feedback to user on 400 responses (shows "No results found" instead). LOW priority.

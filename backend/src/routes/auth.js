@@ -879,7 +879,12 @@ router.post('/google', googleLimiter, async (req, res) => {
   }
 
   try {
-    const googlePayload = await verifyGoogleIdToken(credential)
+    let googlePayload
+    try {
+      googlePayload = await verifyGoogleIdToken(credential)
+    } catch {
+      throw new AppError(401, 'Google sign-in failed. Please try again.')
+    }
 
     const existingByGoogleId = await findUserByGoogleId(googlePayload.googleId)
     if (existingByGoogleId) {
@@ -892,20 +897,13 @@ router.post('/google', googleLimiter, async (req, res) => {
 
     const existingByEmail = await findUserByEmail(googlePayload.email)
     if (existingByEmail) {
-      await prisma.user.update({
-        where: { id: existingByEmail.id },
-        data: {
-          googleId: googlePayload.googleId,
-          authProvider: existingByEmail.authProvider === 'local' ? 'both' : existingByEmail.authProvider,
-          emailVerified: true,
-        },
-      })
-
-      const authenticatedUser = await issueAuthenticatedSession(res, existingByEmail.id)
-      return res.json({
-        message: 'Login successful! Google account linked.',
-        user: authenticatedUser,
-      })
+      // Security: Do NOT auto-link Google to an existing account.
+      // An attacker with a Google account matching the victim's email could
+      // take over their StudyHub account. Require explicit linking from Settings.
+      const msg = existingByEmail.authProvider === 'google'
+        ? 'An account with this email already exists. Try signing in with your original Google account.'
+        : 'An account with this email already exists. Log in with your password, then link Google from Settings > Security.'
+      return res.status(409).json({ error: msg })
     }
 
     const parsedSchoolId = parseOptionalInteger(schoolId, 'schoolId')
@@ -934,6 +932,7 @@ router.post('/google', googleLimiter, async (req, res) => {
     let username = baseUsername
     let suffix = 1
     while (await prisma.user.findUnique({ where: { username }, select: { id: true } })) {
+      if (suffix > 100) throw new AppError(500, 'Unable to generate a unique username. Please try again.')
       username = `${baseUsername.slice(0, 16)}${suffix}`
       suffix += 1
     }
@@ -993,7 +992,12 @@ router.post('/google/complete', googleLimiter, async (req, res) => {
   }
 
   try {
-    const googlePayload = await verifyGoogleIdToken(credential)
+    let googlePayload
+    try {
+      googlePayload = await verifyGoogleIdToken(credential)
+    } catch {
+      throw new AppError(401, 'Google sign-in failed. Please try again.')
+    }
 
     const existingUser = await findUserByGoogleId(googlePayload.googleId)
     if (existingUser) {
@@ -1003,16 +1007,13 @@ router.post('/google/complete', googleLimiter, async (req, res) => {
 
     const existingByEmail = await findUserByEmail(googlePayload.email)
     if (existingByEmail) {
-      await prisma.user.update({
-        where: { id: existingByEmail.id },
-        data: {
-          googleId: googlePayload.googleId,
-          authProvider: existingByEmail.authProvider === 'local' ? 'both' : existingByEmail.authProvider,
-          emailVerified: true,
-        },
-      })
-      const authenticatedUser = await issueAuthenticatedSession(res, existingByEmail.id)
-      return res.json({ message: 'Login successful! Google account linked.', user: authenticatedUser })
+      // Security: Do NOT auto-link Google to an existing account.
+      // An attacker with a Google account matching the victim's email could
+      // take over their StudyHub account. Require explicit linking from Settings.
+      const msg = existingByEmail.authProvider === 'google'
+        ? 'An account with this email already exists. Try signing in with your original Google account.'
+        : 'An account with this email already exists. Log in with your password, then link Google from Settings > Security.'
+      return res.status(409).json({ error: msg })
     }
 
     const parsedSchoolId = parseOptionalInteger(schoolId, 'schoolId')
@@ -1032,6 +1033,7 @@ router.post('/google/complete', googleLimiter, async (req, res) => {
     let username = baseUsername
     let suffix = 1
     while (await prisma.user.findUnique({ where: { username }, select: { id: true } })) {
+      if (suffix > 100) throw new AppError(500, 'Unable to generate a unique username. Please try again.')
       username = `${baseUsername.slice(0, 16)}${suffix}`
       suffix += 1
     }

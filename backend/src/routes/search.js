@@ -1,6 +1,7 @@
 const express = require('express')
 const rateLimit = require('express-rate-limit')
 const { getAuthTokenFromRequest, verifyAuthToken } = require('../lib/authTokens')
+const { captureError } = require('../monitoring/sentry')
 const prisma = require('../lib/prisma')
 
 const router = express.Router()
@@ -8,11 +9,14 @@ const router = express.Router()
 const searchLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 120,
+  message: { error: 'Too many search requests. Please slow down.' },
   standardHeaders: true,
   legacyHeaders: false,
 })
 
 router.use(searchLimiter)
+
+const VALID_TYPES = ['all', 'sheets', 'courses', 'users']
 
 // Optional auth — attach user if token present, but don't require it
 function optionalAuth(req, _res, next) {
@@ -28,14 +32,26 @@ function optionalAuth(req, _res, next) {
 }
 
 router.get('/', optionalAuth, async (req, res) => {
-  const { q, type = 'all', limit: limitParam } = req.query
-  const query = (q || '').trim()
+  const rawQ = Array.isArray(req.query.q) ? req.query.q[0] : req.query.q
+  const rawType = Array.isArray(req.query.type) ? req.query.type[0] : req.query.type
+  const rawLimit = Array.isArray(req.query.limit) ? req.query.limit[0] : req.query.limit
+
+  const query = (rawQ || '').trim()
+  const type = rawType || 'all'
 
   if (!query || query.length < 2) {
     return res.json({ results: { sheets: [], courses: [], users: [] }, query, type })
   }
 
-  const limit = Math.min(Math.max(parseInt(limitParam, 10) || 8, 1), 20)
+  if (query.length > 200) {
+    return res.status(400).json({ error: 'Search query too long (max 200 characters).' })
+  }
+
+  if (!VALID_TYPES.includes(type)) {
+    return res.status(400).json({ error: `Invalid search type. Must be one of: ${VALID_TYPES.join(', ')}` })
+  }
+
+  const limit = Math.min(Math.max(parseInt(rawLimit, 10) || 8, 1), 20)
 
   try {
     const promises = []
@@ -124,8 +140,8 @@ router.get('/', optionalAuth, async (req, res) => {
       type,
     })
   } catch (error) {
-    console.error('[search] error:', error)
-    return res.status(500).json({ error: 'Search failed.' })
+    captureError(error, { route: req.originalUrl, method: req.method })
+    return res.status(500).json({ error: 'Server error.' })
   }
 })
 
