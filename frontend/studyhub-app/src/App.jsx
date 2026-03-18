@@ -58,13 +58,15 @@ function RouteTelemetry() {
   useEffect(() => {
     const nextPath = `${location.pathname}${location.search}`
     trackPageView(nextPath)
+  }, [location.pathname, location.search])
 
+  useEffect(() => {
     if (!user) {
       clearAuthenticatedUser()
       return
     }
     identifyAuthenticatedUser(user)
-  }, [location.pathname, location.search, user])
+  }, [user])
 
   return null
 }

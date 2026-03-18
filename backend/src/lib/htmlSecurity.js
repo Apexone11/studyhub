@@ -27,11 +27,11 @@ function skipWhitespace(value, index) {
 }
 
 function stripAsciiWhitespace(value) {
-  let result = ''
+  const resultChars = []
   for (let i = 0; i < value.length; i += 1) {
-    if (!isAsciiWhitespace(value[i])) result += value[i]
+    if (!isAsciiWhitespace(value[i])) resultChars.push(value[i])
   }
-  return result
+  return resultChars.join('')
 }
 
 function containsForbiddenTag(value) {

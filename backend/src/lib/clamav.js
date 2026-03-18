@@ -67,7 +67,7 @@ function scanBufferWithClamAv(buffer, options = {}) {
     let response = ''
 
     const socket = net.createConnection({ host, port }, () => {
-      const streamCommand = Buffer.from('zINSTREAM\0')
+      const streamCommand = Buffer.from('INSTREAM\0')
       socket.write(streamCommand)
 
       const chunkSize = 64 * 1024

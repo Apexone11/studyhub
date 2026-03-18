@@ -494,3 +494,57 @@ Cycle 10 Deferred-Risk Notes
 - Recommended before final release cut:
   1. rerun full beta gate once on latest PR head.
   2. capture fresh diagnostics artifacts after merge-ready state.
+
+Cycle 11 Additions (Post-Review Security + UX Hardening) [2026-03-18]
+Implemented in beta lane:
+- Route telemetry duplicate-pageview risk removed by splitting effects by concern:
+  - `frontend/studyhub-app/src/App.jsx`
+  - page views now track on route changes only, user identify/clear runs on session-user changes.
+- ClamAV stream protocol corrected for raw chunk transport:
+  - `backend/src/lib/clamav.js`
+  - switched command from `zINSTREAM` to `INSTREAM` for uncompressed chunked payloads.
+- Upload error envelope consistency expanded across avatar/attachment handlers:
+  - `backend/src/middleware/errorEnvelope.js`
+  - `backend/src/routes/upload.js`
+  - added and used `UPLOAD_INVALID`, `UPLOAD_MISSING_FILE`, and `UPLOAD_SAVE_FAILED` stable codes for early and persistence failures.
+- HTML security parser micro-optimization applied:
+  - `backend/src/lib/htmlSecurity.js`
+  - ASCII whitespace stripping now uses array collection + join to avoid repeated string concatenation overhead.
+- Sidebar drawer keyboard accessibility improved:
+  - `frontend/studyhub-app/src/components/AppSidebar.jsx`
+  - added `aria-haspopup="dialog"` and Tab focus-trap cycling within the open modal drawer.
+- Auth navigation logic now has explicit unit coverage:
+  - `frontend/studyhub-app/src/lib/authNavigation.test.js`
+  - includes null user, student, admin with 2FA, admin without 2FA, and unexpected role path assertions.
+- Local ClamAV host exposure removed from compose stack:
+  - `docker-compose.yml`
+  - dropped `3310:3310` host mapping while preserving service-to-service connectivity on Docker network.
+
+Cycle 11 Validation Commands (Executed)
+- `npm --prefix backend run test -- test/clamav.adapter.test.js test/htmlSecurity.test.js test/admin.routes.test.js test/preview.routes.test.js`
+- `npm --prefix backend run lint`
+- `npm --prefix frontend/studyhub-app run test -- src/lib/authNavigation.test.js src/components/AppSidebar.responsive.test.jsx`
+- `npm --prefix frontend/studyhub-app run lint`
+
+Cycle 11 Validation Result
+- Targeted backend tests passed:
+  - `4` files
+  - `16` tests
+- Backend lint passed.
+- Targeted frontend tests passed:
+  - `2` files
+  - `6` tests
+- Frontend lint passed.
+
+Cycle 11 Deep Scan Summary
+- Focused scan of latest Copilot findings showed these unresolved items before this cycle:
+  - RouteTelemetry dependency coupling (`location` + `user`) causing duplicate pageview events.
+  - ClamAV streaming command mismatch (`zINSTREAM` with raw payload).
+  - Upload route early exits still returning non-enveloped JSON in key branches.
+  - Drawer modal lacked keyboard focus trapping on Tab navigation.
+  - Auth navigation helper lacked direct unit tests.
+- All listed items were implemented and validated in this cycle.
+
+Cycle 11 Deferred-Risk Notes
+- CI beta-log enforcement rule in `.github/workflows/ci.yml` remains intentionally strict to versioned release logs; this cycle keeps that policy unchanged.
+- Full end-to-end beta gate (`npm run beta:check`) was not rerun in this targeted pass.

@@ -12,6 +12,14 @@ import { API } from '../config'
 import { useSession } from '../lib/session-context'
 
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
+const FOCUSABLE_DRAWER_SELECTORS = [
+  'a[href]',
+  'button:not([disabled])',
+  'textarea:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',')
 
 const NAV_LINKS = [
   { icon: IconFeed,          label: 'Feed',           to: '/feed' },
@@ -219,6 +227,7 @@ export default function AppSidebar({ mode = 'fixed' }) {
           type="button"
           onClick={() => setDrawerOpen(true)}
           ref={triggerButtonRef}
+          aria-haspopup="dialog"
           aria-expanded={drawerOpen}
           aria-controls="app-sidebar-drawer"
           style={{
@@ -258,6 +267,52 @@ export default function AppSidebar({ mode = 'fixed' }) {
                 if (event.key === 'Escape') {
                   event.stopPropagation()
                   setDrawerOpen(false)
+                  return
+                }
+
+                if (event.key !== 'Tab') {
+                  return
+                }
+
+                const dialog = drawerDialogRef.current
+                if (!dialog) {
+                  return
+                }
+
+                const focusableElements = Array.from(dialog.querySelectorAll(FOCUSABLE_DRAWER_SELECTORS)).filter((element) => {
+                  if (!(element instanceof HTMLElement)) return false
+                  if (element.tabIndex === -1 || element.hasAttribute('disabled')) return false
+
+                  const style = window.getComputedStyle(element)
+                  return style.visibility !== 'hidden' && style.display !== 'none'
+                })
+
+                if (focusableElements.length === 0) {
+                  event.preventDefault()
+                  dialog.focus()
+                  return
+                }
+
+                const firstElement = focusableElements[0]
+                const lastElement = focusableElements[focusableElements.length - 1]
+                const { activeElement } = document
+                const shiftPressed = event.shiftKey
+
+                if (!dialog.contains(activeElement)) {
+                  event.preventDefault()
+                  ;(shiftPressed ? lastElement : firstElement).focus()
+                  return
+                }
+
+                if (!shiftPressed && activeElement === lastElement) {
+                  event.preventDefault()
+                  firstElement.focus()
+                  return
+                }
+
+                if (shiftPressed && (activeElement === firstElement || activeElement === dialog)) {
+                  event.preventDefault()
+                  lastElement.focus()
                 }
               }}
               onClick={(event) => event.stopPropagation()}
