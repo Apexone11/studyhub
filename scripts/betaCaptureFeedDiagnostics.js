@@ -9,6 +9,44 @@ function npmCommand() {
   return 'npm'
 }
 
+function quoteWindowsArg(text) {
+  // If no whitespace or double quotes, return as-is
+  if (!/[\s"]/u.test(text)) {
+    return text
+  }
+
+  // Escape backslashes and double quotes according to Windows/CRT rules
+  let result = '"'
+  let backslashCount = 0
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]
+
+    if (ch === '\\') {
+      backslashCount += 1
+    } else if (ch === '"') {
+      // Escape all backslashes before a quote, then the quote itself
+      result += '\\'.repeat(backslashCount * 2 + 1)
+      result += '"'
+      backslashCount = 0
+    } else {
+      if (backslashCount > 0) {
+        result += '\\'.repeat(backslashCount)
+        backslashCount = 0
+      }
+      result += ch
+    }
+  }
+
+  // Escape trailing backslashes before the closing quote
+  if (backslashCount > 0) {
+    result += '\\'.repeat(backslashCount * 2)
+  }
+
+  result += '"'
+  return result
+}
+
 function runCommand(command, args, extraEnv = {}) {
   const baseOptions = {
     cwd: repoRoot,
@@ -21,7 +59,7 @@ function runCommand(command, args, extraEnv = {}) {
     const cmd = [command, ...args]
       .map((part) => {
         const text = String(part)
-        return /\s/.test(text) ? `"${text.replace(/"/g, '\\"')}"` : text
+        return quoteWindowsArg(text)
       })
       .join(' ')
     result = spawnSync(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', cmd], baseOptions)
