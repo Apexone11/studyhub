@@ -54,7 +54,7 @@ function getEmailMode() {
   if (shouldUseResend()) return 'resend'
   if (process.env.EMAIL_CAPTURE_DIR) return 'capture'
   if (process.env.EMAIL_USER && process.env.EMAIL_PASS) return process.env.EMAIL_HOST ? 'smtp-host' : 'provider'
-  return 'disabled'
+  return 'json'
 }
 
 // Create transporter lazily so missing env vars don't crash on startup
