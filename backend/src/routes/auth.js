@@ -572,7 +572,7 @@ router.post('/login', loginLimiter, async (req, res) => {
       data: { failedAttempts: 0, lockedUntil: null },
     })
 
-    if (!user.emailVerified || !user.email) {
+    if (user.role !== 'admin' && (!user.emailVerified || !user.email)) {
       const { challenge, code, didSend } = await createOrRefreshLoginChallenge({
         user,
         email: user.email || null,
