@@ -454,3 +454,43 @@ Cycle 9 Validation Result
 Cycle 9 Operational Notes
 - The CI beta-log gate is scoped to pull requests and checks for code-impacting path changes.
 - Diagnostic capture scripts now fail fast with a clear message when credentials are missing.
+
+Cycle 10 Additions (PR Review Closure + Preview Coverage) [2026-03-18]
+Implemented in beta lane:
+- HTML archive scheduler now reuses the shared Prisma singleton instead of creating an extra client pool:
+  - `backend/src/lib/htmlArchiveScheduler.js`
+  - adds archive failure logging for observability while preserving best-effort behavior.
+- HTML preview sanitizer now allows `blob:` URLs to align with preview CSP behavior:
+  - `backend/src/lib/htmlPreviewDocument.js`
+- Backend email smoke script now loads dotenv from explicit backend path for cwd-safe execution:
+  - `backend/scripts/emailSmoke.js`
+- Drawer focus-capture reliability improved for accessibility on close/restore:
+  - `frontend/studyhub-app/src/components/AppSidebar.jsx`
+- New route-level preview coverage added:
+  - `backend/test/preview.routes.test.js`
+  - validates missing/invalid token handling, version mismatch rejection, unpublished access policy, and `PREVIEW_HTML_BLOCKED` issue surfacing.
+
+Cycle 10 Validation Commands (Executed)
+- `npm --prefix backend run test -- preview.routes.test.js admin.routes.test.js htmlArchive.test.js`
+- `npm --prefix backend run lint`
+- `npm --prefix frontend/studyhub-app run lint`
+
+Cycle 10 Validation Result
+- Targeted backend tests passed:
+  - `3` files
+  - `10` tests
+- Backend lint passed.
+- Frontend lint passed.
+
+Cycle 10 Deep Scan Summary
+- Focused deep scan over review-comment surfaces found only three unresolved items before this cycle:
+  - scheduler Prisma client reuse/logging
+  - preview sanitizer scheme/CSP alignment
+  - missing dedicated `/preview/html` route tests
+- All three were implemented and validated in this cycle.
+
+Cycle 10 Deferred-Risk Notes
+- Full end-to-end beta gate (`npm run beta:check`) was not rerun in this targeted closure pass.
+- Recommended before final release cut:
+  1. rerun full beta gate once on latest PR head.
+  2. capture fresh diagnostics artifacts after merge-ready state.
