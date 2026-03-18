@@ -306,7 +306,7 @@ async function deliverMail(mailOptions, kind) {
   } else {
     const transporter = getTransporter(mode)
     if (!transporter) {
-      throw new Error('Email delivery is not configured. Configure Resend, SMTP, or EMAIL_TRANSPORT=json.')
+      throw new Error('Email delivery is not configured. Configure Resend (EMAIL_TRANSPORT=resend + RESEND_API_KEY), SMTP, or EMAIL_TRANSPORT=json.')
     }
 
     result = await transporter.sendMail(mailOptions)
