@@ -338,7 +338,7 @@ router.post('/register', registerLimiter, async (req, res) => {
   try {
     const { username, email, password } = validateRegistrationInput(req.body || {})
 
-    /* Check for existing username or email (parallel queries for speed).
+    /* Check for existing username or email.
      * Skip email check when email is null (optional registration). */
     const existingUsername = await prisma.user.findUnique({ where: { username }, select: { id: true } })
     if (existingUsername) {

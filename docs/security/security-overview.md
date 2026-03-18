@@ -16,7 +16,7 @@ This document tracks security measures, policies, and the algorithm protection s
 
 ### Removed
 - Two-step verification (2FA) - Removed in v1.5.0 Cycle 8
-- Email verification gate - Being removed in v1.5.0 (Google handles verification)
+- Email verification gate - Removed in v1.5.0 Cycle 13 (registration is username + password only; Google handles its own verification)
 
 ---
 

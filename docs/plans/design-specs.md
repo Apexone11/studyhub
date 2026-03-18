@@ -45,10 +45,11 @@ Chunk information into groups of 5-9 items.
 
 | Name | Width | Columns | Sidebar |
 |------|-------|---------|---------|
-| Mobile | < 640px | 1 | Hidden (hamburger) |
-| Tablet | 640-1024px | 1-2 | Drawer overlay |
-| Desktop | 1024-1440px | 2-3 | Fixed sidebar |
-| Wide | > 1440px | 3 | Fixed sidebar + right panel |
+| Mobile | < 768px | 1 | Hidden (hamburger) |
+| Tablet | 768-1179px | 1-2 | Drawer overlay |
+| Desktop | ≥ 1180px | 2-3 | Fixed sidebar + right panel |
+
+> **Note**: Some legacy styles in `index.css` still use 640px, 900px, and 1024px breakpoints. The canonical breakpoints in `responsive.css` are 767px and 1179px.
 
 ---
 
@@ -64,7 +65,7 @@ Chunk information into groups of 5-9 items.
 - Glass-morphism card on dark gradient
 - Google button prominent
 - Steps: Account -> Courses (no verify step)
-- Username + Email + Password + Google
+- Username + Password + Google (email optional, added later in Settings)
 
 ### 3. Feed Page (REDESIGNING)
 - **Desktop**: 3-column (sidebar 240px | feed flex | right panels 280px)
