@@ -823,3 +823,78 @@ Cycle 16 Validation Result
 - Frontend build: 0 errors, 0 warnings. 39 output chunks.
 - Prisma client regenerated successfully.
 - Migration `20260318160000_add_userid_to_moderation_case` applied.
+
+---
+
+Cycle 17 Additions (Bug Fixes — Crash, UI, Mobile, Theme) [2026-03-18]
+Implemented in beta lane:
+
+Fixed:
+
+- **Upload sheet page crash**: Wrapped `react-joyride` in SafeJoyride error boundary — library requires React 15-18 but project uses React 19. Joyride crashes are now silently caught instead of crashing entire pages. Made upload editor grid responsive (`repeat(auto-fit, minmax(200px, 1fr))`) and added `upload-editor-split` responsive CSS for mobile.
+- **Feed "Open" button**: Hid the "Open" link on post-type feed items — posts link to `/feed?post=X` which just reloads the same page. "Open" now only shows for sheets and announcements with real target pages.
+- **Theme setting not applying in real-time**: Added `applyThemeToDOM()` and `applyFontSizeToDOM()` helpers to AppearanceTab that set `data-theme` attribute and `document.documentElement.style.fontSize` on change. Added `PreferencesBootstrap` component in App.jsx that loads and applies saved preferences on first auth (with localStorage cache for instant apply).
+- **Font size setting not applying in real-time**: Same mechanism as theme — font size changes are applied to the DOM immediately via the `fontSize` CSS property on `<html>`. Preferences are cached in `localStorage` under `studyhub_prefs`.
+- **Oversized search/filter inputs**: Changed `font: 'inherit'` to explicit `fontSize: 13` on SheetsPage search, FeedPage "All courses" dropdown, and FeedPage "Search the feed" input. Shortened SheetsPage placeholder to "Search by title, description...". Constrained feed search to `maxWidth: 240` and course dropdown to `maxWidth: 200`.
+- **Mobile/tablet crash after sign-in/register**: Changed `completeAuthentication()` in session-context from `startTransition` to `flushSync` — ensures session state is committed synchronously before `navigate()` fires. Previously, the target page (FeedPage) would render before the session context was updated, causing a crash on mobile.
+- **Railway build failures**: Changed both Dockerfiles from `npm ci` to `npm install` — project is a workspaces monorepo with a single root lock file, so `npm ci` in subdirectories fails. Added `--legacy-peer-deps` to frontend Dockerfile for react-joyride React 19 peer dep conflict.
+
+Added:
+
+- **User shared notes on profile**: Added `sharedNotes` array to `GET /api/users/:username` response — returns up to 10 non-private notes with title, course code, and date. Added "Shared Notes" section to UserProfilePage showing the notes list.
+- **SafeJoyride component**: `frontend/studyhub-app/src/components/SafeJoyride.jsx` — error boundary wrapper around react-joyride. Used in FeedPage, SheetsPage, NotesPage, and DashboardPage.
+
+Changed:
+
+- `frontend/studyhub-app/Dockerfile`: `npm ci --legacy-peer-deps` → `npm install --legacy-peer-deps`
+- `backend/Dockerfile`: `npm ci --omit=dev` → `npm install --omit=dev`
+
+Cycle 17 Validation Commands (Executed)
+
+- `npm --prefix frontend/studyhub-app run build`
+- `node --check backend/src/index.js`
+- `npm --prefix frontend/studyhub-app run lint`
+
+Cycle 17 Validation Result
+
+- Frontend build: 0 errors, 0 warnings. 39 output chunks.
+- Backend syntax check passed.
+- Lint: 0 new errors/warnings introduced (3 pre-existing errors, 1 pre-existing warning unchanged).
+
+---
+
+Cycle 18 — Feed Post Comments & Google OAuth Security Fix (2026-03-18)
+
+Scope: Add inline comment UI for feed posts; fix Google OAuth email exposure security issue.
+
+Changes:
+
+1. **Feed Post Comment UI** — Added full inline comment section to every post in the feed.
+   - Expandable comment thread: click "N comments" to toggle open/closed
+   - Comment composer: textarea with character count (500 max), Avatar, post button
+   - Comment list: displays author, timestamp, content with delete button for own comments/admins
+   - Calls existing backend endpoints: `GET /posts/:id/comments`, `POST /posts/:id/comments`, `DELETE /posts/:id/comments/:commentId`
+   - `CommentSection` component added to `FeedPage.jsx`, rendered inside each `FeedCard` for posts
+   - Lazy loads comments on first expand (not on page load — performance optimization)
+
+2. **Google OAuth Security Fix** — Removed email exposure from Google OAuth flow.
+   - Backend `POST /api/auth/google`: No longer sends `googleEmail` in `requiresCourseSelection` response
+   - Frontend `RegisterScreen.jsx`: Success message now shows `googleName` instead of email
+   - Frontend `LoginPage.jsx`: Navigation state no longer includes `googleEmail`
+   - Username generation unchanged: still prioritizes `googlePayload.name` over email prefix
+
+3. **Google Sign-In Button (Production)** — Button code is correct and renders when `VITE_GOOGLE_CLIENT_ID` is set. **Action required**: Set `VITE_GOOGLE_CLIENT_ID` environment variable in Railway frontend service to enable the Google button in production.
+
+Files Modified:
+- `frontend/studyhub-app/src/pages/feed/FeedPage.jsx` — Added `CommentSection` component, passed `currentUser` to `FeedCard`
+- `frontend/studyhub-app/src/pages/auth/RegisterScreen.jsx` — Changed email display to name display
+- `frontend/studyhub-app/src/pages/auth/LoginPage.jsx` — Removed `googleEmail` from navigation state
+- `backend/src/routes/auth.js` — Removed `googleEmail` from `requiresCourseSelection` response
+
+Cycle 18 Validation Commands (Executed)
+
+- `npm --prefix frontend/studyhub-app run build`
+
+Cycle 18 Validation Result
+
+- Frontend build: 0 errors, 0 warnings.

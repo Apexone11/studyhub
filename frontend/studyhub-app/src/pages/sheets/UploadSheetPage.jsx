@@ -722,7 +722,7 @@ export default function UploadSheetPage() {
     <div style={{ minHeight: '100vh', background: '#edf0f5', fontFamily: FONT }}>
       <Navbar crumbs={[{ label: 'Study Sheets', to: '/sheets' }, { label: isEditing ? 'Edit Sheet' : 'New Sheet', to: null }]} hideTabs actions={navActions} hideSearch />
       <div style={pageShell('editor', 20, 60)}>
-        <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', padding: '14px 20px', marginBottom: 12, display: 'grid', gridTemplateColumns: '1.8fr 1fr 220px', gap: 12, alignItems: 'end' }}>
+        <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', padding: '14px 20px', marginBottom: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, alignItems: 'end' }}>
           <div>
             <label style={{ fontSize: 10, fontWeight: 700, color: '#64748b', letterSpacing: '.06em', display: 'block', marginBottom: 5 }}>SHEET TITLE</label>
             <input
@@ -861,7 +861,7 @@ export default function UploadSheetPage() {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', minHeight: 420 }}>
+          <div className="upload-editor-split" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', minHeight: 420 }}>
             <div style={{ borderRight: '1px solid #1e293b', background: '#0f172a' }}>
               <textarea
                 value={content}

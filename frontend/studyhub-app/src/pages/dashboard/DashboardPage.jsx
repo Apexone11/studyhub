@@ -30,7 +30,7 @@ import { useSession } from '../../lib/session-context'
 import { pageShell, useResponsiveAppLayout } from '../../lib/ui'
 import { useLivePolling } from '../../lib/useLivePolling'
 import { countUp, fadeInUp, staggerEntrance } from '../../lib/animations'
-import Joyride from 'react-joyride'
+import SafeJoyride from '../../components/SafeJoyride'
 import { useTutorial } from '../../lib/useTutorial'
 import { DASHBOARD_STEPS } from '../../lib/tutorialSteps'
 
@@ -539,7 +539,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Tutorial popup */}
-      <Joyride {...tutorial.joyrideProps} />
+      <SafeJoyride {...tutorial.joyrideProps} />
       {tutorial.seen && (
         <button type="button" onClick={tutorial.restart} title="Show tutorial" style={{ position: 'fixed', bottom: 24, right: 24, width: 44, height: 44, borderRadius: '50%', border: 'none', background: '#3b82f6', color: '#fff', fontSize: 18, fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 14px rgba(59,130,246,0.4)', zIndex: 50, display: 'grid', placeItems: 'center' }}>?</button>
       )}

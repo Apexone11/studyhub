@@ -111,6 +111,19 @@ router.get('/:username', optionalAuth, async (req, res) => {
       isFollowing = !!follow
     }
 
+    /* Fetch shared (non-private) notes for profile display */
+    const sharedNotes = await prisma.note.findMany({
+      where: { userId: user.id, private: false },
+      orderBy: { updatedAt: 'desc' },
+      take: 10,
+      select: {
+        id: true,
+        title: true,
+        updatedAt: true,
+        course: { select: { id: true, code: true } },
+      },
+    })
+
     res.json({
       id: user.id,
       username: user.username,
@@ -123,6 +136,7 @@ router.get('/:username', optionalAuth, async (req, res) => {
       isFollowing,
       recentSheets: user.studySheets,
       enrollments: user.enrollments,
+      sharedNotes,
     })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })

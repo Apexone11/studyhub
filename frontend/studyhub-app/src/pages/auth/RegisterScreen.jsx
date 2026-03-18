@@ -99,7 +99,7 @@ export default function RegisterScreen() {
   const [step, setStep] = useState(isGoogleCourseFlow ? 'courses' : 'account')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState(isGoogleCourseFlow ? `Signed in as ${googleState.googleEmail}. Choose your courses to finish setup.` : '')
+  const [success, setSuccess] = useState(isGoogleCourseFlow ? `Signed in as ${googleState.googleName || 'Google user'}. Choose your courses to finish setup.` : '')
   const [catalogError, setCatalogError] = useState('')
   const [catalogLoading, setCatalogLoading] = useState(false)
   const [schools, setSchools] = useState([])
@@ -254,7 +254,7 @@ export default function RegisterScreen() {
       if (data.requiresCourseSelection) {
         setGoogleCredential(data.tempCredential)
         setStep('courses')
-        setSuccess(`Signed in as ${data.googleEmail}. Choose your courses to finish setup.`)
+        setSuccess(`Signed in as ${data.googleName || 'Google user'}. Choose your courses to finish setup.`)
         return
       }
 

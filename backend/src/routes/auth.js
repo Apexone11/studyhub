@@ -862,8 +862,7 @@ router.post('/google', googleLimiter, async (req, res) => {
     if (parsedCourseIds.length === 0 && parsedCustomCourses.length === 0 && parsedSchoolId === null) {
       return res.json({
         requiresCourseSelection: true,
-        googleEmail: googlePayload.email,
-        googleName: googlePayload.name,
+        googleName: googlePayload.name || 'Google user',
         tempCredential: credential,
       })
     }
