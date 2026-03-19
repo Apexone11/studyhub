@@ -220,7 +220,7 @@ function LeaderboardPanel({ title, items, renderLabel, empty }) {
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{renderLabel(item)}</div>
                 {'author' in item && item.author?.username ? (
-                  <div style={{ fontSize: 12, color: '#64748b' }}>by <Link to={`/profile/${item.author.username}`} style={{ color: '#2563eb', textDecoration: 'none' }}>{item.author.username}</Link></div>
+                  <div style={{ fontSize: 12, color: '#64748b' }}>by <Link to={`/users/${item.author.username}`} style={{ color: '#2563eb', textDecoration: 'none' }}>{item.author.username}</Link></div>
                 ) : null}
               </div>
               <div style={{ fontSize: 12, fontWeight: 800, color: '#2563eb', whiteSpace: 'nowrap' }}>
@@ -411,7 +411,7 @@ function CommentList({ comments, loading, user, onDelete }) {
       {comments.map((comment) => (
         <div key={comment.id} style={commentItemStyle}>
           {comment.author?.username ? (
-            <Link to={`/profile/${comment.author.username}`} style={{ textDecoration: 'none', flexShrink: 0 }}>
+            <Link to={`/users/${comment.author.username}`} style={{ textDecoration: 'none', flexShrink: 0 }}>
               <Avatar username={comment.author.username} role="student" size={28} />
             </Link>
           ) : (
@@ -421,7 +421,7 @@ function CommentList({ comments, loading, user, onDelete }) {
             <div style={commentHeaderStyle}>
               <div>
                 {comment.author?.username ? (
-                  <Link to={`/profile/${comment.author.username}`} style={{ ...commentAuthorStyle, textDecoration: 'none' }}>
+                  <Link to={`/users/${comment.author.username}`} style={{ ...commentAuthorStyle, textDecoration: 'none' }}>
                     {comment.author.username}
                   </Link>
                 ) : (
@@ -545,7 +545,7 @@ function FeedCard({
     >
       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
         {item.author?.username ? (
-          <Link to={`/profile/${item.author.username}`} style={{ textDecoration: 'none', flexShrink: 0 }}>
+          <Link to={`/users/${item.author.username}`} style={{ textDecoration: 'none', flexShrink: 0 }}>
             <Avatar username={item.author.username} role="student" />
           </Link>
         ) : (
@@ -556,7 +556,7 @@ function FeedCard({
             <div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 {item.author?.username ? (
-                  <Link to={`/profile/${item.author.username}`} style={{ fontWeight: 800, color: '#0f172a', fontSize: 14, textDecoration: 'none' }}>
+                  <Link to={`/users/${item.author.username}`} style={{ fontWeight: 800, color: '#0f172a', fontSize: 14, textDecoration: 'none' }}>
                     {item.author.username}
                   </Link>
                 ) : (
@@ -1307,9 +1307,33 @@ export default function FeedPage() {
                     borderRadius: 14,
                     padding: '12px 14px',
                     fontSize: 13,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 12,
                   }}
                 >
-                  {feedState.error}
+                  <span>{feedState.error}</span>
+                  <button
+                    onClick={() => {
+                      setFeedState((c) => ({ ...c, loading: true, error: '' }))
+                      loadFeed()
+                    }}
+                    style={{
+                      background: '#dc2626',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 8,
+                      padding: '6px 14px',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                      fontFamily: FONT,
+                    }}
+                  >
+                    Retry
+                  </button>
                 </div>
               ) : null}
 

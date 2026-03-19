@@ -6,6 +6,7 @@ import { FONT } from './settingsState'
 export default function CoursesTab({ user, busyKey, setBusyKey, syncUser }) {
   const [catalog, setCatalog] = useState([])
   const [catalogLoading, setCatalogLoading] = useState(false)
+  const [catalogError, setCatalogError] = useState('')
   const [courseSchoolId, setCourseSchoolId] = useState(
     () => String(user?.enrollments?.[0]?.course?.schoolId || '')
   )
@@ -19,6 +20,7 @@ export default function CoursesTab({ user, busyKey, setBusyKey, syncUser }) {
 
     let active = true
     setCatalogLoading(true)
+    setCatalogError('')
 
     fetch(`${API}/api/courses/schools`, {
       headers: { 'Content-Type': 'application/json' },
@@ -31,7 +33,9 @@ export default function CoursesTab({ user, busyKey, setBusyKey, syncUser }) {
       .then((data) => {
         if (active) setCatalog(Array.isArray(data) ? data : [])
       })
-      .catch(() => {})
+      .catch((err) => {
+        if (active) setCatalogError(err.message || 'Could not load the course catalog.')
+      })
       .finally(() => {
         if (active) setCatalogLoading(false)
       })
@@ -103,6 +107,22 @@ export default function CoursesTab({ user, busyKey, setBusyKey, syncUser }) {
       </FormField>
 
       {catalogLoading && <div style={{ marginBottom: 14, color: '#64748b', fontSize: 13 }}>Loading course catalog...</div>}
+
+      {catalogError && (
+        <div style={{ marginBottom: 14, color: '#dc2626', fontSize: 13, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span>{catalogError}</span>
+          <button
+            onClick={() => { setCatalogError(''); setCatalog([]); }}
+            style={{
+              background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 8,
+              padding: '5px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+              fontFamily: FONT,
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       {selectedSchool && (
         <div
