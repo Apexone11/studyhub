@@ -242,6 +242,7 @@ export default function Navbar({
 
     const response = await fetch(`${API}/api/notifications?limit=15`, {
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       signal,
     })
     if (!response.ok) return
@@ -278,6 +279,7 @@ export default function Navbar({
     await fetch(`${API}/api/notifications/read-all`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
     }).catch(() => {})
     setNotifications(prev => prev.map(n => ({ ...n, read: true })))
     setUnreadCount(0)
@@ -288,6 +290,7 @@ export default function Navbar({
       fetch(`${API}/api/notifications/${notif.id}/read`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
       }).catch(() => {})
       setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n))
       setUnreadCount(c => Math.max(0, c - 1))

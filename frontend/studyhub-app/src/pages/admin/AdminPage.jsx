@@ -319,6 +319,7 @@ export default function AdminPage() {
       setOverview((current) => ({ ...current, loading: true, error: '' }))
       const response = await fetch(`${API}/api/admin/stats`, {
         headers: authHeaders(),
+        credentials: 'include',
         signal,
       })
       const data = await readJsonSafely(response, {})

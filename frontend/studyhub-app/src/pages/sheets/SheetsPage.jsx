@@ -409,7 +409,13 @@ export default function SheetsPage() {
                       Browse, star, and download study sheets shared by your classmates.
                     </p>
                   </div>
-                  <Link data-tutorial="sheets-upload" to="/sheets/upload" style={linkButton()}>
+                  <Link data-tutorial="sheets-upload" to="/sheets/upload" style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 8, borderRadius: 12,
+                    background: 'linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)',
+                    color: '#fff', padding: '10px 18px', fontSize: 13, fontWeight: 700,
+                    textDecoration: 'none', boxShadow: '0 2px 8px rgba(37,99,235,0.25)',
+                    transition: 'transform 0.15s, box-shadow 0.15s',
+                  }}>
                     <IconUpload size={14} />
                     Upload a sheet
                   </Link>
@@ -499,6 +505,9 @@ export default function SheetsPage() {
                 <h2 style={{ margin: '0 0 10px', fontSize: 15, color: '#0f172a' }}>Workflow</h2>
                 <div style={{ display: 'grid', gap: 10, fontSize: 13, color: '#475569', lineHeight: 1.7 }}>
                   <div>Use filters to narrow the library, open a sheet, then move back to the list without corrupting the SPA state.</div>
+                  <div style={{ padding: '10px 12px', background: '#f0fdf4', borderRadius: 10, border: '1px solid #bbf7d0', fontSize: 12, color: '#15803d' }}>
+                    <strong>Sheet Lab</strong> — Open any sheet to access version history, diffs, and restore points.
+                  </div>
                   <Link to="/feed" style={linkButton()}>Back to feed</Link>
                 </div>
               </section>

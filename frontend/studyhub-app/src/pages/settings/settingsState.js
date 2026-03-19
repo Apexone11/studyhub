@@ -18,6 +18,7 @@ export function usePreferences() {
 
     fetch(`${API}/api/settings/preferences`, {
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
     })
       .then(async (response) => {
         if (!response.ok) throw new Error('Could not load preferences.')
@@ -66,6 +67,7 @@ export function usePreferences() {
       const response = await fetch(`${API}/api/settings/preferences`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(body),
       })
       const data = await response.json()

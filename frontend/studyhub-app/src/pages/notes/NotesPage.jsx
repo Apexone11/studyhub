@@ -40,15 +40,17 @@ marked.setOptions({
 
 /* ── Markdown toolbar actions ────────────────────────────────────────── */
 const TOOLBAR_ACTIONS = [
-  { key: 'bold', label: 'B', title: 'Bold', before: '**', after: '**', style: { fontWeight: 800 } },
-  { key: 'italic', label: 'I', title: 'Italic', before: '_', after: '_', style: { fontStyle: 'italic' } },
-  { key: 'h2', label: 'H', title: 'Heading', before: '## ', after: '', style: { fontWeight: 800, fontSize: 13 } },
-  { key: 'ul', label: '•', title: 'Bullet list', before: '- ', after: '', style: { fontSize: 16, lineHeight: '14px' } },
-  { key: 'ol', label: '1.', title: 'Numbered list', before: '1. ', after: '', style: { fontSize: 11, fontWeight: 700 } },
+  { key: 'bold', label: 'B', title: 'Bold (Ctrl+B)', shortcut: 'b', before: '**', after: '**', style: { fontWeight: 800, fontSize: 14 } },
+  { key: 'italic', label: 'I', title: 'Italic (Ctrl+I)', shortcut: 'i', before: '_', after: '_', style: { fontStyle: 'italic', fontSize: 14 } },
+  { key: 'h2', label: 'H', title: 'Heading (Ctrl+H)', shortcut: 'h', before: '## ', after: '', style: { fontWeight: 800, fontSize: 14 } },
+  { key: 'sep1', sep: true },
+  { key: 'ul', label: '•', title: 'Bullet list', before: '- ', after: '', style: { fontSize: 18, lineHeight: '14px' } },
+  { key: 'ol', label: '1.', title: 'Numbered list', before: '1. ', after: '', style: { fontSize: 12, fontWeight: 700 } },
+  { key: 'sep2', sep: true },
   { key: 'code', label: '</>', title: 'Inline code', before: '`', after: '`', style: { fontFamily: 'monospace', fontSize: 11, fontWeight: 700 } },
-  { key: 'codeblock', label: '{ }', title: 'Code block', before: '```\n', after: '\n```', style: { fontFamily: 'monospace', fontSize: 10, fontWeight: 700 } },
-  { key: 'link', label: '🔗', title: 'Link', before: '[', after: '](url)', style: { fontSize: 12 } },
-  { key: 'quote', label: '❝', title: 'Blockquote', before: '> ', after: '', style: { fontSize: 14, lineHeight: '14px' } },
+  { key: 'codeblock', label: '{ }', title: 'Code block', before: '```\n', after: '\n```', style: { fontFamily: 'monospace', fontSize: 11, fontWeight: 700 } },
+  { key: 'link', label: '🔗', title: 'Link (Ctrl+K)', shortcut: 'k', before: '[', after: '](url)', style: { fontSize: 13 } },
+  { key: 'quote', label: '❝', title: 'Blockquote', before: '> ', after: '', style: { fontSize: 15, lineHeight: '14px' } },
 ]
 
 function applyToolbarAction(textareaRef, action, content, onChange) {
@@ -459,72 +461,96 @@ export default function NotesPage() {
         </div>
       </div>
 
-      {/* Markdown editor with live preview — REDESIGNED */}
-      <div style={{ background: 'var(--sh-surface, #fff)', borderRadius: 14, border: '1px solid var(--sh-border, #e2e8f0)', overflow: 'hidden', marginBottom: 10 }}>
+      {/* Markdown editor with live preview */}
+      <div style={{ background: 'var(--sh-surface, #fff)', borderRadius: 14, border: '1px solid var(--sh-border, #e2e8f0)', overflow: 'hidden', marginBottom: 10, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
         {/* Toolbar */}
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 2, padding: '6px 12px',
+          display: 'flex', alignItems: 'center', gap: 1, padding: '8px 14px',
           borderBottom: '1px solid var(--sh-border, #e2e8f0)',
           background: 'var(--sh-soft, #f8fafc)',
           flexWrap: 'wrap',
         }}>
-          {TOOLBAR_ACTIONS.map((action) => (
+          {TOOLBAR_ACTIONS.map((action) => action.sep ? (
+            <div key={action.key} style={{ width: 1, height: 20, background: 'var(--sh-border, #e2e8f0)', margin: '0 6px' }} />
+          ) : (
             <button
               key={action.key}
               type="button"
               title={action.title}
               onClick={() => applyToolbarAction(editorRef, action, editorContent, handleContentChange)}
               style={{
-                width: 30, height: 30, display: 'grid', placeItems: 'center',
-                border: 'none', background: 'transparent', borderRadius: 6,
+                width: 34, height: 32, display: 'grid', placeItems: 'center',
+                border: '1px solid transparent', background: 'transparent', borderRadius: 8,
                 cursor: 'pointer', color: 'var(--sh-muted, #475569)',
-                transition: 'background .1s, color .1s',
+                transition: 'all .15s',
                 ...action.style,
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = '#e2e8f0'; e.currentTarget.style.color = '#0f172a' }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--sh-muted, #475569)' }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--sh-border, #e2e8f0)'; e.currentTarget.style.color = 'var(--sh-text, #0f172a)'; e.currentTarget.style.borderColor = 'var(--sh-border, #cbd5e1)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--sh-muted, #475569)'; e.currentTarget.style.borderColor = 'transparent' }}
             >
               {action.label}
             </button>
           ))}
           <div style={{ flex: 1 }} />
-          <span style={{ fontSize: 10, color: 'var(--sh-subtext, #94a3b8)', fontWeight: 500 }}>
+          <span style={{ fontSize: 11, color: 'var(--sh-subtext, #94a3b8)', fontWeight: 600, padding: '4px 8px', background: 'var(--sh-surface, #fff)', borderRadius: 6, border: '1px solid var(--sh-border, #e2e8f0)' }}>
             {wordCount(editorContent)} words
           </span>
         </div>
 
         {/* Editor + Preview split */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderTop: 'none' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
           {/* Column headers */}
-          <div style={{ padding: '8px 16px', borderBottom: '1px solid var(--sh-border, #e2e8f0)', borderRight: '1px solid var(--sh-border, #e2e8f0)', fontSize: 11, fontWeight: 700, color: '#3b82f6', textTransform: 'uppercase', letterSpacing: '.05em' }}>
+          <div style={{ padding: '10px 18px', borderBottom: '1px solid var(--sh-border, #e2e8f0)', borderRight: '1px solid var(--sh-border, #e2e8f0)', fontSize: 11, fontWeight: 700, color: '#3b82f6', textTransform: 'uppercase', letterSpacing: '.06em', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3b82f6' }} />
             Write
           </div>
-          <div style={{ padding: '8px 16px', borderBottom: '1px solid var(--sh-border, #e2e8f0)', fontSize: 11, fontWeight: 700, color: 'var(--sh-muted, #64748b)', textTransform: 'uppercase', letterSpacing: '.05em' }}>
+          <div style={{ padding: '10px 18px', borderBottom: '1px solid var(--sh-border, #e2e8f0)', fontSize: 11, fontWeight: 700, color: 'var(--sh-muted, #64748b)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981' }} />
             Preview
           </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', minHeight: 420 }}>
-          {/* Write pane — light background */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', minHeight: 480 }}>
+          {/* Write pane */}
           <div style={{ borderRight: '1px solid var(--sh-border, #e2e8f0)' }}>
             <textarea
               ref={editorRef}
               value={editorContent}
               onChange={(e) => handleContentChange(e.target.value)}
               spellCheck={false}
-              placeholder="Write your notes in markdown…&#10;&#10;# Heading&#10;**bold** _italic_ `code`&#10;- bullet list&#10;1. numbered list&#10;> blockquote"
+              placeholder={'Write your notes in markdown…\n\n# Heading\n**bold** _italic_ `code`\n- bullet list\n1. numbered list\n> blockquote'}
+              onKeyDown={(e) => {
+                // Tab key inserts 2 spaces
+                if (e.key === 'Tab') {
+                  e.preventDefault()
+                  const start = e.target.selectionStart
+                  const end = e.target.selectionEnd
+                  const val = editorContent
+                  handleContentChange(val.slice(0, start) + '  ' + val.slice(end))
+                  requestAnimationFrame(() => { e.target.selectionStart = e.target.selectionEnd = start + 2 })
+                }
+                // Keyboard shortcuts: Ctrl+B, Ctrl+I, Ctrl+H, Ctrl+K
+                if ((e.ctrlKey || e.metaKey) && !e.shiftKey) {
+                  const action = TOOLBAR_ACTIONS.find((a) => a.shortcut === e.key.toLowerCase())
+                  if (action) {
+                    e.preventDefault()
+                    applyToolbarAction(editorRef, action, editorContent, handleContentChange)
+                  }
+                }
+              }}
               style={{
-                width: '100%', height: '100%', minHeight: 420,
+                width: '100%', height: '100%', minHeight: 480,
                 background: 'transparent', border: 'none', outline: 'none',
-                resize: 'none', padding: '16px 18px',
+                resize: 'none', padding: '18px 20px',
                 fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
-                fontSize: 13, lineHeight: 1.8,
+                fontSize: 13.5, lineHeight: 1.9,
                 color: 'var(--sh-text, #1e293b)',
                 boxSizing: 'border-box',
+                letterSpacing: '0.01em',
               }}
             />
           </div>
           {/* Preview pane */}
-          <div style={{ padding: '16px 20px', overflowY: 'auto', maxHeight: 520 }}>
+          <div style={{ padding: '18px 22px', overflowY: 'auto', maxHeight: 580 }}>
             <MarkdownPreview content={editorContent} />
           </div>
         </div>

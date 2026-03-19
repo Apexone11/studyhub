@@ -65,6 +65,7 @@ export default function AccountTab({ user, busyKey, setBusyKey, handlePatch, syn
       const response = await fetch(`${API}/api/settings/email/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ code: verificationCode.trim() }),
       })
       const data = await response.json()
@@ -94,6 +95,7 @@ export default function AccountTab({ user, busyKey, setBusyKey, handlePatch, syn
       const response = await fetch(`${API}/api/settings/email/resend-verification`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
       })
       const data = await response.json()
 
@@ -125,6 +127,7 @@ export default function AccountTab({ user, busyKey, setBusyKey, handlePatch, syn
       const response = await fetch(`${API}/api/settings/account`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(deleteForm),
       })
       const data = await response.json()
