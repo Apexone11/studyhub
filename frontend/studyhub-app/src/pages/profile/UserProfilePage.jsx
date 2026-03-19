@@ -126,7 +126,7 @@ export default function UserProfilePage() {
   /* ── Loading state ───────────────────────────────────────────────────── */
   if (loading) return (
     <div style={{ minHeight: '100vh', background: '#edf0f5', fontFamily: FONT }}>
-      <Navbar crumbs={[{ label: username, to: `/user/${username}` }]} hideTabs />
+      <Navbar crumbs={[{ label: username, to: `/users/${username}` }]} hideTabs />
       <div style={{ maxWidth: 900, margin: '0 auto', padding: 'clamp(20px, 3vw, 40px) clamp(16px, 2vw, 24px)' }}>
         <SkeletonProfile />
       </div>
@@ -157,7 +157,7 @@ export default function UserProfilePage() {
   /* ── Main profile view ───────────────────────────────────────────────── */
   return (
     <div style={{ minHeight: '100vh', background: '#edf0f5', fontFamily: FONT }}>
-      <Navbar crumbs={[{ label: profile.username, to: `/user/${username}` }]} hideTabs />
+      <Navbar crumbs={[{ label: profile.username, to: `/users/${username}` }]} hideTabs />
 
       <div style={{ maxWidth: 900, margin: '0 auto', padding: 'clamp(20px, 3vw, 40px) clamp(16px, 2vw, 24px)' }}>
         {/* ── Profile card ─────────────────────────────────────────────── */}

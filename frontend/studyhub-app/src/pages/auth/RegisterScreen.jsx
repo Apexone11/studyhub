@@ -634,8 +634,18 @@ export default function RegisterScreen() {
 
               {/* Catalog error */}
               {catalogError && (
-                <div style={{ marginBottom: 16, padding: '12px 14px', borderRadius: 12, border: '1px solid #bfdbfe', background: '#eff6ff', color: '#1d4ed8', fontSize: 13, lineHeight: 1.6 }}>
-                  {catalogError}
+                <div style={{ marginBottom: 16, padding: '12px 14px', borderRadius: 12, border: '1px solid #fecaca', background: '#fef2f2', color: '#dc2626', fontSize: 13, lineHeight: 1.6, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                  <span>{catalogError}</span>
+                  <button
+                    onClick={() => { setCatalogError(''); setSchools([]); }}
+                    style={{
+                      background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 8,
+                      padding: '5px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                      whiteSpace: 'nowrap', fontFamily: FONT,
+                    }}
+                  >
+                    Retry
+                  </button>
                 </div>
               )}
 
