@@ -32,6 +32,8 @@ import { useSession } from '../../lib/session-context'
 import { pageShell, useResponsiveAppLayout } from '../../lib/ui'
 import { useLivePolling } from '../../lib/useLivePolling'
 import { staggerEntrance } from '../../lib/animations'
+import { showToast } from '../../lib/toast'
+import { usePageTitle } from '../../lib/usePageTitle'
 import { SkeletonSheetGrid } from '../../components/Skeleton'
 import SafeJoyride from '../../components/SafeJoyride'
 import { useTutorial } from '../../lib/useTutorial'
@@ -183,6 +185,7 @@ function metricPill() {
 }
 
 export default function SheetsPage() {
+  usePageTitle('Study Sheets')
   const { user, clearSession } = useSession()
   const layout = useResponsiveAppLayout()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -327,6 +330,29 @@ export default function SheetsPage() {
     }
   }, [clearSession, courseId, mine, orderBy, schoolId, search, starred])
 
+  const [loadingMore, setLoadingMore] = useState(false)
+  const loadMoreSheets = async () => {
+    setLoadingMore(true)
+    const params = new URLSearchParams({ limit: '24', offset: String(sheetsState.sheets.length), sort: orderBy })
+    if (search) params.set('search', search)
+    if (schoolId) params.set('schoolId', schoolId)
+    if (courseId) params.set('courseId', courseId)
+    if (mine) params.set('mine', '1')
+    if (starred) params.set('starred', '1')
+    try {
+      const response = await fetch(`${API}/api/sheets?${params.toString()}`, { headers: authHeaders() })
+      const data = await readJsonSafely(response, {})
+      if (response.ok && Array.isArray(data.sheets)) {
+        setSheetsState((current) => ({
+          ...current,
+          sheets: [...current.sheets, ...data.sheets],
+          total: data.total || current.total,
+        }))
+      }
+    } catch { /* silent */ }
+    finally { setLoadingMore(false) }
+  }
+
   useLivePolling(loadCatalog, {
     enabled: Boolean(user),
     intervalMs: 120000,
@@ -357,6 +383,7 @@ export default function SheetsPage() {
         )),
       }))
     } catch (error) {
+      showToast(error.message || 'Could not update the star.', 'error')
       setSheetsState((current) => ({ ...current, error: error.message || 'Could not update the star.' }))
     }
   }
@@ -445,6 +472,16 @@ export default function SheetsPage() {
                   {sheetsState.sheets.map((sheet) => (
                     <SheetCard key={sheet.id} sheet={sheet} onStar={toggleStar} />
                   ))}
+                  {sheetsState.sheets.length < sheetsState.total && (
+                    <button
+                      onClick={loadMoreSheets}
+                      disabled={loadingMore}
+                      className="sh-load-more-btn"
+                      style={{ gridColumn: '1 / -1' }}
+                    >
+                      {loadingMore ? 'Loading…' : `Load More (${sheetsState.sheets.length} of ${sheetsState.total})`}
+                    </button>
+                  )}
                 </div>
               )}
             </main>

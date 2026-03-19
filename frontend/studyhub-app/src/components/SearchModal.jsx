@@ -5,6 +5,17 @@ import { API } from '../config'
 
 const DEBOUNCE_MS = 300
 
+function Highlight({ text, query }) {
+  if (!query || query.length < 2 || !text) return text
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const parts = text.split(new RegExp(`(${escaped})`, 'gi'))
+  return parts.map((part, i) =>
+    part.toLowerCase() === query.toLowerCase()
+      ? <mark key={i} style={{ background: '#fef08a', color: 'inherit', borderRadius: 2, padding: '0 1px' }}>{part}</mark>
+      : part
+  )
+}
+
 export default function SearchModal({ open, onClose }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState({ sheets: [], courses: [], users: [] })
@@ -176,7 +187,7 @@ export default function SearchModal({ open, onClose }) {
                     onClick={() => navigateToItem({ type: 'sheet', data: sheet })}
                     onMouseEnter={() => setActiveIndex(flatIdx)}
                   >
-                    <div style={styles.resultTitle}>{sheet.title}</div>
+                    <div style={styles.resultTitle}><Highlight text={sheet.title} query={query} /></div>
                     <div style={styles.resultMeta}>
                       {sheet.course?.code} &middot; by {sheet.author?.username}
                       {sheet.stars > 0 && <span> &middot; {sheet.stars} stars</span>}
@@ -205,7 +216,7 @@ export default function SearchModal({ open, onClose }) {
                     onClick={() => navigateToItem({ type: 'course', data: course })}
                     onMouseEnter={() => setActiveIndex(flatIdx)}
                   >
-                    <div style={styles.resultTitle}>{course.code} — {course.name}</div>
+                    <div style={styles.resultTitle}><Highlight text={`${course.code} — ${course.name}`} query={query} /></div>
                     <div style={styles.resultMeta}>{course.school?.name}</div>
                   </div>
                 )
@@ -236,7 +247,7 @@ export default function SearchModal({ open, onClose }) {
                         {user.username?.slice(0, 2).toUpperCase()}
                       </div>
                       <div>
-                        <div style={styles.resultTitle}>{user.username}</div>
+                        <div style={styles.resultTitle}><Highlight text={user.username} query={query} /></div>
                         <div style={styles.resultMeta}>{user.role}</div>
                       </div>
                     </div>

@@ -1613,3 +1613,67 @@ Cycle 31 Validation Result:
 - Frontend ESLint: passed with zero errors.
 - Frontend Vite production build: passed successfully.
 - Navbar chunk grew from 35.79 kB to 38.10 kB (KeyboardShortcuts modal bundled in).
+
+---
+
+## Cycle 32 — Week 3 (continued): UX Infrastructure & Mobile Fixes
+
+Date: 2026-03-18
+
+### Changes
+
+#### Scroll-to-Top Button
+
+- Created `ScrollToTop.jsx` — floating button appears after 400px scroll, smooth-scrolls to top on click.
+- Uses passive scroll listener for performance. Hidden on print.
+- Full dark mode support, fade-in entrance animation, hover lift effect.
+- Mounted globally via `App.jsx`.
+- File added: `frontend/studyhub-app/src/components/ScrollToTop.jsx`
+
+#### Toast Notification System
+
+- Created event-bus-based toast system split across two files for ESLint compliance:
+  - `lib/toast.js` — `showToast()` global function and `useToast()` hook.
+  - `components/Toast.jsx` — `ToastContainer` component with auto-dismiss (3.5s), max 5 visible, click-to-dismiss.
+- Three toast types: success (green), error (red), info (blue) — each with SVG icon and colored left border.
+- Full dark mode support, slide-up entrance animation.
+- Mounted globally via `App.jsx`.
+- Files added: `frontend/studyhub-app/src/lib/toast.js`, `frontend/studyhub-app/src/components/Toast.jsx`
+
+#### Styled 404 Page
+
+- Created `NotFoundPage.jsx` with gradient icon (sad face SVG), large "404" heading, description, and two CTA buttons ("Go Home" + "Go to Feed").
+- Uses CSS custom properties for dark mode compatibility.
+- Replaced catch-all `<Navigate to="/" />` with `<NotFoundPage />` in router.
+- File added: `frontend/studyhub-app/src/pages/NotFoundPage.jsx`
+- File changed: `frontend/studyhub-app/src/App.jsx`
+
+#### Focus Ring Styles (Accessibility)
+
+- Added global `*:focus-visible` outline styles (2px solid blue, 2px offset) for all interactive elements.
+- Dark mode variant uses lighter blue (`#60a5fa`).
+- Only shows on keyboard navigation (`:focus-visible`), not mouse clicks.
+- File changed: `frontend/studyhub-app/src/index.css`
+
+#### Mobile Responsiveness Fixes
+
+- **HomePage testimonials grid**: Added `@media (max-width: 767px)` to collapse from 3 columns to 1 column on phones. Previously caused horizontal overflow.
+- **HomePage steps grid**: Fixed breakpoint — added tablet-specific 2-column layout (`768px–1179px`), phone 1-column (`≤767px`). Replaced too-broad `max-width: 1024px` rule.
+- **Admin tables**: Added `overflow-x: auto` container and `min-width: 600px` on table for horizontal scrolling on phones.
+- **Notes markdown tables**: Added `overflow-x: auto` to table element for horizontal scroll on narrow screens.
+- **Settings nav on phone**: Increased gap from 4px to 6px for easier tap targets.
+- **Shortcuts modal on phone**: Reduced padding from 28px to 20px on screens ≤640px.
+- Files changed: `frontend/studyhub-app/src/index.css`, `frontend/studyhub-app/src/styles/responsive.css`
+
+### Validation
+
+Cycle 32 Validation Commands:
+
+- `npm --prefix frontend/studyhub-app run lint` — passed clean.
+- `npm --prefix frontend/studyhub-app run build` — passed clean (426ms, 44 output files).
+
+Cycle 32 Validation Result:
+
+- Frontend ESLint: passed with zero errors (Toast split resolved react-refresh/only-export-components violation).
+- Frontend Vite production build: passed successfully.
+- New chunks: `NotFoundPage` (code-split), `ScrollToTop` + `ToastContainer` bundled into index chunk (18.20 kB, up from 15.81 kB).

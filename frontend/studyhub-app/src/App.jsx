@@ -36,6 +36,10 @@ const TestTakerPage = lazy(() => import('./pages/tests/TestTakerPage'))
 const NotesPage = lazy(() => import('./pages/notes/NotesPage'))
 const AnnouncementsPage = lazy(() => import('./pages/announcements/AnnouncementsPage'))
 const SubmitPage = lazy(() => import('./pages/submit/SubmitPage'))
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
+
+import ScrollToTop from './components/ScrollToTop'
+import ToastContainer from './components/Toast'
 
 function PublicRoute({ children }) {
   const { user, isBootstrapping, isAuthenticated } = useSession()
@@ -134,9 +138,11 @@ function AppRoutes() {
             <Route path="/users/:username" element={<UserProfilePage />} />
 
             {/* ── catch-all ────────────────────────────────────────── */}
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>
+        <ScrollToTop />
+        <ToastContainer />
       </SessionProvider>
     </BrowserRouter>
   )

@@ -24,6 +24,8 @@ import { useLivePolling } from '../../lib/useLivePolling'
 import { useTutorial } from '../../lib/useTutorial'
 import { VIEWER_STEPS } from '../../lib/tutorialSteps'
 import { fadeInUp } from '../../lib/animations'
+import { showToast } from '../../lib/toast'
+import { usePageTitle } from '../../lib/usePageTitle'
 
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'avif'])
@@ -200,6 +202,7 @@ function ContributionList({ title, items, canReview, onReview, reviewingId }) {
 export default function SheetViewerPage() {
   const navigate = useNavigate()
   const { id } = useParams()
+  usePageTitle('Sheet Viewer')
   const { user, clearSession } = useSession()
   const layout = useResponsiveAppLayout()
   const [sheetState, setSheetState] = useState({ sheet: null, loading: true, error: '' })
@@ -354,6 +357,7 @@ export default function SheetViewerPage() {
         error: '',
       }))
     } catch (error) {
+      showToast(error.message || 'Could not update the star.', 'error')
       setSheetState((current) => ({ ...current, error: error.message || 'Could not update the star.' }))
     }
   }
@@ -392,8 +396,10 @@ export default function SheetViewerPage() {
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(data.error || 'Could not fork this sheet.')
+      showToast('Sheet forked! Redirecting to editor…', 'success')
       navigate(`/sheets/${data.id}/edit`)
     } catch (error) {
+      showToast(error.message || 'Could not fork this sheet.', 'error')
       setSheetState((current) => ({ ...current, error: error.message }))
     } finally {
       setForking(false)
@@ -411,11 +417,12 @@ export default function SheetViewerPage() {
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(data.error || 'Could not submit contribution.')
+      showToast('Contribution submitted!', 'success')
       setShowContributeModal(false)
       setContributeMessage('')
-      // Reload sheet to show updated contributions list
       loadSheet()
     } catch (error) {
+      showToast(error.message || 'Could not submit contribution.', 'error')
       setSheetState((current) => ({ ...current, error: error.message }))
     } finally {
       setContributing(false)
@@ -433,8 +440,10 @@ export default function SheetViewerPage() {
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(data.error || `Could not ${action} contribution.`)
+      showToast(`Contribution ${action}ed`, 'success')
       loadSheet()
     } catch (error) {
+      showToast(error.message, 'error')
       setSheetState((current) => ({ ...current, error: error.message }))
     } finally {
       setReviewingId(null)

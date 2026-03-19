@@ -30,6 +30,7 @@ import { useSession } from '../../lib/session-context'
 import { pageShell, useResponsiveAppLayout } from '../../lib/ui'
 import { useLivePolling } from '../../lib/useLivePolling'
 import { countUp, fadeInUp, staggerEntrance } from '../../lib/animations'
+import { usePageTitle } from '../../lib/usePageTitle'
 import SafeJoyride from '../../components/SafeJoyride'
 import { useTutorial } from '../../lib/useTutorial'
 import { DASHBOARD_STEPS } from '../../lib/tutorialSteps'
@@ -113,6 +114,7 @@ function DashboardSkeleton() {
 }
 
 export default function DashboardPage() {
+  usePageTitle('Dashboard')
   const navigate = useNavigate()
   const { user, clearSession, signOut } = useSession()
   const layout = useResponsiveAppLayout()

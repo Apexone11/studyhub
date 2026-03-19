@@ -28,6 +28,8 @@ import SafeJoyride from '../../components/SafeJoyride'
 import { useTutorial } from '../../lib/useTutorial'
 import { NOTES_STEPS } from '../../lib/tutorialSteps'
 import { staggerEntrance } from '../../lib/animations'
+import { showToast } from '../../lib/toast'
+import { usePageTitle } from '../../lib/usePageTitle'
 import { SkeletonList } from '../../components/Skeleton'
 
 /* ── Configure marked for safe rendering ─────────────────────────────── */
@@ -109,6 +111,7 @@ function wordCount(text) {
 }
 
 export default function NotesPage() {
+  usePageTitle('My Notes')
   const { status: authStatus, error: authError } = useProtectedPage()
   const layout = useResponsiveAppLayout()
 
@@ -246,6 +249,9 @@ export default function NotesPage() {
       setNotes((prev) => prev.filter((n) => n.id !== activeNote.id))
       setActiveNote(null)
       setConfirmDelete(false)
+      showToast('Note deleted', 'success')
+    } else {
+      showToast('Could not delete note', 'error')
     }
   }
 

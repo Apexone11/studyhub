@@ -20,11 +20,13 @@ import { useLivePolling } from '../../lib/useLivePolling'
 import { useTutorial } from '../../lib/useTutorial'
 import { ANNOUNCEMENTS_STEPS } from '../../lib/tutorialSteps'
 import { staggerEntrance } from '../../lib/animations'
+import { usePageTitle } from '../../lib/usePageTitle'
 import { SkeletonFeed } from '../../components/Skeleton'
 import { PageShell } from '../shared/pageScaffold'
 import { PAGE_FONT, authHeaders, timeAgo } from '../shared/pageUtils'
 
 export default function AnnouncementsPage() {
+  usePageTitle('Announcements')
   const { user } = useSession()
   const isAdmin = user?.role === 'admin'
 

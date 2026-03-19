@@ -18,6 +18,8 @@ import { useSession } from '../../lib/session-context'
 import { useTutorial } from '../../lib/useTutorial'
 import { PROFILE_STEPS } from '../../lib/tutorialSteps'
 import { fadeInUp, staggerEntrance } from '../../lib/animations'
+import { showToast } from '../../lib/toast'
+import { usePageTitle } from '../../lib/usePageTitle'
 
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 
@@ -27,6 +29,7 @@ function authHeaders() {
 
 export default function UserProfilePage() {
   const { username } = useParams()
+  usePageTitle(username ? `${username}'s Profile` : 'Profile')
   const navigate = useNavigate()
   const { user: currentUser, isAuthenticated } = useSession()
 
@@ -106,11 +109,12 @@ export default function UserProfilePage() {
       if (res.ok) {
         setFollowing(data.following)
         setFollowers(data.followerCount)
+        showToast(data.following ? `Following ${username}` : `Unfollowed ${username}`, 'success')
       } else {
-        setError(data.error || 'Could not update follow status.')
+        showToast(data.error || 'Could not update follow status.', 'error')
       }
     } catch {
-      setError('Could not connect to the server.')
+      showToast('Could not connect to the server.', 'error')
     }
     finally { setToggling(false) }
   }

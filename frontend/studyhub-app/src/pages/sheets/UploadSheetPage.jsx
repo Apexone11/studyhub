@@ -24,6 +24,7 @@ import { API } from '../../config'
 import { pageShell } from '../../lib/ui'
 import { useTutorial } from '../../lib/useTutorial'
 import { UPLOAD_STEPS } from '../../lib/tutorialSteps'
+import { usePageTitle } from '../../lib/usePageTitle'
 import {
   UPLOAD_TUTORIAL_KEY,
   canEditHtmlWorkingCopy,
@@ -92,6 +93,7 @@ function statusColor(status) {
 }
 
 export default function UploadSheetPage() {
+  usePageTitle('Upload Sheet')
   const navigate = useNavigate()
   const { id: sheetId } = useParams()
   const isEditing = Boolean(sheetId)

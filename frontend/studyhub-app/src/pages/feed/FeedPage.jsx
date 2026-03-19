@@ -35,6 +35,8 @@ import { useSession } from '../../lib/session-context'
 import { pageShell, useResponsiveAppLayout } from '../../lib/ui'
 import { useLivePolling } from '../../lib/useLivePolling'
 import { staggerEntrance, popScale } from '../../lib/animations'
+import { showToast } from '../../lib/toast'
+import { usePageTitle } from '../../lib/usePageTitle'
 import { SkeletonFeed } from '../../components/Skeleton'
 import SafeJoyride from '../../components/SafeJoyride'
 import { useTutorial } from '../../lib/useTutorial'
@@ -788,6 +790,7 @@ function pillStyle() {
 }
 
 export default function FeedPage() {
+  usePageTitle('Feed')
   const { user, clearSession } = useSession()
   const layout = useResponsiveAppLayout()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -870,6 +873,25 @@ export default function FeedPage() {
       })
     }
   }, [clearSession, search])
+
+  const [loadingMore, setLoadingMore] = useState(false)
+  const loadMoreFeed = async () => {
+    setLoadingMore(true)
+    const params = new URLSearchParams({ limit: '24', offset: String(feedState.items.length) })
+    if (search) params.set('search', search)
+    try {
+      const response = await fetch(`${API}/api/feed?${params.toString()}`, { headers: authHeaders() })
+      const data = await readJsonSafely(response, {})
+      if (response.ok && Array.isArray(data.items)) {
+        setFeedState((current) => ({
+          ...current,
+          items: [...current.items, ...data.items],
+          total: data.total || current.total,
+        }))
+      }
+    } catch { /* silent */ }
+    finally { setLoadingMore(false) }
+  }
 
   const loadLeaderboards = useCallback(async ({ signal, startTransition } = {}) => {
     const apply = startTransition || ((fn) => fn())
@@ -1074,6 +1096,7 @@ export default function FeedPage() {
         throw new Error(data.error || 'Could not delete this post.')
       }
     } catch (error) {
+      showToast(error.message || 'Could not delete this post.', 'error')
       setFeedState((current) => {
         const alreadyRestored = current.items.some((entry) => entry.feedKey === removedItem.feedKey)
         if (alreadyRestored) {
@@ -1288,6 +1311,15 @@ export default function FeedPage() {
                       currentUser={user}
                     />
                   ))}
+                  {feedState.items.length < feedState.total && (
+                    <button
+                      onClick={loadMoreFeed}
+                      disabled={loadingMore}
+                      className="sh-load-more-btn"
+                    >
+                      {loadingMore ? 'Loading…' : `Load More (${feedState.items.length} of ${feedState.total})`}
+                    </button>
+                  )}
                 </div>
               )}
             </main>

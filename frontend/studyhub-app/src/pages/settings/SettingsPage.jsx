@@ -16,6 +16,8 @@ import { SETTINGS_STEPS } from '../../lib/tutorialSteps'
 import { fadeInUp } from '../../lib/animations'
 import { Skeleton } from '../../components/Skeleton'
 import { FONT } from './settingsState'
+import { showToast } from '../../lib/toast'
+import { usePageTitle } from '../../lib/usePageTitle'
 import ProfileTab from './ProfileTab'
 import SecurityTab from './SecurityTab'
 import CoursesTab from './CoursesTab'
@@ -35,6 +37,7 @@ const NAV_TABS = [
 ]
 
 export default function SettingsPage() {
+  usePageTitle('Settings')
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { user: sessionUser, setSessionUser, signOut, clearSession } = useSession()
@@ -93,14 +96,17 @@ export default function SettingsPage() {
 
       if (!response.ok) {
         setter({ type: 'error', text: data.error || 'Request failed.' })
+        showToast(data.error || 'Request failed.', 'error')
         return
       }
 
       if (data.user) syncUser(data.user)
       setter({ type: 'success', text: data.message || 'Saved.' })
+      showToast(data.message || 'Settings saved.', 'success')
       successHandler?.(data)
     } catch {
       setter({ type: 'error', text: 'Could not connect to the server.' })
+      showToast('Could not connect to the server.', 'error')
     } finally {
       setBusyKey('')
     }
