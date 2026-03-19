@@ -5,7 +5,7 @@
  * All helpers respect `prefers-reduced-motion`.
  */
 
-import { animate, stagger, onScroll, utils } from 'animejs'
+import { animate, stagger, utils } from 'animejs'
 
 /* ── Reduced-motion gate ─────────────────────────────────── */
 
@@ -110,8 +110,7 @@ export function countUp(el, end, { duration = 800, prefix = '', suffix = '' } = 
 
 /**
  * Fade-in-up when the target scrolls into view (IntersectionObserver-based).
- * Uses anime.js `onScroll` for scroll-linked triggering.
- * Falls back to immediate show if anime.js onScroll is unavailable.
+ * Uses IntersectionObserver to trigger the entrance animation.
  * @param {string|Element|NodeList} targets
  * @param {{ y?: number, duration?: number, staggerMs?: number }} opts
  */

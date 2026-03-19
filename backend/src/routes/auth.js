@@ -14,12 +14,11 @@ const {
   signAuthToken,
   signCsrfToken,
 } = require('../lib/authTokens')
-const { generateSixDigitCode, maskEmailAddress } = require('../lib/verificationCodes')
+const { maskEmailAddress } = require('../lib/verificationCodes')
 const {
   VERIFICATION_PURPOSE,
   VerificationError,
   consumeChallenge,
-  createOrRefreshLoginChallenge,
   createSignupChallenge,
   findChallengeByToken,
   mapChallengeForClient,
@@ -862,8 +861,7 @@ router.post('/google', googleLimiter, async (req, res) => {
     if (parsedCourseIds.length === 0 && parsedCustomCourses.length === 0 && parsedSchoolId === null) {
       return res.json({
         requiresCourseSelection: true,
-        googleEmail: googlePayload.email,
-        googleName: googlePayload.name,
+        googleName: googlePayload.name || 'Google user',
         tempCredential: credential,
       })
     }

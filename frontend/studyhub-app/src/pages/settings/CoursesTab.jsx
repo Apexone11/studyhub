@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { API } from '../../config'
-import { Button, FONT, FormField, MsgList, SectionCard } from './settingsShared'
+import { Button, FormField, MsgList, SectionCard } from './settingsShared'
+import { FONT } from './settingsState'
 
 export default function CoursesTab({ user, busyKey, setBusyKey, syncUser }) {
   const [catalog, setCatalog] = useState([])

@@ -13,6 +13,7 @@ const { cleanupAttachmentIfUnused, resolveAttachmentPath } = require('../lib/sto
 const { sendAttachmentPreview } = require('../lib/attachmentPreview')
 const { normalizeContentFormat, validateHtmlForSubmission } = require('../lib/htmlSecurity')
 const { HTML_PREVIEW_TOKEN_TTL_SECONDS, signHtmlPreviewToken } = require('../lib/previewTokens')
+const { buildSheetTextSearchClauses } = require('../lib/sheetSearch')
 const {
   SCAN_STATUS,
   HTML_VERSION_KIND,
@@ -493,12 +494,9 @@ router.get('/', optionalAuth, async (req, res) => {
 
     if (courseId) where.courseId = Number.parseInt(courseId, 10)
     if (schoolId) where.course = { schoolId: Number.parseInt(schoolId, 10) }
-    if (search) {
-      where.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { content: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
-      ]
+    const sheetTextSearchClauses = buildSheetTextSearchClauses(search)
+    if (sheetTextSearchClauses.length) {
+      where.OR = sheetTextSearchClauses
     }
 
     const allowedSort = ['createdAt', 'stars', 'downloads', 'forks', 'updatedAt']

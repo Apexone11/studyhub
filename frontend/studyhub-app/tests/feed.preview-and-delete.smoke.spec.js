@@ -26,7 +26,18 @@ startxref
 403
 %%EOF`
 
+async function disableTutorials(page) {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('tutorial_feed_seen', '1')
+    window.localStorage.setItem('tutorial_sheets_seen', '1')
+    window.localStorage.setItem('tutorial_dashboard_seen', '1')
+    window.localStorage.setItem('tutorial_notes_seen', '1')
+    window.localStorage.setItem('studyhub.upload.tutorial.v1', '1')
+  })
+}
+
 test('owner sees delete menu, non-owner does not @smoke', async ({ page }) => {
+  await disableTutorials(page)
   const ownerUserId = 510
   const ownerPost = {
     id: 910,
@@ -102,6 +113,7 @@ test('owner sees delete menu, non-owner does not @smoke', async ({ page }) => {
 })
 
 test('preview endpoints render for image and pdf @smoke', async ({ page }) => {
+  await disableTutorials(page)
   const userId = 610
   const feedItems = [
     {
@@ -185,6 +197,7 @@ test('preview endpoints render for image and pdf @smoke', async ({ page }) => {
 })
 
 test('full preview route keeps original download endpoint unchanged @smoke', async ({ page }) => {
+  await disableTutorials(page)
   const userId = 711
   const feedItems = [
     {

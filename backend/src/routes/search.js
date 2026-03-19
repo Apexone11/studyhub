@@ -1,6 +1,8 @@
 const express = require('express')
 const rateLimit = require('express-rate-limit')
 const { getAuthTokenFromRequest, verifyAuthToken } = require('../lib/authTokens')
+const { getVisibleProfileIds } = require('../lib/profileVisibility')
+const { buildSheetTextSearchClauses } = require('../lib/sheetSearch')
 const { captureError } = require('../monitoring/sentry')
 const prisma = require('../lib/prisma')
 
@@ -55,20 +57,19 @@ router.get('/', optionalAuth, async (req, res) => {
 
   try {
     const promises = []
+    const sheetTextSearchClauses = buildSheetTextSearchClauses(query)
 
     const wantSheets = type === 'all' || type === 'sheets'
     const wantCourses = type === 'all' || type === 'courses'
     const wantUsers = type === 'all' || type === 'users'
+    const userSearchTake = Math.min(limit * 5, 50)
 
     if (wantSheets) {
       promises.push(
         prisma.studySheet.findMany({
           where: {
             status: 'published',
-            OR: [
-              { title: { contains: query, mode: 'insensitive' } },
-              { description: { contains: query, mode: 'insensitive' } },
-            ],
+            OR: sheetTextSearchClauses,
           },
           select: {
             id: true,
@@ -125,14 +126,27 @@ router.get('/', optionalAuth, async (req, res) => {
             createdAt: true,
           },
           orderBy: { username: 'asc' },
-          take: limit,
+          take: userSearchTake,
         })
       )
     } else {
       promises.push(Promise.resolve([]))
     }
 
-    const [sheets, courses, users] = await Promise.all(promises)
+    const [sheets, courses, matchedUsers] = await Promise.all(promises)
+    let users = matchedUsers
+
+    if (wantUsers && matchedUsers.length) {
+      const visibleUserIds = await getVisibleProfileIds(
+        prisma,
+        req.user,
+        matchedUsers.map((user) => user.id),
+      )
+
+      users = matchedUsers
+        .filter((user) => visibleUserIds.has(user.id))
+        .slice(0, limit)
+    }
 
     return res.json({
       results: { sheets, courses, users },

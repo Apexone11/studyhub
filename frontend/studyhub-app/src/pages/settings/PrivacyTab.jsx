@@ -1,10 +1,20 @@
-import { Button, FormField, MsgList, SectionCard, Select, ToggleRow, usePreferences } from './settingsShared'
+import { Button, FormField, MsgList, SectionCard, Select, ToggleRow } from './settingsShared'
+import { usePreferences } from './settingsState'
 
 export default function PrivacyTab() {
-  const { prefs, setPrefs, loading, saving, msg, toggle, save } = usePreferences()
+  const { prefs, setPrefs, loading, saving, msg, loadError, toggle, save, retry } = usePreferences()
 
-  if (loading || !prefs) {
+  if (loading) {
     return <SectionCard title="Privacy"><div style={{ color: '#64748b', fontSize: 13 }}>Loading preferences...</div></SectionCard>
+  }
+
+  if (!prefs) {
+    return (
+      <SectionCard title="Privacy" subtitle="StudyHub could not load your privacy preferences right now.">
+        <MsgList msg={{ type: 'error', text: loadError || 'Could not load preferences.' }} />
+        <Button secondary onClick={retry}>Retry</Button>
+      </SectionCard>
+    )
   }
 
   return (

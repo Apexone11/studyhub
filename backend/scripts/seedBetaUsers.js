@@ -14,24 +14,35 @@ function getBetaUsers() {
       email: process.env.BETA_OWNER_EMAIL || 'studyhub_owner@studyhub.local',
       password: process.env.BETA_OWNER_PASSWORD || 'AdminPass123',
       role: 'admin',
+      profileVisibility: 'public',
     },
     {
       username: process.env.BETA_ADMIN_USERNAME || 'beta_admin',
       email: process.env.BETA_ADMIN_EMAIL || 'beta_admin@studyhub.local',
       password: process.env.BETA_ADMIN_PASSWORD || 'BetaAdmin123!',
       role: 'admin',
+      profileVisibility: 'public',
     },
     {
       username: process.env.BETA_STUDENT1_USERNAME || 'beta_student1',
       email: process.env.BETA_STUDENT1_EMAIL || 'beta_student1@studyhub.local',
       password: process.env.BETA_STUDENT1_PASSWORD || 'BetaStudent123!',
       role: 'student',
+      profileVisibility: 'enrolled',
     },
     {
       username: process.env.BETA_STUDENT2_USERNAME || 'beta_student2',
       email: process.env.BETA_STUDENT2_EMAIL || 'beta_student2@studyhub.local',
       password: process.env.BETA_STUDENT2_PASSWORD || 'BetaStudent123!',
       role: 'student',
+      profileVisibility: 'public',
+    },
+    {
+      username: process.env.BETA_STUDENT3_USERNAME || 'beta_student3',
+      email: process.env.BETA_STUDENT3_EMAIL || 'beta_student3@studyhub.local',
+      password: process.env.BETA_STUDENT3_PASSWORD || 'BetaStudent123!',
+      role: 'student',
+      profileVisibility: 'public',
     },
   ]
 }
@@ -61,7 +72,22 @@ async function upsertBetaUser(userSpec) {
   })
 }
 
-async function seedEnrollments(studentUserIds) {
+async function seedProfilePreferences(users) {
+  for (const user of users) {
+    await prisma.userPreferences.upsert({
+      where: { userId: user.id },
+      update: {
+        profileVisibility: user.profileVisibility || 'public',
+      },
+      create: {
+        userId: user.id,
+        profileVisibility: user.profileVisibility || 'public',
+      },
+    })
+  }
+}
+
+async function seedEnrollments(studentUsers) {
   const courses = await prisma.course.findMany({
     select: { id: true },
     take: 2,
@@ -73,9 +99,24 @@ async function seedEnrollments(studentUserIds) {
     return
   }
 
-  for (const userId of studentUserIds) {
+  await prisma.enrollment.deleteMany({
+    where: {
+      userId: { in: studentUsers.map((user) => user.id) },
+    },
+  })
+
+  const sharedStudentUsernames = new Set([
+    process.env.BETA_STUDENT1_USERNAME || 'beta_student1',
+    process.env.BETA_STUDENT2_USERNAME || 'beta_student2',
+  ])
+
+  for (const user of studentUsers) {
+    if (!sharedStudentUsernames.has(user.username)) {
+      continue
+    }
+
     await prisma.enrollment.createMany({
-      data: courses.map((course) => ({ userId, courseId: course.id })),
+      data: courses.map((course) => ({ userId: user.id, courseId: course.id })),
       skipDuplicates: true,
     })
   }
@@ -107,11 +148,14 @@ async function main() {
   const users = []
   for (const spec of specs) {
     const user = await upsertBetaUser(spec)
-    users.push({ ...user, password: spec.password })
+    users.push({ ...user, password: spec.password, profileVisibility: spec.profileVisibility })
   }
 
-  const studentUserIds = users.filter((user) => user.role === 'student').map((user) => user.id)
-  await seedEnrollments(studentUserIds)
+  await seedProfilePreferences(users)
+
+  const studentUsers = users.filter((user) => user.role === 'student')
+  const studentUserIds = studentUsers.map((user) => user.id)
+  await seedEnrollments(studentUsers)
   if (studentUserIds.length > 0) {
     await seedFeedFixture(studentUserIds[0])
   }

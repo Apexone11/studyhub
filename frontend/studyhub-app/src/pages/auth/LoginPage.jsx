@@ -134,7 +134,6 @@ export default function LoginPage() {
           state: {
             googleCourseSelection: true,
             tempCredential: data.tempCredential,
-            googleEmail: data.googleEmail,
             googleName: data.googleName,
           },
         })

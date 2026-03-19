@@ -235,6 +235,30 @@ export default function UserProfilePage() {
             }
           </div>
 
+          {/* Shared Notes */}
+          {profile.sharedNotes && profile.sharedNotes.length > 0 && (
+            <div style={{ background: '#fff', borderRadius: 18, border: '1px solid #e2e8f0', padding: '24px 28px', boxShadow: '0 2px 10px rgba(15,23,42,0.05)' }}>
+              <h2 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
+                📝 Shared Notes
+              </h2>
+              {profile.sharedNotes.map((note) => (
+                <div key={note.id} style={{ display: 'block', padding: '12px 0', borderBottom: '1px solid #f1f5f9' }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#0f172a', marginBottom: 4 }}>{note.title}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {note.course?.code && (
+                      <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>
+                        {note.course.code}
+                      </span>
+                    )}
+                    <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 'auto' }}>
+                      {new Date(note.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Enrolled Courses */}
           <div style={{ background: '#fff', borderRadius: 18, border: '1px solid #e2e8f0', padding: '24px 28px', boxShadow: '0 2px 10px rgba(15,23,42,0.05)' }}>
             <h2 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>

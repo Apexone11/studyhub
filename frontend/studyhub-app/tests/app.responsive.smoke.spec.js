@@ -52,6 +52,16 @@ async function expectVisibleWithinViewport(page, locator) {
   expect(box.x + box.width).toBeLessThanOrEqual(viewport.width + 1)
 }
 
+async function disableTutorials(page) {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('tutorial_feed_seen', '1')
+    window.localStorage.setItem('tutorial_sheets_seen', '1')
+    window.localStorage.setItem('tutorial_dashboard_seen', '1')
+    window.localStorage.setItem('tutorial_notes_seen', '1')
+    window.localStorage.setItem('studyhub.upload.tutorial.v1', '1')
+  })
+}
+
 async function assertSidebarMode(page, compact, { navigateToSheets = false } = {}) {
   if (compact) {
     const openNavigation = page.getByRole('button', { name: 'Open navigation' })
@@ -124,6 +134,7 @@ for (const viewport of VIEWPORTS) {
     test(`covers the main authenticated routes without layout regressions @smoke`, async ({ page }) => {
       const pageErrors = []
       page.on('pageerror', (error) => pageErrors.push(error))
+      await disableTutorials(page)
 
       const sheetId = 501
       await mockAuthenticatedApp(page, {
@@ -190,10 +201,10 @@ for (const viewport of VIEWPORTS) {
       await mockAttachmentRoutes(page, sheetId)
 
       await page.goto('/feed')
-      await expectVisibleWithinViewport(page, page.getByRole('button', { name: 'Post to Feed' }))
+      await expectVisibleWithinViewport(page, page.getByRole('button', { name: 'Post', exact: true }))
       await assertSidebarMode(page, viewport.compact, { navigateToSheets: true })
       await expect(page.getByRole('heading', { name: 'Study Sheets' })).toBeVisible()
-      await expectVisibleWithinViewport(page, page.getByRole('link', { name: 'Upload sheet' }))
+      await expectVisibleWithinViewport(page, page.getByRole('link', { name: 'Upload a sheet' }))
       await expectNoClientCrash(page, pageErrors)
 
       await page.goto('/feed')
@@ -240,6 +251,7 @@ for (const viewport of VIEWPORTS) {
     test(`keeps the session active when dashboard returns 403 @smoke`, async ({ page }) => {
       const pageErrors = []
       page.on('pageerror', (error) => pageErrors.push(error))
+      await disableTutorials(page)
 
       await mockAuthenticatedApp(page)
       await page.route('**/api/dashboard/summary', async (route) => {
@@ -264,7 +276,7 @@ for (const viewport of VIEWPORTS) {
       }
 
       await expect(page).toHaveURL(/\/feed$/)
-      await expect(page.getByText('Share an update')).toBeVisible()
+      await expect(page.getByPlaceholder(/Share an update/i)).toBeVisible()
       await expectNoClientCrash(page, pageErrors)
     })
   })

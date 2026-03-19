@@ -15,35 +15,39 @@ async function mockPublicAuthApis(page) {
   })
 }
 
-test('registration verifies email before account creation @smoke', async ({ page }) => {
-  let startPayload = null
-  let completePayload = null
+async function disableTutorials(page) {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('tutorial_feed_seen', '1')
+    window.localStorage.setItem('tutorial_sheets_seen', '1')
+    window.localStorage.setItem('tutorial_dashboard_seen', '1')
+    window.localStorage.setItem('tutorial_notes_seen', '1')
+    window.localStorage.setItem('studyhub.upload.tutorial.v1', '1')
+  })
+}
+
+test('registration creates a local account and lets users skip course setup @smoke', async ({ page }) => {
+  let registerPayload = null
 
   await mockPublicAuthApis(page)
-  await page.route('**/api/auth/register/start', async (route) => {
-    startPayload = route.request().postDataJSON()
+  await disableTutorials(page)
+  await page.route('**/api/auth/register', async (route) => {
+    registerPayload = route.request().postDataJSON()
     await route.fulfill({
       status: 201,
       json: {
-        verificationToken: 'register-token',
-        deliveryHint: 'ne***@studyhub.test',
-        expiresAt: '2026-03-16T12:15:00.000Z',
-        resendAvailableAt: '2026-03-16T12:01:00.000Z',
-      },
-    })
-  })
-  await page.route('**/api/auth/register/verify', async (route) => {
-    expect(route.request().postDataJSON()).toMatchObject({
-      verificationToken: 'register-token',
-      code: '123456',
-    })
-    await route.fulfill({
-      status: 200,
-      json: {
-        verified: true,
-        verificationToken: 'register-token',
-        nextStep: 'courses',
-        expiresAt: '2026-03-16T12:15:00.000Z',
+        user: {
+          id: 7,
+          username: 'new_student',
+          role: 'student',
+          email: null,
+          emailVerified: false,
+          twoFaEnabled: false,
+          avatarUrl: null,
+          createdAt: '2026-03-16T12:00:00.000Z',
+          enrollments: [],
+          counts: { courses: 0, sheets: 0, stars: 0 },
+          csrfToken: 'csrf-token',
+        },
       },
     })
   })
@@ -60,101 +64,37 @@ test('registration verifies email before account creation @smoke', async ({ page
       ],
     })
   })
-  await page.route('**/api/auth/register/complete', async (route) => {
-    completePayload = route.request().postDataJSON()
-    await route.fulfill({
-      status: 201,
-      json: {
-        user: {
-          id: 7,
-          username: 'new_student',
-          role: 'student',
-          email: 'new_student@studyhub.test',
-          emailVerified: true,
-          twoFaEnabled: false,
-          avatarUrl: null,
-          createdAt: '2026-03-16T12:00:00.000Z',
-          enrollments: [],
-          counts: { courses: 0, sheets: 0, stars: 0 },
-          csrfToken: 'csrf-token',
-        },
-      },
-    })
-  })
 
   await page.goto('/register')
   await page.getByLabel('Username').fill('new_student')
-  await page.getByLabel('Email', { exact: true }).fill('new_student@studyhub.test')
   await page.getByLabel('Password', { exact: true }).fill('Password123')
   await page.getByLabel('Confirm Password').fill('Password123')
   await page.getByRole('checkbox').check()
-  await page.getByRole('button', { name: 'Continue To Email Verification' }).click()
+  await page.getByRole('button', { name: 'Create Account' }).click()
 
-  expect(startPayload).toMatchObject({
+  expect(registerPayload).toMatchObject({
     username: 'new_student',
-    email: 'new_student@studyhub.test',
     password: 'Password123',
     confirmPassword: 'Password123',
     termsAccepted: true,
   })
 
-  await expect(page.getByRole('heading', { name: 'Verify your email' })).toBeVisible()
-  await page.getByLabel('Verification Code').fill('123456')
-  await page.getByRole('button', { name: 'Verify Code' }).click()
   await expect(page.getByRole('heading', { name: 'Choose your courses' })).toBeVisible()
   await page.getByRole('button', { name: 'Skip For Now' }).click()
 
-  expect(completePayload).toMatchObject({
-    verificationToken: 'register-token',
-    schoolId: null,
-    courseIds: [],
-    customCourses: [],
-  })
-
   await expect(page).toHaveURL(/\/feed$/)
-  await expect(page.getByText('Share an update')).toBeVisible()
+  await expect(page.getByPlaceholder(/Share an update/i)).toBeVisible()
 })
 
-test('legacy login requires email verification before session success @smoke', async ({ page }) => {
-  let sendPayload = null
-  let verifyPayload = null
+test('local login signs in immediately without email verification @smoke', async ({ page }) => {
 
   await mockPublicAuthApis(page)
+  await disableTutorials(page)
   await page.route('**/api/auth/login', async (route) => {
     expect(route.request().postDataJSON()).toMatchObject({
       username: 'legacy_user',
       password: 'Password123',
     })
-    await route.fulfill({
-      status: 200,
-      json: {
-        requiresEmailVerification: true,
-        verificationToken: 'login-token',
-        emailRequired: true,
-        emailHint: '',
-        email: null,
-        expiresAt: '2026-03-16T12:15:00.000Z',
-        resendAvailableAt: '2026-03-16T12:01:00.000Z',
-      },
-    })
-  })
-  await page.route('**/api/auth/login/verification/send', async (route) => {
-    sendPayload = route.request().postDataJSON()
-    await route.fulfill({
-      status: 200,
-      json: {
-        requiresEmailVerification: true,
-        verificationToken: 'login-token',
-        emailRequired: false,
-        emailHint: 'le***@studyhub.test',
-        email: 'legacy_user@studyhub.test',
-        expiresAt: '2026-03-16T12:15:00.000Z',
-        resendAvailableAt: '2026-03-16T12:01:00.000Z',
-      },
-    })
-  })
-  await page.route('**/api/auth/login/verification/verify', async (route) => {
-    verifyPayload = route.request().postDataJSON()
     await route.fulfill({
       status: 200,
       json: {
@@ -178,25 +118,8 @@ test('legacy login requires email verification before session success @smoke', a
   await page.goto('/login')
   await page.getByLabel('Username').fill('legacy_user')
   await page.getByLabel('Password').fill('Password123')
-  await page.getByRole('button', { name: 'Sign In' }).click()
-
-  await expect(page.getByRole('heading', { name: 'Verify your email' })).toBeVisible()
-  await page.getByLabel('Email Address').fill('legacy_user@studyhub.test')
-  await page.getByRole('button', { name: 'Send / Resend Code' }).click()
-
-  expect(sendPayload).toMatchObject({
-    verificationToken: 'login-token',
-    email: 'legacy_user@studyhub.test',
-  })
-
-  await page.getByLabel('Verification Code').fill('654321')
-  await page.getByRole('button', { name: 'Verify Email' }).click()
-
-  expect(verifyPayload).toMatchObject({
-    verificationToken: 'login-token',
-    code: '654321',
-  })
+  await page.getByRole('button', { name: 'Sign In', exact: true }).click()
 
   await expect(page).toHaveURL(/\/feed$/)
-  await expect(page.getByText('Share an update')).toBeVisible()
+  await expect(page.getByPlaceholder(/Share an update/i)).toBeVisible()
 })

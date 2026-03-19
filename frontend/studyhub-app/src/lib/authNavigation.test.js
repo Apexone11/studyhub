@@ -14,8 +14,8 @@ describe('getAuthenticatedHomePath', () => {
     expect(getAuthenticatedHomePath({ role: 'admin', twoFaEnabled: true })).toBe('/admin')
   })
 
-  it('returns /settings for admins without 2FA enabled', () => {
-    expect(getAuthenticatedHomePath({ role: 'admin', twoFaEnabled: false })).toBe('/settings')
+  it('returns /admin for admins without 2FA enabled', () => {
+    expect(getAuthenticatedHomePath({ role: 'admin', twoFaEnabled: false })).toBe('/admin')
   })
 
   it('returns /feed for unexpected role values', () => {

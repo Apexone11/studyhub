@@ -56,7 +56,7 @@ export default function SearchModal({ open, onClose }) {
     try {
       const res = await fetch(
         `${API}/api/search?q=${encodeURIComponent(searchQuery)}&type=all&limit=6`,
-        { signal: controller.signal }
+        { signal: controller.signal, credentials: 'include' }
       )
       if (!res.ok) return
       const data = await res.json()
@@ -93,7 +93,7 @@ export default function SearchModal({ open, onClose }) {
   function navigateToItem(item) {
     onClose()
     if (item.type === 'sheet') navigate(`/sheets/${item.data.id}`)
-    else if (item.type === 'course') navigate(`/sheets?course=${item.data.id}`)
+    else if (item.type === 'course') navigate(`/sheets?courseId=${item.data.id}`)
     else if (item.type === 'user') navigate(`/users/${item.data.username}`)
   }
 

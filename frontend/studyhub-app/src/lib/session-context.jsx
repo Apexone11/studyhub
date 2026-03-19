@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from 'react'
+import { flushSync } from 'react-dom'
 import { API } from '../config'
 import {
   AUTH_SESSION_EXPIRED_EVENT,
@@ -147,7 +148,10 @@ export function SessionProvider({ children }) {
   }, [clearSession])
 
   const completeAuthentication = useCallback((nextUser) => {
-    runTransition(() => {
+    /* Use flushSync so state is committed synchronously before the caller
+       navigates — prevents a race where the target page renders before
+       the session context is updated (crashes on mobile/tablet). */
+    flushSync(() => {
       syncUser(nextUser)
       setStatus('authenticated')
       setError('')

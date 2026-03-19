@@ -34,13 +34,93 @@ import { useSession } from '../../lib/session-context'
 import { pageShell, useResponsiveAppLayout } from '../../lib/ui'
 import { useLivePolling } from '../../lib/useLivePolling'
 import { staggerEntrance, popScale } from '../../lib/animations'
-import Joyride from 'react-joyride'
+import SafeJoyride from '../../components/SafeJoyride'
 import { useTutorial } from '../../lib/useTutorial'
 import { FEED_STEPS } from '../../lib/tutorialSteps'
 
 /* ── Shared constants ──────────────────────────────────────────────────── */
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 const FILTERS = ['all', 'posts', 'sheets', 'announcements']
+const commentSectionContainerStyle = {
+  marginTop: 14,
+  borderTop: '1px solid #f1f5f9',
+  paddingTop: 12,
+}
+const commentToggleButtonStyle = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 6,
+  background: 'none',
+  border: 'none',
+  color: '#64748b',
+  fontSize: 13,
+  fontWeight: 700,
+  cursor: 'pointer',
+  padding: 0,
+  fontFamily: FONT,
+}
+const commentExpandedContentStyle = { marginTop: 12 }
+const commentInputRowStyle = { display: 'flex', gap: 8, marginBottom: 12 }
+const commentTextareaStyle = {
+  width: '100%',
+  resize: 'vertical',
+  borderRadius: 10,
+  border: '1px solid #e2e8f0',
+  padding: '8px 12px',
+  fontSize: 13,
+  fontFamily: FONT,
+  color: '#0f172a',
+  boxSizing: 'border-box',
+}
+const commentInputFooterStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginTop: 6,
+}
+const commentMetaTextStyle = { color: '#94a3b8', fontSize: 13, padding: '8px 0' }
+const commentErrorTextStyle = { color: '#dc2626', fontSize: 12, marginTop: 4 }
+const commentListStyle = { display: 'grid', gap: 8 }
+const commentItemStyle = {
+  display: 'flex',
+  gap: 8,
+  padding: '8px 10px',
+  borderRadius: 10,
+  background: '#f8fafc',
+}
+const commentHeaderStyle = { display: 'flex', justifyContent: 'space-between', gap: 8 }
+const commentAuthorStyle = { fontSize: 12, fontWeight: 700, color: '#0f172a' }
+const commentTimestampStyle = { fontSize: 11, color: '#94a3b8', marginLeft: 8 }
+const commentDeleteButtonStyle = {
+  background: 'none',
+  border: 'none',
+  color: '#94a3b8',
+  fontSize: 11,
+  cursor: 'pointer',
+  padding: '0 4px',
+  fontFamily: FONT,
+}
+const commentBodyStyle = {
+  margin: '2px 0 0',
+  fontSize: 13,
+  color: '#475569',
+  lineHeight: 1.6,
+  whiteSpace: 'pre-wrap',
+}
+
+function commentButtonStyle(hasValue, posting) {
+  return {
+    borderRadius: 8,
+    border: 'none',
+    background: hasValue ? '#3b82f6' : '#e2e8f0',
+    color: hasValue ? '#fff' : '#94a3b8',
+    padding: '6px 14px',
+    fontSize: 12,
+    fontWeight: 700,
+    cursor: posting || !hasValue ? 'not-allowed' : 'pointer',
+    fontFamily: FONT,
+  }
+}
 
 function authHeaders() {
   return { 'Content-Type': 'application/json' }
@@ -168,6 +248,255 @@ function EmptyFeed({ message }) {
   )
 }
 
+function useComments(postId, initialCount = 0) {
+  const [comments, setComments] = useState([])
+  const [total, setTotal] = useState(initialCount)
+  const [loading, setLoading] = useState(false)
+  const [posting, setPosting] = useState(false)
+  const [error, setError] = useState('')
+  const loadedRef = useRef(false)
+
+  useEffect(() => {
+    if (!loadedRef.current) {
+      setTotal(initialCount)
+    }
+  }, [initialCount])
+
+  const loadComments = useCallback(async () => {
+    if (loadedRef.current) {
+      return
+    }
+
+    loadedRef.current = true
+    setLoading(true)
+
+    try {
+      const response = await fetch(`${API}/api/feed/posts/${postId}/comments?limit=50`, {
+        headers: authHeaders(),
+      })
+      const data = await readJsonSafely(response, {})
+
+      if (!response.ok) {
+        loadedRef.current = false
+        return
+      }
+
+      const nextComments = Array.isArray(data.comments) ? data.comments : []
+      setComments(nextComments)
+      setTotal(typeof data.total === 'number' ? data.total : nextComments.length)
+    } catch {
+      loadedRef.current = false
+    } finally {
+      setLoading(false)
+    }
+  }, [postId])
+
+  const postComment = useCallback(async (text) => {
+    const content = text.trim()
+
+    if (!content) {
+      return false
+    }
+
+    setPosting(true)
+    setError('')
+
+    try {
+      const response = await fetch(`${API}/api/feed/posts/${postId}/comments`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ content }),
+      })
+      const data = await readJsonSafely(response, {})
+
+      if (!response.ok) {
+        setError(getApiErrorMessage(data, 'Could not post comment.'))
+        return false
+      }
+
+      loadedRef.current = true
+      setComments((current) => [data, ...current])
+      setTotal((current) => current + 1)
+      return true
+    } catch {
+      setError('Could not connect to the server.')
+      return false
+    } finally {
+      setPosting(false)
+    }
+  }, [postId])
+
+  const deleteComment = useCallback(async (commentId) => {
+    try {
+      const response = await fetch(`${API}/api/feed/posts/${postId}/comments/${commentId}`, {
+        method: 'DELETE',
+        headers: authHeaders(),
+      })
+
+      if (response.ok) {
+        setComments((current) => current.filter((comment) => comment.id !== commentId))
+        setTotal((current) => Math.max(0, current - 1))
+      }
+    } catch {
+      /* silent */
+    }
+  }, [postId])
+
+  return {
+    comments,
+    total,
+    loading,
+    posting,
+    error,
+    setError,
+    loadComments,
+    postComment,
+    deleteComment,
+  }
+}
+
+function CommentInput({ user, value, onChange, onSubmit, posting, error }) {
+  const hasValue = Boolean(value.trim())
+  const { length } = value
+
+  return (
+    <div style={commentInputRowStyle}>
+      <Avatar username={user?.username} role={user?.role} size={32} />
+      <div style={{ flex: 1 }}>
+        <textarea
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder="Write a comment..."
+          rows={2}
+          style={commentTextareaStyle}
+        />
+        <div style={commentInputFooterStyle}>
+          <span style={{ fontSize: 11, color: length > 500 ? '#dc2626' : '#94a3b8' }}>
+            {length}/500
+          </span>
+          <button
+            type="button"
+            onClick={onSubmit}
+            disabled={posting || !hasValue}
+            style={commentButtonStyle(hasValue, posting)}
+          >
+            {posting ? 'Posting...' : 'Comment'}
+          </button>
+        </div>
+        {error ? <div style={commentErrorTextStyle}>{error}</div> : null}
+      </div>
+    </div>
+  )
+}
+
+function CommentList({ comments, loading, user, onDelete }) {
+  if (loading) {
+    return <div style={commentMetaTextStyle}>Loading comments...</div>
+  }
+
+  if (comments.length === 0) {
+    return <div style={commentMetaTextStyle}>No comments yet. Be the first!</div>
+  }
+
+  return (
+    <div style={commentListStyle}>
+      {comments.map((comment) => (
+        <div key={comment.id} style={commentItemStyle}>
+          <Avatar username={comment.author?.username} role="student" size={28} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={commentHeaderStyle}>
+              <div>
+                <span style={commentAuthorStyle}>{comment.author?.username || 'Unknown'}</span>
+                <span style={commentTimestampStyle}>{timeAgo(comment.createdAt)}</span>
+              </div>
+              {(comment.author?.id === user?.id || user?.role === 'admin') ? (
+                <button
+                  type="button"
+                  onClick={() => onDelete(comment.id)}
+                  style={commentDeleteButtonStyle}
+                >
+                  Delete
+                </button>
+              ) : null}
+            </div>
+            <p style={commentBodyStyle}>{comment.content}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function CommentSection({ postId, commentCount, user }) {
+  const [expanded, setExpanded] = useState(false)
+  const [newComment, setNewComment] = useState('')
+  const {
+    comments,
+    total,
+    loading,
+    posting,
+    error,
+    setError,
+    loadComments,
+    postComment,
+    deleteComment,
+  } = useComments(postId, commentCount || 0)
+
+  const handleToggle = () => {
+    const next = !expanded
+    setExpanded(next)
+    if (next) {
+      loadComments()
+    }
+  }
+
+  const handlePost = async () => {
+    const text = newComment.trim()
+    if (!text) return
+    if (text.length > 500) {
+      setError('Comment must be 500 characters or fewer.')
+      return
+    }
+
+    const posted = await postComment(text)
+    if (posted) {
+      setNewComment('')
+    }
+  }
+
+  return (
+    <div style={commentSectionContainerStyle}>
+      <button type="button" onClick={handleToggle} style={commentToggleButtonStyle}>
+        {expanded ? '\u25BE' : '\u25B8'} {total} {total === 1 ? 'comment' : 'comments'}
+      </button>
+
+      {expanded && (
+        <div style={commentExpandedContentStyle}>
+          <CommentInput
+            user={user}
+            value={newComment}
+            onChange={(value) => {
+              setNewComment(value)
+              if (error) {
+                setError('')
+              }
+            }}
+            onSubmit={handlePost}
+            posting={posting}
+            error={error}
+          />
+          <CommentList
+            comments={comments}
+            loading={loading}
+            user={user}
+            onDelete={deleteComment}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
 function FeedCard({
   item,
   onReact,
@@ -177,6 +506,7 @@ function FeedCard({
   isPostMenuOpen,
   onTogglePostMenu,
   isDeletingPost,
+  currentUser,
 }) {
   const isSheet = item.type === 'sheet'
   const isPost = item.type === 'post'
@@ -220,7 +550,7 @@ function FeedCard({
               <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>{timeAgo(item.createdAt)}</div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {item.linkPath ? (
+              {item.linkPath && item.type !== 'post' ? (
                 <Link to={item.linkPath} style={{ fontSize: 12, color: '#2563eb', fontWeight: 700, textDecoration: 'none' }}>
                   Open
                 </Link>
@@ -380,10 +710,14 @@ function FeedCard({
                 Needs work {reaction.dislikes || 0}
               </button>
             ) : null}
-            {item.commentCount ? <span style={pillStyle()}>{item.commentCount} comments</span> : null}
             {item.downloads ? <span style={pillStyle()}>{item.downloads} downloads</span> : null}
             {item.forks ? <span style={pillStyle()}><IconFork size={13} /> {item.forks} forks</span> : null}
           </div>
+
+          {/* Comment section for posts */}
+          {isPost && (
+            <CommentSection postId={item.id} commentCount={item.commentCount || 0} user={currentUser} />
+          )}
         </div>
       </div>
     </article>
@@ -785,7 +1119,7 @@ export default function FeedPage() {
                     <select
                       value={composer.courseId}
                       onChange={(event) => setComposer((current) => ({ ...current, courseId: event.target.value }))}
-                      style={{ minWidth: 180, borderRadius: 10, border: '1px solid #cbd5e1', padding: '10px 12px', font: 'inherit' }}
+                      style={{ minWidth: 140, maxWidth: 200, borderRadius: 10, border: '1px solid #cbd5e1', padding: '8px 10px', fontSize: 13, fontFamily: FONT }}
                     >
                       <option value="">All courses</option>
                       {(user?.enrollments || []).map((enrollment) => (
@@ -878,11 +1212,12 @@ export default function FeedPage() {
                   onChange={(event) => setQueryParam('search', event.target.value)}
                   placeholder="Search the feed..."
                   style={{
-                    minWidth: 'min(100%, 280px)',
+                    maxWidth: 240,
                     borderRadius: 12,
                     border: '1px solid #cbd5e1',
-                    padding: '10px 12px',
-                    font: 'inherit',
+                    padding: '8px 12px',
+                    fontSize: 13,
+                    fontFamily: FONT,
                   }}
                 />
               </div>
@@ -937,6 +1272,7 @@ export default function FeedPage() {
                       isPostMenuOpen={openPostMenuId === item.id}
                       onTogglePostMenu={setOpenPostMenuId}
                       isDeletingPost={Boolean(deletingPostIds[item.id])}
+                      currentUser={user}
                     />
                   ))}
                 </div>
@@ -977,7 +1313,7 @@ export default function FeedPage() {
         </div>
       </div>
       {/* Tutorial popup — first-visit auto-start or re-trigger */}
-      <Joyride {...tutorial.joyrideProps} />
+      <SafeJoyride {...tutorial.joyrideProps} />
 
       {/* Floating re-trigger button for tutorial */}
       {tutorial.seen && (

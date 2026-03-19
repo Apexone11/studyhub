@@ -1,10 +1,20 @@
-import { Button, MsgList, SectionCard, ToggleRow, usePreferences } from './settingsShared'
+import { Button, MsgList, SectionCard, ToggleRow } from './settingsShared'
+import { usePreferences } from './settingsState'
 
 export default function NotificationsTab() {
-  const { prefs, loading, saving, msg, toggle, save } = usePreferences()
+  const { prefs, loading, saving, msg, loadError, toggle, save, retry } = usePreferences()
 
-  if (loading || !prefs) {
+  if (loading) {
     return <SectionCard title="Notifications"><div style={{ color: '#64748b', fontSize: 13 }}>Loading preferences...</div></SectionCard>
+  }
+
+  if (!prefs) {
+    return (
+      <SectionCard title="Notifications" subtitle="StudyHub could not load your notification preferences right now.">
+        <MsgList msg={{ type: 'error', text: loadError || 'Could not load preferences.' }} />
+        <Button secondary onClick={retry}>Retry</Button>
+      </SectionCard>
+    )
   }
 
   return (

@@ -14,7 +14,7 @@
  *
  * Tutorial: First-visit Joyride highlights search, filters, upload, toggles.
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
 import AppSidebar from '../../components/AppSidebar'
@@ -31,7 +31,7 @@ import { getApiErrorMessage, isAuthSessionFailure, readJsonSafely } from '../../
 import { useSession } from '../../lib/session-context'
 import { pageShell, useResponsiveAppLayout } from '../../lib/ui'
 import { useLivePolling } from '../../lib/useLivePolling'
-import Joyride from 'react-joyride'
+import SafeJoyride from '../../components/SafeJoyride'
 import { useTutorial } from '../../lib/useTutorial'
 import { SHEETS_STEPS } from '../../lib/tutorialSteps'
 
@@ -212,6 +212,35 @@ export default function SheetsPage() {
     [catalog, schoolId],
   )
 
+  useEffect(() => {
+    const legacySearch = searchParams.get('q') || ''
+    const legacyCourseId = searchParams.get('course') || ''
+    const nextSearch = searchParams.get('search') || ''
+    const nextCourseId = searchParams.get('courseId') || ''
+
+    if (!legacySearch && !legacyCourseId) {
+      return
+    }
+
+    const nextParams = new URLSearchParams(searchParams)
+
+    if (legacySearch && !nextSearch) {
+      nextParams.set('search', legacySearch)
+    }
+    if (legacySearch) {
+      nextParams.delete('q')
+    }
+
+    if (legacyCourseId && !nextCourseId) {
+      nextParams.set('courseId', legacyCourseId)
+    }
+    if (legacyCourseId) {
+      nextParams.delete('course')
+    }
+
+    setSearchParams(nextParams, { replace: true })
+  }, [searchParams, setSearchParams])
+
   const loadCatalog = useCallback(async ({ signal, startTransition } = {}) => {
     const apply = startTransition || ((fn) => fn())
     try {
@@ -355,8 +384,8 @@ export default function SheetsPage() {
                     <input
                       value={search}
                       onChange={(event) => setQueryParam('search', event.target.value)}
-                      placeholder="Search by title, description, or content"
-                      style={{ width: '100%', borderRadius: 12, border: '1px solid #cbd5e1', padding: '10px 12px 10px 36px', font: 'inherit' }}
+                      placeholder="Search by title, description..."
+                      style={{ width: '100%', borderRadius: 12, border: '1px solid #cbd5e1', padding: '10px 12px 10px 36px', fontSize: 13, fontFamily: FONT }}
                     />
                   </label>
                   <select value={schoolId} onChange={(event) => setQueryParam('schoolId', event.target.value)} style={selectStyle()}>
@@ -427,7 +456,7 @@ export default function SheetsPage() {
       </div>
 
       {/* Tutorial popup */}
-      <Joyride {...tutorial.joyrideProps} />
+      <SafeJoyride {...tutorial.joyrideProps} />
       {tutorial.seen && (
         <button type="button" onClick={tutorial.restart} title="Show tutorial" style={{ position: 'fixed', bottom: 24, right: 24, width: 44, height: 44, borderRadius: '50%', border: 'none', background: '#3b82f6', color: '#fff', fontSize: 18, fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 14px rgba(59,130,246,0.4)', zIndex: 50, display: 'grid', placeItems: 'center' }}>?</button>
       )}

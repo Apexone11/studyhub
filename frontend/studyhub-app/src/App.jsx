@@ -6,6 +6,7 @@ import {
   identifyAuthenticatedUser,
   clearAuthenticatedUser
 } from './lib/telemetry'
+import { useBootstrapPreferences } from './lib/useBootstrapPreferences'
 import RouteErrorBoundary from './components/RouteErrorBoundary'
 import { getAuthenticatedHomePath } from './lib/authNavigation'
 import { SessionProvider, useSession } from './lib/session-context'
@@ -73,6 +74,16 @@ function RouteTelemetry() {
   return null
 }
 
+/**
+ * Loads and applies saved theme + font size preferences on first auth.
+ * Runs once after login, then applies from cache on subsequent page loads.
+ */
+function PreferencesBootstrap() {
+  useBootstrapPreferences()
+
+  return null
+}
+
 function RouteFallback() {
   return (
     <div className="page-shell" style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>
@@ -88,6 +99,7 @@ function AppRoutes() {
     <BrowserRouter>
       <SessionProvider>
         <RouteTelemetry />
+        <PreferencesBootstrap />
         <Suspense fallback={<RouteFallback />}>
           <Routes>
             {/* ── public (unauthenticated) ─────────────────────────── */}

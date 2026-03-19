@@ -1,10 +1,40 @@
-import { Button, FormField, MsgList, SectionCard, Select, usePreferences } from './settingsShared'
+import { useEffect } from 'react'
+import {
+  applyFontSize,
+  applyTheme,
+  writeCachedAppearancePreferences,
+} from '../../lib/appearance'
+import { useSession } from '../../lib/session-context'
+import { Button, FormField, MsgList, SectionCard, Select } from './settingsShared'
+import { usePreferences } from './settingsState'
 
 export default function AppearanceTab() {
-  const { prefs, setPrefs, loading, saving, msg, save } = usePreferences()
+  const { user } = useSession()
+  const { prefs, setPrefs, loading, saving, msg, loadError, save, retry } = usePreferences()
 
-  if (loading || !prefs) {
+  /* Apply theme and font size to the DOM in real-time as the user changes them */
+  const currentTheme = prefs?.theme
+  const currentFontSize = prefs?.fontSize
+
+  useEffect(() => {
+    if (currentTheme) applyTheme(currentTheme)
+  }, [currentTheme])
+
+  useEffect(() => {
+    if (currentFontSize) applyFontSize(currentFontSize)
+  }, [currentFontSize])
+
+  if (loading) {
     return <SectionCard title="Appearance"><div style={{ color: '#64748b', fontSize: 13 }}>Loading preferences...</div></SectionCard>
+  }
+
+  if (!prefs) {
+    return (
+      <SectionCard title="Appearance" subtitle="StudyHub could not load your appearance preferences right now.">
+        <MsgList msg={{ type: 'error', text: loadError || 'Could not load preferences.' }} />
+        <Button secondary onClick={retry}>Retry</Button>
+      </SectionCard>
+    )
   }
 
   return (
@@ -69,10 +99,15 @@ export default function AppearanceTab() {
       </SectionCard>
 
       <MsgList msg={msg} />
-      <Button disabled={saving} onClick={() => save(
-        ['theme', 'fontSize'],
-        'Appearance preferences saved.',
-      )}>
+      <Button disabled={saving} onClick={async () => {
+        const saved = await save(['theme', 'fontSize'], 'Appearance preferences saved.')
+
+        if (!saved) {
+          return
+        }
+
+        writeCachedAppearancePreferences({ theme: prefs.theme, fontSize: prefs.fontSize }, user?.id)
+      }}>
         {saving ? 'Saving...' : 'Save Appearance Preferences'}
       </Button>
     </>

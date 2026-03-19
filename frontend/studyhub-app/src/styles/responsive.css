@@ -279,6 +279,13 @@
   }
 }
 
+/* ── Upload sheet editor split ─────────────────────────────────────────── */
+@media (max-width: 767px) {
+  .upload-editor-split {
+    grid-template-columns: 1fr !important;
+  }
+}
+
 /* ── Feed composer ─────────────────────────────────────────────────────── */
 @media (max-width: 767px) {
   .feed-composer-actions {
