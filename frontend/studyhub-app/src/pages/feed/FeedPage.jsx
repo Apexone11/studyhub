@@ -220,7 +220,7 @@ function LeaderboardPanel({ title, items, renderLabel, empty }) {
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{renderLabel(item)}</div>
                 {'author' in item && item.author?.username ? (
-                  <div style={{ fontSize: 12, color: '#64748b' }}>by {item.author.username}</div>
+                  <div style={{ fontSize: 12, color: '#64748b' }}>by <Link to={`/profile/${item.author.username}`} style={{ color: '#2563eb', textDecoration: 'none' }}>{item.author.username}</Link></div>
                 ) : null}
               </div>
               <div style={{ fontSize: 12, fontWeight: 800, color: '#2563eb', whiteSpace: 'nowrap' }}>
@@ -410,11 +410,23 @@ function CommentList({ comments, loading, user, onDelete }) {
     <div style={commentListStyle}>
       {comments.map((comment) => (
         <div key={comment.id} style={commentItemStyle}>
-          <Avatar username={comment.author?.username} role="student" size={28} />
+          {comment.author?.username ? (
+            <Link to={`/profile/${comment.author.username}`} style={{ textDecoration: 'none', flexShrink: 0 }}>
+              <Avatar username={comment.author.username} role="student" size={28} />
+            </Link>
+          ) : (
+            <Avatar username="?" role="student" size={28} />
+          )}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={commentHeaderStyle}>
               <div>
-                <span style={commentAuthorStyle}>{comment.author?.username || 'Unknown'}</span>
+                {comment.author?.username ? (
+                  <Link to={`/profile/${comment.author.username}`} style={{ ...commentAuthorStyle, textDecoration: 'none' }}>
+                    {comment.author.username}
+                  </Link>
+                ) : (
+                  <span style={commentAuthorStyle}>Unknown</span>
+                )}
                 <span style={commentTimestampStyle}>{timeAgo(comment.createdAt)}</span>
               </div>
               {(comment.author?.id === user?.id || user?.role === 'admin') ? (
@@ -532,14 +544,24 @@ function FeedCard({
       }}
     >
       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-        <Avatar username={item.author?.username || item.type} role="student" />
+        {item.author?.username ? (
+          <Link to={`/profile/${item.author.username}`} style={{ textDecoration: 'none', flexShrink: 0 }}>
+            <Avatar username={item.author.username} role="student" />
+          </Link>
+        ) : (
+          <Avatar username={item.type} role="student" />
+        )}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
             <div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                <span style={{ fontWeight: 800, color: '#0f172a', fontSize: 14 }}>
-                  {item.author?.username || 'StudyHub'}
-                </span>
+                {item.author?.username ? (
+                  <Link to={`/profile/${item.author.username}`} style={{ fontWeight: 800, color: '#0f172a', fontSize: 14, textDecoration: 'none' }}>
+                    {item.author.username}
+                  </Link>
+                ) : (
+                  <span style={{ fontWeight: 800, color: '#0f172a', fontSize: 14 }}>StudyHub</span>
+                )}
                 <span
                   style={{
                     fontSize: 11,

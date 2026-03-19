@@ -2166,3 +2166,28 @@ Comprehensive WCAG 2.2 AA accessibility audit and final CSS polish pass across t
 ### Known Risks / Deferred
 
 - None. All lint issues resolved.
+
+---
+
+## Cycle 2026-03-19b — Dark Mode, Feed UX, Upload Workflow, Credentials
+
+### Fixed
+
+- **frontend/studyhub-app/src/index.css** — Dark mode: added `<a>`, `<article>`, `<span>` selectors for background, text, and border overrides. Quick Actions buttons now show text in dark mode. Added `#64748b` muted text override.
+- **frontend/studyhub-app/src/pages/feed/FeedPage.jsx** — Post author avatars/usernames now link to `/profile/:username`. Comment author avatars/usernames also link. Leaderboard "by author" links added.
+- **frontend/studyhub-app/src/pages/sheets/uploadSheetWorkflow.js** — Removed strict beta workflow gate: `canEditHtmlWorkingCopy()` now always returns `true`, `canSubmitHtmlReview()` no longer requires `hasOriginalVersion`. Users can type HTML directly.
+- **frontend/studyhub-app/src/pages/sheets/UploadSheetPage.jsx** — Default scan status → `'passed'` for direct editing. Label: "HTML IMPORT (optional)". Error messages reference saving drafts.
+- **Credentials sweep** — Added `credentials: 'include'` to 14 fetch calls across 7 files: CoursesTab, settingsState, SettingsPage, AccountTab, RegisterScreen, Navbar, UploadSheetPage, AdminPage.
+
+### Changed
+
+- **frontend/studyhub-app/src/pages/sheets/SheetsPage.jsx** — Upload button restyled with gradient + shadow. Added Sheet Lab info card in Workflow sidebar.
+
+### Validation Commands
+
+- `npm --prefix frontend/studyhub-app run lint` — 0 errors ✅
+- `npm --prefix frontend/studyhub-app run build` — success ✅
+
+### Known Risks / Deferred
+
+- None.

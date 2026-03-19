@@ -133,6 +133,7 @@ export default function RegisterScreen() {
 
     fetch(`${API}/api/courses/schools`, {
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
     })
       .then(async (response) => {
         if (!response.ok) throw new Error('Could not load the course catalog.')
@@ -321,6 +322,7 @@ export default function RegisterScreen() {
         const response = await fetch(`${API}/api/auth/google/complete`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify({
             credential: googleCredential,
             schoolId: skipCourses ? null : (form.schoolId ? Number(form.schoolId) : null),
@@ -346,6 +348,7 @@ export default function RegisterScreen() {
         const response = await fetch(`${API}/api/settings/courses`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify({
             schoolId: form.schoolId ? Number(form.schoolId) : null,
             courseIds: selectedCourseIds,

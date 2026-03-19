@@ -1,11 +1,10 @@
 export const UPLOAD_TUTORIAL_KEY = 'studyhub.upload.tutorial.v1'
 
-export function canEditHtmlWorkingCopy({ hasOriginalVersion }) {
-  return Boolean(hasOriginalVersion)
+export function canEditHtmlWorkingCopy() {
+  return true
 }
 
 export function canSubmitHtmlReview({
-  hasOriginalVersion,
   scanStatus,
   title,
   courseId,
@@ -13,7 +12,6 @@ export function canSubmitHtmlReview({
   html,
 }) {
   return (
-    Boolean(hasOriginalVersion) &&
     String(scanStatus || '').toLowerCase() === 'passed' &&
     String(title || '').trim().length > 0 &&
     Number.isInteger(Number.parseInt(courseId, 10)) &&

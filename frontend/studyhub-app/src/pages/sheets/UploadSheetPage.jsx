@@ -118,7 +118,7 @@ export default function UploadSheetPage() {
   const [saved, setSaved] = useState(false)
 
   const [scanState, setScanState] = useState({
-    status: 'queued',
+    status: 'passed',
     findings: [],
     updatedAt: null,
     acknowledgedAt: null,
@@ -160,7 +160,7 @@ export default function UploadSheetPage() {
   const autosaveTimer = useRef(null)
 
   const activeSheetId = isEditing ? Number.parseInt(sheetId, 10) : draftId
-  const canEditHtml = canEditHtmlWorkingCopy({ hasOriginalVersion: scanState.hasOriginalVersion })
+  const canEditHtml = canEditHtmlWorkingCopy()
   const canSubmitHtml = canSubmitHtmlReview({
     hasOriginalVersion: scanState.hasOriginalVersion,
     scanStatus: scanState.status,
@@ -174,7 +174,7 @@ export default function UploadSheetPage() {
 
   const loadCourses = useCallback(async () => {
     try {
-      const response = await fetch(`${API}/api/courses/schools`, { headers: authHeaders() })
+      const response = await fetch(`${API}/api/courses/schools`, { headers: authHeaders(), credentials: 'include' })
       const data = await response.json().catch(() => ([]))
       setCourses(
         (data || []).flatMap((school) =>
@@ -441,6 +441,53 @@ export default function UploadSheetPage() {
     title,
   ])
 
+  const saveDraftNow = useCallback(async () => {
+    if (!courseId || (!title.trim() && !content.trim())) {
+      setError('Add a title and select a course before saving.')
+      return
+    }
+    clearTimeout(autosaveTimer.current)
+    setSaved(false)
+    try {
+      if (legacyMarkdownMode) {
+        const response = await fetch(`${API}/api/sheets/drafts/autosave`, {
+          method: 'POST',
+          headers: authHeaders(),
+          credentials: 'include',
+          body: JSON.stringify({ id: draftId, title, courseId: Number.parseInt(courseId, 10), content, contentFormat: 'markdown', description, allowDownloads }),
+        })
+        const data = await response.json().catch(() => ({}))
+        if (!response.ok) throw new Error(data.error || 'Draft save failed.')
+        if (data?.draft?.id) setDraftId(data.draft.id)
+      } else if (Number.isInteger(draftId)) {
+        const response = await fetch(`${API}/api/sheets/drafts/${draftId}/working-html`, {
+          method: 'PATCH',
+          headers: authHeaders(),
+          credentials: 'include',
+          body: JSON.stringify({ title, courseId: Number.parseInt(courseId, 10), description, allowDownloads, html: content }),
+        })
+        const data = await response.json().catch(() => ({}))
+        if (!response.ok) throw new Error(data.error || 'Draft save failed.')
+        if (data?.draft?.status) setStatus(data.draft.status)
+        if (data?.scan) setScanState((prev) => reduceScanState(prev, data.scan))
+      } else {
+        const response = await fetch(`${API}/api/sheets/drafts/autosave`, {
+          method: 'POST',
+          headers: authHeaders(),
+          credentials: 'include',
+          body: JSON.stringify({ id: null, title, courseId: Number.parseInt(courseId, 10), content, contentFormat: 'html', description, allowDownloads }),
+        })
+        const data = await response.json().catch(() => ({}))
+        if (!response.ok) throw new Error(data.error || 'Draft save failed.')
+        if (data?.draft?.id) setDraftId(data.draft.id)
+      }
+      setSaved(true)
+      setHasUnsavedChanges(false)
+    } catch (err) {
+      setError(err.message || 'Draft save failed.')
+    }
+  }, [allowDownloads, content, courseId, description, draftId, legacyMarkdownMode, title])
+
   async function handleAttachmentSelect(event) {
     const file = event.target.files?.[0]
     if (!file) return
@@ -619,17 +666,12 @@ export default function UploadSheetPage() {
 
   const openHtmlPreview = useCallback(() => {
     if (!Number.isInteger(activeSheetId)) {
-      setError('Import an HTML file first before opening preview.')
-      return
-    }
-
-    if (!canEditHtml) {
-      setError('Import an HTML file first before opening preview.')
+      setError('Save your draft first before opening preview.')
       return
     }
 
     navigate(`/sheets/preview/html/${activeSheetId}`)
-  }, [activeSheetId, canEditHtml, navigate])
+  }, [activeSheetId, navigate])
 
   const uploadAttachment = useCallback(async (sheetIdToUpload) => {
     if (!attachFile) return
@@ -641,6 +683,7 @@ export default function UploadSheetPage() {
 
       const uploadResponse = await fetch(`${API}/api/upload/attachment/${sheetIdToUpload}`, {
         method: 'POST',
+        credentials: 'include',
         body: formData,
       })
       const uploadData = await uploadResponse.json().catch(() => ({}))
@@ -696,7 +739,7 @@ export default function UploadSheetPage() {
     }
 
     if (!Number.isInteger(activeSheetId)) {
-      setError('Import an HTML file before submit.')
+      setError('Save your draft first before submitting.')
       return
     }
     if (!canSubmitHtml) {
@@ -756,6 +799,26 @@ export default function UploadSheetPage() {
       ) : (
         <span style={{ fontSize: 11, color: '#64748b' }}>{legacyMarkdownMode ? 'Draft autosave…' : 'Working draft sync…'}</span>
       )}
+      <button
+        type="button"
+        onClick={saveDraftNow}
+        style={{
+          fontSize: 12,
+          fontWeight: 700,
+          color: '#059669',
+          padding: '6px 12px',
+          background: '#ecfdf5',
+          border: '1px solid #a7f3d0',
+          borderRadius: 8,
+          cursor: 'pointer',
+          fontFamily: FONT,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+        }}
+      >
+        <IconCheck size={13} /> Save Draft
+      </button>
       {isHtmlMode ? (
         <button
           type="button"
@@ -814,7 +877,7 @@ export default function UploadSheetPage() {
         {loading ? 'Saving…' : legacyMarkdownMode ? (isEditing ? 'Save Changes' : 'Publish Sheet') : 'Submit For Review'}
       </button>
     </div>
-  ), [attachUploading, canSubmitHtml, handleSubmit, isEditing, isHtmlMode, legacyMarkdownMode, loading, openHtmlPreview, saved])
+  ), [attachUploading, canSubmitHtml, handleSubmit, isEditing, isHtmlMode, legacyMarkdownMode, loading, openHtmlPreview, saved, saveDraftNow])
 
   if (initializing) {
     return (
@@ -880,7 +943,7 @@ export default function UploadSheetPage() {
         {isHtmlMode ? (
           <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', padding: '14px 20px', marginBottom: 12 }}>
             <label style={{ fontSize: 10, fontWeight: 700, color: '#64748b', letterSpacing: '.06em', display: 'block', marginBottom: 8 }}>
-              HTML IMPORT (STRICT MODE)
+              HTML IMPORT <span style={{ fontSize: 9, color: '#94a3b8', textTransform: 'none', letterSpacing: 0 }}>(optional — or type directly below)</span>
             </label>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <input

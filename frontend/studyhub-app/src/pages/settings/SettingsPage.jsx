@@ -60,6 +60,7 @@ export default function SettingsPage() {
 
     fetch(`${API}/api/settings/me`, {
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
     })
       .then(async (r) => {
         if (!r.ok) throw new Error('Could not load your settings.')
@@ -90,6 +91,7 @@ export default function SettingsPage() {
       const response = await fetch(`${API}/api/settings/${endpoint}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(body),
       })
       const data = await response.json()

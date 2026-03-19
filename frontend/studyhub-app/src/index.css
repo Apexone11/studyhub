@@ -159,7 +159,11 @@
 [data-theme='dark'] div[style*="background: #f8fafc"],
 [data-theme='dark'] div[style*="background: rgb(248, 250, 252)"],
 [data-theme='dark'] div[style*="background: #f1f5f9"],
-[data-theme='dark'] div[style*="background: rgb(241, 245, 249)"] {
+[data-theme='dark'] div[style*="background: rgb(241, 245, 249)"],
+[data-theme='dark'] a[style*="background: #f8fafc"],
+[data-theme='dark'] a[style*="background: rgb(248, 250, 252)"],
+[data-theme='dark'] a[style*="background: #f1f5f9"],
+[data-theme='dark'] a[style*="background: rgb(241, 245, 249)"] {
   background: #1e293b !important;
 }
 
@@ -168,24 +172,50 @@
 [data-theme='dark'] [style*="color: rgb(15, 23, 42)"],
 [data-theme='dark'] h1[style*="color: #0f172a"],
 [data-theme='dark'] h2[style*="color: #0f172a"],
-[data-theme='dark'] h3[style*="color: #0f172a"] {
+[data-theme='dark'] h3[style*="color: #0f172a"],
+[data-theme='dark'] a[style*="color: #0f172a"],
+[data-theme='dark'] a[style*="color: rgb(15, 23, 42)"],
+[data-theme='dark'] span[style*="color: #0f172a"],
+[data-theme='dark'] span[style*="color: rgb(15, 23, 42)"] {
   color: #f1f5f9 !important;
 }
 
 [data-theme='dark'] [style*="color: #1e293b"],
-[data-theme='dark'] [style*="color: rgb(30, 41, 59)"] {
+[data-theme='dark'] [style*="color: rgb(30, 41, 59)"],
+[data-theme='dark'] a[style*="color: #1e293b"],
+[data-theme='dark'] span[style*="color: #1e293b"] {
   color: #e2e8f0 !important;
 }
 
 [data-theme='dark'] [style*="color: #475569"],
-[data-theme='dark'] [style*="color: rgb(71, 85, 105)"] {
+[data-theme='dark'] [style*="color: rgb(71, 85, 105)"],
+[data-theme='dark'] a[style*="color: #475569"],
+[data-theme='dark'] span[style*="color: #475569"] {
   color: #94a3b8 !important;
+}
+
+/* Muted text: #64748b and #94a3b8 */
+[data-theme='dark'] [style*="color: #64748b"],
+[data-theme='dark'] [style*="color: rgb(100, 116, 139)"],
+[data-theme='dark'] span[style*="color: #64748b"] {
+  color: #94a3b8 !important;
+}
+
+/* Article backgrounds (feed cards) */
+[data-theme='dark'] article[style*="background: #fff"],
+[data-theme='dark'] article[style*="background: rgb(255, 255, 255)"] {
+  background: #111827 !important;
+  border-color: #334155 !important;
 }
 
 /* Border overrides */
 [data-theme='dark'] [style*="border-color: #e2e8f0"],
 [data-theme='dark'] [style*="border: 1px solid #e2e8f0"],
-[data-theme='dark'] [style*="border: 1px solid rgb(226, 232, 240)"] {
+[data-theme='dark'] [style*="border: 1px solid rgb(226, 232, 240)"],
+[data-theme='dark'] a[style*="border: 1px solid #e2e8f0"],
+[data-theme='dark'] a[style*="border: 1px solid rgb(226, 232, 240)"],
+[data-theme='dark'] article[style*="border: 1px solid #e2e8f0"],
+[data-theme='dark'] article[style*="border: 1px solid rgb(226, 232, 240)"] {
   border-color: #334155 !important;
 }
 

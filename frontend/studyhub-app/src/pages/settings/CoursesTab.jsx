@@ -22,6 +22,7 @@ export default function CoursesTab({ user, busyKey, setBusyKey, syncUser }) {
 
     fetch(`${API}/api/courses/schools`, {
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
     })
       .then(async (r) => {
         if (!r.ok) throw new Error('Could not load catalog.')
@@ -51,6 +52,7 @@ export default function CoursesTab({ user, busyKey, setBusyKey, syncUser }) {
       const response = await fetch(`${API}/api/settings/courses`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           schoolId: courseSchoolId ? Number(courseSchoolId) : null,
           courseIds: selectedCourseIds,
