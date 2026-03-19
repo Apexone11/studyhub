@@ -618,10 +618,7 @@ export default function AdminPage() {
         <AppSidebar mode={layout.sidebarMode} />
 
         <main style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {!isAdmin ? (
-            // Keep the route shell mounted so non-admin users understand why /admin is unavailable without losing their session.
-            <AccessDeniedCard user={user} />
-          ) : (
+          {isAdmin ? (
             <>
               <section
                 style={{
@@ -1197,6 +1194,9 @@ export default function AdminPage() {
             </section>
               ) : null}
             </>
+          ) : (
+            // Keep the route shell mounted so non-admin users understand why /admin is unavailable without losing their session.
+            <AccessDeniedCard user={user} />
           )}
         </main>
       </div>
@@ -1268,20 +1268,6 @@ const primaryButtonLink = {
   borderRadius: 10,
   background: '#3b82f6',
   color: '#fff',
-  fontSize: 13,
-  fontWeight: 700,
-  textDecoration: 'none',
-}
-
-const secondaryButtonLink = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '10px 16px',
-  borderRadius: 10,
-  border: '1px solid #cbd5e1',
-  background: '#fff',
-  color: '#334155',
   fontSize: 13,
   fontWeight: 700,
   textDecoration: 'none',

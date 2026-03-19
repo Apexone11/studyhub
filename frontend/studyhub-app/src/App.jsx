@@ -6,10 +6,11 @@ import {
   identifyAuthenticatedUser,
   clearAuthenticatedUser
 } from './lib/telemetry'
+import { useBootstrapPreferences } from './lib/useBootstrapPreferences'
 import RouteErrorBoundary from './components/RouteErrorBoundary'
 import { getAuthenticatedHomePath } from './lib/authNavigation'
 import { SessionProvider, useSession } from './lib/session-context'
-import { GOOGLE_CLIENT_ID, API } from './config'
+import { GOOGLE_CLIENT_ID } from './config'
 
 const HomePage = lazy(() => import('./pages/home/HomePage'))
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'))
@@ -78,56 +79,9 @@ function RouteTelemetry() {
  * Runs once after login, then applies from cache on subsequent page loads.
  */
 function PreferencesBootstrap() {
-  const { isAuthenticated } = useSession()
-
-  useEffect(() => {
-    if (!isAuthenticated) return
-
-    // Try localStorage cache first for instant apply
-    try {
-      const cached = localStorage.getItem('studyhub_prefs')
-      if (cached) {
-        const { theme, fontSize } = JSON.parse(cached)
-        if (theme) applyTheme(theme)
-        if (fontSize) applyFontSize(fontSize)
-      }
-    } catch { /* ignore */ }
-
-    // Fetch latest from server and apply
-    fetch(`${API}/api/settings/preferences`, {
-      headers: { 'Content-Type': 'application/json' },
-    })
-      .then((r) => r.ok ? r.json() : null)
-      .then((data) => {
-        if (!data) return
-        if (data.theme) applyTheme(data.theme)
-        if (data.fontSize) applyFontSize(data.fontSize)
-        try {
-          localStorage.setItem('studyhub_prefs', JSON.stringify({ theme: data.theme, fontSize: data.fontSize }))
-        } catch { /* ignore */ }
-      })
-      .catch(() => {})
-  }, [isAuthenticated])
+  useBootstrapPreferences()
 
   return null
-}
-
-function applyTheme(theme) {
-  const root = document.documentElement
-  if (theme === 'dark') {
-    root.setAttribute('data-theme', 'dark')
-  } else if (theme === 'light') {
-    root.removeAttribute('data-theme')
-  } else {
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-    if (prefersDark) root.setAttribute('data-theme', 'dark')
-    else root.removeAttribute('data-theme')
-  }
-}
-
-function applyFontSize(fontSize) {
-  const sizeMap = { small: '14px', medium: '16px', large: '18px' }
-  document.documentElement.style.fontSize = sizeMap[fontSize] || '16px'
 }
 
 function RouteFallback() {

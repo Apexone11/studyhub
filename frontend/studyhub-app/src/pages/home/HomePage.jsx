@@ -153,7 +153,7 @@ export default function HomePage() {
 
   function handleHeroSearch(e) {
     e.preventDefault()
-    if (heroSearch.trim()) navigate(`/sheets?q=${encodeURIComponent(heroSearch.trim())}`)
+    if (heroSearch.trim()) navigate(`/sheets?search=${encodeURIComponent(heroSearch.trim())}`)
   }
 
   return (

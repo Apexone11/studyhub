@@ -1,5 +1,6 @@
 import { Component } from 'react'
 import Joyride from 'react-joyride'
+import { captureComponentError } from '../lib/telemetry'
 
 /**
  * Wraps react-joyride in an error boundary so that React 19 incompatibilities
@@ -14,6 +15,13 @@ class JoyrideErrorBoundary extends Component {
 
   static getDerivedStateFromError() {
     return { hasError: true }
+  }
+
+  componentDidCatch(error, info) {
+    captureComponentError(error, {
+      surface: 'joyride-error-boundary',
+      componentStack: info?.componentStack,
+    })
   }
 
   render() {

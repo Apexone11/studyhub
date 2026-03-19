@@ -107,6 +107,7 @@ export default function RegisterScreen() {
   const [customCourses, setCustomCourses] = useState([])
   const [customCourseDraft, setCustomCourseDraft] = useState({ code: '', name: '' })
   const [googleCredential, setGoogleCredential] = useState(isGoogleCourseFlow ? googleState.tempCredential : null)
+  const [pendingLocalUser, setPendingLocalUser] = useState(null)
 
   /* Form state for account step */
   const [form, setForm] = useState({
@@ -216,8 +217,10 @@ export default function RegisterScreen() {
         return
       }
 
-      /* Account created — authenticate and move to course selection */
-      completeAuthentication(data.user)
+      /* Keep the user on the onboarding route until course setup is finished.
+        PublicRoute redirects authenticated users away from /register, so the
+        local account flow defers session completion until setup is submitted. */
+      setPendingLocalUser(data.user)
       setStep('courses')
       setSuccess('Account created! Now choose your courses, or skip for now.')
     } catch {
@@ -358,6 +361,9 @@ export default function RegisterScreen() {
       }
 
       /* Navigate to authenticated home */
+      if (pendingLocalUser) {
+        completeAuthentication(pendingLocalUser)
+      }
       trackSignupConversion()
       navigate('/feed', { replace: true })
     } catch {

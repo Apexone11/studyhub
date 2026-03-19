@@ -1,12 +1,16 @@
-// LoginPage.test validates the legacy email-verification branch from the auth route folder.
+// LoginPage.test covers the current direct sign-in flow for local accounts.
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { SessionProvider } from '../../lib/session-context'
 import { server } from '../../test/server'
 import LoginPage from './LoginPage'
+
+vi.mock('@react-oauth/google', () => ({
+  GoogleLogin: () => null,
+}))
 
 function renderLoginPage() {
   return render(
@@ -23,40 +27,16 @@ function renderLoginPage() {
 }
 
 describe('LoginPage', () => {
-  it('lets legacy users add and verify an email before sign-in completes', async () => {
+  it('signs students in immediately and routes them to the feed', async () => {
     const user = userEvent.setup()
-    let sendPayload = null
-    let verifyPayload = null
+    let loginPayload = null
 
     server.use(
       http.get('http://localhost:4000/api/auth/me', () => (
         HttpResponse.json({ error: 'Unauthorized' }, { status: 401 })
       )),
-      http.post('http://localhost:4000/api/auth/login', () => (
-        HttpResponse.json({
-          requiresEmailVerification: true,
-          verificationToken: 'login-token',
-          emailRequired: true,
-          emailHint: '',
-          email: null,
-          expiresAt: '2026-03-16T12:15:00.000Z',
-          resendAvailableAt: '2026-03-16T12:01:00.000Z',
-        })
-      )),
-      http.post('http://localhost:4000/api/auth/login/verification/send', async ({ request }) => {
-        sendPayload = await request.json()
-        return HttpResponse.json({
-          requiresEmailVerification: true,
-          verificationToken: 'login-token',
-          emailRequired: false,
-          emailHint: 'le***@studyhub.test',
-          email: 'legacy_user@studyhub.test',
-          expiresAt: '2026-03-16T12:15:00.000Z',
-          resendAvailableAt: '2026-03-16T12:01:00.000Z',
-        })
-      }),
-      http.post('http://localhost:4000/api/auth/login/verification/verify', async ({ request }) => {
-        verifyPayload = await request.json()
+      http.post('http://localhost:4000/api/auth/login', async ({ request }) => {
+        loginPayload = await request.json()
         return HttpResponse.json({
           user: {
             id: 9,
@@ -73,6 +53,9 @@ describe('LoginPage', () => {
           },
         })
       }),
+      http.get('http://localhost:4000/api/notifications', () => (
+        HttpResponse.json({ notifications: [], unreadCount: 0 })
+      )),
     )
 
     renderLoginPage()
@@ -81,27 +64,15 @@ describe('LoginPage', () => {
     await user.type(screen.getByLabelText('Password'), 'Password123')
     await user.click(screen.getByRole('button', { name: 'Sign In' }))
 
-    await screen.findByRole('heading', { name: 'Verify your email' })
-    await user.type(screen.getByLabelText('Email Address'), 'legacy_user@studyhub.test')
-    await user.click(screen.getByRole('button', { name: 'Send / Resend Code' }))
-
-    expect(sendPayload).toMatchObject({
-      verificationToken: 'login-token',
-      email: 'legacy_user@studyhub.test',
-    })
-
-    await user.type(screen.getByLabelText('Verification Code'), '654321')
-    await user.click(screen.getByRole('button', { name: 'Verify Email' }))
-
-    expect(verifyPayload).toMatchObject({
-      verificationToken: 'login-token',
-      code: '654321',
+    expect(loginPayload).toMatchObject({
+      username: 'legacy_user',
+      password: 'Password123',
     })
 
     await screen.findByText('Feed ready')
   })
 
-  it('disables resend while verification cooldown is active', async () => {
+  it('shows recovery guidance when sign-in fails with forgot-password support', async () => {
     const user = userEvent.setup()
 
     server.use(
@@ -110,14 +81,9 @@ describe('LoginPage', () => {
       )),
       http.post('http://localhost:4000/api/auth/login', () => (
         HttpResponse.json({
-          requiresEmailVerification: true,
-          verificationToken: 'cooldown-token',
-          emailRequired: false,
-          emailHint: 'co***@studyhub.test',
-          email: 'cooldown_user@studyhub.test',
-          expiresAt: '2099-03-16T12:15:00.000Z',
-          resendAvailableAt: '2099-03-16T12:01:00.000Z',
-        })
+          error: 'Invalid username or password.',
+          showForgot: true,
+        }, { status: 401 })
       )),
     )
 
@@ -127,10 +93,7 @@ describe('LoginPage', () => {
     await user.type(screen.getByLabelText('Password'), 'Password123')
     await user.click(screen.getByRole('button', { name: 'Sign In' }))
 
-    await screen.findByRole('heading', { name: 'Verify your email' })
-
-    const resendButton = screen.getByRole('button', { name: /Resend in/i })
-    expect(resendButton).toBeDisabled()
-    expect(screen.getByText(/You can request another verification code in/i)).toBeInTheDocument()
+    await screen.findByText('Invalid username or password.')
+    expect(screen.getByText('Use the link above to reset your password.')).toBeInTheDocument()
   })
 })

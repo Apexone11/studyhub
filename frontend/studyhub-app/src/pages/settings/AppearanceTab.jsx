@@ -1,43 +1,40 @@
 import { useEffect } from 'react'
-import { Button, FormField, MsgList, SectionCard, Select, usePreferences } from './settingsShared'
-
-function applyThemeToDOM(theme) {
-  const root = document.documentElement
-  if (theme === 'dark') {
-    root.setAttribute('data-theme', 'dark')
-  } else if (theme === 'light') {
-    root.removeAttribute('data-theme')
-  } else {
-    // system — check OS preference
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-    if (prefersDark) root.setAttribute('data-theme', 'dark')
-    else root.removeAttribute('data-theme')
-  }
-}
-
-function applyFontSizeToDOM(fontSize) {
-  const root = document.documentElement
-  const sizeMap = { small: '14px', medium: '16px', large: '18px' }
-  root.style.fontSize = sizeMap[fontSize] || '16px'
-}
+import {
+  applyFontSize,
+  applyTheme,
+  writeCachedAppearancePreferences,
+} from '../../lib/appearance'
+import { useSession } from '../../lib/session-context'
+import { Button, FormField, MsgList, SectionCard, Select } from './settingsShared'
+import { usePreferences } from './settingsState'
 
 export default function AppearanceTab() {
-  const { prefs, setPrefs, loading, saving, msg, save } = usePreferences()
+  const { user } = useSession()
+  const { prefs, setPrefs, loading, saving, msg, loadError, save, retry } = usePreferences()
 
   /* Apply theme and font size to the DOM in real-time as the user changes them */
   const currentTheme = prefs?.theme
   const currentFontSize = prefs?.fontSize
 
   useEffect(() => {
-    if (currentTheme) applyThemeToDOM(currentTheme)
+    if (currentTheme) applyTheme(currentTheme)
   }, [currentTheme])
 
   useEffect(() => {
-    if (currentFontSize) applyFontSizeToDOM(currentFontSize)
+    if (currentFontSize) applyFontSize(currentFontSize)
   }, [currentFontSize])
 
-  if (loading || !prefs) {
+  if (loading) {
     return <SectionCard title="Appearance"><div style={{ color: '#64748b', fontSize: 13 }}>Loading preferences...</div></SectionCard>
+  }
+
+  if (!prefs) {
+    return (
+      <SectionCard title="Appearance" subtitle="StudyHub could not load your appearance preferences right now.">
+        <MsgList msg={{ type: 'error', text: loadError || 'Could not load preferences.' }} />
+        <Button secondary onClick={retry}>Retry</Button>
+      </SectionCard>
+    )
   }
 
   return (
@@ -102,9 +99,14 @@ export default function AppearanceTab() {
       </SectionCard>
 
       <MsgList msg={msg} />
-      <Button disabled={saving} onClick={() => {
-        save(['theme', 'fontSize'], 'Appearance preferences saved.')
-        try { localStorage.setItem('studyhub_prefs', JSON.stringify({ theme: prefs.theme, fontSize: prefs.fontSize })) } catch { /* ignore */ }
+      <Button disabled={saving} onClick={async () => {
+        const saved = await save(['theme', 'fontSize'], 'Appearance preferences saved.')
+
+        if (!saved) {
+          return
+        }
+
+        writeCachedAppearancePreferences({ theme: prefs.theme, fontSize: prefs.fontSize }, user?.id)
       }}>
         {saving ? 'Saving...' : 'Save Appearance Preferences'}
       </Button>

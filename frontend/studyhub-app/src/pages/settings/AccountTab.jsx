@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { API } from '../../config'
-import { Button, FONT, FormField, Input, Message, MsgList, SectionCard } from './settingsShared'
+import { Button, FormField, Input, Message, MsgList, SectionCard } from './settingsShared'
+import { FONT } from './settingsState'
 
 const DELETION_REASONS = [
   { value: 'better_platform', label: 'Found a better platform' },

@@ -14,7 +14,7 @@
  *
  * Tutorial: First-visit Joyride highlights search, filters, upload, toggles.
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
 import AppSidebar from '../../components/AppSidebar'
@@ -211,6 +211,35 @@ export default function SheetsPage() {
     () => catalog.find((school) => String(school.id) === schoolId) || null,
     [catalog, schoolId],
   )
+
+  useEffect(() => {
+    const legacySearch = searchParams.get('q') || ''
+    const legacyCourseId = searchParams.get('course') || ''
+    const nextSearch = searchParams.get('search') || ''
+    const nextCourseId = searchParams.get('courseId') || ''
+
+    if (!legacySearch && !legacyCourseId) {
+      return
+    }
+
+    const nextParams = new URLSearchParams(searchParams)
+
+    if (legacySearch && !nextSearch) {
+      nextParams.set('search', legacySearch)
+    }
+    if (legacySearch) {
+      nextParams.delete('q')
+    }
+
+    if (legacyCourseId && !nextCourseId) {
+      nextParams.set('courseId', legacyCourseId)
+    }
+    if (legacyCourseId) {
+      nextParams.delete('course')
+    }
+
+    setSearchParams(nextParams, { replace: true })
+  }, [searchParams, setSearchParams])
 
   const loadCatalog = useCallback(async ({ signal, startTransition } = {}) => {
     const apply = startTransition || ((fn) => fn())

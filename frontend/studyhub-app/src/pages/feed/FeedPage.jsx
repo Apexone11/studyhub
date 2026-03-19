@@ -41,6 +41,86 @@ import { FEED_STEPS } from '../../lib/tutorialSteps'
 /* ── Shared constants ──────────────────────────────────────────────────── */
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 const FILTERS = ['all', 'posts', 'sheets', 'announcements']
+const commentSectionContainerStyle = {
+  marginTop: 14,
+  borderTop: '1px solid #f1f5f9',
+  paddingTop: 12,
+}
+const commentToggleButtonStyle = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 6,
+  background: 'none',
+  border: 'none',
+  color: '#64748b',
+  fontSize: 13,
+  fontWeight: 700,
+  cursor: 'pointer',
+  padding: 0,
+  fontFamily: FONT,
+}
+const commentExpandedContentStyle = { marginTop: 12 }
+const commentInputRowStyle = { display: 'flex', gap: 8, marginBottom: 12 }
+const commentTextareaStyle = {
+  width: '100%',
+  resize: 'vertical',
+  borderRadius: 10,
+  border: '1px solid #e2e8f0',
+  padding: '8px 12px',
+  fontSize: 13,
+  fontFamily: FONT,
+  color: '#0f172a',
+  boxSizing: 'border-box',
+}
+const commentInputFooterStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginTop: 6,
+}
+const commentMetaTextStyle = { color: '#94a3b8', fontSize: 13, padding: '8px 0' }
+const commentErrorTextStyle = { color: '#dc2626', fontSize: 12, marginTop: 4 }
+const commentListStyle = { display: 'grid', gap: 8 }
+const commentItemStyle = {
+  display: 'flex',
+  gap: 8,
+  padding: '8px 10px',
+  borderRadius: 10,
+  background: '#f8fafc',
+}
+const commentHeaderStyle = { display: 'flex', justifyContent: 'space-between', gap: 8 }
+const commentAuthorStyle = { fontSize: 12, fontWeight: 700, color: '#0f172a' }
+const commentTimestampStyle = { fontSize: 11, color: '#94a3b8', marginLeft: 8 }
+const commentDeleteButtonStyle = {
+  background: 'none',
+  border: 'none',
+  color: '#94a3b8',
+  fontSize: 11,
+  cursor: 'pointer',
+  padding: '0 4px',
+  fontFamily: FONT,
+}
+const commentBodyStyle = {
+  margin: '2px 0 0',
+  fontSize: 13,
+  color: '#475569',
+  lineHeight: 1.6,
+  whiteSpace: 'pre-wrap',
+}
+
+function commentButtonStyle(hasValue, posting) {
+  return {
+    borderRadius: 8,
+    border: 'none',
+    background: hasValue ? '#3b82f6' : '#e2e8f0',
+    color: hasValue ? '#fff' : '#94a3b8',
+    padding: '6px 14px',
+    fontSize: 12,
+    fontWeight: 700,
+    cursor: posting || !hasValue ? 'not-allowed' : 'pointer',
+    fontFamily: FONT,
+  }
+}
 
 function authHeaders() {
   return { 'Content-Type': 'application/json' }
@@ -168,35 +248,204 @@ function EmptyFeed({ message }) {
   )
 }
 
-function CommentSection({ postId, commentCount, user }) {
-  const [expanded, setExpanded] = useState(false)
+function useComments(postId, initialCount = 0) {
   const [comments, setComments] = useState([])
-  const [total, setTotal] = useState(commentCount || 0)
-  const [loadingComments, setLoadingComments] = useState(false)
-  const [newComment, setNewComment] = useState('')
+  const [total, setTotal] = useState(initialCount)
+  const [loading, setLoading] = useState(false)
   const [posting, setPosting] = useState(false)
-  const [commentError, setCommentError] = useState('')
+  const [error, setError] = useState('')
   const loadedRef = useRef(false)
 
+  useEffect(() => {
+    if (!loadedRef.current) {
+      setTotal(initialCount)
+    }
+  }, [initialCount])
+
   const loadComments = useCallback(async () => {
-    setLoadingComments(true)
+    if (loadedRef.current) {
+      return
+    }
+
+    loadedRef.current = true
+    setLoading(true)
+
     try {
-      const res = await fetch(`${API}/api/feed/posts/${postId}/comments?limit=50`, { headers: authHeaders() })
-      if (res.ok) {
-        const data = await res.json()
-        setComments(data.comments || [])
-        setTotal(data.total || 0)
+      const response = await fetch(`${API}/api/feed/posts/${postId}/comments?limit=50`, {
+        headers: authHeaders(),
+      })
+      const data = await readJsonSafely(response, {})
+
+      if (!response.ok) {
+        loadedRef.current = false
+        return
       }
-    } catch { /* silent */ } finally {
-      setLoadingComments(false)
+
+      const nextComments = Array.isArray(data.comments) ? data.comments : []
+      setComments(nextComments)
+      setTotal(typeof data.total === 'number' ? data.total : nextComments.length)
+    } catch {
+      loadedRef.current = false
+    } finally {
+      setLoading(false)
     }
   }, [postId])
+
+  const postComment = useCallback(async (text) => {
+    const content = text.trim()
+
+    if (!content) {
+      return false
+    }
+
+    setPosting(true)
+    setError('')
+
+    try {
+      const response = await fetch(`${API}/api/feed/posts/${postId}/comments`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ content }),
+      })
+      const data = await readJsonSafely(response, {})
+
+      if (!response.ok) {
+        setError(getApiErrorMessage(data, 'Could not post comment.'))
+        return false
+      }
+
+      loadedRef.current = true
+      setComments((current) => [data, ...current])
+      setTotal((current) => current + 1)
+      return true
+    } catch {
+      setError('Could not connect to the server.')
+      return false
+    } finally {
+      setPosting(false)
+    }
+  }, [postId])
+
+  const deleteComment = useCallback(async (commentId) => {
+    try {
+      const response = await fetch(`${API}/api/feed/posts/${postId}/comments/${commentId}`, {
+        method: 'DELETE',
+        headers: authHeaders(),
+      })
+
+      if (response.ok) {
+        setComments((current) => current.filter((comment) => comment.id !== commentId))
+        setTotal((current) => Math.max(0, current - 1))
+      }
+    } catch {
+      /* silent */
+    }
+  }, [postId])
+
+  return {
+    comments,
+    total,
+    loading,
+    posting,
+    error,
+    setError,
+    loadComments,
+    postComment,
+    deleteComment,
+  }
+}
+
+function CommentInput({ user, value, onChange, onSubmit, posting, error }) {
+  const hasValue = Boolean(value.trim())
+  const { length } = value
+
+  return (
+    <div style={commentInputRowStyle}>
+      <Avatar username={user?.username} role={user?.role} size={32} />
+      <div style={{ flex: 1 }}>
+        <textarea
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder="Write a comment..."
+          rows={2}
+          style={commentTextareaStyle}
+        />
+        <div style={commentInputFooterStyle}>
+          <span style={{ fontSize: 11, color: length > 500 ? '#dc2626' : '#94a3b8' }}>
+            {length}/500
+          </span>
+          <button
+            type="button"
+            onClick={onSubmit}
+            disabled={posting || !hasValue}
+            style={commentButtonStyle(hasValue, posting)}
+          >
+            {posting ? 'Posting...' : 'Comment'}
+          </button>
+        </div>
+        {error ? <div style={commentErrorTextStyle}>{error}</div> : null}
+      </div>
+    </div>
+  )
+}
+
+function CommentList({ comments, loading, user, onDelete }) {
+  if (loading) {
+    return <div style={commentMetaTextStyle}>Loading comments...</div>
+  }
+
+  if (comments.length === 0) {
+    return <div style={commentMetaTextStyle}>No comments yet. Be the first!</div>
+  }
+
+  return (
+    <div style={commentListStyle}>
+      {comments.map((comment) => (
+        <div key={comment.id} style={commentItemStyle}>
+          <Avatar username={comment.author?.username} role="student" size={28} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={commentHeaderStyle}>
+              <div>
+                <span style={commentAuthorStyle}>{comment.author?.username || 'Unknown'}</span>
+                <span style={commentTimestampStyle}>{timeAgo(comment.createdAt)}</span>
+              </div>
+              {(comment.author?.id === user?.id || user?.role === 'admin') ? (
+                <button
+                  type="button"
+                  onClick={() => onDelete(comment.id)}
+                  style={commentDeleteButtonStyle}
+                >
+                  Delete
+                </button>
+              ) : null}
+            </div>
+            <p style={commentBodyStyle}>{comment.content}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function CommentSection({ postId, commentCount, user }) {
+  const [expanded, setExpanded] = useState(false)
+  const [newComment, setNewComment] = useState('')
+  const {
+    comments,
+    total,
+    loading,
+    posting,
+    error,
+    setError,
+    loadComments,
+    postComment,
+    deleteComment,
+  } = useComments(postId, commentCount || 0)
 
   const handleToggle = () => {
     const next = !expanded
     setExpanded(next)
-    if (next && !loadedRef.current) {
-      loadedRef.current = true
+    if (next) {
       loadComments()
     }
   }
@@ -204,131 +453,44 @@ function CommentSection({ postId, commentCount, user }) {
   const handlePost = async () => {
     const text = newComment.trim()
     if (!text) return
-    if (text.length > 500) { setCommentError('Comment must be 500 characters or fewer.'); return }
+    if (text.length > 500) {
+      setError('Comment must be 500 characters or fewer.')
+      return
+    }
 
-    setPosting(true)
-    setCommentError('')
-    try {
-      const res = await fetch(`${API}/api/feed/posts/${postId}/comments`, {
-        method: 'POST',
-        headers: authHeaders(),
-        body: JSON.stringify({ content: text }),
-      })
-      const data = await res.json()
-      if (!res.ok) { setCommentError(data.error || 'Could not post comment.'); return }
-      setComments((c) => [data, ...c])
-      setTotal((t) => t + 1)
+    const posted = await postComment(text)
+    if (posted) {
       setNewComment('')
-    } catch {
-      setCommentError('Could not connect to the server.')
-    } finally {
-      setPosting(false)
     }
   }
 
-  const handleDelete = async (commentId) => {
-    try {
-      const res = await fetch(`${API}/api/feed/posts/${postId}/comments/${commentId}`, {
-        method: 'DELETE',
-        headers: authHeaders(),
-      })
-      if (res.ok) {
-        setComments((c) => c.filter((cm) => cm.id !== commentId))
-        setTotal((t) => Math.max(0, t - 1))
-      }
-    } catch { /* silent */ }
-  }
-
   return (
-    <div style={{ marginTop: 14, borderTop: '1px solid #f1f5f9', paddingTop: 12 }}>
-      <button
-        type="button"
-        onClick={handleToggle}
-        style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          background: 'none', border: 'none', color: '#64748b',
-          fontSize: 13, fontWeight: 700, cursor: 'pointer', padding: 0, fontFamily: FONT,
-        }}
-      >
+    <div style={commentSectionContainerStyle}>
+      <button type="button" onClick={handleToggle} style={commentToggleButtonStyle}>
         {expanded ? '\u25BE' : '\u25B8'} {total} {total === 1 ? 'comment' : 'comments'}
       </button>
 
       {expanded && (
-        <div style={{ marginTop: 12 }}>
-          {/* Comment input */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-            <Avatar username={user?.username} role="student" size={32} />
-            <div style={{ flex: 1 }}>
-              <textarea
-                value={newComment}
-                onChange={(e) => { setNewComment(e.target.value); setCommentError('') }}
-                placeholder="Write a comment..."
-                rows={2}
-                style={{
-                  width: '100%', resize: 'vertical', borderRadius: 10,
-                  border: '1px solid #e2e8f0', padding: '8px 12px',
-                  fontSize: 13, fontFamily: FONT, color: '#0f172a', boxSizing: 'border-box',
-                }}
-              />
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
-                <span style={{ fontSize: 11, color: newComment.length > 500 ? '#dc2626' : '#94a3b8' }}>
-                  {newComment.length}/500
-                </span>
-                <button
-                  type="button"
-                  onClick={handlePost}
-                  disabled={posting || !newComment.trim()}
-                  style={{
-                    borderRadius: 8, border: 'none',
-                    background: newComment.trim() ? '#3b82f6' : '#e2e8f0',
-                    color: newComment.trim() ? '#fff' : '#94a3b8',
-                    padding: '6px 14px', fontSize: 12, fontWeight: 700,
-                    cursor: posting || !newComment.trim() ? 'not-allowed' : 'pointer',
-                    fontFamily: FONT,
-                  }}
-                >
-                  {posting ? 'Posting...' : 'Comment'}
-                </button>
-              </div>
-              {commentError && <div style={{ color: '#dc2626', fontSize: 12, marginTop: 4 }}>{commentError}</div>}
-            </div>
-          </div>
-
-          {/* Comment list */}
-          {loadingComments ? (
-            <div style={{ color: '#94a3b8', fontSize: 13, padding: '8px 0' }}>Loading comments...</div>
-          ) : comments.length === 0 ? (
-            <div style={{ color: '#94a3b8', fontSize: 13, padding: '8px 0' }}>No comments yet. Be the first!</div>
-          ) : (
-            <div style={{ display: 'grid', gap: 8 }}>
-              {comments.map((cm) => (
-                <div key={cm.id} style={{ display: 'flex', gap: 8, padding: '8px 10px', borderRadius: 10, background: '#f8fafc' }}>
-                  <Avatar username={cm.author?.username} role="student" size={28} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                      <div>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: '#0f172a' }}>{cm.author?.username || 'Unknown'}</span>
-                        <span style={{ fontSize: 11, color: '#94a3b8', marginLeft: 8 }}>{timeAgo(cm.createdAt)}</span>
-                      </div>
-                      {(cm.author?.id === user?.id || user?.role === 'admin') && (
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(cm.id)}
-                          style={{
-                            background: 'none', border: 'none', color: '#94a3b8',
-                            fontSize: 11, cursor: 'pointer', padding: '0 4px', fontFamily: FONT,
-                          }}
-                        >
-                          Delete
-                        </button>
-                      )}
-                    </div>
-                    <p style={{ margin: '2px 0 0', fontSize: 13, color: '#475569', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{cm.content}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+        <div style={commentExpandedContentStyle}>
+          <CommentInput
+            user={user}
+            value={newComment}
+            onChange={(value) => {
+              setNewComment(value)
+              if (error) {
+                setError('')
+              }
+            }}
+            onSubmit={handlePost}
+            posting={posting}
+            error={error}
+          />
+          <CommentList
+            comments={comments}
+            loading={loading}
+            user={user}
+            onDelete={deleteComment}
+          />
         </div>
       )}
     </div>

@@ -250,7 +250,6 @@ async function main() {
     let emailVerificationCode = ''
     let registerVerificationToken = ''
     let registerVerificationCode = ''
-    let twoFactorCode = ''
     let sheetAttachmentPath = ''
     let lockedPostAttachmentPath = ''
 
@@ -386,22 +385,6 @@ async function main() {
       return `${response.status} emailVerified=${data.user.emailVerified}`
     })
 
-    await check('enable-student-2fa', async () => {
-      const response = await fetch(`${baseUrl}/api/settings/2fa/enable`, {
-        method: 'PATCH',
-        headers: {
-          'content-type': 'application/json',
-          cookie: studentCookie,
-        },
-        body: JSON.stringify({ password: studentPassword }),
-      })
-      const data = await response.json()
-      if (response.status !== 200 || data.twoFaEnabled !== true) {
-        throw new Error(JSON.stringify(data))
-      }
-      return `${response.status} twoFaEnabled=${data.twoFaEnabled}`
-    })
-
     await check('login-fake-user', async () => {
       const response = await fetch(`${baseUrl}/api/auth/login`, {
         method: 'POST',
@@ -415,7 +398,7 @@ async function main() {
       return data.error
     })
 
-    await check('login-student-2fa-start', async () => {
+    await check('login-student-direct-after-email-verify', async () => {
       const response = await fetch(`${baseUrl}/api/auth/login`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -425,33 +408,11 @@ async function main() {
         }),
       })
       const data = await response.json()
-      if (response.status !== 200 || !data.requires2fa) {
-        throw new Error(JSON.stringify(data))
-      }
-      return `${response.status} hint=${data.deliveryHint || 'none'}`
-    })
-
-    await check('capture-2fa-email', async () => {
-      const capturedEmail = await waitForCapturedEmail(emailCaptureDir, 'two-factor', studentEmail)
-      twoFactorCode = extractSixDigitCode(`${capturedEmail.text}\n${capturedEmail.html}`)
-      return `code=${twoFactorCode}`
-    })
-
-    await check('verify-student-2fa', async () => {
-      const response = await fetch(`${baseUrl}/api/auth/verify-2fa`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          username: studentUsername,
-          code: twoFactorCode,
-        }),
-      })
-      const data = await response.json()
-      if (response.status !== 200 || !data.user?.twoFaEnabled) {
+      if (response.status !== 200 || !data.user) {
         throw new Error(JSON.stringify(data))
       }
       studentCookie = syncSessionCookie(studentCookie, response, data, csrfTokenByCookie)
-      return `${response.status} twoFaEnabled=${data.user.twoFaEnabled}`
+      return `${response.status} user=${data.user.username}`
     })
 
     await check('forgot-password-verified-email', async () => {
@@ -1029,10 +990,10 @@ async function main() {
         headers: { cookie: adminCookie },
       })
       const data = await response.json()
-      if (response.status !== 200 || !Array.isArray(data)) {
+      if (response.status !== 200 || !Array.isArray(data.notes)) {
         throw new Error(JSON.stringify(data))
       }
-      return `${response.status} count=${data.length}`
+      return `${response.status} count=${data.total}`
     })
 
     await check('notifications-index', async () => {

@@ -4,6 +4,7 @@ const requireAuth = require('../middleware/auth')
 const { captureError } = require('../monitoring/sentry')
 const { createNotification } = require('../lib/notify')
 const { getAuthTokenFromRequest, verifyAuthToken } = require('../lib/authTokens')
+const { getProfileAccessDecision, PROFILE_VISIBILITY } = require('../lib/profileVisibility')
 const prisma = require('../lib/prisma')
 
 const router = express.Router()
@@ -61,46 +62,14 @@ router.get('/:username', optionalAuth, async (req, res) => {
 
     if (!user) return res.status(404).json({ error: 'User not found.' })
 
-    /* ── Profile-visibility enforcement ────────────────────────────
-     * Reads the target user's UserPreferences.profileVisibility:
-     *   "public"   → visible to everyone (default)
-     *   "enrolled" → visible only to classmates sharing ≥ 1 course
-     *   "private"  → visible only to the profile owner and admins
-     * Own profile and admin viewers always bypass. */
-    const isOwn = req.user?.userId === user.id
-    const isAdmin = req.user?.role === 'admin'
+    const accessDecision = await getProfileAccessDecision(prisma, req.user, user.id)
 
-    if (!isOwn && !isAdmin) {
-      const prefs = await prisma.userPreferences.findUnique({
-        where: { userId: user.id },
-        select: { profileVisibility: true },
-      })
-      const visibility = prefs?.profileVisibility || 'public'
+    if (!accessDecision.allowed) {
+      const errorMessage = accessDecision.visibility === PROFILE_VISIBILITY.PRIVATE
+        ? 'This profile is private.'
+        : 'This profile is only visible to classmates.'
 
-      if (visibility === 'private') {
-        return res.status(403).json({ error: 'This profile is private.' })
-      }
-
-      if (visibility === 'enrolled') {
-        /* Check if the viewer shares at least one course with the target.
-         * Single query using a relational filter — Prisma translates this
-         * to an EXISTS subquery, avoiding the N+1 two-query pattern. */
-        if (!req.user?.userId) {
-          return res.status(403).json({ error: 'This profile is only visible to classmates.' })
-        }
-        const sharedCourse = await prisma.enrollment.findFirst({
-          where: {
-            userId: req.user.userId,
-            course: {
-              enrollments: { some: { userId: user.id } },
-            },
-          },
-          select: { id: true },
-        })
-        if (!sharedCourse) {
-          return res.status(403).json({ error: 'This profile is only visible to classmates.' })
-        }
-      }
+      return res.status(403).json({ error: errorMessage })
     }
 
     let isFollowing = false

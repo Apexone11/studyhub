@@ -7,7 +7,7 @@ const require = createRequire(import.meta.url)
 const adminRoutePath = require.resolve('../src/routes/admin')
 
 const mocks = vi.hoisted(() => {
-  const state = { role: 'student', twoFaEnabled: true }
+  const state = { role: 'student' }
   const prisma = {
     user: {
       count: vi.fn(),
@@ -105,11 +105,9 @@ beforeEach(() => {
   vi.clearAllMocks()
 
   mocks.state.role = 'student'
-  mocks.state.twoFaEnabled = true
   mocks.prisma.user.findUnique.mockImplementation(async () => ({
     id: 42,
     role: mocks.state.role,
-    twoFaEnabled: mocks.state.twoFaEnabled,
   }))
   mocks.prisma.user.count.mockResolvedValue(36)
   mocks.prisma.studySheet.count.mockResolvedValue(19)
@@ -193,18 +191,19 @@ describe('admin routes', () => {
     expect(mocks.prisma.user.count).not.toHaveBeenCalled()
   })
 
-  it('returns ADMIN_MFA_REQUIRED for admins without 2FA enabled', async () => {
+  it('still returns admin stats for admins without 2FA enabled', async () => {
     mocks.state.role = 'admin'
-    mocks.state.twoFaEnabled = false
 
     const response = await request(app).get('/stats')
 
-    expect(response.status).toBe(403)
+    expect(response.status).toBe(200)
     expect(response.body).toMatchObject({
-      error: 'Enable 2-step verification in Settings before using admin tools.',
-      code: 'ADMIN_MFA_REQUIRED',
+      totalUsers: 36,
+      totalSheets: 19,
+      totalComments: 14,
+      flaggedRequests: 4,
     })
-    expect(mocks.prisma.user.count).not.toHaveBeenCalled()
+    expect(mocks.prisma.user.count).toHaveBeenCalled()
   })
 
   it('still returns admin stats for authenticated admins', async () => {

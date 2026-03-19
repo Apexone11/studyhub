@@ -28,6 +28,14 @@ import {
   reduceScanState,
 } from './uploadSheetWorkflow'
 
+function useSafeBlocker(predicate) {
+  try {
+    return useBlocker(predicate)
+  } catch {
+    return { state: 'unblocked' }
+  }
+}
+
 /* ── Shared constants ──────────────────────────────────────────────────── */
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 
@@ -273,7 +281,7 @@ export default function UploadSheetPage() {
   }, [hasUnsavedChanges])
 
   /* ── React Router blocker: intercepts in-app navigation with unsaved changes ── */
-  const blocker = useBlocker(
+  const blocker = useSafeBlocker(
     ({ currentLocation, nextLocation }) =>
       hasUnsavedChanges && currentLocation.pathname !== nextLocation.pathname,
   )
@@ -284,7 +292,7 @@ export default function UploadSheetPage() {
       pendingBlockerRef.current = blocker
       setShowLeaveDialog(true)
     }
-  }, [blocker.state])
+  }, [blocker])
 
   /* User confirmed leaving — proceed with blocked navigation */
   const confirmLeave = useCallback(() => {
@@ -798,11 +806,11 @@ export default function UploadSheetPage() {
                 Scan: {scanState.status}
               </span>
             </div>
-            {!canEditHtml ? (
+            {canEditHtml ? null : (
               <div style={{ marginTop: 8, fontSize: 12, color: '#b45309' }}>
                 Import HTML first. Direct posting is disabled in strict beta workflow.
               </div>
-            ) : null}
+            )}
           </div>
         ) : null}
 

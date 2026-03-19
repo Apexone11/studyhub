@@ -182,12 +182,31 @@ export function trackSignupConversion() {
   })
 }
 
-function createFallbackEventId() {
+function createFallbackEventId(surface = 'client') {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID()
   }
 
-  return `route-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+  return `${surface}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+}
+
+export function captureComponentError(error, context = {}) {
+  const { surface = 'component-error', ...extra } = context
+  let eventId = ''
+
+  if (sentryInitialized) {
+    eventId = Sentry.captureException(error, {
+      tags: { surface },
+      extra,
+    }) || ''
+  }
+
+  if (!eventId) {
+    eventId = createFallbackEventId(surface)
+  }
+
+  console.error('Component error captured.', { eventId, surface, ...extra, error })
+  return eventId
 }
 
 export function captureRouteCrash(error, context = {}) {
@@ -201,7 +220,7 @@ export function captureRouteCrash(error, context = {}) {
   }
 
   if (!eventId) {
-    eventId = createFallbackEventId()
+    eventId = createFallbackEventId('route')
   }
 
   console.error('Route render crashed.', { eventId, ...context, error })

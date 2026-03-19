@@ -1,7 +1,18 @@
 import { expect, test } from '@playwright/test'
 import { mockAuthenticatedApp } from './helpers/mockStudyHubApi'
 
+async function disableTutorials(page) {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('tutorial_feed_seen', '1')
+    window.localStorage.setItem('tutorial_sheets_seen', '1')
+    window.localStorage.setItem('tutorial_dashboard_seen', '1')
+    window.localStorage.setItem('tutorial_notes_seen', '1')
+    window.localStorage.setItem('studyhub.upload.tutorial.v1', '1')
+  })
+}
+
 test('strict html upload flow blocks submit before import and allows submit after passing scan @smoke', async ({ page }) => {
+  await disableTutorials(page)
   await mockAuthenticatedApp(page)
 
   await page.route('**/api/sheets/drafts/latest', async (route) => {
@@ -98,7 +109,7 @@ test('strict html upload flow blocks submit before import and allows submit afte
   })
 
   await page.goto('/sheets/upload')
-  await expect(page.getByText('Direct posting is disabled in strict beta workflow.')).toBeVisible()
+  await expect(page.getByText('Import HTML first. Direct posting is disabled in strict beta workflow.')).toBeVisible()
 
   const submitButton = page.getByRole('button', { name: 'Submit For Review' })
   await expect(submitButton).toBeDisabled()

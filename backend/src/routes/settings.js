@@ -482,7 +482,7 @@ router.get('/preferences', async (req, res) => {
     if (!prefs) {
       prefs = await prisma.userPreferences.create({ data: { userId } })
     }
-    const { id, userId: _uid, ...payload } = prefs
+    const { id: _id, userId: _uid, ...payload } = prefs
     return res.json(payload)
   } catch (error) {
     return sendError(req, res, error)
@@ -514,7 +514,7 @@ router.patch('/preferences', async (req, res) => {
       create: { userId, ...updates },
       update: updates,
     })
-    const { id, userId: _uid, ...payload } = prefs
+    const { id: _id, userId: _uid, ...payload } = prefs
     return res.json({ message: 'Preferences saved.', preferences: payload })
   } catch (error) {
     return sendError(req, res, error)

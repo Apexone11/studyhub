@@ -14,12 +14,11 @@ const {
   signAuthToken,
   signCsrfToken,
 } = require('../lib/authTokens')
-const { generateSixDigitCode, maskEmailAddress } = require('../lib/verificationCodes')
+const { maskEmailAddress } = require('../lib/verificationCodes')
 const {
   VERIFICATION_PURPOSE,
   VerificationError,
   consumeChallenge,
-  createOrRefreshLoginChallenge,
   createSignupChallenge,
   findChallengeByToken,
   mapChallengeForClient,

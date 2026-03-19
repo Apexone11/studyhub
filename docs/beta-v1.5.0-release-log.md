@@ -898,3 +898,341 @@ Cycle 18 Validation Commands (Executed)
 Cycle 18 Validation Result
 
 - Frontend build: 0 errors, 0 warnings.
+
+---
+
+Cycle 19 — Appearance Bootstrap Cleanup + Joyride Telemetry + Feed Comment Refactor [2026-03-18]
+
+Changed:
+
+- Centralized appearance DOM helpers and cache utilities into `frontend/studyhub-app/src/lib/appearance.js`:
+  - Shared `applyTheme`, `applyFontSize`, and cached-preferences helpers now back both `App.jsx` and `AppearanceTab.jsx`.
+  - Eliminated duplicate theme/font-size DOM logic between the auth bootstrap path and settings UI.
+- Extracted preferences bootstrap orchestration into `frontend/studyhub-app/src/lib/useBootstrapPreferences.js`:
+  - `App.jsx` now consumes a dedicated hook instead of owning the localStorage + fetch + DOM apply flow inline.
+  - Bootstrap now runs once per authenticated app session and keeps the route layer thinner.
+- Refactored Feed comments in `frontend/studyhub-app/src/pages/feed/FeedPage.jsx`:
+  - Added `useComments(postId, initialCount)` hook for comment fetch/post/delete state.
+  - Split rendering into `CommentInput` and `CommentList` helpers.
+  - Lifted repeated comment-section style objects into named constants for easier scanning and lower JSX noise.
+
+Fixed:
+
+- Joyride errors are no longer silently swallowed:
+  - Added `captureComponentError` to `frontend/studyhub-app/src/lib/telemetry.js`.
+  - `frontend/studyhub-app/src/components/SafeJoyride.jsx` now logs boundary failures through the shared telemetry layer with `surface: joyride-error-boundary`.
+- Feed comment loading now retries correctly after a failed initial fetch instead of permanently treating the thread as loaded.
+- Feed comment post flow now uses shared API error parsing (`readJsonSafely` + `getApiErrorMessage`) for more consistent failures.
+
+Cycle 19 Validation Commands (Executed)
+
+- `npx eslint src/App.jsx src/pages/settings/AppearanceTab.jsx src/components/SafeJoyride.jsx src/lib/telemetry.js src/lib/appearance.js src/lib/useBootstrapPreferences.js src/pages/feed/FeedPage.jsx` (from `frontend/studyhub-app/`)
+- VS Code Problems scan on all touched files (`App.jsx`, `AppearanceTab.jsx`, `SafeJoyride.jsx`, `telemetry.js`, `appearance.js`, `useBootstrapPreferences.js`, `FeedPage.jsx`)
+
+Cycle 19 Validation Result
+
+- Targeted ESLint passed with exit code `0` for all files changed in this cycle.
+- VS Code diagnostics reported no remaining errors in the touched files.
+- Full frontend lint script remains blocked by pre-existing unrelated issues in `src/lib/animations.js`, `src/pages/admin/AdminPage.jsx`, `src/pages/settings/settingsShared.jsx`, and `src/pages/sheets/UploadSheetPage.jsx`.
+
+Cycle 19 Deep Scan Summary
+
+- Scope: frontend-only refactor of appearance bootstrap, settings appearance application, Joyride observability, and feed comment rendering.
+- Shared-behavior scan confirmed theme/font-size application now has a single implementation path, reducing drift risk between settings and app bootstrap.
+- Observability scan confirmed Joyride failures still degrade safely to `null` render, but now emit telemetry instead of disappearing silently.
+- Comment-flow scan confirmed lazy load, comment count display, 500-character guard, optimistic append, and delete permissions remain intact after the extraction.
+
+Cycle 19 Deferred-Risk Notes
+
+- No browser-level manual interaction pass was run in this cycle; validation was limited to editor diagnostics and targeted ESLint.
+- `system` theme behavior still follows the OS preference only when preferences are applied; it does not live-update if the OS theme changes after initial application.
+- The Joyride boundary now restores observability, but the underlying third-party incompatibility that triggers the boundary is still a vendor-level risk until `react-joyride` is upgraded or replaced.
+
+---
+
+Cycle 20 — PR Review Follow-Ups (Appearance Cache + Feed Composer Avatar) [2026-03-18]
+
+Fixed:
+
+- Appearance preference cache is now user-scoped instead of global:
+  - `frontend/studyhub-app/src/lib/appearance.js`
+  - Cached theme/font-size now writes to `studyhub_prefs_<userId>` instead of a shared device-wide key.
+  - Added logout-time appearance reset and legacy-cache cleanup to avoid one user's cached appearance briefly carrying into another user's session on shared devices.
+- AppearanceTab now writes cached preferences only after a successful server save:
+  - `frontend/studyhub-app/src/pages/settings/AppearanceTab.jsx`
+  - `frontend/studyhub-app/src/pages/settings/settingsState.js`
+  - `usePreferences.save()` now returns a boolean so appearance cache writes only happen after a successful PATCH.
+- Feed comment composer now uses the actual current user role when rendering the avatar, so admin users get the correct styling:
+  - `frontend/studyhub-app/src/pages/feed/FeedPage.jsx`
+
+Cycle 20 Validation Commands (Executed)
+
+- `npx eslint src/App.jsx src/pages/settings/AppearanceTab.jsx src/pages/settings/settingsShared.jsx src/components/SafeJoyride.jsx src/lib/telemetry.js src/lib/appearance.js src/lib/useBootstrapPreferences.js src/pages/feed/FeedPage.jsx` (from `frontend/studyhub-app/`)
+- `npx eslint src/App.jsx src/pages/settings/AppearanceTab.jsx src/pages/settings/settingsShared.jsx src/pages/settings/settingsState.js src/components/SafeJoyride.jsx src/lib/telemetry.js src/lib/appearance.js src/lib/useBootstrapPreferences.js src/pages/feed/FeedPage.jsx` (from `frontend/studyhub-app/`)
+- VS Code Problems scan on touched frontend files
+
+Cycle 20 Validation Result
+
+- Targeted ESLint passed with exit code `0` for the touched files.
+- VS Code diagnostics reported no remaining errors in the touched files.
+
+Cycle 20 Deep Scan Summary
+
+- Appearance bootstrap now uses authenticated user identity as the cache boundary, which closes the cross-user cached-theme bleed path without giving up warm-start behavior for the same user.
+- Save-path scan confirmed appearance cache is no longer written on failed PATCH responses, so bootstrap state cannot drift ahead of server state.
+- Feed review follow-up was limited to the composer avatar because comment payload authors still only include `id` and `username` from the backend.
+
+Cycle 20 Deferred-Risk Notes
+
+- The PR metadata scope comment is a review-process concern, not a code defect. If needed, update the PR title/description manually to reflect shared notes, appearance bootstrap work, Joyride hardening, feed comments, and auth/mobile fixes.
+
+---
+
+Cycle 21 — Repo Health Cleanup (Auth Tests + Settings Retry) [2026-03-18]
+
+Fixed:
+
+- Backend auth/admin tests now match the current v1.5.0 contract:
+  - `backend/test/auth.routes.test.js`
+  - `backend/test/admin.routes.test.js`
+  - Removed stale expectations for login-time email verification and admin 2FA enforcement.
+  - Tests now assert that login issues a session directly and that admin access depends on admin role only.
+- Settings tabs no longer get stuck on a permanent loading state when preferences fail to load:
+  - `frontend/studyhub-app/src/pages/settings/settingsState.js`
+  - `frontend/studyhub-app/src/pages/settings/AppearanceTab.jsx`
+  - `frontend/studyhub-app/src/pages/settings/NotificationsTab.jsx`
+  - `frontend/studyhub-app/src/pages/settings/PrivacyTab.jsx`
+  - `usePreferences()` now tracks load failures separately and exposes a retry path.
+  - Appearance, Notifications, and Privacy now render a retryable error card instead of continuing to show `Loading preferences...` after a failed fetch.
+- Full-frontend lint blockers were cleaned up:
+  - `frontend/studyhub-app/src/lib/animations.js`
+  - `frontend/studyhub-app/src/pages/admin/AdminPage.jsx`
+  - `frontend/studyhub-app/src/pages/sheets/UploadSheetPage.jsx`
+  - Removed an unused anime.js import, removed an unused admin button style object, tightened the navigation-blocker effect dependency, and cleaned two negated ternaries flagged by diagnostics.
+
+Cycle 21 Validation Commands (Executed)
+
+- `npm --prefix backend test`
+- `npm --prefix frontend/studyhub-app run lint`
+- `npm --prefix frontend/studyhub-app run build`
+
+Cycle 21 Validation Result
+
+- Backend Vitest: 14 test files passed, 57 tests passed.
+- Frontend ESLint: full app passed with exit code `0`.
+- Frontend production build: passed; Vite transformed 442 modules successfully.
+
+Cycle 21 Deep Scan Summary
+
+- Repo-wide validation confirmed the remaining backend failures were stale tests left behind after the v1.5.0 removal of login email-verification gating and admin 2FA enforcement, not active regressions in the application code.
+- Settings tabs now distinguish `loading` from `load failed`, which closes a real UX bug where a failed preferences fetch left users with no recovery path.
+- Full-frontend lint blockers were limited to dead code and a blocker-effect dependency issue; no additional runtime regressions surfaced during the production build.
+- GitHub/ecosystem research surfaced general React 19 `findDOMNode` incompatibilities around tour libraries, which is consistent with the existing `SafeJoyride` isolation. No new StudyHub-specific upstream bug required an additional patch in this cycle.
+
+Cycle 21 Deferred-Risk Notes
+
+- The external research pass did not reveal a StudyHub-specific upstream issue to fix automatically; it mainly reinforced the existing third-party guided-tour compatibility risk already documented in Cycle 19.
+- Settings retry currently reloads the entire preferences document. There is still no per-section fallback if the backend ever returns a partial preferences payload.
+
+---
+
+Cycle 22 — Search Contract Repair + Search Privacy Enforcement [2026-03-19]
+
+Changed:
+
+- Centralized profile-visibility decisions into `backend/src/lib/profileVisibility.js`:
+  - Added shared helpers for `public`, `enrolled`, and `private` profile access.
+  - Search and profile routes now consume the same visibility rules instead of maintaining separate logic branches.
+- Added frontend regression coverage for the search entry-point contract:
+  - `frontend/studyhub-app/src/components/SearchModal.test.jsx`
+  - `frontend/studyhub-app/src/pages/home/HomePage.test.jsx`
+- Added backend regression coverage for search privacy:
+  - `backend/test/search.routes.test.js`
+- Added `@testing-library/dom` to `frontend/studyhub-app` devDependencies so the React Testing Library suites run reliably in this workspace.
+
+Fixed:
+
+- Landing-page hero search now uses the canonical sheets query parameter:
+  - `frontend/studyhub-app/src/pages/home/HomePage.jsx`
+  - Navigation changed from `/sheets?q=...` to `/sheets?search=...`.
+- Global search course results now use the canonical sheets filter parameter:
+  - `frontend/studyhub-app/src/components/SearchModal.jsx`
+  - Navigation changed from `/sheets?course=...` to `/sheets?courseId=...`.
+- SheetsPage now normalizes legacy incoming search URLs so old links and bookmarks still work:
+  - `frontend/studyhub-app/src/pages/sheets/SheetsPage.jsx`
+  - Legacy `q` is rewritten to `search`, and legacy `course` is rewritten to `courseId` with `replace` semantics.
+- `/api/search` no longer leaks hidden profiles:
+  - `backend/src/routes/search.js`
+  - `backend/src/routes/users.js`
+  - Search results now filter matched users through the shared profile-visibility helper before returning them.
+- Backend lint is clean again after removing stale unused auth imports and unused preference destructuring leftovers:
+  - `backend/src/routes/auth.js`
+  - `backend/src/routes/settings.js`
+
+Cycle 22 Validation Commands (Executed)
+
+- `npm --prefix backend test -- test/search.routes.test.js`
+- `npm --prefix frontend/studyhub-app run test -- src/components/SearchModal.test.jsx src/pages/home/HomePage.test.jsx`
+- `npm --prefix backend test`
+- `npm --prefix backend run lint`
+- `npm --prefix frontend/studyhub-app run lint`
+- `npm --prefix frontend/studyhub-app run build`
+
+Cycle 22 Validation Result
+
+- Targeted backend search privacy tests: passed (`1` file, `4` tests).
+- Targeted frontend search contract tests: passed (`2` files).
+- Backend Vitest: `15` test files passed, `61` tests passed.
+- Backend ESLint: full backend passed with exit code `0`.
+- Frontend ESLint: full app passed with exit code `0`.
+- Frontend production build: passed; Vite transformed `442` modules successfully.
+
+Cycle 22 Deep Scan Summary
+
+- The search contract is now consistent across all current entry points: HomePage writes `search`, SearchModal writes `courseId`, and SheetsPage treats those parameters as canonical state.
+- Legacy links were preserved deliberately. Instead of breaking previously shared URLs that still use `q` or `course`, SheetsPage rewrites them forward to the canonical contract on first load.
+- Search privacy enforcement now shares the same decision logic as profile-page access, which closes the drift risk that caused `/api/search` to expose users that `/api/users/:username` would hide.
+- Full validation surfaced unrelated backend lint residue in auth/settings routes; those were cleaned in the same cycle so the repository ends in a fully green state for the touched surfaces.
+
+Cycle 22 Deferred-Risk Notes
+
+- The remaining known search inconsistency is content indexing parity: `/api/sheets` search still matches title, description, and content, while `/api/search` sheet results still only match title and description.
+- There is still no browser-level end-to-end test that covers search privacy from the actual UI, so the privacy guarantee is currently protected by backend route tests rather than a full-stack browser flow.
+
+---
+
+Cycle 23 — Search Content Parity + Browser Search Regression [2026-03-19]
+
+Changed:
+
+- Centralized sheet text-search clauses into `backend/src/lib/sheetSearch.js`:
+  - Added one shared helper for title, content, and description matching.
+  - `backend/src/routes/search.js` and `backend/src/routes/sheets.js` now consume the same sheet text-search definition instead of duplicating separate field lists.
+- Added a browser regression flow in `frontend/studyhub-app/tests/search.regression.spec.js`:
+  - Covers the public HomePage hero search, authenticated SheetsPage rendering for the canonical `search` param, SearchModal course navigation, and privacy-filtered user results.
+
+Fixed:
+
+- Global sheet search now returns sheets when the match exists only in the sheet body content:
+  - `backend/src/routes/search.js`
+  - `backend/test/search.routes.test.js`
+- SheetsPage and global search can no longer drift on sheet text fields without touching the same helper:
+  - `backend/src/routes/sheets.js`
+  - `backend/src/lib/sheetSearch.js`
+- Browser-level search coverage now reflects the actual app contract for public users:
+  - HomePage hero search targets `/sheets?search=...`, then the private-route guard redirects unauthenticated users to `/login`.
+  - The regression captures that canonical intermediate navigation before re-entering the authenticated app to validate the SheetsPage and SearchModal flows.
+
+Cycle 23 Validation Commands (Executed)
+
+- `npm --prefix backend test`
+- `npm --prefix backend run lint`
+- `npm --prefix frontend/studyhub-app run lint`
+- `npm --prefix frontend/studyhub-app run test:e2e -- tests/search.regression.spec.js`
+
+Cycle 23 Validation Result
+
+- Backend Vitest: `15` test files passed, `62` tests passed.
+- Backend ESLint: full backend passed with exit code `0`.
+- Frontend ESLint: full app passed with exit code `0`.
+- Playwright regression: `tests/search.regression.spec.js` passed.
+
+Cycle 23 Deep Scan Summary
+
+- The remaining sheet-content parity bug is resolved at the root cause level by sharing one backend helper between the sheets listing and global search endpoints.
+- The new backend regression proves `/api/search` can now return a sheet whose search hit exists only in `content`, which was the last known mismatch against `/api/sheets`.
+- The browser regression exposed and then documented a real routing nuance: HomePage search is public, but the target SheetsPage is auth-gated. The test now asserts the canonical `/sheets?search=...` navigation intent before the redirect to `/login`, then validates the authenticated continuation on SheetsPage.
+- SearchModal browser coverage now verifies canonical course navigation and confirms the UI only renders the privacy-filtered user results returned by the backend-facing search API.
+
+Cycle 23 Deferred-Risk Notes
+
+- Legacy URL normalization from `q` and `course` is still not covered by a browser-level regression.
+- The new browser privacy check uses mocked filtered results; explicit live-stack verification for unauthenticated and non-classmate viewers is still primarily enforced by backend tests.
+
+---
+
+Cycle 24 — Live Beta Search Privacy + Validation Contract Refresh [2026-03-19]
+
+Changed:
+
+- Added a browser regression for legacy SheetsPage URL normalization in `frontend/studyhub-app/tests/search.regression.spec.js`:
+  - Confirms incoming `/sheets?q=...&course=...` URLs normalize to canonical `search` and `courseId` parameters.
+- Added dedicated live beta-stack search privacy coverage:
+  - `frontend/studyhub-app/tests/search.privacy.beta-live.spec.js`
+  - `frontend/studyhub-app/playwright.beta.config.js`
+  - `frontend/studyhub-app/package.json`
+  - `package.json`
+  - The beta workflow now runs `npm --prefix frontend/studyhub-app run test:e2e:beta` during `npm run beta:validate`.
+- Beta seed and stack plumbing were updated so live privacy tests are deterministic and reproducible:
+  - `backend/scripts/seedBetaUsers.js` now seeds a non-classmate beta user plus explicit profile-visibility fixtures.
+  - `package.json` now forces `docker compose exec -T backend npx prisma generate` before beta reseeding.
+  - `docker-compose.yml` now uses `clamav/clamav:stable`.
+  - `frontend/studyhub-app/scripts/dev-entrypoint.js` now installs with `--legacy-peer-deps` inside the Docker dev container.
+- SearchModal now sends authenticated search requests correctly on the split-origin beta stack:
+  - `frontend/studyhub-app/src/components/SearchModal.jsx`
+  - `frontend/studyhub-app/src/components/SearchModal.test.jsx`
+  - The `/api/search` fetch explicitly uses `credentials: 'include'`.
+
+Fixed:
+
+- Local register onboarding no longer redirects away from the course-selection step under `PublicRoute`:
+  - `frontend/studyhub-app/src/pages/auth/RegisterScreen.jsx`
+  - Local account creation now defers `completeAuthentication(...)` until course setup is submitted.
+- UploadSheetPage no longer crashes under the current `BrowserRouter` setup:
+  - `frontend/studyhub-app/src/pages/sheets/UploadSheetPage.jsx`
+  - The unsaved-changes blocker now falls back safely when `useBlocker` is unavailable.
+- Stale auth, smoke, and backend validation contracts were refreshed to current product behavior:
+  - `frontend/studyhub-app/src/lib/authNavigation.test.js`
+  - `frontend/studyhub-app/src/pages/auth/LoginPage.test.jsx`
+  - `frontend/studyhub-app/src/pages/auth/RegisterScreen.test.jsx`
+  - `frontend/studyhub-app/tests/app.responsive.smoke.spec.js`
+  - `frontend/studyhub-app/tests/auth.smoke.spec.js`
+  - `frontend/studyhub-app/tests/navigation.regression.spec.js`
+  - `frontend/studyhub-app/tests/feed.preview-and-delete.smoke.spec.js`
+  - `frontend/studyhub-app/tests/sheets.upload-html-workflow.smoke.spec.js`
+  - `backend/scripts/smokeRoutes.js`
+- Playwright smoke execution is now stable under the repo validation workflow:
+  - `frontend/studyhub-app/package.json`
+  - `test:e2e:smoke` now runs with `--workers=4` to avoid preview-server flake during the one-click beta validation run.
+
+Cycle 24 Validation Commands (Executed)
+
+- `npm run beta:seed`
+- `npm --prefix frontend/studyhub-app run test -- src/components/SearchModal.test.jsx`
+- `npm --prefix frontend/studyhub-app run test:e2e -- tests/search.regression.spec.js`
+- `npm --prefix frontend/studyhub-app run test:e2e:beta`
+- `npm --prefix frontend/studyhub-app run test -- src/lib/authNavigation.test.js src/pages/auth/LoginPage.test.jsx src/pages/auth/RegisterScreen.test.jsx`
+- `npm --prefix frontend/studyhub-app run test`
+- `npm --prefix frontend/studyhub-app run test:e2e:smoke -- tests/app.responsive.smoke.spec.js tests/auth.smoke.spec.js tests/navigation.regression.spec.js tests/sheets.upload-html-workflow.smoke.spec.js`
+- `npm --prefix frontend/studyhub-app run test:e2e:smoke -- tests/feed.preview-and-delete.smoke.spec.js`
+- `docker compose exec -T backend npm run smoke:routes`
+- `npm run beta:validate`
+- `npm run lint`
+- `npm run build`
+
+Cycle 24 Validation Result
+
+- Legacy search normalization browser regression: passed.
+- Live beta privacy browser regression: `2` Playwright tests passed against the real beta stack.
+- Frontend targeted auth tests: passed (`3` files, `9` tests).
+- Full frontend Vitest: `12` test files passed, `30` tests passed.
+- Full frontend Playwright smoke suite: `16` tests passed with the stabilized worker cap.
+- Backend smoke routes: all checks passed after aligning the script with the current direct-login and notes contracts.
+- Root beta validation workflow: passed end to end.
+- Repository lint: backend and frontend ESLint both passed.
+- Repository build: backend syntax check and frontend Vite production build both passed.
+
+Cycle 24 Deep Scan Summary
+
+- The live beta-stack privacy requirement exposed a real browser auth bug: SearchModal was calling `/api/search` without credentials, so authenticated search silently behaved as unauthenticated on the beta frontend/backend split-origin setup. That is now fixed at the fetch layer and protected by both unit and live browser coverage.
+- Broader beta validation surfaced two actual route-level regressions outside the original search surface:
+  - local registration completed session state too early for the `/register` course step under `PublicRoute`
+  - UploadSheetPage crashed because `useBlocker` is not guaranteed under the current router configuration.
+  Both were fixed at the source instead of weakening the tests.
+- The remaining validation failures were stale contract drift in smoke/unit scripts, not product regressions. Those tests now reflect the current direct-login behavior, current feed/sheets copy, and current paginated notes API shape.
+- The one-click beta workflow is materially stronger after this cycle: reseeding is deterministic for privacy fixtures, smoke tests are stable under the repo script, and live beta privacy checks now run as part of `npm run beta:validate`.
+
+Cycle 24 Deferred-Risk Notes
+
+- The auth-gated HomePage search flow still does not assert a future post-login destination-return behavior if StudyHub later preserves the original `/sheets?search=...` target through the `/login` redirect.
+- The Docker beta frontend still relies on `--legacy-peer-deps` because `react-joyride@2.9.3` has not yet been upgraded for React 19 peer compatibility.
