@@ -25,7 +25,7 @@ Built by students, for students, StudyHub turns scattered notes, dead group chat
 
 ## V1.0.0
 
-StudyHub V1.0.0 is the current live release.
+StudyHub V1.5.0 is the current live release.
 
 - Study sheet creation, uploads, and sharing
 - Feed posts, comments, reactions, and notifications
