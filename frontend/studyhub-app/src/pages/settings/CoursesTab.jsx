@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { API } from '../../config'
+import CourseListPicker from '../../components/CourseListPicker'
 import { Button, FormField, MsgList, SectionCard } from './settingsShared'
 import { FONT } from './settingsState'
 
@@ -124,52 +125,23 @@ export default function CoursesTab({ user, busyKey, setBusyKey, syncUser }) {
         </div>
       )}
 
-      {selectedSchool && (
-        <div
-          style={{
-            maxHeight: 320,
-            overflowY: 'auto',
-            border: '1px solid #e2e8f0',
-            borderRadius: 12,
-            background: '#f8fafc',
-            marginBottom: 16,
-          }}
-        >
-          {(selectedSchool.courses || []).map((course) => {
-            const checked = selectedCourseIds.includes(course.id)
-            return (
-              <label
-                key={course.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 10,
-                  padding: '12px 14px',
-                  borderBottom: '1px solid #e2e8f0',
-                  background: checked ? '#eff6ff' : 'transparent',
-                  cursor: 'pointer',
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={() => {
-                    setSelectedCourseIds((current) => (
-                      checked
-                        ? current.filter((id) => id !== course.id)
-                        : current.length < 10
-                          ? [...current, course.id]
-                          : current
-                    ))
-                  }}
-                />
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{course.code}</div>
-                  <div style={{ fontSize: 12, color: '#64748b' }}>{course.name}{course.department ? ` · ${course.department}` : ''}</div>
-                </div>
-              </label>
-            )
-          })}
+      {selectedSchool && (selectedSchool.courses || []).length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <CourseListPicker
+            courses={selectedSchool.courses || []}
+            selectedIds={selectedCourseIds}
+            onToggle={(courseId) => {
+              setSelectedCourseIds((current) => (
+                current.includes(courseId)
+                  ? current.filter((id) => id !== courseId)
+                  : current.length < 10
+                    ? [...current, courseId]
+                    : current
+              ))
+            }}
+            maxSelections={10}
+            maxHeight={320}
+          />
         </div>
       )}
 

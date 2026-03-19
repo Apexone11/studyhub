@@ -310,3 +310,49 @@
     display: none !important;
   }
 }
+
+/* ── Register page: Password row (P0-8 mobile pass) ─────────────────── */
+.register-pw-grid {
+  grid-template-columns: 1fr 1fr;
+}
+
+@media (max-width: 500px) {
+  .register-pw-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Register page: Custom course input row ──────────────────────────── */
+.register-custom-course-grid {
+  grid-template-columns: 1fr 2fr auto;
+}
+
+@media (max-width: 500px) {
+  .register-custom-course-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Register page: Password hints grid ──────────────────────────────── */
+.password-hints-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+@media (max-width: 500px) {
+  .password-hints-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Sheet viewer: Diff split view (stacks on phone) ────────────────── */
+.sheet-diff-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+@media (max-width: 767px) {
+  .sheet-diff-split {
+    grid-template-columns: 1fr;
+  }
+}

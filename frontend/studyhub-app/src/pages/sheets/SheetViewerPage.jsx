@@ -236,7 +236,7 @@ function ContributionInlineDiff({ contributionId }) {
                       @@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@
                     </div>
                     {rows.map((row, ri) => (
-                      <div key={ri} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+                      <div key={ri} className="sheet-diff-split">
                         <div style={{ padding: '1px 8px', whiteSpace: 'pre-wrap', wordBreak: 'break-all', borderRight: '1px solid #e2e8f0', background: row.left?.type === 'remove' ? '#fef2f2' : 'transparent', color: row.left?.type === 'remove' ? '#991b1b' : '#64748b', minHeight: '1.5em' }}>
                           {row.left ? (row.left.segments ? row.left.segments.map((seg, si) => <span key={si} style={seg.type === 'remove' ? { background: '#fecaca', borderRadius: 2 } : {}}>{seg.text}</span>) : row.left.content) : ''}
                         </div>

@@ -4,21 +4,22 @@ import { useState } from 'react'
 import { API } from '../../config'
 
 function ForgotPasswordPage() {
-  const [username, setUsername] = useState('')
+  const [identifier, setIdentifier] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!username.trim()) { setError('Please enter your username.'); return }
+    if (!identifier.trim()) { setError('Please enter your username or email.'); return }
     setError('')
     setLoading(true)
     try {
       await fetch(`${API}/api/auth/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: username.trim() }),
+        credentials: 'include',
+        body: JSON.stringify({ identifier: identifier.trim() }),
       })
       setSubmitted(true)
     } catch {
@@ -38,16 +39,16 @@ function ForgotPasswordPage() {
               <i className="fas fa-key" style={styles.icon}></i>
             </div>
             <h1 style={styles.h1}>Forgot Password</h1>
-            <p style={styles.sub}>Enter your username and we&apos;ll send a reset link to your email.</p>
+            <p style={styles.sub}>Enter your username or email and we&apos;ll send a reset link.</p>
           </div>
 
           {submitted ? (
             <div>
               <div style={styles.successBox}>
                 <i className="fas fa-circle-check" style={{ marginRight: 8 }}></i>
-                If we have an email on file for that account, a reset link has been sent.
+                If an account exists with that username or email, a reset link has been sent.
               </div>
-              <p style={styles.hint}>Check your inbox and spam folder. The link expires in 1 hour.</p>
+              <p style={styles.hint}>Check your inbox and spam folder. The email includes your username and a reset link that expires in 1 hour.</p>
               <Link to="/login" style={styles.backLink}>← Back to Login</Link>
             </div>
           ) : (
@@ -59,16 +60,16 @@ function ForgotPasswordPage() {
                 </div>
               )}
               <div style={styles.formGroup}>
-                <label style={styles.label} htmlFor="username">Username</label>
+                <label style={styles.label} htmlFor="identifier">Username or Email</label>
                 <div style={styles.inputWrap}>
                   <i className="fas fa-user" style={styles.inputIcon}></i>
                   <input
-                    id="username"
+                    id="identifier"
                     type="text"
-                    placeholder="Enter your username"
-                    autoComplete="username"
-                    value={username}
-                    onChange={e => { setUsername(e.target.value); setError('') }}
+                    placeholder="Enter your username or email"
+                    autoComplete="username email"
+                    value={identifier}
+                    onChange={e => { setIdentifier(e.target.value); setError('') }}
                     style={styles.input}
                     onFocus={e => (e.target.style.borderColor = '#2563eb')}
                     onBlur={e => (e.target.style.borderColor = '#e5e7eb')}

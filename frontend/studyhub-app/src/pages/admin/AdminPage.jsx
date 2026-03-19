@@ -9,6 +9,7 @@ import { useSession } from '../../lib/session-context'
 import { pageShell, useResponsiveAppLayout } from '../../lib/ui'
 import { useLivePolling } from '../../lib/useLivePolling'
 import ModerationTab from './ModerationTab'
+import SheetReviewPanel from './SheetReviewPanel'
 
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 const PAGE_SIZE = 20
@@ -286,10 +287,15 @@ export default function AdminPage() {
   const [unsuppressSavingId, setUnsuppressSavingId] = useState(null)
   const [auditState, setAuditState] = useState(createAuditState)
   const [reviewStatus, setReviewStatus] = useState('pending_review')
+  const [reviewFormatFilter, setReviewFormatFilter] = useState('')
+  const [reviewScanFilter, setReviewScanFilter] = useState('')
   const [announceForm, setAnnounceForm] = useState({ title: '', body: '', pinned: false })
   const [announceSaving, setAnnounceSaving] = useState(false)
   const [announceError, setAnnounceError] = useState('')
   const [confirmAction, setConfirmAction] = useState(null) // { title, message, variant, onConfirm }
+  const [reviewPanelSheetId, setReviewPanelSheetId] = useState(null)
+  const [htmlKillSwitch, setHtmlKillSwitch] = useState({ loading: true, enabled: true, source: 'default', envOverride: null, error: '' })
+  const [htmlToggleSaving, setHtmlToggleSaving] = useState(false)
 
   const apiJson = useCallback(async (url, options = {}) => {
     const response = await fetch(`${API}${url}`, {
@@ -367,7 +373,7 @@ export default function AdminPage() {
     const endpoints = {
       users: `/api/admin/users?page=${page}`,
       sheets: `/api/admin/sheets?page=${page}`,
-      'sheet-reviews': `/api/admin/sheets/review?page=${page}&status=${encodeURIComponent(reviewStatus)}`,
+      'sheet-reviews': `/api/admin/sheets/review?page=${page}&status=${encodeURIComponent(reviewStatus)}${reviewFormatFilter ? `&contentFormat=${encodeURIComponent(reviewFormatFilter)}` : ''}${reviewScanFilter ? `&htmlScanStatus=${encodeURIComponent(reviewScanFilter)}` : ''}`,
       announcements: `/api/admin/announcements?page=${page}`,
       'deletion-reasons': `/api/admin/deletion-reasons?page=${page}`,
       'email-suppressions': `/api/admin/email-suppressions?page=${page}&status=${encodeURIComponent(suppressionStatus)}${suppressionQuery ? `&q=${encodeURIComponent(suppressionQuery)}` : ''}`,
@@ -402,7 +408,32 @@ export default function AdminPage() {
         error: error.message || 'Could not load this tab.',
       }))
     }
-  }, [apiJson, reviewStatus, suppressionQuery, suppressionStatus])
+  }, [apiJson, reviewStatus, reviewFormatFilter, reviewScanFilter, suppressionQuery, suppressionStatus])
+
+  const loadHtmlKillSwitch = useCallback(async () => {
+    try {
+      const data = await apiJson('/admin/settings/html-uploads')
+      setHtmlKillSwitch({ loading: false, enabled: data.enabled, source: data.source, envOverride: data.envOverride, error: '' })
+    } catch (err) {
+      setHtmlKillSwitch((prev) => ({ ...prev, loading: false, error: err.message || 'Failed to load HTML upload status.' }))
+    }
+  }, [apiJson])
+
+  const toggleHtmlUploads = useCallback(async (newEnabled) => {
+    setHtmlToggleSaving(true)
+    try {
+      const data = await apiJson('/admin/settings/html-uploads', {
+        method: 'PATCH',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: newEnabled }),
+      })
+      setHtmlKillSwitch((prev) => ({ ...prev, enabled: data.enabled, source: data.source, envOverride: data.envOverride, error: data.message || '' }))
+    } catch (err) {
+      setHtmlKillSwitch((prev) => ({ ...prev, error: err.message || 'Toggle failed.' }))
+    } finally {
+      setHtmlToggleSaving(false)
+    }
+  }, [apiJson])
 
   useEffect(() => {
     if (!user || user.role !== 'admin') return
@@ -440,6 +471,10 @@ export default function AdminPage() {
     if (activeTab === 'email-suppressions' && !suppressionsState.loaded && !suppressionsState.loading) {
       void loadPagedData('email-suppressions', suppressionsState.page)
     }
+
+    if (activeTab === 'settings' && htmlKillSwitch.loading) {
+      void loadHtmlKillSwitch()
+    }
   }, [
     activeTab,
     announcementsState.loaded,
@@ -465,6 +500,8 @@ export default function AdminPage() {
     usersState.loaded,
     usersState.loading,
     usersState.page,
+    htmlKillSwitch.loading,
+    loadHtmlKillSwitch,
   ])
 
   useLivePolling(loadOverview, {
@@ -477,7 +514,7 @@ export default function AdminPage() {
   }, {
     enabled: Boolean(user?.role === 'admin' && activeTab === 'sheet-reviews'),
     intervalMs: 30000,
-    refreshKey: `${reviewState.page}|${reviewStatus}`,
+    refreshKey: `${reviewState.page}|${reviewStatus}|${reviewFormatFilter}|${reviewScanFilter}`,
   })
 
   const tabState = useMemo(() => {
@@ -537,16 +574,19 @@ export default function AdminPage() {
 
   function reviewSheet(sheetId, action) {
     setConfirmAction({
-      title: action === 'approve' ? 'Approve this sheet?' : 'Reject this sheet?',
+      title: action === 'approve' ? 'Quick-approve this sheet?' : 'Quick-reject this sheet?',
       message: action === 'approve'
-        ? 'This will publish the sheet and make it visible to all users.'
-        : 'This will reject the sheet submission.',
+        ? 'This will publish the sheet. For HTML sheets, use "Review HTML" for detailed inspection.'
+        : 'This will reject the sheet submission. For HTML sheets, use "Review HTML" for detailed inspection.',
       variant: action === 'approve' ? 'default' : 'danger',
       onConfirm: async () => {
         setConfirmAction(null)
+        const reason = action === 'approve'
+          ? 'Quick-approved via admin panel.'
+          : 'Quick-rejected via admin panel.'
         await apiJson(`/api/admin/sheets/${sheetId}/review`, {
           method: 'PATCH',
-          body: JSON.stringify({ action }),
+          body: JSON.stringify({ action, reason }),
         })
         await Promise.all([
           loadPagedData('sheet-reviews', reviewState.page),
@@ -897,56 +937,97 @@ export default function AdminPage() {
 
               {activeTab === 'sheet-reviews' ? (
                 <>
+                  {/* ── Filter bar ──────────────────────────────────────── */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
-                    <div style={{ fontSize: 13, color: '#64748b' }}>
-                      {reviewState.total} sheets in review queue ({reviewStatus})
+                    <div style={{ fontSize: 13, color: 'var(--sh-muted)' }}>
+                      {reviewState.total} sheet{reviewState.total !== 1 ? 's' : ''} in queue
+                      {reviewFormatFilter || reviewScanFilter ? ' (filtered)' : ''}
                     </div>
-                    <select
-                      value={reviewStatus}
-                      onChange={(event) => {
-                        setReviewStatus(event.target.value)
-                        setReviewState(createPageState())
-                      }}
-                      style={{
-                        borderRadius: 8,
-                        border: '1px solid #e2e8f0',
-                        padding: '7px 10px',
-                        fontSize: 12,
-                        color: '#334155',
-                        fontFamily: FONT,
-                      }}
-                    >
-                      <option value="pending_review">Pending review</option>
-                      <option value="rejected">Rejected</option>
-                      <option value="draft">Draft</option>
-                      <option value="published">Published</option>
-                    </select>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <select
+                        value={reviewStatus}
+                        onChange={(event) => {
+                          setReviewStatus(event.target.value)
+                          setReviewState(createPageState())
+                        }}
+                        style={filterSelectStyle}
+                        aria-label="Filter by status"
+                      >
+                        <option value="pending_review">Pending review</option>
+                        <option value="rejected">Rejected</option>
+                        <option value="draft">Draft</option>
+                        <option value="published">Published</option>
+                      </select>
+                      <select
+                        value={reviewFormatFilter}
+                        onChange={(event) => {
+                          setReviewFormatFilter(event.target.value)
+                          setReviewState(createPageState())
+                        }}
+                        style={filterSelectStyle}
+                        aria-label="Filter by format"
+                      >
+                        <option value="">All formats</option>
+                        <option value="html">HTML only</option>
+                        <option value="markdown">Markdown only</option>
+                      </select>
+                      <select
+                        value={reviewScanFilter}
+                        onChange={(event) => {
+                          setReviewScanFilter(event.target.value)
+                          setReviewState(createPageState())
+                        }}
+                        style={filterSelectStyle}
+                        aria-label="Filter by scan status"
+                      >
+                        <option value="">All scan states</option>
+                        <option value="queued">Scan queued</option>
+                        <option value="running">Scan running</option>
+                        <option value="passed">Scan passed</option>
+                        <option value="failed">Scan failed</option>
+                      </select>
+                    </div>
                   </div>
                   <div style={{ display: 'grid', gap: 10 }}>
                     {reviewState.items.map((record) => (
-                      <div key={record.id} style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: '14px 16px' }}>
+                      <div key={record.id} style={{ border: '1px solid var(--sh-border)', borderRadius: 14, padding: '14px 16px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 10 }}>
-                          <div>
-                            <div style={{ fontSize: 14, fontWeight: 800, color: '#0f172a', marginBottom: 4 }}>
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--sh-heading)', marginBottom: 4 }}>
                               {record.title}
                             </div>
-                            <div style={{ fontSize: 12, color: '#64748b' }}>
-                              {record.course?.code || 'No course'} · by {record.author?.username || 'unknown'} · format {record.contentFormat || 'markdown'}
+                            <div style={{ fontSize: 12, color: 'var(--sh-muted)' }}>
+                              {record.course?.code || 'No course'} · by {record.author?.username || 'unknown'} · {record.contentFormat || 'markdown'}
                             </div>
                           </div>
-                          <span style={{ fontSize: 11, fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase' }}>
-                            {record.status}
-                          </span>
+                          {/* ── Pipeline status badges ──────────────────── */}
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                            <PipelineBadge label={record.status?.replace('_', ' ')} type={record.status === 'published' ? 'success' : record.status === 'rejected' ? 'danger' : record.status === 'pending_review' ? 'warning' : 'muted'} />
+                            {record.contentFormat === 'html' && (
+                              <PipelineBadge label={`scan: ${record.htmlScanStatus || 'n/a'}`} type={record.htmlScanStatus === 'passed' ? 'success' : record.htmlScanStatus === 'failed' ? 'danger' : record.htmlScanStatus === 'running' ? 'info' : 'muted'} />
+                            )}
+                          </div>
                         </div>
                         {record.description ? (
-                          <div style={{ fontSize: 12, color: '#475569', marginBottom: 10, whiteSpace: 'pre-wrap' }}>
+                          <div style={{ fontSize: 12, color: 'var(--sh-subtext)', marginBottom: 10, whiteSpace: 'pre-wrap' }}>
                             {record.description}
                           </div>
                         ) : null}
+                        {/* ── Review history (if previously reviewed) ─── */}
+                        {record.reviewedBy && (
+                          <div style={{ fontSize: 11, color: 'var(--sh-muted)', marginBottom: 10, padding: '6px 10px', borderRadius: 8, background: 'var(--sh-soft)' }}>
+                            Previously reviewed by <strong>{record.reviewedBy.username}</strong>
+                            {record.reviewedAt ? ` on ${new Date(record.reviewedAt).toLocaleDateString()}` : ''}
+                            {record.reviewReason ? ` — "${record.reviewReason}"` : ''}
+                          </div>
+                        )}
                         {record.htmlScanStatus === 'failed' && Array.isArray(record.htmlScanFindings) && record.htmlScanFindings.length > 0 ? (
-                          <div style={{ border: '1px solid #fecaca', background: '#fff1f2', borderRadius: 10, padding: 10, marginBottom: 10 }}>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: '#b91c1c', marginBottom: 4 }}>Security Scan Findings (user acknowledged)</div>
-                            <ul style={{ margin: 0, paddingLeft: 16, color: '#991b1b', fontSize: 11, lineHeight: 1.6 }}>
+                          <div style={{ border: '1px solid var(--sh-danger-border)', background: 'var(--sh-danger-bg)', borderRadius: 10, padding: 10, marginBottom: 10 }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--sh-danger-text)', marginBottom: 4 }}>
+                              Security Scan Findings ({record.htmlScanFindings.length})
+                              {record.htmlScanAcknowledgedAt ? ' · user acknowledged' : ''}
+                            </div>
+                            <ul style={{ margin: 0, paddingLeft: 16, color: 'var(--sh-danger-text)', fontSize: 11, lineHeight: 1.6 }}>
                               {record.htmlScanFindings.map((finding, index) => (
                                 <li key={index}>{finding?.message || String(finding)}</li>
                               ))}
@@ -958,15 +1039,15 @@ export default function AdminPage() {
                             Open
                           </Link>
                           {record.contentFormat === 'html' ? (
-                            <Link to={`/sheets/preview/html/${record.id}`} style={{ ...pillButton('#eff6ff', '#1d4ed8', '#bfdbfe'), textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>
-                              Preview HTML
-                            </Link>
+                            <button type="button" onClick={() => setReviewPanelSheetId(record.id)} style={pillButton('#faf5ff', '#7c3aed', '#ddd6fe')}>
+                              Review HTML
+                            </button>
                           ) : null}
                           <button type="button" onClick={() => void reviewSheet(record.id, 'approve')} style={pillButton('#ecfdf5', '#047857', '#a7f3d0')}>
-                            Approve
+                            Quick Approve
                           </button>
                           <button type="button" onClick={() => void reviewSheet(record.id, 'reject')} style={pillButton('#fef2f2', '#dc2626', '#fecaca')}>
-                            Reject
+                            Quick Reject
                           </button>
                         </div>
                       </div>
@@ -1299,6 +1380,55 @@ export default function AdminPage() {
                     Use the main settings page to change email, password, username, 2-step verification, and enrolled courses.
                   </div>
                 </div>
+                <div style={{
+                  ...settingsCardStyle,
+                  border: htmlKillSwitch.enabled ? '1px solid var(--sh-success-border, #bbf7d0)' : '1px solid var(--sh-danger-border, #fecaca)',
+                  background: htmlKillSwitch.enabled ? 'var(--sh-success-bg, #f0fdf4)' : 'var(--sh-danger-bg, #fef2f2)',
+                }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', marginBottom: 6 }}>HTML UPLOADS KILL-SWITCH</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                    <div style={{
+                      fontSize: 14, fontWeight: 700,
+                      color: htmlKillSwitch.enabled ? 'var(--sh-success, #16a34a)' : 'var(--sh-danger, #dc2626)',
+                    }}>
+                      {htmlKillSwitch.loading ? 'Loading…' : htmlKillSwitch.enabled ? 'HTML Uploads Enabled' : 'HTML Uploads Disabled'}
+                    </div>
+                    {!htmlKillSwitch.loading && (
+                      <button
+                        type="button"
+                        disabled={htmlToggleSaving || htmlKillSwitch.envOverride === 'disabled' || htmlKillSwitch.envOverride === 'enabled'}
+                        onClick={() => toggleHtmlUploads(!htmlKillSwitch.enabled)}
+                        style={{
+                          padding: '5px 14px',
+                          borderRadius: 8,
+                          border: htmlKillSwitch.enabled ? '1px solid var(--sh-danger-border, #fecaca)' : '1px solid var(--sh-success-border, #bbf7d0)',
+                          background: htmlKillSwitch.enabled ? 'var(--sh-surface, #fff)' : 'var(--sh-surface, #fff)',
+                          color: htmlKillSwitch.enabled ? 'var(--sh-danger, #dc2626)' : 'var(--sh-success, #16a34a)',
+                          fontSize: 12,
+                          fontWeight: 700,
+                          cursor: htmlToggleSaving || htmlKillSwitch.envOverride ? 'not-allowed' : 'pointer',
+                          opacity: htmlToggleSaving ? 0.6 : 1,
+                          fontFamily: 'inherit',
+                        }}
+                      >
+                        {htmlToggleSaving ? 'Saving…' : htmlKillSwitch.enabled ? 'Disable HTML' : 'Enable HTML'}
+                      </button>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.7 }}>
+                    {htmlKillSwitch.envOverride
+                      ? `Environment variable STUDYHUB_HTML_UPLOADS is set to "${htmlKillSwitch.envOverride}" — this overrides the toggle. Change the env var and restart to use the admin toggle.`
+                      : htmlKillSwitch.enabled
+                        ? 'HTML sheets go through sanitization + admin review. Disable instantly if you spot abuse.'
+                        : 'All HTML uploads are blocked. Users will see a message to use Markdown instead.'}
+                  </div>
+                  {htmlKillSwitch.error && (
+                    <div style={{ fontSize: 12, color: 'var(--sh-danger, #dc2626)', marginTop: 6 }}>{htmlKillSwitch.error}</div>
+                  )}
+                  <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 8 }}>
+                    Source: {htmlKillSwitch.source} {htmlKillSwitch.envOverride ? `(env: ${htmlKillSwitch.envOverride})` : ''}
+                  </div>
+                </div>
               </div>
               <div style={{ marginTop: 16 }}>
                 <Link to="/settings" style={primaryButtonLink}>
@@ -1325,6 +1455,20 @@ export default function AdminPage() {
       onConfirm={confirmAction?.onConfirm}
       onCancel={() => setConfirmAction(null)}
     />
+    {reviewPanelSheetId !== null && (
+      <SheetReviewPanel
+        sheetId={reviewPanelSheetId}
+        onClose={() => setReviewPanelSheetId(null)}
+        onReviewComplete={async () => {
+          setReviewPanelSheetId(null)
+          await Promise.all([
+            loadPagedData('sheet-reviews', reviewState.page),
+            loadPagedData('sheets', sheetsState.page),
+            loadOverview(),
+          ])
+        }}
+      />
+    )}
   </>
   )
 }
@@ -1392,6 +1536,39 @@ const settingsCardStyle = {
   borderRadius: 14,
   padding: '16px 18px',
   background: '#f8fafc',
+}
+
+const PIPELINE_BADGE_COLORS = {
+  success: { bg: 'var(--sh-success-bg)', text: 'var(--sh-success-text)', border: 'var(--sh-success-border)' },
+  danger:  { bg: 'var(--sh-danger-bg)',  text: 'var(--sh-danger-text)',  border: 'var(--sh-danger-border)' },
+  warning: { bg: 'var(--sh-warning-bg)', text: 'var(--sh-warning-text)', border: 'var(--sh-warning-border)' },
+  info:    { bg: 'var(--sh-pill-bg)',    text: 'var(--sh-pill-text)',    border: 'var(--sh-border)' },
+  muted:   { bg: 'var(--sh-soft)',       text: 'var(--sh-muted)',        border: 'var(--sh-border)' },
+}
+
+function PipelineBadge({ label, type = 'muted' }) {
+  const palette = PIPELINE_BADGE_COLORS[type] || PIPELINE_BADGE_COLORS.muted
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center',
+      padding: '3px 8px', borderRadius: 6,
+      fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.03em',
+      background: palette.bg, color: palette.text, border: `1px solid ${palette.border}`,
+      whiteSpace: 'nowrap',
+    }}>
+      {label}
+    </span>
+  )
+}
+
+const filterSelectStyle = {
+  borderRadius: 8,
+  border: '1px solid var(--sh-input-border)',
+  padding: '7px 10px',
+  fontSize: 12,
+  color: 'var(--sh-subtext)',
+  fontFamily: FONT,
+  background: 'var(--sh-input-bg)',
 }
 
 function pillButton(background, color, borderColor) {

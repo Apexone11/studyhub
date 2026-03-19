@@ -56,6 +56,65 @@
   --sh-soft: #f8fafc;
   --sh-pill-bg: #eff6ff;
   --sh-pill-text: #1d4ed8;
+
+  /* ── Control tokens (buttons, inputs, alerts) ───────────────────── */
+  --sh-input-bg: #f8fafc;
+  --sh-input-text: #0f172a;
+  --sh-input-placeholder: #94a3b8;
+  --sh-input-border: #e2e8f0;
+  --sh-input-focus: #3b82f6;
+  --sh-input-focus-ring: rgba(59, 130, 246, 0.1);
+
+  --sh-btn-primary-bg: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  --sh-btn-primary-text: #ffffff;
+  --sh-btn-primary-shadow: 0 4px 14px rgba(59, 130, 246, 0.4);
+  --sh-btn-secondary-bg: #ffffff;
+  --sh-btn-secondary-text: #475569;
+  --sh-btn-secondary-border: #e2e8f0;
+
+  --sh-danger: #dc2626;
+  --sh-danger-bg: #fef2f2;
+  --sh-danger-border: #fecaca;
+  --sh-danger-text: #b91c1c;
+
+  --sh-success: #10b981;
+  --sh-success-bg: #f0fdf4;
+  --sh-success-border: #bbf7d0;
+  --sh-success-text: #166534;
+
+  --sh-warning-bg: #fffbeb;
+  --sh-warning-border: #fde68a;
+  --sh-warning-text: #92400e;
+
+  --sh-link: #3b82f6;
+  --sh-focus-ring: 0 0 0 3px rgba(59, 130, 246, 0.15);
+
+  /* ── Page backgrounds ───────────────────────────────────────────── */
+  --sh-page-bg: #edf0f5;
+
+  /* ── Navbar (dark chrome — same in both themes) ──────────────────── */
+  --sh-nav-bg: #0f172a;
+  --sh-nav-border: #1e293b;
+  --sh-nav-text: #ffffff;
+  --sh-nav-muted: #64748b;
+  --sh-nav-muted-hover: #e2e8f0;
+  --sh-nav-accent: #94a3b8;
+  --sh-nav-search-bg: #1e293b;
+  --sh-nav-search-border: #334155;
+  --sh-nav-search-text: #475569;
+  --sh-nav-tab-active: #3b82f6;
+  --sh-nav-badge-bg: #ef4444;
+
+  /* ── Notification dropdown (content panel — flips in dark) ──────── */
+  --sh-dropdown-bg: #ffffff;
+  --sh-dropdown-border: #e2e8f0;
+  --sh-dropdown-shadow: 0 8px 32px rgba(15, 23, 42, 0.18);
+  --sh-dropdown-divider: #f1f5f9;
+  --sh-notif-unread-bg: #f0f7ff;
+  --sh-notif-unread-hover: #e8f0fe;
+  --sh-notif-read-bg: #ffffff;
+  --sh-notif-read-hover: #f8fafc;
+  --sh-notif-empty-icon: #cbd5e1;
 }
 
 [data-theme='dark'] {
@@ -72,6 +131,65 @@
   --sh-brand-dark: #e2e8f0;
   --sh-code-bg: #1e293b;
   --sh-quote-bg: #1e293b;
+
+  /* ── Control tokens (dark) ──────────────────────────────────────── */
+  --sh-input-bg: #1e293b;
+  --sh-input-text: #e2e8f0;
+  --sh-input-placeholder: #64748b;
+  --sh-input-border: #334155;
+  --sh-input-focus: #60a5fa;
+  --sh-input-focus-ring: rgba(96, 165, 250, 0.2);
+
+  --sh-btn-primary-bg: linear-gradient(135deg, #3b82f6, #2563eb);
+  --sh-btn-primary-text: #ffffff;
+  --sh-btn-primary-shadow: 0 4px 14px rgba(59, 130, 246, 0.25);
+  --sh-btn-secondary-bg: #1e293b;
+  --sh-btn-secondary-text: #e2e8f0;
+  --sh-btn-secondary-border: #334155;
+
+  --sh-danger: #f87171;
+  --sh-danger-bg: #1c1917;
+  --sh-danger-border: #7f1d1d;
+  --sh-danger-text: #fca5a5;
+
+  --sh-success: #34d399;
+  --sh-success-bg: #022c22;
+  --sh-success-border: #064e3b;
+  --sh-success-text: #6ee7b7;
+
+  --sh-warning-bg: #1c1917;
+  --sh-warning-border: #78350f;
+  --sh-warning-text: #fde68a;
+
+  --sh-link: #60a5fa;
+  --sh-focus-ring: 0 0 0 3px rgba(96, 165, 250, 0.25);
+
+  --sh-page-bg: #0f172a;
+
+  /* ── Navbar (dark chrome — slightly deeper in dark mode) ──────── */
+  --sh-nav-bg: #080c14;
+  --sh-nav-border: #1e293b;
+  --sh-nav-text: #ffffff;
+  --sh-nav-muted: #64748b;
+  --sh-nav-muted-hover: #e2e8f0;
+  --sh-nav-accent: #94a3b8;
+  --sh-nav-search-bg: #1e293b;
+  --sh-nav-search-border: #334155;
+  --sh-nav-search-text: #475569;
+  --sh-nav-tab-active: #60a5fa;
+  --sh-nav-badge-bg: #ef4444;
+
+  /* ── Notification dropdown (dark) ─────────────────────────────── */
+  --sh-dropdown-bg: #1e293b;
+  --sh-dropdown-border: #334155;
+  --sh-dropdown-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  --sh-dropdown-divider: #334155;
+  --sh-notif-unread-bg: #172554;
+  --sh-notif-unread-hover: #1e3a8a;
+  --sh-notif-read-bg: #1e293b;
+  --sh-notif-read-hover: #334155;
+  --sh-notif-empty-icon: #475569;
+
   --navy: #e2e8f0;
   --navy-2: #cbd5e1;
   --navy-3: #94a3b8;

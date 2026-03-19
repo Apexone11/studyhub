@@ -1091,7 +1091,7 @@ export default function UploadSheetPage() {
         ) : null}
 
         <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: '1px solid #e2e8f0' }}>
+          <div className="upload-editor-split" style={{ borderBottom: '1px solid #e2e8f0' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 16px', borderRight: '1px solid #e2e8f0' }}>
               <IconUpload size={13} style={{ color: '#3b82f6' }} />
               <span style={{ fontSize: 12, fontWeight: 600, color: '#3b82f6' }}>{isHtmlMode ? 'HTML Working Editor' : 'Markdown Editor'}</span>

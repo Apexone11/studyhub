@@ -28,6 +28,8 @@ const {
 } = require('../lib/htmlDraftWorkflow')
 const { isModerationEnabled, scanContent } = require('../lib/moderationEngine')
 const { createProvenanceToken } = require('../lib/provenance')
+const { isHtmlUploadsEnabled } = require('../lib/htmlKillSwitch')
+const requireVerifiedEmail = require('../middleware/requireVerifiedEmail')
 
 const router = express.Router()
 const SHEET_STATUS = {
@@ -718,6 +720,13 @@ router.post('/drafts/autosave', requireAuth, sheetWriteLimiter, async (req, res)
 
   try {
     if (contentFormat === 'html' && content.trim()) {
+      const killSwitch = await isHtmlUploadsEnabled()
+      if (!killSwitch.enabled) {
+        return res.status(403).json({
+          error: 'HTML uploads are temporarily disabled. Please use Markdown instead.',
+          code: 'HTML_UPLOADS_DISABLED',
+        })
+      }
       const validation = validateHtmlForSubmission(content)
       if (!validation.ok) {
         return res.status(400).json({ error: validation.issues[0], issues: validation.issues })
@@ -1197,7 +1206,7 @@ async function getUserDefaultDownloads(userId) {
   return prefs?.defaultDownloads !== false
 }
 
-router.post('/', requireAuth, sheetWriteLimiter, async (req, res) => {
+router.post('/', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (req, res) => {
   const { title, content, courseId, forkOf, description, allowDownloads } = req.body || {}
   const contentFormat = normalizeContentFormat(req.body?.contentFormat)
   const nextStatus = resolveNextSheetStatus({
@@ -1211,6 +1220,13 @@ router.post('/', requireAuth, sheetWriteLimiter, async (req, res) => {
 
   try {
     if (contentFormat === 'html') {
+      const killSwitch = await isHtmlUploadsEnabled()
+      if (!killSwitch.enabled) {
+        return res.status(403).json({
+          error: 'HTML uploads are temporarily disabled. Please use Markdown instead.',
+          code: 'HTML_UPLOADS_DISABLED',
+        })
+      }
       const validation = validateHtmlForSubmission(content)
       if (!validation.ok) {
         return res.status(400).json({ error: validation.issues[0], issues: validation.issues })
@@ -1358,6 +1374,13 @@ router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
         })
 
     if (nextFormat === 'html') {
+      const killSwitch = await isHtmlUploadsEnabled()
+      if (!killSwitch.enabled) {
+        return res.status(403).json({
+          error: 'HTML uploads are temporarily disabled. Please use Markdown instead.',
+          code: 'HTML_UPLOADS_DISABLED',
+        })
+      }
       const htmlToValidate = typeof nextContent === 'string' ? nextContent : String(sheet.content || '')
       if (nextStatus !== SHEET_STATUS.DRAFT || htmlToValidate.trim()) {
         const validation = validateHtmlForSubmission(htmlToValidate)
@@ -1780,7 +1803,7 @@ router.get('/:id/comments', async (req, res) => {
   }
 })
 
-router.post('/:id/comments', requireAuth, commentLimiter, async (req, res) => {
+router.post('/:id/comments', requireAuth, requireVerifiedEmail, commentLimiter, async (req, res) => {
   const sheetId = Number.parseInt(req.params.id, 10)
   const content = typeof req.body.content === 'string' ? req.body.content.trim() : ''
 

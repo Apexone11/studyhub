@@ -466,15 +466,92 @@ export default function SheetsPage() {
               {sheetsState.loading ? (
                 <SkeletonSheetGrid count={4} />
               ) : sheetsState.sheets.length === 0 ? (
-                <section style={{ ...panelStyle(), borderStyle: 'dashed', textAlign: 'center', padding: '52px 24px' }}>
-                  <div style={{ width: 56, height: 56, borderRadius: 14, background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-                    </svg>
-                  </div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--sh-heading, #0f172a)', marginBottom: 6 }}>No sheets matched your filters</div>
-                  <div style={{ fontSize: 13, color: 'var(--sh-muted, #94a3b8)', lineHeight: 1.6 }}>Try adjusting your search, school, or course filters to find what you&apos;re looking for.</div>
-                </section>
+                (() => {
+                  /* Smart empty state: differentiate course-filtered vs. search vs. generic */
+                  const activeCourse = courseId && activeSchool
+                    ? (activeSchool.courses || []).find((c) => String(c.id) === String(courseId))
+                    : null
+                  const isCourseEmpty = Boolean(activeCourse) && !search && !mine && !starred
+                  const isSearchEmpty = Boolean(search)
+
+                  return (
+                    <section style={{ ...panelStyle(), borderStyle: 'dashed', textAlign: 'center', padding: '52px 24px' }}>
+                      {isCourseEmpty ? (
+                        <>
+                          {/* Course-specific empty: "Be the first" CTA */}
+                          <div style={{ width: 56, height: 56, borderRadius: 14, background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M12 5v14M5 12h14" />
+                            </svg>
+                          </div>
+                          <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--sh-heading, #0f172a)', marginBottom: 8 }}>
+                            Be the first to share notes for {activeCourse.code}!
+                          </div>
+                          <div style={{ fontSize: 13, color: 'var(--sh-muted, #64748b)', lineHeight: 1.7, marginBottom: 20, maxWidth: 380, marginInline: 'auto' }}>
+                            No study sheets exist for <strong>{activeCourse.code} — {activeCourse.name}</strong> yet. Upload yours and help classmates studying this course.
+                          </div>
+                          <Link
+                            to="/sheets/upload"
+                            style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 8,
+                              padding: '11px 22px', borderRadius: 12, border: 'none',
+                              background: 'linear-gradient(135deg, #10b981, #059669)',
+                              color: '#fff', fontSize: 14, fontWeight: 700,
+                              textDecoration: 'none',
+                              boxShadow: '0 4px 14px rgba(16, 185, 129, 0.3)',
+                            }}
+                          >
+                            <IconUpload size={16} /> Upload a Sheet
+                          </Link>
+                          <div style={{ marginTop: 16, fontSize: 12, color: 'var(--sh-muted, #94a3b8)', lineHeight: 1.6 }}>
+                            Tip: Lecture notes, cheat sheets, formula summaries, and study guides all work great.
+                          </div>
+                        </>
+                      ) : isSearchEmpty ? (
+                        <>
+                          {/* Search empty state */}
+                          <div style={{ width: 56, height: 56, borderRadius: 14, background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                            </svg>
+                          </div>
+                          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--sh-heading, #0f172a)', marginBottom: 6 }}>
+                            No sheets match &ldquo;{search}&rdquo;
+                          </div>
+                          <div style={{ fontSize: 13, color: 'var(--sh-muted, #94a3b8)', lineHeight: 1.6 }}>
+                            Try a different search term, or adjust your school and course filters.
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          {/* Generic empty state */}
+                          <div style={{ width: 56, height: 56, borderRadius: 14, background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                              <polyline points="14 2 14 8 20 8" />
+                            </svg>
+                          </div>
+                          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--sh-heading, #0f172a)', marginBottom: 6 }}>No sheets matched your filters</div>
+                          <div style={{ fontSize: 13, color: 'var(--sh-muted, #94a3b8)', lineHeight: 1.6, marginBottom: 16 }}>
+                            Try adjusting your school, course, or toggle filters to find what you&apos;re looking for.
+                          </div>
+                          <Link
+                            to="/sheets/upload"
+                            style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 8,
+                              padding: '9px 18px', borderRadius: 10,
+                              background: '#3b82f6', color: '#fff',
+                              fontSize: 13, fontWeight: 700,
+                              textDecoration: 'none',
+                            }}
+                          >
+                            <IconUpload size={14} /> Upload a Sheet
+                          </Link>
+                        </>
+                      )}
+                    </section>
+                  )
+                })()
               ) : (
                 <div ref={cardsRef} className="sheets-card-grid">
                   {sheetsState.sheets.map((sheet) => (

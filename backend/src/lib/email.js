@@ -409,6 +409,10 @@ async function sendPasswordReset(toEmail, username, resetUrl) {
   const body = `
     <h2 style="margin:0 0 8px;color:#1e3a5f;font-size:22px;">Reset Your Password</h2>
     <p style="margin:0 0 24px;color:#6b7280;font-size:15px;">Hi <strong>${escapeHtml(username)}</strong>, we received a request to reset your StudyHub password.</p>
+    <div style="background:#f0f4f8;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px;margin:0 0 24px;">
+      <p style="margin:0;color:#6b7280;font-size:13px;">Your username</p>
+      <p style="margin:4px 0 0;color:#1e3a5f;font-size:18px;font-weight:bold;letter-spacing:0.5px;">${escapeHtml(username)}</p>
+    </div>
     <div style="text-align:center;margin:0 0 24px;">
       <a href="${escapeHtml(resetUrl)}" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;padding:14px 32px;border-radius:8px;">Reset Password</a>
     </div>
@@ -423,6 +427,8 @@ async function sendPasswordReset(toEmail, username, resetUrl) {
     subject: 'Reset your StudyHub password',
     text: [
       `Hi ${username},`,
+      '',
+      `Your StudyHub username: ${username}`,
       '',
       'We received a request to reset your StudyHub password.',
       '',
