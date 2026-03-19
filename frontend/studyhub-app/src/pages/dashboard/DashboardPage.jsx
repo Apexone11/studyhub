@@ -61,16 +61,20 @@ function EmptyState({ title, body, actionLabel, actionTo }) {
   return (
     <div
       style={{
-        background: '#fff',
+        background: 'var(--sh-surface, #fff)',
         borderRadius: 16,
-        border: '1px solid #e2e8f0',
-        padding: '30px 24px',
+        border: '2px dashed var(--sh-border, #cbd5e1)',
+        padding: '44px 24px',
         textAlign: 'center',
-        color: '#64748b',
       }}
     >
-      <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 8 }}>{title}</div>
-      <p style={{ margin: '0 0 16px', fontSize: 13, lineHeight: 1.7 }}>{body}</p>
+      <div style={{ width: 52, height: 52, borderRadius: 13, background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="2" y="3" width="20" height="14" rx="2" ry="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" />
+        </svg>
+      </div>
+      <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--sh-heading, #0f172a)', marginBottom: 8 }}>{title}</div>
+      <p style={{ margin: '0 0 16px', fontSize: 13, lineHeight: 1.7, color: 'var(--sh-muted, #64748b)' }}>{body}</p>
       {actionLabel && actionTo ? (
         <Link
           to={actionTo}

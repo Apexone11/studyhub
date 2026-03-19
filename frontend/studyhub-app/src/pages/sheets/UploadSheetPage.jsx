@@ -17,10 +17,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useBlocker, useNavigate, useParams } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
+import SafeJoyride from '../../components/SafeJoyride'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import { IconCheck, IconEye, IconUpload } from '../../components/Icons'
 import { API } from '../../config'
 import { pageShell } from '../../lib/ui'
+import { useTutorial } from '../../lib/useTutorial'
+import { UPLOAD_STEPS } from '../../lib/tutorialSteps'
 import {
   UPLOAD_TUTORIAL_KEY,
   canEditHtmlWorkingCopy,
@@ -102,6 +105,7 @@ export default function UploadSheetPage() {
   const [status, setStatus] = useState(isEditing ? 'published' : 'draft')
   const [draftId, setDraftId] = useState(null)
   const [legacyMarkdownMode, setLegacyMarkdownMode] = useState(false)
+  const tutorial = useTutorial('upload', UPLOAD_STEPS)
 
   const [courses, setCourses] = useState([])
   const [error, setError] = useState('')
@@ -809,7 +813,7 @@ export default function UploadSheetPage() {
     <div style={{ minHeight: '100vh', background: '#edf0f5', fontFamily: FONT }}>
       <Navbar crumbs={[{ label: 'Study Sheets', to: '/sheets' }, { label: isEditing ? 'Edit Sheet' : 'New Sheet', to: null }]} hideTabs actions={navActions} hideSearch />
       <div style={pageShell('editor', 20, 60)}>
-        <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', padding: '14px 20px', marginBottom: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, alignItems: 'end' }}>
+        <div data-tutorial="upload-info" style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', padding: '14px 20px', marginBottom: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, alignItems: 'end' }}>
           <div>
             <label style={{ fontSize: 10, fontWeight: 700, color: '#64748b', letterSpacing: '.06em', display: 'block', marginBottom: 5 }}>SHEET TITLE</label>
             <input
@@ -843,7 +847,7 @@ export default function UploadSheetPage() {
           </div>
         </div>
 
-        <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', padding: '14px 20px', marginBottom: 12 }}>
+        <div data-tutorial="upload-content" style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', padding: '14px 20px', marginBottom: 12 }}>
           <label style={{ fontSize: 10, fontWeight: 700, color: '#64748b', letterSpacing: '.06em', display: 'block', marginBottom: 5 }}>
             DESCRIPTION <span style={{ fontSize: 9, color: '#94a3b8', textTransform: 'none', letterSpacing: 0 }}>(required for HTML review)</span>
           </label>
@@ -893,7 +897,7 @@ export default function UploadSheetPage() {
           </div>
         ) : null}
 
-        <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', padding: '14px 20px', marginBottom: 12 }}>
+        <div data-tutorial="upload-attachment" style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', padding: '14px 20px', marginBottom: 12 }}>
           <label style={{ fontSize: 10, fontWeight: 700, color: '#64748b', letterSpacing: '.06em', display: 'block', marginBottom: 8 }}>
             OPTIONAL ATTACHMENT <span style={{ fontSize: 9, color: '#94a3b8', textTransform: 'none', letterSpacing: 0 }}>(PDF, PNG, JPEG, GIF, WebP — max 10 MB)</span>
           </label>
@@ -1123,6 +1127,8 @@ export default function UploadSheetPage() {
         onConfirm={confirmLeave}
         onCancel={cancelLeave}
       />
+
+      <SafeJoyride {...tutorial.joyrideProps} />
 
       <ConfirmDialog
         open={showDiscardDialog}

@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
 import AppSidebar from '../../components/AppSidebar'
+import SafeJoyride from '../../components/SafeJoyride'
+import { SkeletonCard } from '../../components/Skeleton'
 import MentionText from '../../components/MentionText'
 import {
   IconArrowLeft,
@@ -19,6 +21,9 @@ import { getApiErrorMessage, isAuthSessionFailure, readJsonSafely } from '../../
 import { useSession } from '../../lib/session-context'
 import { pageShell, useResponsiveAppLayout } from '../../lib/ui'
 import { useLivePolling } from '../../lib/useLivePolling'
+import { useTutorial } from '../../lib/useTutorial'
+import { VIEWER_STEPS } from '../../lib/tutorialSteps'
+import { fadeInUp } from '../../lib/animations'
 
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'avif'])
@@ -131,7 +136,15 @@ function ContributionList({ title, items, canReview, onReview, reviewingId }) {
     <section style={panelStyle()}>
       <h2 style={{ margin: '0 0 10px', fontSize: 15, color: '#0f172a' }}>{title}</h2>
       {items.length === 0 ? (
-        <div style={{ color: '#94a3b8', fontSize: 13 }}>No contributions yet.</div>
+        <div style={{ textAlign: 'center', padding: '28px 16px' }}>
+          <div style={{ width: 44, height: 44, borderRadius: 11, background: 'linear-gradient(135deg, #f0fdf4, #bbf7d0)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" />
+            </svg>
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--sh-heading, #0f172a)', marginBottom: 4 }}>No contributions yet</div>
+          <div style={{ fontSize: 12, color: 'var(--sh-muted, #94a3b8)', lineHeight: 1.5 }}>Fork this sheet to suggest improvements.</div>
+        </div>
       ) : (
         <div style={{ display: 'grid', gap: 12 }}>
           {items.map((item) => (
@@ -198,6 +211,16 @@ export default function SheetViewerPage() {
   const [showContributeModal, setShowContributeModal] = useState(false)
   const [contributeMessage, setContributeMessage] = useState('')
   const [reviewingId, setReviewingId] = useState(null)
+  const tutorial = useTutorial('viewer', VIEWER_STEPS)
+  const sheetPanelRef = useRef(null)
+  const animatedRef = useRef(false)
+
+  /* Animate sheet content on first load */
+  useEffect(() => {
+    if (sheetState.loading || animatedRef.current || !sheetState.sheet) return
+    animatedRef.current = true
+    if (sheetPanelRef.current) fadeInUp(sheetPanelRef.current, { duration: 450, y: 16 })
+  }, [sheetState.loading, sheetState.sheet])
 
   const sheetId = Number.parseInt(id, 10)
 
@@ -498,7 +521,7 @@ export default function SheetViewerPage() {
                   Back
                 </button>
                 {sheet ? (
-                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  <div data-tutorial="viewer-actions" style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                     <button type="button" onClick={updateStar} style={actionButton(sheet.starred ? '#f59e0b' : '#475569')}>
                       {sheet.starred ? <IconStarFilled size={14} /> : <IconStar size={14} />}
                       {sheet.stars || 0}
@@ -551,11 +574,9 @@ export default function SheetViewerPage() {
               {errorBanner(sheetState.error)}
 
               {sheetState.loading ? (
-                <section style={panelStyle()}>
-                  <div style={{ color: '#64748b', fontSize: 14 }}>Loading sheet...</div>
-                </section>
+                <SkeletonCard style={{ padding: '28px 24px' }} />
               ) : sheet ? (
-                <section style={panelStyle()}>
+                <section ref={sheetPanelRef} data-tutorial="viewer-content" style={panelStyle()}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 14 }}>
                     <div>
                       <h1 style={{ margin: 0, fontSize: 30, color: '#0f172a' }}>{sheet.title}</h1>
@@ -618,7 +639,7 @@ export default function SheetViewerPage() {
 
               {errorBanner(commentsState.error)}
 
-              <section style={panelStyle()}>
+              <section data-tutorial="viewer-comments" style={panelStyle()}>
                 <h2 style={{ margin: '0 0 12px', fontSize: 18, color: '#0f172a' }}>Comments</h2>
                 <form onSubmit={submitComment} style={{ display: 'grid', gap: 12, marginBottom: 16 }}>
                   <textarea
@@ -827,6 +848,8 @@ export default function SheetViewerPage() {
           </div>
         </div>
       ) : null}
+
+      <SafeJoyride {...tutorial.joyrideProps} />
     </>
   )
 }

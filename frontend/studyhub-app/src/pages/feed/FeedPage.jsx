@@ -35,6 +35,7 @@ import { useSession } from '../../lib/session-context'
 import { pageShell, useResponsiveAppLayout } from '../../lib/ui'
 import { useLivePolling } from '../../lib/useLivePolling'
 import { staggerEntrance, popScale } from '../../lib/animations'
+import { SkeletonFeed } from '../../components/Skeleton'
 import SafeJoyride from '../../components/SafeJoyride'
 import { useTutorial } from '../../lib/useTutorial'
 import { FEED_STEPS } from '../../lib/tutorialSteps'
@@ -235,16 +236,20 @@ function EmptyFeed({ message }) {
   return (
     <div
       style={{
-        background: '#fff',
+        background: 'var(--sh-surface, #fff)',
         borderRadius: 18,
-        border: '1px dashed #cbd5e1',
-        color: '#94a3b8',
-        padding: '48px 24px',
+        border: '2px dashed var(--sh-border, #cbd5e1)',
+        padding: '52px 24px',
         textAlign: 'center',
-        fontSize: 18,
       }}
     >
-      {message}
+      <div style={{ width: 56, height: 56, borderRadius: 14, background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+        </svg>
+      </div>
+      <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--sh-heading, #0f172a)', marginBottom: 6 }}>{message}</div>
+      <div style={{ fontSize: 13, color: 'var(--sh-muted, #94a3b8)', lineHeight: 1.6 }}>Posts from your classmates and followed users will appear here.</div>
     </div>
   )
 }
@@ -561,33 +566,36 @@ function FeedCard({
                   <button
                     type="button"
                     onClick={() => onTogglePostMenu(isPostMenuOpen ? null : item.id)}
+                    className="feed-post-menu-btn"
                     style={{
                       border: '1px solid #e2e8f0',
                       background: '#fff',
-                      borderRadius: 10,
-                      color: '#475569',
-                      width: 30,
-                      height: 28,
-                      fontSize: 18,
-                      lineHeight: 1,
+                      borderRadius: 8,
+                      color: '#94a3b8',
+                      width: 32,
+                      height: 32,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
                       cursor: 'pointer',
+                      transition: 'all .15s',
                     }}
                     aria-label="Post actions"
                   >
-                    ...
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="3" r="1.5"/><circle cx="8" cy="8" r="1.5"/><circle cx="8" cy="13" r="1.5"/></svg>
                   </button>
                   {isPostMenuOpen ? (
                     <div
                       style={{
                         position: 'absolute',
-                        top: 34,
+                        top: 36,
                         right: 0,
-                        minWidth: 150,
+                        minWidth: 160,
                         borderRadius: 12,
                         border: '1px solid #e2e8f0',
                         background: '#fff',
-                        boxShadow: '0 12px 24px rgba(15, 23, 42, 0.08)',
-                        padding: 6,
+                        boxShadow: '0 8px 24px rgba(15, 23, 42, 0.12)',
+                        padding: 4,
                         zIndex: 3,
                       }}
                     >
@@ -595,21 +603,27 @@ function FeedCard({
                         type="button"
                         onClick={() => onDeletePost(item)}
                         disabled={isDeletingPost}
+                        className="feed-post-delete-btn"
                         style={{
                           width: '100%',
                           borderRadius: 8,
                           border: 'none',
-                          background: '#fef2f2',
+                          background: 'transparent',
                           color: '#dc2626',
-                          fontSize: 12,
-                          fontWeight: 700,
+                          fontSize: 13,
+                          fontWeight: 600,
                           textAlign: 'left',
-                          padding: '9px 10px',
+                          padding: '8px 12px',
                           cursor: isDeletingPost ? 'wait' : 'pointer',
                           fontFamily: FONT,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          transition: 'background .15s',
                         }}
                       >
-                        {isDeletingPost ? 'Deleting...' : 'Delete post'}
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                        {isDeletingPost ? 'Deleting…' : 'Delete post'}
                       </button>
                     </div>
                   ) : null}
@@ -1255,9 +1269,7 @@ export default function FeedPage() {
               ) : null}
 
               {feedState.loading ? (
-                <Panel title="Loading feed">
-                  <div style={{ color: '#64748b', fontSize: 14 }}>Fetching posts, sheets, and announcements...</div>
-                </Panel>
+                <SkeletonFeed count={3} />
               ) : visibleItems.length === 0 ? (
                 <EmptyFeed message="No feed items matched this filter." />
               ) : (

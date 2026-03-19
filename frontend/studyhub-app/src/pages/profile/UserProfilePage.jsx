@@ -7,12 +7,17 @@
  *
  * Uses the shared Navbar for navigation consistency across the app.
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
+import SafeJoyride from '../../components/SafeJoyride'
 import { IconSheets, IconStar } from '../../components/Icons'
+import { SkeletonProfile } from '../../components/Skeleton'
 import { API } from '../../config'
 import { useSession } from '../../lib/session-context'
+import { useTutorial } from '../../lib/useTutorial'
+import { PROFILE_STEPS } from '../../lib/tutorialSteps'
+import { fadeInUp, staggerEntrance } from '../../lib/animations'
 
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 
@@ -32,8 +37,39 @@ export default function UserProfilePage() {
   const [following, setFollowing] = useState(false)
   const [followers, setFollowers] = useState(0)
   const [toggling, setToggling] = useState(false)
+  const [followModal, setFollowModal] = useState(null) // 'followers' | 'following' | null
+  const [followList, setFollowList] = useState([])
+  const [followListLoading, setFollowListLoading] = useState(false)
 
   const isOwnProfile = currentUser?.username === username
+  const tutorial = useTutorial('profile', PROFILE_STEPS)
+  const profileCardRef = useRef(null)
+  const columnsRef = useRef(null)
+  const animatedRef = useRef(false)
+
+  /* Animate profile on first data load */
+  useEffect(() => {
+    if (loading || !profile || animatedRef.current) return
+    animatedRef.current = true
+    if (profileCardRef.current) fadeInUp(profileCardRef.current, { duration: 400, y: 16 })
+    if (columnsRef.current) staggerEntrance(columnsRef.current.children, { staggerMs: 80, duration: 450, y: 14 })
+  }, [loading, profile])
+
+  /* ── Load followers/following list ─────────────────────────────────── */
+  async function loadFollowList(type) {
+    setFollowModal(type)
+    setFollowListLoading(true)
+    try {
+      const res = await fetch(`${API}/api/users/${username}/${type}`, {
+        headers: authHeaders(),
+        credentials: 'include',
+      })
+      if (res.ok) {
+        setFollowList(await res.json())
+      }
+    } catch { /* ignore */ }
+    finally { setFollowListLoading(false) }
+  }
 
   /* ── Load profile data ───────────────────────────────────────────────── */
   useEffect(() => {
@@ -88,9 +124,7 @@ export default function UserProfilePage() {
     <div style={{ minHeight: '100vh', background: '#edf0f5', fontFamily: FONT }}>
       <Navbar crumbs={[{ label: username, to: `/user/${username}` }]} hideTabs />
       <div style={{ maxWidth: 900, margin: '0 auto', padding: 'clamp(20px, 3vw, 40px) clamp(16px, 2vw, 24px)' }}>
-        <div style={{ background: '#fff', borderRadius: 18, border: '1px solid #e2e8f0', padding: 48, textAlign: 'center', color: '#94a3b8' }}>
-          Loading profile…
-        </div>
+        <SkeletonProfile />
       </div>
     </div>
   )
@@ -123,7 +157,7 @@ export default function UserProfilePage() {
 
       <div style={{ maxWidth: 900, margin: '0 auto', padding: 'clamp(20px, 3vw, 40px) clamp(16px, 2vw, 24px)' }}>
         {/* ── Profile card ─────────────────────────────────────────────── */}
-        <div style={{ background: '#fff', borderRadius: 18, border: '1px solid #e2e8f0', padding: 'clamp(20px, 3vw, 28px)', marginBottom: 20, boxShadow: '0 2px 10px rgba(15,23,42,0.05)' }}>
+        <div ref={profileCardRef} style={{ background: '#fff', borderRadius: 18, border: '1px solid #e2e8f0', padding: 'clamp(20px, 3vw, 28px)', marginBottom: 20, boxShadow: '0 2px 10px rgba(15,23,42,0.05)' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'clamp(14px, 2vw, 20px)', flexWrap: 'wrap' }}>
             {/* Avatar — responsive sizing via clamp */}
             <div style={{
@@ -157,21 +191,21 @@ export default function UserProfilePage() {
               </div>
 
               {/* Stats — flex-wrap for responsive */}
-              <div className="profile-stats-row">
+              <div className="profile-stats-row" data-tutorial="profile-stats">
                 <div style={{ textAlign: 'center', padding: '8px 20px' }}>
                   <div style={{ fontSize: 20, fontWeight: 800, color: '#0f172a' }}>{profile.sheetCount || 0}</div>
                   <div style={{ fontSize: 12, color: '#94a3b8' }}>Sheets</div>
                 </div>
                 <div style={{ width: 1, height: 36, background: '#e8ecf0' }} />
-                <div style={{ textAlign: 'center', padding: '8px 20px' }}>
+                <button onClick={() => loadFollowList('followers')} style={{ textAlign: 'center', padding: '8px 20px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', borderRadius: 8 }} className="profile-stat-btn">
                   <div style={{ fontSize: 20, fontWeight: 800, color: '#0f172a' }}>{followers}</div>
                   <div style={{ fontSize: 12, color: '#94a3b8' }}>Followers</div>
-                </div>
+                </button>
                 <div style={{ width: 1, height: 36, background: '#e8ecf0' }} />
-                <div style={{ textAlign: 'center', padding: '8px 20px' }}>
+                <button onClick={() => loadFollowList('following')} style={{ textAlign: 'center', padding: '8px 20px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', borderRadius: 8 }} className="profile-stat-btn">
                   <div style={{ fontSize: 20, fontWeight: 800, color: '#0f172a' }}>{profile.followingCount || 0}</div>
                   <div style={{ fontSize: 12, color: '#94a3b8' }}>Following</div>
-                </div>
+                </button>
               </div>
             </div>
 
@@ -203,9 +237,9 @@ export default function UserProfilePage() {
         </div>
 
         {/* ── Two-column content: sheets | courses ─────────────────────── */}
-        <div className="profile-columns">
+        <div ref={columnsRef} className="profile-columns">
           {/* Recent Sheets */}
-          <div style={{ background: '#fff', borderRadius: 18, border: '1px solid #e2e8f0', padding: '24px 28px', boxShadow: '0 2px 10px rgba(15,23,42,0.05)' }}>
+          <div data-tutorial="profile-sheets" style={{ background: '#fff', borderRadius: 18, border: '1px solid #e2e8f0', padding: '24px 28px', boxShadow: '0 2px 10px rgba(15,23,42,0.05)' }}>
             <h2 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
               <IconSheets size={16} style={{ color: '#3b82f6' }} />
               Recent Sheets
@@ -227,9 +261,14 @@ export default function UserProfilePage() {
                   </Link>
                 ))
               : (
-                  <div style={{ textAlign: 'center', padding: '28px 0', fontSize: 14, color: '#94a3b8' }}>
-                    <div style={{ fontSize: 28, color: '#cbd5e1', marginBottom: 10 }}>📄</div>
-                    No public sheets yet
+                  <div style={{ textAlign: 'center', padding: '36px 16px' }}>
+                    <div style={{ width: 48, height: 48, borderRadius: 12, background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
+                      </svg>
+                    </div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--sh-heading, #0f172a)', marginBottom: 4 }}>No public sheets yet</div>
+                    <div style={{ fontSize: 12, color: 'var(--sh-muted, #94a3b8)', lineHeight: 1.5 }}>Sheets uploaded by this user will appear here.</div>
                   </div>
                 )
             }
@@ -293,7 +332,7 @@ export default function UserProfilePage() {
           )}
 
           {/* Enrolled Courses */}
-          <div style={{ background: '#fff', borderRadius: 18, border: '1px solid #e2e8f0', padding: '24px 28px', boxShadow: '0 2px 10px rgba(15,23,42,0.05)' }}>
+          <div data-tutorial="profile-courses" style={{ background: '#fff', borderRadius: 18, border: '1px solid #e2e8f0', padding: '24px 28px', boxShadow: '0 2px 10px rgba(15,23,42,0.05)' }}>
             <h2 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
               📚 Enrolled Courses
             </h2>
@@ -320,6 +359,85 @@ export default function UserProfilePage() {
           </div>
         </div>
       </div>
+
+      <SafeJoyride {...tutorial.joyrideProps} />
+
+      {/* ── Followers / Following modal ──────────────────────────────── */}
+      {followModal && (
+        <div
+          onClick={() => setFollowModal(null)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9999,
+            background: 'rgba(15,23,42,0.45)', backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#fff', borderRadius: 18, width: 'min(420px, 92vw)',
+              maxHeight: '70vh', display: 'flex', flexDirection: 'column',
+              boxShadow: '0 8px 30px rgba(15,23,42,0.18)', fontFamily: FONT,
+            }}
+          >
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 22px 14px', borderBottom: '1px solid #f1f5f9' }}>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#0f172a' }}>
+                {followModal === 'followers' ? 'Followers' : 'Following'}
+              </h3>
+              <button
+                onClick={() => setFollowModal(null)}
+                style={{ background: 'none', border: 'none', fontSize: 20, color: '#94a3b8', cursor: 'pointer', padding: '4px 8px', lineHeight: 1 }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* List */}
+            <div style={{ overflowY: 'auto', padding: '8px 10px 14px' }}>
+              {followListLoading ? (
+                <div style={{ textAlign: 'center', padding: 32, color: '#94a3b8', fontSize: 14 }}>Loading…</div>
+              ) : followList.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: 32, color: '#94a3b8', fontSize: 14 }}>
+                  {followModal === 'followers' ? 'No followers yet' : 'Not following anyone yet'}
+                </div>
+              ) : (
+                followList.map((u) => (
+                  <Link
+                    key={u.id}
+                    to={`/users/${u.username}`}
+                    onClick={() => setFollowModal(null)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px',
+                      borderRadius: 10, textDecoration: 'none', color: 'inherit',
+                      transition: 'background .15s',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = '#f8fafc' }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+                  >
+                    <div style={{
+                      width: 38, height: 38, borderRadius: '50%', background: '#0f172a',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      flexShrink: 0, overflow: 'hidden',
+                    }}>
+                      {u.avatarUrl
+                        ? <img src={u.avatarUrl.startsWith('http') ? u.avatarUrl : `${API}${u.avatarUrl}`} alt={u.username} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                        : <span style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>{u.username.slice(0, 2).toUpperCase()}</span>
+                      }
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>{u.username}</div>
+                      <div style={{ fontSize: 12, color: '#94a3b8' }}>
+                        {u.role === 'admin' ? 'Admin' : 'Student'}
+                      </div>
+                    </div>
+                  </Link>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

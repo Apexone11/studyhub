@@ -27,6 +27,8 @@ import { PAGE_FONT, authHeaders, timeAgo } from '../shared/pageUtils'
 import SafeJoyride from '../../components/SafeJoyride'
 import { useTutorial } from '../../lib/useTutorial'
 import { NOTES_STEPS } from '../../lib/tutorialSteps'
+import { staggerEntrance } from '../../lib/animations'
+import { SkeletonList } from '../../components/Skeleton'
 
 /* ── Configure marked for safe rendering ─────────────────────────────── */
 marked.setOptions({
@@ -125,9 +127,18 @@ export default function NotesPage() {
   const [loadingNotes, setLoadingNotes] = useState(true)
   const saveTimer = useRef()
   const editorRef = useRef(null)
+  const notesListRef = useRef(null)
+  const animatedRef = useRef(false)
 
   /* Tutorial popup */
   const tutorial = useTutorial('notes', NOTES_STEPS)
+
+  /* Animate notes list on first load */
+  useEffect(() => {
+    if (loadingNotes || animatedRef.current || notes.length === 0) return
+    animatedRef.current = true
+    if (notesListRef.current) staggerEntrance(notesListRef.current.children, { staggerMs: 50, duration: 400, y: 12 })
+  }, [loadingNotes, notes.length])
 
   /* ── Data loading (with abort cleanup to prevent state updates after unmount) */
   useEffect(() => {
@@ -312,7 +323,7 @@ export default function NotesPage() {
 
       {/* Notes list */}
       {loadingNotes ? (
-        <div style={{ color: '#94a3b8', fontSize: 13, padding: '20px 0' }}>Loading…</div>
+        <SkeletonList count={4} />
       ) : visibleNotes.length === 0 ? (
         <div style={{ background: 'var(--sh-surface, #fff)', borderRadius: 16, border: '2px dashed var(--sh-border, #cbd5e1)', padding: '52px 24px', textAlign: 'center' }}>
           <div style={{ width: 56, height: 56, borderRadius: 14, background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
@@ -341,7 +352,7 @@ export default function NotesPage() {
           </button>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div ref={notesListRef} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {visibleNotes.map((note) => {
             const isActive = activeNote?.id === note.id
             return (

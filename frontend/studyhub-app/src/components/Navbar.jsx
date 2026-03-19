@@ -16,6 +16,7 @@ import {
   IconChevronDown,
 } from './Icons'
 import SearchModal from './SearchModal'
+import KeyboardShortcuts from './KeyboardShortcuts'
 import { pageWidths } from '../lib/ui'
 import { useSession } from '../lib/session-context'
 import { useLivePolling } from '../lib/useLivePolling'
@@ -218,6 +219,18 @@ export default function Navbar({
   // search modal state
   const [searchOpen, setSearchOpen] = useState(false)
 
+  // Global Ctrl+K / Cmd+K shortcut to open search
+  useEffect(() => {
+    function onGlobalKey(e) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setSearchOpen(true)
+      }
+    }
+    document.addEventListener('keydown', onGlobalKey)
+    return () => document.removeEventListener('keydown', onGlobalKey)
+  }, [])
+
   // notification bell state
   const [notifications, setNotifications] = useState([])
   const [unreadCount,   setUnreadCount]   = useState(0)
@@ -390,9 +403,11 @@ export default function Navbar({
           <div className={isLanding ? 'sh-landing-search' : undefined} style={searchBoxStyle} onClick={() => setSearchOpen(true)}>
             <IconSearch size={13} style={{ color: '#475569', flexShrink: 0 }} />
             <span style={searchTextStyle}>Search sheets, courses...</span>
+            <kbd className="sh-kbd-hint">{navigator.platform?.includes('Mac') ? '⌘' : 'Ctrl+'}K</kbd>
           </div>
         )}
         <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
+        <KeyboardShortcuts />
 
         {!user && isLanding && <div style={{ flex: 1 }} />}
 

@@ -14,7 +14,7 @@
  *
  * Tutorial: First-visit Joyride highlights search, filters, upload, toggles.
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
 import AppSidebar from '../../components/AppSidebar'
@@ -31,6 +31,8 @@ import { getApiErrorMessage, isAuthSessionFailure, readJsonSafely } from '../../
 import { useSession } from '../../lib/session-context'
 import { pageShell, useResponsiveAppLayout } from '../../lib/ui'
 import { useLivePolling } from '../../lib/useLivePolling'
+import { staggerEntrance } from '../../lib/animations'
+import { SkeletonSheetGrid } from '../../components/Skeleton'
 import SafeJoyride from '../../components/SafeJoyride'
 import { useTutorial } from '../../lib/useTutorial'
 import { SHEETS_STEPS } from '../../lib/tutorialSteps'
@@ -187,6 +189,8 @@ export default function SheetsPage() {
   const [catalog, setCatalog] = useState([])             // school+course catalog for filters
   const [sheetsState, setSheetsState] = useState({ sheets: [], total: 0, loading: true, error: '' })
   const [catalogError, setCatalogError] = useState('')
+  const cardsRef = useRef(null)
+  const animatedRef = useRef(false)
 
   /* ── Query parameters drive the filter state (URL-as-truth) ──────────── */
   const search = searchParams.get('search') || ''
@@ -198,6 +202,13 @@ export default function SheetsPage() {
 
   /* Tutorial popup — first-visit or re-trigger via floating "?" button */
   const tutorial = useTutorial('sheets', SHEETS_STEPS)
+
+  /* Animate sheet cards on first load */
+  useEffect(() => {
+    if (sheetsState.loading || animatedRef.current || sheetsState.sheets.length === 0) return
+    animatedRef.current = true
+    if (cardsRef.current) staggerEntrance(cardsRef.current.children, { staggerMs: 60, duration: 400, y: 14 })
+  }, [sheetsState.loading, sheetsState.sheets.length])
 
   const setQueryParam = useCallback((key, value) => {
     const next = new URLSearchParams(searchParams)
@@ -418,15 +429,19 @@ export default function SheetsPage() {
               {sheetsState.error ? <div style={errorBanner()}>{sheetsState.error}</div> : null}
 
               {sheetsState.loading ? (
-                <section style={panelStyle()}>
-                  <div style={{ color: '#64748b', fontSize: 14 }}>Loading sheets...</div>
-                </section>
+                <SkeletonSheetGrid count={4} />
               ) : sheetsState.sheets.length === 0 ? (
-                <section style={{ ...panelStyle(), borderStyle: 'dashed', textAlign: 'center', color: '#94a3b8' }}>
-                  No sheets matched your filters.
+                <section style={{ ...panelStyle(), borderStyle: 'dashed', textAlign: 'center', padding: '52px 24px' }}>
+                  <div style={{ width: 56, height: 56, borderRadius: 14, background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                    </svg>
+                  </div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--sh-heading, #0f172a)', marginBottom: 6 }}>No sheets matched your filters</div>
+                  <div style={{ fontSize: 13, color: 'var(--sh-muted, #94a3b8)', lineHeight: 1.6 }}>Try adjusting your search, school, or course filters to find what you&apos;re looking for.</div>
                 </section>
               ) : (
-                <div className="sheets-card-grid">
+                <div ref={cardsRef} className="sheets-card-grid">
                   {sheetsState.sheets.map((sheet) => (
                     <SheetCard key={sheet.id} sheet={sheet} onStar={toggleStar} />
                   ))}

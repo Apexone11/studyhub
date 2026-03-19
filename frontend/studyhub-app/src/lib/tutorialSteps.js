@@ -91,3 +91,93 @@ export const NOTES_STEPS = [
     content: 'Start a new markdown note. Notes are private by default and auto-save as you type.',
   },
 ]
+
+export const SETTINGS_STEPS = [
+  {
+    target: '[data-tutorial="settings-tabs"]',
+    title: 'Settings categories',
+    content: 'Navigate between profile, security, notifications, privacy, courses, appearance, and account settings.',
+    disableBeacon: true,
+  },
+  {
+    target: '[data-tutorial="settings-appearance"]',
+    title: 'Customize appearance',
+    content: 'Switch between light and dark themes, and adjust your preferred font size.',
+  },
+  {
+    target: '[data-tutorial="settings-notifications"]',
+    title: 'Notification preferences',
+    content: 'Control which notifications you receive — stars, comments, follows, and more.',
+  },
+]
+
+export const PROFILE_STEPS = [
+  {
+    target: '[data-tutorial="profile-stats"]',
+    title: 'Profile stats',
+    content: 'See sheet count, followers, and following. Click followers or following to view the full list.',
+    disableBeacon: true,
+  },
+  {
+    target: '[data-tutorial="profile-sheets"]',
+    title: 'Recent sheets',
+    content: 'Browse the latest public study sheets this user has shared.',
+  },
+  {
+    target: '[data-tutorial="profile-courses"]',
+    title: 'Enrolled courses',
+    content: 'See which courses this student is enrolled in.',
+  },
+]
+
+export const VIEWER_STEPS = [
+  {
+    target: '[data-tutorial="viewer-actions"]',
+    title: 'Sheet actions',
+    content: 'Star, react, fork, or download this sheet. Contribute improvements back to the author.',
+    disableBeacon: true,
+  },
+  {
+    target: '[data-tutorial="viewer-content"]',
+    title: 'Sheet content',
+    content: 'Read the study material here. HTML sheets render in a secure preview.',
+  },
+  {
+    target: '[data-tutorial="viewer-comments"]',
+    title: 'Discussion',
+    content: 'Ask questions and discuss with classmates. Use @mentions to notify someone.',
+  },
+]
+
+export const ANNOUNCEMENTS_STEPS = [
+  {
+    target: '[data-tutorial="announcements-header"]',
+    title: 'Announcements',
+    content: 'Official updates from the StudyHub team appear here. Pinned announcements stay at the top.',
+    disableBeacon: true,
+  },
+  {
+    target: '[data-tutorial="announcements-list"]',
+    title: 'Stay up to date',
+    content: 'New announcements appear automatically. Pinned posts are highlighted in yellow.',
+  },
+]
+
+export const UPLOAD_STEPS = [
+  {
+    target: '[data-tutorial="upload-info"]',
+    title: 'Sheet details',
+    content: 'Give your sheet a clear title and select the relevant course.',
+    disableBeacon: true,
+  },
+  {
+    target: '[data-tutorial="upload-content"]',
+    title: 'Add content',
+    content: 'Write or paste your study material. Choose between Markdown and HTML formats.',
+  },
+  {
+    target: '[data-tutorial="upload-attachment"]',
+    title: 'Attach files',
+    content: 'Optionally attach a PDF or image (10MB max) for classmates to preview and download.',
+  },
+]

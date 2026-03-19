@@ -1370,3 +1370,246 @@ Cycle 26 Deferred-Risk Notes
 - Dark mode uses CSS attribute selectors to override inline styles. This works for most elements but some deeply nested components with unusual inline style patterns may need individual fixes. Pages verified: Feed, Sheets, Dashboard, Settings, Notes, Profile, SheetViewer.
 - `defaultContributions` preference in Privacy settings is stored but not enforced at the API level. Adding a per-sheet `allowContributions` column would require a Prisma migration.
 - Schools must be added via admin to populate the school/course selector. An admin seeding script or UI would improve onboarding.
+
+---
+
+## Cycle 27 — Week 3: Profile Enhancements, Tutorials, Animations, Dark Mode Expansion
+
+Date: 2026-03-18
+
+### Changes
+
+#### Followers/Following Modal (UserProfilePage)
+
+- **Backend**: Added `GET /api/users/:username/followers` and `GET /api/users/:username/following` endpoints returning up to 50 users with id, username, role, avatarUrl.
+- **Frontend**: Followers and Following counts are now clickable buttons that open a modal overlay displaying the full list. Each user in the list links to their profile with avatar, username, and role badge. Modal closes on backdrop click or X button.
+- Files changed: `backend/src/routes/users.js`, `frontend/studyhub-app/src/pages/profile/UserProfilePage.jsx`, `frontend/studyhub-app/src/index.css`
+
+#### Tutorials for Remaining Pages
+
+- Added tutorial step definitions for Settings (3 steps), Profile (3 steps), SheetViewer (3 steps), and Upload (3 steps) in `lib/tutorialSteps.js`.
+- Integrated `useTutorial` hook and `SafeJoyride` component into all four pages with `data-tutorial` attributes on key UI sections.
+- Previously covered pages (Feed, Sheets, Dashboard, Notes) remain unchanged.
+- Files changed: `frontend/studyhub-app/src/lib/tutorialSteps.js`, `frontend/studyhub-app/src/pages/settings/SettingsPage.jsx`, `frontend/studyhub-app/src/pages/profile/UserProfilePage.jsx`, `frontend/studyhub-app/src/pages/sheets/SheetViewerPage.jsx`, `frontend/studyhub-app/src/pages/sheets/UploadSheetPage.jsx`
+
+#### Animations Added to Remaining Pages
+
+- **SheetsPage**: Staggered card entrance animation on first load (60ms stagger, 400ms duration).
+- **NotesPage**: Staggered notes list entrance animation on first load (50ms stagger, 400ms duration).
+- **SheetViewerPage**: FadeInUp animation on sheet content panel when data loads (450ms).
+- **SettingsPage**: FadeInUp animation on tab content when switching tabs (350ms).
+- All animations use the existing `lib/animations.js` utilities and respect `prefers-reduced-motion`.
+- Files changed: `frontend/studyhub-app/src/pages/sheets/SheetsPage.jsx`, `frontend/studyhub-app/src/pages/notes/NotesPage.jsx`, `frontend/studyhub-app/src/pages/sheets/SheetViewerPage.jsx`, `frontend/studyhub-app/src/pages/settings/SettingsPage.jsx`
+
+#### Feed Post Delete Button Redesign
+
+- Replaced text ellipsis trigger (`...`) with a vertical three-dot SVG icon in a cleaner 32×32 button.
+- Delete option now includes a trash icon SVG alongside the text.
+- Button uses transparent background with red hover state instead of permanent red background.
+- Added CSS hover classes (`feed-post-menu-btn`, `feed-post-delete-btn`) with dark mode support.
+- Files changed: `frontend/studyhub-app/src/pages/feed/FeedPage.jsx`, `frontend/studyhub-app/src/index.css`
+
+#### Dark Mode — Semantic Color Overrides
+
+- Added CSS dark mode overrides for status/semantic colors not previously covered:
+  - Green status (`#f0fdf4`, `#bbf7d0`, `#166534`) → dark green variants
+  - Blue badges (`#eff6ff`, `#bfdbfe`, `#dbeafe`, `#1d4ed8`) → dark blue variants
+  - Yellow/Amber (`#fef9ec`, `#fef3c7`, `#fde68a`, `#92400e`) → dark amber variants
+  - Red/Error (`#fef2f2`, `#fecaca`, `#fca5a5`) → dark red variants
+- Covers admin/student badges, course code badges, follow buttons, error banners, success messages, info boxes, and pinned announcements across all pages.
+- Added dark mode for follow modal overlay, Joyride tooltip, and profile stat hover.
+- File changed: `frontend/studyhub-app/src/index.css`
+
+#### Profile Page CSS
+
+- Added `.profile-stats-row`, `.profile-stat-btn`, `.profile-columns` CSS classes with responsive grid layout and hover states.
+- File changed: `frontend/studyhub-app/src/index.css`
+
+### Validation
+
+Cycle 27 Validation Commands:
+
+- `npm --prefix frontend/studyhub-app run lint` — passed clean.
+- `npm --prefix backend run lint` — passed clean.
+- `npm --prefix frontend/studyhub-app run build` — passed clean (404ms, 41 output files).
+
+Cycle 27 Validation Result:
+
+- Frontend and backend ESLint: both passed with zero errors.
+- Frontend Vite production build: passed successfully.
+- All new tutorial steps code-split into `tutorialSteps` chunk.
+- Profile page code-split into `UserProfilePage` chunk (14.35 kB).
+
+---
+
+## Cycle 28 — Week 3 (continued): Profile Animations, Announcements Polish
+
+Date: 2026-03-18
+
+### Changes
+
+#### UserProfilePage Animations
+
+- Added `fadeInUp` for profile card header and `staggerEntrance` for content columns on first data load.
+- Files changed: `frontend/studyhub-app/src/pages/profile/UserProfilePage.jsx`
+
+#### AnnouncementsPage Polish, Tutorial & Animations
+
+- **Design polish**: Increased card padding and gaps, enlarged author avatars (32→36px for regular, added 22px mini-avatar for pinned), improved typography (title sizes, line heights).
+- **@Mention support**: Announcement bodies now render `@username` as clickable links via `MentionText` component.
+- **Author profile links**: Author usernames in both pinned and regular cards now link to `/users/:username`.
+- **Pinned badge redesign**: Replaced emoji pin with SVG icon, increased badge padding, improved visual weight.
+- **Hover effects**: Added `announcement-card` and `announcement-card-pinned` CSS classes with shadow hover transitions.
+- **Tutorial**: Added `ANNOUNCEMENTS_STEPS` (2 steps: header overview + card list) with `SafeJoyride` integration.
+- **Animations**: Staggered card entrance on first load (70ms stagger, 400ms duration).
+- **Dark mode**: Added CSS overrides for pinned card background, hover shadows, and amber text colors (`#78350f`, `#b45309`).
+- Files changed: `frontend/studyhub-app/src/pages/announcements/AnnouncementsPage.jsx`, `frontend/studyhub-app/src/lib/tutorialSteps.js`, `frontend/studyhub-app/src/index.css`
+
+### Validation
+
+Cycle 28 Validation Commands:
+
+- `npm --prefix frontend/studyhub-app run lint` — passed clean.
+- `npm --prefix backend run lint` — passed clean.
+- `npm --prefix frontend/studyhub-app run build` — passed clean (410ms, 41 output files).
+
+Cycle 28 Validation Result:
+
+- Frontend and backend ESLint: both passed with zero errors.
+- Frontend Vite production build: passed successfully.
+- AnnouncementsPage chunk grew from 6.12 kB to 7.49 kB (added MentionText, tutorial, animations).
+- UserProfilePage chunk grew from 14.35 kB to 14.65 kB (added animations).
+
+---
+
+## Cycle 29 — Week 3 (continued): Skeleton Loaders
+
+Date: 2026-03-18
+
+### Changes
+
+#### Reusable Skeleton Component Library
+
+- Created `frontend/studyhub-app/src/components/Skeleton.jsx` with 6 exported components:
+  - `Skeleton` — base block with configurable width/height/borderRadius.
+  - `SkeletonCard` — card with avatar circle + text lines.
+  - `SkeletonList` — repeated row placeholders.
+  - `SkeletonProfile` — profile page layout (header + two-column grid).
+  - `SkeletonSheetGrid` — responsive card grid.
+  - `SkeletonFeed` — stacked feed cards.
+- All use `.sh-skeleton` CSS class with shimmer animation via `background-position` keyframes.
+- Dark mode variant adjusts shimmer gradient colors.
+- File added: `frontend/studyhub-app/src/components/Skeleton.jsx`
+
+#### Skeleton CSS & Dark Mode
+
+- Added `@keyframes skeletonShimmer` animation (1.2s infinite linear).
+- Added `.sh-skeleton` class with light/dark shimmer gradients.
+- File changed: `frontend/studyhub-app/src/index.css`
+
+#### Loading State Replacements (7 pages)
+
+- **UserProfilePage**: Replaced "Loading profile…" text with `<SkeletonProfile />`.
+- **SheetsPage**: Replaced "Loading sheets..." with `<SkeletonSheetGrid count={4} />`.
+- **FeedPage**: Replaced "Fetching posts..." Panel with `<SkeletonFeed count={3} />`.
+- **SheetViewerPage**: Replaced "Loading sheet..." with `<SkeletonCard />`.
+- **NotesPage**: Replaced "Loading…" with `<SkeletonList count={4} />`.
+- **AnnouncementsPage**: Replaced loading state with `<SkeletonFeed count={3} />`.
+- **SettingsPage**: Replaced loading state with Skeleton blocks (tab bar + content areas).
+
+### Validation
+
+Cycle 29 Validation Commands:
+
+- `npm --prefix frontend/studyhub-app run lint` — passed clean.
+- `npm --prefix frontend/studyhub-app run build` — passed clean (406ms, 42 output files).
+
+Cycle 29 Validation Result:
+
+- Frontend ESLint: passed with zero errors.
+- Frontend Vite production build: passed successfully.
+- New `Skeleton` chunk at 2.55 kB (code-split automatically by Vite).
+- Output file count increased from 41 to 42 (new Skeleton chunk).
+
+---
+
+## Cycle 30 — Week 3 (continued): Empty State Polish
+
+Date: 2026-03-18
+
+### Changes
+
+#### Unified Empty State Design Pattern
+
+- Upgraded empty states across 6 pages to use a consistent visual pattern: gradient icon box with SVG illustration, bold title, descriptive subtitle, and optional CTA button.
+- All empty states now use CSS custom properties (`--sh-surface`, `--sh-heading`, `--sh-muted`, `--sh-border`) for dark mode compatibility.
+- Changed borders from `1px solid` to `2px dashed` for clearer empty-state visual language.
+
+#### Page-by-Page Changes
+
+- **SheetsPage**: Added search magnifying glass SVG icon, title "No sheets matched your filters", and filter adjustment hint. File: `frontend/studyhub-app/src/pages/sheets/SheetsPage.jsx`
+- **FeedPage**: Added chat bubble SVG icon to `EmptyFeed` component, restructured with title + subtitle layout. File: `frontend/studyhub-app/src/pages/feed/FeedPage.jsx`
+- **AnnouncementsPage**: Replaced emoji with bell SVG icon in amber gradient box, improved copy. File: `frontend/studyhub-app/src/pages/announcements/AnnouncementsPage.jsx`
+- **UserProfilePage**: Replaced emoji with document SVG icon in blue gradient box, added subtitle. File: `frontend/studyhub-app/src/pages/profile/UserProfilePage.jsx`
+- **SheetViewerPage**: Replaced plain text "No contributions yet" with green plus-circle SVG icon, title, and fork prompt. File: `frontend/studyhub-app/src/pages/sheets/SheetViewerPage.jsx`
+- **DashboardPage**: Added monitor SVG icon to reusable `EmptyState` component, switched to CSS variables for theming. File: `frontend/studyhub-app/src/pages/dashboard/DashboardPage.jsx`
+
+### Validation
+
+Cycle 30 Validation Commands:
+
+- `npm --prefix frontend/studyhub-app run lint` — passed clean.
+- `npm --prefix frontend/studyhub-app run build` — passed clean (414ms, 42 output files).
+
+Cycle 30 Validation Result:
+
+- Frontend ESLint: passed with zero errors.
+- Frontend Vite production build: passed successfully.
+- No new chunks — changes are inline within existing page bundles.
+
+---
+
+## Cycle 31 — Week 3 (continued): Keyboard Shortcuts & Navigation
+
+Date: 2026-03-18
+
+### Changes
+
+#### Global Ctrl+K / Cmd+K Search Shortcut
+
+- Added `useEffect` listener in Navbar for `Ctrl+K` (Windows/Linux) and `⌘K` (Mac) to open SearchModal.
+- Prevents default browser behavior (`e.preventDefault()`).
+- File changed: `frontend/studyhub-app/src/components/Navbar.jsx`
+
+#### Search Box Keyboard Hint Badge
+
+- Added `<kbd>` element inside the Navbar search box showing "⌘K" on Mac or "Ctrl+K" on Windows/Linux.
+- Uses `.sh-kbd-hint` CSS class with subtle border/background styling.
+- Hidden on mobile (`@media max-width: 640px`) to save space.
+- Dark mode support included.
+- Files changed: `frontend/studyhub-app/src/components/Navbar.jsx`, `frontend/studyhub-app/src/index.css`
+
+#### Keyboard Shortcuts Help Modal
+
+- Created `KeyboardShortcuts.jsx` component that opens on `?` key press.
+- Groups shortcuts by category: General (search, help), Search Modal (arrows, enter, escape), Dialogs (escape).
+- Platform-aware: detects Mac vs Windows/Linux for modifier key display.
+- Closes on Escape or backdrop click.
+- Ignores `?` keypress when focus is in input/textarea/select/contentEditable elements.
+- Full dark mode support via CSS classes.
+- Rendered globally via Navbar.
+- Files added: `frontend/studyhub-app/src/components/KeyboardShortcuts.jsx`
+- Files changed: `frontend/studyhub-app/src/components/Navbar.jsx`, `frontend/studyhub-app/src/index.css`
+
+### Validation
+
+Cycle 31 Validation Commands:
+
+- `npm --prefix frontend/studyhub-app run lint` — passed clean.
+- `npm --prefix frontend/studyhub-app run build` — passed clean (439ms, 42 output files).
+
+Cycle 31 Validation Result:
+
+- Frontend ESLint: passed with zero errors.
+- Frontend Vite production build: passed successfully.
+- Navbar chunk grew from 35.79 kB to 38.10 kB (KeyboardShortcuts modal bundled in).
