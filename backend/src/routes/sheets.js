@@ -14,6 +14,7 @@ const { sendAttachmentPreview } = require('../lib/attachmentPreview')
 const { normalizeContentFormat, validateHtmlForSubmission } = require('../lib/htmlSecurity')
 const { HTML_PREVIEW_TOKEN_TTL_SECONDS, signHtmlPreviewToken } = require('../lib/previewTokens')
 const { buildSheetTextSearchClauses } = require('../lib/sheetSearch')
+const { computeLineDiff, addWordSegments } = require('../lib/diff')
 const { searchSheetsFTS } = require('../lib/fullTextSearch')
 const {
   SCAN_STATUS,
@@ -1900,6 +1901,46 @@ router.delete('/:id/comments/:commentId', requireAuth, commentLimiter, async (re
 
     await prisma.comment.delete({ where: { id: comment.id } })
     res.json({ message: 'Comment deleted.' })
+  } catch (error) {
+    captureError(error, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── GET /api/sheets/contributions/:contributionId/diff — inline diff for contribution review ──
+
+router.get('/contributions/:contributionId/diff', requireAuth, async (req, res) => {
+  const contributionId = Number.parseInt(req.params.contributionId, 10)
+  if (!Number.isInteger(contributionId)) {
+    return res.status(400).json({ error: 'Invalid contribution ID.' })
+  }
+
+  try {
+    const contribution = await prisma.sheetContribution.findUnique({
+      where: { id: contributionId },
+      include: {
+        targetSheet: { select: { id: true, userId: true, content: true } },
+        forkSheet: { select: { id: true, content: true } },
+      },
+    })
+
+    if (!contribution) return res.status(404).json({ error: 'Contribution not found.' })
+
+    // Only the target sheet owner, admin, or the proposer can view the diff
+    const isTargetOwner = req.user.userId === contribution.targetSheet.userId
+    const isProposer = req.user.userId === contribution.proposerId
+    const isAdmin = req.user.role === 'admin'
+    if (!isTargetOwner && !isProposer && !isAdmin) {
+      return res.status(403).json({ error: 'You do not have access to this contribution diff.' })
+    }
+
+    const diff = computeLineDiff(
+      contribution.targetSheet.content || '',
+      contribution.forkSheet.content || ''
+    )
+    addWordSegments(diff.hunks)
+
+    res.json({ diff })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })

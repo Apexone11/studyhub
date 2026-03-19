@@ -198,6 +198,22 @@ export function captureWebVital(metric) {
   }
 }
 
+/**
+ * Track a product-level event in PostHog.
+ * Safe to call at any time — silently no-ops if PostHog isn't initialised.
+ *
+ * @param {string} name  Event name, e.g. 'sheet_forked'
+ * @param {object} [props]  Optional flat properties object
+ */
+export function trackEvent(name, props = {}) {
+  if (!name || typeof name !== 'string') return
+  if (posthogInitialized) {
+    posthog.capture(name, props)
+  } else if (import.meta.env?.DEV) {
+    console.debug('[trackEvent]', name, props)
+  }
+}
+
 export function captureComponentError(error, context = {}) {
   const { surface = 'component-error', ...extra } = context
   let eventId = ''

@@ -312,6 +312,38 @@
   color: #dc2626;
 }
 
+/* ── Diff mode toggle ──────────────────────────────────────── */
+
+.sheet-lab__diff-mode-toggle {
+  display: inline-flex;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.sheet-lab__diff-mode-btn {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: inherit;
+  border: none;
+  background: #fff;
+  color: #64748b;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.sheet-lab__diff-mode-btn:first-child {
+  border-right: 1px solid #e2e8f0;
+}
+
+.sheet-lab__diff-mode-btn.active {
+  background: #6366f1;
+  color: #fff;
+}
+
+/* ── Unified diff ──────────────────────────────────────────── */
+
 .sheet-lab__diff-hunks {
   font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
   font-size: 12px;
@@ -328,9 +360,23 @@
 }
 
 .sheet-lab__diff-line {
-  padding: 1px 16px;
+  display: flex;
   white-space: pre-wrap;
   word-break: break-all;
+}
+
+.sheet-lab__diff-gutter {
+  display: inline-block;
+  width: 20px;
+  min-width: 20px;
+  padding-left: 6px;
+  user-select: none;
+  color: #94a3b8;
+}
+
+.sheet-lab__diff-content {
+  padding: 1px 10px 1px 0;
+  flex: 1;
 }
 
 .sheet-lab__diff-line--add {
@@ -345,6 +391,137 @@
 
 .sheet-lab__diff-line--equal {
   color: #64748b;
+}
+
+/* ── Word-level highlight segments ─────────────────────────── */
+
+.sheet-lab__word-add {
+  background: #bbf7d0;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+.sheet-lab__word-remove {
+  background: #fecaca;
+  border-radius: 2px;
+  padding: 0 1px;
+  text-decoration: line-through;
+  text-decoration-color: #991b1b;
+}
+
+/* ── Side-by-side diff ─────────────────────────────────────── */
+
+.sheet-lab__split-diff {
+  font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-x: auto;
+}
+
+.sheet-lab__split-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.sheet-lab__split-col-header {
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  background: #f8fafc;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.sheet-lab__split-col-header:first-child {
+  border-right: 1px solid #e2e8f0;
+}
+
+.sheet-lab__split-hunk-header {
+  background: #eff6ff;
+  color: #3b82f6;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.sheet-lab__split-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.sheet-lab__split-cell {
+  padding: 2px 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  min-height: 1.6em;
+  color: #475569;
+}
+
+.sheet-lab__split-cell:first-child {
+  border-right: 1px solid #e2e8f0;
+}
+
+.sheet-lab__split-cell--remove {
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.sheet-lab__split-cell--add {
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.sheet-lab__split-cell--empty {
+  background: #f8fafc;
+  color: transparent;
+}
+
+/* ── Auto-summary in create modal ──────────────────────────── */
+
+.sheet-lab__auto-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  font-size: 12px;
+}
+
+.sheet-lab__auto-summary-label {
+  font-weight: 700;
+  color: #1d4ed8;
+}
+
+.sheet-lab__auto-summary-text {
+  color: #334155;
+  flex: 1;
+}
+
+.sheet-lab__auto-summary-use {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid #93c5fd;
+  background: #fff;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* ── Wide modal variant (restore preview) ──────────────────── */
+
+.sheet-lab__modal--wide {
+  max-width: 720px;
 }
 
 /* ── Empty state ───────────────────────────────────────────── */
@@ -391,6 +568,8 @@
   background: rgba(15, 23, 42, 0.5);
   display: grid;
   place-items: center;
+  overflow-y: auto;
+  padding: 24px;
 }
 
 .sheet-lab__modal {
@@ -425,12 +604,21 @@
   font-size: 13px;
   font-family: inherit;
   margin-bottom: 16px;
+  box-sizing: border-box;
 }
 
 .sheet-lab__modal-actions {
   display: flex;
   gap: 10px;
   justify-content: flex-end;
+}
+
+/* ── Contribution inline diff ──────────────────────────────── */
+
+.sheet-lab__contribution-diff {
+  margin-top: 12px;
+  border-radius: 12px;
+  overflow: hidden;
 }
 
 /* ── Responsive ────────────────────────────────────────────── */
@@ -448,5 +636,13 @@
     left: 7px;
     width: 14px;
     height: 14px;
+  }
+
+  .sheet-lab__split-diff {
+    font-size: 10px;
+  }
+
+  .sheet-lab__modal--wide {
+    max-width: 100%;
   }
 }

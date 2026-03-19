@@ -15,7 +15,7 @@ import Navbar from '../../components/Navbar'
 import { API, GOOGLE_CLIENT_ID } from '../../config'
 import { fadeInUp } from '../../lib/animations'
 import { getAuthenticatedHomePath } from '../../lib/authNavigation'
-import { trackSignupConversion } from '../../lib/telemetry'
+import { trackSignupConversion, trackEvent } from '../../lib/telemetry'
 import { useSession } from '../../lib/session-context'
 
 /* ── Validation rules ──────────────────────────────────────────────────── */
@@ -204,6 +204,7 @@ export default function RegisterScreen() {
       const response = await fetch(`${API}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           username: form.username.trim(),
           password: form.password,
@@ -223,6 +224,7 @@ export default function RegisterScreen() {
         local account flow defers session completion until setup is submitted. */
       setPendingLocalUser(data.user)
       setStep('courses')
+      trackEvent('signup_started', { method: 'local' })
       setSuccess('Account created! Now choose your courses, or skip for now.')
     } catch {
       setError('Could not connect to the server.')
@@ -245,6 +247,7 @@ export default function RegisterScreen() {
       const response = await fetch(`${API}/api/auth/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ credential: credentialResponse.credential }),
       })
       const data = await response.json()
@@ -339,7 +342,8 @@ export default function RegisterScreen() {
 
         completeAuthentication(data.user)
         trackSignupConversion()
-        navigate(getAuthenticatedHomePath(data.user), { replace: true })
+        trackEvent('signup_completed', { method: 'google' })
+        navigate('/dashboard?welcome=1', { replace: true })
         return
       }
 
@@ -363,12 +367,13 @@ export default function RegisterScreen() {
         }
       }
 
-      /* Navigate to authenticated home */
+      /* Navigate to dashboard with welcome flag so onboarding checklist is prominent */
       if (pendingLocalUser) {
         completeAuthentication(pendingLocalUser)
       }
       trackSignupConversion()
-      navigate('/feed', { replace: true })
+      trackEvent('signup_completed', { method: 'local', skipped_courses: skipCourses })
+      navigate('/dashboard?welcome=1', { replace: true })
     } catch {
       setError('Could not connect to the server.')
     } finally {
@@ -665,7 +670,7 @@ export default function RegisterScreen() {
                   <option value="">Skip school selection for now</option>
                   {schools.map((school) => (
                     <option key={school.id} value={school.id}>
-                      {school.name}
+                      {school.short} — {school.name}{school.city ? `, ${school.city}` : ''}
                     </option>
                   ))}
                 </select>
@@ -708,7 +713,7 @@ export default function RegisterScreen() {
                           />
                           <div>
                             <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{course.code}</div>
-                            <div style={{ fontSize: 12, color: '#64748b' }}>{course.name}</div>
+                            <div style={{ fontSize: 12, color: '#64748b' }}>{course.name}{course.department ? ` · ${course.department}` : ''}</div>
                           </div>
                         </label>
                       )

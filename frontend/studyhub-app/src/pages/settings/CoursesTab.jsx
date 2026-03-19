@@ -101,7 +101,7 @@ export default function CoursesTab({ user, busyKey, setBusyKey, syncUser }) {
         >
           <option value="">Select a school</option>
           {catalog.map((school) => (
-            <option key={school.id} value={school.id}>{school.name}</option>
+            <option key={school.id} value={school.id}>{school.short} — {school.name}{school.city ? `, ${school.city}` : ''}</option>
           ))}
         </select>
       </FormField>
@@ -165,7 +165,7 @@ export default function CoursesTab({ user, busyKey, setBusyKey, syncUser }) {
                 />
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{course.code}</div>
-                  <div style={{ fontSize: 12, color: '#64748b' }}>{course.name}</div>
+                  <div style={{ fontSize: 12, color: '#64748b' }}>{course.name}{course.department ? ` · ${course.department}` : ''}</div>
                 </div>
               </label>
             )

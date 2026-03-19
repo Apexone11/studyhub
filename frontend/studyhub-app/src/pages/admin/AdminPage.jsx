@@ -294,6 +294,7 @@ export default function AdminPage() {
   const apiJson = useCallback(async (url, options = {}) => {
     const response = await fetch(`${API}${url}`, {
       headers: authHeaders(),
+      credentials: 'include',
       ...options,
     })
     const data = await readJsonSafely(response, {})
@@ -940,6 +941,16 @@ export default function AdminPage() {
                         {record.description ? (
                           <div style={{ fontSize: 12, color: '#475569', marginBottom: 10, whiteSpace: 'pre-wrap' }}>
                             {record.description}
+                          </div>
+                        ) : null}
+                        {record.htmlScanStatus === 'failed' && Array.isArray(record.htmlScanFindings) && record.htmlScanFindings.length > 0 ? (
+                          <div style={{ border: '1px solid #fecaca', background: '#fff1f2', borderRadius: 10, padding: 10, marginBottom: 10 }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: '#b91c1c', marginBottom: 4 }}>Security Scan Findings (user acknowledged)</div>
+                            <ul style={{ margin: 0, paddingLeft: 16, color: '#991b1b', fontSize: 11, lineHeight: 1.6 }}>
+                              {record.htmlScanFindings.map((finding, index) => (
+                                <li key={index}>{finding?.message || String(finding)}</li>
+                              ))}
+                            </ul>
                           </div>
                         ) : null}
                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

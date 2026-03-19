@@ -37,9 +37,18 @@ import { useLivePolling } from '../../lib/useLivePolling'
 import { staggerEntrance, popScale } from '../../lib/animations'
 import { showToast } from '../../lib/toast'
 import { usePageTitle } from '../../lib/usePageTitle'
+import { trackEvent } from '../../lib/telemetry'
 import { SkeletonFeed } from '../../components/Skeleton'
 import SafeJoyride from '../../components/SafeJoyride'
 import { useTutorial } from '../../lib/useTutorial'
+
+const COMPOSER_PROMPTS = [
+  'Share an update, mention classmates with @username, or point people to a great sheet…',
+  'What are you studying this week? Share a tip with your class…',
+  'Post a question, resource, or link for your classmates…',
+  'Found a great study sheet? Tag it with @username and share…',
+  'Ask for help, share notes, or drop a helpful link…',
+]
 import { FEED_STEPS } from '../../lib/tutorialSteps'
 
 /* ── Shared constants ──────────────────────────────────────────────────── */
@@ -281,6 +290,7 @@ function useComments(postId, initialCount = 0) {
     try {
       const response = await fetch(`${API}/api/feed/posts/${postId}/comments?limit=50`, {
         headers: authHeaders(),
+        credentials: 'include',
       })
       const data = await readJsonSafely(response, {})
 
@@ -313,6 +323,7 @@ function useComments(postId, initialCount = 0) {
       const response = await fetch(`${API}/api/feed/posts/${postId}/comments`, {
         method: 'POST',
         headers: authHeaders(),
+        credentials: 'include',
         body: JSON.stringify({ content }),
       })
       const data = await readJsonSafely(response, {})
@@ -339,6 +350,7 @@ function useComments(postId, initialCount = 0) {
       const response = await fetch(`${API}/api/feed/posts/${postId}/comments/${commentId}`, {
         method: 'DELETE',
         headers: authHeaders(),
+        credentials: 'include',
       })
 
       if (response.ok) {
@@ -849,6 +861,7 @@ export default function FeedPage() {
     try {
       const response = await fetch(`${API}/api/feed?${params.toString()}`, {
         headers: authHeaders(),
+        credentials: 'include',
         signal,
       })
 
@@ -902,7 +915,7 @@ export default function FeedPage() {
     const params = new URLSearchParams({ limit: '24', offset: String(feedState.items.length) })
     if (search) params.set('search', search)
     try {
-      const response = await fetch(`${API}/api/feed?${params.toString()}`, { headers: authHeaders() })
+      const response = await fetch(`${API}/api/feed?${params.toString()}`, { headers: authHeaders(), credentials: 'include' })
       const data = await readJsonSafely(response, {})
       if (response.ok && Array.isArray(data.items)) {
         setFeedState((current) => ({
@@ -920,9 +933,9 @@ export default function FeedPage() {
 
     try {
       const [starsResponse, downloadsResponse, contributorsResponse] = await Promise.all([
-        fetch(`${API}/api/sheets/leaderboard?type=stars`, { headers: authHeaders(), signal }),
-        fetch(`${API}/api/sheets/leaderboard?type=downloads`, { headers: authHeaders(), signal }),
-        fetch(`${API}/api/sheets/leaderboard?type=contributors`, { headers: authHeaders(), signal }),
+        fetch(`${API}/api/sheets/leaderboard?type=stars`, { headers: authHeaders(), credentials: 'include', signal }),
+        fetch(`${API}/api/sheets/leaderboard?type=downloads`, { headers: authHeaders(), credentials: 'include', signal }),
+        fetch(`${API}/api/sheets/leaderboard?type=contributors`, { headers: authHeaders(), credentials: 'include', signal }),
       ])
 
       const [stars, downloads, contributors] = await Promise.all([
@@ -964,6 +977,11 @@ export default function FeedPage() {
     return feedState.items.filter((item) => item.type === nextType)
   }, [activeFilter, feedState.items])
 
+  const composerPrompt = useMemo(
+    () => COMPOSER_PROMPTS[Math.floor(Date.now() / 60000) % COMPOSER_PROMPTS.length],
+    []
+  )
+
   // Animate feed cards on first load
   useEffect(() => {
     if (!feedState.loading && visibleItems.length > 0 && feedListRef.current && !feedAnimatedRef.current) {
@@ -985,6 +1003,7 @@ export default function FeedPage() {
       const response = await fetch(`${API}/api/feed/posts`, {
         method: 'POST',
         headers: authHeaders(),
+        credentials: 'include',
         body: JSON.stringify({
           content: composer.content.trim(),
           courseId: composer.courseId || null,
@@ -1006,6 +1025,7 @@ export default function FeedPage() {
           formData.append('attachment', attachedFile)
           const uploadRes = await fetch(`${API}/api/upload/post-attachment/${data.id}`, {
             method: 'POST',
+            credentials: 'include',
             body: formData,
           })
           if (uploadRes.ok) {
@@ -1025,6 +1045,7 @@ export default function FeedPage() {
         items: [finalPost, ...current.items],
         total: current.total + 1,
       }))
+      trackEvent('feed_post_created', { hasCourse: Boolean(composer.courseId), hasAttachment: Boolean(attachedFile) })
     } catch (error) {
       setComposeState({ saving: false, error: error.message || 'Could not post to the feed.' })
     }
@@ -1039,6 +1060,7 @@ export default function FeedPage() {
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: authHeaders(),
+        credentials: 'include',
         body: JSON.stringify({ type: nextType }),
       })
       const data = await response.json().catch(() => ({}))
@@ -1064,6 +1086,7 @@ export default function FeedPage() {
       const response = await fetch(`${API}/api/sheets/${item.id}/star`, {
         method: 'POST',
         headers: authHeaders(),
+        credentials: 'include',
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
@@ -1112,6 +1135,7 @@ export default function FeedPage() {
       const response = await fetch(`${API}/api/feed/posts/${item.id}`, {
         method: 'DELETE',
         headers: authHeaders(),
+        credentials: 'include',
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
@@ -1163,7 +1187,7 @@ export default function FeedPage() {
                   <textarea
                     value={composer.content}
                     onChange={(event) => setComposer((current) => ({ ...current, content: event.target.value }))}
-                    placeholder="Share an update, mention classmates with @username, or point people to a great sheet..."
+                    placeholder={composerPrompt}
                     rows={4}
                     style={{
                       width: '100%',

@@ -164,6 +164,7 @@ export default function UploadSheetPage() {
   const canSubmitHtml = canSubmitHtmlReview({
     hasOriginalVersion: scanState.hasOriginalVersion,
     scanStatus: scanState.status,
+    scanAcknowledged: Boolean(scanState.acknowledgedAt) || scanModalDismissed,
     title,
     courseId,
     description,
@@ -224,7 +225,7 @@ export default function UploadSheetPage() {
     async function loadData() {
       try {
         if (isEditing) {
-          const response = await fetch(`${API}/api/sheets/${sheetId}`, { headers: authHeaders() })
+          const response = await fetch(`${API}/api/sheets/${sheetId}`, { headers: authHeaders(), credentials: 'include' })
           const data = await response.json().catch(() => ({}))
           if (!response.ok) throw new Error(data.error || 'Could not load sheet.')
           if (cancelled) return
@@ -233,7 +234,7 @@ export default function UploadSheetPage() {
           return
         }
 
-        const response = await fetch(`${API}/api/sheets/drafts/latest`, { headers: authHeaders() })
+        const response = await fetch(`${API}/api/sheets/drafts/latest`, { headers: authHeaders(), credentials: 'include' })
         const data = await response.json().catch(() => ({}))
         if (!response.ok) throw new Error(data.error || 'Could not load latest draft.')
         if (cancelled) return
@@ -335,7 +336,7 @@ export default function UploadSheetPage() {
 
     async function pollScanStatus() {
       try {
-        const response = await fetch(`${API}/api/sheets/drafts/${activeSheetId}/scan-status`, { headers: authHeaders() })
+        const response = await fetch(`${API}/api/sheets/drafts/${activeSheetId}/scan-status`, { headers: authHeaders(), credentials: 'include' })
         const data = await response.json().catch(() => ({}))
         if (!response.ok) return
         if (cancelled) return
@@ -373,6 +374,7 @@ export default function UploadSheetPage() {
           const response = await fetch(`${API}/api/sheets/drafts/autosave`, {
             method: 'POST',
             headers: authHeaders(),
+            credentials: 'include',
             body: JSON.stringify({
               id: draftId,
               title,
@@ -406,6 +408,7 @@ export default function UploadSheetPage() {
         const response = await fetch(`${API}/api/sheets/drafts/${draftId}/working-html`, {
           method: 'PATCH',
           headers: authHeaders(),
+          credentials: 'include',
           body: JSON.stringify({
             title,
             courseId: Number.parseInt(courseId, 10),
@@ -537,6 +540,7 @@ export default function UploadSheetPage() {
       const response = await fetch(`${API}/api/sheets/${draftId}`, {
         method: 'DELETE',
         headers: authHeaders(),
+        credentials: 'include',
       })
       if (!response.ok) {
         const data = await response.json().catch(() => ({}))
@@ -612,6 +616,7 @@ export default function UploadSheetPage() {
       const response = await fetch(`${API}/api/sheets/drafts/import-html`, {
         method: 'POST',
         headers: authHeaders(),
+        credentials: 'include',
         body: JSON.stringify({
           id: draftId,
           title,
@@ -654,6 +659,7 @@ export default function UploadSheetPage() {
       await fetch(`${API}/api/sheets/drafts/${activeSheetId}/scan-status/acknowledge`, {
         method: 'POST',
         headers: authHeaders(),
+        credentials: 'include',
       })
     } catch {
       // acknowledgement is best-effort
@@ -713,6 +719,7 @@ export default function UploadSheetPage() {
         const response = await fetch(endpoint, {
           method,
           headers: authHeaders(),
+          credentials: 'include',
           body: JSON.stringify({
             title,
             description,
@@ -743,7 +750,7 @@ export default function UploadSheetPage() {
       return
     }
     if (!canSubmitHtml) {
-      setError('Complete required fields and wait for scan status to pass before submit.')
+      setError('Complete required fields and either pass the security scan or acknowledge the findings before submit.')
       return
     }
 
@@ -752,6 +759,7 @@ export default function UploadSheetPage() {
       const response = await fetch(`${API}/api/sheets/${activeSheetId}/submit-review`, {
         method: 'POST',
         headers: authHeaders(),
+        credentials: 'include',
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
@@ -1166,9 +1174,15 @@ export default function UploadSheetPage() {
                 </div>
               ) : null}
 
+              {scanState.status === 'failed' ? (
+                <div style={{ border: '1px solid #fde68a', background: '#fffbeb', borderRadius: 10, padding: 12, fontSize: 12, color: '#92400e', lineHeight: 1.6 }}>
+                  You can still submit this sheet for review. It will be placed in <strong>Pending</strong> status and sent to an admin for approval. Other users will see it listed but the HTML preview will be disabled until an admin approves it.
+                </div>
+              ) : null}
+
               <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: '#475569' }}>
                 <input type="checkbox" checked={scanAckChecked} onChange={(event) => setScanAckChecked(event.target.checked)} style={{ marginTop: 2 }} />
-                I understand unsafe HTML is blocked and I must resolve flagged issues before submit.
+                I understand this sheet may contain flagged HTML. I acknowledge it will be sent to an admin for review and will remain in Pending status until approved.
               </label>
             </div>
             <div style={{ borderTop: '1px solid #e2e8f0', padding: 14, display: 'flex', justifyContent: 'space-between', gap: 10 }}>

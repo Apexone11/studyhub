@@ -1606,6 +1606,73 @@ Date: 2026-03-18
 Cycle 31 Validation Commands:
 
 - `npm --prefix frontend/studyhub-app run lint` — passed clean.
+
+---
+
+## Cycle 32 — Growth Strategy Implementation (Analytics, Live Stats, Onboarding, SEO)
+
+Date: 2026-03-19
+
+### Changes
+
+#### telemetry.js — trackEvent helper
+- Added `trackEvent(name, props = {})` export to `frontend/studyhub-app/src/lib/telemetry.js`.
+- Forwards custom events to PostHog when initialized; falls back to `console.debug` in dev.
+
+#### Backend — Public platform stats endpoint
+- Created `backend/src/routes/public.js` with `GET /api/public/platform-stats`.
+- Returns `{ sheetCount, courseCount, schoolCount, userCount }` from Prisma with a 5-minute in-memory cache.
+- Registered in `backend/src/index.js` as `app.use('/api/public', publicRoutes)`.
+
+#### RegisterScreen.jsx — Post-signup onboarding redirect + tracking
+- Local signup: redirects to `/dashboard?welcome=1` after course selection (or skip).
+- Google OAuth new-user path: redirects to `/dashboard?welcome=1` instead of the generic authenticated home.
+- Added `trackEvent('signup_started', { method: 'local' })` on account creation.
+- Added `trackEvent('signup_completed', { method: 'local'|'google', skipped_courses })`.
+
+#### DashboardPage.jsx — Welcome banner + activation checklist
+- Reads `?welcome=1` from URL via `useSearchParams`; shows dismissible welcome banner for new users.
+- Consumes `activation` object from `GET /api/dashboard/summary` (enriched in backend `dashboard.js`).
+- Renders conic-gradient progress ring and 4-item activation checklist (join_course, star_or_view_sheet, upload_or_fork_sheet, make_post).
+- Fires `trackEvent('dashboard_viewed', { isNewUser })` once per page load.
+
+#### backend/src/routes/dashboard.js — Activation enrichment
+- `GET /api/dashboard/summary` response now includes an `activation` object with `isNewUser`, `completedCount`, `totalCount`, `checklist[]`, and `nextStep`.
+
+#### HomePage.jsx — Live stats + CTA tracking + page title
+- Fetches `/api/public/platform-stats` on mount; stat row is dynamic (falls back to hardcoded values on error).
+- Hero and bottom CTAs call `trackEvent('landing_cta_clicked', { target, location })`.
+- `handleHeroSearch` calls `trackEvent('landing_search_used', { query })`.
+- Added `usePageTitle('The GitHub of Studying')` for accurate browser tab title.
+
+#### SheetViewerPage.jsx — Share button + tracking
+- Added `handleShare` function: copies current URL to clipboard, shows success toast, fires `trackEvent('sheet_shared', { sheetId, method: 'copy_link' })`.
+- Added Share button in the viewer-actions bar.
+- Added `trackEvent('sheet_starred'|'sheet_unstarred', { sheetId })` in `updateStar`.
+- Added `trackEvent('sheet_forked', { sheetId })` in `handleFork`.
+
+#### FeedPage.jsx — Rotating composer prompts + post tracking
+- Added `COMPOSER_PROMPTS` constant array with 5 rotating placeholder strings.
+- `composerPrompt` selected via `useMemo` using minute-of-day modulo to rotate without a timer.
+- Composer `<textarea>` placeholder now uses `{composerPrompt}`.
+- Added `trackEvent('feed_post_created', { hasCourse, hasAttachment })` after successful post submission.
+
+#### index.html — OG/Twitter meta tags
+- Added `og:type`, `og:site_name`, `og:title`, `og:description`, `og:url`, `twitter:card`, `twitter:title`, `twitter:description` as site-wide static defaults in `frontend/studyhub-app/index.html`.
+
+### Validation
+
+Cycle 32 Validation Commands:
+
+- `npm --prefix frontend/studyhub-app run lint` — 0 errors, 0 warnings.
+- `npm --prefix frontend/studyhub-app run build` — 0 errors. 39 output chunks. Built in ~1.3s.
+
+Cycle 32 Validation Result: PASSED
+
+Cycle 32 Deferred-Risk Notes:
+- OG meta tags in `index.html` are static site-wide defaults; per-page dynamic OG tags (e.g., for individual sheet pages) are deferred for a future cycle using SSR or an edge handler.
+- `usePageTitle` sets `document.title` only — does not update `og:title` dynamically (acceptable for SPA; crawlers see the static defaults).
+- Activation checklist is read-only display; completion is derived from real user activity (stars, uploads, posts, course joins) — no separate "mark complete" API call needed.
 - `npm --prefix frontend/studyhub-app run build` — passed clean (439ms, 42 output files).
 
 Cycle 31 Validation Result:

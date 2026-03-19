@@ -1,6 +1,9 @@
 // HomePage renders the public landing experience and routes anonymous users into discovery flows.
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { API } from '../../config'
+import { trackEvent } from '../../lib/telemetry'
+import { usePageTitle } from '../../lib/usePageTitle'
 import Navbar from '../../components/Navbar'
 import {
   IconAnnouncements,
@@ -123,12 +126,21 @@ const TESTIMONIALS = [
 ]
 
 export default function HomePage() {
+  usePageTitle('The GitHub of Studying')
   const currentYear = new Date().getFullYear()
   const navigate = useNavigate()
   const [heroSearch, setHeroSearch] = useState('')
+  const [platformStats, setPlatformStats] = useState(null)
   const featuresRef = useRef(null)
   const stepsRef = useRef(null)
   const testimonialsRef = useRef(null)
+
+  useEffect(() => {
+    fetch(`${API}/api/public/platform-stats`)
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => { if (data) setPlatformStats(data) })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (featuresRef.current) {
@@ -153,7 +165,10 @@ export default function HomePage() {
 
   function handleHeroSearch(e) {
     e.preventDefault()
-    if (heroSearch.trim()) navigate(`/sheets?search=${encodeURIComponent(heroSearch.trim())}`)
+    if (heroSearch.trim()) {
+      trackEvent('landing_search_used', { query: heroSearch.trim() })
+      navigate(`/sheets?search=${encodeURIComponent(heroSearch.trim())}`)
+    }
   }
 
   return (
@@ -229,7 +244,7 @@ export default function HomePage() {
           </p>
 
           <div className="home-hero-actions">
-            <Link to="/register" className="home-btn home-btn-primary hero-cta-glow">
+            <Link to="/register" className="home-btn home-btn-primary hero-cta-glow" onClick={() => trackEvent('landing_cta_clicked', { target: 'register', location: 'hero' })}>
               Get Started Free
               <IconArrowRight size={18} aria-hidden="true" />
             </Link>
@@ -256,9 +271,15 @@ export default function HomePage() {
 
           <div className="home-stats-row">
             {[
-              { value: '30+', label: 'Maryland Schools' },
-              { value: '100%', label: 'Student Built' },
-              { value: 'Free', label: 'Always and Forever' }
+              {
+                value: platformStats?.sheetCount != null ? `${platformStats.sheetCount}+` : '30+',
+                label: platformStats?.sheetCount != null ? 'Study Sheets' : 'Maryland Schools',
+              },
+              {
+                value: platformStats?.courseCount != null ? `${platformStats.courseCount}+` : '100%',
+                label: platformStats?.courseCount != null ? 'Courses Covered' : 'Student Built',
+              },
+              { value: 'Free', label: 'Always and Forever' },
             ].map((stat) => (
               <div key={stat.label} className="home-stat-item">
                 <div className="home-stat-value">{stat.value}</div>
@@ -451,7 +472,7 @@ export default function HomePage() {
             Join thousands of students already using StudyHub. Free forever, no strings attached.
           </p>
           <div className="home-cta-buttons">
-            <Link to="/register" className="home-btn home-btn-primary home-btn-large hero-cta-glow">
+            <Link to="/register" className="home-btn home-btn-primary home-btn-large hero-cta-glow" onClick={() => trackEvent('landing_cta_clicked', { target: 'register', location: 'bottom_cta' })}>
               Create Your Free Account
               <IconArrowRight size={18} aria-hidden="true" />
             </Link>

@@ -37,6 +37,7 @@ export default function SheetHtmlPreviewPage() {
     try {
       const response = await fetch(`${API}/api/sheets/${sheetId}/html-preview`, {
         headers: authHeaders(),
+        credentials: 'include',
       })
       const data = await readJsonSafely(response, {})
 

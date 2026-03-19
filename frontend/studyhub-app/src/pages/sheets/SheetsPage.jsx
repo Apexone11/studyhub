@@ -258,7 +258,7 @@ export default function SheetsPage() {
   const loadCatalog = useCallback(async ({ signal, startTransition } = {}) => {
     const apply = startTransition || ((fn) => fn())
     try {
-      const response = await fetch(`${API}/api/courses/schools`, { headers: authHeaders(), signal })
+      const response = await fetch(`${API}/api/courses/schools`, { headers: authHeaders(), credentials: 'include', signal })
       const data = await response.json().catch(() => [])
       if (!response.ok) {
         throw new Error('Could not load schools.')
@@ -285,6 +285,7 @@ export default function SheetsPage() {
     try {
       const response = await fetch(`${API}/api/sheets?${params.toString()}`, {
         headers: authHeaders(),
+        credentials: 'include',
         signal,
       })
 
@@ -340,7 +341,7 @@ export default function SheetsPage() {
     if (mine) params.set('mine', '1')
     if (starred) params.set('starred', '1')
     try {
-      const response = await fetch(`${API}/api/sheets?${params.toString()}`, { headers: authHeaders() })
+      const response = await fetch(`${API}/api/sheets?${params.toString()}`, { headers: authHeaders(), credentials: 'include' })
       const data = await readJsonSafely(response, {})
       if (response.ok && Array.isArray(data.sheets)) {
         setSheetsState((current) => ({
@@ -369,6 +370,7 @@ export default function SheetsPage() {
       const response = await fetch(`${API}/api/sheets/${sheet.id}/star`, {
         method: 'POST',
         headers: authHeaders(),
+        credentials: 'include',
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {

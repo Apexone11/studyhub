@@ -55,7 +55,7 @@ router.get('/summary', async (req, res) => {
 
     const enrolledCourseIds = user.enrollments.map((enrollment) => enrollment.courseId)
 
-    const [starCount, recentSheets] = await Promise.all([
+    const [starCount, recentSheets, forkCount, feedPostCount] = await Promise.all([
       prisma.starredSheet.count({
         where: { userId: user.id },
       }),
@@ -75,7 +75,61 @@ router.get('/summary', async (req, res) => {
           },
         },
       }),
+      // Count sheets this user has forked (i.e., has a forkOf reference)
+      prisma.studySheet.count({ where: { userId: user.id, forkOf: { not: null } } }),
+      // Count feed posts made by this user
+      prisma.feedPost.count({ where: { userId: user.id } }),
     ])
+
+    // ── Activation checklist ──────────────────────────────────────────────
+    // Guides new users through four key "aha moments" in product order.
+    const hasCourse = user._count.enrollments > 0
+    const hasStarred = starCount > 0
+    const hasOwnSheet = user._count.studySheets > 0
+    const hasForked = forkCount > 0
+    const hasPosted = feedPostCount > 0
+
+    const activationChecklist = [
+      {
+        key: 'join_course',
+        label: 'Join a course',
+        helper: 'Personalise your feed and sheets.',
+        done: hasCourse,
+        actionLabel: 'Choose courses',
+        actionPath: '/settings?tab=courses',
+      },
+      {
+        key: 'star_or_view_sheet',
+        label: 'Star a useful sheet',
+        helper: 'Save sheets you want to revisit.',
+        done: hasStarred,
+        actionLabel: 'Browse sheets',
+        actionPath: '/sheets',
+      },
+      {
+        key: 'upload_or_fork_sheet',
+        label: 'Upload or fork a study sheet',
+        helper: 'Contribute to your course community.',
+        done: hasOwnSheet || hasForked,
+        actionLabel: hasOwnSheet ? 'See your sheets' : 'Upload a sheet',
+        actionPath: hasOwnSheet ? '/sheets?mine=true' : '/sheets/upload',
+      },
+      {
+        key: 'make_post',
+        label: 'Post in the feed',
+        helper: 'Introduce yourself or share a tip.',
+        done: hasPosted,
+        actionLabel: 'Open feed',
+        actionPath: '/feed',
+      },
+    ]
+
+    const completedCount = activationChecklist.filter((item) => item.done).length
+    const nextItem = activationChecklist.find((item) => !item.done) || null
+
+    // Mark as "new user" if account is less than 7 days old
+    const accountAgeMs = Date.now() - new Date(user.createdAt).getTime()
+    const isNewUser = accountAgeMs < 7 * 24 * 60 * 60 * 1000
 
     res.json({
       hero: {
@@ -93,6 +147,13 @@ router.get('/summary', async (req, res) => {
       },
       courses: user.enrollments.map((enrollment) => enrollment.course),
       recentSheets,
+      activation: {
+        isNewUser,
+        completedCount,
+        totalCount: activationChecklist.length,
+        checklist: activationChecklist,
+        nextStep: nextItem,
+      },
     })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })

@@ -78,7 +78,7 @@ export default function UserProfilePage() {
   useEffect(() => {
     setLoading(true)
     setError(null)
-    fetch(`${API}/api/users/${username}`, { headers: authHeaders() })
+    fetch(`${API}/api/users/${username}`, { headers: authHeaders(), credentials: 'include' })
       .then(async (r) => {
         if (!r.ok) {
           const body = await r.json().catch(() => ({}))
@@ -104,6 +104,7 @@ export default function UserProfilePage() {
       const res = await fetch(`${API}/api/users/${username}/follow`, {
         method,
         headers: authHeaders(),
+        credentials: 'include',
       })
       const data = await res.json()
       if (res.ok) {

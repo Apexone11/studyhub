@@ -11,8 +11,8 @@ router.use(requireAuth)
 
 // ── GET /api/notifications ─────────────────────────────────────
 router.get('/', async (req, res) => {
-  const limit  = Math.min(parseInt(req.query.limit  || '20'), 50)
-  const offset = parseInt(req.query.offset || '0')
+  const limit  = Math.min(parseInt(req.query.limit  || '20', 10) || 20, 50)
+  const offset = parseInt(req.query.offset || '0', 10) || 0
   try {
     const [notifications, total, unreadCount] = await Promise.all([
       prisma.notification.findMany({
@@ -48,7 +48,7 @@ router.patch('/read-all', async (req, res) => {
 
 // ── PATCH /api/notifications/:id/read ─────────────────────────
 router.patch('/:id/read', async (req, res) => {
-  const notifId = parseInt(req.params.id)
+  const notifId = parseInt(req.params.id, 10)
   try {
     const notif = await prisma.notification.findUnique({ where: { id: notifId } })
     if (!notif) return res.status(404).json({ error: 'Notification not found.' })
@@ -74,7 +74,7 @@ router.patch('/:id/read', async (req, res) => {
 
 // ── DELETE /api/notifications/:id ─────────────────────────────
 router.delete('/:id', async (req, res) => {
-  const notifId = parseInt(req.params.id)
+  const notifId = parseInt(req.params.id, 10)
   try {
     const notif = await prisma.notification.findUnique({ where: { id: notifId } })
     if (!notif) return res.status(404).json({ error: 'Notification not found.' })
