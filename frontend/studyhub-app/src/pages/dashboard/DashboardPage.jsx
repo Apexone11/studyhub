@@ -239,7 +239,7 @@ export default function DashboardPage() {
       <div className="app-two-col-grid" style={pageShell('app')}>
         <AppSidebar mode={layout.sidebarMode} />
 
-        <main style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+        <main id="main-content" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
           <section
             ref={heroRef}
             data-tutorial="dashboard-hero"

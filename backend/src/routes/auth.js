@@ -776,6 +776,9 @@ router.post('/reset-password', forgotLimiter, async (req, res) => {
   if (newPassword.length < PASSWORD_MIN_LENGTH) {
     return res.status(400).json({ error: `Password must be at least ${PASSWORD_MIN_LENGTH} characters.` })
   }
+  if (!/[A-Z]/.test(newPassword) || !/\d/.test(newPassword)) {
+    return res.status(400).json({ error: 'Password must include at least one capital letter and one number.' })
+  }
 
   try {
     const tokenHash = hashStoredSecret(token)

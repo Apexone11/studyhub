@@ -63,8 +63,8 @@ export default function KeyboardShortcuts() {
   if (!open) return null
 
   return (
-    <div className="sh-shortcuts-overlay" onClick={() => setOpen(false)}>
-      <div className="sh-shortcuts-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="sh-shortcuts-overlay" onClick={() => setOpen(false)} role="presentation">
+      <div className="sh-shortcuts-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
         <h2>Keyboard Shortcuts</h2>
         {SHORTCUT_GROUPS.map((group) => (
           <div key={group.title} className="sh-shortcut-group">

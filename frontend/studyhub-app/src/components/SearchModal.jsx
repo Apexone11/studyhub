@@ -127,8 +127,8 @@ export default function SearchModal({ open, onClose }) {
   const hasQuery = query.trim().length >= 2
 
   return (
-    <div style={styles.overlay} onClick={onClose}>
-      <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
+    <div style={styles.overlay} onClick={onClose} role="presentation">
+      <div style={styles.modal} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Search sheets, courses, and users">
         {/* Search input */}
         <div style={styles.inputRow}>
           <IconSearch size={16} style={{ color: '#64748b', flexShrink: 0 }} />
@@ -139,6 +139,7 @@ export default function SearchModal({ open, onClose }) {
             onChange={handleChange}
             onKeyDown={handleKeyDown}
             placeholder="Search sheets, courses, users..."
+            aria-label="Search sheets, courses, and users"
             style={styles.input}
             autoComplete="off"
             spellCheck={false}
@@ -148,6 +149,7 @@ export default function SearchModal({ open, onClose }) {
               onClick={() => { setQuery(''); setResults({ sheets: [], courses: [], users: [] }); inputRef.current?.focus() }}
               style={styles.clearBtn}
               title="Clear"
+              aria-label="Clear search"
             >
               <IconX size={14} />
             </button>

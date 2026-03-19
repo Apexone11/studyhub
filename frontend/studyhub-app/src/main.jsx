@@ -4,7 +4,8 @@ import './index.css'
 import './styles/responsive.css'
 import App from './App.jsx'
 import { installApiFetchShim } from './lib/http'
-import { initTelemetry } from './lib/telemetry'
+import { initTelemetry, captureWebVital } from './lib/telemetry'
+import { reportWebVitals } from './lib/performance'
 
 initTelemetry()
 installApiFetchShim()
@@ -14,3 +15,15 @@ createRoot(document.getElementById('root')).render(
     <App />
   </StrictMode>,
 )
+
+// Register service worker for offline support
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {})
+  })
+}
+
+// Report Web Vitals to telemetry
+reportWebVitals((metric) => {
+  captureWebVital(metric)
+})

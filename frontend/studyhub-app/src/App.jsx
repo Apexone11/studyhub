@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect } from 'react'
+import { Suspense, lazy, useEffect, useRef } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { GoogleOAuthProvider } from '@react-oauth/google'
 import {
@@ -36,6 +36,7 @@ const TestTakerPage = lazy(() => import('./pages/tests/TestTakerPage'))
 const NotesPage = lazy(() => import('./pages/notes/NotesPage'))
 const AnnouncementsPage = lazy(() => import('./pages/announcements/AnnouncementsPage'))
 const SubmitPage = lazy(() => import('./pages/submit/SubmitPage'))
+const SheetLabPage = lazy(() => import('./pages/sheets/SheetLabPage'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 
 import ScrollToTop from './components/ScrollToTop'
@@ -56,6 +57,51 @@ function PrivateRoute({ children }) {
   if (!isAuthenticated) return <Navigate to="/login" replace />
 
   return <RouteErrorBoundary>{children}</RouteErrorBoundary>
+}
+
+/* Route-change announcer for screen readers */
+const ROUTE_TITLES = {
+  '/': 'Home',
+  '/login': 'Sign In',
+  '/register': 'Create Account',
+  '/feed': 'Feed',
+  '/sheets': 'Study Sheets',
+  '/sheets/upload': 'Upload Sheet',
+  '/tests': 'Practice Tests',
+  '/notes': 'My Notes',
+  '/announcements': 'Announcements',
+  '/submit': 'Submit Request',
+  '/admin': 'Admin',
+  '/dashboard': 'Profile',
+  '/settings': 'Settings',
+  '/terms': 'Terms of Service',
+  '/privacy': 'Privacy Policy',
+  '/guidelines': 'Community Guidelines',
+  '/about': 'About',
+  '/forgot-password': 'Forgot Password',
+  '/reset-password': 'Reset Password',
+}
+
+function RouteAnnouncer() {
+  const location = useLocation()
+  const announcerRef = useRef(null)
+
+  useEffect(() => {
+    const title = ROUTE_TITLES[location.pathname] || 'Page'
+    if (announcerRef.current) {
+      announcerRef.current.textContent = `Navigated to ${title}`
+    }
+  }, [location.pathname])
+
+  return (
+    <div
+      ref={announcerRef}
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      className="sr-only"
+    />
+  )
 }
 
 function RouteTelemetry() {
@@ -102,6 +148,8 @@ function AppRoutes() {
   return (
     <BrowserRouter>
       <SessionProvider>
+        <a href="#main-content" className="skip-to-content">Skip to main content</a>
+        <RouteAnnouncer />
         <RouteTelemetry />
         <PreferencesBootstrap />
         <Suspense fallback={<RouteFallback />}>
@@ -122,6 +170,7 @@ function AppRoutes() {
             <Route path="/sheets"        element={<PrivateRoute><SheetsPage /></PrivateRoute>} />
             <Route path="/sheets/upload" element={<PrivateRoute><UploadSheetPage /></PrivateRoute>} />
             <Route path="/sheets/:id/edit" element={<PrivateRoute><UploadSheetPage /></PrivateRoute>} />
+            <Route path="/sheets/:id/lab" element={<PrivateRoute><SheetLabPage /></PrivateRoute>} />
             <Route path="/sheets/:id"    element={<PrivateRoute><SheetViewerPage /></PrivateRoute>} />
             <Route path="/sheets/preview/html/:id" element={<PrivateRoute><SheetHtmlPreviewPage /></PrivateRoute>} />
             <Route path="/preview/:scope/:id" element={<PrivateRoute><AttachmentPreviewPage /></PrivateRoute>} />

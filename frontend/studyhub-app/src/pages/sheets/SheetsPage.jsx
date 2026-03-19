@@ -400,7 +400,7 @@ export default function SheetsPage() {
           <div className="app-three-col-grid">
             <AppSidebar mode={layout.sidebarMode} />
 
-            <main style={{ display: 'grid', gap: 16 }}>
+            <main id="main-content" style={{ display: 'grid', gap: 16 }}>
               <section style={panelStyle()}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap', marginBottom: 14 }}>
                   <div>

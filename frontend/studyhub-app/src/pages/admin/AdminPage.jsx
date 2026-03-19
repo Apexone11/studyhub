@@ -69,7 +69,11 @@ function formatLabel(value, fallback = 'Unknown') {
 function StatsGrid({ stats }) {
   const cards = [
     ['Users', stats.totalUsers, '#2563eb'],
+    ['New This Week', stats.users?.thisWeek ?? 0, '#6366f1'],
     ['Sheets', stats.totalSheets, '#059669'],
+    ['Published', stats.sheets?.published ?? 0, '#10b981'],
+    ['Drafts', stats.sheets?.draft ?? 0, '#f59e0b'],
+    ['Feed Posts', stats.feedPosts?.total ?? 0, '#8b5cf6'],
     ['Comments', stats.totalComments, '#7c3aed'],
     ['Flagged Requests', stats.flaggedRequests, '#dc2626'],
     ['Stars', stats.totalStars, '#f59e0b'],
@@ -96,6 +100,100 @@ function StatsGrid({ stats }) {
           <div style={{ fontSize: 30, fontWeight: 800, color: tone }}>{value ?? 0}</div>
         </div>
       ))}
+    </div>
+  )
+}
+
+function ModerationOverview({ stats }) {
+  const moderation = stats.moderation || {}
+  const cards = [
+    ['Pending Cases', moderation.pendingCases ?? 0, '#dc2626'],
+    ['Active Strikes', moderation.activeStrikes ?? 0, '#ea580c'],
+    ['Pending Appeals', moderation.pendingAppeals ?? 0, '#7c3aed'],
+  ]
+
+  return (
+    <div style={{ marginTop: 20 }}>
+      <div style={{ fontSize: 14, fontWeight: 800, color: '#0f172a', marginBottom: 12 }}>
+        Moderation Status
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
+        {cards.map(([label, value, tone]) => (
+          <div
+            key={label}
+            style={{
+              background: value > 0 ? '#fef2f2' : '#f8fafc',
+              borderRadius: 14,
+              border: value > 0 ? '1px solid #fecaca' : '1px solid #e2e8f0',
+              padding: '14px 16px',
+            }}
+          >
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '.06em', marginBottom: 6 }}>
+              {label.toUpperCase()}
+            </div>
+            <div style={{ fontSize: 26, fontWeight: 800, color: value > 0 ? tone : '#94a3b8' }}>{value}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ModerationActivityLog({ actions }) {
+  if (!actions || actions.length === 0) return null
+
+  return (
+    <div style={{ marginTop: 20 }}>
+      <div style={{ fontSize: 14, fontWeight: 800, color: '#0f172a', marginBottom: 12 }}>
+        Recent Moderation Activity
+      </div>
+      <div style={{ display: 'grid', gap: 8 }}>
+        {actions.map((action) => (
+          <div
+            key={action.id}
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 12,
+              padding: '10px 14px',
+              border: '1px solid #e2e8f0',
+              borderRadius: 12,
+              background: '#f8fafc',
+            }}
+          >
+            <div
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                marginTop: 5,
+                flexShrink: 0,
+                background: action.status === 'confirmed' ? '#dc2626' : action.status === 'dismissed' ? '#94a3b8' : '#3b82f6',
+              }}
+            />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
+                Case #{action.id} — {action.contentType || 'content'} — <span style={{
+                  color: action.status === 'confirmed' ? '#dc2626' : action.status === 'dismissed' ? '#64748b' : '#1d4ed8',
+                  textTransform: 'capitalize',
+                }}>{action.status}</span>
+              </div>
+              <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                User: {action.user?.username || 'Unknown'}
+                {action.reviewer ? ` — Reviewed by ${action.reviewer.username}` : ''}
+              </div>
+              {action.reviewNote ? (
+                <div style={{ fontSize: 12, color: '#475569', marginTop: 4, fontStyle: 'italic' }}>
+                  {action.reviewNote}
+                </div>
+              ) : null}
+            </div>
+            <div style={{ fontSize: 11, color: '#94a3b8', whiteSpace: 'nowrap', flexShrink: 0 }}>
+              {action.updatedAt ? new Date(action.updatedAt).toLocaleDateString() : ''}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -617,7 +715,7 @@ export default function AdminPage() {
       >
         <AppSidebar mode={layout.sidebarMode} />
 
-        <main style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <main id="main-content" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {isAdmin ? (
             <>
               <section
@@ -696,7 +794,11 @@ export default function AdminPage() {
               {!overview.stats && overview.loading ? (
                 <div style={{ color: '#94a3b8', fontSize: 13 }}>Loading admin stats…</div>
               ) : overview.stats ? (
-                <StatsGrid stats={overview.stats} />
+                <>
+                  <StatsGrid stats={overview.stats} />
+                  <ModerationOverview stats={overview.stats} />
+                  <ModerationActivityLog actions={overview.stats.recentModerationActions} />
+                </>
               ) : null}
             </section>
               ) : null}

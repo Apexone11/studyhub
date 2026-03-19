@@ -523,7 +523,7 @@ export default function SheetViewerPage() {
           >
             <AppSidebar mode={layout.sidebarMode} />
 
-            <main style={{ display: 'grid', gap: 16 }}>
+            <main id="main-content" style={{ display: 'grid', gap: 16 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                 <button type="button" onClick={handleBack} style={actionButton('#475569')}>
                   <IconArrowLeft size={14} />
@@ -562,6 +562,11 @@ export default function SheetViewerPage() {
                     {canEdit ? (
                       <Link to={`/sheets/${sheet.id}/edit`} style={linkButton()}>
                         Edit
+                      </Link>
+                    ) : null}
+                    {user ? (
+                      <Link to={`/sheets/${sheet.id}/lab`} style={linkButton()}>
+                        Sheet Lab
                       </Link>
                     ) : null}
                     {user && sheet.userId !== user.id ? (

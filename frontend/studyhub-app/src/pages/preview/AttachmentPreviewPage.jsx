@@ -164,7 +164,7 @@ export default function AttachmentPreviewPage() {
       <Navbar />
       <div style={{ background: '#edf0f5', minHeight: '100vh', fontFamily: FONT }}>
         <div style={pageShell('reading', 26, 48)}>
-          <main style={{ display: 'grid', gap: 16 }}>
+          <main id="main-content" style={{ display: 'grid', gap: 16 }}>
             <section style={panelStyle()}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                 <div>

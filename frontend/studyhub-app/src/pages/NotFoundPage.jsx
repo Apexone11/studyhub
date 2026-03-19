@@ -7,10 +7,10 @@ const FONT = "'Plus Jakarta Sans', sans-serif"
 
 export default function NotFoundPage() {
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--sh-page-bg, #edf0f5)', fontFamily: FONT, padding: 24 }}>
+    <main id="main-content" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--sh-page-bg, #edf0f5)', fontFamily: FONT, padding: 24 }}>
       <div style={{ textAlign: 'center', maxWidth: 420 }}>
         <div style={{ width: 80, height: 80, borderRadius: 20, background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}>
-          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <circle cx="12" cy="12" r="10" />
             <path d="M16 16s-1.5-2-4-2-4 2-4 2" />
             <line x1="9" y1="9" x2="9.01" y2="9" />
@@ -37,6 +37,6 @@ export default function NotFoundPage() {
           </Link>
         </div>
       </div>
-    </div>
+    </main>
   )
 }

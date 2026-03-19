@@ -352,7 +352,7 @@ export default function Navbar({
   }
 
   return (
-    <nav style={S.nav}>
+    <nav style={S.nav} aria-label="Main navigation">
       {/* — top row — */}
       <div style={rowStyle}>
 
@@ -400,10 +400,19 @@ export default function Navbar({
         {/* search box — hide on auth pages where it's irrelevant */}
         {!hideSearch && location.pathname !== '/login' && location.pathname !== '/register'
           && location.pathname !== '/forgot-password' && location.pathname !== '/reset-password' && (
-          <div className={isLanding ? 'sh-landing-search' : undefined} style={searchBoxStyle} onClick={() => setSearchOpen(true)}>
-            <IconSearch size={13} style={{ color: '#475569', flexShrink: 0 }} />
+          <div
+            className={isLanding ? 'sh-landing-search' : undefined}
+            style={searchBoxStyle}
+            onClick={() => setSearchOpen(true)}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSearchOpen(true) } }}
+            role="button"
+            tabIndex={0}
+            aria-label="Open search"
+            data-search-trigger
+          >
+            <IconSearch size={13} style={{ color: '#475569', flexShrink: 0 }} aria-hidden="true" />
             <span style={searchTextStyle}>Search sheets, courses...</span>
-            <kbd className="sh-kbd-hint">{navigator.platform?.includes('Mac') ? '⌘' : 'Ctrl+'}K</kbd>
+            <kbd className="sh-kbd-hint" aria-hidden="true">{navigator.platform?.includes('Mac') ? '⌘' : 'Ctrl+'}K</kbd>
           </div>
         )}
         <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
@@ -434,6 +443,9 @@ export default function Navbar({
             <button
               style={S.iconBtn}
               title="Notifications"
+              aria-label={unreadCount > 0 ? `Notifications (${unreadCount} unread)` : 'Notifications'}
+              aria-expanded={showBell}
+              aria-haspopup="true"
               onClick={() => setShowBell(v => !v)}
               onMouseEnter={e => handleIconHover(e, true)}
               onMouseLeave={e => handleIconHover(e, false)}
@@ -518,12 +530,17 @@ export default function Navbar({
 
         {/* user avatar + name */}
         {user && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
+          <div
+            style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
             onClick={() => navigate('/dashboard')}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate('/dashboard') } }}
+            role="button"
+            tabIndex={0}
+            aria-label={`Profile: ${user.username}`}
           >
-            <div style={S.avatar}>{initials}</div>
+            <div style={S.avatar} aria-hidden="true">{initials}</div>
             <span style={S.username}>{user.username}</span>
-            <IconChevronDown size={13} style={{ color: '#475569' }} />
+            <IconChevronDown size={13} style={{ color: '#475569' }} aria-hidden="true" />
           </div>
         )}
 

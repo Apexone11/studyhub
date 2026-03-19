@@ -6,7 +6,7 @@ const requireAuth = require('../middleware/auth')
 const { ERROR_CODES, sendError } = require('../middleware/errorEnvelope')
 const { assertOwnerOrAdmin } = require('../lib/accessControl')
 const { captureError } = require('../monitoring/sentry')
-const { signatureMatchesExpected } = require('../lib/fileSignatures')
+const { signatureMatchesExpected, validateMagicBytes } = require('../lib/fileSignatures')
 const prisma = require('../lib/prisma')
 const {
   ATTACHMENTS_DIR,
@@ -93,6 +93,11 @@ router.post('/avatar', requireAuth, avatarUploadLimiter, (req, res) => {
     if (!signatureMatchesExpected(req.file.path, Array.from(AVATAR_ALLOWED_MIME)).ok) {
       return rejectSignatureMismatch(res, req.file, 'Avatar contents do not match a supported image format.')
     }
+    const avatarMagic = validateMagicBytes(req.file.path, req.file.mimetype)
+    if (!avatarMagic.valid) {
+      return rejectSignatureMismatch(res, req.file,
+        `Avatar file signature does not match declared type (detected: ${avatarMagic.detectedType || 'unknown'}, declared: ${avatarMagic.declaredType}).`)
+    }
 
     try {
       // Delete old avatar file if it exists locally
@@ -150,6 +155,11 @@ router.post('/attachment/:sheetId', requireAuth, attachmentUploadLimiter, (req, 
     if (!req.file) return sendError(res, 400, 'No file uploaded.', ERROR_CODES.UPLOAD_MISSING_FILE)
     if (!signatureMatchesExpected(req.file.path, Array.from(ATTACHMENT_ALLOWED_MIME)).ok) {
       return rejectSignatureMismatch(res, req.file, 'Attachment contents do not match a supported PDF or image format.')
+    }
+    const sheetMagic = validateMagicBytes(req.file.path, req.file.mimetype)
+    if (!sheetMagic.valid) {
+      return rejectSignatureMismatch(res, req.file,
+        `Attachment file signature does not match declared type (detected: ${sheetMagic.detectedType || 'unknown'}, declared: ${sheetMagic.declaredType}).`)
     }
 
     const sheetId = Number.parseInt(req.params.sheetId, 10)
@@ -210,6 +220,11 @@ router.post('/post-attachment/:postId', requireAuth, attachmentUploadLimiter, (r
     if (!req.file) return sendError(res, 400, 'No file uploaded.', ERROR_CODES.UPLOAD_MISSING_FILE)
     if (!signatureMatchesExpected(req.file.path, Array.from(ATTACHMENT_ALLOWED_MIME)).ok) {
       return rejectSignatureMismatch(res, req.file, 'Attachment contents do not match a supported PDF or image format.')
+    }
+    const postMagic = validateMagicBytes(req.file.path, req.file.mimetype)
+    if (!postMagic.valid) {
+      return rejectSignatureMismatch(res, req.file,
+        `Attachment file signature does not match declared type (detected: ${postMagic.detectedType || 'unknown'}, declared: ${postMagic.declaredType}).`)
     }
 
     const postId = Number.parseInt(req.params.postId, 10)

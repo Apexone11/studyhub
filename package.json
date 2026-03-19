@@ -27,6 +27,9 @@
     "beta:cycle5": "npm run beta:check && npm --prefix frontend/studyhub-app run test:e2e:smoke -- tests/sheets.upload-html-workflow.smoke.spec.js tests/sheets.html-preview.sandbox.smoke.spec.js && docker compose exec -T backend npm run archive:html-originals",
     "beta:cycle6": "docker compose exec -T backend npm run migrate:readiness:smoke && npm run beta:check && npm run beta:snapshots && npm run beta:load:synthetic",
     "beta:start:oneclick": "npm run beta:bootstrap",
-    "beta:validate:oneclick": "npm run beta:cycle6"
+    "beta:validate:oneclick": "npm run beta:cycle6",
+    "ci:lighthouse": "npm --prefix frontend/studyhub-app run build && npx --yes @lhci/cli@latest autorun --config frontend/studyhub-app/lighthouse.config.js",
+    "ci:a11y": "echo 'Run a11y audit with: npx axe-cli http://localhost:4173'",
+    "ci:quality": "npm run lint && npm run build && npm run test"
   }
 }

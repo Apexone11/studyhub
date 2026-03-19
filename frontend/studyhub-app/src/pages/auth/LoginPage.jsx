@@ -170,7 +170,7 @@ export default function LoginPage() {
       <div style={{ position: 'absolute', top: '40%', left: '50%', transform: 'translate(-50%, -50%)', width: 600, height: 600, borderRadius: '50%', background: 'rgba(16, 185, 129, 0.04)', filter: 'blur(100px)', pointerEvents: 'none' }} />
 
       {/* ── Main card ────────────────────────────────────────────────── */}
-      <div ref={cardRef} style={{ padding: '48px 20px 80px', display: 'grid', placeItems: 'center', position: 'relative', zIndex: 1 }}>
+      <main id="main-content" ref={cardRef} style={{ padding: '48px 20px 80px', display: 'grid', placeItems: 'center', position: 'relative', zIndex: 1 }}>
         <div
           style={{
             width: 'min(92vw, 440px)',
@@ -205,7 +205,7 @@ export default function LoginPage() {
 
           {/* ── Error message ────────────────────────────────────────── */}
           {error && (
-            <div style={{
+            <div role="alert" style={{
               marginBottom: 16, padding: '12px 14px', borderRadius: 12,
               border: '1px solid #fecaca', background: '#fef2f2', color: '#b91c1c',
               fontSize: 13, lineHeight: 1.6,
@@ -313,7 +313,7 @@ export default function LoginPage() {
             </Link>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   )
 }

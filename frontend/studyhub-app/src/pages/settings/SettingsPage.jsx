@@ -216,7 +216,7 @@ export default function SettingsPage() {
           </nav>
         </aside>
 
-        <main ref={tabContentRef}>
+        <main id="main-content" ref={tabContentRef}>
           {renderTab()}
         </main>
       </div>

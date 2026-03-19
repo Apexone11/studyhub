@@ -25,6 +25,8 @@ import { pageShell } from '../../lib/ui'
 import { useTutorial } from '../../lib/useTutorial'
 import { UPLOAD_STEPS } from '../../lib/tutorialSteps'
 import { usePageTitle } from '../../lib/usePageTitle'
+import { showToast } from '../../lib/toast'
+import { checkImageSafety, isImageFile } from '../../lib/imageSafety'
 import {
   UPLOAD_TUTORIAL_KEY,
   canEditHtmlWorkingCopy,
@@ -439,7 +441,7 @@ export default function UploadSheetPage() {
     title,
   ])
 
-  function handleAttachmentSelect(event) {
+  async function handleAttachmentSelect(event) {
     const file = event.target.files?.[0]
     if (!file) return
     const validationError = validateAttachment(file)
@@ -447,6 +449,18 @@ export default function UploadSheetPage() {
       setAttachErr(validationError)
       event.target.value = ''
       return
+    }
+
+    /* Pre-upload image safety screening (client-side heuristic) */
+    if (isImageFile(file)) {
+      try {
+        const safetyResult = await checkImageSafety(file)
+        if (safetyResult.warnings.length > 0) {
+          showToast(safetyResult.warnings[0], 'info')
+        }
+      } catch {
+        // Safety check is best-effort — never block attachment selection
+      }
     }
 
     setAttachErr('')
@@ -574,7 +588,7 @@ export default function UploadSheetPage() {
       setShowScanModal(true)
       setScanModalDismissed(false)
       setSaved(true)
-      setHasUnsavedChanges(true)
+      setHasUnsavedChanges(false)
     } catch (importError) {
       setError(importError.message || 'Could not import HTML file.')
     } finally {

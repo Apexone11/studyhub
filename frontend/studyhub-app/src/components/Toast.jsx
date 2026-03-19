@@ -61,9 +61,9 @@ export default function ToastContainer() {
   if (toasts.length === 0) return null
 
   return (
-    <div className="sh-toast-container">
+    <div className="sh-toast-container" role="status" aria-live="polite" aria-atomic="false">
       {toasts.map((t) => (
-        <div key={t.id} className={`sh-toast sh-toast-${t.type}`} onClick={() => dismiss(t.id)}>
+        <div key={t.id} className={`sh-toast sh-toast-${t.type}`} onClick={() => dismiss(t.id)} role="alert">
           {ICONS[t.type] || ICONS.info}
           <span className="sh-toast-msg">{t.message}</span>
         </div>

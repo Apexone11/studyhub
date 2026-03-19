@@ -42,9 +42,9 @@ export default function ConfirmDialog({
   const isDanger = variant === 'danger'
 
   return (
-    <div style={styles.overlay} onClick={onCancel}>
-      <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
-        <h3 style={styles.title}>{title}</h3>
+    <div style={styles.overlay} onClick={onCancel} role="presentation">
+      <div style={styles.modal} onClick={(e) => e.stopPropagation()} role="alertdialog" aria-modal="true" aria-labelledby="confirm-dialog-title">
+        <h3 id="confirm-dialog-title" style={styles.title}>{title}</h3>
         {message && <p style={styles.message}>{message}</p>}
         <div style={styles.actions}>
           <button onClick={onCancel} style={styles.cancelBtn}>

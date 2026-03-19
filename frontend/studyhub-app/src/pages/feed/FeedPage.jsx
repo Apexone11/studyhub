@@ -1134,7 +1134,7 @@ export default function FeedPage() {
           <div className="app-three-col-grid">
             <AppSidebar mode={layout.sidebarMode} />
 
-            <main style={{ display: 'grid', gap: 18 }}>
+            <main id="main-content" style={{ display: 'grid', gap: 18 }}>
               <div data-tutorial="feed-composer">
               <Panel title="Share with your classmates" helper="Post class notes, course questions, or links to your latest sheet.">
                 <form onSubmit={submitPost} style={{ display: 'grid', gap: 12 }}>

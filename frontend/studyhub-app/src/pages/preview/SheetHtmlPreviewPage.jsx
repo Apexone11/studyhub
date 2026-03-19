@@ -78,7 +78,7 @@ export default function SheetHtmlPreviewPage() {
     <div style={{ minHeight: '100vh', background: '#edf0f5', fontFamily: FONT }}>
       <Navbar crumbs={[{ label: 'Study Sheets', to: '/sheets' }, { label: 'HTML Preview', to: null }]} hideTabs hideSearch />
       <div style={pageShell('reading', 22, 40)}>
-        <main style={{ display: 'grid', gap: 14 }}>
+        <main id="main-content" style={{ display: 'grid', gap: 14 }}>
           <section style={panelStyle()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
               <div>

@@ -190,6 +190,14 @@ function createFallbackEventId(surface = 'client') {
   return `${surface}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
 }
 
+export function captureWebVital(metric) {
+  if (posthogInitialized) {
+    posthog.capture('web_vital', metric)
+  } else if (import.meta.env?.DEV) {
+    console.debug('[WebVital]', metric.name, metric.value?.toFixed?.(2), metric.rating)
+  }
+}
+
 export function captureComponentError(error, context = {}) {
   const { surface = 'component-error', ...extra } = context
   let eventId = ''
