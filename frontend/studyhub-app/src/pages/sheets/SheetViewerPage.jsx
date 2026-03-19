@@ -2,13 +2,17 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
 import AppSidebar from '../../components/AppSidebar'
+import MentionText from '../../components/MentionText'
 import {
   IconArrowLeft,
+  IconCheck,
   IconDownload,
   IconEye,
   IconFork,
+  IconGitPullRequest,
   IconStar,
   IconStarFilled,
+  IconX,
 } from '../../components/Icons'
 import { API } from '../../config'
 import { getApiErrorMessage, isAuthSessionFailure, readJsonSafely } from '../../lib/http'
@@ -108,7 +112,21 @@ function errorBanner(message) {
   )
 }
 
-function ContributionList({ title, items }) {
+function statusBadge(status) {
+  const colors = {
+    pending: { bg: '#fef3c7', color: '#92400e' },
+    accepted: { bg: '#dcfce7', color: '#166534' },
+    rejected: { bg: '#fee2e2', color: '#991b1b' },
+  }
+  const c = colors[status] || colors.pending
+  return {
+    fontSize: 11, fontWeight: 800, textTransform: 'uppercase',
+    padding: '2px 8px', borderRadius: 6,
+    background: c.bg, color: c.color,
+  }
+}
+
+function ContributionList({ title, items, canReview, onReview, reviewingId }) {
   return (
     <section style={panelStyle()}>
       <h2 style={{ margin: '0 0 10px', fontSize: 15, color: '#0f172a' }}>{title}</h2>
@@ -118,18 +136,46 @@ function ContributionList({ title, items }) {
         <div style={{ display: 'grid', gap: 12 }}>
           {items.map((item) => (
             <div key={item.id} style={{ borderTop: '1px solid #f1f5f9', paddingTop: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 4 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 4, alignItems: 'center' }}>
                 <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
                   {item.forkSheet?.title || 'Contribution'}
                 </span>
-                <span style={{ fontSize: 11, fontWeight: 800, color: '#2563eb', textTransform: 'uppercase' }}>
-                  {item.status}
-                </span>
+                <span style={statusBadge(item.status)}>{item.status}</span>
               </div>
               <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.6 }}>
                 {item.proposer?.username ? `Proposed by ${item.proposer.username}. ` : ''}
                 {item.message || 'No message included.'}
               </div>
+              {canReview && item.status === 'pending' ? (
+                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                  <button
+                    type="button"
+                    disabled={reviewingId === item.id}
+                    onClick={() => onReview(item.id, 'accept')}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 4,
+                      padding: '5px 10px', borderRadius: 8, border: '1px solid #bbf7d0',
+                      background: '#f0fdf4', color: '#16a34a', fontSize: 11, fontWeight: 700,
+                      cursor: reviewingId === item.id ? 'wait' : 'pointer', fontFamily: FONT,
+                    }}
+                  >
+                    <IconCheck size={11} /> Accept
+                  </button>
+                  <button
+                    type="button"
+                    disabled={reviewingId === item.id}
+                    onClick={() => onReview(item.id, 'reject')}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 4,
+                      padding: '5px 10px', borderRadius: 8, border: '1px solid #fecaca',
+                      background: '#fef2f2', color: '#dc2626', fontSize: 11, fontWeight: 700,
+                      cursor: reviewingId === item.id ? 'wait' : 'pointer', fontFamily: FONT,
+                    }}
+                  >
+                    <IconX size={11} /> Reject
+                  </button>
+                </div>
+              ) : null}
             </div>
           ))}
         </div>
@@ -147,6 +193,11 @@ export default function SheetViewerPage() {
   const [commentsState, setCommentsState] = useState({ comments: [], total: 0, loading: true, error: '' })
   const [commentDraft, setCommentDraft] = useState('')
   const [commentSaving, setCommentSaving] = useState(false)
+  const [forking, setForking] = useState(false)
+  const [contributing, setContributing] = useState(false)
+  const [showContributeModal, setShowContributeModal] = useState(false)
+  const [contributeMessage, setContributeMessage] = useState('')
+  const [reviewingId, setReviewingId] = useState(null)
 
   const sheetId = Number.parseInt(id, 10)
 
@@ -307,6 +358,66 @@ export default function SheetViewerPage() {
     }
   }
 
+  const handleFork = async () => {
+    if (!sheet || forking) return
+    setForking(true)
+    try {
+      const response = await fetch(`${API}/api/sheets/${sheet.id}/fork`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({}),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.error || 'Could not fork this sheet.')
+      navigate(`/sheets/${data.id}/edit`)
+    } catch (error) {
+      setSheetState((current) => ({ ...current, error: error.message }))
+    } finally {
+      setForking(false)
+    }
+  }
+
+  const handleContribute = async () => {
+    if (!sheet || contributing) return
+    setContributing(true)
+    try {
+      const response = await fetch(`${API}/api/sheets/${sheet.id}/contributions`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ message: contributeMessage.trim() }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.error || 'Could not submit contribution.')
+      setShowContributeModal(false)
+      setContributeMessage('')
+      // Reload sheet to show updated contributions list
+      loadSheet()
+    } catch (error) {
+      setSheetState((current) => ({ ...current, error: error.message }))
+    } finally {
+      setContributing(false)
+    }
+  }
+
+  const handleReviewContribution = async (contributionId, action) => {
+    if (reviewingId) return
+    setReviewingId(contributionId)
+    try {
+      const response = await fetch(`${API}/api/sheets/contributions/${contributionId}`, {
+        method: 'PATCH',
+        headers: authHeaders(),
+        body: JSON.stringify({ action }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.error || `Could not ${action} contribution.`)
+      loadSheet()
+    } catch (error) {
+      setSheetState((current) => ({ ...current, error: error.message }))
+    } finally {
+      setReviewingId(null)
+    }
+  }
+
   const submitComment = async (event) => {
     event.preventDefault()
     if (!commentDraft.trim()) return
@@ -338,6 +449,30 @@ export default function SheetViewerPage() {
       setCommentsState((current) => ({ ...current, error: error.message || 'Could not post the comment.' }))
     } finally {
       setCommentSaving(false)
+    }
+  }
+
+  const deleteComment = async (commentId) => {
+    try {
+      const response = await fetch(`${API}/api/sheets/${sheetId}/comments/${commentId}`, {
+        method: 'DELETE',
+        headers: authHeaders(),
+      })
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error || 'Could not delete comment.')
+      }
+      setCommentsState((current) => ({
+        ...current,
+        comments: current.comments.filter((c) => c.id !== commentId),
+        total: Math.max(0, current.total - 1),
+      }))
+      setSheetState((current) => ({
+        ...current,
+        sheet: current.sheet ? { ...current.sheet, commentCount: Math.max(0, (current.sheet.commentCount || 1) - 1) } : current.sheet,
+      }))
+    } catch (error) {
+      setCommentsState((current) => ({ ...current, error: error.message }))
     }
   }
 
@@ -396,6 +531,18 @@ export default function SheetViewerPage() {
                       <Link to={`/sheets/${sheet.id}/edit`} style={linkButton()}>
                         Edit
                       </Link>
+                    ) : null}
+                    {user && sheet.userId !== user.id ? (
+                      <button type="button" onClick={handleFork} disabled={forking} style={actionButton('#6366f1')}>
+                        <IconFork size={13} />
+                        {forking ? 'Forking…' : 'Fork'}
+                      </button>
+                    ) : null}
+                    {user && sheet.forkOf && sheet.userId === user.id ? (
+                      <button type="button" onClick={() => setShowContributeModal(true)} style={actionButton('#059669')}>
+                        <IconGitPullRequest size={13} />
+                        Contribute Back
+                      </button>
                     ) : null}
                   </div>
                 ) : null}
@@ -517,12 +664,29 @@ export default function SheetViewerPage() {
                   <div style={{ display: 'grid', gap: 12 }}>
                     {commentsState.comments.map((comment) => (
                       <div key={comment.id} style={{ borderTop: '1px solid #f1f5f9', paddingTop: 12 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 4 }}>
-                          <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{comment.author?.username || 'Unknown'}</span>
-                          <span style={{ fontSize: 11, color: '#94a3b8' }}>{timeAgo(comment.createdAt)}</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 4, alignItems: 'center' }}>
+                          <Link to={`/users/${comment.author?.username}`} style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', textDecoration: 'none' }}>
+                            {comment.author?.username || 'Unknown'}
+                          </Link>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: 11, color: '#94a3b8' }}>{timeAgo(comment.createdAt)}</span>
+                            {user && (user.id === comment.author?.id || user.role === 'admin') ? (
+                              <button
+                                type="button"
+                                onClick={() => deleteComment(comment.id)}
+                                style={{
+                                  padding: '2px 8px', borderRadius: 6, border: '1px solid #fecaca',
+                                  background: '#fff', color: '#dc2626', fontSize: 11, fontWeight: 600,
+                                  cursor: 'pointer', fontFamily: FONT,
+                                }}
+                              >
+                                Delete
+                              </button>
+                            ) : null}
+                          </div>
                         </div>
                         <div style={{ fontSize: 13, color: '#475569', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
-                          {comment.content}
+                          <MentionText text={comment.content} />
                         </div>
                       </div>
                     ))}
@@ -583,7 +747,13 @@ export default function SheetViewerPage() {
                 </section>
               ) : null}
               {sheet?.incomingContributions ? (
-                <ContributionList title="Incoming contributions" items={sheet.incomingContributions} />
+                <ContributionList
+                  title="Incoming contributions"
+                  items={sheet.incomingContributions}
+                  canReview={canEdit}
+                  onReview={handleReviewContribution}
+                  reviewingId={reviewingId}
+                />
               ) : null}
               {sheet?.outgoingContributions ? (
                 <ContributionList title="Outgoing contributions" items={sheet.outgoingContributions} />
@@ -592,6 +762,71 @@ export default function SheetViewerPage() {
           </div>
         </div>
       </div>
+
+      {/* ── Contribute-back modal ────────────────────────────────────── */}
+      {showContributeModal ? (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9999,
+            background: 'rgba(15, 23, 42, 0.5)', display: 'grid', placeItems: 'center',
+          }}
+          onClick={() => setShowContributeModal(false)}
+        >
+          <div
+            style={{
+              background: '#fff', borderRadius: 18, padding: 28, width: '100%', maxWidth: 440,
+              boxShadow: '0 20px 60px rgba(0,0,0,0.2)', fontFamily: FONT,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 style={{ margin: '0 0 6px', fontSize: 18, color: '#0f172a' }}>
+              <IconGitPullRequest size={18} style={{ verticalAlign: 'middle', marginRight: 8 }} />
+              Contribute Changes Back
+            </h2>
+            <p style={{ margin: '0 0 16px', color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
+              Submit your changes to the original author for review. They can accept or reject your contribution.
+            </p>
+            <textarea
+              value={contributeMessage}
+              onChange={(e) => setContributeMessage(e.target.value)}
+              placeholder="Describe what you changed and why (optional)…"
+              rows={3}
+              maxLength={500}
+              style={{
+                width: '100%', resize: 'vertical', borderRadius: 12, border: '1px solid #cbd5e1',
+                padding: 12, fontSize: 13, fontFamily: 'inherit', marginBottom: 16,
+              }}
+            />
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={() => setShowContributeModal(false)}
+                style={{
+                  padding: '8px 16px', borderRadius: 10, border: '1px solid #cbd5e1',
+                  background: '#fff', color: '#64748b', fontSize: 13, fontWeight: 600,
+                  cursor: 'pointer', fontFamily: FONT,
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleContribute}
+                disabled={contributing}
+                style={{
+                  padding: '8px 18px', borderRadius: 10, border: 'none',
+                  background: contributing ? '#86efac' : '#059669', color: '#fff',
+                  fontSize: 13, fontWeight: 700, cursor: contributing ? 'wait' : 'pointer',
+                  fontFamily: FONT, display: 'inline-flex', alignItems: 'center', gap: 6,
+                }}
+              >
+                <IconGitPullRequest size={13} />
+                {contributing ? 'Submitting…' : 'Submit Contribution'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   )
 }

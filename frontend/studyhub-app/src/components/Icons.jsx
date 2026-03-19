@@ -450,6 +450,18 @@ export function IconCamera({ size, ...p }) {
   )
 }
 
+// Git Pull Request — contribute changes back
+export function IconGitPullRequest({ size, ...p }) {
+  return (
+    <Svg size={size} {...p}>
+      <circle cx="18" cy="18" r="3" stroke="currentColor" strokeWidth="2" fill="none" />
+      <circle cx="6" cy="6" r="3" stroke="currentColor" strokeWidth="2" fill="none" />
+      <path d="M13 6H16A2 2 0 0 1 18 8V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <line x1="6" y1="9" x2="6" y2="21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </Svg>
+  )
+}
+
 // ─── LOGO MARK ────────────────────────────────────────────────────
 // Inline logo mark — exact fork tree proportions from logo-dark.svg
 // scaled to a 24x24 container. Use for nav wordmark.

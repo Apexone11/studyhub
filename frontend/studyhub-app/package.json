@@ -24,6 +24,7 @@
     "@sentry/react": "^10.43.0",
     "animejs": "^4.3.6",
     "dompurify": "^3.3.3",
+    "marked": "^17.0.4",
     "posthog-js": "^1.360.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

@@ -259,6 +259,39 @@ export default function UserProfilePage() {
             </div>
           )}
 
+          {/* Starred Sheets */}
+          {profile.starredSheets && profile.starredSheets.length > 0 && (
+            <div style={{ background: '#fff', borderRadius: 18, border: '1px solid #e2e8f0', padding: '24px 28px', boxShadow: '0 2px 10px rgba(15,23,42,0.05)' }}>
+              <h2 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <IconStar size={16} style={{ color: '#f59e0b' }} />
+                Starred Sheets
+              </h2>
+              {profile.starredSheets.map((sheet) => (
+                <Link key={sheet.id} to={`/sheets/${sheet.id}`} style={{ display: 'block', padding: '12px 0', borderBottom: '1px solid #f1f5f9', textDecoration: 'none' }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#0f172a', marginBottom: 6 }}>{sheet.title}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {sheet.course?.code && (
+                      <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>
+                        {sheet.course.code}
+                      </span>
+                    )}
+                    {sheet.author?.username && (
+                      <span style={{ fontSize: 11, color: '#94a3b8' }}>by {sheet.author.username}</span>
+                    )}
+                    <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <IconStar size={12} /> {sheet.stars || 0}
+                    </span>
+                  </div>
+                </Link>
+              ))}
+              {isOwnProfile && (
+                <Link to="/sheets?starred=1" style={{ display: 'block', textAlign: 'center', marginTop: 12, fontSize: 13, fontWeight: 700, color: '#3b82f6', textDecoration: 'none' }}>
+                  View all starred sheets →
+                </Link>
+              )}
+            </div>
+          )}
+
           {/* Enrolled Courses */}
           <div style={{ background: '#fff', borderRadius: 18, border: '1px solid #e2e8f0', padding: '24px 28px', boxShadow: '0 2px 10px rgba(15,23,42,0.05)' }}>
             <h2 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>

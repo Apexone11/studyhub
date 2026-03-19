@@ -1236,3 +1236,137 @@ Cycle 24 Deferred-Risk Notes
 
 - The auth-gated HomePage search flow still does not assert a future post-login destination-return behavior if StudyHub later preserves the original `/sheets?search=...` target through the `/login` redirect.
 - The Docker beta frontend still relies on `--legacy-peer-deps` because `react-joyride@2.9.3` has not yet been upgraded for React 19 peer compatibility.
+
+---
+
+Cycle 25 — Week 1 UX: Draft Management, Notes Redesign, Fork/Contribute UI [2026-03-18]
+
+Added:
+
+- Google OAuth Railway setup documentation (`docs/google-oauth-railway-setup.md`):
+  - Step-by-step guide for enabling Google Sign-In on Railway production.
+  - Covers Google Cloud Console redirect URIs, backend/frontend env vars, runtime-config verification, and verification steps.
+  - Reference table mapping all OAuth files (backend lib, routes, frontend config, login/register/settings pages).
+
+- Draft sheet management on UploadSheetPage (`frontend/studyhub-app/src/pages/sheets/UploadSheetPage.jsx`):
+  - Yellow banner shown when resuming a draft, with draft title and "Discard & Start New" button.
+  - `discardDraft` function calls `DELETE /api/sheets/:id` then resets all editor state.
+  - Confirmation dialog (existing `ConfirmDialog` component) gates destructive discard.
+  - `draftReloadKey` state forces the init effect to re-run after discard for a clean editor.
+
+- Attachment remove buttons on UploadSheetPage:
+  - Green badge with ✕ button for newly selected (not yet uploaded) files — calls `clearAttachFile`.
+  - Blue badge with ✕ button for existing server-side attachments — sets `removeExistingAttachment(true)`.
+  - "Attachment will be removed on save" message shown after removal.
+  - File input label changes to "Change file" when any attachment is present.
+
+- Notes page complete redesign (`frontend/studyhub-app/src/pages/notes/NotesPage.jsx`):
+  - Replaced dark (#0f172a) editor background with light/transparent background.
+  - Added markdown formatting toolbar with 9 actions: bold, italic, heading, bullet list, numbered list, inline code, code block, link, blockquote.
+  - `applyToolbarAction` function handles smart cursor-aware text insertion with line-start prefix handling.
+  - Real markdown-to-HTML preview via `marked` (GFM + line breaks) + `DOMPurify` sanitization.
+  - New `MarkdownPreview` component replaces plain-text `MiniPreview`.
+  - Word count displayed in toolbar.
+  - Note list cards now show content preview (first 80 chars) and course code in blue.
+  - SVG empty-state icons instead of emoji.
+  - Filter tabs with border styling and transitions.
+  - Private/Shared toggle with color-coded pill background.
+
+- Markdown preview CSS styles (`frontend/studyhub-app/src/index.css`):
+  - `.notes-markdown-preview` class with full typography: headings (h1-h4), paragraphs, links, lists, inline code (rose-colored), code blocks (dark background), blockquotes (indigo left border), tables, horizontal rules, images.
+  - Uses CSS variables for dark-mode compatibility.
+
+- Fork and contribute UI on SheetViewerPage (`frontend/studyhub-app/src/pages/sheets/SheetViewerPage.jsx`):
+  - Fork button (purple) shown for non-owners — calls `POST /api/sheets/:id/fork`, navigates to edit page on success.
+  - "Contribute Back" button (green) shown for fork owners — opens modal to submit contribution with optional message.
+  - Contribute modal with textarea, cancel/submit buttons, calls `POST /api/sheets/:id/contributions`.
+  - Accept/Reject buttons on incoming pending contributions — calls `PATCH /api/sheets/contributions/:id` with action.
+  - Color-coded status badges (amber=pending, green=accepted, red=rejected) on contribution items.
+
+- `IconGitPullRequest` icon added to Icons.jsx for contribute/PR actions.
+
+Changed:
+
+- UploadSheetPage status display now only shows for non-draft statuses to avoid confusing "draft" label during normal editing.
+
+Cycle 25 Validation Commands
+
+- `npm --prefix frontend/studyhub-app run lint` — passed clean.
+- `npm --prefix frontend/studyhub-app run build` — passed clean (478ms, 40 output files).
+
+Cycle 25 Validation Result
+
+- Frontend ESLint: passed with zero warnings or errors.
+- Frontend Vite production build: passed successfully.
+- All new UI components use existing backend API endpoints (no backend changes needed).
+- `marked` library was installed in a prior session; `DOMPurify` was already a dependency.
+
+Cycle 25 Deferred-Risk Notes
+
+- Google OAuth activation on production requires manual Railway env var setup (documented in `docs/google-oauth-railway-setup.md`).
+- Fork/contribute buttons rely on existing backend endpoints — no new backend routes were added.
+- Notes markdown preview renders user-authored HTML through DOMPurify sanitization — safe against XSS but rendered output quality depends on `marked` parsing fidelity.
+
+---
+
+Cycle 26 — Week 2: @Mentions, Dark Mode, Comment Delete, Profile Stars, Sheet Filtering [2026-03-18]
+
+Added:
+
+- @Mention highlighting component (`frontend/studyhub-app/src/components/MentionText.jsx`):
+  - Parses `@username` patterns in text and renders them as clickable blue links to `/users/:username`.
+  - Uses same regex pattern as backend (`mentions.js`) for consistency.
+  - Integrated into SheetViewerPage comments, FeedPage comments, and FeedPage post bodies.
+  - Backend already had full mention extraction + notification creation via `backend/src/lib/mentions.js` — this cycle adds the missing frontend rendering.
+
+- Comment delete button on SheetViewerPage:
+  - `deleteComment` handler calls `DELETE /api/sheets/:id/comments/:commentId`.
+  - Red-bordered "Delete" button shown only for the comment author or admins.
+  - Updates both comment list and sheet comment count on success.
+  - Comment author usernames now link to their profile pages.
+
+- Comprehensive dark mode CSS (`frontend/studyhub-app/src/index.css`):
+  - Extended `[data-theme='dark']` CSS variables: 25+ overrides for colors, shadows, borders.
+  - Structural overrides for inline-styled elements: inputs, textareas, selects, sections, buttons.
+  - Page background overrides for `#edf0f5` → `#0f172a`, `#fff` → `#111827`, `#f8fafc` → `#1e293b`.
+  - Text color overrides for `#0f172a` → `#f1f5f9`, `#1e293b` → `#e2e8f0`, `#475569` → `#94a3b8`.
+  - Border overrides from `#e2e8f0` → `#334155`.
+  - Notification dropdown, search modal, and markdown preview dark mode.
+  - Custom dark scrollbar styling.
+  - AppearanceTab already had theme toggle + `applyTheme()` via `data-theme` attribute; `useBootstrapPreferences` loads cached theme on app boot.
+
+- Starred Sheets section on UserProfilePage:
+  - Backend `GET /api/users/:username` now returns `starredSheets` (up to 10 published starred sheets with author, course, star count).
+  - Frontend renders a "Starred Sheets" card with star icon, sheet links, course badges, author names.
+  - "View all starred sheets →" link for own profile navigates to `/sheets?starred=1`.
+
+Fixed:
+
+- User profile now only shows published sheets in "Recent Sheets" section (was showing drafts/rejected).
+- Sheet count in profile `_count` now filters by `status: 'published'` (was counting all including drafts).
+
+Verified (no changes needed):
+
+- **Sheet listing visibility**: `GET /api/sheets` already correctly filters by `status: 'published'` for public queries. Deleted/draft/rejected sheets are excluded.
+- **Stars feature**: Star toggle, star count display, "Starred" filter on SheetsPage, and Dashboard star count all work correctly.
+- **Notification system**: Full notification pipeline works — backend `createNotification` + `notifyMentionedUsers`, frontend bell with live polling (30s), click-to-navigate with `linkPath`, mark-as-read. All functional.
+- **School/Course selection**: Backend `GET /api/courses/schools` endpoint works. Register page and CoursesTab both fetch from it correctly. Empty dropdown is expected when no schools exist in the database (admin setup required).
+- **Default permissions**: `defaultDownloads` from UserPreferences is already applied to new sheet creation. `defaultContributions` exists in settings UI but cannot be enforced per-sheet since the schema lacks an `allowContributions` field on `StudySheet`.
+
+Cycle 26 Validation Commands
+
+- `npm --prefix frontend/studyhub-app run lint` — passed clean.
+- `npm --prefix backend run lint` — passed clean.
+- `npm --prefix frontend/studyhub-app run build` — passed clean (411ms, 41 output files).
+
+Cycle 26 Validation Result
+
+- Frontend and backend ESLint: both passed with zero errors.
+- Frontend Vite production build: passed successfully.
+- New `MentionText` component correctly code-split into its own chunk (0.58 kB).
+
+Cycle 26 Deferred-Risk Notes
+
+- Dark mode uses CSS attribute selectors to override inline styles. This works for most elements but some deeply nested components with unusual inline style patterns may need individual fixes. Pages verified: Feed, Sheets, Dashboard, Settings, Notes, Profile, SheetViewer.
+- `defaultContributions` preference in Privacy settings is stored but not enforced at the API level. Adding a per-sheet `allowContributions` column would require a Prisma migration.
+- Schools must be added via admin to populate the school/course selector. An admin seeding script or UI would improve onboarding.

@@ -17,6 +17,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
 import AppSidebar from '../../components/AppSidebar'
 import ConfirmDialog from '../../components/ConfirmDialog'
+import MentionText from '../../components/MentionText'
 import {
   IconDownload,
   IconEye,
@@ -419,7 +420,7 @@ function CommentList({ comments, loading, user, onDelete }) {
                 </button>
               ) : null}
             </div>
-            <p style={commentBodyStyle}>{comment.content}</p>
+            <p style={commentBodyStyle}><MentionText text={comment.content} /></p>
           </div>
         </div>
       ))}
@@ -619,7 +620,7 @@ function FeedCard({
 
           {item.title ? <h3 style={{ margin: '0 0 10px', color: '#0f172a', fontSize: 19 }}>{item.title}</h3> : null}
           <p style={{ margin: 0, color: '#475569', fontSize: 14, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
-            {item.body || item.content || item.preview || item.description || 'No content yet.'}
+            <MentionText text={item.body || item.content || item.preview || item.description || 'No content yet.'} />
           </p>
 
           {urls ? (
