@@ -68,12 +68,18 @@ export default defineConfig(async ({ mode }) => {
               if (id.includes('\\dompurify\\') || id.includes('/dompurify/')) {
                 return 'content-safety'
               }
+
+              if (id.includes('\\animejs\\') || id.includes('/animejs/')) {
+                return 'animation'
+              }
             }
 
             return undefined
           },
         },
       },
+      reportCompressedSize: false,
+      cssCodeSplit: true,
     },
   }
 })

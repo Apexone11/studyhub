@@ -14,7 +14,7 @@
  *
  * Tutorial: First-visit Joyride highlights search, filters, upload, toggles.
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
 import AppSidebar from '../../components/AppSidebar'
@@ -31,6 +31,10 @@ import { getApiErrorMessage, isAuthSessionFailure, readJsonSafely } from '../../
 import { useSession } from '../../lib/session-context'
 import { pageShell, useResponsiveAppLayout } from '../../lib/ui'
 import { useLivePolling } from '../../lib/useLivePolling'
+import { staggerEntrance } from '../../lib/animations'
+import { showToast } from '../../lib/toast'
+import { usePageTitle } from '../../lib/usePageTitle'
+import { SkeletonSheetGrid } from '../../components/Skeleton'
 import SafeJoyride from '../../components/SafeJoyride'
 import { useTutorial } from '../../lib/useTutorial'
 import { SHEETS_STEPS } from '../../lib/tutorialSteps'
@@ -181,12 +185,15 @@ function metricPill() {
 }
 
 export default function SheetsPage() {
+  usePageTitle('Study Sheets')
   const { user, clearSession } = useSession()
   const layout = useResponsiveAppLayout()
   const [searchParams, setSearchParams] = useSearchParams()
   const [catalog, setCatalog] = useState([])             // school+course catalog for filters
   const [sheetsState, setSheetsState] = useState({ sheets: [], total: 0, loading: true, error: '' })
   const [catalogError, setCatalogError] = useState('')
+  const cardsRef = useRef(null)
+  const animatedRef = useRef(false)
 
   /* ── Query parameters drive the filter state (URL-as-truth) ──────────── */
   const search = searchParams.get('search') || ''
@@ -198,6 +205,13 @@ export default function SheetsPage() {
 
   /* Tutorial popup — first-visit or re-trigger via floating "?" button */
   const tutorial = useTutorial('sheets', SHEETS_STEPS)
+
+  /* Animate sheet cards on first load */
+  useEffect(() => {
+    if (sheetsState.loading || animatedRef.current || sheetsState.sheets.length === 0) return
+    animatedRef.current = true
+    if (cardsRef.current) staggerEntrance(cardsRef.current.children, { staggerMs: 60, duration: 400, y: 14 })
+  }, [sheetsState.loading, sheetsState.sheets.length])
 
   const setQueryParam = useCallback((key, value) => {
     const next = new URLSearchParams(searchParams)
@@ -316,6 +330,29 @@ export default function SheetsPage() {
     }
   }, [clearSession, courseId, mine, orderBy, schoolId, search, starred])
 
+  const [loadingMore, setLoadingMore] = useState(false)
+  const loadMoreSheets = async () => {
+    setLoadingMore(true)
+    const params = new URLSearchParams({ limit: '24', offset: String(sheetsState.sheets.length), sort: orderBy })
+    if (search) params.set('search', search)
+    if (schoolId) params.set('schoolId', schoolId)
+    if (courseId) params.set('courseId', courseId)
+    if (mine) params.set('mine', '1')
+    if (starred) params.set('starred', '1')
+    try {
+      const response = await fetch(`${API}/api/sheets?${params.toString()}`, { headers: authHeaders() })
+      const data = await readJsonSafely(response, {})
+      if (response.ok && Array.isArray(data.sheets)) {
+        setSheetsState((current) => ({
+          ...current,
+          sheets: [...current.sheets, ...data.sheets],
+          total: data.total || current.total,
+        }))
+      }
+    } catch { /* silent */ }
+    finally { setLoadingMore(false) }
+  }
+
   useLivePolling(loadCatalog, {
     enabled: Boolean(user),
     intervalMs: 120000,
@@ -346,6 +383,7 @@ export default function SheetsPage() {
         )),
       }))
     } catch (error) {
+      showToast(error.message || 'Could not update the star.', 'error')
       setSheetsState((current) => ({ ...current, error: error.message || 'Could not update the star.' }))
     }
   }
@@ -362,7 +400,7 @@ export default function SheetsPage() {
           <div className="app-three-col-grid">
             <AppSidebar mode={layout.sidebarMode} />
 
-            <main style={{ display: 'grid', gap: 16 }}>
+            <main id="main-content" style={{ display: 'grid', gap: 16 }}>
               <section style={panelStyle()}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap', marginBottom: 14 }}>
                   <div>
@@ -418,18 +456,32 @@ export default function SheetsPage() {
               {sheetsState.error ? <div style={errorBanner()}>{sheetsState.error}</div> : null}
 
               {sheetsState.loading ? (
-                <section style={panelStyle()}>
-                  <div style={{ color: '#64748b', fontSize: 14 }}>Loading sheets...</div>
-                </section>
+                <SkeletonSheetGrid count={4} />
               ) : sheetsState.sheets.length === 0 ? (
-                <section style={{ ...panelStyle(), borderStyle: 'dashed', textAlign: 'center', color: '#94a3b8' }}>
-                  No sheets matched your filters.
+                <section style={{ ...panelStyle(), borderStyle: 'dashed', textAlign: 'center', padding: '52px 24px' }}>
+                  <div style={{ width: 56, height: 56, borderRadius: 14, background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                    </svg>
+                  </div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--sh-heading, #0f172a)', marginBottom: 6 }}>No sheets matched your filters</div>
+                  <div style={{ fontSize: 13, color: 'var(--sh-muted, #94a3b8)', lineHeight: 1.6 }}>Try adjusting your search, school, or course filters to find what you&apos;re looking for.</div>
                 </section>
               ) : (
-                <div className="sheets-card-grid">
+                <div ref={cardsRef} className="sheets-card-grid">
                   {sheetsState.sheets.map((sheet) => (
                     <SheetCard key={sheet.id} sheet={sheet} onStar={toggleStar} />
                   ))}
+                  {sheetsState.sheets.length < sheetsState.total && (
+                    <button
+                      onClick={loadMoreSheets}
+                      disabled={loadingMore}
+                      className="sh-load-more-btn"
+                      style={{ gridColumn: '1 / -1' }}
+                    >
+                      {loadingMore ? 'Loading…' : `Load More (${sheetsState.sheets.length} of ${sheetsState.total})`}
+                    </button>
+                  )}
                 </div>
               )}
             </main>

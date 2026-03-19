@@ -14,6 +14,7 @@ const { sendAttachmentPreview } = require('../lib/attachmentPreview')
 const { normalizeContentFormat, validateHtmlForSubmission } = require('../lib/htmlSecurity')
 const { HTML_PREVIEW_TOKEN_TTL_SECONDS, signHtmlPreviewToken } = require('../lib/previewTokens')
 const { buildSheetTextSearchClauses } = require('../lib/sheetSearch')
+const { searchSheetsFTS } = require('../lib/fullTextSearch')
 const {
   SCAN_STATUS,
   HTML_VERSION_KIND,
@@ -25,6 +26,7 @@ const {
   upsertHtmlVersion,
 } = require('../lib/htmlDraftWorkflow')
 const { isModerationEnabled, scanContent } = require('../lib/moderationEngine')
+const { createProvenanceToken } = require('../lib/provenance')
 
 const router = express.Router()
 const SHEET_STATUS = {
@@ -511,7 +513,6 @@ router.get('/', optionalAuth, async (req, res) => {
       const starredRows = await prisma.starredSheet.findMany({
         where: { userId: req.user.userId, sheet: where },
         select: { sheetId: true },
-        orderBy: { createdAt: 'desc' },
         take,
         skip,
       })
@@ -551,6 +552,74 @@ router.get('/', optionalAuth, async (req, res) => {
         }))
 
       return res.json({ sheets: ordered, total: totalStarred, limit: take, offset: skip })
+    }
+
+    /* ── Full-text search path (opt-in via ?fts=true) ──────────────── */
+    const useFTS = req.query.fts === 'true'
+    if (useFTS && search && String(search).trim().length >= 2) {
+      const ftsPage = Math.max(1, Math.floor(skip / take) + 1)
+      const ftsResult = await searchSheetsFTS(search, {
+        courseId: courseId ? Number.parseInt(courseId, 10) : undefined,
+        userId: includeUnpublishedMine ? req.user.userId : undefined,
+        status: includeUnpublishedMine ? undefined : SHEET_STATUS.PUBLISHED,
+        page: ftsPage,
+        limit: take,
+      })
+
+      const ftsSheetIds = ftsResult.sheets.map((s) => s.id)
+
+      /* Hydrate with full Prisma relations for consistent serialization */
+      const hydratedSheets = ftsSheetIds.length > 0
+        ? await prisma.studySheet.findMany({
+            where: { id: { in: ftsSheetIds } },
+            include: {
+              author: { select: { id: true, username: true } },
+              course: { include: { school: true } },
+              forkSource: {
+                select: {
+                  id: true,
+                  title: true,
+                  userId: true,
+                  author: { select: { id: true, username: true } },
+                },
+              },
+            },
+          })
+        : []
+
+      /* Preserve rank ordering from the FTS query */
+      const hydratedById = new Map(hydratedSheets.map((s) => [s.id, s]))
+      const orderedSheets = ftsSheetIds.map((id) => hydratedById.get(id)).filter(Boolean)
+
+      const [ftsStarredRows, ftsCommentRows] = await Promise.all([
+        req.user && ftsSheetIds.length > 0
+          ? prisma.starredSheet.findMany({
+              where: { userId: req.user.userId, sheetId: { in: ftsSheetIds } },
+              select: { sheetId: true },
+            })
+          : [],
+        ftsSheetIds.length > 0
+          ? prisma.comment.groupBy({
+              by: ['sheetId'],
+              where: { sheetId: { in: ftsSheetIds } },
+              _count: { _all: true },
+            })
+          : [],
+      ])
+
+      const ftsStarredIds = new Set(ftsStarredRows.map((r) => r.sheetId))
+      const ftsCommentMap = new Map(ftsCommentRows.map((r) => [r.sheetId, r._count._all]))
+
+      return res.json({
+        sheets: orderedSheets.map((sheet) => serializeSheet(sheet, {
+          starred: ftsStarredIds.has(sheet.id),
+          commentCount: ftsCommentMap.get(sheet.id) || 0,
+        })),
+        total: ftsResult.total,
+        limit: take,
+        offset: skip,
+        fts: true,
+      })
     }
 
     const [sheets, total] = await Promise.all([
@@ -1183,6 +1252,33 @@ router.post('/', requireAuth, sheetWriteLimiter, async (req, res) => {
       const textToScan = `${title} ${description || ''} ${contentFormat === 'markdown' ? content : ''}`.trim()
       void scanContent({ contentType: 'sheet', contentId: sheet.id, text: textToScan, userId: req.user.userId })
     }
+
+    /* Auto-generate provenance manifest (fire-and-forget) */
+    Promise.resolve().then(async () => {
+      try {
+        const token = createProvenanceToken(sheet.id, req.user.userId, content.trim(), sheet.createdAt)
+        await prisma.provenanceManifest.upsert({
+          where: { sheetId: sheet.id },
+          update: {
+            originHash: token.originHash,
+            encryptedToken: token.encryptedToken,
+            algorithm: token.algorithm,
+            iv: token.iv,
+            authTag: token.authTag,
+          },
+          create: {
+            sheetId: sheet.id,
+            originHash: token.originHash,
+            encryptedToken: token.encryptedToken,
+            algorithm: token.algorithm,
+            iv: token.iv,
+            authTag: token.authTag,
+          },
+        })
+      } catch (err) {
+        captureError(err, { context: 'provenance.autoGenerate', sheetId: sheet.id })
+      }
+    })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
@@ -1317,6 +1413,37 @@ router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
         void scanContent({ contentType: 'sheet', contentId: sheetId, text: textToScan, userId: req.user.userId })
       }
     }
+
+    /* Auto-generate provenance manifest if one does not exist yet (fire-and-forget) */
+    Promise.resolve().then(async () => {
+      try {
+        const existing = await prisma.provenanceManifest.findUnique({
+          where: { sheetId },
+          select: { id: true },
+        })
+        if (!existing) {
+          const fullSheet = await prisma.studySheet.findUnique({
+            where: { id: sheetId },
+            select: { content: true, createdAt: true },
+          })
+          if (fullSheet) {
+            const token = createProvenanceToken(sheetId, req.user.userId, fullSheet.content, fullSheet.createdAt)
+            await prisma.provenanceManifest.create({
+              data: {
+                sheetId,
+                originHash: token.originHash,
+                encryptedToken: token.encryptedToken,
+                algorithm: token.algorithm,
+                iv: token.iv,
+                authTag: token.authTag,
+              },
+            })
+          }
+        }
+      } catch (err) {
+        captureError(err, { context: 'provenance.autoGenerate', sheetId })
+      }
+    })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })

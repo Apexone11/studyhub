@@ -53,6 +53,8 @@ model User {
   moderationCases            ModerationCase[] @relation("ModerationCaseAuthor")
   moderationReviews          ModerationCase[] @relation("ModerationReviewer")
   appealReviews              Appeal[]         @relation("AppealReviewer")
+  sheetCommits               SheetCommit[]
+  webauthnCredentials        WebAuthnCredential[]
 }
 
 model School {
@@ -119,6 +121,8 @@ model StudySheet {
   incomingContributions SheetContribution[] @relation("ContributionTarget")
   outgoingContributions SheetContribution[] @relation("ContributionFork")
   htmlVersions SheetHtmlVersion[]
+  commits      SheetCommit[]
+  provenance   ProvenanceManifest?
 
   @@index([createdAt(sort: Desc)])
   @@index([courseId, createdAt(sort: Desc)])
@@ -483,4 +487,67 @@ model UserRestriction {
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, endsAt])
+}
+
+// ── Sheet Lab: version control commits ──────────────────────
+model SheetCommit {
+  id            Int       @id @default(autoincrement())
+  sheetId       Int
+  userId        Int
+  message       String    @default("")
+  content       String
+  contentFormat String    @default("markdown")
+  checksum      String
+  parentId      Int?
+  createdAt     DateTime  @default(now())
+  sheet         StudySheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  author        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent        SheetCommit?  @relation("CommitHistory", fields: [parentId], references: [id])
+  children      SheetCommit[] @relation("CommitHistory")
+
+  @@index([sheetId, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+// ── Provenance: encrypted origin manifests ──────────────────
+model ProvenanceManifest {
+  id             Int       @id @default(autoincrement())
+  sheetId        Int       @unique
+  originHash     String
+  encryptedToken String
+  algorithm      String    @default("aes-256-gcm")
+  iv             String
+  authTag        String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  sheet          StudySheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+}
+
+// ── Feature flags ───────────────────────────────────────────
+model FeatureFlag {
+  id                Int      @id @default(autoincrement())
+  name              String   @unique
+  description       String   @default("")
+  enabled           Boolean  @default(false)
+  rolloutPercentage Int      @default(0)
+  conditions        Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+// ── WebAuthn passkey credentials ────────────────────────────
+model WebAuthnCredential {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  credentialId  String   @unique
+  publicKey     Bytes
+  counter       Int      @default(0)
+  deviceType    String?
+  backedUp      Boolean  @default(false)
+  transports    String?
+  name          String   @default("Passkey")
+  createdAt     DateTime @default(now())
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

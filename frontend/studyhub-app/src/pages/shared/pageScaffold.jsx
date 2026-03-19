@@ -24,7 +24,7 @@ export function PageShell({ nav, sidebar, children }) {
           <div style={{ position: layout.isCompact ? 'static' : 'sticky', top: layout.isCompact ? undefined : 74 }}>
             {responsiveSidebar}
           </div>
-          <main>{children}</main>
+          <main id="main-content">{children}</main>
         </div>
       </div>
     </div>

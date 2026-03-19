@@ -1236,3 +1236,933 @@ Cycle 24 Deferred-Risk Notes
 
 - The auth-gated HomePage search flow still does not assert a future post-login destination-return behavior if StudyHub later preserves the original `/sheets?search=...` target through the `/login` redirect.
 - The Docker beta frontend still relies on `--legacy-peer-deps` because `react-joyride@2.9.3` has not yet been upgraded for React 19 peer compatibility.
+
+---
+
+Cycle 25 — Week 1 UX: Draft Management, Notes Redesign, Fork/Contribute UI [2026-03-18]
+
+Added:
+
+- Google OAuth Railway setup documentation (`docs/google-oauth-railway-setup.md`):
+  - Step-by-step guide for enabling Google Sign-In on Railway production.
+  - Covers Google Cloud Console redirect URIs, backend/frontend env vars, runtime-config verification, and verification steps.
+  - Reference table mapping all OAuth files (backend lib, routes, frontend config, login/register/settings pages).
+
+- Draft sheet management on UploadSheetPage (`frontend/studyhub-app/src/pages/sheets/UploadSheetPage.jsx`):
+  - Yellow banner shown when resuming a draft, with draft title and "Discard & Start New" button.
+  - `discardDraft` function calls `DELETE /api/sheets/:id` then resets all editor state.
+  - Confirmation dialog (existing `ConfirmDialog` component) gates destructive discard.
+  - `draftReloadKey` state forces the init effect to re-run after discard for a clean editor.
+
+- Attachment remove buttons on UploadSheetPage:
+  - Green badge with ✕ button for newly selected (not yet uploaded) files — calls `clearAttachFile`.
+  - Blue badge with ✕ button for existing server-side attachments — sets `removeExistingAttachment(true)`.
+  - "Attachment will be removed on save" message shown after removal.
+  - File input label changes to "Change file" when any attachment is present.
+
+- Notes page complete redesign (`frontend/studyhub-app/src/pages/notes/NotesPage.jsx`):
+  - Replaced dark (#0f172a) editor background with light/transparent background.
+  - Added markdown formatting toolbar with 9 actions: bold, italic, heading, bullet list, numbered list, inline code, code block, link, blockquote.
+  - `applyToolbarAction` function handles smart cursor-aware text insertion with line-start prefix handling.
+  - Real markdown-to-HTML preview via `marked` (GFM + line breaks) + `DOMPurify` sanitization.
+  - New `MarkdownPreview` component replaces plain-text `MiniPreview`.
+  - Word count displayed in toolbar.
+  - Note list cards now show content preview (first 80 chars) and course code in blue.
+  - SVG empty-state icons instead of emoji.
+  - Filter tabs with border styling and transitions.
+  - Private/Shared toggle with color-coded pill background.
+
+- Markdown preview CSS styles (`frontend/studyhub-app/src/index.css`):
+  - `.notes-markdown-preview` class with full typography: headings (h1-h4), paragraphs, links, lists, inline code (rose-colored), code blocks (dark background), blockquotes (indigo left border), tables, horizontal rules, images.
+  - Uses CSS variables for dark-mode compatibility.
+
+- Fork and contribute UI on SheetViewerPage (`frontend/studyhub-app/src/pages/sheets/SheetViewerPage.jsx`):
+  - Fork button (purple) shown for non-owners — calls `POST /api/sheets/:id/fork`, navigates to edit page on success.
+  - "Contribute Back" button (green) shown for fork owners — opens modal to submit contribution with optional message.
+  - Contribute modal with textarea, cancel/submit buttons, calls `POST /api/sheets/:id/contributions`.
+  - Accept/Reject buttons on incoming pending contributions — calls `PATCH /api/sheets/contributions/:id` with action.
+  - Color-coded status badges (amber=pending, green=accepted, red=rejected) on contribution items.
+
+- `IconGitPullRequest` icon added to Icons.jsx for contribute/PR actions.
+
+Changed:
+
+- UploadSheetPage status display now only shows for non-draft statuses to avoid confusing "draft" label during normal editing.
+
+Cycle 25 Validation Commands
+
+- `npm --prefix frontend/studyhub-app run lint` — passed clean.
+- `npm --prefix frontend/studyhub-app run build` — passed clean (478ms, 40 output files).
+
+Cycle 25 Validation Result
+
+- Frontend ESLint: passed with zero warnings or errors.
+- Frontend Vite production build: passed successfully.
+- All new UI components use existing backend API endpoints (no backend changes needed).
+- `marked` library was installed in a prior session; `DOMPurify` was already a dependency.
+
+Cycle 25 Deferred-Risk Notes
+
+- Google OAuth activation on production requires manual Railway env var setup (documented in `docs/google-oauth-railway-setup.md`).
+- Fork/contribute buttons rely on existing backend endpoints — no new backend routes were added.
+- Notes markdown preview renders user-authored HTML through DOMPurify sanitization — safe against XSS but rendered output quality depends on `marked` parsing fidelity.
+
+---
+
+Cycle 26 — Week 2: @Mentions, Dark Mode, Comment Delete, Profile Stars, Sheet Filtering [2026-03-18]
+
+Added:
+
+- @Mention highlighting component (`frontend/studyhub-app/src/components/MentionText.jsx`):
+  - Parses `@username` patterns in text and renders them as clickable blue links to `/users/:username`.
+  - Uses same regex pattern as backend (`mentions.js`) for consistency.
+  - Integrated into SheetViewerPage comments, FeedPage comments, and FeedPage post bodies.
+  - Backend already had full mention extraction + notification creation via `backend/src/lib/mentions.js` — this cycle adds the missing frontend rendering.
+
+- Comment delete button on SheetViewerPage:
+  - `deleteComment` handler calls `DELETE /api/sheets/:id/comments/:commentId`.
+  - Red-bordered "Delete" button shown only for the comment author or admins.
+  - Updates both comment list and sheet comment count on success.
+  - Comment author usernames now link to their profile pages.
+
+- Comprehensive dark mode CSS (`frontend/studyhub-app/src/index.css`):
+  - Extended `[data-theme='dark']` CSS variables: 25+ overrides for colors, shadows, borders.
+  - Structural overrides for inline-styled elements: inputs, textareas, selects, sections, buttons.
+  - Page background overrides for `#edf0f5` → `#0f172a`, `#fff` → `#111827`, `#f8fafc` → `#1e293b`.
+  - Text color overrides for `#0f172a` → `#f1f5f9`, `#1e293b` → `#e2e8f0`, `#475569` → `#94a3b8`.
+  - Border overrides from `#e2e8f0` → `#334155`.
+  - Notification dropdown, search modal, and markdown preview dark mode.
+  - Custom dark scrollbar styling.
+  - AppearanceTab already had theme toggle + `applyTheme()` via `data-theme` attribute; `useBootstrapPreferences` loads cached theme on app boot.
+
+- Starred Sheets section on UserProfilePage:
+  - Backend `GET /api/users/:username` now returns `starredSheets` (up to 10 published starred sheets with author, course, star count).
+  - Frontend renders a "Starred Sheets" card with star icon, sheet links, course badges, author names.
+  - "View all starred sheets →" link for own profile navigates to `/sheets?starred=1`.
+
+Fixed:
+
+- User profile now only shows published sheets in "Recent Sheets" section (was showing drafts/rejected).
+- Sheet count in profile `_count` now filters by `status: 'published'` (was counting all including drafts).
+
+Verified (no changes needed):
+
+- **Sheet listing visibility**: `GET /api/sheets` already correctly filters by `status: 'published'` for public queries. Deleted/draft/rejected sheets are excluded.
+- **Stars feature**: Star toggle, star count display, "Starred" filter on SheetsPage, and Dashboard star count all work correctly.
+- **Notification system**: Full notification pipeline works — backend `createNotification` + `notifyMentionedUsers`, frontend bell with live polling (30s), click-to-navigate with `linkPath`, mark-as-read. All functional.
+- **School/Course selection**: Backend `GET /api/courses/schools` endpoint works. Register page and CoursesTab both fetch from it correctly. Empty dropdown is expected when no schools exist in the database (admin setup required).
+- **Default permissions**: `defaultDownloads` from UserPreferences is already applied to new sheet creation. `defaultContributions` exists in settings UI but cannot be enforced per-sheet since the schema lacks an `allowContributions` field on `StudySheet`.
+
+Cycle 26 Validation Commands
+
+- `npm --prefix frontend/studyhub-app run lint` — passed clean.
+- `npm --prefix backend run lint` — passed clean.
+- `npm --prefix frontend/studyhub-app run build` — passed clean (411ms, 41 output files).
+
+Cycle 26 Validation Result
+
+- Frontend and backend ESLint: both passed with zero errors.
+- Frontend Vite production build: passed successfully.
+- New `MentionText` component correctly code-split into its own chunk (0.58 kB).
+
+Cycle 26 Deferred-Risk Notes
+
+- Dark mode uses CSS attribute selectors to override inline styles. This works for most elements but some deeply nested components with unusual inline style patterns may need individual fixes. Pages verified: Feed, Sheets, Dashboard, Settings, Notes, Profile, SheetViewer.
+- `defaultContributions` preference in Privacy settings is stored but not enforced at the API level. Adding a per-sheet `allowContributions` column would require a Prisma migration.
+- Schools must be added via admin to populate the school/course selector. An admin seeding script or UI would improve onboarding.
+
+---
+
+## Cycle 27 — Week 3: Profile Enhancements, Tutorials, Animations, Dark Mode Expansion
+
+Date: 2026-03-18
+
+### Changes
+
+#### Followers/Following Modal (UserProfilePage)
+
+- **Backend**: Added `GET /api/users/:username/followers` and `GET /api/users/:username/following` endpoints returning up to 50 users with id, username, role, avatarUrl.
+- **Frontend**: Followers and Following counts are now clickable buttons that open a modal overlay displaying the full list. Each user in the list links to their profile with avatar, username, and role badge. Modal closes on backdrop click or X button.
+- Files changed: `backend/src/routes/users.js`, `frontend/studyhub-app/src/pages/profile/UserProfilePage.jsx`, `frontend/studyhub-app/src/index.css`
+
+#### Tutorials for Remaining Pages
+
+- Added tutorial step definitions for Settings (3 steps), Profile (3 steps), SheetViewer (3 steps), and Upload (3 steps) in `lib/tutorialSteps.js`.
+- Integrated `useTutorial` hook and `SafeJoyride` component into all four pages with `data-tutorial` attributes on key UI sections.
+- Previously covered pages (Feed, Sheets, Dashboard, Notes) remain unchanged.
+- Files changed: `frontend/studyhub-app/src/lib/tutorialSteps.js`, `frontend/studyhub-app/src/pages/settings/SettingsPage.jsx`, `frontend/studyhub-app/src/pages/profile/UserProfilePage.jsx`, `frontend/studyhub-app/src/pages/sheets/SheetViewerPage.jsx`, `frontend/studyhub-app/src/pages/sheets/UploadSheetPage.jsx`
+
+#### Animations Added to Remaining Pages
+
+- **SheetsPage**: Staggered card entrance animation on first load (60ms stagger, 400ms duration).
+- **NotesPage**: Staggered notes list entrance animation on first load (50ms stagger, 400ms duration).
+- **SheetViewerPage**: FadeInUp animation on sheet content panel when data loads (450ms).
+- **SettingsPage**: FadeInUp animation on tab content when switching tabs (350ms).
+- All animations use the existing `lib/animations.js` utilities and respect `prefers-reduced-motion`.
+- Files changed: `frontend/studyhub-app/src/pages/sheets/SheetsPage.jsx`, `frontend/studyhub-app/src/pages/notes/NotesPage.jsx`, `frontend/studyhub-app/src/pages/sheets/SheetViewerPage.jsx`, `frontend/studyhub-app/src/pages/settings/SettingsPage.jsx`
+
+#### Feed Post Delete Button Redesign
+
+- Replaced text ellipsis trigger (`...`) with a vertical three-dot SVG icon in a cleaner 32×32 button.
+- Delete option now includes a trash icon SVG alongside the text.
+- Button uses transparent background with red hover state instead of permanent red background.
+- Added CSS hover classes (`feed-post-menu-btn`, `feed-post-delete-btn`) with dark mode support.
+- Files changed: `frontend/studyhub-app/src/pages/feed/FeedPage.jsx`, `frontend/studyhub-app/src/index.css`
+
+#### Dark Mode — Semantic Color Overrides
+
+- Added CSS dark mode overrides for status/semantic colors not previously covered:
+  - Green status (`#f0fdf4`, `#bbf7d0`, `#166534`) → dark green variants
+  - Blue badges (`#eff6ff`, `#bfdbfe`, `#dbeafe`, `#1d4ed8`) → dark blue variants
+  - Yellow/Amber (`#fef9ec`, `#fef3c7`, `#fde68a`, `#92400e`) → dark amber variants
+  - Red/Error (`#fef2f2`, `#fecaca`, `#fca5a5`) → dark red variants
+- Covers admin/student badges, course code badges, follow buttons, error banners, success messages, info boxes, and pinned announcements across all pages.
+- Added dark mode for follow modal overlay, Joyride tooltip, and profile stat hover.
+- File changed: `frontend/studyhub-app/src/index.css`
+
+#### Profile Page CSS
+
+- Added `.profile-stats-row`, `.profile-stat-btn`, `.profile-columns` CSS classes with responsive grid layout and hover states.
+- File changed: `frontend/studyhub-app/src/index.css`
+
+### Validation
+
+Cycle 27 Validation Commands:
+
+- `npm --prefix frontend/studyhub-app run lint` — passed clean.
+- `npm --prefix backend run lint` — passed clean.
+- `npm --prefix frontend/studyhub-app run build` — passed clean (404ms, 41 output files).
+
+Cycle 27 Validation Result:
+
+- Frontend and backend ESLint: both passed with zero errors.
+- Frontend Vite production build: passed successfully.
+- All new tutorial steps code-split into `tutorialSteps` chunk.
+- Profile page code-split into `UserProfilePage` chunk (14.35 kB).
+
+---
+
+## Cycle 28 — Week 3 (continued): Profile Animations, Announcements Polish
+
+Date: 2026-03-18
+
+### Changes
+
+#### UserProfilePage Animations
+
+- Added `fadeInUp` for profile card header and `staggerEntrance` for content columns on first data load.
+- Files changed: `frontend/studyhub-app/src/pages/profile/UserProfilePage.jsx`
+
+#### AnnouncementsPage Polish, Tutorial & Animations
+
+- **Design polish**: Increased card padding and gaps, enlarged author avatars (32→36px for regular, added 22px mini-avatar for pinned), improved typography (title sizes, line heights).
+- **@Mention support**: Announcement bodies now render `@username` as clickable links via `MentionText` component.
+- **Author profile links**: Author usernames in both pinned and regular cards now link to `/users/:username`.
+- **Pinned badge redesign**: Replaced emoji pin with SVG icon, increased badge padding, improved visual weight.
+- **Hover effects**: Added `announcement-card` and `announcement-card-pinned` CSS classes with shadow hover transitions.
+- **Tutorial**: Added `ANNOUNCEMENTS_STEPS` (2 steps: header overview + card list) with `SafeJoyride` integration.
+- **Animations**: Staggered card entrance on first load (70ms stagger, 400ms duration).
+- **Dark mode**: Added CSS overrides for pinned card background, hover shadows, and amber text colors (`#78350f`, `#b45309`).
+- Files changed: `frontend/studyhub-app/src/pages/announcements/AnnouncementsPage.jsx`, `frontend/studyhub-app/src/lib/tutorialSteps.js`, `frontend/studyhub-app/src/index.css`
+
+### Validation
+
+Cycle 28 Validation Commands:
+
+- `npm --prefix frontend/studyhub-app run lint` — passed clean.
+- `npm --prefix backend run lint` — passed clean.
+- `npm --prefix frontend/studyhub-app run build` — passed clean (410ms, 41 output files).
+
+Cycle 28 Validation Result:
+
+- Frontend and backend ESLint: both passed with zero errors.
+- Frontend Vite production build: passed successfully.
+- AnnouncementsPage chunk grew from 6.12 kB to 7.49 kB (added MentionText, tutorial, animations).
+- UserProfilePage chunk grew from 14.35 kB to 14.65 kB (added animations).
+
+---
+
+## Cycle 29 — Week 3 (continued): Skeleton Loaders
+
+Date: 2026-03-18
+
+### Changes
+
+#### Reusable Skeleton Component Library
+
+- Created `frontend/studyhub-app/src/components/Skeleton.jsx` with 6 exported components:
+  - `Skeleton` — base block with configurable width/height/borderRadius.
+  - `SkeletonCard` — card with avatar circle + text lines.
+  - `SkeletonList` — repeated row placeholders.
+  - `SkeletonProfile` — profile page layout (header + two-column grid).
+  - `SkeletonSheetGrid` — responsive card grid.
+  - `SkeletonFeed` — stacked feed cards.
+- All use `.sh-skeleton` CSS class with shimmer animation via `background-position` keyframes.
+- Dark mode variant adjusts shimmer gradient colors.
+- File added: `frontend/studyhub-app/src/components/Skeleton.jsx`
+
+#### Skeleton CSS & Dark Mode
+
+- Added `@keyframes skeletonShimmer` animation (1.2s infinite linear).
+- Added `.sh-skeleton` class with light/dark shimmer gradients.
+- File changed: `frontend/studyhub-app/src/index.css`
+
+#### Loading State Replacements (7 pages)
+
+- **UserProfilePage**: Replaced "Loading profile…" text with `<SkeletonProfile />`.
+- **SheetsPage**: Replaced "Loading sheets..." with `<SkeletonSheetGrid count={4} />`.
+- **FeedPage**: Replaced "Fetching posts..." Panel with `<SkeletonFeed count={3} />`.
+- **SheetViewerPage**: Replaced "Loading sheet..." with `<SkeletonCard />`.
+- **NotesPage**: Replaced "Loading…" with `<SkeletonList count={4} />`.
+- **AnnouncementsPage**: Replaced loading state with `<SkeletonFeed count={3} />`.
+- **SettingsPage**: Replaced loading state with Skeleton blocks (tab bar + content areas).
+
+### Validation
+
+Cycle 29 Validation Commands:
+
+- `npm --prefix frontend/studyhub-app run lint` — passed clean.
+- `npm --prefix frontend/studyhub-app run build` — passed clean (406ms, 42 output files).
+
+Cycle 29 Validation Result:
+
+- Frontend ESLint: passed with zero errors.
+- Frontend Vite production build: passed successfully.
+- New `Skeleton` chunk at 2.55 kB (code-split automatically by Vite).
+- Output file count increased from 41 to 42 (new Skeleton chunk).
+
+---
+
+## Cycle 30 — Week 3 (continued): Empty State Polish
+
+Date: 2026-03-18
+
+### Changes
+
+#### Unified Empty State Design Pattern
+
+- Upgraded empty states across 6 pages to use a consistent visual pattern: gradient icon box with SVG illustration, bold title, descriptive subtitle, and optional CTA button.
+- All empty states now use CSS custom properties (`--sh-surface`, `--sh-heading`, `--sh-muted`, `--sh-border`) for dark mode compatibility.
+- Changed borders from `1px solid` to `2px dashed` for clearer empty-state visual language.
+
+#### Page-by-Page Changes
+
+- **SheetsPage**: Added search magnifying glass SVG icon, title "No sheets matched your filters", and filter adjustment hint. File: `frontend/studyhub-app/src/pages/sheets/SheetsPage.jsx`
+- **FeedPage**: Added chat bubble SVG icon to `EmptyFeed` component, restructured with title + subtitle layout. File: `frontend/studyhub-app/src/pages/feed/FeedPage.jsx`
+- **AnnouncementsPage**: Replaced emoji with bell SVG icon in amber gradient box, improved copy. File: `frontend/studyhub-app/src/pages/announcements/AnnouncementsPage.jsx`
+- **UserProfilePage**: Replaced emoji with document SVG icon in blue gradient box, added subtitle. File: `frontend/studyhub-app/src/pages/profile/UserProfilePage.jsx`
+- **SheetViewerPage**: Replaced plain text "No contributions yet" with green plus-circle SVG icon, title, and fork prompt. File: `frontend/studyhub-app/src/pages/sheets/SheetViewerPage.jsx`
+- **DashboardPage**: Added monitor SVG icon to reusable `EmptyState` component, switched to CSS variables for theming. File: `frontend/studyhub-app/src/pages/dashboard/DashboardPage.jsx`
+
+### Validation
+
+Cycle 30 Validation Commands:
+
+- `npm --prefix frontend/studyhub-app run lint` — passed clean.
+- `npm --prefix frontend/studyhub-app run build` — passed clean (414ms, 42 output files).
+
+Cycle 30 Validation Result:
+
+- Frontend ESLint: passed with zero errors.
+- Frontend Vite production build: passed successfully.
+- No new chunks — changes are inline within existing page bundles.
+
+---
+
+## Cycle 31 — Week 3 (continued): Keyboard Shortcuts & Navigation
+
+Date: 2026-03-18
+
+### Changes
+
+#### Global Ctrl+K / Cmd+K Search Shortcut
+
+- Added `useEffect` listener in Navbar for `Ctrl+K` (Windows/Linux) and `⌘K` (Mac) to open SearchModal.
+- Prevents default browser behavior (`e.preventDefault()`).
+- File changed: `frontend/studyhub-app/src/components/Navbar.jsx`
+
+#### Search Box Keyboard Hint Badge
+
+- Added `<kbd>` element inside the Navbar search box showing "⌘K" on Mac or "Ctrl+K" on Windows/Linux.
+- Uses `.sh-kbd-hint` CSS class with subtle border/background styling.
+- Hidden on mobile (`@media max-width: 640px`) to save space.
+- Dark mode support included.
+- Files changed: `frontend/studyhub-app/src/components/Navbar.jsx`, `frontend/studyhub-app/src/index.css`
+
+#### Keyboard Shortcuts Help Modal
+
+- Created `KeyboardShortcuts.jsx` component that opens on `?` key press.
+- Groups shortcuts by category: General (search, help), Search Modal (arrows, enter, escape), Dialogs (escape).
+- Platform-aware: detects Mac vs Windows/Linux for modifier key display.
+- Closes on Escape or backdrop click.
+- Ignores `?` keypress when focus is in input/textarea/select/contentEditable elements.
+- Full dark mode support via CSS classes.
+- Rendered globally via Navbar.
+- Files added: `frontend/studyhub-app/src/components/KeyboardShortcuts.jsx`
+- Files changed: `frontend/studyhub-app/src/components/Navbar.jsx`, `frontend/studyhub-app/src/index.css`
+
+### Validation
+
+Cycle 31 Validation Commands:
+
+- `npm --prefix frontend/studyhub-app run lint` — passed clean.
+- `npm --prefix frontend/studyhub-app run build` — passed clean (439ms, 42 output files).
+
+Cycle 31 Validation Result:
+
+- Frontend ESLint: passed with zero errors.
+- Frontend Vite production build: passed successfully.
+- Navbar chunk grew from 35.79 kB to 38.10 kB (KeyboardShortcuts modal bundled in).
+
+---
+
+## Cycle 32 — Week 3 (continued): UX Infrastructure & Mobile Fixes
+
+Date: 2026-03-18
+
+### Changes
+
+#### Scroll-to-Top Button
+
+- Created `ScrollToTop.jsx` — floating button appears after 400px scroll, smooth-scrolls to top on click.
+- Uses passive scroll listener for performance. Hidden on print.
+- Full dark mode support, fade-in entrance animation, hover lift effect.
+- Mounted globally via `App.jsx`.
+- File added: `frontend/studyhub-app/src/components/ScrollToTop.jsx`
+
+#### Toast Notification System
+
+- Created event-bus-based toast system split across two files for ESLint compliance:
+  - `lib/toast.js` — `showToast()` global function and `useToast()` hook.
+  - `components/Toast.jsx` — `ToastContainer` component with auto-dismiss (3.5s), max 5 visible, click-to-dismiss.
+- Three toast types: success (green), error (red), info (blue) — each with SVG icon and colored left border.
+- Full dark mode support, slide-up entrance animation.
+- Mounted globally via `App.jsx`.
+- Files added: `frontend/studyhub-app/src/lib/toast.js`, `frontend/studyhub-app/src/components/Toast.jsx`
+
+#### Styled 404 Page
+
+- Created `NotFoundPage.jsx` with gradient icon (sad face SVG), large "404" heading, description, and two CTA buttons ("Go Home" + "Go to Feed").
+- Uses CSS custom properties for dark mode compatibility.
+- Replaced catch-all `<Navigate to="/" />` with `<NotFoundPage />` in router.
+- File added: `frontend/studyhub-app/src/pages/NotFoundPage.jsx`
+- File changed: `frontend/studyhub-app/src/App.jsx`
+
+#### Focus Ring Styles (Accessibility)
+
+- Added global `*:focus-visible` outline styles (2px solid blue, 2px offset) for all interactive elements.
+- Dark mode variant uses lighter blue (`#60a5fa`).
+- Only shows on keyboard navigation (`:focus-visible`), not mouse clicks.
+- File changed: `frontend/studyhub-app/src/index.css`
+
+#### Mobile Responsiveness Fixes
+
+- **HomePage testimonials grid**: Added `@media (max-width: 767px)` to collapse from 3 columns to 1 column on phones. Previously caused horizontal overflow.
+- **HomePage steps grid**: Fixed breakpoint — added tablet-specific 2-column layout (`768px–1179px`), phone 1-column (`≤767px`). Replaced too-broad `max-width: 1024px` rule.
+- **Admin tables**: Added `overflow-x: auto` container and `min-width: 600px` on table for horizontal scrolling on phones.
+- **Notes markdown tables**: Added `overflow-x: auto` to table element for horizontal scroll on narrow screens.
+- **Settings nav on phone**: Increased gap from 4px to 6px for easier tap targets.
+- **Shortcuts modal on phone**: Reduced padding from 28px to 20px on screens ≤640px.
+- Files changed: `frontend/studyhub-app/src/index.css`, `frontend/studyhub-app/src/styles/responsive.css`
+
+### Validation
+
+Cycle 32 Validation Commands:
+
+- `npm --prefix frontend/studyhub-app run lint` — passed clean.
+- `npm --prefix frontend/studyhub-app run build` — passed clean (426ms, 44 output files).
+
+Cycle 32 Validation Result:
+
+- Frontend ESLint: passed with zero errors (Toast split resolved react-refresh/only-export-components violation).
+- Frontend Vite production build: passed successfully.
+- New chunks: `NotFoundPage` (code-split), `ScrollToTop` + `ToastContainer` bundled into index chunk (18.20 kB, up from 15.81 kB).
+
+---
+
+## Cycle 33 — Week 3 (continued): Toast Integration, Page Titles, Search Highlighting, Pagination, Print Styles
+
+Date: 2026-03-18
+
+### Changes
+
+#### Toast Notifications Wired Up
+
+- Integrated `showToast()` into 5 pages for user action feedback:
+  - **UserProfilePage**: Follow/unfollow success + error toasts.
+  - **NotesPage**: Note delete success/error toasts.
+  - **FeedPage**: Post delete error toast.
+  - **SheetsPage**: Star toggle error toast.
+  - **SheetViewerPage**: Star error, fork success, contribute success/error, review contribution success/error toasts.
+  - **SettingsPage**: `handlePatch` success/error toasts alongside inline messages.
+- Files changed: `UserProfilePage.jsx`, `NotesPage.jsx`, `FeedPage.jsx`, `SheetsPage.jsx`, `SheetViewerPage.jsx`, `SettingsPage.jsx`
+
+#### Page Titles (document.title)
+
+- Created `usePageTitle` hook in `lib/usePageTitle.js` — sets `document.title` to `"Page — StudyHub"` format, resets on unmount.
+- Integrated into 8 pages: Feed, Study Sheets, My Notes, Settings, Dashboard, Announcements, Upload Sheet, Sheet Viewer.
+- UserProfilePage uses dynamic title: `"username's Profile — StudyHub"`.
+- File added: `frontend/studyhub-app/src/lib/usePageTitle.js`
+
+#### Search Result Text Highlighting
+
+- Added `Highlight` component to SearchModal that bolds matching query text in search results.
+- Uses `<mark>` elements with yellow background highlight.
+- Applied to sheet titles, course names/codes, and usernames.
+- Regex-safe: escapes special characters in query before splitting.
+- File changed: `frontend/studyhub-app/src/components/SearchModal.jsx`
+
+#### Pagination — Load More
+
+- Added "Load More" buttons to Feed and Sheets pages.
+- Uses existing backend `limit`/`offset` pagination params.
+- Shows progress: "Load More (24 of 156)" format.
+- Disabled state while loading with "Loading…" text.
+- Styled via `.sh-load-more-btn` CSS class with dark mode support.
+- Files changed: `FeedPage.jsx`, `SheetsPage.jsx`, `frontend/studyhub-app/src/index.css`
+
+#### Print Stylesheet
+
+- Added `@media print` rules to `index.css`:
+  - Hides navbar, sidebar, scroll-to-top, toasts, tutorials, keyboard shortcuts.
+  - Resets page background to white.
+  - Removes card shadows, sets `break-inside: avoid` on cards.
+  - Appends URLs after links for print context.
+  - Hides non-submit buttons.
+- File changed: `frontend/studyhub-app/src/index.css`
+
+#### Unsaved Form Confirmation (Already Implemented)
+
+- Verified `UploadSheetPage.jsx` already has full unsaved-changes protection via `beforeunload` event + React Router `useBlocker` with custom `ConfirmDialog`. No changes needed.
+
+### Validation
+
+Cycle 33 Validation Commands:
+
+- `npm --prefix frontend/studyhub-app run lint` — passed clean.
+- `npm --prefix frontend/studyhub-app run build` — passed clean (555ms).
+
+Cycle 33 Validation Result:
+
+- Frontend ESLint: passed with zero errors.
+- Frontend Vite production build: passed successfully.
+- FeedPage chunk: 27.66 kB (up from 27.04 kB — load-more + toast).
+- SheetsPage chunk: 12.61 kB (up from 12.03 kB — load-more + toast).
+- SheetViewerPage chunk: 19.15 kB (up from 18.78 kB — toast).
+- usePageTitle shared chunk created at 104.32 kB (bundled with tutorialSteps).
+
+---
+
+Cycle 34 — PWA Offline Support & Performance Optimizations (2026-03-19)
+
+Added:
+- PWA manifest (`public/manifest.json`) with app metadata, theme color, and icon references.
+- Service worker (`public/sw.js`) with network-first strategy for API calls and cache-first for static assets. Cleans old caches on activation.
+- Service worker registration in `src/main.jsx` on window load.
+- SVG PWA icon (`public/icon.svg`) for scalable icon support; manifest also references existing `icon-256.png`.
+- Web Vitals monitoring utility (`src/lib/performance.js`) tracking LCP, INP, and CLS via PerformanceObserver.
+- `captureWebVital()` export in `src/lib/telemetry.js` to send Web Vitals to PostHog (or console in dev).
+- Web Vitals reporting wired into `src/main.jsx` startup.
+
+Changed:
+- `index.html`: added `<meta name="theme-color">`, Apple mobile web app meta tags, manifest link, apple-touch-icon link, and `<link rel="preconnect">` hints for Google Fonts, gstatic, and cdnjs.cloudflare.com.
+- `vite.config.js`: added `animejs` to manual chunks as `animation` bundle; enabled `cssCodeSplit: true` and `reportCompressedSize: false` for faster builds.
+- `src/index.css`: added CLS-prevention rules — `min-height: 100vh` on `#root`, `aspect-ratio: 1/1` on circular avatar containers, `contain: layout style` on `.card-shell`.
+
+Files touched:
+- `frontend/studyhub-app/public/manifest.json` (new)
+- `frontend/studyhub-app/public/sw.js` (new)
+- `frontend/studyhub-app/public/icon.svg` (new)
+- `frontend/studyhub-app/src/lib/performance.js` (new)
+- `frontend/studyhub-app/src/lib/telemetry.js` (modified)
+- `frontend/studyhub-app/src/main.jsx` (modified)
+- `frontend/studyhub-app/index.html` (modified)
+- `frontend/studyhub-app/vite.config.js` (modified)
+- `frontend/studyhub-app/src/index.css` (modified)
+
+Cycle 34 Validation Commands:
+- `npm --prefix frontend/studyhub-app run lint` — pending user validation.
+- `npm --prefix frontend/studyhub-app run build` — pending user validation.
+
+Known Risks / Deferred:
+- PNG icons (192x192, 512x512, maskable) are not yet generated; manifest references existing `icon-256.png` and the new SVG as fallback.
+- Service worker caches all GET API responses; a cache-size eviction policy may be needed for heavy users.
+- Web Vitals INP observer uses `durationThreshold: 16` which may produce high volume of events in PostHog.
+
+---
+
+## Cycle 35 — Sheet Lab: Version Control UI (2026-03-19)
+
+### Added
+
+- **Backend: Sheet Lab API** (`backend/src/routes/sheetLab.js`):
+  - `GET /api/sheets/:id/lab/commits` — paginated commit list (newest first) with author, message, checksum, timestamps. Supports `?page=&limit=` query params. Public for published sheets, auth required for drafts.
+  - `GET /api/sheets/:id/lab/commits/:commitId` — single commit with full content body.
+  - `POST /api/sheets/:id/lab/commits` — create a new commit (owner only). Auto-captures current sheet content, computes SHA-256 checksum, chains to latest commit via `parentId`.
+  - `POST /api/sheets/:id/lab/restore/:commitId` — restore sheet to a previous commit (owner only). Creates a new commit recording the restore and updates the sheet's content/contentFormat in a Prisma transaction.
+  - `GET /api/sheets/:id/lab/diff/:commitIdA/:commitIdB` — line-based diff between two commits with additions/deletions counts and unified hunks.
+  - Router registered in `backend/src/index.js` under `app.use('/api/sheets', sheetLabRoutes)`.
+
+- **Backend: Line diff utility** (`backend/src/lib/diff.js`):
+  - `computeLineDiff(textA, textB)` using LCS algorithm.
+  - Returns `{ additions, deletions, hunks }` where each hunk has `oldStart`, `oldLines`, `newStart`, `newLines`, and `lines` array with `type` (add/remove/equal) and `content`.
+
+- **Frontend: Sheet Lab page** (`frontend/studyhub-app/src/pages/sheets/SheetLabPage.jsx`):
+  - Header with sheet title, "Sheet Lab" subtitle, back button to sheet viewer.
+  - Vertical commit timeline with staggered anime.js entrance animation.
+  - Each commit card shows: message, author avatar + username, relative timestamp, truncated SHA-256 checksum.
+  - Click-to-expand content preview for each commit.
+  - "Create Snapshot" button (owner only) — opens modal with message input.
+  - "Restore" button on each commit (owner only) — confirmation dialog before restoring.
+  - "Compare" mode — select two commits to see unified diff viewer.
+  - Diff viewer with green/red line coloring, hunk headers, and addition/deletion stats.
+  - Pagination controls for commit list.
+
+- **Frontend: Sheet Lab CSS** (`frontend/studyhub-app/src/pages/sheets/SheetLabPage.css`):
+  - Timeline layout with vertical line and dot markers.
+  - Commit cards with hover effects and selected state.
+  - Diff viewer with syntax-colored lines (green additions, red deletions).
+  - Modal overlay for snapshot creation.
+  - Responsive breakpoints for mobile.
+
+- **Frontend: Route registration** (`frontend/studyhub-app/src/App.jsx`):
+  - Lazy import: `const SheetLabPage = lazy(() => import('./pages/sheets/SheetLabPage'))`.
+  - Route: `/sheets/:id/lab` wrapped in `<PrivateRoute>`, placed before the `:id` catch-all.
+
+- **Frontend: Sheet Lab link** (`frontend/studyhub-app/src/pages/sheets/SheetViewerPage.jsx`):
+  - "Sheet Lab" button added next to the "Edit" button in the action bar.
+  - Only visible to sheet owner (same `canEdit` guard as Edit).
+
+### Files Created
+
+- `backend/src/lib/diff.js`
+- `backend/src/routes/sheetLab.js`
+- `frontend/studyhub-app/src/pages/sheets/SheetLabPage.jsx`
+- `frontend/studyhub-app/src/pages/sheets/SheetLabPage.css`
+
+### Files Modified
+
+- `backend/src/index.js` — added sheetLab router import and mount
+- `frontend/studyhub-app/src/App.jsx` — added lazy import and route
+- `frontend/studyhub-app/src/pages/sheets/SheetViewerPage.jsx` — added Sheet Lab link button
+
+### Cycle 35 Validation Commands
+
+- `npm --prefix backend run lint` — pending user validation.
+- `npm --prefix frontend/studyhub-app run lint` — pending user validation.
+- `npm --prefix frontend/studyhub-app run build` — pending user validation.
+
+### Known Risks / Deferred
+
+- No new npm packages installed; diff algorithm uses built-in LCS, checksum uses Node.js `crypto` module.
+- The LCS diff algorithm is O(n*m) in time and space; very large sheets (>10K lines) may be slow. Consider streaming or limiting content size for diff endpoint if needed.
+- Dark mode CSS for Sheet Lab page is not yet added — uses CSS custom properties that will inherit from existing dark mode overrides where possible.
+- No backend tests added in this cycle for the Sheet Lab endpoints.
+
+---
+
+## Cycle 36 — Client-Side Image Safety Check + CI Quality Gates (2026-03-19)
+
+### Added
+
+#### Client-Side Image Safety Fallback
+
+- Created `frontend/studyhub-app/src/lib/imageSafety.js` — lightweight pre-upload image screening:
+  - File size validation (15 MB cap).
+  - Image dimension validation (8192x8192 cap).
+  - Skin-tone pixel ratio heuristic using canvas sampling (informational only, does not block uploads).
+  - `checkImageWithModel()` stub for future TF.js/NSFWJS model integration.
+  - `isImageFile()` helper for MIME type checking.
+- Integrated into `UploadSheetPage.jsx` `handleAttachmentSelect`:
+  - Runs `checkImageSafety()` on image attachments before accepting them.
+  - Shows an informational toast via `showToast()` if any warnings are raised.
+  - Safety check is best-effort — errors are silently caught and never block attachment selection.
+  - Server-side OpenAI moderation (`moderationEngine.js`) remains the authoritative safety layer.
+
+#### CI Quality Gates
+
+- Created `frontend/studyhub-app/lighthouse.config.js` — Lighthouse CI configuration:
+  - Performance budget: min 0.8 (warn).
+  - Accessibility budget: min 0.9 (error).
+  - Best practices budget: min 0.85 (warn).
+  - SEO budget: min 0.8 (warn).
+  - Core Web Vitals: FCP < 2s, LCP < 3s, CLS < 0.1 (error), TBT < 300ms.
+  - Uploads results to temporary public storage.
+- Created `frontend/studyhub-app/a11y.config.js` — accessibility audit configuration:
+  - WCAG 2.2 AA rule set: color-contrast, keyboard-navigation, focus-visible, aria-roles, img-alt, label, link-name, button-name, heading-order, landmark-one-main.
+  - Zero-tolerance violations threshold.
+- Created `.github/workflows/quality-gates.yml` — GitHub Actions CI workflow:
+  - `lint-and-test` job: checkout, Node 20, install, lint (backend + frontend), test (backend), build (frontend).
+  - `accessibility` job (depends on lint-and-test): runs Lighthouse CI via `treosh/lighthouse-ci-action@v12`.
+  - `bundle-size` job (depends on lint-and-test): checks dist size against 5 MB budget, emits GitHub warning on overage.
+  - Triggers on PRs to main and pushes to main.
+- Added root `package.json` CI scripts: `ci:lighthouse`, `ci:a11y`, `ci:quality`.
+
+### Files Added
+- `frontend/studyhub-app/src/lib/imageSafety.js`
+- `frontend/studyhub-app/lighthouse.config.js`
+- `frontend/studyhub-app/a11y.config.js`
+- `.github/workflows/quality-gates.yml`
+
+### Files Changed
+- `frontend/studyhub-app/src/pages/sheets/UploadSheetPage.jsx` — added imageSafety + toast imports, async safety check in attachment handler.
+- `package.json` — added `ci:lighthouse`, `ci:a11y`, `ci:quality` scripts.
+
+### Cycle 36 Validation Commands
+- `npm --prefix frontend/studyhub-app run lint` — pending user validation.
+- `npm --prefix frontend/studyhub-app run build` — pending user validation.
+
+### Cycle 36 Deferred-Risk Notes
+- The skin-tone heuristic is a very rough RGB-space check, not a classifier. It is informational only and defers authoritative decisions to the server-side OpenAI moderation pipeline.
+- TF.js/NSFWJS model loading is stubbed out in `checkImageWithModel()` — no ML packages are installed.
+- Lighthouse CI and axe-cli tools are installed at CI runtime via `npx --yes`, not as local dependencies.
+- The quality-gates workflow uses `npm ci --prefix` which requires each subdirectory to have its own `package-lock.json` or rely on workspaces hoisting; may need adjustment depending on lock file strategy.
+
+---
+
+## Cycle 37 — Full-Text Search + Admin Moderation Dashboard Enhancements (2026-03-19)
+
+### Added
+
+#### Part 1: PostgreSQL Full-Text Search
+
+- **Migration**: `backend/prisma/migrations/20260319000000_add_fulltext_search/migration.sql`
+  - GIN indexes on `StudySheet` (title, description, content, combined multi-field).
+  - GIN indexes on `User` (username) and `Course` (name, code).
+  - All indexes use `CREATE INDEX IF NOT EXISTS` for safe re-run.
+
+- **Full-text search helper**: `backend/src/lib/fullTextSearch.js`
+  - `sanitizeSearchQuery(input)` — strips special tsquery characters, joins words with `&`.
+  - `searchSheetsFTS(query, opts)` — ranked sheet search via `to_tsvector`/`to_tsquery` with `ts_rank` ordering.
+  - `searchCoursesFTS(query, opts)` — full-text course search by name and code.
+  - `searchUsersFTS(query, opts)` — full-text username search.
+  - All functions use `prisma.$queryRawUnsafe` with parameterized queries.
+
+- **Opt-in FTS in search route**: `backend/src/routes/search.js`
+  - Added `?fts=true` query parameter support to `GET /api/search`.
+  - When enabled, uses `searchSheetsFTS`, `searchCoursesFTS`, `searchUsersFTS` instead of ILIKE.
+  - Existing ILIKE behavior is the default (no breaking change).
+
+- **Opt-in FTS in sheets route**: `backend/src/routes/sheets.js`
+  - Added `?fts=true` query parameter support to `GET /api/sheets`.
+  - When enabled and `search` param is present, uses `searchSheetsFTS` with rank-ordered results.
+  - Hydrates FTS results through Prisma for full relation data.
+  - Response includes `fts: true` flag to indicate FTS was used.
+
+#### Part 2: Admin Moderation Dashboard Enhancements
+
+- **Enhanced admin stats endpoint**: `backend/src/routes/admin.js`
+  - `GET /api/admin/stats` now returns additional fields:
+    - `users.thisWeek` — new user registrations in the last 7 days.
+    - `sheets.published`, `sheets.draft` — breakdown by status.
+    - `moderation.pendingCases`, `moderation.activeStrikes`, `moderation.pendingAppeals`.
+    - `feedPosts.total` — total feed post count.
+    - `recentModerationActions` — last 10 reviewed moderation cases with user/reviewer info.
+  - Original flat stats fields preserved for backward compatibility.
+
+- **Admin Overview enhancements**: `frontend/studyhub-app/src/pages/admin/AdminPage.jsx`
+  - `StatsGrid` now shows: New This Week, Published, Drafts, Feed Posts (in addition to existing cards).
+  - Added `ModerationOverview` component — shows pending cases, active strikes, pending appeals with color-coded severity.
+  - Added `ModerationActivityLog` component — timeline of recent moderation actions with status dots, reviewer info, and review notes.
+
+- **Moderation case detail view**: `frontend/studyhub-app/src/pages/admin/ModerationTab.jsx`
+  - Click any case row to expand a full detail panel showing:
+    - User info, confidence score, flagged content snippet.
+    - Review note and reviewer info (for reviewed cases).
+    - Linked strikes and appeals.
+    - Quick action buttons: Confirm, Dismiss, Issue Strike (navigates to strikes sub-tab with pre-filled form).
+  - Added sort dropdown: sort cases by date or confidence score.
+  - Highlighted row background for the currently expanded case.
+
+### Files Added
+- `backend/prisma/migrations/20260319000000_add_fulltext_search/migration.sql`
+- `backend/src/lib/fullTextSearch.js`
+
+### Files Changed
+- `backend/src/routes/search.js` — added fullTextSearch import, FTS branching.
+- `backend/src/routes/sheets.js` — added fullTextSearch import, FTS branching with hydration.
+- `backend/src/routes/admin.js` — enhanced stats endpoint with moderation/user/sheet breakdowns.
+- `frontend/studyhub-app/src/pages/admin/AdminPage.jsx` — added ModerationOverview, ModerationActivityLog, enriched StatsGrid.
+- `frontend/studyhub-app/src/pages/admin/ModerationTab.jsx` — added case detail view, sort dropdown, expanded case state.
+
+### Cycle 37 Validation Commands
+- `npm --prefix backend run lint` — pending user validation.
+- `npm --prefix frontend/studyhub-app run lint` — pending user validation.
+- `npm --prefix frontend/studyhub-app run build` — pending user validation.
+
+### Known Risks / Deferred
+- FTS migration requires `prisma migrate deploy` to apply GIN indexes; safe to run since all indexes use `IF NOT EXISTS`.
+- FTS is opt-in via `?fts=true` — no breaking changes to existing search behavior.
+- FTS raw SQL uses parameterized queries to prevent SQL injection, but `sanitizeSearchQuery` strips non-alphanumeric characters as an additional safety layer.
+- The combined GIN index on StudySheet may have write-performance overhead on INSERT/UPDATE for large datasets; monitor after deployment.
+- Moderation stats queries use `.catch(() => 0)` fallbacks so the stats endpoint works even if moderation tables are not yet migrated.
+- No new npm packages installed.
+
+---
+
+## Cycle 38 — Security Audit, WebAuthn Passkeys, SECURITY.md (2026-03-19)
+
+### Security Audit
+
+Audited the following critical backend files:
+
+- `backend/src/routes/auth.js` — rate limiting present on all auth endpoints, bcrypt cost 12, account lockout after 5 failures, constant-response forgot-password endpoint prevents enumeration.
+- `backend/src/middleware/auth.js` — JWT verified properly, generic error messages returned.
+- `backend/src/routes/upload.js` — MIME + extension + magic byte validation, size limits, safe filename generation, proper file cleanup on failure.
+- `backend/src/routes/sheets.js` — Prisma ORM throughout (no raw SQL injection risk), proper authorization checks, rate limiting.
+- `backend/src/middleware/csrf.js` — CSRF token validated against auth token userId, skips safe methods correctly.
+- `backend/src/lib/htmlSecurity.js` — forbidden tags (script/iframe/object/embed/meta/base/form), inline event handler detection, dangerous href/src blocking. Input lowercased before scanning.
+- `backend/src/index.js` — Helmet configured, CSP headers, CORS with origin whitelist, x-powered-by disabled, global rate limiter.
+
+### Security Fix
+
+- **Password reset complexity enforcement** (`backend/src/routes/auth.js`): The `POST /api/auth/reset-password` endpoint was missing the uppercase letter and digit requirement that registration enforces. Added the same `[A-Z]` and `\d` regex checks to ensure password complexity is consistent across all password-setting flows.
+
+### Added — WebAuthn Passkeys for Admin Users
+
+- **Backend: WebAuthn utility** (`backend/src/lib/webauthn.js`):
+  - Minimal FIDO2 implementation using built-in Node.js `crypto` module — no external packages.
+  - Manual CBOR decoder supporting maps, byte strings, integers, text, arrays.
+  - `generateRegistrationOptions(user)` — creates challenge, returns PublicKeyCredentialCreationOptions.
+  - `verifyRegistration(credential, userId)` — verifies clientDataJSON (type, challenge, origin), parses attestationObject, extracts credentialId/publicKey/counter from authenticatorData, verifies RP ID hash and user presence flag.
+  - `generateAuthenticationOptions(userId, credentials)` — creates challenge for authentication ceremony.
+  - `verifyAuthentication(credential, expectedCredential, userId)` — verifies clientDataJSON, authenticator data, RP ID hash, counter increment, and cryptographic signature using stored public key. Supports ES256 (P-256) and RS256 algorithms.
+  - DER encoding helpers for SubjectPublicKeyInfo construction (EC P-256 and RSA).
+  - In-memory challenge store with 2-minute expiry and 5-minute cleanup interval.
+  - Comment noting that full FIDO2 compliance requires @simplewebauthn/server.
+
+- **Backend: WebAuthn routes** (`backend/src/routes/webauthn.js`):
+  - `POST /api/webauthn/register/options` — admin-only, returns registration options.
+  - `POST /api/webauthn/register/verify` — admin-only, verifies attestation and stores credential in DB.
+  - `POST /api/webauthn/authenticate/options` — public, returns authentication options for admin users with registered passkeys.
+  - `POST /api/webauthn/authenticate/verify` — public, verifies assertion, updates counter, issues JWT session.
+  - `GET /api/webauthn/credentials` — admin-only, lists user's registered passkeys.
+  - `DELETE /api/webauthn/credentials/:id` — admin-only, removes a passkey (ownership verified).
+  - Rate limited at 20 requests per 15 minutes.
+  - Authentication endpoints return generic errors to prevent user enumeration.
+
+- **Backend: Route registration** (`backend/src/index.js`):
+  - WebAuthn routes mounted at `/api/webauthn`.
+
+- **Frontend: WebAuthn client helpers** (`frontend/studyhub-app/src/lib/webauthn.js`):
+  - `isWebAuthnSupported()` — checks for PublicKeyCredential API availability.
+  - `registerPasskey(name)` — fetches registration options, calls `navigator.credentials.create()`, sends attestation to server.
+  - `authenticateWithPasskey(username)` — fetches authentication options, calls `navigator.credentials.get()`, sends assertion to server.
+  - `listPasskeys()` / `removePasskey(id)` — credential management API calls.
+  - Base64url <-> ArrayBuffer conversion helpers.
+  - CSRF token included in authenticated requests.
+
+- **Frontend: SecurityTab passkey management** (`frontend/studyhub-app/src/pages/settings/SecurityTab.jsx`):
+  - Passkeys section visible only to admin users.
+  - Lists registered passkeys with name, creation date, and device type.
+  - "Register New Passkey" button with optional name input.
+  - "Remove" button on each passkey with loading state.
+  - Graceful handling when WebAuthn is not supported by the browser.
+
+### Added — SECURITY.md
+
+- **Security policy** (`SECURITY.md`):
+  - Updated from placeholder to full security policy document.
+  - Supported versions table (1.5.x supported, < 1.5 not).
+  - Vulnerability reporting instructions (email, expected response times by severity).
+  - Scope definitions (in-scope and out-of-scope vulnerability classes).
+  - Security measures summary covering all implemented protections.
+  - Responsible disclosure statement.
+
+### Files Created
+
+- `backend/src/lib/webauthn.js`
+- `backend/src/routes/webauthn.js`
+- `frontend/studyhub-app/src/lib/webauthn.js`
+
+### Files Changed
+
+- `backend/src/routes/auth.js` — added password complexity check to reset-password endpoint.
+- `backend/src/index.js` — added webauthn route import and mount.
+- `frontend/studyhub-app/src/pages/settings/SecurityTab.jsx` — added passkey management section for admin users.
+- `SECURITY.md` — replaced placeholder with full security policy.
+
+### Cycle 38 Validation Commands
+
+- `npm --prefix backend run lint` — pending user validation.
+- `npm --prefix frontend/studyhub-app run lint` — pending user validation.
+- `npm --prefix frontend/studyhub-app run build` — pending user validation.
+
+### Known Risks / Deferred
+
+- WebAuthn implementation uses manual CBOR parsing and DER encoding; for full FIDO2 compliance (attestation statement verification, metadata service, Android SafetyNet), consider migrating to @simplewebauthn/server.
+- Challenge store is in-memory (Map); in a multi-instance production deployment, challenges should be stored in Redis or the database.
+- Only ES256 (P-256 ECDSA) and RS256 (RSASSA-PKCS1-v1_5) algorithms are supported; Ed25519 (EdDSA) is not yet implemented.
+- No new npm packages installed.
+
+---
+
+## Cycle 39 — Accessibility Audit & Final CSS Polish (2026-03-19)
+
+### Summary
+
+Comprehensive WCAG 2.2 AA accessibility audit and final CSS polish pass across the frontend.
+
+### Added
+
+- **Skip-to-content link** — `App.jsx` now renders a visually hidden skip link at the top of every page, visible on focus, targeting `#main-content`. CSS in `index.css`.
+- **Route change announcer** — `RouteAnnouncer` component in `App.jsx` uses `aria-live="polite"` to announce page navigations to screen readers.
+- **Screen reader utility class** — `.sr-only` CSS class added to `index.css` for visually hidden but accessible content.
+- **Selection styles** — `::selection` color applied for light and dark themes.
+- **Light-mode scrollbar styles** — `::-webkit-scrollbar` rules added for consistency with existing dark-mode scrollbar styles.
+- **`useKeyboardShortcuts` hook** — Created `lib/useKeyboardShortcuts.js` for global Ctrl/Cmd+K search trigger via `data-search-trigger`.
+
+### Changed
+
+- **`id="main-content"` on all pages** — Added to `<main>` elements across FeedPage, SheetsPage, DashboardPage, SheetViewerPage, AdminPage, SettingsPage, AttachmentPreviewPage, SheetHtmlPreviewPage, NotFoundPage, HomePage, LoginPage, RegisterScreen, and the shared `PageShell` scaffold.
+- **Navbar search box** — Now has `role="button"`, `tabIndex={0}`, `aria-label`, keyboard activation (Enter/Space), and `data-search-trigger` attribute.
+- **Navbar user avatar** — Now has `role="button"`, `tabIndex={0}`, `aria-label`, and keyboard activation.
+- **Navbar notification bell** — Added `aria-label` with unread count, `aria-expanded`, and `aria-haspopup`.
+- **Navbar** — Added `aria-label="Main navigation"` to `<nav>`.
+- **AppSidebar** — Added `aria-label="Sidebar navigation"` to sidebar `<nav>`.
+- **SearchModal** — Added `role="dialog"`, `aria-modal="true"`, `aria-label` to modal, `aria-label` to search input and clear button.
+- **ConfirmDialog** — Added `role="alertdialog"`, `aria-modal="true"`, `aria-labelledby` pointing to title.
+- **KeyboardShortcuts modal** — Added `role="dialog"`, `aria-modal="true"`, `aria-label`.
+- **Toast container** — Added `role="status"`, `aria-live="polite"`. Individual toasts get `role="alert"`.
+- **Login/Register error messages** — Added `role="alert"` for screen reader announcements.
+- **Smooth scrolling** — Now respects `prefers-reduced-motion` via `@media (prefers-reduced-motion: no-preference)`.
+- **Reduced motion** — Enhanced global `*` selector to reduce all animation/transition durations.
+- **Print styles** — Updated to also hide `.skip-to-content` link.
+
+### Validation Commands
+
+- `npm --prefix frontend/studyhub-app run lint` — pending user validation.
+- `npm --prefix frontend/studyhub-app run build` — pending user validation.
+
+### Known Risks / Deferred
+
+- No new npm packages installed.
+- Some inline-styled interactive `<div>` elements deeper in page components (e.g., notification items, feed post menus) use `onClick` without explicit `role="button"` — these are lower priority since they supplement adjacent button/link controls.
+- Full focus trap is only implemented on AppSidebar drawer; SearchModal and KeyboardShortcuts use Escape-to-close but not full Tab trapping.
+
+---
+
+## Cycle 39 — Lint Fixes + Validation + Release Notes (2026-03-19)
+
+### Changed
+
+- **backend/src/lib/featureFlags.js** — Fixed unused `err` variable in catch block (use bare `catch`).
+- **backend/src/lib/webauthn.js** — Fixed 4 unused variable lint errors: `value` (eslint-disable comment), `aaguid` → `_aaguid`, `coseKey` → `_coseKey`, `derOctetString` → `_derOctetString`.
+- **frontend/studyhub-app/src/lib/performance.js** — Replaced `catch (_)` with bare `catch` blocks (3 instances).
+- **frontend/studyhub-app/lighthouse.config.js** — Changed `/* eslint-env node */` to `/* global module */` for flat config compatibility.
+- **frontend/studyhub-app/a11y.config.js** — Same flat config fix.
+
+### Added
+
+- **docs/v1.5.0-release-notes.md** — Comprehensive release notes for v1.5.0.
+- **docs/plans/v1.5-weekly-roadmap.md** — All Week 3–6 items marked complete (2026-03-19).
+
+### Validation Commands
+
+- `npm --prefix backend run lint` — 0 errors ✅
+- `npm --prefix frontend/studyhub-app run lint` — 0 errors ✅
+- `npm --prefix frontend/studyhub-app run build` — success (465ms) ✅
+
+### Known Risks / Deferred
+
+- None. All lint issues resolved.

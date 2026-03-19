@@ -17,10 +17,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useBlocker, useNavigate, useParams } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
+import SafeJoyride from '../../components/SafeJoyride'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import { IconCheck, IconEye, IconUpload } from '../../components/Icons'
 import { API } from '../../config'
 import { pageShell } from '../../lib/ui'
+import { useTutorial } from '../../lib/useTutorial'
+import { UPLOAD_STEPS } from '../../lib/tutorialSteps'
+import { usePageTitle } from '../../lib/usePageTitle'
+import { showToast } from '../../lib/toast'
+import { checkImageSafety, isImageFile } from '../../lib/imageSafety'
 import {
   UPLOAD_TUTORIAL_KEY,
   canEditHtmlWorkingCopy,
@@ -89,6 +95,7 @@ function statusColor(status) {
 }
 
 export default function UploadSheetPage() {
+  usePageTitle('Upload Sheet')
   const navigate = useNavigate()
   const { id: sheetId } = useParams()
   const isEditing = Boolean(sheetId)
@@ -102,6 +109,7 @@ export default function UploadSheetPage() {
   const [status, setStatus] = useState(isEditing ? 'published' : 'draft')
   const [draftId, setDraftId] = useState(null)
   const [legacyMarkdownMode, setLegacyMarkdownMode] = useState(false)
+  const tutorial = useTutorial('upload', UPLOAD_STEPS)
 
   const [courses, setCourses] = useState([])
   const [error, setError] = useState('')
@@ -129,6 +137,14 @@ export default function UploadSheetPage() {
   const [attachUploading, setAttachUploading] = useState(false)
   const [existingAttachment, setExistingAttachment] = useState(null)
   const [removeExistingAttachment, setRemoveExistingAttachment] = useState(false)
+
+  /* ── Draft management ──────────────────────────────────────────────────
+   * draftReloadKey increments to force the init effect to re-run after
+   * discarding a draft, so the editor resets to a blank state.
+   * ─────────────────────────────────────────────────────────────────── */
+  const [draftReloadKey, setDraftReloadKey] = useState(0)
+  const [showDiscardDialog, setShowDiscardDialog] = useState(false)
+  const [discarding, setDiscarding] = useState(false)
 
   /* ── Unsaved-changes tracking ────────────────────────────────────────────
    * Tracks whether the user has modified any content since the last save.
@@ -250,7 +266,7 @@ export default function UploadSheetPage() {
     return () => {
       cancelled = true
     }
-  }, [hydrateFromSheet, isEditing, sheetId])
+  }, [hydrateFromSheet, isEditing, sheetId, draftReloadKey])
   useEffect(() => {
     if (initializing || isEditing) return
     if (typeof window === 'undefined') return
@@ -425,7 +441,7 @@ export default function UploadSheetPage() {
     title,
   ])
 
-  function handleAttachmentSelect(event) {
+  async function handleAttachmentSelect(event) {
     const file = event.target.files?.[0]
     if (!file) return
     const validationError = validateAttachment(file)
@@ -435,10 +451,93 @@ export default function UploadSheetPage() {
       return
     }
 
+    /* Pre-upload image safety screening (client-side heuristic) */
+    if (isImageFile(file)) {
+      try {
+        const safetyResult = await checkImageSafety(file)
+        if (safetyResult.warnings.length > 0) {
+          showToast(safetyResult.warnings[0], 'info')
+        }
+      } catch {
+        // Safety check is best-effort — never block attachment selection
+      }
+    }
+
     setAttachErr('')
     setAttachFile(file)
     setRemoveExistingAttachment(false)
     setHasUnsavedChanges(true)
+  }
+
+  /* ── Discard draft: deletes the current draft and resets the editor ──── */
+  async function discardDraft() {
+    if (!Number.isInteger(draftId)) {
+      // No draft saved yet — just reset local state
+      setTitle('')
+      setDescription('')
+      setContent('')
+      setCourseId('')
+      setAttachFile(null)
+      setExistingAttachment(null)
+      setRemoveExistingAttachment(false)
+      setHasUnsavedChanges(false)
+      setShowDiscardDialog(false)
+      return
+    }
+
+    setDiscarding(true)
+    try {
+      const response = await fetch(`${API}/api/sheets/${draftId}`, {
+        method: 'DELETE',
+        headers: authHeaders(),
+      })
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error || 'Could not discard draft.')
+      }
+
+      // Reset all editor state
+      setDraftId(null)
+      setTitle('')
+      setDescription('')
+      setContent('')
+      setCourseId('')
+      setAllowDownloads(true)
+      setContentFormat('html')
+      setLegacyMarkdownMode(false)
+      setStatus('draft')
+      setAttachFile(null)
+      setAttachErr('')
+      setExistingAttachment(null)
+      setRemoveExistingAttachment(false)
+      setHasUnsavedChanges(false)
+      setSaved(false)
+      setError('')
+      setScanState({
+        status: 'queued',
+        findings: [],
+        updatedAt: null,
+        acknowledgedAt: null,
+        hasOriginalVersion: false,
+        hasWorkingVersion: false,
+        originalSourceName: null,
+      })
+
+      // Force re-init to pick up clean state
+      setDraftReloadKey((prev) => prev + 1)
+    } catch (discardError) {
+      setError(discardError.message || 'Could not discard draft.')
+    } finally {
+      setDiscarding(false)
+      setShowDiscardDialog(false)
+    }
+  }
+
+  /* ── Clear selected (new) attachment file ──────────────────────────── */
+  function clearAttachFile() {
+    setAttachFile(null)
+    setAttachErr('')
+    if (attachmentInputRef.current) attachmentInputRef.current.value = ''
   }
 
   async function handleHtmlImport(event) {
@@ -489,7 +588,7 @@ export default function UploadSheetPage() {
       setShowScanModal(true)
       setScanModalDismissed(false)
       setSaved(true)
-      setHasUnsavedChanges(true)
+      setHasUnsavedChanges(false)
     } catch (importError) {
       setError(importError.message || 'Could not import HTML file.')
     } finally {
@@ -730,7 +829,7 @@ export default function UploadSheetPage() {
     <div style={{ minHeight: '100vh', background: '#edf0f5', fontFamily: FONT }}>
       <Navbar crumbs={[{ label: 'Study Sheets', to: '/sheets' }, { label: isEditing ? 'Edit Sheet' : 'New Sheet', to: null }]} hideTabs actions={navActions} hideSearch />
       <div style={pageShell('editor', 20, 60)}>
-        <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', padding: '14px 20px', marginBottom: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, alignItems: 'end' }}>
+        <div data-tutorial="upload-info" style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', padding: '14px 20px', marginBottom: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, alignItems: 'end' }}>
           <div>
             <label style={{ fontSize: 10, fontWeight: 700, color: '#64748b', letterSpacing: '.06em', display: 'block', marginBottom: 5 }}>SHEET TITLE</label>
             <input
@@ -764,7 +863,7 @@ export default function UploadSheetPage() {
           </div>
         </div>
 
-        <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', padding: '14px 20px', marginBottom: 12 }}>
+        <div data-tutorial="upload-content" style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', padding: '14px 20px', marginBottom: 12 }}>
           <label style={{ fontSize: 10, fontWeight: 700, color: '#64748b', letterSpacing: '.06em', display: 'block', marginBottom: 5 }}>
             DESCRIPTION <span style={{ fontSize: 9, color: '#94a3b8', textTransform: 'none', letterSpacing: 0 }}>(required for HTML review)</span>
           </label>
@@ -814,7 +913,7 @@ export default function UploadSheetPage() {
           </div>
         ) : null}
 
-        <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', padding: '14px 20px', marginBottom: 12 }}>
+        <div data-tutorial="upload-attachment" style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', padding: '14px 20px', marginBottom: 12 }}>
           <label style={{ fontSize: 10, fontWeight: 700, color: '#64748b', letterSpacing: '.06em', display: 'block', marginBottom: 8 }}>
             OPTIONAL ATTACHMENT <span style={{ fontSize: 9, color: '#94a3b8', textTransform: 'none', letterSpacing: 0 }}>(PDF, PNG, JPEG, GIF, WebP — max 10 MB)</span>
           </label>
@@ -826,26 +925,89 @@ export default function UploadSheetPage() {
               style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', background: '#f8fafc', border: '1.5px dashed #cbd5e1', borderRadius: 8, fontSize: 12, fontWeight: 600, color: '#64748b', cursor: 'pointer', fontFamily: FONT }}
             >
               <i className="fas fa-paperclip" style={{ fontSize: 12 }}></i>
-              {attachFile ? 'Change file' : 'Attach file'}
+              {attachFile || (existingAttachment && !removeExistingAttachment) ? 'Change file' : 'Attach file'}
             </button>
-            {attachFile ? <span style={{ fontSize: 12, color: '#334155', fontWeight: 600 }}>{attachFile.name}</span> : null}
-            {!attachFile && existingAttachment && !removeExistingAttachment ? (
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 12, color: '#334155', fontWeight: 600 }}>{existingAttachment.name}</span>
+            {/* Show newly selected file with remove option */}
+            {attachFile ? (
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '4px 10px' }}>
+                <span style={{ fontSize: 12, color: '#166534', fontWeight: 600 }}>{attachFile.name}</span>
                 <button
                   type="button"
-                  onClick={() => setRemoveExistingAttachment(true)}
-                  style={{ border: 'none', background: 'none', color: '#dc2626', cursor: 'pointer', fontSize: 12, fontFamily: FONT }}
+                  onClick={clearAttachFile}
+                  style={{ border: 'none', background: 'none', color: '#dc2626', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: FONT, padding: '2px 4px' }}
+                  title="Remove selected file"
                 >
-                  Remove
+                  ✕
                 </button>
               </div>
+            ) : null}
+            {/* Show existing (server-side) attachment with remove option */}
+            {!attachFile && existingAttachment && !removeExistingAttachment ? (
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: '4px 10px' }}>
+                <span style={{ fontSize: 12, color: '#1e40af', fontWeight: 600 }}>{existingAttachment.name}</span>
+                <button
+                  type="button"
+                  onClick={() => { setRemoveExistingAttachment(true); setHasUnsavedChanges(true) }}
+                  style={{ border: 'none', background: 'none', color: '#dc2626', cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: FONT, padding: '2px 4px' }}
+                  title="Remove attachment"
+                >
+                  ✕
+                </button>
+              </div>
+            ) : null}
+            {/* Show "removed" indicator */}
+            {removeExistingAttachment && !attachFile ? (
+              <span style={{ fontSize: 11, color: '#94a3b8', fontStyle: 'italic' }}>Attachment will be removed on save</span>
             ) : null}
           </div>
           {attachErr ? <div style={{ marginTop: 6, fontSize: 12, color: '#dc2626' }}>{attachErr}</div> : null}
         </div>
 
-        {status ? (
+        {/* ── Draft management banner ─────────────────────────────────────── */}
+        {!isEditing && draftId && status === 'draft' ? (
+          <div style={{
+            background: 'linear-gradient(135deg, #fffbeb, #fef3c7)',
+            border: '1px solid #fcd34d',
+            borderRadius: 12,
+            padding: '12px 16px',
+            marginBottom: 12,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 10,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 18 }}>📝</span>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#92400e' }}>Continuing your draft</div>
+                <div style={{ fontSize: 11, color: '#a16207' }}>
+                  {title.trim() ? `"${title.trim()}"` : 'Untitled draft'} — auto-saved
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowDiscardDialog(true)}
+              disabled={discarding}
+              style={{
+                padding: '6px 14px',
+                background: '#fff',
+                border: '1px solid #fbbf24',
+                borderRadius: 8,
+                fontSize: 12,
+                fontWeight: 600,
+                color: '#92400e',
+                cursor: 'pointer',
+                fontFamily: FONT,
+              }}
+            >
+              {discarding ? 'Discarding…' : 'Discard & Start New'}
+            </button>
+          </div>
+        ) : null}
+
+        {status && status !== 'draft' ? (
           <div style={{ background: status === 'rejected' ? '#fef2f2' : '#eff6ff', border: `1px solid ${status === 'rejected' ? '#fecaca' : '#bfdbfe'}`, borderRadius: 9, padding: '10px 14px', marginBottom: 10, fontSize: 13, color: status === 'rejected' ? '#b91c1c' : '#1d4ed8' }}>
             Status: <strong>{status}</strong>
           </div>
@@ -980,6 +1142,19 @@ export default function UploadSheetPage() {
         variant="danger"
         onConfirm={confirmLeave}
         onCancel={cancelLeave}
+      />
+
+      <SafeJoyride {...tutorial.joyrideProps} />
+
+      <ConfirmDialog
+        open={showDiscardDialog}
+        title="Discard this draft?"
+        message="This will permanently delete your current draft and start a fresh sheet. Any saved content, imported HTML, and attachments will be removed."
+        confirmLabel={discarding ? 'Discarding…' : 'Discard Draft'}
+        cancelLabel="Keep Draft"
+        variant="danger"
+        onConfirm={discardDraft}
+        onCancel={() => setShowDiscardDialog(false)}
       />
     </div>
   )

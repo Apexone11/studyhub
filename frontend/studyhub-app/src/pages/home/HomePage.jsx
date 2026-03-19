@@ -160,6 +160,7 @@ export default function HomePage() {
     <div className="home-page">
       <Navbar variant="landing" />
 
+      <main id="main-content">
       <section className="home-hero">
         {/* Enhanced fork-tree SVG */}
         <svg className="home-hero-tree hero-tree-base" viewBox="0 0 56 56" fill="none" aria-hidden="true">
@@ -460,6 +461,7 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+      </main>
 
       <footer className="home-footer">
         <div className="home-shell">

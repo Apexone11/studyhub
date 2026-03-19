@@ -42,7 +42,7 @@ router.get('/:username', optionalAuth, async (req, res) => {
         createdAt: true,
         _count: {
           select: {
-            studySheets: true,
+            studySheets: { where: { status: 'published' } },
             followers: true,
             following: true,
           }
@@ -51,6 +51,7 @@ router.get('/:username', optionalAuth, async (req, res) => {
           include: { course: { include: { school: true } } },
         },
         studySheets: {
+          where: { status: 'published' },
           orderBy: { createdAt: 'desc' },
           take: 10,
           include: {
@@ -93,6 +94,29 @@ router.get('/:username', optionalAuth, async (req, res) => {
       },
     })
 
+    /* Fetch starred sheets for profile display */
+    const starredRows = await prisma.starredSheet.findMany({
+      where: { userId: user.id },
+      orderBy: { sheetId: 'desc' },
+      take: 10,
+      select: {
+        sheet: {
+          select: {
+            id: true,
+            title: true,
+            stars: true,
+            updatedAt: true,
+            status: true,
+            author: { select: { id: true, username: true } },
+            course: { select: { id: true, code: true } },
+          },
+        },
+      },
+    })
+    const starredSheets = starredRows
+      .map((r) => r.sheet)
+      .filter((s) => s && s.status === 'published')
+
     res.json({
       id: user.id,
       username: user.username,
@@ -106,6 +130,7 @@ router.get('/:username', optionalAuth, async (req, res) => {
       recentSheets: user.studySheets,
       enrollments: user.enrollments,
       sharedNotes,
+      starredSheets,
     })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
@@ -161,6 +186,60 @@ router.delete('/:username/follow', requireAuth, followLimiter, async (req, res) 
     res.json({ following: false, followerCount })
   } catch (err) {
     if (err.code === 'P2025') return res.status(404).json({ error: 'Not following this user.' })
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── GET /api/users/:username/followers ─────────────────────
+router.get('/:username/followers', optionalAuth, async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { username: req.params.username },
+      select: { id: true },
+    })
+    if (!user) return res.status(404).json({ error: 'User not found.' })
+
+    const follows = await prisma.userFollow.findMany({
+      where: { followingId: user.id },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+      select: {
+        follower: {
+          select: { id: true, username: true, role: true, avatarUrl: true },
+        },
+      },
+    })
+
+    res.json(follows.map((f) => f.follower))
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── GET /api/users/:username/following ─────────────────────
+router.get('/:username/following', optionalAuth, async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { username: req.params.username },
+      select: { id: true },
+    })
+    if (!user) return res.status(404).json({ error: 'User not found.' })
+
+    const follows = await prisma.userFollow.findMany({
+      where: { followerId: user.id },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+      select: {
+        following: {
+          select: { id: true, username: true, role: true, avatarUrl: true },
+        },
+      },
+    })
+
+    res.json(follows.map((f) => f.following))
+  } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
   }

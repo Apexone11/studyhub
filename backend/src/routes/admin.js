@@ -29,16 +29,43 @@ function parseSuppressionStatus(rawStatus) {
 // ── GET /api/admin/stats ──────────────────────────────────────
 router.get('/stats', async (req, res) => {
   try {
-    const [totalUsers, totalSheets, totalComments, flaggedRequests, starAgg, totalNotes, totalFollows, totalReactions] = await Promise.all([
+    const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+
+    const [
+      totalUsers, usersThisWeek,
+      totalSheets, publishedSheets, draftSheets,
+      totalComments, flaggedRequests, starAgg,
+      totalNotes, totalFollows, totalReactions,
+      totalFeedPosts,
+      pendingCases, activeStrikes, pendingAppeals,
+      recentModerationActions,
+    ] = await Promise.all([
       prisma.user.count(),
+      prisma.user.count({ where: { createdAt: { gte: oneWeekAgo } } }),
       prisma.studySheet.count(),
+      prisma.studySheet.count({ where: { status: 'published' } }),
+      prisma.studySheet.count({ where: { status: 'draft' } }),
       prisma.comment.count(),
       prisma.requestedCourse.count({ where: { flagged: true } }),
       prisma.studySheet.aggregate({ _sum: { stars: true } }),
       prisma.note.count(),
       prisma.userFollow.count(),
       prisma.reaction.count(),
+      prisma.feedPost.count(),
+      prisma.moderationCase.count({ where: { status: 'pending' } }).catch(() => 0),
+      prisma.strike.count({ where: { decayedAt: null, expiresAt: { gt: new Date() } } }).catch(() => 0),
+      prisma.appeal.count({ where: { status: 'pending' } }).catch(() => 0),
+      prisma.moderationCase.findMany({
+        where: { status: { not: 'pending' } },
+        orderBy: { updatedAt: 'desc' },
+        take: 10,
+        include: {
+          user: { select: { id: true, username: true } },
+          reviewer: { select: { id: true, username: true } },
+        },
+      }).catch(() => []),
     ])
+
     res.json({
       totalUsers,
       totalSheets,
@@ -48,6 +75,11 @@ router.get('/stats', async (req, res) => {
       totalNotes,
       totalFollows,
       totalReactions,
+      users: { total: totalUsers, thisWeek: usersThisWeek },
+      sheets: { total: totalSheets, published: publishedSheets, draft: draftSheets },
+      moderation: { pendingCases, activeStrikes, pendingAppeals },
+      feedPosts: { total: totalFeedPosts },
+      recentModerationActions,
     })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
@@ -405,7 +437,7 @@ router.delete('/users/:id', async (req, res) => {
     if (err.code === 'P2025') return res.status(404).json({ error: 'User not found.' })
     if (err.code === 'P2003') return res.status(409).json({ error: 'Cannot delete user: dependent records still exist. Contact support.' })
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: `Deletion failed: ${err.message}` })
+    res.status(500).json({ error: 'Deletion failed. Please try again or contact support.' })
   }
 })
 

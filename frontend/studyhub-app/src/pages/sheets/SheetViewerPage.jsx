@@ -1,20 +1,31 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
 import AppSidebar from '../../components/AppSidebar'
+import SafeJoyride from '../../components/SafeJoyride'
+import { SkeletonCard } from '../../components/Skeleton'
+import MentionText from '../../components/MentionText'
 import {
   IconArrowLeft,
+  IconCheck,
   IconDownload,
   IconEye,
   IconFork,
+  IconGitPullRequest,
   IconStar,
   IconStarFilled,
+  IconX,
 } from '../../components/Icons'
 import { API } from '../../config'
 import { getApiErrorMessage, isAuthSessionFailure, readJsonSafely } from '../../lib/http'
 import { useSession } from '../../lib/session-context'
 import { pageShell, useResponsiveAppLayout } from '../../lib/ui'
 import { useLivePolling } from '../../lib/useLivePolling'
+import { useTutorial } from '../../lib/useTutorial'
+import { VIEWER_STEPS } from '../../lib/tutorialSteps'
+import { fadeInUp } from '../../lib/animations'
+import { showToast } from '../../lib/toast'
+import { usePageTitle } from '../../lib/usePageTitle'
 
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'avif'])
@@ -108,28 +119,78 @@ function errorBanner(message) {
   )
 }
 
-function ContributionList({ title, items }) {
+function statusBadge(status) {
+  const colors = {
+    pending: { bg: '#fef3c7', color: '#92400e' },
+    accepted: { bg: '#dcfce7', color: '#166534' },
+    rejected: { bg: '#fee2e2', color: '#991b1b' },
+  }
+  const c = colors[status] || colors.pending
+  return {
+    fontSize: 11, fontWeight: 800, textTransform: 'uppercase',
+    padding: '2px 8px', borderRadius: 6,
+    background: c.bg, color: c.color,
+  }
+}
+
+function ContributionList({ title, items, canReview, onReview, reviewingId }) {
   return (
     <section style={panelStyle()}>
       <h2 style={{ margin: '0 0 10px', fontSize: 15, color: '#0f172a' }}>{title}</h2>
       {items.length === 0 ? (
-        <div style={{ color: '#94a3b8', fontSize: 13 }}>No contributions yet.</div>
+        <div style={{ textAlign: 'center', padding: '28px 16px' }}>
+          <div style={{ width: 44, height: 44, borderRadius: 11, background: 'linear-gradient(135deg, #f0fdf4, #bbf7d0)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" />
+            </svg>
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--sh-heading, #0f172a)', marginBottom: 4 }}>No contributions yet</div>
+          <div style={{ fontSize: 12, color: 'var(--sh-muted, #94a3b8)', lineHeight: 1.5 }}>Fork this sheet to suggest improvements.</div>
+        </div>
       ) : (
         <div style={{ display: 'grid', gap: 12 }}>
           {items.map((item) => (
             <div key={item.id} style={{ borderTop: '1px solid #f1f5f9', paddingTop: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 4 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 4, alignItems: 'center' }}>
                 <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
                   {item.forkSheet?.title || 'Contribution'}
                 </span>
-                <span style={{ fontSize: 11, fontWeight: 800, color: '#2563eb', textTransform: 'uppercase' }}>
-                  {item.status}
-                </span>
+                <span style={statusBadge(item.status)}>{item.status}</span>
               </div>
               <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.6 }}>
                 {item.proposer?.username ? `Proposed by ${item.proposer.username}. ` : ''}
                 {item.message || 'No message included.'}
               </div>
+              {canReview && item.status === 'pending' ? (
+                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                  <button
+                    type="button"
+                    disabled={reviewingId === item.id}
+                    onClick={() => onReview(item.id, 'accept')}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 4,
+                      padding: '5px 10px', borderRadius: 8, border: '1px solid #bbf7d0',
+                      background: '#f0fdf4', color: '#16a34a', fontSize: 11, fontWeight: 700,
+                      cursor: reviewingId === item.id ? 'wait' : 'pointer', fontFamily: FONT,
+                    }}
+                  >
+                    <IconCheck size={11} /> Accept
+                  </button>
+                  <button
+                    type="button"
+                    disabled={reviewingId === item.id}
+                    onClick={() => onReview(item.id, 'reject')}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 4,
+                      padding: '5px 10px', borderRadius: 8, border: '1px solid #fecaca',
+                      background: '#fef2f2', color: '#dc2626', fontSize: 11, fontWeight: 700,
+                      cursor: reviewingId === item.id ? 'wait' : 'pointer', fontFamily: FONT,
+                    }}
+                  >
+                    <IconX size={11} /> Reject
+                  </button>
+                </div>
+              ) : null}
             </div>
           ))}
         </div>
@@ -141,12 +202,28 @@ function ContributionList({ title, items }) {
 export default function SheetViewerPage() {
   const navigate = useNavigate()
   const { id } = useParams()
+  usePageTitle('Sheet Viewer')
   const { user, clearSession } = useSession()
   const layout = useResponsiveAppLayout()
   const [sheetState, setSheetState] = useState({ sheet: null, loading: true, error: '' })
   const [commentsState, setCommentsState] = useState({ comments: [], total: 0, loading: true, error: '' })
   const [commentDraft, setCommentDraft] = useState('')
   const [commentSaving, setCommentSaving] = useState(false)
+  const [forking, setForking] = useState(false)
+  const [contributing, setContributing] = useState(false)
+  const [showContributeModal, setShowContributeModal] = useState(false)
+  const [contributeMessage, setContributeMessage] = useState('')
+  const [reviewingId, setReviewingId] = useState(null)
+  const tutorial = useTutorial('viewer', VIEWER_STEPS)
+  const sheetPanelRef = useRef(null)
+  const animatedRef = useRef(false)
+
+  /* Animate sheet content on first load */
+  useEffect(() => {
+    if (sheetState.loading || animatedRef.current || !sheetState.sheet) return
+    animatedRef.current = true
+    if (sheetPanelRef.current) fadeInUp(sheetPanelRef.current, { duration: 450, y: 16 })
+  }, [sheetState.loading, sheetState.sheet])
 
   const sheetId = Number.parseInt(id, 10)
 
@@ -280,6 +357,7 @@ export default function SheetViewerPage() {
         error: '',
       }))
     } catch (error) {
+      showToast(error.message || 'Could not update the star.', 'error')
       setSheetState((current) => ({ ...current, error: error.message || 'Could not update the star.' }))
     }
   }
@@ -304,6 +382,71 @@ export default function SheetViewerPage() {
       }))
     } catch (error) {
       setSheetState((current) => ({ ...current, error: error.message || 'Could not update the reaction.' }))
+    }
+  }
+
+  const handleFork = async () => {
+    if (!sheet || forking) return
+    setForking(true)
+    try {
+      const response = await fetch(`${API}/api/sheets/${sheet.id}/fork`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({}),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.error || 'Could not fork this sheet.')
+      showToast('Sheet forked! Redirecting to editor…', 'success')
+      navigate(`/sheets/${data.id}/edit`)
+    } catch (error) {
+      showToast(error.message || 'Could not fork this sheet.', 'error')
+      setSheetState((current) => ({ ...current, error: error.message }))
+    } finally {
+      setForking(false)
+    }
+  }
+
+  const handleContribute = async () => {
+    if (!sheet || contributing) return
+    setContributing(true)
+    try {
+      const response = await fetch(`${API}/api/sheets/${sheet.id}/contributions`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ message: contributeMessage.trim() }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.error || 'Could not submit contribution.')
+      showToast('Contribution submitted!', 'success')
+      setShowContributeModal(false)
+      setContributeMessage('')
+      loadSheet()
+    } catch (error) {
+      showToast(error.message || 'Could not submit contribution.', 'error')
+      setSheetState((current) => ({ ...current, error: error.message }))
+    } finally {
+      setContributing(false)
+    }
+  }
+
+  const handleReviewContribution = async (contributionId, action) => {
+    if (reviewingId) return
+    setReviewingId(contributionId)
+    try {
+      const response = await fetch(`${API}/api/sheets/contributions/${contributionId}`, {
+        method: 'PATCH',
+        headers: authHeaders(),
+        body: JSON.stringify({ action }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.error || `Could not ${action} contribution.`)
+      showToast(`Contribution ${action}ed`, 'success')
+      loadSheet()
+    } catch (error) {
+      showToast(error.message, 'error')
+      setSheetState((current) => ({ ...current, error: error.message }))
+    } finally {
+      setReviewingId(null)
     }
   }
 
@@ -341,6 +484,30 @@ export default function SheetViewerPage() {
     }
   }
 
+  const deleteComment = async (commentId) => {
+    try {
+      const response = await fetch(`${API}/api/sheets/${sheetId}/comments/${commentId}`, {
+        method: 'DELETE',
+        headers: authHeaders(),
+      })
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error || 'Could not delete comment.')
+      }
+      setCommentsState((current) => ({
+        ...current,
+        comments: current.comments.filter((c) => c.id !== commentId),
+        total: Math.max(0, current.total - 1),
+      }))
+      setSheetState((current) => ({
+        ...current,
+        sheet: current.sheet ? { ...current.sheet, commentCount: Math.max(0, (current.sheet.commentCount || 1) - 1) } : current.sheet,
+      }))
+    } catch (error) {
+      setCommentsState((current) => ({ ...current, error: error.message }))
+    }
+  }
+
   return (
     <>
       <Navbar />
@@ -356,14 +523,14 @@ export default function SheetViewerPage() {
           >
             <AppSidebar mode={layout.sidebarMode} />
 
-            <main style={{ display: 'grid', gap: 16 }}>
+            <main id="main-content" style={{ display: 'grid', gap: 16 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                 <button type="button" onClick={handleBack} style={actionButton('#475569')}>
                   <IconArrowLeft size={14} />
                   Back
                 </button>
                 {sheet ? (
-                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  <div data-tutorial="viewer-actions" style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                     <button type="button" onClick={updateStar} style={actionButton(sheet.starred ? '#f59e0b' : '#475569')}>
                       {sheet.starred ? <IconStarFilled size={14} /> : <IconStar size={14} />}
                       {sheet.stars || 0}
@@ -397,6 +564,23 @@ export default function SheetViewerPage() {
                         Edit
                       </Link>
                     ) : null}
+                    {user ? (
+                      <Link to={`/sheets/${sheet.id}/lab`} style={linkButton()}>
+                        Sheet Lab
+                      </Link>
+                    ) : null}
+                    {user && sheet.userId !== user.id ? (
+                      <button type="button" onClick={handleFork} disabled={forking} style={actionButton('#6366f1')}>
+                        <IconFork size={13} />
+                        {forking ? 'Forking…' : 'Fork'}
+                      </button>
+                    ) : null}
+                    {user && sheet.forkOf && sheet.userId === user.id ? (
+                      <button type="button" onClick={() => setShowContributeModal(true)} style={actionButton('#059669')}>
+                        <IconGitPullRequest size={13} />
+                        Contribute Back
+                      </button>
+                    ) : null}
                   </div>
                 ) : null}
               </div>
@@ -404,11 +588,9 @@ export default function SheetViewerPage() {
               {errorBanner(sheetState.error)}
 
               {sheetState.loading ? (
-                <section style={panelStyle()}>
-                  <div style={{ color: '#64748b', fontSize: 14 }}>Loading sheet...</div>
-                </section>
+                <SkeletonCard style={{ padding: '28px 24px' }} />
               ) : sheet ? (
-                <section style={panelStyle()}>
+                <section ref={sheetPanelRef} data-tutorial="viewer-content" style={panelStyle()}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 14 }}>
                     <div>
                       <h1 style={{ margin: 0, fontSize: 30, color: '#0f172a' }}>{sheet.title}</h1>
@@ -471,7 +653,7 @@ export default function SheetViewerPage() {
 
               {errorBanner(commentsState.error)}
 
-              <section style={panelStyle()}>
+              <section data-tutorial="viewer-comments" style={panelStyle()}>
                 <h2 style={{ margin: '0 0 12px', fontSize: 18, color: '#0f172a' }}>Comments</h2>
                 <form onSubmit={submitComment} style={{ display: 'grid', gap: 12, marginBottom: 16 }}>
                   <textarea
@@ -517,12 +699,29 @@ export default function SheetViewerPage() {
                   <div style={{ display: 'grid', gap: 12 }}>
                     {commentsState.comments.map((comment) => (
                       <div key={comment.id} style={{ borderTop: '1px solid #f1f5f9', paddingTop: 12 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 4 }}>
-                          <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{comment.author?.username || 'Unknown'}</span>
-                          <span style={{ fontSize: 11, color: '#94a3b8' }}>{timeAgo(comment.createdAt)}</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 4, alignItems: 'center' }}>
+                          <Link to={`/users/${comment.author?.username}`} style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', textDecoration: 'none' }}>
+                            {comment.author?.username || 'Unknown'}
+                          </Link>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: 11, color: '#94a3b8' }}>{timeAgo(comment.createdAt)}</span>
+                            {user && (user.id === comment.author?.id || user.role === 'admin') ? (
+                              <button
+                                type="button"
+                                onClick={() => deleteComment(comment.id)}
+                                style={{
+                                  padding: '2px 8px', borderRadius: 6, border: '1px solid #fecaca',
+                                  background: '#fff', color: '#dc2626', fontSize: 11, fontWeight: 600,
+                                  cursor: 'pointer', fontFamily: FONT,
+                                }}
+                              >
+                                Delete
+                              </button>
+                            ) : null}
+                          </div>
                         </div>
                         <div style={{ fontSize: 13, color: '#475569', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
-                          {comment.content}
+                          <MentionText text={comment.content} />
                         </div>
                       </div>
                     ))}
@@ -583,7 +782,13 @@ export default function SheetViewerPage() {
                 </section>
               ) : null}
               {sheet?.incomingContributions ? (
-                <ContributionList title="Incoming contributions" items={sheet.incomingContributions} />
+                <ContributionList
+                  title="Incoming contributions"
+                  items={sheet.incomingContributions}
+                  canReview={canEdit}
+                  onReview={handleReviewContribution}
+                  reviewingId={reviewingId}
+                />
               ) : null}
               {sheet?.outgoingContributions ? (
                 <ContributionList title="Outgoing contributions" items={sheet.outgoingContributions} />
@@ -592,6 +797,73 @@ export default function SheetViewerPage() {
           </div>
         </div>
       </div>
+
+      {/* ── Contribute-back modal ────────────────────────────────────── */}
+      {showContributeModal ? (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9999,
+            background: 'rgba(15, 23, 42, 0.5)', display: 'grid', placeItems: 'center',
+          }}
+          onClick={() => setShowContributeModal(false)}
+        >
+          <div
+            style={{
+              background: '#fff', borderRadius: 18, padding: 28, width: '100%', maxWidth: 440,
+              boxShadow: '0 20px 60px rgba(0,0,0,0.2)', fontFamily: FONT,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 style={{ margin: '0 0 6px', fontSize: 18, color: '#0f172a' }}>
+              <IconGitPullRequest size={18} style={{ verticalAlign: 'middle', marginRight: 8 }} />
+              Contribute Changes Back
+            </h2>
+            <p style={{ margin: '0 0 16px', color: '#64748b', fontSize: 13, lineHeight: 1.6 }}>
+              Submit your changes to the original author for review. They can accept or reject your contribution.
+            </p>
+            <textarea
+              value={contributeMessage}
+              onChange={(e) => setContributeMessage(e.target.value)}
+              placeholder="Describe what you changed and why (optional)…"
+              rows={3}
+              maxLength={500}
+              style={{
+                width: '100%', resize: 'vertical', borderRadius: 12, border: '1px solid #cbd5e1',
+                padding: 12, fontSize: 13, fontFamily: 'inherit', marginBottom: 16,
+              }}
+            />
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={() => setShowContributeModal(false)}
+                style={{
+                  padding: '8px 16px', borderRadius: 10, border: '1px solid #cbd5e1',
+                  background: '#fff', color: '#64748b', fontSize: 13, fontWeight: 600,
+                  cursor: 'pointer', fontFamily: FONT,
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleContribute}
+                disabled={contributing}
+                style={{
+                  padding: '8px 18px', borderRadius: 10, border: 'none',
+                  background: contributing ? '#86efac' : '#059669', color: '#fff',
+                  fontSize: 13, fontWeight: 700, cursor: contributing ? 'wait' : 'pointer',
+                  fontFamily: FONT, display: 'inline-flex', alignItems: 'center', gap: 6,
+                }}
+              >
+                <IconGitPullRequest size={13} />
+                {contributing ? 'Submitting…' : 'Submit Contribution'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <SafeJoyride {...tutorial.joyrideProps} />
     </>
   )
 }

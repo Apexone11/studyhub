@@ -3,6 +3,7 @@ const rateLimit = require('express-rate-limit')
 const { getAuthTokenFromRequest, verifyAuthToken } = require('../lib/authTokens')
 const { getVisibleProfileIds } = require('../lib/profileVisibility')
 const { buildSheetTextSearchClauses } = require('../lib/sheetSearch')
+const { searchSheetsFTS, searchCoursesFTS, searchUsersFTS } = require('../lib/fullTextSearch')
 const { captureError } = require('../monitoring/sentry')
 const prisma = require('../lib/prisma')
 
@@ -55,6 +56,8 @@ router.get('/', optionalAuth, async (req, res) => {
 
   const limit = Math.min(Math.max(parseInt(rawLimit, 10) || 8, 1), 20)
 
+  const useFTS = req.query.fts === 'true'
+
   try {
     const promises = []
     const sheetTextSearchClauses = buildSheetTextSearchClauses(query)
@@ -65,70 +68,120 @@ router.get('/', optionalAuth, async (req, res) => {
     const userSearchTake = Math.min(limit * 5, 50)
 
     if (wantSheets) {
-      promises.push(
-        prisma.studySheet.findMany({
-          where: {
-            status: 'published',
-            OR: sheetTextSearchClauses,
-          },
-          select: {
-            id: true,
-            title: true,
-            description: true,
-            stars: true,
-            downloads: true,
-            createdAt: true,
-            course: { select: { id: true, code: true, name: true } },
-            author: { select: { id: true, username: true } },
-          },
-          orderBy: { stars: 'desc' },
-          take: limit,
-        })
-      )
+      if (useFTS) {
+        promises.push(
+          searchSheetsFTS(query, { status: 'published', limit }).then(async (result) => {
+            if (!result.sheets.length) return []
+            const ids = result.sheets.map((s) => Number(s.id))
+            return prisma.studySheet.findMany({
+              where: { id: { in: ids } },
+              select: {
+                id: true, title: true, description: true, stars: true,
+                downloads: true, createdAt: true,
+                course: { select: { id: true, code: true, name: true } },
+                author: { select: { id: true, username: true } },
+              },
+            })
+          })
+        )
+      } else {
+        promises.push(
+          prisma.studySheet.findMany({
+            where: {
+              status: 'published',
+              OR: sheetTextSearchClauses,
+            },
+            select: {
+              id: true,
+              title: true,
+              description: true,
+              stars: true,
+              downloads: true,
+              createdAt: true,
+              course: { select: { id: true, code: true, name: true } },
+              author: { select: { id: true, username: true } },
+            },
+            orderBy: { stars: 'desc' },
+            take: limit,
+          })
+        )
+      }
     } else {
       promises.push(Promise.resolve([]))
     }
 
     if (wantCourses) {
-      promises.push(
-        prisma.course.findMany({
-          where: {
-            OR: [
-              { code: { contains: query, mode: 'insensitive' } },
-              { name: { contains: query, mode: 'insensitive' } },
-            ],
-          },
-          select: {
-            id: true,
-            code: true,
-            name: true,
-            school: { select: { id: true, name: true, short: true } },
-          },
-          orderBy: { code: 'asc' },
-          take: limit,
-        })
-      )
+      if (useFTS) {
+        promises.push(
+          searchCoursesFTS(query, { limit }).then(async (rows) => {
+            if (!rows.length) return []
+            const ids = rows.map((c) => Number(c.id))
+            return prisma.course.findMany({
+              where: { id: { in: ids } },
+              select: {
+                id: true, code: true, name: true,
+                school: { select: { id: true, name: true, short: true } },
+              },
+            })
+          })
+        )
+      } else {
+        promises.push(
+          prisma.course.findMany({
+            where: {
+              OR: [
+                { code: { contains: query, mode: 'insensitive' } },
+                { name: { contains: query, mode: 'insensitive' } },
+              ],
+            },
+            select: {
+              id: true,
+              code: true,
+              name: true,
+              school: { select: { id: true, name: true, short: true } },
+            },
+            orderBy: { code: 'asc' },
+            take: limit,
+          })
+        )
+      }
     } else {
       promises.push(Promise.resolve([]))
     }
 
     if (wantUsers) {
-      promises.push(
-        prisma.user.findMany({
-          where: {
-            username: { contains: query, mode: 'insensitive' },
-          },
-          select: {
-            id: true,
-            username: true,
-            role: true,
-            avatarUrl: true,
-            createdAt: true,
-          },
-          orderBy: { username: 'asc' },
-          take: userSearchTake,
-        })
-      )
+      if (useFTS) {
+        promises.push(
+          searchUsersFTS(query, { limit: userSearchTake }).then(async (rows) => {
+            if (!rows.length) return []
+            const ids = rows.map((u) => Number(u.id))
+            return prisma.user.findMany({
+              where: { id: { in: ids } },
+              select: {
+                id: true, username: true, role: true,
+                avatarUrl: true, createdAt: true,
+              },
+            })
+          })
+        )
+      } else {
+        promises.push(
+          prisma.user.findMany({
+            where: {
+              username: { contains: query, mode: 'insensitive' },
+            },
+            select: {
+              id: true,
+              username: true,
+              role: true,
+              avatarUrl: true,
+              createdAt: true,
+            },
+            orderBy: { username: 'asc' },
+            take: userSearchTake,
+          })
+        )
+      }
     } else {
       promises.push(Promise.resolve([]))
     }

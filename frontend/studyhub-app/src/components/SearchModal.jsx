@@ -5,6 +5,17 @@ import { API } from '../config'
 
 const DEBOUNCE_MS = 300
 
+function Highlight({ text, query }) {
+  if (!query || query.length < 2 || !text) return text
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const parts = text.split(new RegExp(`(${escaped})`, 'gi'))
+  return parts.map((part, i) =>
+    part.toLowerCase() === query.toLowerCase()
+      ? <mark key={i} style={{ background: '#fef08a', color: 'inherit', borderRadius: 2, padding: '0 1px' }}>{part}</mark>
+      : part
+  )
+}
+
 export default function SearchModal({ open, onClose }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState({ sheets: [], courses: [], users: [] })
@@ -116,8 +127,8 @@ export default function SearchModal({ open, onClose }) {
   const hasQuery = query.trim().length >= 2
 
   return (
-    <div style={styles.overlay} onClick={onClose}>
-      <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
+    <div style={styles.overlay} onClick={onClose} role="presentation">
+      <div style={styles.modal} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Search sheets, courses, and users">
         {/* Search input */}
         <div style={styles.inputRow}>
           <IconSearch size={16} style={{ color: '#64748b', flexShrink: 0 }} />
@@ -128,6 +139,7 @@ export default function SearchModal({ open, onClose }) {
             onChange={handleChange}
             onKeyDown={handleKeyDown}
             placeholder="Search sheets, courses, users..."
+            aria-label="Search sheets, courses, and users"
             style={styles.input}
             autoComplete="off"
             spellCheck={false}
@@ -137,6 +149,7 @@ export default function SearchModal({ open, onClose }) {
               onClick={() => { setQuery(''); setResults({ sheets: [], courses: [], users: [] }); inputRef.current?.focus() }}
               style={styles.clearBtn}
               title="Clear"
+              aria-label="Clear search"
             >
               <IconX size={14} />
             </button>
@@ -176,7 +189,7 @@ export default function SearchModal({ open, onClose }) {
                     onClick={() => navigateToItem({ type: 'sheet', data: sheet })}
                     onMouseEnter={() => setActiveIndex(flatIdx)}
                   >
-                    <div style={styles.resultTitle}>{sheet.title}</div>
+                    <div style={styles.resultTitle}><Highlight text={sheet.title} query={query} /></div>
                     <div style={styles.resultMeta}>
                       {sheet.course?.code} &middot; by {sheet.author?.username}
                       {sheet.stars > 0 && <span> &middot; {sheet.stars} stars</span>}
@@ -205,7 +218,7 @@ export default function SearchModal({ open, onClose }) {
                     onClick={() => navigateToItem({ type: 'course', data: course })}
                     onMouseEnter={() => setActiveIndex(flatIdx)}
                   >
-                    <div style={styles.resultTitle}>{course.code} — {course.name}</div>
+                    <div style={styles.resultTitle}><Highlight text={`${course.code} — ${course.name}`} query={query} /></div>
                     <div style={styles.resultMeta}>{course.school?.name}</div>
                   </div>
                 )
@@ -236,7 +249,7 @@ export default function SearchModal({ open, onClose }) {
                         {user.username?.slice(0, 2).toUpperCase()}
                       </div>
                       <div>
-                        <div style={styles.resultTitle}>{user.username}</div>
+                        <div style={styles.resultTitle}><Highlight text={user.username} query={query} /></div>
                         <div style={styles.resultMeta}>{user.role}</div>
                       </div>
                     </div>

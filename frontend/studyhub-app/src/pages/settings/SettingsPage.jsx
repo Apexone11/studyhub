@@ -5,12 +5,19 @@
  * Responsive: On phone, tabs become a horizontal scrollable row.
  * 7 tabs: Profile, Security, Notifications, Privacy, Courses, Appearance, Account
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
+import SafeJoyride from '../../components/SafeJoyride'
 import { API } from '../../config'
 import { useSession } from '../../lib/session-context'
+import { useTutorial } from '../../lib/useTutorial'
+import { SETTINGS_STEPS } from '../../lib/tutorialSteps'
+import { fadeInUp } from '../../lib/animations'
+import { Skeleton } from '../../components/Skeleton'
 import { FONT } from './settingsState'
+import { showToast } from '../../lib/toast'
+import { usePageTitle } from '../../lib/usePageTitle'
 import ProfileTab from './ProfileTab'
 import SecurityTab from './SecurityTab'
 import CoursesTab from './CoursesTab'
@@ -30,12 +37,20 @@ const NAV_TABS = [
 ]
 
 export default function SettingsPage() {
+  usePageTitle('Settings')
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { user: sessionUser, setSessionUser, signOut, clearSession } = useSession()
 
   const initialTab = NAV_TABS.find((t) => t.id === searchParams.get('tab'))?.id || 'profile'
   const [tab, setTab] = useState(initialTab)
+  const tutorial = useTutorial('settings', SETTINGS_STEPS)
+  const tabContentRef = useRef(null)
+
+  /* Animate tab content on switch */
+  useEffect(() => {
+    if (tabContentRef.current) fadeInUp(tabContentRef.current, { duration: 350, y: 10 })
+  }, [tab])
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [busyKey, setBusyKey] = useState('')
@@ -81,14 +96,17 @@ export default function SettingsPage() {
 
       if (!response.ok) {
         setter({ type: 'error', text: data.error || 'Request failed.' })
+        showToast(data.error || 'Request failed.', 'error')
         return
       }
 
       if (data.user) syncUser(data.user)
       setter({ type: 'success', text: data.message || 'Saved.' })
+      showToast(data.message || 'Settings saved.', 'success')
       successHandler?.(data)
     } catch {
       setter({ type: 'error', text: 'Could not connect to the server.' })
+      showToast('Could not connect to the server.', 'error')
     } finally {
       setBusyKey('')
     }
@@ -96,8 +114,15 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#edf0f5', color: '#64748b' }}>
-        Loading settings...
+      <div style={{ minHeight: '100vh', background: '#edf0f5', fontFamily: FONT }}>
+        <Navbar crumbs={[{ label: 'Settings', to: '/settings' }]} hideTabs />
+        <div style={{ maxWidth: 1180, margin: '0 auto', padding: '28px 24px 60px' }}>
+          <div style={{ display: 'grid', gap: 12 }}>
+            <Skeleton width="100%" height={48} borderRadius={12} />
+            <Skeleton width="100%" height={200} borderRadius={16} />
+            <Skeleton width="100%" height={120} borderRadius={16} />
+          </div>
+        </div>
       </div>
     )
   }
@@ -118,13 +143,13 @@ export default function SettingsPage() {
           />
         )
       case 'notifications':
-        return <NotificationsTab />
+        return <div data-tutorial="settings-notifications"><NotificationsTab /></div>
       case 'privacy':
         return <PrivacyTab />
       case 'courses':
         return <CoursesTab user={user} busyKey={busyKey} setBusyKey={setBusyKey} syncUser={syncUser} />
       case 'appearance':
-        return <AppearanceTab />
+        return <div data-tutorial="settings-appearance"><AppearanceTab /></div>
       case 'account':
         return (
           <AccountTab
@@ -161,7 +186,7 @@ export default function SettingsPage() {
 
       <div className="settings-layout" style={{ maxWidth: 1180, margin: '0 auto', padding: '28px 24px 60px' }}>
         <aside>
-          <nav className="settings-nav">
+          <nav className="settings-nav" data-tutorial="settings-tabs">
             {NAV_TABS.map((item) => (
               <button
                 key={item.id}
@@ -191,10 +216,12 @@ export default function SettingsPage() {
           </nav>
         </aside>
 
-        <main>
+        <main id="main-content" ref={tabContentRef}>
           {renderTab()}
         </main>
       </div>
+
+      <SafeJoyride {...tutorial.joyrideProps} />
     </div>
   )
 }

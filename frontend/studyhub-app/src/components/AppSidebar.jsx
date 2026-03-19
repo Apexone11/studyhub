@@ -130,7 +130,7 @@ export default function AppSidebar({ mode = 'fixed' }) {
       </div>
 
       {/* Nav links */}
-      <nav style={{
+      <nav aria-label="Sidebar navigation" style={{
         background: '#fff', borderRadius: 16,
         border: '1px solid #e8ecf0',
         boxShadow: '0 2px 10px rgba(15,23,42,0.05)',

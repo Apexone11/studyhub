@@ -7,17 +7,26 @@
  *
  * Polling: Announcements refresh every 20 seconds via useLivePolling.
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
 import AppSidebar from '../../components/AppSidebar'
+import SafeJoyride from '../../components/SafeJoyride'
+import MentionText from '../../components/MentionText'
 import { IconPlus } from '../../components/Icons'
 import { API } from '../../config'
 import { useSession } from '../../lib/session-context'
 import { useLivePolling } from '../../lib/useLivePolling'
+import { useTutorial } from '../../lib/useTutorial'
+import { ANNOUNCEMENTS_STEPS } from '../../lib/tutorialSteps'
+import { staggerEntrance } from '../../lib/animations'
+import { usePageTitle } from '../../lib/usePageTitle'
+import { SkeletonFeed } from '../../components/Skeleton'
 import { PageShell } from '../shared/pageScaffold'
 import { PAGE_FONT, authHeaders, timeAgo } from '../shared/pageUtils'
 
 export default function AnnouncementsPage() {
+  usePageTitle('Announcements')
   const { user } = useSession()
   const isAdmin = user?.role === 'admin'
 
@@ -30,6 +39,19 @@ export default function AnnouncementsPage() {
   const [pinned, setPinned] = useState(false)
   const [posting, setPosting] = useState(false)
   const [postError, setPostError] = useState('')
+
+  const cardsRef = useRef(null)
+  const animatedRef = useRef(false)
+
+  /* Tutorial */
+  const tutorial = useTutorial('announcements', ANNOUNCEMENTS_STEPS)
+
+  /* Animate cards on first load */
+  useEffect(() => {
+    if (loading || animatedRef.current || announcements.length === 0) return
+    animatedRef.current = true
+    if (cardsRef.current) staggerEntrance(cardsRef.current.children, { staggerMs: 70, duration: 400, y: 14 })
+  }, [loading, announcements.length])
 
   /* ── Live polling (20s interval) ─────────────────────────────────────── */
   async function loadAnnouncements({ signal, startTransition } = {}) {
@@ -96,14 +118,14 @@ export default function AnnouncementsPage() {
   return (
     <PageShell nav={<Navbar crumbs={[{ label: 'Announcements', to: '/announcements' }]} hideTabs actions={navActions} />} sidebar={<AppSidebar />}>
       {/* Page header */}
-      <div style={{ marginBottom: 18 }}>
+      <div data-tutorial="announcements-header" style={{ marginBottom: 18 }}>
         <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', marginBottom: 4 }}>Announcements</h1>
         <p style={{ fontSize: 13, color: '#64748b' }}>Official updates from the StudyHub team.</p>
       </div>
 
       {/* Admin post form */}
       {isAdmin && showForm ? (
-        <form onSubmit={handlePost} style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', padding: '20px 22px', marginBottom: 18, boxShadow: '0 2px 10px rgba(15,23,42,0.05)' }}>
+        <form data-tutorial="announcements-form" onSubmit={handlePost} style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', padding: '20px 22px', marginBottom: 18, boxShadow: '0 2px 10px rgba(15,23,42,0.05)' }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', marginBottom: 14 }}>New Announcement</div>
           <input
             value={title}
@@ -134,47 +156,65 @@ export default function AnnouncementsPage() {
       ) : null}
 
       {/* Loading state */}
-      {loading ? <div style={{ color: '#94a3b8', fontSize: 13, padding: '20px 0' }}>Loading…</div> : null}
+      {loading ? <SkeletonFeed count={3} /> : null}
 
       {/* Empty state */}
       {!loading && announcements.length === 0 ? (
-        <div style={{ background: '#fff', borderRadius: 16, border: '1.5px dashed #cbd5e1', padding: '48px 24px', textAlign: 'center' }}>
-          <div style={{ fontSize: 36, color: '#cbd5e1', marginBottom: 12 }}>📢</div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>No announcements yet</div>
-          <div style={{ fontSize: 12, color: '#94a3b8' }}>Check back later for updates from the StudyHub team.</div>
+        <div style={{ background: 'var(--sh-surface, #fff)', borderRadius: 16, border: '2px dashed var(--sh-border, #cbd5e1)', padding: '52px 24px', textAlign: 'center' }}>
+          <div style={{ width: 56, height: 56, borderRadius: 14, background: 'linear-gradient(135deg, #fef3c7, #fde68a)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
+            </svg>
+          </div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--sh-heading, #0f172a)', marginBottom: 6 }}>No announcements yet</div>
+          <div style={{ fontSize: 13, color: 'var(--sh-muted, #94a3b8)', lineHeight: 1.6 }}>Check back later for official updates from the StudyHub team.</div>
         </div>
       ) : null}
 
       {/* Announcement cards */}
-      <div style={{ display: 'grid', gap: 12 }}>
+      <div ref={cardsRef} data-tutorial="announcements-list" style={{ display: 'grid', gap: 14 }}>
         {announcements.map((a) => a.pinned ? (
           /* Pinned announcement card — yellow highlight */
-          <article key={a.id} style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 16, padding: '18px 22px', boxShadow: '0 2px 10px rgba(245,158,11,0.08)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-              <span style={{ fontSize: 10, fontWeight: 800, color: '#92400e', letterSpacing: '.08em', background: '#fef3c7', padding: '2px 8px', borderRadius: 99 }}>📌 PINNED</span>
+          <article key={a.id} className="announcement-card-pinned" style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 16, padding: '20px 24px', boxShadow: '0 2px 12px rgba(245,158,11,0.1)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <span style={{ fontSize: 10, fontWeight: 800, color: '#92400e', letterSpacing: '.08em', background: '#fef3c7', padding: '3px 10px', borderRadius: 99, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M16 2L17.41 3.41 13.34 7.48l2.12 2.12 4.07-4.07L21 7V2h-5zM3.41 20.59l7.07-7.07 2.12 2.12L5.53 22.71l-2.12-2.12z"/></svg>
+                PINNED
+              </span>
               <span style={{ fontSize: 11, color: '#b45309' }}>{timeAgo(a.createdAt)}</span>
             </div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#92400e', marginBottom: 8 }}>{a.title}</div>
-            <div style={{ fontSize: 13, color: '#78350f', lineHeight: 1.7, marginBottom: 10, whiteSpace: 'pre-wrap' }}>{a.body}</div>
-            <div style={{ fontSize: 12, color: '#b45309' }}>Posted by <strong>{a.author?.username}</strong></div>
+            <div style={{ fontSize: 17, fontWeight: 800, color: '#92400e', marginBottom: 8 }}>{a.title}</div>
+            <div style={{ fontSize: 13, color: '#78350f', lineHeight: 1.8, marginBottom: 12, whiteSpace: 'pre-wrap' }}>
+              <MentionText text={a.body} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#b45309' }}>
+              <span style={{ width: 22, height: 22, borderRadius: '50%', background: '#92400e', color: '#fef3c7', display: 'grid', placeItems: 'center', fontSize: 9, fontWeight: 800, flexShrink: 0 }}>
+                {(a.author?.username || '?').slice(0, 2).toUpperCase()}
+              </span>
+              <Link to={`/users/${a.author?.username}`} style={{ fontWeight: 700, color: '#92400e', textDecoration: 'none' }}>{a.author?.username}</Link>
+            </div>
           </article>
         ) : (
           /* Regular announcement card */
-          <article key={a.id} style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', padding: '18px 22px', boxShadow: '0 2px 10px rgba(15,23,42,0.04)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-              <span style={{ width: 32, height: 32, borderRadius: '50%', background: '#0f172a', color: '#fff', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 800, flexShrink: 0 }}>
+          <article key={a.id} className="announcement-card" style={{ background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', padding: '20px 24px', boxShadow: '0 2px 10px rgba(15,23,42,0.04)', transition: 'box-shadow .15s' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+              <span style={{ width: 36, height: 36, borderRadius: '50%', background: '#0f172a', color: '#fff', display: 'grid', placeItems: 'center', fontSize: 13, fontWeight: 800, flexShrink: 0 }}>
                 {(a.author?.username || '?').slice(0, 2).toUpperCase()}
               </span>
               <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{a.author?.username}</div>
+                <Link to={`/users/${a.author?.username}`} style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', textDecoration: 'none' }}>{a.author?.username}</Link>
                 <div style={{ fontSize: 11, color: '#94a3b8' }}>{timeAgo(a.createdAt)}</div>
               </div>
             </div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', marginBottom: 6 }}>{a.title}</div>
-            <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{a.body}</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', marginBottom: 6 }}>{a.title}</div>
+            <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>
+              <MentionText text={a.body} />
+            </div>
           </article>
         ))}
       </div>
+
+      <SafeJoyride {...tutorial.joyrideProps} />
     </PageShell>
   )
 }

@@ -398,7 +398,7 @@ export default function RegisterScreen() {
       <div style={{ position: 'absolute', bottom: -100, left: -100, width: 350, height: 350, borderRadius: '50%', background: 'rgba(139, 92, 246, 0.06)', filter: 'blur(80px)', pointerEvents: 'none' }} />
 
       {/* ── Main card ──────────────────────────────────────────────── */}
-      <div ref={cardRef} style={{ padding: '48px 20px 80px', display: 'grid', placeItems: 'center', position: 'relative', zIndex: 1 }}>
+      <main id="main-content" ref={cardRef} style={{ padding: '48px 20px 80px', display: 'grid', placeItems: 'center', position: 'relative', zIndex: 1 }}>
         <div
           style={{
             width: 'min(92vw, 580px)',
@@ -451,7 +451,7 @@ export default function RegisterScreen() {
 
           {/* ── Error/success messages ──────────────────────────────── */}
           {error && (
-            <div style={{
+            <div role="alert" style={{
               marginBottom: 16, padding: '12px 14px', borderRadius: 12,
               border: '1px solid #fecaca', background: '#fef2f2', color: '#b91c1c',
               fontSize: 13, lineHeight: 1.6,
@@ -820,7 +820,7 @@ export default function RegisterScreen() {
             </Link>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   )
 }

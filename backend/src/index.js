@@ -33,8 +33,13 @@ const notificationsRoutes = require('./routes/notifications')
 const usersRoutes = require('./routes/users')
 const previewRoutes = require('./routes/preview')
 const searchRoutes = require('./routes/search')
+const sheetLabRoutes = require('./routes/sheetLab')
 const webhookRoutes = require('./routes/webhooks')
 const { adminRouter: moderationAdminRoutes, userRouter: moderationUserRoutes } = require('./routes/moderation')
+const provenanceRoutes = require('./routes/provenance')
+const featureFlagRoutes = require('./routes/featureFlags')
+const webauthnRoutes = require('./routes/webauthn')
+const { featureFlagMiddleware } = require('./lib/featureFlags')
 
 if (sentryEnabled) {
     console.log('Sentry monitoring enabled for backend.')
@@ -218,6 +223,9 @@ app.use((req, _res, next) => {
 // Skips GET/HEAD/OPTIONS, unauthenticated requests, and admin users.
 app.use(checkRestrictions)
 
+// Attach feature flag evaluation helper to every request.
+app.use(featureFlagMiddleware)
+
 // Only avatars remain publicly retrievable. Study attachments now stay behind
 // auth-checked preview/download handlers.
 app.use('/uploads/avatars', express.static(AVATARS_DIR, {
@@ -239,6 +247,9 @@ app.use('/api/courses', courseRoutes)
 
 // Mount study sheet endpoints under /api/sheets.
 app.use('/api/sheets', sheetRoutes)
+
+// Mount Sheet Lab (version control) endpoints under /api/sheets/:id/lab.
+app.use('/api/sheets', sheetLabRoutes)
 
 // Mount feed endpoints under /api/feed.
 app.use('/api/feed', feedRoutes)
@@ -275,6 +286,15 @@ app.use('/api/users', usersRoutes)
 
 // Mount unified search endpoints under /api/search.
 app.use('/api/search', searchRoutes)
+
+// Mount provenance manifest endpoints under /api/provenance.
+app.use('/api/provenance', provenanceRoutes)
+
+// Mount feature flag endpoints under /api/flags.
+app.use('/api/flags', featureFlagRoutes)
+
+// Mount WebAuthn passkey endpoints under /api/webauthn.
+app.use('/api/webauthn', webauthnRoutes)
 
 // Basic API health check.
 app.get('/', (req, res) => {

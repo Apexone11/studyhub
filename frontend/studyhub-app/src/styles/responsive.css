@@ -210,8 +210,8 @@
   .settings-nav {
     flex-direction: row;
     overflow-x: auto;
-    gap: 4px;
-    padding-bottom: 4px;
+    gap: 6px;
+    padding-bottom: 6px;
   }
 
   .settings-nav::-webkit-scrollbar {
@@ -274,8 +274,12 @@
 
 /* ── Admin tables: constrain width on phone so horizontal scroll works ── */
 @media (max-width: 767px) {
+  .admin-stats-grid ~ section {
+    overflow-x: auto;
+  }
   .admin-stats-grid ~ section table {
     font-size: 12px;
+    min-width: 600px;
   }
 }
 

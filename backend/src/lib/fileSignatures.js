@@ -45,6 +45,10 @@ function detectFileSignature(filePath) {
     ) {
       return { mime: 'image/webp', type: 'image' }
     }
+    // ZIP-based formats (DOCX, XLSX, PPTX, plain ZIP)
+    if (head.length >= 4 && head[0] === 0x50 && head[1] === 0x4b && head[2] === 0x03 && head[3] === 0x04) {
+      return { mime: 'application/zip', type: 'archive' }
+    }
 
     return null
   } catch {
@@ -58,6 +62,40 @@ function detectFileSignature(filePath) {
       }
     }
   }
+}
+
+// MIME types that share the same magic bytes (ZIP-based Office formats)
+const ZIP_COMPATIBLE_MIMES = new Set([
+  'application/zip',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+])
+
+function validateMagicBytes(filePath, declaredMimeType) {
+  const detected = detectFileSignature(filePath)
+  const declared = String(declaredMimeType || '').toLowerCase()
+
+  if (!detected) {
+    return { valid: false, detectedType: null, declaredType: declared }
+  }
+
+  // Exact match
+  if (detected.mime === declared) {
+    return { valid: true, detectedType: detected.mime, declaredType: declared }
+  }
+
+  // JPEG has multiple valid MIME representations
+  if (detected.mime === 'image/jpeg' && declared === 'image/jpg') {
+    return { valid: true, detectedType: detected.mime, declaredType: declared }
+  }
+
+  // ZIP-based Office formats all share the PK magic bytes
+  if (detected.mime === 'application/zip' && ZIP_COMPATIBLE_MIMES.has(declared)) {
+    return { valid: true, detectedType: detected.mime, declaredType: declared }
+  }
+
+  return { valid: false, detectedType: detected.mime, declaredType: declared }
 }
 
 function signatureMatchesExpected(filePath, expectedMimes = []) {
@@ -84,4 +122,5 @@ function signatureMatchesExpected(filePath, expectedMimes = []) {
 module.exports = {
   detectFileSignature,
   signatureMatchesExpected,
+  validateMagicBytes,
 }
