@@ -1,25 +1,8 @@
-/* ═══════════════════════════════════════════════════════════════════════════
- * SheetsPage.jsx — Browse, star, and download study sheets
- *
- * Layout (responsive via CSS class `app-three-col-grid` in responsive.css):
- *   Desktop: sidebar (250px) | main content (flex) | quick-view aside (300px)
- *   Tablet:  sidebar trigger (auto) | main + aside (280px)
- *   Phone:   single column
- *
- * Filter bar uses `sheets-filter-grid` class for responsive wrapping.
- * Card grid uses `sheets-card-grid` class (2-col on tablet, 1-col phone).
- *
- * Features: search, school/course/sort filters, Mine/Starred toggles,
- * star/download actions, live polling, sheet quick-view panel.
- *
- * Tutorial: First-visit Joyride highlights search, filters, upload, toggles.
- * ═══════════════════════════════════════════════════════════════════════════ */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
 import AppSidebar from '../../components/AppSidebar'
 import {
-  IconDownload,
   IconFork,
   IconSearch,
   IconStar,
@@ -38,9 +21,21 @@ import { SkeletonSheetGrid } from '../../components/Skeleton'
 import SafeJoyride from '../../components/SafeJoyride'
 import { useTutorial } from '../../lib/useTutorial'
 import { SHEETS_STEPS } from '../../lib/tutorialSteps'
+import './SheetsPage.css'
 
-/* ── Shared constants ──────────────────────────────────────────────────── */
-const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
+const SORT_OPTIONS = [
+  { value: 'createdAt', label: 'Recent' },
+  { value: 'stars', label: 'Stars' },
+  { value: 'forks', label: 'Forks' },
+  { value: 'updatedAt', label: 'Updated' },
+]
+
+const FORMAT_OPTIONS = [
+  { value: 'all', label: 'All formats' },
+  { value: 'markdown', label: 'Markdown' },
+  { value: 'html', label: 'HTML' },
+  { value: 'pdf', label: 'PDF' },
+]
 
 function authHeaders() {
   return { 'Content-Type': 'application/json' }
@@ -57,173 +52,213 @@ function timeAgo(value) {
   return `${Math.floor(seconds / 86400)}d ago`
 }
 
-function courseTone(code = '') {
-  const prefix = code.replace(/\d.*/, '').toUpperCase()
-  const palette = {
-    CMSC: ['#ede9fe', '#6d28d9'],
-    MATH: ['#d1fae5', '#047857'],
-    ENGL: ['#fef3c7', '#b45309'],
-    PHYS: ['#e0f2fe', '#0369a1'],
-    BIOL: ['#fce7f3', '#be185d'],
-    HIST: ['#e0e7ff', '#4338ca'],
-    ECON: ['#ccfbf1', '#0f766e'],
-    CHEM: ['#ffedd5', '#c2410c'],
-  }
-  return palette[prefix] || ['#eff6ff', '#1d4ed8']
+function resolveSheetFormat(sheet) {
+  const attachmentType = String(sheet?.attachmentType || '').toLowerCase()
+  if (attachmentType.includes('pdf')) return 'pdf'
+  const contentFormat = String(sheet?.contentFormat || '').toLowerCase()
+  if (contentFormat === 'html') return 'html'
+  return 'markdown'
 }
 
-function panelStyle() {
-  return {
-    background: '#fff',
-    borderRadius: 18,
-    border: '1px solid #e2e8f0',
-    padding: 18,
-  }
+function formatBadgeText(format) {
+  if (format === 'html') return 'HTML'
+  if (format === 'pdf') return 'PDF'
+  return 'MD'
 }
 
-function SheetCard({ sheet, onStar }) {
-  const [background, tone] = courseTone(sheet.course?.code)
+function SheetListRow({ sheet, forking, onOpen, onStar, onFork }) {
+  const format = resolveSheetFormat(sheet)
+  const authorName = sheet.author?.username || 'Unknown author'
+  const schoolLabel = sheet.course?.school?.short || sheet.course?.school?.name || 'StudyHub'
+  const preview = (sheet.description || sheet.content || 'No summary available yet.').replace(/\s+/g, ' ').trim()
+
+  const handleRowKeyDown = (event) => {
+    if (event.target !== event.currentTarget) return
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      onOpen(sheet.id)
+    }
+  }
+
   return (
-    <article style={{ ...panelStyle(), padding: 20 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'flex-start' }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
-            <span
-              style={{
-                borderRadius: 999,
-                background,
-                color: tone,
-                padding: '4px 10px',
-                fontSize: 11,
-                fontWeight: 800,
-                letterSpacing: '.05em',
-              }}
-            >
-              {sheet.course?.code || 'General'}
+    <article
+      className="sheets-repo-row"
+      role="link"
+      tabIndex={0}
+      onClick={() => onOpen(sheet.id)}
+      onKeyDown={handleRowKeyDown}
+      aria-label={`Open ${sheet.title}`}
+    >
+      <div className="sheets-repo-row__main">
+        <h2 className="sheets-repo-row__title">
+          <Link to={`/sheets/${sheet.id}`} onClick={(event) => event.stopPropagation()}>
+            {sheet.title}
+          </Link>
+        </h2>
+        <p className="sheets-repo-row__description">{preview}</p>
+        <div className="sheets-repo-row__meta">
+          <span>{sheet.course?.code || 'General'} · {schoolLabel}</span>
+          <span aria-hidden="true">•</span>
+          {sheet.author?.username ? (
+            <span>
+              by{' '}
+              <Link to={`/users/${sheet.author.username}`} onClick={(event) => event.stopPropagation()}>
+                {sheet.author.username}
+              </Link>
             </span>
-            {sheet.course?.school?.short || sheet.course?.school?.name ? (
-              <span style={{ color: '#94a3b8', fontSize: 12 }}>
-                {sheet.course.school.short || sheet.course.school.name}
-              </span>
-            ) : null}
-            <span style={{ color: '#94a3b8', fontSize: 12 }}>{timeAgo(sheet.createdAt)}</span>
-          </div>
-          <Link to={`/sheets/${sheet.id}`} style={{ display: 'block', color: '#0f172a', textDecoration: 'none', marginBottom: 8 }}>
-            <h2 style={{ margin: 0, fontSize: 19 }}>{sheet.title}</h2>
-          </Link>
-          <p style={{ margin: '0 0 12px', color: '#475569', fontSize: 14, lineHeight: 1.7 }}>
-            {sheet.description || sheet.content?.slice(0, 180) || 'No preview yet.'}
-          </p>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <span style={metricPill()}>{sheet.author?.username || 'Unknown author'}</span>
-            <span style={metricPill()}>{sheet.commentCount || 0} comments</span>
-            <span style={metricPill()}>{sheet.downloads || 0} downloads</span>
-            <span style={metricPill()}><IconFork size={13} /> {sheet.forks || 0} forks</span>
-          </div>
+          ) : (
+            <span>by {authorName}</span>
+          )}
+          <span aria-hidden="true">•</span>
+          <span>Updated {timeAgo(sheet.updatedAt || sheet.createdAt)}</span>
+          <span aria-hidden="true">•</span>
+          <span className={`sh-pill sheets-repo-row__format sheets-repo-row__format--${format}`}>
+            {formatBadgeText(format)}
+          </span>
         </div>
-        <div style={{ display: 'grid', gap: 10, justifyItems: 'end' }}>
-          <button type="button" onClick={() => onStar(sheet)} style={actionButton(sheet.starred ? '#f59e0b' : '#475569')}>
-            {sheet.starred ? <IconStarFilled size={14} /> : <IconStar size={14} />}
+      </div>
+
+      <div className="sheets-repo-row__side">
+        <div className="sheets-repo-row__stats" aria-label="Sheet stats">
+          <span className="sheets-repo-row__stat">
+            <IconStar size={13} />
             {sheet.stars || 0}
+          </span>
+          <span className="sheets-repo-row__stat">
+            <IconFork size={13} />
+            {sheet.forks || 0}
+          </span>
+        </div>
+        <div className="sheets-repo-row__actions">
+          <button
+            type="button"
+            className={`sh-btn sh-btn--secondary sh-btn--sm sheets-repo-row__action ${sheet.starred ? 'is-active' : ''}`}
+            onClick={(event) => {
+              event.stopPropagation()
+              onStar(sheet)
+            }}
+            aria-pressed={Boolean(sheet.starred)}
+            aria-label={`Star ${sheet.title}`}
+          >
+            {sheet.starred ? <IconStarFilled size={13} /> : <IconStar size={13} />}
+            Star
           </button>
-          <Link to={`/sheets/${sheet.id}`} style={linkButton()}>
-            <IconDownload size={14} />
-            Open
-          </Link>
+          <button
+            type="button"
+            className="sh-btn sh-btn--secondary sh-btn--sm sheets-repo-row__action"
+            onClick={(event) => {
+              event.stopPropagation()
+              onFork(sheet)
+            }}
+            disabled={forking}
+            aria-label={`Fork ${sheet.title}`}
+          >
+            <IconFork size={13} />
+            {forking ? 'Forking...' : 'Fork'}
+          </button>
         </div>
       </div>
     </article>
   )
 }
 
-function actionButton(color) {
-  return {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 6,
-    borderRadius: 999,
-    border: '1px solid #e2e8f0',
-    background: '#fff',
-    color,
-    padding: '8px 12px',
-    fontSize: 12,
-    fontWeight: 700,
-    cursor: 'pointer',
-    fontFamily: FONT,
-  }
-}
-
-function linkButton() {
-  return {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 6,
-    borderRadius: 999,
-    border: '1px solid #dbeafe',
-    background: '#eff6ff',
-    color: '#1d4ed8',
-    padding: '8px 12px',
-    fontSize: 12,
-    fontWeight: 700,
-    textDecoration: 'none',
-  }
-}
-
-function metricPill() {
-  return {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 6,
-    borderRadius: 999,
-    border: '1px solid #e2e8f0',
-    background: '#f8fafc',
-    padding: '7px 11px',
-    fontSize: 12,
-    color: '#64748b',
-    fontWeight: 700,
-  }
-}
-
 export default function SheetsPage() {
   usePageTitle('Study Sheets')
+  const navigate = useNavigate()
   const { user, clearSession } = useSession()
   const layout = useResponsiveAppLayout()
   const [searchParams, setSearchParams] = useSearchParams()
-  const [catalog, setCatalog] = useState([])             // school+course catalog for filters
-  const [sheetsState, setSheetsState] = useState({ sheets: [], total: 0, loading: true, error: '' })
+  const [catalog, setCatalog] = useState([])
   const [catalogError, setCatalogError] = useState('')
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
+  const [forkingSheetId, setForkingSheetId] = useState(null)
+  const [sheetsState, setSheetsState] = useState({ sheets: [], total: 0, loading: true, error: '' })
   const cardsRef = useRef(null)
   const animatedRef = useRef(false)
 
-  /* ── Query parameters drive the filter state (URL-as-truth) ──────────── */
   const search = searchParams.get('search') || ''
   const schoolId = searchParams.get('schoolId') || ''
   const courseId = searchParams.get('courseId') || ''
   const mine = searchParams.get('mine') === '1'
   const starred = searchParams.get('starred') === '1'
-  const orderBy = searchParams.get('sort') || 'createdAt'
+  const sortValue = SORT_OPTIONS.some((option) => option.value === searchParams.get('sort'))
+    ? searchParams.get('sort')
+    : 'createdAt'
+  const formatValue = FORMAT_OPTIONS.some((option) => option.value === searchParams.get('format'))
+    ? searchParams.get('format')
+    : 'all'
 
-  /* Tutorial popup — first-visit or re-trigger via floating "?" button */
   const tutorial = useTutorial('sheets', SHEETS_STEPS)
 
-  /* Animate sheet cards on first load */
   useEffect(() => {
     if (sheetsState.loading || animatedRef.current || sheetsState.sheets.length === 0) return
     animatedRef.current = true
-    if (cardsRef.current) staggerEntrance(cardsRef.current.children, { staggerMs: 60, duration: 400, y: 14 })
+    if (cardsRef.current) {
+      staggerEntrance(cardsRef.current.children, { staggerMs: 45, duration: 300, y: 8 })
+    }
   }, [sheetsState.loading, sheetsState.sheets.length])
 
   const setQueryParam = useCallback((key, value) => {
     const next = new URLSearchParams(searchParams)
     if (value) next.set(key, value)
     else next.delete(key)
-    if (key === 'schoolId' && !value) next.delete('courseId')
     setSearchParams(next, { replace: true })
   }, [searchParams, setSearchParams])
+
+  const handleSchoolChange = useCallback((value) => {
+    const next = new URLSearchParams(searchParams)
+    if (value) next.set('schoolId', value)
+    else next.delete('schoolId')
+
+    if (!value) {
+      next.delete('courseId')
+    } else {
+      const selectedSchool = catalog.find((school) => String(school.id) === String(value))
+      const currentCourseId = next.get('courseId')
+      const hasCourse = (selectedSchool?.courses || []).some((course) => String(course.id) === String(currentCourseId))
+      if (currentCourseId && !hasCourse) {
+        next.delete('courseId')
+      }
+    }
+
+    setSearchParams(next, { replace: true })
+  }, [catalog, searchParams, setSearchParams])
+
+  const allCourses = useMemo(
+    () => catalog.flatMap((school) =>
+      (school.courses || []).map((course) => ({ ...course, school }))),
+    [catalog],
+  )
 
   const activeSchool = useMemo(
     () => catalog.find((school) => String(school.id) === schoolId) || null,
     [catalog, schoolId],
+  )
+
+  const availableCourses = useMemo(() => {
+    if (!activeSchool) return allCourses
+    return (activeSchool.courses || []).map((course) => ({ ...course, school: activeSchool }))
+  }, [activeSchool, allCourses])
+
+  const selectedCourse = useMemo(
+    () => allCourses.find((course) => String(course.id) === courseId) || null,
+    [allCourses, courseId],
+  )
+
+  const subtitle = useMemo(() => {
+    if (selectedCourse) {
+      const schoolLabel = selectedCourse.school?.short || selectedCourse.school?.name || 'StudyHub'
+      return `${selectedCourse.code} — ${selectedCourse.name} · ${schoolLabel}`
+    }
+    if (activeSchool) {
+      return `Browse sheets shared in ${activeSchool.short || activeSchool.name}.`
+    }
+    return 'Browse, star, and fork study sheets shared by your classmates.'
+  }, [activeSchool, selectedCourse])
+
+  const hasActiveFilters = Boolean(
+    search || schoolId || courseId || mine || starred || formatValue !== 'all' || sortValue !== 'createdAt',
   )
 
   useEffect(() => {
@@ -258,7 +293,11 @@ export default function SheetsPage() {
   const loadCatalog = useCallback(async ({ signal, startTransition } = {}) => {
     const apply = startTransition || ((fn) => fn())
     try {
-      const response = await fetch(`${API}/api/courses/schools`, { headers: authHeaders(), credentials: 'include', signal })
+      const response = await fetch(`${API}/api/courses/schools`, {
+        headers: authHeaders(),
+        credentials: 'include',
+        signal,
+      })
       const data = await response.json().catch(() => [])
       if (!response.ok) {
         throw new Error('Could not load schools.')
@@ -275,12 +314,14 @@ export default function SheetsPage() {
 
   const loadSheets = useCallback(async ({ signal, startTransition } = {}) => {
     const apply = startTransition || ((fn) => fn())
-    const params = new URLSearchParams({ limit: '24', sort: orderBy })
+    const params = new URLSearchParams({ limit: '24', sort: sortValue })
+
     if (search) params.set('search', search)
     if (schoolId) params.set('schoolId', schoolId)
     if (courseId) params.set('courseId', courseId)
     if (mine) params.set('mine', '1')
     if (starred) params.set('starred', '1')
+    if (formatValue !== 'all') params.set('format', formatValue)
 
     try {
       const response = await fetch(`${API}/api/sheets?${params.toString()}`, {
@@ -329,19 +370,27 @@ export default function SheetsPage() {
         }))
       })
     }
-  }, [clearSession, courseId, mine, orderBy, schoolId, search, starred])
+  }, [clearSession, courseId, formatValue, mine, schoolId, search, sortValue, starred])
 
-  const [loadingMore, setLoadingMore] = useState(false)
-  const loadMoreSheets = async () => {
+  const loadMoreSheets = useCallback(async () => {
     setLoadingMore(true)
-    const params = new URLSearchParams({ limit: '24', offset: String(sheetsState.sheets.length), sort: orderBy })
+    const params = new URLSearchParams({
+      limit: '24',
+      offset: String(sheetsState.sheets.length),
+      sort: sortValue,
+    })
     if (search) params.set('search', search)
     if (schoolId) params.set('schoolId', schoolId)
     if (courseId) params.set('courseId', courseId)
     if (mine) params.set('mine', '1')
     if (starred) params.set('starred', '1')
+    if (formatValue !== 'all') params.set('format', formatValue)
+
     try {
-      const response = await fetch(`${API}/api/sheets?${params.toString()}`, { headers: authHeaders(), credentials: 'include' })
+      const response = await fetch(`${API}/api/sheets?${params.toString()}`, {
+        headers: authHeaders(),
+        credentials: 'include',
+      })
       const data = await readJsonSafely(response, {})
       if (response.ok && Array.isArray(data.sheets)) {
         setSheetsState((current) => ({
@@ -350,9 +399,12 @@ export default function SheetsPage() {
           total: data.total || current.total,
         }))
       }
-    } catch { /* silent */ }
-    finally { setLoadingMore(false) }
-  }
+    } catch {
+      // Keep current list if load-more fails.
+    } finally {
+      setLoadingMore(false)
+    }
+  }, [courseId, formatValue, mine, schoolId, search, sheetsState.sheets.length, sortValue, starred])
 
   useLivePolling(loadCatalog, {
     enabled: Boolean(user),
@@ -362,8 +414,12 @@ export default function SheetsPage() {
   useLivePolling(loadSheets, {
     enabled: Boolean(user),
     intervalMs: 45000,
-    refreshKey: `${search}|${schoolId}|${courseId}|${mine}|${starred}|${orderBy}`,
+    refreshKey: `${search}|${schoolId}|${courseId}|${mine}|${starred}|${sortValue}|${formatValue}`,
   })
+
+  const clearAllFilters = useCallback(() => {
+    setSearchParams(new URLSearchParams(), { replace: true })
+  }, [setSearchParams])
 
   const toggleStar = async (sheet) => {
     try {
@@ -386,257 +442,280 @@ export default function SheetsPage() {
       }))
     } catch (error) {
       showToast(error.message || 'Could not update the star.', 'error')
-      setSheetsState((current) => ({ ...current, error: error.message || 'Could not update the star.' }))
+      setSheetsState((current) => ({
+        ...current,
+        error: error.message || 'Could not update the star.',
+      }))
+    }
+  }
+
+  const handleFork = async (sheet) => {
+    if (forkingSheetId === sheet.id) return
+    setForkingSheetId(sheet.id)
+    try {
+      const response = await fetch(`${API}/api/sheets/${sheet.id}/fork`, {
+        method: 'POST',
+        headers: authHeaders(),
+        credentials: 'include',
+        body: JSON.stringify({}),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(data.error || 'Could not fork this sheet.')
+      }
+      showToast('Sheet forked! Redirecting to editor…', 'success')
+      navigate(`/sheets/${data.id}/edit`)
+    } catch (error) {
+      showToast(error.message || 'Could not fork this sheet.', 'error')
+    } finally {
+      setForkingSheetId(null)
     }
   }
 
   return (
     <>
       <Navbar />
-      <div style={{ background: '#edf0f5', minHeight: '100vh', fontFamily: FONT }}>
+      <div className="sheets-page">
         <div style={pageShell('app', 26, 48)}>
-          {/* 3-column responsive grid: sidebar | sheets list | quick view
-           * Desktop: all 3 columns visible
-           * Tablet:  sidebar trigger (auto) + sheets + quick view
-           * Phone:   single column, everything stacked */}
           <div className="app-three-col-grid">
             <AppSidebar mode={layout.sidebarMode} />
 
-            <main id="main-content" style={{ display: 'grid', gap: 16 }}>
-              <section style={panelStyle()}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap', marginBottom: 14 }}>
+            <main id="main-content" className="sheets-page__main">
+              <section className="sh-card sheets-page__title-card">
+                <div className="sheets-page__title-row">
                   <div>
-                    <h1 style={{ margin: 0, fontSize: 28, color: '#0f172a' }}>Study Sheets</h1>
-                    <p style={{ margin: '6px 0 0', fontSize: 13, color: '#64748b' }}>
-                      Browse, star, and download study sheets shared by your classmates.
-                    </p>
+                    <h1 className="sheets-page__title">Study Sheets</h1>
+                    <p className="sheets-page__subtitle">{subtitle}</p>
                   </div>
-                  <Link data-tutorial="sheets-upload" to="/sheets/upload" style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 8, borderRadius: 12,
-                    background: 'linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)',
-                    color: '#fff', padding: '10px 18px', fontSize: 13, fontWeight: 700,
-                    textDecoration: 'none', boxShadow: '0 2px 8px rgba(37,99,235,0.25)',
-                    transition: 'transform 0.15s, box-shadow 0.15s',
-                  }}>
+                  <Link data-tutorial="sheets-upload" to="/sheets/upload" className="sh-btn sh-btn--primary sheets-page__upload-cta">
                     <IconUpload size={14} />
                     Upload a sheet
                   </Link>
                 </div>
+              </section>
 
-                {/* Filter bar: responsive via CSS class sheets-filter-grid */}
-                <div className="sheets-filter-grid" data-tutorial="sheets-filters">
-                  <label data-tutorial="sheets-search" style={{ position: 'relative' }}>
-                    <IconSearch size={15} style={{ position: 'absolute', left: 12, top: 12, color: '#94a3b8' }} />
+              <section className="sh-card sheets-page__filters-card">
+                <div className="sheets-page__mobile-search-row">
+                  <label className="sheets-page__search-wrap">
+                    <IconSearch size={15} className="sheets-page__search-icon" />
                     <input
+                      className="sh-input sheets-page__search-input"
                       value={search}
                       onChange={(event) => setQueryParam('search', event.target.value)}
-                      placeholder="Search by title, description..."
-                      style={{ width: '100%', borderRadius: 12, border: '1px solid #cbd5e1', padding: '10px 12px 10px 36px', fontSize: 13, fontFamily: FONT }}
+                      placeholder="Search sheets, topics, or authors..."
                     />
                   </label>
-                  <select value={schoolId} onChange={(event) => setQueryParam('schoolId', event.target.value)} style={selectStyle()}>
+                  <button
+                    type="button"
+                    className="sh-btn sh-btn--secondary sh-btn--sm"
+                    onClick={() => setMobileFiltersOpen((open) => !open)}
+                    aria-expanded={mobileFiltersOpen}
+                    aria-controls="sheets-filter-panel"
+                  >
+                    {mobileFiltersOpen ? 'Close' : 'Filters'}
+                  </button>
+                </div>
+
+                <div
+                  id="sheets-filter-panel"
+                  className={`sheets-page__filter-grid ${mobileFiltersOpen ? 'is-open' : ''}`}
+                  data-tutorial="sheets-filters"
+                >
+                  <label data-tutorial="sheets-search" className="sheets-page__search-wrap sheets-page__desktop-search">
+                    <IconSearch size={15} className="sheets-page__search-icon" />
+                    <input
+                      className="sh-input sheets-page__search-input"
+                      value={search}
+                      onChange={(event) => setQueryParam('search', event.target.value)}
+                      placeholder="Search sheets, topics, or authors..."
+                    />
+                  </label>
+
+                  <select
+                    className="sh-input sheets-page__filter-select"
+                    value={schoolId}
+                    onChange={(event) => handleSchoolChange(event.target.value)}
+                  >
                     <option value="">All schools</option>
                     {catalog.map((school) => (
-                      <option key={school.id} value={school.id}>{school.short || school.name}</option>
+                      <option key={school.id} value={school.id}>
+                        {school.short || school.name}
+                      </option>
                     ))}
                   </select>
-                  <select value={courseId} onChange={(event) => setQueryParam('courseId', event.target.value)} style={selectStyle()}>
+
+                  <select
+                    className="sh-input sheets-page__filter-select"
+                    value={courseId}
+                    onChange={(event) => setQueryParam('courseId', event.target.value)}
+                  >
                     <option value="">All courses</option>
-                    {(activeSchool?.courses || []).map((course) => (
-                      <option key={course.id} value={course.id}>{course.code}</option>
+                    {availableCourses.map((course) => {
+                      const schoolLabel = course.school?.short || course.school?.name
+                      return (
+                        <option key={course.id} value={course.id}>
+                          {activeSchool ? course.code : `${course.code}${schoolLabel ? ` · ${schoolLabel}` : ''}`}
+                        </option>
+                      )
+                    })}
+                  </select>
+
+                  <select
+                    className="sh-input sheets-page__filter-select"
+                    value={sortValue}
+                    onChange={(event) => setQueryParam('sort', event.target.value)}
+                  >
+                    {SORT_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
                     ))}
                   </select>
-                  <select value={orderBy} onChange={(event) => setQueryParam('sort', event.target.value)} style={selectStyle()}>
-                    <option value="createdAt">Newest</option>
-                    <option value="updatedAt">Recently updated</option>
-                    <option value="stars">Most starred</option>
-                    <option value="downloads">Most downloaded</option>
-                    <option value="forks">Most forked</option>
+
+                  <select
+                    className="sh-input sheets-page__filter-select"
+                    value={formatValue}
+                    onChange={(event) => setQueryParam('format', event.target.value === 'all' ? '' : event.target.value)}
+                  >
+                    {FORMAT_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
                   </select>
-                  <div data-tutorial="sheets-toggles" style={{ display: 'flex', gap: 8 }}>
-                    <button type="button" onClick={() => setQueryParam('mine', mine ? '' : '1')} style={togglePill(mine)}>Mine</button>
-                    <button type="button" onClick={() => setQueryParam('starred', starred ? '' : '1')} style={togglePill(starred)}>Starred</button>
+
+                  <div className="sheets-page__toggle-row" data-tutorial="sheets-toggles">
+                    <button
+                      type="button"
+                      className={`sh-chip ${mine ? 'sh-chip--active' : ''}`}
+                      onClick={() => setQueryParam('mine', mine ? '' : '1')}
+                    >
+                      Mine
+                    </button>
+                    <button
+                      type="button"
+                      className={`sh-chip ${starred ? 'sh-chip--active' : ''}`}
+                      onClick={() => setQueryParam('starred', starred ? '' : '1')}
+                    >
+                      Starred
+                    </button>
                   </div>
                 </div>
               </section>
 
-              {catalogError ? <div style={errorBanner()}>{catalogError}</div> : null}
-              {sheetsState.error ? <div style={errorBanner()}>{sheetsState.error}</div> : null}
+              {catalogError ? <div className="sh-alert sh-alert--danger">{catalogError}</div> : null}
+              {sheetsState.error ? <div className="sh-alert sh-alert--danger">{sheetsState.error}</div> : null}
 
               {sheetsState.loading ? (
                 <SkeletonSheetGrid count={4} />
               ) : sheetsState.sheets.length === 0 ? (
-                (() => {
-                  /* Smart empty state: differentiate course-filtered vs. search vs. generic */
-                  const activeCourse = courseId && activeSchool
-                    ? (activeSchool.courses || []).find((c) => String(c.id) === String(courseId))
-                    : null
-                  const isCourseEmpty = Boolean(activeCourse) && !search && !mine && !starred
-                  const isSearchEmpty = Boolean(search)
-
-                  return (
-                    <section style={{ ...panelStyle(), borderStyle: 'dashed', textAlign: 'center', padding: '52px 24px' }}>
-                      {isCourseEmpty ? (
-                        <>
-                          {/* Course-specific empty: "Be the first" CTA */}
-                          <div style={{ width: 56, height: 56, borderRadius: 14, background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M12 5v14M5 12h14" />
-                            </svg>
-                          </div>
-                          <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--sh-heading, #0f172a)', marginBottom: 8 }}>
-                            Be the first to share notes for {activeCourse.code}!
-                          </div>
-                          <div style={{ fontSize: 13, color: 'var(--sh-muted, #64748b)', lineHeight: 1.7, marginBottom: 20, maxWidth: 380, marginInline: 'auto' }}>
-                            No study sheets exist for <strong>{activeCourse.code} — {activeCourse.name}</strong> yet. Upload yours and help classmates studying this course.
-                          </div>
-                          <Link
-                            to="/sheets/upload"
-                            style={{
-                              display: 'inline-flex', alignItems: 'center', gap: 8,
-                              padding: '11px 22px', borderRadius: 12, border: 'none',
-                              background: 'linear-gradient(135deg, #10b981, #059669)',
-                              color: '#fff', fontSize: 14, fontWeight: 700,
-                              textDecoration: 'none',
-                              boxShadow: '0 4px 14px rgba(16, 185, 129, 0.3)',
-                            }}
-                          >
-                            <IconUpload size={16} /> Upload a Sheet
-                          </Link>
-                          <div style={{ marginTop: 16, fontSize: 12, color: 'var(--sh-muted, #94a3b8)', lineHeight: 1.6 }}>
-                            Tip: Lecture notes, cheat sheets, formula summaries, and study guides all work great.
-                          </div>
-                        </>
-                      ) : isSearchEmpty ? (
-                        <>
-                          {/* Search empty state */}
-                          <div style={{ width: 56, height: 56, borderRadius: 14, background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-                            </svg>
-                          </div>
-                          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--sh-heading, #0f172a)', marginBottom: 6 }}>
-                            No sheets match &ldquo;{search}&rdquo;
-                          </div>
-                          <div style={{ fontSize: 13, color: 'var(--sh-muted, #94a3b8)', lineHeight: 1.6 }}>
-                            Try a different search term, or adjust your school and course filters.
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          {/* Generic empty state */}
-                          <div style={{ width: 56, height: 56, borderRadius: 14, background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                              <polyline points="14 2 14 8 20 8" />
-                            </svg>
-                          </div>
-                          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--sh-heading, #0f172a)', marginBottom: 6 }}>No sheets matched your filters</div>
-                          <div style={{ fontSize: 13, color: 'var(--sh-muted, #94a3b8)', lineHeight: 1.6, marginBottom: 16 }}>
-                            Try adjusting your school, course, or toggle filters to find what you&apos;re looking for.
-                          </div>
-                          <Link
-                            to="/sheets/upload"
-                            style={{
-                              display: 'inline-flex', alignItems: 'center', gap: 8,
-                              padding: '9px 18px', borderRadius: 10,
-                              background: '#3b82f6', color: '#fff',
-                              fontSize: 13, fontWeight: 700,
-                              textDecoration: 'none',
-                            }}
-                          >
-                            <IconUpload size={14} /> Upload a Sheet
-                          </Link>
-                        </>
-                      )}
-                    </section>
-                  )
-                })()
-              ) : (
-                <div ref={cardsRef} className="sheets-card-grid">
-                  {sheetsState.sheets.map((sheet) => (
-                    <SheetCard key={sheet.id} sheet={sheet} onStar={toggleStar} />
-                  ))}
-                  {sheetsState.sheets.length < sheetsState.total && (
-                    <button
-                      onClick={loadMoreSheets}
-                      disabled={loadingMore}
-                      className="sh-load-more-btn"
-                      style={{ gridColumn: '1 / -1' }}
-                    >
-                      {loadingMore ? 'Loading…' : `Load More (${sheetsState.sheets.length} of ${sheetsState.total})`}
-                    </button>
+                <section className="sh-card sheets-page__empty-state">
+                  {search.trim() ? (
+                    <>
+                      <h2 className="sheets-page__empty-title">No results for &ldquo;{search}&rdquo;</h2>
+                      <p className="sheets-page__empty-copy">
+                        Try another query or clear your filters to scan the full sheet index.
+                      </p>
+                      <button type="button" className="sh-btn sh-btn--secondary" onClick={clearAllFilters}>
+                        Clear filters
+                      </button>
+                    </>
+                  ) : hasActiveFilters ? (
+                    <>
+                      <h2 className="sheets-page__empty-title">No sheets matched your filters</h2>
+                      <p className="sheets-page__empty-copy">
+                        Your current filters are too narrow. Clear them to return to the full list.
+                      </p>
+                      <button type="button" className="sh-btn sh-btn--secondary" onClick={clearAllFilters}>
+                        Clear filters
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <h2 className="sheets-page__empty-title">Be the first to share for this space</h2>
+                      <p className="sheets-page__empty-copy">
+                        No published sheets yet. Upload your notes or start with a template to kick off the course repo.
+                      </p>
+                      <div className="sheets-page__empty-actions">
+                        <Link to="/sheets/upload" className="sh-btn sh-btn--primary">
+                          <IconUpload size={14} />
+                          Upload a sheet
+                        </Link>
+                        <Link to="/sheets/upload?template=starter" className="sh-btn sh-btn--secondary">
+                          Use a template
+                        </Link>
+                      </div>
+                    </>
                   )}
-                </div>
+                </section>
+              ) : (
+                <section className="sh-card sh-card--flat sh-card--flush sheets-page__list-shell">
+                  <div className="sheets-page__list-head">
+                    <span>{sheetsState.total} sheet{sheetsState.total === 1 ? '' : 's'}</span>
+                    {hasActiveFilters ? (
+                      <button type="button" className="sh-btn sh-btn--ghost sh-btn--sm" onClick={clearAllFilters}>
+                        Clear filters
+                      </button>
+                    ) : null}
+                  </div>
+
+                  <div ref={cardsRef} className="sheets-page__rows" role="list">
+                    {sheetsState.sheets.map((sheet) => (
+                      <SheetListRow
+                        key={sheet.id}
+                        sheet={sheet}
+                        forking={forkingSheetId === sheet.id}
+                        onOpen={(sheetId) => navigate(`/sheets/${sheetId}`)}
+                        onStar={toggleStar}
+                        onFork={handleFork}
+                      />
+                    ))}
+                  </div>
+
+                  {sheetsState.sheets.length < sheetsState.total ? (
+                    <div className="sheets-page__load-more-wrap">
+                      <button onClick={loadMoreSheets} disabled={loadingMore} className="sh-load-more-btn">
+                        {loadingMore
+                          ? 'Loading...'
+                          : `Load More (${sheetsState.sheets.length} of ${sheetsState.total})`}
+                      </button>
+                    </div>
+                  ) : null}
+                </section>
               )}
             </main>
 
-            <aside style={{ display: 'grid', gap: 16 }}>
-              <section style={panelStyle()}>
-                <h2 style={{ margin: '0 0 10px', fontSize: 15, color: '#0f172a' }}>Quick view</h2>
-                <div style={{ display: 'grid', gap: 10, fontSize: 13, color: '#64748b' }}>
+            <aside className="feed-aside sheets-page__aside">
+              <section className="sh-card">
+                <h2 className="sh-card-title">Quick view</h2>
+                <p className="sh-card-helper">Live index context</p>
+                <div className="sheets-page__aside-stats">
                   <div>{sheetsState.total} sheets found</div>
-                  <div>{catalog.length} schools in the catalog</div>
+                  <div>{catalog.length} schools available</div>
                   <div>{user?.enrollments?.length || 0} courses in your profile</div>
                 </div>
               </section>
-              <section style={panelStyle()}>
-                <h2 style={{ margin: '0 0 10px', fontSize: 15, color: '#0f172a' }}>Workflow</h2>
-                <div style={{ display: 'grid', gap: 10, fontSize: 13, color: '#475569', lineHeight: 1.7 }}>
-                  <div>Use filters to narrow the library, open a sheet, then move back to the list without corrupting the SPA state.</div>
-                  <div style={{ padding: '10px 12px', background: '#f0fdf4', borderRadius: 10, border: '1px solid #bbf7d0', fontSize: 12, color: '#15803d' }}>
-                    <strong>Sheet Lab</strong> — Open any sheet to access version history, diffs, and restore points.
-                  </div>
-                  <Link to="/feed" style={linkButton()}>Back to feed</Link>
-                </div>
+
+              <section className="sh-card">
+                <h2 className="sh-card-title">Workflow</h2>
+                <p className="sheets-page__aside-copy">
+                  Use the filters to narrow the repo list, open a sheet row, then fork or star from the same view.
+                </p>
+                <Link to="/feed" className="sh-btn sh-btn--secondary sh-btn--sm">
+                  Back to feed
+                </Link>
               </section>
             </aside>
           </div>
         </div>
       </div>
 
-      {/* Tutorial popup */}
       <SafeJoyride {...tutorial.joyrideProps} />
-      {tutorial.seen && (
-        <button type="button" onClick={tutorial.restart} title="Show tutorial" style={{ position: 'fixed', bottom: 24, right: 24, width: 44, height: 44, borderRadius: '50%', border: 'none', background: '#3b82f6', color: '#fff', fontSize: 18, fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 14px rgba(59,130,246,0.4)', zIndex: 50, display: 'grid', placeItems: 'center' }}>?</button>
-      )}
+      {tutorial.seen ? (
+        <button type="button" onClick={tutorial.restart} title="Show tutorial" className="sheets-page__tutorial-btn">
+          ?
+        </button>
+      ) : null}
     </>
   )
-}
-
-function selectStyle() {
-  return {
-    width: '100%',
-    borderRadius: 12,
-    border: '1px solid #cbd5e1',
-    padding: '10px 12px',
-    fontFamily: FONT,
-    fontSize: 14,
-    color: '#0f172a',
-  }
-}
-
-function togglePill(active) {
-  return {
-    borderRadius: 999,
-    border: active ? '1px solid #93c5fd' : '1px solid #e2e8f0',
-    background: active ? '#eff6ff' : '#fff',
-    color: active ? '#1d4ed8' : '#475569',
-    padding: '9px 14px',
-    fontSize: 12,
-    fontWeight: 800,
-    cursor: 'pointer',
-    fontFamily: FONT,
-  }
-}
-
-function errorBanner() {
-  return {
-    background: '#fef2f2',
-    color: '#dc2626',
-    border: '1px solid #fecaca',
-    borderRadius: 14,
-    padding: '12px 14px',
-    fontSize: 13,
-  }
 }

@@ -478,6 +478,7 @@ router.get('/', optionalAuth, async (req, res) => {
     courseId,
     schoolId,
     search,
+    format,
     mine,
     starred,
     limit = 20,
@@ -499,6 +500,17 @@ router.get('/', optionalAuth, async (req, res) => {
 
     if (courseId) where.courseId = Number.parseInt(courseId, 10)
     if (schoolId) where.course = { schoolId: Number.parseInt(schoolId, 10) }
+
+    const formatCandidate = typeof format === 'string' ? format.trim().toLowerCase() : ''
+    if (formatCandidate === 'html') {
+      where.contentFormat = 'html'
+    } else if (formatCandidate === 'pdf') {
+      where.attachmentType = { contains: 'pdf', mode: 'insensitive' }
+    } else if (formatCandidate === 'markdown') {
+      where.contentFormat = 'markdown'
+      where.NOT = { attachmentType: { contains: 'pdf', mode: 'insensitive' } }
+    }
+
     const sheetTextSearchClauses = buildSheetTextSearchClauses(search)
     if (sheetTextSearchClauses.length) {
       where.OR = sheetTextSearchClauses

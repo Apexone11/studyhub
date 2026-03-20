@@ -34,7 +34,7 @@
 
   /* On phone, right-side panels collapse into a toggleable section */
   .app-three-col-grid > .feed-aside {
-    border-top: 1px solid #e2e8f0;
+    border-top: 1px solid var(--sh-border);
     padding-top: 16px;
   }
 }

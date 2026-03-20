@@ -1,6 +1,6 @@
 // src/components/AppSidebar.jsx
-// Shared left navigation sidebar — same as FeedPage sidebar
-// Used by: TestsPage, NotesPage, AnnouncementsPage, SubmitPage, SheetsPage
+// Shared left navigation sidebar — navigation-first design
+// Used by: FeedPage, TestsPage, NotesPage, AnnouncementsPage, SubmitPage, SheetsPage
 
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
@@ -11,7 +11,6 @@ import {
 import { API } from '../config'
 import { useSession } from '../lib/session-context'
 
-const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 const FOCUSABLE_DRAWER_SELECTORS = [
   'a[href]',
   'button:not([disabled])',
@@ -37,19 +36,19 @@ const COURSE_COLORS = {
 }
 function courseColor(code = '') {
   const prefix = code.replace(/\d.*/, '').toUpperCase()
-  return COURSE_COLORS[prefix] || '#3b82f6'
+  return COURSE_COLORS[prefix] || 'var(--sh-brand)'
 }
 
 function Avatar({ name, size = 48, role }) {
   const initials = (name || '?').slice(0, 2).toUpperCase()
-  const bg = role === 'admin' ? '#1d4ed8' : '#0f172a'
   return (
     <div style={{
       width: size, height: size, borderRadius: '50%',
-      background: bg, color: '#fff',
+      background: role === 'admin' ? 'var(--sh-brand)' : 'var(--sh-heading)',
+      color: '#fff',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       fontSize: size * 0.35, fontWeight: 700, flexShrink: 0,
-      border: '2px solid #e2e8f0',
+      border: '2px solid var(--sh-border)',
     }}>
       {initials}
     </div>
@@ -93,49 +92,37 @@ export default function AppSidebar({ mode = 'fixed' }) {
 
   const shell = (
     <>
-      {/* Profile card */}
-      <div style={{
-        background: '#fff', borderRadius: 16,
-        border: '1px solid #e8ecf0',
-        boxShadow: '0 2px 10px rgba(15,23,42,0.05)',
-        padding: '20px 16px', marginBottom: 12,
+      {/* Profile summary — compact, no heavy card */}
+      <div className="sh-sidebar-section" style={{
+        display: 'flex', alignItems: 'center', gap: 12,
+        padding: '4px 0', marginBottom: 8,
       }}>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
-          <div style={{ position: 'relative' }}>
-            {user.avatarUrl
-              ? <img
-                  src={user.avatarUrl.startsWith('http') ? user.avatarUrl : `${API}${user.avatarUrl}`}
-                  alt={user.username}
-                  style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover', border: '2px solid #e2e8f0' }}
-                />
-              : <Avatar name={user.username} size={56} role={user.role} />
-            }
-            <div style={{
-              position: 'absolute', bottom: 0, right: 0,
-              width: 14, height: 14, borderRadius: '50%',
-              background: '#10b981', border: '2px solid #fff',
-            }} />
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontWeight: 800, fontSize: 15, color: '#0f172a' }}>{user.username}</div>
-            {user.role === 'admin'
-              ? <div style={{ fontSize: 11, color: '#f59e0b', marginTop: 2 }}>
-                  <i className="fas fa-crown" style={{ marginRight: 4 }}></i>Admin
-                </div>
-              : <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>Student</div>
-            }
-            {joinDate && <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 1 }}>Joined {joinDate}</div>}
+        <div style={{ position: 'relative' }}>
+          {user.avatarUrl
+            ? <img
+                src={user.avatarUrl.startsWith('http') ? user.avatarUrl : `${API}${user.avatarUrl}`}
+                alt={user.username}
+                style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--sh-border)' }}
+              />
+            : <Avatar name={user.username} size={44} role={user.role} />
+          }
+          <div style={{
+            position: 'absolute', bottom: 0, right: 0,
+            width: 12, height: 12, borderRadius: '50%',
+            background: '#10b981', border: '2px solid var(--sh-surface)',
+          }} />
+        </div>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontWeight: 700, fontSize: 'var(--type-sm)', color: 'var(--sh-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.username}</div>
+          <div style={{ fontSize: 'var(--type-xs)', color: 'var(--sh-muted)', marginTop: 1 }}>
+            {user.role === 'admin' ? '👑 Admin' : 'Student'}
+            {joinDate ? ` · Joined ${joinDate}` : ''}
           </div>
         </div>
       </div>
 
-      {/* Nav links */}
-      <nav aria-label="Sidebar navigation" style={{
-        background: '#fff', borderRadius: 16,
-        border: '1px solid #e8ecf0',
-        boxShadow: '0 2px 10px rgba(15,23,42,0.05)',
-        padding: '8px 8px', marginBottom: 12,
-      }}>
+      {/* Nav links — clean list, no enclosing card */}
+      <nav aria-label="Sidebar navigation" className="sh-sidebar-section">
         {NAV_LINKS.map((link) => {
           const isActive = pathname === link.to || (link.to === '/sheets' && pathname.startsWith('/sheets'))
           const Icon = link.icon
@@ -143,19 +130,7 @@ export default function AppSidebar({ mode = 'fixed' }) {
             <Link
               key={link.to}
               to={link.to}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '10px 12px', borderRadius: 10,
-                textDecoration: 'none',
-                background: isActive ? '#eff6ff' : 'transparent',
-                color: isActive ? '#1d4ed8' : '#475569',
-                fontWeight: isActive ? 700 : 500,
-                fontSize: 14, marginBottom: 2,
-                transition: 'all 0.15s',
-                borderLeft: isActive ? '3px solid #3b82f6' : '3px solid transparent',
-              }}
-              onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = '#f8fafc' }}
-              onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent' }}
+              className={`sh-sidebar-nav-link${isActive ? ' sh-sidebar-nav-link--active' : ''}`}
             >
               <Icon size={15} />
               {link.label}
@@ -164,34 +139,28 @@ export default function AppSidebar({ mode = 'fixed' }) {
         })}
       </nav>
 
-      {/* My Courses */}
-      <div style={{
-        background: '#fff', borderRadius: 16,
-        border: '1px solid #e8ecf0',
-        boxShadow: '0 2px 10px rgba(15,23,42,0.05)',
-        padding: '14px 16px',
-      }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.08em', marginBottom: 10 }}>
+      {/* My Courses — lighter section with label */}
+      <div className="sh-sidebar-section">
+        <div className="sh-label" style={{ marginBottom: 8, paddingLeft: 2 }}>
           MY COURSES
         </div>
         {courseCodes.length === 0
-          ? <div style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic', padding: '4px 0' }}>No courses yet</div>
+          ? <div style={{ fontSize: 'var(--type-xs)', color: 'var(--sh-muted)', fontStyle: 'italic', padding: '4px 2px' }}>No courses yet</div>
           : courseCodes.map(code => (
-              <div key={code} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid #f1f5f9' }}>
+              <div key={code} style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '6px 2px',
+                borderBottom: '1px solid var(--sh-border)',
+              }}>
                 <div style={{ width: 7, height: 7, borderRadius: '50%', background: courseColor(code), flexShrink: 0 }} />
-                <span style={{ fontSize: 13, fontWeight: 600, color: '#334155' }}>{code}</span>
+                <span style={{ fontSize: 'var(--type-sm)', fontWeight: 600, color: 'var(--sh-text)' }}>{code}</span>
               </div>
             ))
         }
         <button
           onClick={() => navigate('/settings?tab=courses')}
-          style={{
-            marginTop: 10, width: '100%', padding: '7px',
-            background: '#f8fafc', border: '1px dashed #cbd5e1',
-            borderRadius: 8, color: '#64748b', fontSize: 12, fontWeight: 600,
-            cursor: 'pointer', fontFamily: FONT,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-          }}
+          className="sh-btn sh-btn--secondary sh-btn--sm"
+          style={{ marginTop: 10, width: '100%', justifyContent: 'center', gap: 5 }}
         >
           <IconPlus size={12} />Add Course
         </button>
@@ -199,30 +168,27 @@ export default function AppSidebar({ mode = 'fixed' }) {
 
       {/* Admin panel shortcut */}
       {user.role === 'admin' && (
-        <div style={{ marginTop: 12 }}>
-          <Link
-            to="/admin"
-            style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              padding: '10px 12px', borderRadius: 10,
-              textDecoration: 'none', background: '#fefce8',
-              color: '#92400e', fontWeight: 700, fontSize: 13,
-              border: '1px solid #fde68a',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = '#fef9c3' }}
-            onMouseLeave={e => { e.currentTarget.style.background = '#fefce8' }}
-          >
-            <IconSettings size={14} />
-            Admin Panel
-          </Link>
-        </div>
+        <Link
+          to="/admin"
+          className="sh-sidebar-nav-link"
+          style={{
+            background: 'var(--sh-warning-bg)',
+            color: 'var(--sh-warning-text)',
+            fontWeight: 700,
+            border: '1px solid var(--sh-warning-border)',
+            marginTop: 4,
+          }}
+        >
+          <IconSettings size={14} />
+          Admin Panel
+        </Link>
       )}
     </>
   )
 
   if (mode === 'drawer') {
     return (
-      <aside style={{ position: 'sticky', top: 74, alignSelf: 'start', fontFamily: FONT, zIndex: 25 }}>
+      <aside style={{ position: 'sticky', top: 74, alignSelf: 'start', zIndex: 25 }}>
         <button
           type="button"
           onClick={() => setDrawerOpen(true)}
@@ -230,16 +196,7 @@ export default function AppSidebar({ mode = 'fixed' }) {
           aria-haspopup="dialog"
           aria-expanded={drawerOpen}
           aria-controls="app-sidebar-drawer"
-          style={{
-            border: '1px solid #cbd5e1',
-            borderRadius: 12,
-            background: '#fff',
-            color: '#0f172a',
-            fontWeight: 700,
-            padding: '10px 14px',
-            fontSize: 13,
-            fontFamily: FONT,
-          }}
+          className="sh-btn sh-btn--secondary sh-btn--sm"
         >
           Open navigation
         </button>
@@ -250,7 +207,7 @@ export default function AppSidebar({ mode = 'fixed' }) {
             style={{
               position: 'fixed',
               inset: 0,
-              background: 'rgba(15, 23, 42, 0.45)',
+              background: 'rgba(0, 0, 0, 0.4)',
               zIndex: 50,
               display: 'flex',
               justifyContent: 'flex-start',
@@ -317,29 +274,20 @@ export default function AppSidebar({ mode = 'fixed' }) {
               }}
               onClick={(event) => event.stopPropagation()}
               style={{
-                width: 'min(86vw, 320px)',
+                width: 'min(86vw, 300px)',
                 height: '100%',
                 overflowY: 'auto',
-                background: '#f1f5f9',
-                padding: 14,
+                background: 'var(--sh-bg)',
+                padding: 16,
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                <div style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>Navigation</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                <div style={{ fontSize: 'var(--type-sm)', fontWeight: 800, color: 'var(--sh-heading)' }}>Navigation</div>
                 <button
                   type="button"
                   onClick={() => setDrawerOpen(false)}
                   ref={closeButtonRef}
-                  style={{
-                    border: '1px solid #cbd5e1',
-                    borderRadius: 10,
-                    background: '#fff',
-                    color: '#475569',
-                    fontSize: 12,
-                    fontWeight: 700,
-                    padding: '6px 10px',
-                    fontFamily: FONT,
-                  }}
+                  className="sh-btn sh-btn--secondary sh-btn--sm"
                 >
                   Close
                 </button>
@@ -353,7 +301,7 @@ export default function AppSidebar({ mode = 'fixed' }) {
   }
 
   return (
-    <aside style={{ position: 'sticky', top: 74, alignSelf: 'start', fontFamily: FONT }}>
+    <aside style={{ position: 'sticky', top: 74, alignSelf: 'start' }}>
       {shell}
     </aside>
   )
