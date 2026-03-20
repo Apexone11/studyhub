@@ -12,6 +12,7 @@
 		"db:push": "prisma db push",
 		"email:smoke": "node scripts/emailSmoke.js",
 		"seed": "node prisma/seed.js",
+		"seed:content": "node prisma/seed-content.js",
 		"seed:beta": "node scripts/seedBetaUsers.js",
 		"preview:fixture": "node scripts/ensurePreviewFixture.js",
 		"seed:admin": "node scripts/seedAdmin.js",

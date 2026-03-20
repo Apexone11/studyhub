@@ -12,6 +12,7 @@ dist
 dist-ssr
 playwright-report
 test-results
+tests/screenshots/*.png
 *.local
 
 # Editor directories and files

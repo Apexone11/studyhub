@@ -2619,3 +2619,260 @@ Registration now requires email verification before account creation. The existi
 
 - `npm --prefix frontend/studyhub-app run lint` — 0 errors
 - `npm --prefix backend run lint` — 0 errors
+
+---
+
+## Visual Baseline Screenshot Suite + Content Seeding — 2026-03-19
+
+### Added: Playwright Visual Baseline Suite
+
+**File:** `frontend/studyhub-app/tests/visual-baseline.spec.js`
+- Captures reference screenshots of every important page/state.
+- Matrix: 2 viewports (mobile 390×844, desktop 1440×900) × 2 themes (light, dark).
+- Public pages: landing, login, register, forgot-password, about, terms, 404.
+- Authenticated pages: dashboard, feed, sheets, sheet-viewer, upload-sheet, notes, announcements, settings, admin.
+- Critical states: unverified-user banner, error-403, sheets-empty, mobile-nav-open.
+- Screenshots saved to `tests/screenshots/` (PNGs gitignored, gallery.html checked in).
+
+**File:** `frontend/studyhub-app/scripts/generate-gallery.mjs`
+- Generates a self-contained HTML gallery grouped by page → theme → viewport.
+- Click-to-zoom images, table of contents, and summary stats.
+- Open in browser to review the full app UI in 2–3 minutes.
+
+**NPM scripts added:**
+- `npm run visual:capture` — run the screenshot suite.
+- `npm run visual:gallery` — regenerate the gallery from existing screenshots.
+- `npm run visual:review` — capture + gallery in one command.
+
+### Added: Content Seed Script
+
+**File:** `backend/prisma/seed-content.js`
+- Additive script (safe to re-run) that seeds realistic study sheets across 10 UMD courses.
+- Courses seeded: CMSC131, CMSC132, CMSC216, CMSC250, CMSC351, MATH140, MATH240, BSCI170, CHEM131, ENGL101.
+- 12 detailed study sheets with real academic content (500–1500 words each).
+- 5 seed author accounts with varied usernames.
+- Auto-enrolls authors in the courses they publish to.
+- Skips sheets whose title already exists (idempotent).
+
+**NPM script:** `npm --prefix backend run seed:content`
+
+### Validation
+
+- `npm --prefix frontend/studyhub-app run lint` — 0 errors
+- `npm --prefix backend run lint` — 0 errors
+
+---
+
+## Design System Rebuild — Direction A "Campus Lab" (Sprint 1 Day 1) — 2026-03-19
+
+### What changed
+
+**Design spec produced:** `docs/design-spec-direction-a.md`
+- Full typography scale (Plus Jakarta Sans UI + Inter reading), 7-step fluid type scale
+- Warm paper color palette (light: `#f6f5f2` bg, `#ffffff` surface; dark: `#121212` bg, `#1c1c1c` surface)
+- 4px-base spacing system, 4-level elevation scale, updated border radius tokens
+- Component primitive rules (Button, Input, Card, Badge, Toast, Tab)
+- Page template specs for auth, feed, sheets, viewer, dashboard
+- 2-sprint execution plan with per-page Definition of Done checklist
+
+**Token layer rebuilt:** `frontend/studyhub-app/src/index.css`
+- `:root` tokens updated: warm paper surfaces, true ink text, intentional blue accent
+- `[data-theme='dark']` tokens updated: OLED-friendly true dark (#121212), lifted blue accent
+- All dark mode structural overrides migrated from hardcoded hex to `var()` token references
+- Added Inter font import for reading/content contexts
+- New spacing tokens (`--space-1` through `--space-16`)
+- New elevation tokens (`--elevation-0` through `--elevation-3`)
+- Legacy aliases preserved for backward compatibility
+
+**Dark mode screenshot fix:** `frontend/studyhub-app/tests/visual-baseline.spec.js`
+- 4-layer theme enforcement: emulateMedia, localStorage pre-seed, preferences API mock, post-load evaluate
+- "Session expired" toast suppressed on public pages via event interception
+- All 9 tutorial keys now suppressed (was missing: viewer, settings, profile, announcements)
+
+**About page migrated to tokens:** `frontend/studyhub-app/src/pages/legal/AboutPage.jsx`
+- All hardcoded colors (#1e3a5f headings, #374151 body, #6b7280 muted) replaced with `var()` tokens
+- Dark mode now renders readable text on all sections (Our Goals, How It Works, Roadmap, Team)
+
+**Landing page ghost button fixed:** `frontend/studyhub-app/src/index.css`
+- `.home-btn-ghost` and `.home-btn-primary` use explicit `#ffffff` instead of `var(--white)`
+
+### Files modified
+- `docs/design-spec-direction-a.md` (new)
+- `frontend/studyhub-app/src/index.css`
+- `frontend/studyhub-app/src/pages/legal/AboutPage.jsx`
+- `frontend/studyhub-app/tests/visual-baseline.spec.js`
+
+### Validation
+- `npm --prefix frontend/studyhub-app run lint` — 0 errors
+- Playwright visual suite: 78 passed, 0 failed, 2 skipped
+
+---
+
+## Sprint 1 — SheetsPage GitHub-Dense Redesign (Direction A) — 2026-03-19
+
+### Summary
+
+Implemented the SheetsPage redesign using the selected Direction A style: metadata-first, GitHub-dense list rows with full-row click behavior, tokenized styling, and mobile filter collapse behavior.
+
+### Changed
+
+- `frontend/studyhub-app/src/pages/sheets/SheetsPage.jsx`
+  - Replaced card grid rendering with dense repository-style list rows.
+  - Implemented full-row click navigation (keyboard accessible with Enter/Space) while preserving explicit title links.
+  - Kept URL-as-source-of-truth filtering (`search`, `schoolId`, `courseId`, `sort`, `mine`, `starred`) and added `format` support in URL state.
+  - Added format filter options: All formats, Markdown, HTML, PDF.
+  - Added mobile-specific search row + collapsible Filters panel.
+  - Updated empty-state language to match the new pattern:
+    - generic “Be the first…” with Upload + Template CTA
+    - search/filter no-results with clear-filters CTA
+  - Preserved tutorial anchors (`sheets-search`, `sheets-filters`, `sheets-toggles`, `sheets-upload`).
+
+- `frontend/studyhub-app/src/pages/sheets/SheetsPage.css` (new)
+  - Added full token-based page stylesheet (no new hardcoded hex usage in this page stylesheet).
+  - Added dense row spacing/border rules, hover/focus interaction states, metadata line styling, right-column stats/actions, and responsive mobile stacking.
+  - Added tutorial FAB class styling for consistent theme behavior.
+
+- `backend/src/routes/sheets.js`
+  - Added `format` query handling in `GET /api/sheets` to support server-backed format filtering:
+    - `html` → `contentFormat = html`
+    - `pdf` → `attachmentType` contains `pdf`
+    - `markdown` → `contentFormat = markdown` and excludes PDF attachments
+
+### Visual Review Notes
+
+- Regenerated screenshots and gallery with `npm --prefix frontend/studyhub-app run visual:review`.
+- Reviewed updated Sheets screenshots in all required variants:
+  - `tests/screenshots/sheets--light--desktop.png`
+  - `tests/screenshots/sheets--dark--desktop.png`
+  - `tests/screenshots/sheets--light--mobile.png`
+  - `tests/screenshots/sheets--dark--mobile.png`
+  - `tests/screenshots/sheets-empty--light--desktop.png`
+  - `tests/screenshots/sheets-empty--dark--desktop.png`
+  - `tests/screenshots/sheets-empty--light--mobile.png`
+  - `tests/screenshots/sheets-empty--dark--mobile.png`
+- Outcome: redesigned rows, spacing density, and empty states render cleanly across 2 themes × 2 viewports with no visual test regressions.
+
+### Validation Commands (Executed)
+
+- `npm --prefix frontend/studyhub-app run build` — passed
+- `npm --prefix frontend/studyhub-app run lint` — passed
+- `npm --prefix frontend/studyhub-app run visual:review` — passed (78 passed, 2 skipped)
+
+### Additional Validation Note
+
+- `npm --prefix backend run lint` currently reports an existing unrelated lint issue in `backend/prisma.config.js` (`env` unused). This was not introduced by the SheetsPage redesign changes.
+
+### Deferred / Follow-up
+
+- If we want strict one-row desktop filter density at narrower desktop widths, we can tighten select widths another step and move secondary toggles into a compact overflow pattern.
+
+---
+
+## Sprint 1.1 — Tablet Viewport + Visual QA Gate — 2026-03-19
+
+### Summary
+
+Added a tablet (768×1024) viewport to the visual baseline screenshot suite, bringing total test coverage to 3 viewports × 2 themes across all 20 pages. Updated the gallery generator to dynamically compute viewport/theme counts. Established a mandatory visual QA gate workflow for all future UI changes.
+
+### Changed
+
+- `frontend/studyhub-app/tests/visual-baseline.spec.js`
+  - Added `{ tag: 'tablet', width: 768, height: 1024 }` to the VIEWPORTS matrix.
+  - Test count increased from 80 → 120 (116 passed, 4 skipped — mobile-nav-open skipped on tablet + desktop as expected).
+
+- `frontend/studyhub-app/scripts/generate-gallery.mjs`
+  - Replaced hardcoded viewport/theme stats (was `2`/`2`) with dynamically computed `Set` sizes from parsed entries. Gallery now auto-adapts to any number of viewports/themes.
+
+### Visual Review Notes
+
+- Full QA cycle executed: deleted all old PNGs → regenerated 116 fresh screenshots → visually inspected every tablet screenshot.
+- All 20 pages pass at 768px tablet viewport with zero layout issues:
+  - No overflow, clipping, or misplaced buttons
+  - Sidebar pages (Sheets, Feed, Notes) correctly hide the sidebar and show content with right-side widgets
+  - Admin stats render in a 2-column grid (better than mobile's single column)
+  - Notes page shows the split-pane layout (list + editor) at tablet width
+  - Settings page shows left nav tabs + profile card grid
+  - All forms (Login, Register, Upload, Forgot Password) center properly
+  - All empty states (Sheets, Announcements) center properly
+
+### Validation Commands (Executed)
+
+- `npm --prefix frontend/studyhub-app run visual:review` — passed (116 passed, 4 skipped)
+- Gallery regenerated with 116 screenshots across 20 pages, 3 viewports, 2 themes
+
+---
+
+## Sprint 1.2 — Mobile-Nav Conditional + Smoke Suite — 2026-03-19
+
+### Summary
+
+Eliminated 4 "skipped" entries in CI output by extracting mobile-nav-open tests into a dedicated mobile-only `test.describe` block. Added a fast 6-page smoke visual suite for quick iteration during heavy refactoring.
+
+### Changed
+
+- `frontend/studyhub-app/tests/visual-baseline.spec.js`
+  - Extracted mobile-nav-open tests into a standalone `test.describe` block scoped to mobile viewport only. Result: 116 passed, 0 skipped (was 4 skipped).
+
+- `frontend/studyhub-app/tests/visual-smoke.spec.js` (NEW)
+  - Fast smoke suite covering 6 key pages: login, register step 1, dashboard, feed, sheets, sheet viewer.
+  - Same 3 viewports × 2 themes = 36 tests, runs in ~38s (vs full suite 116 tests in ~1.3min).
+
+- `frontend/studyhub-app/package.json`
+  - Added `visual:smoke` script for quick visual regression checks.
+
+### Validation Commands (Executed)
+
+- `npx playwright test visual-baseline` — 116 passed, 0 skipped
+- `npx playwright test visual-smoke` — 36 passed in ~38s
+
+---
+
+## Sprint 2 — Auth Pages Token Migration — 2026-03-19
+
+### Summary
+
+Migrated all 3 auth pages (ForgotPasswordPage, LoginPage, RegisterScreen) from inline `style={{}}` objects with hardcoded hex colors to token-based CSS class files using `var(--sh-*)` design tokens. This eliminates inline style tech debt, enables native CSS pseudo-class handling (`:focus`, `:hover`, `:disabled`), and reduces the need for `!important` dark-mode overrides in `index.css`.
+
+### Changed
+
+- `frontend/studyhub-app/src/pages/auth/ForgotPasswordPage.jsx`
+  - Removed `const styles = { ... }` object (~20 inline style definitions with hardcoded hex values).
+  - Removed inline `onFocus`/`onBlur` handlers that set hardcoded hex border colors.
+  - All elements now use CSS classes from `ForgotPasswordPage.css`.
+
+- `frontend/studyhub-app/src/pages/auth/ForgotPasswordPage.css` (NEW)
+  - Token-based stylesheet: `.forgot-page`, `.forgot-card`, `.forgot-input`, `.forgot-submit-btn`, etc.
+  - Uses CSS `:focus` pseudo-class instead of JS event handlers for focus states.
+
+- `frontend/studyhub-app/src/pages/auth/LoginPage.jsx`
+  - Removed `FONT` constant, `inputStyle` object, `handleInputFocus`/`handleInputBlur` functions.
+  - Decorative orbs converted from inline style divs to CSS class divs.
+  - All elements now use CSS classes from `LoginPage.css`.
+
+- `frontend/studyhub-app/src/pages/auth/LoginPage.css` (NEW)
+  - Token-based stylesheet covering: gradient background, decorative orbs, card, header, alerts, Google OAuth section, form fields, submit button, links, register footer.
+
+- `frontend/studyhub-app/src/pages/auth/RegisterScreen.jsx`
+  - Removed `FONT` constant, `inputStyle` object, `focusInput`/`blurInput` handlers.
+  - PasswordHint component converted from inline styles to CSS classes.
+  - All 3 steps (account, verify, courses) converted to CSS classes from `RegisterScreen.css`.
+
+- `frontend/studyhub-app/src/pages/auth/RegisterScreen.css` (NEW)
+  - Comprehensive stylesheet covering: page layout, orbs, card, step indicator, section headers, alerts, Google OAuth, form fields, password grid/hints, terms checkbox, 6 button variants, action row, custom course section, pills, footer.
+  - Responsive breakpoints at 480px for password grid and custom course grid.
+
+### Design Decisions
+
+- The dark gradient background (`linear-gradient(135deg, #0f172a, #1e3a5f, #1e40af)`) is kept as a literal value — it is intentional page-level design, not a token candidate.
+- All other colors use `var(--sh-*)` tokens from `index.css`, enabling automatic dark mode support through `[data-theme='dark']` token overrides.
+
+### Visual QA Gate
+
+- Deleted all old PNGs → regenerated 36 smoke screenshots → visually inspected all 12 auth page screenshots (login + register-step1 × 3 viewports × 2 themes).
+- All auth pages render cleanly: cards centered, form fields properly spaced, buttons aligned, dark mode tokens working, responsive layouts correct at mobile/tablet/desktop.
+
+### Validation Commands (Executed)
+
+- `npm --prefix frontend/studyhub-app run lint` — passed
+- `npm --prefix frontend/studyhub-app run build` — passed
+- `npx playwright test visual-smoke` — 36 passed in ~39s

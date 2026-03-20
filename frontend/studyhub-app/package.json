@@ -17,7 +17,11 @@
     "test:e2e:responsive": "playwright test tests/app.responsive.smoke.spec.js",
     "test:e2e": "playwright test",
     "capture:feed-console": "node scripts/captureFeedConsole.mjs",
-    "beta:snapshots": "node scripts/captureBetaSnapshots.mjs"
+    "beta:snapshots": "node scripts/captureBetaSnapshots.mjs",
+    "visual:capture": "playwright test visual-baseline",
+    "visual:smoke": "playwright test visual-smoke || true && node scripts/generate-gallery.mjs",
+    "visual:gallery": "node scripts/generate-gallery.mjs",
+    "visual:review": "playwright test visual-baseline || true && node scripts/generate-gallery.mjs"
   },
   "dependencies": {
     "@react-oauth/google": "^0.13.4",
