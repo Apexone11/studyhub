@@ -20,3 +20,10 @@ backend-smoke.err.log
 beta-diagnostics/
 beta-artifacts/
 *.enc.txt
+
+# Generated screenshots (regenerated on demand)
+tests/screenshots/
+frontend/studyhub-app/tests/screenshots/*.png
+
+# Nested repos / experiments
+mission-control/
