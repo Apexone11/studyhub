@@ -4,7 +4,7 @@ const requireAuth = require('../middleware/auth')
 const { assertOwnerOrAdmin } = require('../lib/accessControl')
 const { getAuthTokenFromRequest, verifyAuthToken } = require('../lib/authTokens')
 const { captureError } = require('../monitoring/sentry')
-const { computeLineDiff } = require('../lib/diff')
+const { computeLineDiff, addWordSegments, generateChangeSummary } = require('../lib/diff')
 const prisma = require('../lib/prisma')
 
 const router = express.Router()
@@ -322,8 +322,94 @@ router.get('/:id/lab/diff/:commitIdA/:commitIdB', optionalAuth, async (req, res)
     }
 
     const diff = computeLineDiff(commitA.content, commitB.content)
+    addWordSegments(diff.hunks)
 
     res.json({ diff })
+  } catch (error) {
+    captureError(error, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── GET /api/sheets/:id/lab/auto-summary — generate change summary for snapshot ──
+
+router.get('/:id/lab/auto-summary', requireAuth, async (req, res) => {
+  const sheetId = parsePositiveInt(req.params.id, 0)
+  if (!sheetId) return res.status(400).json({ error: 'Invalid sheet ID.' })
+
+  try {
+    const sheet = await prisma.studySheet.findUnique({
+      where: { id: sheetId },
+      select: { id: true, userId: true, content: true },
+    })
+
+    if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
+    if (!assertOwnerOrAdmin({
+      res,
+      user: req.user,
+      ownerId: sheet.userId,
+      message: 'Only the sheet owner can get the auto-summary.',
+      targetType: 'sheet-lab',
+      targetId: sheetId,
+    })) return
+
+    const latestCommit = await prisma.sheetCommit.findFirst({
+      where: { sheetId },
+      orderBy: { createdAt: 'desc' },
+      select: { content: true },
+    })
+
+    const previousContent = latestCommit ? latestCommit.content : ''
+    const summary = generateChangeSummary(previousContent, sheet.content)
+
+    res.json({ summary })
+  } catch (error) {
+    captureError(error, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── GET /api/sheets/:id/lab/restore-preview/:commitId — diff preview before restore ──
+
+router.get('/:id/lab/restore-preview/:commitId', requireAuth, async (req, res) => {
+  const sheetId = parsePositiveInt(req.params.id, 0)
+  const commitId = parsePositiveInt(req.params.commitId, 0)
+  if (!sheetId || !commitId) return res.status(400).json({ error: 'Invalid ID.' })
+
+  try {
+    const sheet = await prisma.studySheet.findUnique({
+      where: { id: sheetId },
+      select: { id: true, userId: true, content: true, contentFormat: true },
+    })
+
+    if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
+    if (!assertOwnerOrAdmin({
+      res,
+      user: req.user,
+      ownerId: sheet.userId,
+      message: 'Only the sheet owner can preview restores.',
+      targetType: 'sheet-lab',
+      targetId: sheetId,
+    })) return
+
+    const targetCommit = await prisma.sheetCommit.findFirst({
+      where: { id: commitId, sheetId },
+      select: { id: true, content: true, message: true, createdAt: true },
+    })
+
+    if (!targetCommit) return res.status(404).json({ error: 'Commit not found.' })
+
+    const diff = computeLineDiff(sheet.content, targetCommit.content)
+    addWordSegments(diff.hunks)
+
+    res.json({
+      diff,
+      commit: {
+        id: targetCommit.id,
+        message: targetCommit.message,
+        createdAt: targetCommit.createdAt,
+      },
+    })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })

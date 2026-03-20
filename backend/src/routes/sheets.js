@@ -14,6 +14,7 @@ const { sendAttachmentPreview } = require('../lib/attachmentPreview')
 const { normalizeContentFormat, validateHtmlForSubmission } = require('../lib/htmlSecurity')
 const { HTML_PREVIEW_TOKEN_TTL_SECONDS, signHtmlPreviewToken } = require('../lib/previewTokens')
 const { buildSheetTextSearchClauses } = require('../lib/sheetSearch')
+const { computeLineDiff, addWordSegments } = require('../lib/diff')
 const { searchSheetsFTS } = require('../lib/fullTextSearch')
 const {
   SCAN_STATUS,
@@ -27,6 +28,8 @@ const {
 } = require('../lib/htmlDraftWorkflow')
 const { isModerationEnabled, scanContent } = require('../lib/moderationEngine')
 const { createProvenanceToken } = require('../lib/provenance')
+const { isHtmlUploadsEnabled } = require('../lib/htmlKillSwitch')
+const requireVerifiedEmail = require('../middleware/requireVerifiedEmail')
 
 const router = express.Router()
 const SHEET_STATUS = {
@@ -475,6 +478,7 @@ router.get('/', optionalAuth, async (req, res) => {
     courseId,
     schoolId,
     search,
+    format,
     mine,
     starred,
     limit = 20,
@@ -496,6 +500,17 @@ router.get('/', optionalAuth, async (req, res) => {
 
     if (courseId) where.courseId = Number.parseInt(courseId, 10)
     if (schoolId) where.course = { schoolId: Number.parseInt(schoolId, 10) }
+
+    const formatCandidate = typeof format === 'string' ? format.trim().toLowerCase() : ''
+    if (formatCandidate === 'html') {
+      where.contentFormat = 'html'
+    } else if (formatCandidate === 'pdf') {
+      where.attachmentType = { contains: 'pdf', mode: 'insensitive' }
+    } else if (formatCandidate === 'markdown') {
+      where.contentFormat = 'markdown'
+      where.NOT = { attachmentType: { contains: 'pdf', mode: 'insensitive' } }
+    }
+
     const sheetTextSearchClauses = buildSheetTextSearchClauses(search)
     if (sheetTextSearchClauses.length) {
       where.OR = sheetTextSearchClauses
@@ -717,6 +732,13 @@ router.post('/drafts/autosave', requireAuth, sheetWriteLimiter, async (req, res)
 
   try {
     if (contentFormat === 'html' && content.trim()) {
+      const killSwitch = await isHtmlUploadsEnabled()
+      if (!killSwitch.enabled) {
+        return res.status(403).json({
+          error: 'HTML uploads are temporarily disabled. Please use Markdown instead.',
+          code: 'HTML_UPLOADS_DISABLED',
+        })
+      }
       const validation = validateHtmlForSubmission(content)
       if (!validation.ok) {
         return res.status(400).json({ error: validation.issues[0], issues: validation.issues })
@@ -1196,7 +1218,7 @@ async function getUserDefaultDownloads(userId) {
   return prefs?.defaultDownloads !== false
 }
 
-router.post('/', requireAuth, sheetWriteLimiter, async (req, res) => {
+router.post('/', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (req, res) => {
   const { title, content, courseId, forkOf, description, allowDownloads } = req.body || {}
   const contentFormat = normalizeContentFormat(req.body?.contentFormat)
   const nextStatus = resolveNextSheetStatus({
@@ -1210,6 +1232,13 @@ router.post('/', requireAuth, sheetWriteLimiter, async (req, res) => {
 
   try {
     if (contentFormat === 'html') {
+      const killSwitch = await isHtmlUploadsEnabled()
+      if (!killSwitch.enabled) {
+        return res.status(403).json({
+          error: 'HTML uploads are temporarily disabled. Please use Markdown instead.',
+          code: 'HTML_UPLOADS_DISABLED',
+        })
+      }
       const validation = validateHtmlForSubmission(content)
       if (!validation.ok) {
         return res.status(400).json({ error: validation.issues[0], issues: validation.issues })
@@ -1357,6 +1386,13 @@ router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
         })
 
     if (nextFormat === 'html') {
+      const killSwitch = await isHtmlUploadsEnabled()
+      if (!killSwitch.enabled) {
+        return res.status(403).json({
+          error: 'HTML uploads are temporarily disabled. Please use Markdown instead.',
+          code: 'HTML_UPLOADS_DISABLED',
+        })
+      }
       const htmlToValidate = typeof nextContent === 'string' ? nextContent : String(sheet.content || '')
       if (nextStatus !== SHEET_STATUS.DRAFT || htmlToValidate.trim()) {
         const validation = validateHtmlForSubmission(htmlToValidate)
@@ -1779,7 +1815,7 @@ router.get('/:id/comments', async (req, res) => {
   }
 })
 
-router.post('/:id/comments', requireAuth, commentLimiter, async (req, res) => {
+router.post('/:id/comments', requireAuth, requireVerifiedEmail, commentLimiter, async (req, res) => {
   const sheetId = Number.parseInt(req.params.id, 10)
   const content = typeof req.body.content === 'string' ? req.body.content.trim() : ''
 
@@ -1900,6 +1936,46 @@ router.delete('/:id/comments/:commentId', requireAuth, commentLimiter, async (re
 
     await prisma.comment.delete({ where: { id: comment.id } })
     res.json({ message: 'Comment deleted.' })
+  } catch (error) {
+    captureError(error, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── GET /api/sheets/contributions/:contributionId/diff — inline diff for contribution review ──
+
+router.get('/contributions/:contributionId/diff', requireAuth, async (req, res) => {
+  const contributionId = Number.parseInt(req.params.contributionId, 10)
+  if (!Number.isInteger(contributionId)) {
+    return res.status(400).json({ error: 'Invalid contribution ID.' })
+  }
+
+  try {
+    const contribution = await prisma.sheetContribution.findUnique({
+      where: { id: contributionId },
+      include: {
+        targetSheet: { select: { id: true, userId: true, content: true } },
+        forkSheet: { select: { id: true, content: true } },
+      },
+    })
+
+    if (!contribution) return res.status(404).json({ error: 'Contribution not found.' })
+
+    // Only the target sheet owner, admin, or the proposer can view the diff
+    const isTargetOwner = req.user.userId === contribution.targetSheet.userId
+    const isProposer = req.user.userId === contribution.proposerId
+    const isAdmin = req.user.role === 'admin'
+    if (!isTargetOwner && !isProposer && !isAdmin) {
+      return res.status(403).json({ error: 'You do not have access to this contribution diff.' })
+    }
+
+    const diff = computeLineDiff(
+      contribution.targetSheet.content || '',
+      contribution.forkSheet.content || ''
+    )
+    addWordSegments(diff.hunks)
+
+    res.json({ diff })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })

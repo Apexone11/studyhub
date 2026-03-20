@@ -4,6 +4,8 @@ const requireAdmin = require('../middleware/requireAdmin')
 const { captureError } = require('../monitoring/sentry')
 const { deleteUserAccount } = require('../lib/deleteUserAccount')
 const { validateHtmlForSubmission } = require('../lib/htmlSecurity')
+const { sanitizePreviewHtml } = require('../lib/htmlPreviewDocument')
+const { isHtmlUploadsEnabled, setHtmlUploadsEnabled, readEnvOverride } = require('../lib/htmlKillSwitch')
 const prisma = require('../lib/prisma')
 
 const router = express.Router()
@@ -299,21 +301,86 @@ router.get('/sheets/review', async (req, res) => {
     ? rawStatus
     : 'pending_review'
 
+  /* Optional filters: contentFormat and htmlScanStatus */
+  const rawFormat = String(req.query.contentFormat || '').trim().toLowerCase()
+  const contentFormat = ['html', 'markdown'].includes(rawFormat) ? rawFormat : undefined
+
+  const rawScan = String(req.query.htmlScanStatus || '').trim().toLowerCase()
+  const htmlScanStatus = ['queued', 'running', 'passed', 'failed'].includes(rawScan) ? rawScan : undefined
+
+  const where = {
+    status,
+    ...(contentFormat ? { contentFormat } : {}),
+    ...(htmlScanStatus ? { htmlScanStatus } : {}),
+  }
+
   try {
     const [sheets, total] = await Promise.all([
       prisma.studySheet.findMany({
-        where: { status },
+        where,
         include: {
           author: { select: { id: true, username: true } },
           course: { include: { school: true } },
+          reviewedBy: { select: { id: true, username: true } },
         },
         orderBy: { updatedAt: 'desc' },
         take: PAGE_SIZE,
         skip: (page - 1) * PAGE_SIZE,
       }),
-      prisma.studySheet.count({ where: { status } }),
+      prisma.studySheet.count({ where }),
     ])
-    res.json({ sheets, total, page, pages: Math.ceil(total / PAGE_SIZE), status })
+    res.json({ sheets, total, page, pages: Math.ceil(total / PAGE_SIZE), status, filters: { contentFormat, htmlScanStatus } })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── GET /api/admin/sheets/:id/review-detail ─────────────────────────
+// Returns rawHtml (text), sanitizedHtml (safe), findings, and metadata
+// for the side-by-side admin review UI.
+router.get('/sheets/:id/review-detail', async (req, res) => {
+  const sheetId = parseInt(req.params.id, 10)
+  if (!Number.isInteger(sheetId)) {
+    return res.status(400).json({ error: 'Sheet id must be an integer.' })
+  }
+
+  try {
+    const sheet = await prisma.studySheet.findUnique({
+      where: { id: sheetId },
+      include: {
+        author: { select: { id: true, username: true } },
+        course: { include: { school: true } },
+        reviewedBy: { select: { id: true, username: true } },
+      },
+    })
+    if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
+
+    const rawHtml = sheet.contentFormat === 'html' ? sheet.content : null
+    const sanitizedHtml = rawHtml ? sanitizePreviewHtml(rawHtml) : null
+    const validation = rawHtml ? validateHtmlForSubmission(rawHtml) : { ok: true, issues: [] }
+
+    res.json({
+      id: sheet.id,
+      title: sheet.title,
+      description: sheet.description,
+      contentFormat: sheet.contentFormat,
+      status: sheet.status,
+      rawHtml,
+      sanitizedHtml,
+      validationIssues: validation.issues,
+      htmlScanStatus: sheet.htmlScanStatus,
+      htmlScanFindings: sheet.htmlScanFindings || [],
+      htmlScanAcknowledgedAt: sheet.htmlScanAcknowledgedAt,
+      author: sheet.author,
+      course: sheet.course,
+      reviewedBy: sheet.reviewedBy,
+      reviewedAt: sheet.reviewedAt,
+      reviewReason: sheet.reviewReason,
+      reviewFindingsSnapshot: sheet.reviewFindingsSnapshot,
+      createdAt: sheet.createdAt,
+      updatedAt: sheet.updatedAt,
+    })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
@@ -324,12 +391,16 @@ router.get('/sheets/review', async (req, res) => {
 router.patch('/sheets/:id/review', async (req, res) => {
   const sheetId = parseInt(req.params.id, 10)
   const action = String(req.body?.action || '').trim().toLowerCase()
+  const reason = String(req.body?.reason || '').trim()
 
   if (!Number.isInteger(sheetId)) {
     return res.status(400).json({ error: 'Sheet id must be an integer.' })
   }
   if (!['approve', 'reject'].includes(action)) {
     return res.status(400).json({ error: 'Action must be "approve" or "reject".' })
+  }
+  if (!reason) {
+    return res.status(400).json({ error: 'A review reason is required.' })
   }
 
   try {
@@ -340,6 +411,7 @@ router.patch('/sheets/:id/review', async (req, res) => {
         status: true,
         contentFormat: true,
         content: true,
+        htmlScanFindings: true,
       },
     })
     if (!current) return res.status(404).json({ error: 'Sheet not found.' })
@@ -357,10 +429,17 @@ router.patch('/sheets/:id/review', async (req, res) => {
     const nextStatus = action === 'approve' ? 'published' : 'rejected'
     const updated = await prisma.studySheet.update({
       where: { id: sheetId },
-      data: { status: nextStatus },
+      data: {
+        status: nextStatus,
+        reviewedById: req.user.id,
+        reviewedAt: new Date(),
+        reviewReason: reason,
+        reviewFindingsSnapshot: current.htmlScanFindings || [],
+      },
       include: {
         author: { select: { id: true, username: true } },
         course: { include: { school: true } },
+        reviewedBy: { select: { id: true, username: true } },
       },
     })
 
@@ -525,6 +604,53 @@ router.delete('/announcements/:id', async (req, res) => {
     res.json({ message: 'Announcement deleted.' })
   } catch (err) {
     if (err.code === 'P2025') return res.status(404).json({ error: 'Announcement not found.' })
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── GET /api/admin/settings/html-uploads ─────────────────────
+// Returns the current state of the HTML uploads kill-switch.
+router.get('/settings/html-uploads', async (req, res) => {
+  try {
+    const status = await isHtmlUploadsEnabled()
+    const envOverride = readEnvOverride()
+    res.json({
+      enabled: status.enabled,
+      source: status.source,
+      envOverride,
+    })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── PATCH /api/admin/settings/html-uploads ────────────────────
+// Toggle HTML uploads on or off. The DB value is always written;
+// if the env var overrides, the response explains that clearly.
+router.patch('/settings/html-uploads', async (req, res) => {
+  const enabled = req.body?.enabled
+  if (typeof enabled !== 'boolean') {
+    return res.status(400).json({ error: '"enabled" must be a boolean.' })
+  }
+
+  try {
+    const result = await setHtmlUploadsEnabled(enabled, {
+      adminUserId: req.user.userId,
+    })
+
+    const envLocked = result.envOverride != null
+    res.json({
+      enabled: result.enabled,
+      dbValue: result.dbValue,
+      source: result.source,
+      envOverride: result.envOverride,
+      message: envLocked
+        ? `Database updated, but the STUDYHUB_HTML_UPLOADS env var ("${result.envOverride}") overrides the toggle.`
+        : `HTML uploads ${result.enabled ? 'enabled' : 'disabled'}.`,
+    })
+  } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
   }

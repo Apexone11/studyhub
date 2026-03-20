@@ -117,7 +117,7 @@ export default function AttachmentPreviewPage() {
     if (!config) return
 
     try {
-      const response = await fetch(config.detailUrl, { headers: authHeaders() })
+      const response = await fetch(config.detailUrl, { headers: authHeaders(), credentials: 'include' })
       const data = await readJsonSafely(response, {})
 
       if (isAuthSessionFailure(response, data)) {

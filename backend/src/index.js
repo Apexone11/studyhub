@@ -39,6 +39,7 @@ const { adminRouter: moderationAdminRoutes, userRouter: moderationUserRoutes } =
 const provenanceRoutes = require('./routes/provenance')
 const featureFlagRoutes = require('./routes/featureFlags')
 const webauthnRoutes = require('./routes/webauthn')
+const publicRoutes = require('./routes/public')
 const { featureFlagMiddleware } = require('./lib/featureFlags')
 
 if (sentryEnabled) {
@@ -295,6 +296,9 @@ app.use('/api/flags', featureFlagRoutes)
 
 // Mount WebAuthn passkey endpoints under /api/webauthn.
 app.use('/api/webauthn', webauthnRoutes)
+
+// Public unauthenticated data endpoints (landing page stats, etc.).
+app.use('/api/public', publicRoutes)
 
 // Basic API health check.
 app.get('/', (req, res) => {

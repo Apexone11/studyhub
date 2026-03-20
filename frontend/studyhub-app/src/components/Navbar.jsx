@@ -7,7 +7,7 @@
 //  - Uses custom Icons from Icons.jsx instead of Font Awesome
 //  - Shared responsive sizing for landing + app nav states
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Fragment } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   LogoMark,
@@ -21,6 +21,7 @@ import { pageWidths } from '../lib/ui'
 import { useSession } from '../lib/session-context'
 import { useLivePolling } from '../lib/useLivePolling'
 import { API } from '../config'
+import EmailVerificationBanner from './EmailVerificationBanner'
 
 // ─── NAV CONFIG ───────────────────────────────────────────────────
 // Maps route patterns → { crumbs, tabs, backTo }
@@ -74,8 +75,8 @@ function getConfig(pathname) {
 // ─── STYLES ───────────────────────────────────────────────────────
 const S = {
   nav: {
-    background: '#0f172a',
-    borderBottom: '1px solid #1e293b',
+    background: 'var(--sh-nav-bg)',
+    borderBottom: '1px solid var(--sh-nav-border)',
     position: 'sticky',
     top: 0,
     zIndex: 100,
@@ -91,24 +92,24 @@ const S = {
     margin: '0 auto',
   },
   sep: {
-    color: '#1e3a5f',
+    color: 'var(--sh-nav-border)',
     fontSize: 18,
     userSelect: 'none',
   },
   crumbLink: {
     fontSize: 13,
-    color: '#64748b',
+    color: 'var(--sh-nav-muted)',
     textDecoration: 'none',
     transition: 'color .15s',
   },
   crumbActive: {
     fontSize: 13,
-    color: '#94a3b8',
+    color: 'var(--sh-nav-accent)',
     fontWeight: 600,
   },
   searchBox: {
-    background: '#1e293b',
-    border: '1px solid #334155',
+    background: 'var(--sh-nav-search-bg)',
+    border: '1px solid var(--sh-nav-search-border)',
     borderRadius: 8,
     height: 32,
     display: 'flex',
@@ -120,41 +121,41 @@ const S = {
   },
   searchText: {
     fontSize: 12,
-    color: '#475569',
+    color: 'var(--sh-nav-search-text)',
   },
   iconBtn: {
     background: 'transparent',
     border: 'none',
-    padding: 5,
+    padding: 8,
     borderRadius: 7,
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    color: '#64748b',
+    color: 'var(--sh-nav-muted)',
     transition: 'background .15s, color .15s',
   },
   avatar: {
-    width: 28,
-    height: 28,
+    width: 32,
+    height: 32,
     borderRadius: '50%',
-    background: '#0f172a',
-    border: '1.5px solid #3b82f6',
+    background: 'var(--sh-nav-bg)',
+    border: '1.5px solid var(--sh-nav-tab-active)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     fontSize: 10,
     fontWeight: 700,
-    color: '#fff',
+    color: 'var(--sh-nav-text)',
     flexShrink: 0,
   },
   username: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: 'var(--sh-nav-accent)',
     fontWeight: 600,
   },
   tabsRow: {
-    borderTop: '1px solid #1e293b',
+    borderTop: '1px solid var(--sh-nav-border)',
     padding: '0 24px',
     maxWidth: 1400,
     margin: '0 auto',
@@ -168,7 +169,7 @@ const S = {
     border: 'none',
     background: 'transparent',
     cursor: 'pointer',
-    color: '#64748b',
+    color: 'var(--sh-nav-muted)',
     borderBottom: '2px solid transparent',
     transition: 'color .15s, border-color .15s',
     fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
@@ -176,8 +177,8 @@ const S = {
     display: 'inline-block',
   },
   tabActive: {
-    color: '#3b82f6',
-    borderBottom: '2px solid #3b82f6',
+    color: 'var(--sh-nav-tab-active)',
+    borderBottom: '2px solid var(--sh-nav-tab-active)',
   },
 }
 
@@ -311,7 +312,7 @@ export default function Navbar({
   const searchBoxStyle = {
     ...S.searchBox,
     width: isLanding ? 'clamp(240px, 30vw, 620px)' : 'clamp(180px, 22vw, 520px)',
-    height: isLanding ? 'clamp(40px, 4vw, 52px)' : 'clamp(34px, 3vw, 44px)',
+    height: isLanding ? 'clamp(40px, 4vw, 52px)' : 'clamp(38px, 3vw, 44px)',
     borderRadius: isLanding ? 16 : 10,
     padding: isLanding ? '0 14px' : '0 10px',
     marginLeft: isLanding ? 'auto' : undefined,
@@ -320,7 +321,7 @@ export default function Navbar({
   const wordmarkStyle = {
     fontSize: isLanding ? 'clamp(16px, 1vw + 12px, 22px)' : 15,
     fontWeight: 800,
-    color: '#fff',
+    color: 'var(--sh-nav-text)',
     letterSpacing: '-0.02em',
   }
   const searchTextStyle = {
@@ -336,7 +337,7 @@ export default function Navbar({
     borderRadius: isLanding ? 16 : 10,
     border: '1px solid rgba(255,255,255,0.16)',
     background: 'rgba(255,255,255,0.04)',
-    color: '#fff',
+    color: 'var(--sh-nav-text)',
     fontSize: isLanding ? 'clamp(13px, 0.8vw + 8px, 17px)' : 12,
     fontWeight: 600,
     textDecoration: 'none',
@@ -345,16 +346,17 @@ export default function Navbar({
   const publicPrimaryBtn = {
     ...publicGhostBtn,
     border: '1px solid transparent',
-    background: '#3b82f6',
+    background: 'var(--sh-brand)',
     fontWeight: 700,
   }
 
   function handleIconHover(e, enter) {
-    e.currentTarget.style.background = enter ? '#1e293b' : 'transparent'
-    e.currentTarget.style.color      = enter ? '#94a3b8' : '#64748b'
+    e.currentTarget.style.background = enter ? 'var(--sh-nav-search-bg)' : 'transparent'
+    e.currentTarget.style.color      = enter ? 'var(--sh-nav-accent)' : 'var(--sh-nav-muted)'
   }
 
   return (
+    <Fragment>
     <nav style={S.nav} aria-label="Main navigation">
       {/* — top row — */}
       <div style={rowStyle}>
@@ -363,7 +365,7 @@ export default function Navbar({
         <Link to={user ? '/feed' : '/'} style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8 }}>
           <LogoMark size={isLanding ? 34 : 28} />
           <span style={wordmarkStyle}>
-            Study<span style={{ color: '#3b82f6' }}>Hub</span>
+            Study<span style={{ color: 'var(--sh-nav-tab-active)' }}>Hub</span>
           </span>
         </Link>
 
@@ -373,8 +375,8 @@ export default function Navbar({
             <span style={S.sep}>/</span>
             {crumb.to
               ? <Link to={crumb.to} style={S.crumbLink}
-                  onMouseEnter={e => e.currentTarget.style.color = '#e2e8f0'}
-                  onMouseLeave={e => e.currentTarget.style.color = '#64748b'}
+                  onMouseEnter={e => e.currentTarget.style.color = 'var(--sh-nav-muted-hover)'}
+                  onMouseLeave={e => e.currentTarget.style.color = 'var(--sh-nav-muted)'}
                 >{crumb.label}</Link>
               : <span style={S.crumbActive}>{crumb.label}</span>
             }
@@ -395,7 +397,7 @@ export default function Navbar({
 
         {/* auto-save indicator */}
         {autoSave && (
-          <span style={{ fontSize: 11, color: '#64748b', marginRight: 4 }}>
+          <span style={{ fontSize: 11, color: 'var(--sh-nav-muted)', marginRight: 4 }}>
             ✦ Auto-saving…
           </span>
         )}
@@ -413,7 +415,7 @@ export default function Navbar({
             aria-label="Open search"
             data-search-trigger
           >
-            <IconSearch size={13} style={{ color: '#475569', flexShrink: 0 }} aria-hidden="true" />
+            <IconSearch size={13} style={{ color: 'var(--sh-nav-search-text)', flexShrink: 0 }} aria-hidden="true" />
             <span style={searchTextStyle}>Search sheets, courses...</span>
             <kbd className="sh-kbd-hint" aria-hidden="true">{navigator.platform?.includes('Mac') ? '⌘' : 'Ctrl+'}K</kbd>
           </div>
@@ -429,12 +431,12 @@ export default function Navbar({
         {/* back link (when no actions) */}
         {!actions && backTo && (
           <Link to={backTo} style={{
-            fontSize: 12, color: '#64748b', textDecoration: 'none',
+            fontSize: 12, color: 'var(--sh-nav-muted)', textDecoration: 'none',
             display: 'flex', alignItems: 'center', gap: 5,
             transition: 'color .15s',
           }}
-            onMouseEnter={e => e.currentTarget.style.color = '#94a3b8'}
-            onMouseLeave={e => e.currentTarget.style.color = '#64748b'}
+            onMouseEnter={e => e.currentTarget.style.color = 'var(--sh-nav-accent)'}
+            onMouseLeave={e => e.currentTarget.style.color = 'var(--sh-nav-muted)'}
           >
             ← {backTo === '/feed' ? 'Feed' : backTo === '/sheets' ? 'Sheets' : 'Back'}
           </Link>
@@ -457,7 +459,7 @@ export default function Navbar({
               {unreadCount > 0 && (
                 <span style={{
                   position: 'absolute', top: 2, right: 2,
-                  background: '#ef4444', color: '#fff',
+                  background: 'var(--sh-nav-badge-bg)', color: 'var(--sh-nav-text)',
                   fontSize: 10, fontWeight: 800,
                   borderRadius: 99, minWidth: 16, height: 16,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -471,21 +473,21 @@ export default function Navbar({
             {showBell && (
               <div style={{
                 position: 'absolute', top: 'calc(100% + 8px)', right: 0,
-                width: 'clamp(280px, 90vw, 320px)', background: '#fff', borderRadius: 12,
-                border: '1px solid #e2e8f0',
-                boxShadow: '0 8px 32px rgba(15,23,42,0.18)',
+                width: 'clamp(280px, 90vw, 320px)', background: 'var(--sh-dropdown-bg)', borderRadius: 12,
+                border: '1px solid var(--sh-dropdown-border)',
+                boxShadow: 'var(--sh-dropdown-shadow)',
                 zIndex: 200, overflow: 'hidden',
                 fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
               }}>
                 {/* header */}
                 <div style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '12px 16px', borderBottom: '1px solid #f1f5f9',
+                  padding: '12px 16px', borderBottom: '1px solid var(--sh-dropdown-divider)',
                 }}>
-                  <span style={{ fontWeight: 700, fontSize: 14, color: '#0f172a' }}>Notifications</span>
+                  <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--sh-text)' }}>Notifications</span>
                   {unreadCount > 0 && (
                     <button onClick={markAllRead} style={{
-                      fontSize: 12, color: '#3b82f6', fontWeight: 600,
+                      fontSize: 12, color: 'var(--sh-link)', fontWeight: 600,
                       background: 'none', border: 'none', cursor: 'pointer',
                       fontFamily: 'inherit',
                     }}>
@@ -498,8 +500,8 @@ export default function Navbar({
                 <div style={{ maxHeight: 340, overflowY: 'auto' }}>
                   {notifications.length === 0
                     ? (
-                      <div style={{ padding: '28px 16px', textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
-                        <i className="fas fa-bell-slash" style={{ fontSize: 22, display: 'block', marginBottom: 8, color: '#cbd5e1' }}></i>
+                      <div style={{ padding: '28px 16px', textAlign: 'center', color: 'var(--sh-muted)', fontSize: 13 }}>
+                        <i className="fas fa-bell-slash" style={{ fontSize: 22, display: 'block', marginBottom: 8, color: 'var(--sh-notif-empty-icon)' }}></i>
                         No notifications yet
                       </div>
                     )
@@ -509,19 +511,19 @@ export default function Navbar({
                         onClick={() => markOneRead(notif)}
                         style={{
                           padding: '12px 16px',
-                          borderBottom: '1px solid #f8fafc',
+                          borderBottom: '1px solid var(--sh-dropdown-divider)',
                           cursor: 'pointer',
-                          background: notif.read ? '#fff' : '#f0f7ff',
-                          borderLeft: notif.read ? '3px solid transparent' : '3px solid #3b82f6',
+                          background: notif.read ? 'var(--sh-notif-read-bg)' : 'var(--sh-notif-unread-bg)',
+                          borderLeft: notif.read ? '3px solid transparent' : '3px solid var(--sh-link)',
                           transition: 'background .12s',
                         }}
-                        onMouseEnter={e => e.currentTarget.style.background = notif.read ? '#f8fafc' : '#e8f0fe'}
-                        onMouseLeave={e => e.currentTarget.style.background = notif.read ? '#fff' : '#f0f7ff'}
+                        onMouseEnter={e => e.currentTarget.style.background = notif.read ? 'var(--sh-notif-read-hover)' : 'var(--sh-notif-unread-hover)'}
+                        onMouseLeave={e => e.currentTarget.style.background = notif.read ? 'var(--sh-notif-read-bg)' : 'var(--sh-notif-unread-bg)'}
                       >
-                        <div style={{ fontSize: 13, color: '#334155', lineHeight: 1.4, marginBottom: 4 }}>
+                        <div style={{ fontSize: 13, color: 'var(--sh-text)', lineHeight: 1.4, marginBottom: 4 }}>
                           <strong>{notif.actor?.username || 'Someone'}</strong> {notif.message}
                         </div>
-                        <div style={{ fontSize: 11, color: '#94a3b8' }}>{notif.timeAgoLabel || 'just now'}</div>
+                        <div style={{ fontSize: 11, color: 'var(--sh-muted)' }}>{notif.timeAgoLabel || 'just now'}</div>
                       </div>
                     ))
                   }
@@ -543,7 +545,7 @@ export default function Navbar({
           >
             <div style={S.avatar} aria-hidden="true">{initials}</div>
             <span style={S.username}>{user.username}</span>
-            <IconChevronDown size={13} style={{ color: '#475569' }} aria-hidden="true" />
+            <IconChevronDown size={13} style={{ color: 'var(--sh-nav-search-text)' }} aria-hidden="true" />
           </div>
         )}
 
@@ -568,7 +570,7 @@ export default function Navbar({
               to="/register"
               style={publicPrimaryBtn}
               onMouseEnter={e => { e.currentTarget.style.background = '#2563eb' }}
-              onMouseLeave={e => { e.currentTarget.style.background = '#3b82f6' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'var(--sh-brand)' }}
             >
               Get Started
             </Link>
@@ -578,21 +580,21 @@ export default function Navbar({
         {/* contextual auth links on public pages */}
         {!user && !isLanding && (
           location.pathname === '/login' ? (
-            <Link to="/register" style={{ fontSize: 12, fontWeight: 600, color: '#3b82f6', textDecoration: 'none' }}>
+            <Link to="/register" style={{ fontSize: 12, fontWeight: 600, color: 'var(--sh-nav-tab-active)', textDecoration: 'none' }}>
               Create account →
             </Link>
           ) : location.pathname === '/register' ? (
-            <Link to="/login" style={{ fontSize: 12, fontWeight: 600, color: '#3b82f6', textDecoration: 'none' }}>
+            <Link to="/login" style={{ fontSize: 12, fontWeight: 600, color: 'var(--sh-nav-tab-active)', textDecoration: 'none' }}>
               Sign in →
             </Link>
           ) : location.pathname === '/forgot-password' || location.pathname === '/reset-password' ? (
-            <Link to="/login" style={{ fontSize: 12, fontWeight: 600, color: '#3b82f6', textDecoration: 'none' }}>
+            <Link to="/login" style={{ fontSize: 12, fontWeight: 600, color: 'var(--sh-nav-tab-active)', textDecoration: 'none' }}>
               Back to login
             </Link>
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <Link to="/login" style={{ fontSize: 12, fontWeight: 600, color: '#94a3b8', textDecoration: 'none' }}>Log in</Link>
-              <Link to="/register" style={{ fontSize: 12, fontWeight: 700, color: '#fff', textDecoration: 'none', background: '#3b82f6', padding: '5px 12px', borderRadius: 7 }}>Get Started</Link>
+              <Link to="/login" style={{ fontSize: 12, fontWeight: 600, color: 'var(--sh-nav-accent)', textDecoration: 'none' }}>Log in</Link>
+              <Link to="/register" style={{ fontSize: 12, fontWeight: 700, color: 'var(--sh-nav-text)', textDecoration: 'none', background: 'var(--sh-brand)', padding: '5px 12px', borderRadius: 7 }}>Get Started</Link>
             </div>
           )
         )}
@@ -601,7 +603,7 @@ export default function Navbar({
 
       {/* — tabs row (only if tabs configured) — */}
       {tabs && (
-        <div style={{ borderTop: '1px solid #1e293b' }}>
+        <div style={{ borderTop: '1px solid var(--sh-nav-border)' }}>
           <div style={{ ...S.tabsRow, maxWidth: pageWidths.app, padding: '0 clamp(16px, 2.5vw, 40px)' }}>
             {tabs.map(tab => {
               const isActive = location.pathname + location.search === tab.to
@@ -623,5 +625,7 @@ export default function Navbar({
         </div>
       )}
     </nav>
+    {!isLanding && <EmailVerificationBanner />}
+    </Fragment>
   )
 }

@@ -67,15 +67,15 @@ function validateAttachment(file) {
 }
 
 function MiniPreview({ md }) {
-  if (!md) return <div style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic' }}>Start typing to preview…</div>
+  if (!md) return <div style={{ fontSize: 12, color: 'var(--sh-muted)', fontStyle: 'italic' }}>Start typing to preview…</div>
   return (
     <div
       style={{
         borderRadius: 12,
-        border: '1px solid #e2e8f0',
-        background: '#f8fafc',
+        border: '1px solid var(--sh-border)',
+        background: 'var(--sh-soft)',
         padding: 14,
-        color: '#1e293b',
+        color: 'var(--sh-text)',
         fontSize: 13,
         lineHeight: 1.8,
         whiteSpace: 'pre-wrap',
@@ -164,6 +164,7 @@ export default function UploadSheetPage() {
   const canSubmitHtml = canSubmitHtmlReview({
     hasOriginalVersion: scanState.hasOriginalVersion,
     scanStatus: scanState.status,
+    scanAcknowledged: Boolean(scanState.acknowledgedAt) || scanModalDismissed,
     title,
     courseId,
     description,
@@ -224,7 +225,7 @@ export default function UploadSheetPage() {
     async function loadData() {
       try {
         if (isEditing) {
-          const response = await fetch(`${API}/api/sheets/${sheetId}`, { headers: authHeaders() })
+          const response = await fetch(`${API}/api/sheets/${sheetId}`, { headers: authHeaders(), credentials: 'include' })
           const data = await response.json().catch(() => ({}))
           if (!response.ok) throw new Error(data.error || 'Could not load sheet.')
           if (cancelled) return
@@ -233,7 +234,7 @@ export default function UploadSheetPage() {
           return
         }
 
-        const response = await fetch(`${API}/api/sheets/drafts/latest`, { headers: authHeaders() })
+        const response = await fetch(`${API}/api/sheets/drafts/latest`, { headers: authHeaders(), credentials: 'include' })
         const data = await response.json().catch(() => ({}))
         if (!response.ok) throw new Error(data.error || 'Could not load latest draft.')
         if (cancelled) return
@@ -335,7 +336,7 @@ export default function UploadSheetPage() {
 
     async function pollScanStatus() {
       try {
-        const response = await fetch(`${API}/api/sheets/drafts/${activeSheetId}/scan-status`, { headers: authHeaders() })
+        const response = await fetch(`${API}/api/sheets/drafts/${activeSheetId}/scan-status`, { headers: authHeaders(), credentials: 'include' })
         const data = await response.json().catch(() => ({}))
         if (!response.ok) return
         if (cancelled) return
@@ -373,6 +374,7 @@ export default function UploadSheetPage() {
           const response = await fetch(`${API}/api/sheets/drafts/autosave`, {
             method: 'POST',
             headers: authHeaders(),
+            credentials: 'include',
             body: JSON.stringify({
               id: draftId,
               title,
@@ -406,6 +408,7 @@ export default function UploadSheetPage() {
         const response = await fetch(`${API}/api/sheets/drafts/${draftId}/working-html`, {
           method: 'PATCH',
           headers: authHeaders(),
+          credentials: 'include',
           body: JSON.stringify({
             title,
             courseId: Number.parseInt(courseId, 10),
@@ -537,6 +540,7 @@ export default function UploadSheetPage() {
       const response = await fetch(`${API}/api/sheets/${draftId}`, {
         method: 'DELETE',
         headers: authHeaders(),
+        credentials: 'include',
       })
       if (!response.ok) {
         const data = await response.json().catch(() => ({}))
@@ -612,6 +616,7 @@ export default function UploadSheetPage() {
       const response = await fetch(`${API}/api/sheets/drafts/import-html`, {
         method: 'POST',
         headers: authHeaders(),
+        credentials: 'include',
         body: JSON.stringify({
           id: draftId,
           title,
@@ -654,6 +659,7 @@ export default function UploadSheetPage() {
       await fetch(`${API}/api/sheets/drafts/${activeSheetId}/scan-status/acknowledge`, {
         method: 'POST',
         headers: authHeaders(),
+        credentials: 'include',
       })
     } catch {
       // acknowledgement is best-effort
@@ -713,6 +719,7 @@ export default function UploadSheetPage() {
         const response = await fetch(endpoint, {
           method,
           headers: authHeaders(),
+          credentials: 'include',
           body: JSON.stringify({
             title,
             description,
@@ -743,7 +750,7 @@ export default function UploadSheetPage() {
       return
     }
     if (!canSubmitHtml) {
-      setError('Complete required fields and wait for scan status to pass before submit.')
+      setError('Complete required fields and either pass the security scan or acknowledge the findings before submit.')
       return
     }
 
@@ -752,6 +759,7 @@ export default function UploadSheetPage() {
       const response = await fetch(`${API}/api/sheets/${activeSheetId}/submit-review`, {
         method: 'POST',
         headers: authHeaders(),
+        credentials: 'include',
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
@@ -892,7 +900,7 @@ export default function UploadSheetPage() {
     <div style={{ minHeight: '100vh', background: '#edf0f5', fontFamily: FONT }}>
       <Navbar crumbs={[{ label: 'Study Sheets', to: '/sheets' }, { label: isEditing ? 'Edit Sheet' : 'New Sheet', to: null }]} hideTabs actions={navActions} hideSearch />
       <div style={pageShell('editor', 20, 60)}>
-        <div data-tutorial="upload-info" style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', padding: '14px 20px', marginBottom: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, alignItems: 'end' }}>
+        <div data-tutorial="upload-info" style={{ background: 'var(--sh-surface)', borderRadius: 14, border: '1px solid var(--sh-border)', padding: '14px 20px', marginBottom: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, alignItems: 'end' }}>
           <div>
             <label style={{ fontSize: 10, fontWeight: 700, color: '#64748b', letterSpacing: '.06em', display: 'block', marginBottom: 5 }}>SHEET TITLE</label>
             <input
@@ -926,7 +934,7 @@ export default function UploadSheetPage() {
           </div>
         </div>
 
-        <div data-tutorial="upload-content" style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', padding: '14px 20px', marginBottom: 12 }}>
+        <div data-tutorial="upload-content" style={{ background: 'var(--sh-surface)', borderRadius: 14, border: '1px solid var(--sh-border)', padding: '14px 20px', marginBottom: 12 }}>
           <label style={{ fontSize: 10, fontWeight: 700, color: '#64748b', letterSpacing: '.06em', display: 'block', marginBottom: 5 }}>
             DESCRIPTION <span style={{ fontSize: 9, color: '#94a3b8', textTransform: 'none', letterSpacing: 0 }}>(required for HTML review)</span>
           </label>
@@ -941,7 +949,7 @@ export default function UploadSheetPage() {
           <div style={{ fontSize: 10, color: '#94a3b8', textAlign: 'right', marginTop: 3 }}>{description.length}/300</div>
         </div>
         {isHtmlMode ? (
-          <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', padding: '14px 20px', marginBottom: 12 }}>
+          <div style={{ background: 'var(--sh-surface)', borderRadius: 14, border: '1px solid var(--sh-border)', padding: '14px 20px', marginBottom: 12 }}>
             <label style={{ fontSize: 10, fontWeight: 700, color: '#64748b', letterSpacing: '.06em', display: 'block', marginBottom: 8 }}>
               HTML IMPORT <span style={{ fontSize: 9, color: '#94a3b8', textTransform: 'none', letterSpacing: 0 }}>(optional — or type directly below)</span>
             </label>
@@ -976,7 +984,7 @@ export default function UploadSheetPage() {
           </div>
         ) : null}
 
-        <div data-tutorial="upload-attachment" style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', padding: '14px 20px', marginBottom: 12 }}>
+        <div data-tutorial="upload-attachment" style={{ background: 'var(--sh-surface)', borderRadius: 14, border: '1px solid var(--sh-border)', padding: '14px 20px', marginBottom: 12 }}>
           <label style={{ fontSize: 10, fontWeight: 700, color: '#64748b', letterSpacing: '.06em', display: 'block', marginBottom: 8 }}>
             OPTIONAL ATTACHMENT <span style={{ fontSize: 9, color: '#94a3b8', textTransform: 'none', letterSpacing: 0 }}>(PDF, PNG, JPEG, GIF, WebP — max 10 MB)</span>
           </label>
@@ -1082,15 +1090,15 @@ export default function UploadSheetPage() {
           </div>
         ) : null}
 
-        <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: '1px solid #e2e8f0' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 16px', borderRight: '1px solid #e2e8f0' }}>
-              <IconUpload size={13} style={{ color: '#3b82f6' }} />
-              <span style={{ fontSize: 12, fontWeight: 600, color: '#3b82f6' }}>{isHtmlMode ? 'HTML Working Editor' : 'Markdown Editor'}</span>
+        <div style={{ background: 'var(--sh-surface)', borderRadius: 14, border: '1px solid var(--sh-border)', overflow: 'hidden' }}>
+          <div className="upload-editor-split" style={{ borderBottom: '1px solid var(--sh-border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 16px', borderRight: '1px solid var(--sh-border)' }}>
+              <IconUpload size={13} style={{ color: 'var(--sh-brand)' }} />
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--sh-brand)' }}>{isHtmlMode ? 'HTML Working Editor' : 'Markdown Editor'}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 16px' }}>
-              <IconEye size={13} style={{ color: '#64748b' }} />
-              <span style={{ fontSize: 12, fontWeight: 600, color: '#64748b' }}>Live Preview</span>
+              <IconEye size={13} style={{ color: 'var(--sh-muted)' }} />
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--sh-muted)' }}>Live Preview</span>
             </div>
           </div>
 
@@ -1105,13 +1113,13 @@ export default function UploadSheetPage() {
                 style={{ width: '100%', height: '100%', minHeight: 420, background: 'transparent', border: 'none', outline: 'none', resize: 'none', padding: '16px 18px', fontFamily: "'JetBrains Mono','Fira Code',monospace", fontSize: 12.5, lineHeight: 1.9, color: '#e2e8f0', boxSizing: 'border-box', opacity: isHtmlMode && !canEditHtml ? 0.6 : 1 }}
               />
             </div>
-            <div style={{ padding: '16px 20px', overflowY: 'auto', maxHeight: 600 }}>
+            <div style={{ padding: '16px 20px', overflowY: 'auto', maxHeight: 600, background: 'var(--sh-surface)' }}>
               {isHtmlMode ? (
                 <iframe
                   title="html-inline-preview"
                   sandbox="allow-forms allow-modals allow-pointer-lock allow-popups allow-scripts"
                   srcDoc={content}
-                  style={{ width: '100%', minHeight: 520, border: '1px solid #e2e8f0', borderRadius: 10, background: '#fff' }}
+                  style={{ width: '100%', minHeight: 520, border: '1px solid var(--sh-border)', borderRadius: 10, background: '#fff' }}
                 />
               ) : (
                 <MiniPreview md={content} />
@@ -1123,20 +1131,20 @@ export default function UploadSheetPage() {
 
       {showTutorial ? (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'grid', placeItems: 'center', zIndex: 80, padding: 20 }}>
-          <div style={{ width: 'min(680px, 100%)', background: '#fff', borderRadius: 18, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+          <div style={{ width: 'min(680px, 100%)', background: 'var(--sh-surface)', borderRadius: 18, border: '1px solid var(--sh-border)', overflow: 'hidden' }}>
             <div style={{ padding: '16px 18px', background: 'linear-gradient(135deg,#0f172a,#1d4ed8)', color: '#fff' }}>
               <div style={{ fontSize: 18, fontWeight: 800 }}>Welcome to HTML Upload Beta</div>
               <div style={{ marginTop: 4, fontSize: 12, opacity: 0.9 }}>Secure upload-first workflow with scan + sandbox preview.</div>
             </div>
-            <div style={{ padding: 18, display: 'grid', gap: 10, fontSize: 13, color: '#334155', lineHeight: 1.7 }}>
+            <div style={{ padding: 18, display: 'grid', gap: 10, fontSize: 13, color: 'var(--sh-subtext)', lineHeight: 1.7 }}>
               <div>1. Fill title, course, and description.</div>
               <div>2. Import an <strong>.html</strong> file to create original + working copies.</div>
               <div>3. Fix issues in editor while security scan runs.</div>
               <div>4. Use preview to test full-page behavior.</div>
               <div>5. Submit only after scan status shows <strong>passed</strong>.</div>
             </div>
-            <div style={{ borderTop: '1px solid #e2e8f0', padding: 14, display: 'flex', justifyContent: 'flex-end' }}>
-              <button onClick={dismissTutorial} style={{ background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: FONT }}>
+            <div style={{ borderTop: '1px solid var(--sh-border)', padding: 14, display: 'flex', justifyContent: 'flex-end' }}>
+              <button onClick={dismissTutorial} style={{ background: 'var(--sh-brand)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: FONT }}>
                 Got it
               </button>
             </div>
@@ -1146,13 +1154,13 @@ export default function UploadSheetPage() {
 
       {showScanModal ? (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'grid', placeItems: 'center', zIndex: 85, padding: 20 }}>
-          <div style={{ width: 'min(720px, 100%)', background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-            <div style={{ padding: '14px 16px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>HTML Security Scan</div>
+          <div style={{ width: 'min(720px, 100%)', background: 'var(--sh-surface)', borderRadius: 16, border: '1px solid var(--sh-border)', overflow: 'hidden' }}>
+            <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--sh-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--sh-heading)' }}>HTML Security Scan</div>
               <div style={{ fontSize: 12, fontWeight: 700, color: statusColor(scanState.status) }}>{scanState.status}</div>
             </div>
             <div style={{ padding: 16, display: 'grid', gap: 10 }}>
-              <div style={{ fontSize: 13, color: '#334155' }}>
+              <div style={{ fontSize: 13, color: 'var(--sh-subtext)' }}>
                 Scan checks policy rules + antivirus before review submission.
               </div>
               {scanState.findings?.length ? (
@@ -1166,16 +1174,22 @@ export default function UploadSheetPage() {
                 </div>
               ) : null}
 
-              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: '#475569' }}>
+              {scanState.status === 'failed' ? (
+                <div style={{ border: '1px solid #fde68a', background: '#fffbeb', borderRadius: 10, padding: 12, fontSize: 12, color: '#92400e', lineHeight: 1.6 }}>
+                  You can still submit this sheet for review. It will be placed in <strong>Pending</strong> status and sent to an admin for approval. Other users will see it listed but the HTML preview will be disabled until an admin approves it.
+                </div>
+              ) : null}
+
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: 'var(--sh-subtext)' }}>
                 <input type="checkbox" checked={scanAckChecked} onChange={(event) => setScanAckChecked(event.target.checked)} style={{ marginTop: 2 }} />
-                I understand unsafe HTML is blocked and I must resolve flagged issues before submit.
+                I understand this sheet may contain flagged HTML. I acknowledge it will be sent to an admin for review and will remain in Pending status until approved.
               </label>
             </div>
-            <div style={{ borderTop: '1px solid #e2e8f0', padding: 14, display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+            <div style={{ borderTop: '1px solid var(--sh-border)', padding: 14, display: 'flex', justifyContent: 'space-between', gap: 10 }}>
               <button
                 type="button"
                 onClick={() => setShowScanModal(false)}
-                style={{ background: '#fff', color: '#64748b', border: '1px solid #cbd5e1', borderRadius: 8, padding: '8px 12px', fontSize: 12, cursor: 'pointer', fontFamily: FONT }}
+                style={{ background: 'var(--sh-surface)', color: 'var(--sh-muted)', border: '1px solid var(--sh-border)', borderRadius: 8, padding: '8px 12px', fontSize: 12, cursor: 'pointer', fontFamily: FONT }}
               >
                 Keep open
               </button>
@@ -1183,7 +1197,7 @@ export default function UploadSheetPage() {
                 type="button"
                 disabled={!scanAckChecked}
                 onClick={acknowledgeScanAndDismiss}
-                style={{ background: scanAckChecked ? '#2563eb' : '#93c5fd', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 12px', fontSize: 12, fontWeight: 700, cursor: scanAckChecked ? 'pointer' : 'not-allowed', fontFamily: FONT }}
+                style={{ background: scanAckChecked ? 'var(--sh-brand)' : '#93c5fd', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 12px', fontSize: 12, fontWeight: 700, cursor: scanAckChecked ? 'pointer' : 'not-allowed', fontFamily: FONT }}
               >
                 Acknowledge and dismiss
               </button>

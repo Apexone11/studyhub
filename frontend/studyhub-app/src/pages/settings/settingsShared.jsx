@@ -1,6 +1,9 @@
 /**
  * Shared UI primitives for all Settings tabs.
  * Extracted from the original monolithic SettingsPage.jsx.
+ *
+ * All colors use CSS variable tokens (--sh-*) so dark mode works
+ * automatically without !important overrides.
  */
 
 import { FONT } from './settingsState'
@@ -12,11 +15,12 @@ export function Input(props) {
       style={{
         width: '100%',
         padding: '10px 14px',
-        border: '1px solid #cbd5e1',
+        border: '1px solid var(--sh-input-border)',
         borderRadius: 10,
         fontSize: 14,
         fontFamily: FONT,
-        color: '#0f172a',
+        color: 'var(--sh-input-text)',
+        background: 'var(--sh-input-bg)',
         outline: 'none',
         boxSizing: 'border-box',
         ...(props.style || {}),
@@ -26,20 +30,20 @@ export function Input(props) {
 }
 
 export function Button({ children, secondary = false, danger = false, ...props }) {
-  let background = '#3b82f6'
-  let color = '#fff'
+  let background = 'var(--sh-brand)'
+  let color = 'var(--sh-btn-primary-text)'
   let border = 'none'
 
   if (secondary) {
-    background = '#fff'
-    color = '#475569'
-    border = '1px solid #cbd5e1'
+    background = 'var(--sh-btn-secondary-bg)'
+    color = 'var(--sh-btn-secondary-text)'
+    border = '1px solid var(--sh-btn-secondary-border)'
   }
 
   if (danger) {
-    background = '#fff1f2'
-    color = '#be123c'
-    border = '1px solid #fecdd3'
+    background = 'var(--sh-danger-bg)'
+    color = 'var(--sh-danger-text)'
+    border = '1px solid var(--sh-danger-border)'
   }
 
   return (
@@ -67,10 +71,10 @@ export function Button({ children, secondary = false, danger = false, ...props }
 export function Message({ tone = 'error', children }) {
   const palette =
     tone === 'success'
-      ? { bg: '#f0fdf4', border: '#bbf7d0', text: '#166534' }
+      ? { bg: 'var(--sh-success-bg)', border: 'var(--sh-success-border)', text: 'var(--sh-success-text)' }
       : tone === 'info'
-        ? { bg: '#eff6ff', border: '#bfdbfe', text: '#1d4ed8' }
-        : { bg: '#fef2f2', border: '#fecaca', text: '#b91c1c' }
+        ? { bg: 'var(--sh-pill-bg)', border: 'var(--sh-border)', text: 'var(--sh-pill-text)' }
+        : { bg: 'var(--sh-danger-bg)', border: 'var(--sh-danger-border)', text: 'var(--sh-danger-text)' }
 
   return (
     <div
@@ -93,12 +97,12 @@ export function Message({ tone = 'error', children }) {
 export function FormField({ label, children, hint }) {
   return (
     <div style={{ marginBottom: 16 }}>
-      <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#334155' }}>
+      <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: 'var(--sh-subtext)' }}>
         <span style={{ display: 'block', marginBottom: 6 }}>{label}</span>
         {children}
       </label>
       {hint && (
-        <div style={{ marginTop: 5, fontSize: 12, color: '#94a3b8' }}>
+        <div style={{ marginTop: 5, fontSize: 12, color: 'var(--sh-muted)' }}>
           {hint}
         </div>
       )}
@@ -110,16 +114,16 @@ export function SectionCard({ title, subtitle, children, danger = false }) {
   return (
     <section
       style={{
-        background: '#fff',
+        background: 'var(--sh-surface)',
         borderRadius: 16,
-        border: `1px solid ${danger ? '#fecaca' : '#e2e8f0'}`,
+        border: `1px solid ${danger ? 'var(--sh-danger-border)' : 'var(--sh-border)'}`,
         padding: '24px',
-        boxShadow: '0 2px 10px rgba(15, 23, 42, 0.05)',
+        boxShadow: 'var(--shadow-sm)',
         marginBottom: 18,
       }}
     >
-      <h3 style={{ margin: '0 0 6px', fontSize: 17, color: danger ? '#be123c' : '#0f172a' }}>{title}</h3>
-      {subtitle && <p style={{ margin: '0 0 18px', fontSize: 13, color: '#64748b', lineHeight: 1.7 }}>{subtitle}</p>}
+      <h3 style={{ margin: '0 0 6px', fontSize: 17, color: danger ? 'var(--sh-danger)' : 'var(--sh-heading)' }}>{title}</h3>
+      {subtitle && <p style={{ margin: '0 0 18px', fontSize: 13, color: 'var(--sh-muted)', lineHeight: 1.7 }}>{subtitle}</p>}
       {children}
     </section>
   )
@@ -140,10 +144,11 @@ export function Select({ value, onChange, children, ...props }) {
         width: '100%',
         padding: '10px 14px',
         borderRadius: 10,
-        border: '1px solid #cbd5e1',
+        border: '1px solid var(--sh-input-border)',
         fontSize: 14,
         fontFamily: FONT,
-        color: '#0f172a',
+        color: 'var(--sh-input-text)',
+        background: 'var(--sh-input-bg)',
         ...(props.style || {}),
       }}
     >
@@ -161,21 +166,21 @@ export function ToggleRow({ label, description, checked, onChange, disabled = fa
         justifyContent: 'space-between',
         gap: 12,
         padding: '14px 0',
-        borderBottom: '1px solid #f1f5f9',
+        borderBottom: '1px solid var(--sh-soft)',
         cursor: disabled ? 'not-allowed' : 'pointer',
         opacity: disabled ? 0.6 : 1,
       }}
     >
       <div>
-        <div style={{ fontSize: 14, fontWeight: 600, color: '#0f172a' }}>{label}</div>
-        {description && <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{description}</div>}
+        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--sh-text)' }}>{label}</div>
+        {description && <div style={{ fontSize: 12, color: 'var(--sh-muted)', marginTop: 2 }}>{description}</div>}
       </div>
       <input
         type="checkbox"
         checked={checked}
         onChange={onChange}
         disabled={disabled}
-        style={{ width: 18, height: 18, accentColor: '#3b82f6', cursor: 'inherit' }}
+        style={{ width: 18, height: 18, accentColor: 'var(--sh-brand)', cursor: 'inherit' }}
       />
     </label>
   )

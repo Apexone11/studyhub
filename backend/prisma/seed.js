@@ -14,11 +14,17 @@ const prisma = createPrismaClient()
 async function main() {
   console.log('🌱 Seeding database...')
 
-  // Clear existing data in correct order
+  // Clear existing data in correct dependency order
   await prisma.enrollment.deleteMany()
+  await prisma.note.deleteMany().catch(() => {})
+  await prisma.feedPost.deleteMany().catch(() => {})
+  await prisma.sheetContribution.deleteMany().catch(() => {})
+  await prisma.sheetCommit.deleteMany().catch(() => {})
+  await prisma.sheetHtmlVersion.deleteMany().catch(() => {})
   await prisma.studySheet.deleteMany()
   await prisma.course.deleteMany()
   await prisma.school.deleteMany()
+  await prisma.requestedCourse.deleteMany().catch(() => {})
 
   // Seed schools + courses
   for (const school of SCHOOLS) {
@@ -26,10 +32,17 @@ async function main() {
 
     await prisma.school.create({
       data: {
-        name:    school.name,
-        short:   school.short,
+        name:       school.name,
+        short:      school.short,
+        city:       school.city || '',
+        state:      school.state || 'MD',
+        schoolType: school.schoolType || 'public',
         courses: {
-          create: courses
+          create: courses.map((c) => ({
+            name: c.name,
+            code: c.code,
+            department: c.department || '',
+          }))
         }
       }
     })

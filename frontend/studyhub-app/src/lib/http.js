@@ -10,6 +10,19 @@ import {
 let fetchShimInstalled = false
 export const AUTH_SESSION_EXPIRED_EVENT = 'studyhub:auth-expired'
 
+/* Debounce auth-expired events so multiple simultaneous 401s
+   (e.g. feed + leaderboard + comments) don't flood the user. */
+let lastExpiredDispatch = 0
+const EXPIRED_DEBOUNCE_MS = 2000
+
+function dispatchAuthExpired() {
+  const now = Date.now()
+  if (now - lastExpiredDispatch < EXPIRED_DEBOUNCE_MS) return
+  lastExpiredDispatch = now
+  clearStoredSession()
+  window.dispatchEvent(new CustomEvent(AUTH_SESSION_EXPIRED_EVENT))
+}
+
 const AUTH_ERROR_CODES = new Set(['AUTH_REQUIRED', 'AUTH_EXPIRED'])
 
 export async function readJsonSafely(response, fallback = {}) {
@@ -118,16 +131,14 @@ export function installApiFetchShim() {
     if (input instanceof Request) {
       const response = await nativeFetch(new Request(input, nextInit))
       if (response.status === 401) {
-        clearStoredSession()
-        window.dispatchEvent(new CustomEvent(AUTH_SESSION_EXPIRED_EVENT))
+        dispatchAuthExpired()
       }
       return response
     }
 
     const response = await nativeFetch(input, nextInit)
     if (response.status === 401) {
-      clearStoredSession()
-      window.dispatchEvent(new CustomEvent(AUTH_SESSION_EXPIRED_EVENT))
+      dispatchAuthExpired()
     }
     return response
   }

@@ -55,13 +55,17 @@ model User {
   appealReviews              Appeal[]         @relation("AppealReviewer")
   sheetCommits               SheetCommit[]
   webauthnCredentials        WebAuthnCredential[]
+  reviewedSheets             StudySheet[] @relation("SheetReviewer")
 }
 
 model School {
-  id      Int      @id @default(autoincrement())
-  name    String   @unique
-  short   String
-  courses Course[]
+  id         Int      @id @default(autoincrement())
+  name       String   @unique
+  short      String   @unique
+  city       String   @default("")
+  state      String   @default("MD")
+  schoolType String   @default("public")
+  courses    Course[]
 }
 
 model Course {
@@ -69,19 +73,22 @@ model Course {
   schoolId     Int
   name         String
   code         String
-  school       School       @relation(fields: [schoolId], references: [id])
+  department   String       @default("")
+  school       School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   studySheets  StudySheet[]
   enrollments  Enrollment[]
   notes        Note[]
   feedPosts    FeedPost[]
+
+  @@unique([schoolId, code])
 }
 
 model Enrollment {
   id       Int    @id @default(autoincrement())
   userId   Int
-  courseId Int
-  user     User   @relation(fields: [userId], references: [id])
-  course   Course @relation(fields: [courseId], references: [id])
+  courseId  Int
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
   @@unique([userId, courseId])
 }
@@ -97,6 +104,10 @@ model StudySheet {
   htmlScanUpdatedAt DateTime?
   htmlScanAcknowledgedAt DateTime?
   htmlOriginalArchivedAt DateTime?
+  reviewedById           Int?
+  reviewedAt             DateTime?
+  reviewReason           String?
+  reviewFindingsSnapshot Json?
   courseId  Int
   userId    Int
   forkOf    Int?
@@ -112,6 +123,7 @@ model StudySheet {
   updatedAt      DateTime @updatedAt
   course    Course   @relation(fields: [courseId], references: [id])
   author    User     @relation(fields: [userId], references: [id])
+  reviewedBy User?   @relation("SheetReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
   forkSource StudySheet? @relation("SheetForks", fields: [forkOf], references: [id])
   forkChildren StudySheet[] @relation("SheetForks")
 

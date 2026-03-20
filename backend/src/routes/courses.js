@@ -265,13 +265,17 @@ router.get('/schools', schoolsLimiter, async (req, res) => {
         id: true,
         name: true,
         short: true,
+        city: true,
+        state: true,
+        schoolType: true,
         courses: {
           select: {
             id: true,
             code: true,
-            name: true
+            name: true,
+            department: true,
           },
-          orderBy: { name: 'asc' }
+          orderBy: { code: 'asc' }
         }
       },
       orderBy: { name: 'asc' }

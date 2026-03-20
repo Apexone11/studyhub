@@ -22,6 +22,9 @@ import {
   logoutSession,
   setStoredUser,
 } from './session'
+import { showToast } from './toast'
+
+export const SESSION_EXPIRED_FLAG = 'studyhub:session-expired'
 
 const SessionContext = createContext(null)
 const runTransition = typeof startTransition === 'function'
@@ -138,6 +141,9 @@ export function SessionProvider({ children }) {
     if (typeof window === 'undefined') return undefined
 
     const handleAuthExpired = () => {
+      /* Mark the expiry so LoginPage can show a contextual banner */
+      try { sessionStorage.setItem(SESSION_EXPIRED_FLAG, '1') } catch { /* private mode */ }
+      showToast('Your session has expired. Please sign in again.', 'error', 5000)
       clearSession()
     }
 

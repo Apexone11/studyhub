@@ -37,9 +37,18 @@ import { useLivePolling } from '../../lib/useLivePolling'
 import { staggerEntrance, popScale } from '../../lib/animations'
 import { showToast } from '../../lib/toast'
 import { usePageTitle } from '../../lib/usePageTitle'
+import { trackEvent } from '../../lib/telemetry'
 import { SkeletonFeed } from '../../components/Skeleton'
 import SafeJoyride from '../../components/SafeJoyride'
 import { useTutorial } from '../../lib/useTutorial'
+
+const COMPOSER_PROMPTS = [
+  'Share an update, mention classmates with @username, or point people to a great sheet…',
+  'What are you studying this week? Share a tip with your class…',
+  'Post a question, resource, or link for your classmates…',
+  'Found a great study sheet? Tag it with @username and share…',
+  'Ask for help, share notes, or drop a helpful link…',
+]
 import { FEED_STEPS } from '../../lib/tutorialSteps'
 
 /* ── Shared constants ──────────────────────────────────────────────────── */
@@ -47,7 +56,7 @@ const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 const FILTERS = ['all', 'posts', 'sheets', 'announcements']
 const commentSectionContainerStyle = {
   marginTop: 14,
-  borderTop: '1px solid #f1f5f9',
+  borderTop: '1px solid var(--sh-border)',
   paddingTop: 12,
 }
 const commentToggleButtonStyle = {
@@ -56,7 +65,7 @@ const commentToggleButtonStyle = {
   gap: 6,
   background: 'none',
   border: 'none',
-  color: '#64748b',
+  color: 'var(--sh-subtext)',
   fontSize: 13,
   fontWeight: 700,
   cursor: 'pointer',
@@ -69,11 +78,12 @@ const commentTextareaStyle = {
   width: '100%',
   resize: 'vertical',
   borderRadius: 10,
-  border: '1px solid #e2e8f0',
+  border: '1px solid var(--sh-input-border)',
   padding: '8px 12px',
   fontSize: 13,
   fontFamily: FONT,
-  color: '#0f172a',
+  color: 'var(--sh-input-text)',
+  background: 'var(--sh-input-bg)',
   boxSizing: 'border-box',
 }
 const commentInputFooterStyle = {
@@ -82,23 +92,23 @@ const commentInputFooterStyle = {
   alignItems: 'center',
   marginTop: 6,
 }
-const commentMetaTextStyle = { color: '#94a3b8', fontSize: 13, padding: '8px 0' }
-const commentErrorTextStyle = { color: '#dc2626', fontSize: 12, marginTop: 4 }
+const commentMetaTextStyle = { color: 'var(--sh-muted)', fontSize: 13, padding: '8px 0' }
+const commentErrorTextStyle = { color: 'var(--sh-danger)', fontSize: 12, marginTop: 4 }
 const commentListStyle = { display: 'grid', gap: 8 }
 const commentItemStyle = {
   display: 'flex',
   gap: 8,
   padding: '8px 10px',
   borderRadius: 10,
-  background: '#f8fafc',
+  background: 'var(--sh-soft)',
 }
 const commentHeaderStyle = { display: 'flex', justifyContent: 'space-between', gap: 8 }
-const commentAuthorStyle = { fontSize: 12, fontWeight: 700, color: '#0f172a' }
-const commentTimestampStyle = { fontSize: 11, color: '#94a3b8', marginLeft: 8 }
+const commentAuthorStyle = { fontSize: 12, fontWeight: 700, color: 'var(--sh-heading)' }
+const commentTimestampStyle = { fontSize: 11, color: 'var(--sh-muted)', marginLeft: 8 }
 const commentDeleteButtonStyle = {
   background: 'none',
   border: 'none',
-  color: '#94a3b8',
+  color: 'var(--sh-muted)',
   fontSize: 11,
   cursor: 'pointer',
   padding: '0 4px',
@@ -107,7 +117,7 @@ const commentDeleteButtonStyle = {
 const commentBodyStyle = {
   margin: '2px 0 0',
   fontSize: 13,
-  color: '#475569',
+  color: 'var(--sh-subtext)',
   lineHeight: 1.6,
   whiteSpace: 'pre-wrap',
 }
@@ -116,8 +126,8 @@ function commentButtonStyle(hasValue, posting) {
   return {
     borderRadius: 8,
     border: 'none',
-    background: hasValue ? '#3b82f6' : '#e2e8f0',
-    color: hasValue ? '#fff' : '#94a3b8',
+    background: hasValue ? 'var(--sh-brand)' : 'var(--sh-border)',
+    color: hasValue ? '#fff' : 'var(--sh-muted)',
     padding: '6px 14px',
     fontSize: 12,
     fontWeight: 700,
@@ -164,7 +174,7 @@ function Avatar({ username, role, size = 42 }) {
         width: size,
         height: size,
         borderRadius: '50%',
-        background: role === 'admin' ? '#2563eb' : '#0f172a',
+        background: role === 'admin' ? 'var(--sh-brand)' : 'var(--sh-heading)',
         color: '#fff',
         display: 'grid',
         placeItems: 'center',
@@ -180,18 +190,11 @@ function Avatar({ username, role, size = 42 }) {
 
 function Panel({ title, children, helper }) {
   return (
-    <section
-      style={{
-        background: '#fff',
-        borderRadius: 18,
-        border: '1px solid #e2e8f0',
-        padding: 18,
-      }}
-    >
+    <section className="sh-card">
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 14, color: '#0f172a', fontWeight: 800 }}>{title}</h2>
-          {helper ? <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: 12 }}>{helper}</p> : null}
+          <h2 className="sh-card-title">{title}</h2>
+          {helper ? <p className="sh-card-helper">{helper}</p> : null}
         </div>
       </div>
       {children}
@@ -203,7 +206,7 @@ function LeaderboardPanel({ title, items, renderLabel, empty }) {
   return (
     <Panel title={title}>
       {items.length === 0 ? (
-        <div style={{ color: '#94a3b8', fontSize: 13 }}>{empty}</div>
+        <div style={{ color: 'var(--sh-muted)', fontSize: 13 }}>{empty}</div>
       ) : (
         <div style={{ display: 'grid', gap: 10 }}>
           {items.map((item, index) => (
@@ -214,16 +217,16 @@ function LeaderboardPanel({ title, items, renderLabel, empty }) {
                 justifyContent: 'space-between',
                 gap: 12,
                 paddingBottom: 10,
-                borderBottom: index === items.length - 1 ? 'none' : '1px solid #f1f5f9',
+                borderBottom: index === items.length - 1 ? 'none' : '1px solid var(--sh-border)',
               }}
             >
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{renderLabel(item)}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--sh-heading)' }}>{renderLabel(item)}</div>
                 {'author' in item && item.author?.username ? (
-                  <div style={{ fontSize: 12, color: '#64748b' }}>by <Link to={`/users/${item.author.username}`} style={{ color: '#2563eb', textDecoration: 'none' }}>{item.author.username}</Link></div>
+                  <div style={{ fontSize: 12, color: 'var(--sh-subtext)' }}>by <Link to={`/users/${item.author.username}`} style={{ color: 'var(--sh-brand)', textDecoration: 'none' }}>{item.author.username}</Link></div>
                 ) : null}
               </div>
-              <div style={{ fontSize: 12, fontWeight: 800, color: '#2563eb', whiteSpace: 'nowrap' }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--sh-brand)', whiteSpace: 'nowrap' }}>
                 {item.count ?? item.stars ?? item.downloads ?? 0}
               </div>
             </div>
@@ -281,6 +284,7 @@ function useComments(postId, initialCount = 0) {
     try {
       const response = await fetch(`${API}/api/feed/posts/${postId}/comments?limit=50`, {
         headers: authHeaders(),
+        credentials: 'include',
       })
       const data = await readJsonSafely(response, {})
 
@@ -313,6 +317,7 @@ function useComments(postId, initialCount = 0) {
       const response = await fetch(`${API}/api/feed/posts/${postId}/comments`, {
         method: 'POST',
         headers: authHeaders(),
+        credentials: 'include',
         body: JSON.stringify({ content }),
       })
       const data = await readJsonSafely(response, {})
@@ -339,6 +344,7 @@ function useComments(postId, initialCount = 0) {
       const response = await fetch(`${API}/api/feed/posts/${postId}/comments/${commentId}`, {
         method: 'DELETE',
         headers: authHeaders(),
+        credentials: 'include',
       })
 
       if (response.ok) {
@@ -535,14 +541,7 @@ function FeedCard({
   const previewKind = attachmentPreviewKind(item)
 
   return (
-    <article
-      style={{
-        background: '#fff',
-        borderRadius: 18,
-        border: '1px solid #e2e8f0',
-        padding: 18,
-      }}
-    >
+    <article className="sh-card">
       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
         {item.author?.username ? (
           <Link to={`/users/${item.author.username}`} style={{ textDecoration: 'none', flexShrink: 0 }}>
@@ -556,11 +555,11 @@ function FeedCard({
             <div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 {item.author?.username ? (
-                  <Link to={`/users/${item.author.username}`} style={{ fontWeight: 800, color: '#0f172a', fontSize: 14, textDecoration: 'none' }}>
+                  <Link to={`/users/${item.author.username}`} style={{ fontWeight: 800, color: 'var(--sh-heading)', fontSize: 14, textDecoration: 'none' }}>
                     {item.author.username}
                   </Link>
                 ) : (
-                  <span style={{ fontWeight: 800, color: '#0f172a', fontSize: 14 }}>StudyHub</span>
+                  <span style={{ fontWeight: 800, color: 'var(--sh-heading)', fontSize: 14 }}>StudyHub</span>
                 )}
                 <span
                   style={{
@@ -574,14 +573,14 @@ function FeedCard({
                   {item.type}
                 </span>
                 {item.course?.code ? (
-                  <span style={{ fontSize: 11, color: '#64748b' }}>{item.course.code}</span>
+                  <span style={{ fontSize: 11, color: 'var(--sh-subtext)' }}>{item.course.code}</span>
                 ) : null}
               </div>
-              <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>{timeAgo(item.createdAt)}</div>
+              <div style={{ fontSize: 12, color: 'var(--sh-muted)', marginTop: 2 }}>{timeAgo(item.createdAt)}</div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {item.linkPath && item.type !== 'post' ? (
-                <Link to={item.linkPath} style={{ fontSize: 12, color: '#2563eb', fontWeight: 700, textDecoration: 'none' }}>
+                <Link to={item.linkPath} style={{ fontSize: 12, color: 'var(--sh-brand)', fontWeight: 700, textDecoration: 'none' }}>
                   Open
                 </Link>
               ) : null}
@@ -592,10 +591,10 @@ function FeedCard({
                     onClick={() => onTogglePostMenu(isPostMenuOpen ? null : item.id)}
                     className="feed-post-menu-btn"
                     style={{
-                      border: '1px solid #e2e8f0',
-                      background: '#fff',
+                      border: '1px solid var(--sh-border)',
+                      background: 'var(--sh-surface)',
                       borderRadius: 8,
-                      color: '#94a3b8',
+                      color: 'var(--sh-muted)',
                       width: 32,
                       height: 32,
                       display: 'flex',
@@ -616,9 +615,9 @@ function FeedCard({
                         right: 0,
                         minWidth: 160,
                         borderRadius: 12,
-                        border: '1px solid #e2e8f0',
-                        background: '#fff',
-                        boxShadow: '0 8px 24px rgba(15, 23, 42, 0.12)',
+                        border: '1px solid var(--sh-border)',
+                        background: 'var(--sh-surface)',
+                        boxShadow: 'var(--elevation-3)',
                         padding: 4,
                         zIndex: 3,
                       }}
@@ -656,8 +655,8 @@ function FeedCard({
             </div>
           </div>
 
-          {item.title ? <h3 style={{ margin: '0 0 10px', color: '#0f172a', fontSize: 19 }}>{item.title}</h3> : null}
-          <p style={{ margin: 0, color: '#475569', fontSize: 14, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+          {item.title ? <h3 style={{ margin: '0 0 10px', color: 'var(--sh-heading)', fontSize: 19 }}>{item.title}</h3> : null}
+          <p style={{ margin: 0, color: 'var(--sh-subtext)', fontSize: 14, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
             <MentionText text={item.body || item.content || item.preview || item.description || 'No content yet.'} />
           </p>
 
@@ -665,20 +664,20 @@ function FeedCard({
             <section
               style={{
                 marginTop: 14,
-                border: '1px solid #e2e8f0',
-                borderRadius: 14,
-                background: '#f8fafc',
+                border: '1px solid var(--sh-border)',
+                borderRadius: 'var(--radius-card)',
+                background: 'var(--sh-soft)',
                 padding: 12,
               }}
             >
-              <div style={{ fontSize: 12, color: '#64748b', marginBottom: 10 }}>
-                Attachment: <span style={{ color: '#334155', fontWeight: 700 }}>{item.attachmentName || 'Attachment'}</span>
+              <div style={{ fontSize: 12, color: 'var(--sh-subtext)', marginBottom: 10 }}>
+                Attachment: <span style={{ color: 'var(--sh-text)', fontWeight: 700 }}>{item.attachmentName || 'Attachment'}</span>
               </div>
               <div
                 style={{
-                  border: '1px solid #dbe2ef',
+                  border: '1px solid var(--sh-border)',
                   borderRadius: 10,
-                  background: '#fff',
+                  background: 'var(--sh-surface)',
                   overflow: 'hidden',
                   maxHeight: 300,
                 }}
@@ -767,12 +766,12 @@ function actionButton(color) {
   return {
     display: 'inline-flex',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
     borderRadius: 999,
-    border: '1px solid #e2e8f0',
-    background: '#fff',
+    border: '1px solid var(--sh-border)',
+    background: 'var(--sh-surface)',
     color,
-    padding: '8px 12px',
+    padding: '6px 12px',
     fontSize: 12,
     fontWeight: 700,
     cursor: 'pointer',
@@ -784,12 +783,12 @@ function linkButton() {
   return {
     display: 'inline-flex',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
     borderRadius: 999,
-    border: '1px solid #dbeafe',
-    background: '#eff6ff',
-    color: '#1d4ed8',
-    padding: '8px 12px',
+    border: '1px solid transparent',
+    background: 'var(--sh-brand-soft)',
+    color: 'var(--sh-brand-hover)',
+    padding: '6px 12px',
     fontSize: 12,
     fontWeight: 700,
     textDecoration: 'none',
@@ -800,13 +799,13 @@ function pillStyle() {
   return {
     display: 'inline-flex',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
     borderRadius: 999,
-    background: '#f8fafc',
-    border: '1px solid #e2e8f0',
-    padding: '8px 12px',
+    background: 'var(--sh-soft)',
+    border: '1px solid var(--sh-border)',
+    padding: '6px 12px',
     fontSize: 12,
-    color: '#64748b',
+    color: 'var(--sh-subtext)',
     fontWeight: 700,
   }
 }
@@ -849,6 +848,7 @@ export default function FeedPage() {
     try {
       const response = await fetch(`${API}/api/feed?${params.toString()}`, {
         headers: authHeaders(),
+        credentials: 'include',
         signal,
       })
 
@@ -902,7 +902,7 @@ export default function FeedPage() {
     const params = new URLSearchParams({ limit: '24', offset: String(feedState.items.length) })
     if (search) params.set('search', search)
     try {
-      const response = await fetch(`${API}/api/feed?${params.toString()}`, { headers: authHeaders() })
+      const response = await fetch(`${API}/api/feed?${params.toString()}`, { headers: authHeaders(), credentials: 'include' })
       const data = await readJsonSafely(response, {})
       if (response.ok && Array.isArray(data.items)) {
         setFeedState((current) => ({
@@ -920,9 +920,9 @@ export default function FeedPage() {
 
     try {
       const [starsResponse, downloadsResponse, contributorsResponse] = await Promise.all([
-        fetch(`${API}/api/sheets/leaderboard?type=stars`, { headers: authHeaders(), signal }),
-        fetch(`${API}/api/sheets/leaderboard?type=downloads`, { headers: authHeaders(), signal }),
-        fetch(`${API}/api/sheets/leaderboard?type=contributors`, { headers: authHeaders(), signal }),
+        fetch(`${API}/api/sheets/leaderboard?type=stars`, { headers: authHeaders(), credentials: 'include', signal }),
+        fetch(`${API}/api/sheets/leaderboard?type=downloads`, { headers: authHeaders(), credentials: 'include', signal }),
+        fetch(`${API}/api/sheets/leaderboard?type=contributors`, { headers: authHeaders(), credentials: 'include', signal }),
       ])
 
       const [stars, downloads, contributors] = await Promise.all([
@@ -964,6 +964,11 @@ export default function FeedPage() {
     return feedState.items.filter((item) => item.type === nextType)
   }, [activeFilter, feedState.items])
 
+  const composerPrompt = useMemo(
+    () => COMPOSER_PROMPTS[Math.floor(Date.now() / 60000) % COMPOSER_PROMPTS.length],
+    []
+  )
+
   // Animate feed cards on first load
   useEffect(() => {
     if (!feedState.loading && visibleItems.length > 0 && feedListRef.current && !feedAnimatedRef.current) {
@@ -985,6 +990,7 @@ export default function FeedPage() {
       const response = await fetch(`${API}/api/feed/posts`, {
         method: 'POST',
         headers: authHeaders(),
+        credentials: 'include',
         body: JSON.stringify({
           content: composer.content.trim(),
           courseId: composer.courseId || null,
@@ -1006,6 +1012,7 @@ export default function FeedPage() {
           formData.append('attachment', attachedFile)
           const uploadRes = await fetch(`${API}/api/upload/post-attachment/${data.id}`, {
             method: 'POST',
+            credentials: 'include',
             body: formData,
           })
           if (uploadRes.ok) {
@@ -1025,6 +1032,7 @@ export default function FeedPage() {
         items: [finalPost, ...current.items],
         total: current.total + 1,
       }))
+      trackEvent('feed_post_created', { hasCourse: Boolean(composer.courseId), hasAttachment: Boolean(attachedFile) })
     } catch (error) {
       setComposeState({ saving: false, error: error.message || 'Could not post to the feed.' })
     }
@@ -1039,6 +1047,7 @@ export default function FeedPage() {
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: authHeaders(),
+        credentials: 'include',
         body: JSON.stringify({ type: nextType }),
       })
       const data = await response.json().catch(() => ({}))
@@ -1064,6 +1073,7 @@ export default function FeedPage() {
       const response = await fetch(`${API}/api/sheets/${item.id}/star`, {
         method: 'POST',
         headers: authHeaders(),
+        credentials: 'include',
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
@@ -1112,6 +1122,7 @@ export default function FeedPage() {
       const response = await fetch(`${API}/api/feed/posts/${item.id}`, {
         method: 'DELETE',
         headers: authHeaders(),
+        credentials: 'include',
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
@@ -1147,7 +1158,7 @@ export default function FeedPage() {
   return (
     <>
       <Navbar />
-      <div style={{ background: '#edf0f5', minHeight: '100vh', fontFamily: FONT }}>
+      <div style={{ background: 'var(--sh-page-bg)', minHeight: '100vh', fontFamily: FONT }}>
         <div style={pageShell('app', 26, 48)}>
           {/* 3-column responsive grid: sidebar | feed | right panels
            * Desktop: all 3 columns visible
@@ -1163,23 +1174,23 @@ export default function FeedPage() {
                   <textarea
                     value={composer.content}
                     onChange={(event) => setComposer((current) => ({ ...current, content: event.target.value }))}
-                    placeholder="Share an update, mention classmates with @username, or point people to a great sheet..."
+                    placeholder={composerPrompt}
                     rows={4}
+                    className="sh-input"
                     style={{
                       width: '100%',
                       resize: 'vertical',
-                      borderRadius: 14,
-                      border: '1px solid #cbd5e1',
+                      borderRadius: 'var(--radius-card)',
                       padding: 14,
                       font: 'inherit',
-                      color: '#0f172a',
                     }}
                   />
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                     <select
                       value={composer.courseId}
                       onChange={(event) => setComposer((current) => ({ ...current, courseId: event.target.value }))}
-                      style={{ minWidth: 140, maxWidth: 200, borderRadius: 10, border: '1px solid #cbd5e1', padding: '8px 10px', fontSize: 13, fontFamily: FONT }}
+                      className="sh-input"
+                      style={{ minWidth: 140, maxWidth: 200, width: 'auto' }}
                     >
                       <option value="">All courses</option>
                       {(user?.enrollments || []).map((enrollment) => (
@@ -1213,16 +1224,10 @@ export default function FeedPage() {
                       <button
                         type="submit"
                         disabled={composeState.saving}
+                        className="sh-btn sh-btn--primary"
                         style={{
-                          borderRadius: 10,
-                          border: 'none',
-                          background: '#3b82f6',
-                          color: '#fff',
                           fontWeight: 800,
-                          fontSize: 13,
-                          padding: '11px 16px',
                           cursor: composeState.saving ? 'wait' : 'pointer',
-                          fontFamily: FONT,
                         }}
                       >
                         {composeState.saving ? 'Posting...' : 'Post'}
@@ -1230,14 +1235,14 @@ export default function FeedPage() {
                     </div>
                   </div>
                   {attachedFile && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: '#f8fafc', borderRadius: 8, fontSize: 12, color: '#475569' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: 'var(--sh-soft)', borderRadius: 8, fontSize: 12, color: 'var(--sh-subtext)' }}>
                       <IconUpload size={12} />
                       <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{attachedFile.name}</span>
-                      <span style={{ color: '#94a3b8', flexShrink: 0 }}>{(attachedFile.size / 1024).toFixed(0)} KB</span>
-                      <button type="button" onClick={() => setAttachedFile(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', padding: 2 }}><IconX size={12} /></button>
+                      <span style={{ color: 'var(--sh-muted)', flexShrink: 0 }}>{(attachedFile.size / 1024).toFixed(0)} KB</span>
+                      <button type="button" onClick={() => setAttachedFile(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sh-muted)', display: 'flex', padding: 2 }}><IconX size={12} /></button>
                     </div>
                   )}
-                  {composeState.error ? <div style={{ color: '#dc2626', fontSize: 13 }}>{composeState.error}</div> : null}
+                  {composeState.error ? <div style={{ color: 'var(--sh-danger)', fontSize: 13 }}>{composeState.error}</div> : null}
                 </form>
               </Panel>
               </div>
@@ -1249,18 +1254,7 @@ export default function FeedPage() {
                       key={filter}
                       type="button"
                       onClick={() => setQueryParam('filter', filter === 'all' ? '' : filter)}
-                      style={{
-                        borderRadius: 999,
-                        border: filter === activeFilter ? '1px solid #93c5fd' : '1px solid #e2e8f0',
-                        background: filter === activeFilter ? '#eff6ff' : '#fff',
-                        color: filter === activeFilter ? '#1d4ed8' : '#475569',
-                        padding: '9px 14px',
-                        fontSize: 12,
-                        fontWeight: 800,
-                        textTransform: 'capitalize',
-                        cursor: 'pointer',
-                        fontFamily: FONT,
-                      }}
+                      className={`sh-chip${filter === activeFilter ? ' sh-chip--active' : ''}`}
                     >
                       {filter}
                     </button>
@@ -1271,14 +1265,8 @@ export default function FeedPage() {
                   value={search}
                   onChange={(event) => setQueryParam('search', event.target.value)}
                   placeholder="Search the feed..."
-                  style={{
-                    maxWidth: 240,
-                    borderRadius: 12,
-                    border: '1px solid #cbd5e1',
-                    padding: '8px 12px',
-                    fontSize: 13,
-                    fontFamily: FONT,
-                  }}
+                  className="sh-input"
+                  style={{ maxWidth: 240 }}
                 />
               </div>
 
@@ -1390,7 +1378,7 @@ export default function FeedPage() {
                 renderLabel={(item) => item.username}
               />
               <Panel title="Version 1 collaboration tips">
-                <div style={{ display: 'grid', gap: 10, color: '#475569', fontSize: 13, lineHeight: 1.7 }}>
+                <div style={{ display: 'grid', gap: 10, color: 'var(--sh-subtext)', fontSize: 13, lineHeight: 1.7 }}>
                   <div>Post updates with @mentions, fork a sheet before improving it, and send contributions back from your fork so the original author can review safely.</div>
                   <Link to="/sheets/upload" style={{ ...linkButton(), justifyContent: 'center' }}>
                     <IconPlus size={13} />
@@ -1398,7 +1386,7 @@ export default function FeedPage() {
                   </Link>
                 </div>
               </Panel>
-              {leaderboards.error ? <div style={{ color: '#dc2626', fontSize: 13 }}>{leaderboards.error}</div> : null}
+              {leaderboards.error ? <div style={{ color: 'var(--sh-danger)', fontSize: 13 }}>{leaderboards.error}</div> : null}
             </aside>
           </div>
         </div>
@@ -1420,12 +1408,12 @@ export default function FeedPage() {
             height: 44,
             borderRadius: '50%',
             border: 'none',
-            background: '#3b82f6',
+            background: 'var(--sh-brand)',
             color: '#fff',
             fontSize: 18,
             fontWeight: 800,
             cursor: 'pointer',
-            boxShadow: '0 4px 14px rgba(59,130,246,0.4)',
+            boxShadow: 'var(--sh-btn-primary-shadow)',
             zIndex: 50,
             display: 'grid',
             placeItems: 'center',

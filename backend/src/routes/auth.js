@@ -727,18 +727,24 @@ router.post('/login/verification/verify', verificationLimiter, async (req, res) 
 
 router.post('/forgot-password', forgotLimiter, async (req, res) => {
   const body = req.body || {}
-  const username = typeof body.username === 'string' ? body.username.trim() : ''
+  // Accept either { identifier } (new) or { username } (legacy compat)
+  const rawIdentifier = typeof body.identifier === 'string' ? body.identifier.trim()
+    : typeof body.username === 'string' ? body.username.trim()
+      : ''
+  const GENERIC_MESSAGE = 'If an account exists with that username or email, a reset link has been sent.'
 
-  if (!username) {
-    return res.json({
-      message: 'If we have a verified email on file for that account, a reset link has been sent.',
-    })
+  if (!rawIdentifier) {
+    return res.json({ message: GENERIC_MESSAGE })
   }
 
   try {
-    const user = await prisma.user.findUnique({ where: { username } })
+    // Determine lookup strategy: email (contains @) or username
+    const isEmailLookup = rawIdentifier.includes('@')
+    const user = isEmailLookup
+      ? await prisma.user.findUnique({ where: { email: rawIdentifier.toLowerCase() } })
+      : await prisma.user.findUnique({ where: { username: rawIdentifier } })
 
-    if (user && user.email && user.emailVerified) {
+    if (user && user.email) {
       const token = crypto.randomBytes(32).toString('hex')
       const tokenHash = hashStoredSecret(token)
       const expiresAt = new Date(Date.now() + 60 * 60 * 1000)
@@ -753,15 +759,11 @@ router.post('/forgot-password', forgotLimiter, async (req, res) => {
       await sendPasswordReset(user.email, user.username, resetUrl)
     }
 
-    return res.json({
-      message: 'If we have a verified email on file for that account, a reset link has been sent.',
-    })
+    return res.json({ message: GENERIC_MESSAGE })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
     console.error(error)
-    return res.json({
-      message: 'If we have a verified email on file for that account, a reset link has been sent.',
-    })
+    return res.json({ message: GENERIC_MESSAGE })
   }
 })
 
@@ -789,9 +791,6 @@ router.post('/reset-password', forgotLimiter, async (req, res) => {
 
     if (!resetToken || resetToken.expiresAt < new Date()) {
       return res.status(400).json({ error: 'Reset link is invalid or has expired. Please request a new one.' })
-    }
-    if (!resetToken.user.emailVerified || !resetToken.user.email) {
-      return res.status(400).json({ error: 'Password reset requires a verified email address.' })
     }
 
     const passwordHash = await bcrypt.hash(newPassword, 12)

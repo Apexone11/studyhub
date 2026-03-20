@@ -26,6 +26,7 @@ import { VIEWER_STEPS } from '../../lib/tutorialSteps'
 import { fadeInUp } from '../../lib/animations'
 import { showToast } from '../../lib/toast'
 import { usePageTitle } from '../../lib/usePageTitle'
+import { trackEvent } from '../../lib/telemetry'
 
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'avif'])
@@ -133,6 +134,131 @@ function statusBadge(status) {
   }
 }
 
+function ContributionInlineDiff({ contributionId }) {
+  const [diff, setDiff] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [visible, setVisible] = useState(false)
+  const [diffMode, setDiffMode] = useState('unified')
+
+  const loadDiff = async () => {
+    if (diff) {
+      setVisible((v) => !v)
+      return
+    }
+    setLoading(true)
+    setError('')
+    try {
+      const response = await fetch(`${API}/api/sheets/contributions/${contributionId}/diff`, {
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.error || 'Could not load diff.')
+      setDiff(data.diff)
+      setVisible(true)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      <button
+        type="button"
+        onClick={loadDiff}
+        disabled={loading}
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 4,
+          padding: '4px 8px', borderRadius: 6, border: '1px solid #e0e7ff',
+          background: '#f5f3ff', color: '#6366f1', fontSize: 11, fontWeight: 700,
+          cursor: loading ? 'wait' : 'pointer', fontFamily: FONT,
+        }}
+      >
+        {loading ? 'Loading...' : visible ? 'Hide changes' : 'View changes'}
+      </button>
+      {error ? <div style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>{error}</div> : null}
+      {visible && diff ? (
+        <div style={{ marginTop: 8, border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden', background: '#fff' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+            <div style={{ display: 'flex', gap: 10, fontSize: 11, fontWeight: 700 }}>
+              <span style={{ color: '#16a34a' }}>+{diff.additions}</span>
+              <span style={{ color: '#dc2626' }}>-{diff.deletions}</span>
+            </div>
+            <div style={{ display: 'inline-flex', border: '1px solid #e2e8f0', borderRadius: 6, overflow: 'hidden' }}>
+              <button type="button" onClick={() => setDiffMode('unified')} style={{ padding: '2px 8px', fontSize: 10, fontWeight: 700, fontFamily: FONT, border: 'none', background: diffMode === 'unified' ? '#6366f1' : '#fff', color: diffMode === 'unified' ? '#fff' : '#64748b', cursor: 'pointer' }}>
+                Unified
+              </button>
+              <button type="button" onClick={() => setDiffMode('split')} style={{ padding: '2px 8px', fontSize: 10, fontWeight: 700, fontFamily: FONT, border: 'none', borderLeft: '1px solid #e2e8f0', background: diffMode === 'split' ? '#6366f1' : '#fff', color: diffMode === 'split' ? '#fff' : '#64748b', cursor: 'pointer' }}>
+                Split
+              </button>
+            </div>
+          </div>
+          <div style={{ maxHeight: 300, overflowY: 'auto', fontFamily: "'SF Mono', 'Cascadia Code', 'Fira Code', monospace", fontSize: 11, lineHeight: 1.5 }}>
+            {diffMode === 'unified' ? (
+              (diff.hunks || []).map((hunk, hi) => (
+                <div key={hi}>
+                  <div style={{ background: '#eff6ff', color: '#3b82f6', padding: '2px 10px', fontSize: 10, fontWeight: 600 }}>
+                    @@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@
+                  </div>
+                  {hunk.lines.map((line, li) => (
+                    <div key={li} style={{ padding: '1px 10px', whiteSpace: 'pre-wrap', wordBreak: 'break-all', background: line.type === 'add' ? '#f0fdf4' : line.type === 'remove' ? '#fef2f2' : 'transparent', color: line.type === 'add' ? '#166534' : line.type === 'remove' ? '#991b1b' : '#64748b' }}>
+                      {line.type === 'add' ? '+' : line.type === 'remove' ? '-' : ' '} {line.segments ? line.segments.map((seg, si) => (
+                        <span key={si} style={seg.type === 'add' ? { background: '#bbf7d0', borderRadius: 2 } : seg.type === 'remove' ? { background: '#fecaca', borderRadius: 2, textDecoration: 'line-through' } : {}}>{seg.text}</span>
+                      )) : line.content}
+                    </div>
+                  ))}
+                </div>
+              ))
+            ) : (
+              (diff.hunks || []).map((hunk, hi) => {
+                const rows = []
+                const lines = hunk.lines
+                let i = 0
+                while (i < lines.length) {
+                  if (lines[i].type === 'equal') {
+                    rows.push({ left: lines[i], right: lines[i] })
+                    i++
+                  } else {
+                    const removes = []
+                    const adds = []
+                    while (i < lines.length && lines[i].type === 'remove') { removes.push(lines[i]); i++ }
+                    while (i < lines.length && lines[i].type === 'add') { adds.push(lines[i]); i++ }
+                    const max = Math.max(removes.length, adds.length)
+                    for (let j = 0; j < max; j++) rows.push({ left: removes[j] || null, right: adds[j] || null })
+                  }
+                }
+                return (
+                  <div key={hi}>
+                    <div style={{ background: '#eff6ff', color: '#3b82f6', padding: '2px 10px', fontSize: 10, fontWeight: 600 }}>
+                      @@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@
+                    </div>
+                    {rows.map((row, ri) => (
+                      <div key={ri} className="sheet-diff-split">
+                        <div style={{ padding: '1px 8px', whiteSpace: 'pre-wrap', wordBreak: 'break-all', borderRight: '1px solid #e2e8f0', background: row.left?.type === 'remove' ? '#fef2f2' : 'transparent', color: row.left?.type === 'remove' ? '#991b1b' : '#64748b', minHeight: '1.5em' }}>
+                          {row.left ? (row.left.segments ? row.left.segments.map((seg, si) => <span key={si} style={seg.type === 'remove' ? { background: '#fecaca', borderRadius: 2 } : {}}>{seg.text}</span>) : row.left.content) : ''}
+                        </div>
+                        <div style={{ padding: '1px 8px', whiteSpace: 'pre-wrap', wordBreak: 'break-all', background: row.right?.type === 'add' ? '#f0fdf4' : 'transparent', color: row.right?.type === 'add' ? '#166534' : '#64748b', minHeight: '1.5em' }}>
+                          {row.right ? (row.right.segments ? row.right.segments.map((seg, si) => <span key={si} style={seg.type === 'add' ? { background: '#bbf7d0', borderRadius: 2 } : {}}>{seg.text}</span>) : row.right.content) : ''}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })
+            )}
+            {diff.hunks?.length === 0 ? (
+              <div style={{ padding: 12, textAlign: 'center', color: '#94a3b8', fontSize: 11 }}>No differences found.</div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 function ContributionList({ title, items, canReview, onReview, reviewingId }) {
   return (
     <section style={panelStyle()}>
@@ -161,6 +287,7 @@ function ContributionList({ title, items, canReview, onReview, reviewingId }) {
                 {item.proposer?.username ? `Proposed by ${item.proposer.username}. ` : ''}
                 {item.message || 'No message included.'}
               </div>
+              <ContributionInlineDiff contributionId={item.id} />
               {canReview && item.status === 'pending' ? (
                 <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                   <button
@@ -239,6 +366,7 @@ export default function SheetViewerPage() {
     try {
       const response = await fetch(`${API}/api/sheets/${sheetId}`, {
         headers: authHeaders(),
+        credentials: 'include',
         signal,
       })
 
@@ -276,6 +404,7 @@ export default function SheetViewerPage() {
     try {
       const response = await fetch(`${API}/api/sheets/${sheetId}/comments?limit=20`, {
         headers: authHeaders(),
+        credentials: 'include',
         signal,
       })
       const data = await readJsonSafely(response, {})
@@ -346,6 +475,7 @@ export default function SheetViewerPage() {
       const response = await fetch(`${API}/api/sheets/${sheet.id}/star`, {
         method: 'POST',
         headers: authHeaders(),
+        credentials: 'include',
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
@@ -356,6 +486,7 @@ export default function SheetViewerPage() {
         sheet: current.sheet ? { ...current.sheet, starred: data.starred, stars: data.stars } : current.sheet,
         error: '',
       }))
+      trackEvent(data.starred ? 'sheet_starred' : 'sheet_unstarred', { sheetId: sheet.id })
     } catch (error) {
       showToast(error.message || 'Could not update the star.', 'error')
       setSheetState((current) => ({ ...current, error: error.message || 'Could not update the star.' }))
@@ -369,6 +500,7 @@ export default function SheetViewerPage() {
       const response = await fetch(`${API}/api/sheets/${sheet.id}/react`, {
         method: 'POST',
         headers: authHeaders(),
+        credentials: 'include',
         body: JSON.stringify({ type: nextType }),
       })
       const data = await response.json().catch(() => ({}))
@@ -392,11 +524,13 @@ export default function SheetViewerPage() {
       const response = await fetch(`${API}/api/sheets/${sheet.id}/fork`, {
         method: 'POST',
         headers: authHeaders(),
+        credentials: 'include',
         body: JSON.stringify({}),
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(data.error || 'Could not fork this sheet.')
       showToast('Sheet forked! Redirecting to editor…', 'success')
+      trackEvent('sheet_forked', { sheetId: sheet.id })
       navigate(`/sheets/${data.id}/edit`)
     } catch (error) {
       showToast(error.message || 'Could not fork this sheet.', 'error')
@@ -406,6 +540,15 @@ export default function SheetViewerPage() {
     }
   }
 
+  const handleShare = () => {
+    navigator.clipboard.writeText(window.location.href)
+      .then(() => {
+        showToast('Link copied to clipboard!', 'success')
+        trackEvent('sheet_shared', { sheetId: sheet?.id, method: 'copy_link' })
+      })
+      .catch(() => showToast('Could not copy link.', 'error'))
+  }
+
   const handleContribute = async () => {
     if (!sheet || contributing) return
     setContributing(true)
@@ -413,6 +556,7 @@ export default function SheetViewerPage() {
       const response = await fetch(`${API}/api/sheets/${sheet.id}/contributions`, {
         method: 'POST',
         headers: authHeaders(),
+        credentials: 'include',
         body: JSON.stringify({ message: contributeMessage.trim() }),
       })
       const data = await response.json().catch(() => ({}))
@@ -436,6 +580,7 @@ export default function SheetViewerPage() {
       const response = await fetch(`${API}/api/sheets/contributions/${contributionId}`, {
         method: 'PATCH',
         headers: authHeaders(),
+        credentials: 'include',
         body: JSON.stringify({ action }),
       })
       const data = await response.json().catch(() => ({}))
@@ -459,6 +604,7 @@ export default function SheetViewerPage() {
       const response = await fetch(`${API}/api/sheets/${sheetId}/comments`, {
         method: 'POST',
         headers: authHeaders(),
+        credentials: 'include',
         body: JSON.stringify({ content: commentDraft.trim() }),
       })
       const data = await response.json().catch(() => ({}))
@@ -489,6 +635,7 @@ export default function SheetViewerPage() {
       const response = await fetch(`${API}/api/sheets/${sheetId}/comments/${commentId}`, {
         method: 'DELETE',
         headers: authHeaders(),
+        credentials: 'include',
       })
       if (!response.ok) {
         const data = await response.json().catch(() => ({}))
@@ -535,6 +682,10 @@ export default function SheetViewerPage() {
                       {sheet.starred ? <IconStarFilled size={14} /> : <IconStar size={14} />}
                       {sheet.stars || 0}
                     </button>
+                    <button type="button" onClick={handleShare} style={actionButton('#0891b2')}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                      Share
+                    </button>
                     <button type="button" onClick={() => updateReaction('like')} style={actionButton(sheet.reactions?.userReaction === 'like' ? '#16a34a' : '#475569')}>
                       Helpful {sheet.reactions?.likes || 0}
                     </button>
@@ -547,7 +698,7 @@ export default function SheetViewerPage() {
                         Preview attachment
                       </Link>
                     ) : null}
-                    {isHtmlSheet ? (
+                    {isHtmlSheet && (sheet.status !== 'pending_review' || canEdit) ? (
                       <Link to={`/sheets/preview/html/${sheet.id}`} style={linkButton()}>
                         <IconEye size={14} />
                         Open sandbox preview
@@ -598,8 +749,15 @@ export default function SheetViewerPage() {
                         by {sheet.author?.username || 'Unknown'} • {sheet.course?.code || 'General'} • updated {timeAgo(sheet.updatedAt || sheet.createdAt)}
                       </div>
                       {isHtmlSheet ? (
-                        <div style={{ marginTop: 8, fontSize: 11, fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase' }}>
-                          HTML sheet
+                        <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: 11, fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase' }}>
+                            HTML sheet
+                          </span>
+                          {sheet.status === 'pending_review' ? (
+                            <span style={{ fontSize: 10, fontWeight: 700, color: '#b45309', background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 6, padding: '2px 8px', textTransform: 'uppercase' }}>
+                              Pending Review
+                            </span>
+                          ) : null}
                         </div>
                       ) : null}
                     </div>

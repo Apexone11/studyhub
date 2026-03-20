@@ -13,7 +13,7 @@
  * Tutorial: First-visit Joyride highlights hero, stats, sheets, quick actions.
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
 import AppSidebar from '../../components/AppSidebar'
 import {
@@ -31,6 +31,7 @@ import { pageShell, useResponsiveAppLayout } from '../../lib/ui'
 import { useLivePolling } from '../../lib/useLivePolling'
 import { countUp, fadeInUp, staggerEntrance } from '../../lib/animations'
 import { usePageTitle } from '../../lib/usePageTitle'
+import { trackEvent } from '../../lib/telemetry'
 import SafeJoyride from '../../components/SafeJoyride'
 import { useTutorial } from '../../lib/useTutorial'
 import { DASHBOARD_STEPS } from '../../lib/tutorialSteps'
@@ -116,11 +117,14 @@ function DashboardSkeleton() {
 export default function DashboardPage() {
   usePageTitle('Dashboard')
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { user, clearSession, signOut } = useSession()
   const layout = useResponsiveAppLayout()
   const [summary, setSummary] = useState(null)     // aggregated dashboard data from API
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [welcomeDismissed, setWelcomeDismissed] = useState(false)
+  const isWelcome = searchParams.get('welcome') === '1'
   const heroRef = useRef(null)                     // DOM ref for fadeInUp animation
   const statsRef = useRef(null)                    // DOM ref for staggerEntrance animation
   const contentRef = useRef(null)                  // DOM ref for staggerEntrance animation
@@ -135,6 +139,7 @@ export default function DashboardPage() {
     try {
       const response = await fetch(`${API}/api/dashboard/summary`, {
         headers: authHeaders(),
+        credentials: 'include',
         signal,
       })
 
@@ -187,10 +192,11 @@ export default function DashboardPage() {
     ]
   }, [summary])
 
-  // Animate dashboard sections on first data load
+  // Animate dashboard sections on first data load and fire one-time page view event
   useEffect(() => {
     if (!summary || animatedRef.current) return
     animatedRef.current = true
+    trackEvent('dashboard_viewed', { isNewUser: summary.activation?.isNewUser ?? false })
     if (heroRef.current) fadeInUp(heroRef.current, { duration: 450, y: 16 })
     if (statsRef.current) {
       staggerEntrance(statsRef.current.children, { staggerMs: 80, duration: 450, y: 14 })
@@ -240,6 +246,35 @@ export default function DashboardPage() {
         <AppSidebar mode={layout.sidebarMode} />
 
         <main id="main-content" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+          {/* Welcome banner — shown once after registration */}
+          {isWelcome && !welcomeDismissed ? (
+            <div
+              style={{
+                background: 'linear-gradient(135deg, #eff6ff, #dbeafe)',
+                border: '1px solid #93c5fd',
+                borderRadius: 14,
+                padding: '14px 18px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+                flexWrap: 'wrap',
+              }}
+            >
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#1e40af' }}>
+                Welcome to StudyHub! Complete the steps below to set up your account.
+              </div>
+              <button
+                type="button"
+                onClick={() => setWelcomeDismissed(true)}
+                style={{ background: 'none', border: 'none', color: '#3b82f6', fontSize: 18, cursor: 'pointer', lineHeight: 1, padding: 4 }}
+                aria-label="Dismiss welcome banner"
+              >
+                ×
+              </button>
+            </div>
+          ) : null}
+
           <section
             ref={heroRef}
             data-tutorial="dashboard-hero"
@@ -370,6 +405,95 @@ export default function DashboardPage() {
                   </div>
                 ))}
               </section>
+
+              {/* Activation checklist — shown until all 4 steps are complete */}
+              {summary?.activation && summary.activation.completedCount < summary.activation.totalCount ? (
+                <section
+                  style={{
+                    background: '#fff',
+                    borderRadius: 18,
+                    border: '1px solid #e2e8f0',
+                    padding: '20px 22px',
+                    boxShadow: '0 4px 20px rgba(15,23,42,0.04)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                    <div>
+                      <h2 style={{ margin: 0, fontSize: 18, color: '#0f172a' }}>Getting Started</h2>
+                      <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>
+                        {summary.activation.completedCount} of {summary.activation.totalCount} steps complete
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: '50%',
+                        background: `conic-gradient(#3b82f6 ${(summary.activation.completedCount / summary.activation.totalCount) * 360}deg, #e2e8f0 0deg)`,
+                        display: 'grid',
+                        placeItems: 'center',
+                      }}
+                    >
+                      <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#fff', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 800, color: '#3b82f6' }}>
+                        {summary.activation.completedCount}/{summary.activation.totalCount}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {summary.activation.checklist.map((item) => (
+                      <div
+                        key={item.key}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 12,
+                          padding: '12px 14px',
+                          borderRadius: 12,
+                          background: item.done ? '#f0fdf4' : '#f8fafc',
+                          border: `1px solid ${item.done ? '#bbf7d0' : '#e2e8f0'}`,
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 24,
+                            height: 24,
+                            borderRadius: '50%',
+                            background: item.done ? '#10b981' : '#e2e8f0',
+                            display: 'grid',
+                            placeItems: 'center',
+                            flexShrink: 0,
+                          }}
+                        >
+                          {item.done ? (
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>
+                          ) : null}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: item.done ? '#166534' : '#0f172a' }}>{item.label}</div>
+                          <div style={{ fontSize: 12, color: item.done ? '#16a34a' : '#64748b' }}>{item.helper}</div>
+                        </div>
+                        {!item.done && item.actionPath ? (
+                          <Link
+                            to={item.actionPath}
+                            style={{
+                              padding: '6px 12px',
+                              borderRadius: 9,
+                              background: '#3b82f6',
+                              color: '#fff',
+                              fontSize: 12,
+                              fontWeight: 700,
+                              textDecoration: 'none',
+                              flexShrink: 0,
+                            }}
+                          >
+                            {item.actionLabel}
+                          </Link>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
 
               {/* Content: Recent Sheets (wider) | Course Focus + Quick Actions */}
               <section ref={contentRef} className="dashboard-content-grid" data-tutorial="dashboard-sheets">

@@ -20,3 +20,13 @@ backend-smoke.err.log
 beta-diagnostics/
 beta-artifacts/
 *.enc.txt
+
+# Generated screenshots and gallery (regenerated on demand)
+tests/screenshots/
+frontend/studyhub-app/tests/screenshots/
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# Nested repos / experiments
+mission-control/

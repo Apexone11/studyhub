@@ -24,7 +24,10 @@ router.get('/', async (req, res) => {
   try {
     const where = { userId: req.user.userId }
     if (q) where.title = { contains: q, mode: 'insensitive' }
-    if (courseId) where.courseId = parseInt(courseId, 10)
+    if (courseId) {
+      const parsed = parseInt(courseId, 10)
+      if (!Number.isNaN(parsed)) where.courseId = parsed
+    }
     if (priv !== undefined) where.private = priv === 'true'
 
     const page = Math.max(1, parseInt(req.query.page, 10) || 1)
@@ -62,7 +65,7 @@ router.post('/', mutateLimiter, async (req, res) => {
         title: trimmedTitle,
         content: typeof content === 'string' ? content : '',
         userId: req.user.userId,
-        courseId: courseId ? parseInt(courseId) : null,
+        courseId: courseId ? parseInt(courseId, 10) || null : null,
         private: priv !== false,
       },
       include: { course: { select: { id: true, code: true } } },
@@ -98,7 +101,7 @@ router.patch('/:id', mutateLimiter, async (req, res) => {
       data.title = trimmedTitle
     }
     if (content !== undefined) data.content = typeof content === 'string' ? content : ''
-    if (courseId !== undefined) data.courseId = courseId ? parseInt(courseId) : null
+    if (courseId !== undefined) data.courseId = courseId ? parseInt(courseId, 10) || null : null
     if (priv !== undefined) data.private = Boolean(priv)
 
     const updated = await prisma.note.update({

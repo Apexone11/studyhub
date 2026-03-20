@@ -6,13 +6,17 @@ export function canEditHtmlWorkingCopy() {
 
 export function canSubmitHtmlReview({
   scanStatus,
+  scanAcknowledged,
   title,
   courseId,
   description,
   html,
 }) {
+  const scanOk =
+    String(scanStatus || '').toLowerCase() === 'passed' ||
+    Boolean(scanAcknowledged)
   return (
-    String(scanStatus || '').toLowerCase() === 'passed' &&
+    scanOk &&
     String(title || '').trim().length > 0 &&
     Number.isInteger(Number.parseInt(courseId, 10)) &&
     String(description || '').trim().length > 0 &&

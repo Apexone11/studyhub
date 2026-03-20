@@ -1,11 +1,10 @@
 /* ═══════════════════════════════════════════════════════════════════════════
  * RegisterScreen.jsx — StudyHub account creation page
  *
- * Two-step flow: Account -> Courses (no email verification step).
- * Google OAuth flow: Google button -> Courses step (skips account form).
+ * Three-step flow: Account -> Verify Email -> Courses.
+ * Google OAuth flow: Google button -> Courses step (skips account form + verification).
  *
- * Design: Clean Academic Pro — glass-morphism card, gradient indicators,
- * password strength hints, accessible form controls.
+ * Design: Direction A — Campus Lab tokens, no inline hex colors.
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -15,41 +14,15 @@ import Navbar from '../../components/Navbar'
 import { API, GOOGLE_CLIENT_ID } from '../../config'
 import { fadeInUp } from '../../lib/animations'
 import { getAuthenticatedHomePath } from '../../lib/authNavigation'
-import { trackSignupConversion } from '../../lib/telemetry'
+import { trackSignupConversion, trackEvent } from '../../lib/telemetry'
 import { useSession } from '../../lib/session-context'
+import CourseListPicker from '../../components/CourseListPicker'
+import './RegisterScreen.css'
 
 /* ── Validation rules ──────────────────────────────────────────────────── */
 const RULES = {
   username: /^[a-zA-Z0-9_]{3,20}$/,
   password: /^(?=.*[A-Z])(?=.*\d).{8,}$/,
-}
-
-/* ── Shared styles ─────────────────────────────────────────────────────── */
-const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
-const inputStyle = {
-  width: '100%',
-  boxSizing: 'border-box',
-  padding: '13px 16px',
-  borderRadius: 12,
-  border: '1px solid #e2e8f0',
-  fontSize: 14,
-  color: '#0f172a',
-  outline: 'none',
-  background: '#f8fafc',
-  fontFamily: FONT,
-  transition: 'border-color 0.15s, box-shadow 0.15s',
-}
-
-/* ── Input focus/blur handlers ─────────────────────────────────────────── */
-function focusInput(e) {
-  e.target.style.borderColor = '#3b82f6'
-  e.target.style.boxShadow = '0 0 0 3px rgba(59,130,246,0.1)'
-  e.target.style.background = '#fff'
-}
-function blurInput(e) {
-  e.target.style.borderColor = '#e2e8f0'
-  e.target.style.boxShadow = 'none'
-  e.target.style.background = '#f8fafc'
 }
 
 /* ── Password strength indicator ───────────────────────────────────────── */
@@ -64,20 +37,9 @@ function PasswordHint({ password, confirmPassword }) {
   ]
 
   return (
-    <div className="password-hints-grid" style={{ gap: 8, marginTop: 10 }}>
+    <div className="password-hints-grid">
       {checks.map((check) => (
-        <div
-          key={check.label}
-          style={{
-            padding: '8px 10px',
-            borderRadius: 10,
-            background: check.ok ? '#f0fdf4' : '#f8fafc',
-            border: `1px solid ${check.ok ? '#bbf7d0' : '#e2e8f0'}`,
-            fontSize: 12,
-            color: check.ok ? '#166534' : '#64748b',
-            fontWeight: 600,
-          }}
-        >
+        <div key={check.label} className={`password-hint ${check.ok ? 'password-hint--pass' : 'password-hint--fail'}`}>
           {check.ok ? '\u2713' : '\u25CB'} {check.label}
         </div>
       ))}
@@ -107,11 +69,16 @@ export default function RegisterScreen() {
   const [customCourses, setCustomCourses] = useState([])
   const [customCourseDraft, setCustomCourseDraft] = useState({ code: '', name: '' })
   const [googleCredential, setGoogleCredential] = useState(isGoogleCourseFlow ? googleState.tempCredential : null)
-  const [pendingLocalUser, setPendingLocalUser] = useState(null)
+  const [verificationToken, setVerificationToken] = useState('')
+  const [verificationCode, setVerificationCode] = useState('')
+  const [deliveryHint, setDeliveryHint] = useState('')
+  const [resendAvailableAt, setResendAvailableAt] = useState(null)
+  const [resendCountdown, setResendCountdown] = useState(0)
 
   /* Form state for account step */
   const [form, setForm] = useState({
     username: '',
+    email: '',
     password: '',
     confirmPassword: '',
     termsAccepted: false,
@@ -122,6 +89,18 @@ export default function RegisterScreen() {
   useEffect(() => {
     if (cardRef.current) fadeInUp(cardRef.current, { duration: 450, y: 20 })
   }, [])
+
+  /* ── Resend countdown timer ──────────────────────────────────────── */
+  useEffect(() => {
+    if (!resendAvailableAt) return
+    const tick = () => {
+      const remaining = Math.max(0, Math.ceil((new Date(resendAvailableAt).getTime() - Date.now()) / 1000))
+      setResendCountdown(remaining)
+    }
+    tick()
+    const interval = setInterval(tick, 1000)
+    return () => clearInterval(interval)
+  }, [resendAvailableAt])
 
   /* ── Load course catalog when entering courses step ────────────────── */
   useEffect(() => {
@@ -169,11 +148,14 @@ export default function RegisterScreen() {
   }
 
   function validateAccountFields() {
-    if (!form.username.trim() || !form.password || !form.confirmPassword) {
+    if (!form.username.trim() || !form.email.trim() || !form.password || !form.confirmPassword) {
       return 'Please fill in all required fields.'
     }
     if (!RULES.username.test(form.username.trim())) {
       return 'Username must be 3-20 characters using letters, numbers, or underscores.'
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      return 'Please enter a valid email address.'
     }
     if (!RULES.password.test(form.password)) {
       return 'Password must be at least 8 characters and include a capital letter and a number.'
@@ -187,7 +169,7 @@ export default function RegisterScreen() {
     return ''
   }
 
-  /* ── Account creation handler (no verification — direct registration) ─ */
+  /* ── Account creation handler — starts verification pipeline ────────── */
   async function handleCreateAccount(event) {
     event.preventDefault()
     const validationError = validateAccountFields()
@@ -201,11 +183,13 @@ export default function RegisterScreen() {
     setSuccess('')
 
     try {
-      const response = await fetch(`${API}/api/auth/register`, {
+      const response = await fetch(`${API}/api/auth/register/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           username: form.username.trim(),
+          email: form.email.trim(),
           password: form.password,
           confirmPassword: form.confirmPassword,
           termsAccepted: form.termsAccepted,
@@ -218,12 +202,80 @@ export default function RegisterScreen() {
         return
       }
 
-      /* Keep the user on the onboarding route until course setup is finished.
-        PublicRoute redirects authenticated users away from /register, so the
-        local account flow defers session completion until setup is submitted. */
-      setPendingLocalUser(data.user)
+      setVerificationToken(data.verificationToken)
+      setDeliveryHint(data.deliveryHint || form.email.trim())
+      setResendAvailableAt(data.resendAvailableAt)
+      setStep('verify')
+      trackEvent('signup_started', { method: 'local' })
+      setSuccess(`We sent a 6-digit code to ${data.deliveryHint || form.email.trim()}.`)
+    } catch {
+      setError('Could not connect to the server.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  /* ── Verify email code handler ────────────────────────────────────── */
+  async function handleVerifyCode(event) {
+    event.preventDefault()
+    const trimmedCode = verificationCode.trim()
+    if (!trimmedCode || trimmedCode.length !== 6) {
+      setError('Please enter the 6-digit code from your email.')
+      return
+    }
+
+    setLoading(true)
+    setError('')
+    setSuccess('')
+
+    try {
+      const response = await fetch(`${API}/api/auth/register/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          verificationToken,
+          code: trimmedCode,
+        }),
+      })
+      const data = await response.json()
+
+      if (!response.ok) {
+        setError(data.error || 'Invalid or expired code.')
+        return
+      }
+
       setStep('courses')
-      setSuccess('Account created! Now choose your courses, or skip for now.')
+      setSuccess('Email verified! Now choose your courses, or skip for now.')
+    } catch {
+      setError('Could not connect to the server.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  /* ── Resend verification code handler ─────────────────────────────── */
+  async function handleResendCode() {
+    setLoading(true)
+    setError('')
+
+    try {
+      const response = await fetch(`${API}/api/auth/register/resend`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ verificationToken }),
+      })
+      const data = await response.json()
+
+      if (!response.ok) {
+        setError(data.error || 'Could not resend code.')
+        return
+      }
+
+      setResendAvailableAt(data.resendAvailableAt)
+      setVerificationCode('')
+      setSuccess(`New code sent to ${deliveryHint}.`)
     } catch {
       setError('Could not connect to the server.')
     } finally {
@@ -245,6 +297,7 @@ export default function RegisterScreen() {
       const response = await fetch(`${API}/api/auth/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ credential: credentialResponse.credential }),
       })
       const data = await response.json()
@@ -254,7 +307,6 @@ export default function RegisterScreen() {
         return
       }
 
-      /* New Google user — go to course selection */
       if (data.requiresCourseSelection) {
         setGoogleCredential(data.tempCredential)
         setStep('courses')
@@ -262,7 +314,6 @@ export default function RegisterScreen() {
         return
       }
 
-      /* Existing Google user — go to authenticated home */
       completeAuthentication(data.user)
       trackSignupConversion()
       navigate(getAuthenticatedHomePath(data.user), { replace: true })
@@ -317,7 +368,6 @@ export default function RegisterScreen() {
     setSuccess('')
 
     try {
-      /* Google flow: call /api/auth/google/complete */
       if (googleCredential) {
         const response = await fetch(`${API}/api/auth/google/complete`, {
           method: 'POST',
@@ -339,36 +389,33 @@ export default function RegisterScreen() {
 
         completeAuthentication(data.user)
         trackSignupConversion()
-        navigate(getAuthenticatedHomePath(data.user), { replace: true })
+        trackEvent('signup_completed', { method: 'google' })
+        navigate('/dashboard?welcome=1', { replace: true })
         return
       }
 
-      /* Local account: already created in step 1, just save courses via settings */
-      if (!skipCourses && (selectedCourseIds.length > 0 || customCourses.length > 0)) {
-        const response = await fetch(`${API}/api/settings/courses`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            schoolId: form.schoolId ? Number(form.schoolId) : null,
-            courseIds: selectedCourseIds,
-            customCourses,
-          }),
-        })
+      const response = await fetch(`${API}/api/auth/register/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          verificationToken,
+          schoolId: skipCourses ? null : (form.schoolId ? Number(form.schoolId) : null),
+          courseIds: skipCourses ? [] : selectedCourseIds,
+          customCourses: skipCourses ? [] : customCourses,
+        }),
+      })
+      const data = await response.json()
 
-        if (!response.ok) {
-          const data = await response.json().catch(() => ({}))
-          setError(data.error || 'Could not save your courses.')
-          return
-        }
+      if (!response.ok) {
+        setError(data.error || 'Could not finish registration.')
+        return
       }
 
-      /* Navigate to authenticated home */
-      if (pendingLocalUser) {
-        completeAuthentication(pendingLocalUser)
-      }
+      completeAuthentication(data.user)
       trackSignupConversion()
-      navigate('/feed', { replace: true })
+      trackEvent('signup_completed', { method: 'local', skipped_courses: skipCourses })
+      navigate('/dashboard?welcome=1', { replace: true })
     } catch {
       setError('Could not connect to the server.')
     } finally {
@@ -379,42 +426,23 @@ export default function RegisterScreen() {
   /* ── Step configuration ────────────────────────────────────────────── */
   const steps = googleCredential
     ? [['courses', 'Courses']]
-    : [['account', 'Account'], ['courses', 'Courses']]
+    : [['account', 'Account'], ['verify', 'Verify'], ['courses', 'Courses']]
   const stepOrder = steps.map(([key]) => key)
 
   /* ── Render ────────────────────────────────────────────────────────── */
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #1e40af 100%)',
-        fontFamily: FONT,
-        color: '#0f172a',
-        position: 'relative',
-        overflow: 'hidden',
-      }}
-    >
+    <div className="register-page">
       <Navbar variant="landing" />
 
       {/* Decorative background orbs */}
-      <div style={{ position: 'absolute', top: -120, right: -120, width: 400, height: 400, borderRadius: '50%', background: 'rgba(59, 130, 246, 0.08)', filter: 'blur(80px)', pointerEvents: 'none' }} />
-      <div style={{ position: 'absolute', bottom: -100, left: -100, width: 350, height: 350, borderRadius: '50%', background: 'rgba(139, 92, 246, 0.06)', filter: 'blur(80px)', pointerEvents: 'none' }} />
+      <div className="register-orb register-orb--blue" />
+      <div className="register-orb register-orb--purple" />
 
       {/* ── Main card ──────────────────────────────────────────────── */}
-      <main id="main-content" ref={cardRef} style={{ padding: '48px 20px 80px', display: 'grid', placeItems: 'center', position: 'relative', zIndex: 1 }}>
-        <div
-          style={{
-            width: 'min(92vw, 580px)',
-            background: 'rgba(255, 255, 255, 0.97)',
-            backdropFilter: 'blur(20px)',
-            borderRadius: 24,
-            border: '1px solid rgba(226, 232, 240, 0.8)',
-            boxShadow: '0 25px 60px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.1)',
-            padding: '40px 36px',
-          }}
-        >
+      <main id="main-content" ref={cardRef} className="register-main">
+        <div className="register-card">
           {/* ── Step indicator ──────────────────────────────────────── */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 28 }}>
+          <div className="register-steps">
             {steps.map(([key, label], index) => {
               const currentIndex = stepOrder.indexOf(step)
               const thisIndex = stepOrder.indexOf(key)
@@ -422,31 +450,16 @@ export default function RegisterScreen() {
               const active = key === step
 
               return (
-                <div key={key} style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div
-                      style={{
-                        width: 34, height: 34, borderRadius: '50%',
-                        background: active || complete ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)' : '#f1f5f9',
-                        color: active || complete ? '#fff' : '#94a3b8',
-                        display: 'grid', placeItems: 'center',
-                        fontSize: 13, fontWeight: 700,
-                        boxShadow: active ? '0 4px 12px rgba(59, 130, 246, 0.3)' : 'none',
-                        transition: 'all 0.2s',
-                      }}
-                    >
+                <div key={key} className="register-step">
+                  <div className="register-step-header">
+                    <div className={`register-step-number ${active || complete ? 'register-step-number--active' : 'register-step-number--inactive'}`}>
                       {complete ? '\u2713' : index + 1}
                     </div>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: active ? '#0f172a' : '#94a3b8' }}>
+                    <span className={`register-step-label ${active ? 'register-step-label--active' : 'register-step-label--inactive'}`}>
                       {label}
                     </span>
                   </div>
-                  {/* Progress bar */}
-                  <div style={{
-                    marginTop: 8, height: 3, borderRadius: 999,
-                    background: complete || active ? 'linear-gradient(90deg, #3b82f6, #60a5fa)' : '#f1f5f9',
-                    transition: 'background 0.3s',
-                  }} />
+                  <div className={`register-step-bar ${complete || active ? 'register-step-bar--active' : 'register-step-bar--inactive'}`} />
                 </div>
               )
             })}
@@ -454,22 +467,10 @@ export default function RegisterScreen() {
 
           {/* ── Error/success messages ──────────────────────────────── */}
           {error && (
-            <div role="alert" style={{
-              marginBottom: 16, padding: '12px 14px', borderRadius: 12,
-              border: '1px solid #fecaca', background: '#fef2f2', color: '#b91c1c',
-              fontSize: 13, lineHeight: 1.6,
-            }}>
-              {error}
-            </div>
+            <div role="alert" className="register-alert register-alert--danger">{error}</div>
           )}
           {success && (
-            <div style={{
-              marginBottom: 16, padding: '12px 14px', borderRadius: 12,
-              border: '1px solid #bbf7d0', background: '#f0fdf4', color: '#166534',
-              fontSize: 13, lineHeight: 1.6,
-            }}>
-              {success}
-            </div>
+            <div className="register-alert register-alert--success">{success}</div>
           )}
 
           {/* ══════════════════════════════════════════════════════════
@@ -477,29 +478,20 @@ export default function RegisterScreen() {
            * ══════════════════════════════════════════════════════════ */}
           {step === 'account' && (
             <form onSubmit={handleCreateAccount}>
-              {/* Logo + heading */}
-              <div style={{ textAlign: 'center', marginBottom: 24 }}>
-                <div style={{
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  width: 52, height: 52, borderRadius: 14,
-                  background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-                  boxShadow: '0 8px 24px rgba(59, 130, 246, 0.3)',
-                  marginBottom: 14,
-                }}>
+              <div className="register-section-header">
+                <div className="register-logo-mark register-logo-mark--brand">
                   <svg width="24" height="24" viewBox="0 0 36 36" fill="none">
                     <path d="M18 6 L18 30 M10 14 L18 6 L26 14 M10 22 L18 14 L26 22" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                 </div>
-                <h1 style={{ margin: '0 0 6px', fontSize: 24, fontWeight: 800, color: '#0f172a' }}>Create your account</h1>
-                <p style={{ margin: 0, fontSize: 14, color: '#64748b', lineHeight: 1.7 }}>
-                  Join thousands of students studying smarter together.
-                </p>
+                <h1 className="register-h1">Create your account</h1>
+                <p className="register-subtitle">Join thousands of students studying smarter together.</p>
               </div>
 
               {/* Google Sign-Up button */}
               {GOOGLE_CLIENT_ID && (
                 <>
-                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
+                  <div className="register-google-wrap">
                     <GoogleLogin
                       onSuccess={handleGoogleSuccess}
                       onError={() => setError('Google sign-up was cancelled or failed.')}
@@ -510,34 +502,47 @@ export default function RegisterScreen() {
                       theme="outline"
                     />
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
-                    <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, transparent, #e2e8f0)' }} />
-                    <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>or create an account</span>
-                    <div style={{ flex: 1, height: 1, background: 'linear-gradient(90deg, #e2e8f0, transparent)' }} />
+                  <div className="register-divider">
+                    <div className="register-divider-line register-divider-line--left" />
+                    <span className="register-divider-text">or create an account</span>
+                    <div className="register-divider-line register-divider-line--right" />
                   </div>
                 </>
               )}
 
-              {/* Username (full width) */}
+              {/* Username */}
               <div>
-                <label htmlFor="register-username" style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 700, color: '#334155' }}>Username</label>
+                <label htmlFor="register-username" className="register-label">Username</label>
                 <input
                   id="register-username"
                   value={form.username}
                   onChange={(event) => setField('username', event.target.value)}
                   placeholder="Choose a username"
                   autoComplete="username"
-                  style={inputStyle}
-                  onFocus={focusInput}
-                  onBlur={blurInput}
+                  className="register-input"
                 />
-                <div style={{ marginTop: 4, fontSize: 11, color: '#94a3b8' }}>3-20 chars, letters/numbers/_</div>
+                <div className="register-hint">3-20 chars, letters/numbers/_</div>
+              </div>
+
+              {/* Email */}
+              <div className="register-field" style={{ marginTop: 14 }}>
+                <label htmlFor="register-email" className="register-label">Email</label>
+                <input
+                  id="register-email"
+                  type="email"
+                  value={form.email}
+                  onChange={(event) => setField('email', event.target.value)}
+                  placeholder="you@university.edu"
+                  autoComplete="email"
+                  className="register-input"
+                />
+                <div className="register-hint">We&apos;ll send a verification code to confirm.</div>
               </div>
 
               {/* Password + Confirm row */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 14 }}>
+              <div className="register-pw-grid">
                 <div>
-                  <label htmlFor="register-password" style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 700, color: '#334155' }}>Password</label>
+                  <label htmlFor="register-password" className="register-label">Password</label>
                   <input
                     id="register-password"
                     type="password"
@@ -545,14 +550,11 @@ export default function RegisterScreen() {
                     onChange={(event) => setField('password', event.target.value)}
                     placeholder="Create a password"
                     autoComplete="new-password"
-                    style={inputStyle}
-                    onFocus={focusInput}
-                    onBlur={blurInput}
+                    className="register-input"
                   />
                 </div>
-
                 <div>
-                  <label htmlFor="register-confirm-password" style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 700, color: '#334155' }}>Confirm Password</label>
+                  <label htmlFor="register-confirm-password" className="register-label">Confirm Password</label>
                   <input
                     id="register-confirm-password"
                     type="password"
@@ -560,98 +562,116 @@ export default function RegisterScreen() {
                     onChange={(event) => setField('confirmPassword', event.target.value)}
                     placeholder="Re-enter password"
                     autoComplete="new-password"
-                    style={inputStyle}
-                    onFocus={focusInput}
-                    onBlur={blurInput}
+                    className="register-input"
                   />
                 </div>
               </div>
 
-              {/* Password strength hints */}
               <PasswordHint password={form.password} confirmPassword={form.confirmPassword} />
 
               {/* Terms checkbox */}
-              <label
-                style={{
-                  display: 'flex', alignItems: 'flex-start', gap: 10,
-                  fontSize: 13, color: '#64748b', lineHeight: 1.7,
-                  marginTop: 18, marginBottom: 20,
-                }}
-              >
+              <label className="register-terms">
                 <input
                   type="checkbox"
                   checked={form.termsAccepted}
                   onChange={(event) => setField('termsAccepted', event.target.checked)}
-                  style={{ marginTop: 3, accentColor: '#3b82f6' }}
                 />
                 <span>
                   I agree to the <Link to="/terms">Terms of Use</Link> and <Link to="/guidelines">Community Guidelines</Link>.
                 </span>
               </label>
 
-              {/* Submit button */}
-              <button
-                type="submit"
-                disabled={loading}
-                style={{
-                  width: '100%', padding: '14px 18px', borderRadius: 12, border: 'none',
-                  background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-                  color: '#fff', fontSize: 15, fontWeight: 700,
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  opacity: loading ? 0.7 : 1,
-                  fontFamily: FONT,
-                  boxShadow: '0 4px 14px rgba(59, 130, 246, 0.4)',
-                }}
-              >
+              <button type="submit" disabled={loading} className="register-btn-primary">
                 {loading ? 'Creating account...' : 'Create Account'}
               </button>
             </form>
           )}
 
           {/* ══════════════════════════════════════════════════════════
-           * STEP 2: Course Selection
+           * STEP 2: Email Verification
+           * ══════════════════════════════════════════════════════════ */}
+          {step === 'verify' && (
+            <form onSubmit={handleVerifyCode}>
+              <div className="register-section-header">
+                <div className="register-logo-mark register-logo-mark--verify">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--sh-link)" strokeWidth="2" strokeLinecap="round">
+                    <rect x="2" y="4" width="20" height="16" rx="2"/>
+                    <path d="M22 7l-10 7L2 7"/>
+                  </svg>
+                </div>
+                <h1 className="register-h1">Check your email</h1>
+                <p className="register-subtitle">
+                  We sent a 6-digit code to <strong style={{ color: 'var(--sh-text)' }}>{deliveryHint}</strong>
+                </p>
+              </div>
+
+              <div className="register-field">
+                <label htmlFor="verify-code" className="register-label">Verification code</label>
+                <input
+                  id="verify-code"
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={verificationCode}
+                  onChange={(event) => { setVerificationCode(event.target.value.replace(/\D/g, '').slice(0, 6)); setError('') }}
+                  placeholder="000000"
+                  autoComplete="one-time-code"
+                  className="register-input register-input--code"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading || verificationCode.length !== 6}
+                className="register-btn-primary"
+              >
+                {loading ? 'Verifying...' : 'Verify Email'}
+              </button>
+
+              <div className="register-center-text" style={{ marginTop: 16 }}>
+                {resendCountdown > 0 ? (
+                  <span>Resend available in {resendCountdown}s</span>
+                ) : (
+                  <button type="button" disabled={loading} onClick={handleResendCode} className="register-btn-ghost">
+                    Resend code
+                  </button>
+                )}
+              </div>
+
+              <div className="register-center-text" style={{ marginTop: 12 }}>
+                Check your spam folder if you don&apos;t see it. Code expires in 15 minutes.
+              </div>
+            </form>
+          )}
+
+          {/* ══════════════════════════════════════════════════════════
+           * STEP 3: Course Selection
            * ══════════════════════════════════════════════════════════ */}
           {step === 'courses' && (
             <div>
-              {/* Heading */}
-              <div style={{ textAlign: 'center', marginBottom: 20 }}>
-                <div style={{
-                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  width: 52, height: 52, borderRadius: '50%',
-                  background: '#f0fdf4', border: '2px solid #bbf7d0',
-                  marginBottom: 14,
-                }}>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round">
+              <div className="register-section-header">
+                <div className="register-logo-mark register-logo-mark--courses">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--sh-success)" strokeWidth="2" strokeLinecap="round">
                     <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
                     <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
                   </svg>
                 </div>
-                <h1 style={{ margin: '0 0 6px', fontSize: 24, fontWeight: 800, color: '#0f172a' }}>Choose your courses</h1>
-                <p style={{ margin: 0, fontSize: 14, color: '#64748b', lineHeight: 1.7 }}>
-                  Add your school and courses, or skip and set up later.
-                </p>
+                <h1 className="register-h1">Choose your courses</h1>
+                <p className="register-subtitle">Add your school and courses, or skip and set up later.</p>
               </div>
 
-              {/* Catalog error */}
               {catalogError && (
-                <div style={{ marginBottom: 16, padding: '12px 14px', borderRadius: 12, border: '1px solid #fecaca', background: '#fef2f2', color: '#dc2626', fontSize: 13, lineHeight: 1.6, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                <div className="register-alert--danger-row">
                   <span>{catalogError}</span>
-                  <button
-                    onClick={() => { setCatalogError(''); setSchools([]); }}
-                    style={{
-                      background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 8,
-                      padding: '5px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                      whiteSpace: 'nowrap', fontFamily: FONT,
-                    }}
-                  >
+                  <button onClick={() => { setCatalogError(''); setSchools([]) }} className="register-btn-small">
                     Retry
                   </button>
                 </div>
               )}
 
               {/* School selector */}
-              <div style={{ marginBottom: 16 }}>
-                <label htmlFor="register-school" style={{ display: 'block', marginBottom: 6, fontSize: 13, fontWeight: 700, color: '#334155' }}>School</label>
+              <div className="register-field">
+                <label htmlFor="register-school" className="register-label">School</label>
                 <select
                   id="register-school"
                   value={form.schoolId}
@@ -660,122 +680,63 @@ export default function RegisterScreen() {
                     setSelectedCourseIds([])
                     setCustomCourses([])
                   }}
-                  style={{ ...inputStyle, cursor: 'pointer' }}
+                  className="register-select"
                 >
                   <option value="">Skip school selection for now</option>
                   {schools.map((school) => (
                     <option key={school.id} value={school.id}>
-                      {school.name}
+                      {school.short} — {school.name}{school.city ? `, ${school.city}` : ''}
                     </option>
                   ))}
                 </select>
               </div>
 
-              {/* Loading state */}
               {catalogLoading && (
-                <div style={{ marginBottom: 16, fontSize: 13, color: '#64748b' }}>
-                  Loading course catalog...
-                </div>
+                <div className="register-loading">Loading course catalog...</div>
               )}
 
-              {/* Course checkboxes */}
               {selectedSchool && availableCourses.length > 0 && (
                 <div style={{ marginBottom: 18 }}>
-                  <div style={{ marginBottom: 8, fontSize: 13, fontWeight: 700, color: '#334155' }}>
-                    Course Catalog
-                  </div>
-                  <div style={{
-                    maxHeight: 220, overflowY: 'auto',
-                    border: '1px solid #e2e8f0', borderRadius: 14, background: '#f8fafc',
-                  }}>
-                    {availableCourses.map((course) => {
-                      const checked = selectedCourseIds.includes(course.id)
-                      return (
-                        <label
-                          key={course.id}
-                          style={{
-                            display: 'flex', alignItems: 'center', gap: 10,
-                            padding: '12px 14px', borderBottom: '1px solid #e2e8f0',
-                            background: checked ? '#eff6ff' : 'transparent',
-                            cursor: 'pointer', transition: 'background 0.15s',
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => toggleCourse(course.id)}
-                            style={{ accentColor: '#3b82f6' }}
-                          />
-                          <div>
-                            <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{course.code}</div>
-                            <div style={{ fontSize: 12, color: '#64748b' }}>{course.name}</div>
-                          </div>
-                        </label>
-                      )
-                    })}
-                  </div>
+                  <div className="register-catalog-label">Course Catalog</div>
+                  <CourseListPicker
+                    courses={availableCourses}
+                    selectedIds={selectedCourseIds}
+                    onToggle={toggleCourse}
+                    maxSelections={10}
+                    maxHeight={220}
+                  />
                 </div>
               )}
 
               {/* Custom course input */}
-              <div style={{
-                marginBottom: 18, padding: '14px', borderRadius: 14,
-                border: '1px dashed #cbd5e1', background: '#f8fafc',
-              }}>
-                <div style={{ marginBottom: 10, fontSize: 13, fontWeight: 700, color: '#334155' }}>
-                  Add a custom course
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr auto', gap: 8 }}>
+              <div className="register-custom-course-box">
+                <div className="register-catalog-label">Add a custom course</div>
+                <div className="register-custom-course-grid">
                   <input
                     value={customCourseDraft.code}
                     onChange={(event) => setCustomCourseDraft((current) => ({ ...current, code: event.target.value.toUpperCase() }))}
                     placeholder="Code"
-                    style={inputStyle}
-                    onFocus={focusInput}
-                    onBlur={blurInput}
+                    className="register-input"
                   />
                   <input
                     value={customCourseDraft.name}
                     onChange={(event) => setCustomCourseDraft((current) => ({ ...current, name: event.target.value }))}
                     placeholder="Course name"
-                    style={inputStyle}
-                    onFocus={focusInput}
-                    onBlur={blurInput}
+                    className="register-input"
                   />
-                  <button
-                    type="button"
-                    onClick={addCustomCourse}
-                    style={{
-                      padding: '12px 18px', borderRadius: 12,
-                      border: '1px solid #e2e8f0', background: '#fff',
-                      color: '#475569', fontSize: 14, fontWeight: 700,
-                      cursor: 'pointer',
-                      fontFamily: FONT,
-                    }}
-                  >
+                  <button type="button" onClick={addCustomCourse} className="register-btn-add">
                     Add
                   </button>
                 </div>
                 {customCourses.length > 0 && (
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+                  <div className="register-pills">
                     {customCourses.map((course) => (
-                      <span
-                        key={course.code}
-                        style={{
-                          display: 'inline-flex', alignItems: 'center', gap: 6,
-                          padding: '6px 12px', borderRadius: 999,
-                          background: 'linear-gradient(135deg, #eff6ff, #dbeafe)',
-                          color: '#1d4ed8', fontSize: 12, fontWeight: 700,
-                        }}
-                      >
+                      <span key={course.code} className="register-pill">
                         {course.code}
                         <button
                           type="button"
                           onClick={() => setCustomCourses((current) => current.filter((item) => item.code !== course.code))}
-                          style={{
-                            background: 'none', border: 'none', color: '#1d4ed8',
-                            cursor: 'pointer', padding: 0, fontSize: 14, lineHeight: 1,
-                          }}
+                          className="register-pill-remove"
                         >
                           x
                         </button>
@@ -786,20 +747,12 @@ export default function RegisterScreen() {
               </div>
 
               {/* Action buttons */}
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <div className="register-actions">
                 <button
                   type="button"
                   onClick={() => handleCompleteRegistration(false)}
                   disabled={loading}
-                  style={{
-                    padding: '13px 24px', borderRadius: 12, border: 'none',
-                    background: 'linear-gradient(135deg, #10b981, #059669)',
-                    color: '#fff', fontSize: 14, fontWeight: 700,
-                    cursor: loading ? 'not-allowed' : 'pointer',
-                    opacity: loading ? 0.7 : 1,
-                    fontFamily: FONT,
-                    boxShadow: '0 4px 14px rgba(16, 185, 129, 0.3)',
-                  }}
+                  className="register-btn-success"
                 >
                   {loading ? 'Finishing setup...' : 'Finish Setup'}
                 </button>
@@ -807,14 +760,7 @@ export default function RegisterScreen() {
                   type="button"
                   onClick={() => handleCompleteRegistration(true)}
                   disabled={loading}
-                  style={{
-                    padding: '13px 24px', borderRadius: 12,
-                    border: '1px solid #e2e8f0', background: '#fff',
-                    color: '#475569', fontSize: 14, fontWeight: 700,
-                    cursor: loading ? 'not-allowed' : 'pointer',
-                    opacity: loading ? 0.7 : 1,
-                    fontFamily: FONT,
-                  }}
+                  className="register-btn-secondary"
                 >
                   Skip For Now
                 </button>
@@ -823,14 +769,9 @@ export default function RegisterScreen() {
           )}
 
           {/* ── Sign in link ─────────────────────────────────────────── */}
-          <div style={{
-            marginTop: 28, paddingTop: 20, borderTop: '1px solid #f1f5f9',
-            textAlign: 'center', fontSize: 14, color: '#64748b',
-          }}>
+          <div className="register-footer">
             Already have an account?{' '}
-            <Link to="/login" style={{ color: '#3b82f6', fontWeight: 700, textDecoration: 'none' }}>
-              Sign in here
-            </Link>
+            <Link to="/login" className="register-link">Sign in here</Link>
           </div>
         </div>
       </main>

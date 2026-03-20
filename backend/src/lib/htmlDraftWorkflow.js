@@ -212,7 +212,7 @@ async function runHtmlScanNow(prisma, { sheetId }) {
       htmlScanFindings: findings,
       htmlScanUpdatedAt: new Date(),
       content: htmlToScan,
-      status: sheet.status === 'pending_review' && nextStatus !== SCAN_STATUS.PASSED
+      status: sheet.status === 'pending_review' && nextStatus !== SCAN_STATUS.PASSED && !sheet.htmlScanAcknowledgedAt
         ? 'draft'
         : sheet.status,
     },
@@ -245,7 +245,8 @@ function scheduleHtmlScan(prisma, { sheetId, delayMs = 450 }) {
       scanTimers.delete(sheetId)
       try {
         await runHtmlScanNow(prisma, { sheetId })
-      } catch {
+      } catch (scanErr) {
+        console.error(`[htmlDraftWorkflow] Background scan failed for sheet ${sheetId}:`, scanErr)
         await prisma.studySheet.update({
           where: { id: sheetId },
           data: {
@@ -253,7 +254,9 @@ function scheduleHtmlScan(prisma, { sheetId, delayMs = 450 }) {
             htmlScanFindings: [{ source: 'system', severity: 'high', message: 'Background scan failed to complete.' }],
             htmlScanUpdatedAt: new Date(),
           },
-        }).catch(() => {})
+        }).catch((updateErr) => {
+          console.error(`[htmlDraftWorkflow] Failed to update scan status for sheet ${sheetId}:`, updateErr)
+        })
       }
     }, safeDelay)
 
@@ -397,11 +400,17 @@ async function submitHtmlDraftForReview(prisma, { sheetId, user }) {
   }
 
   const scan = await runHtmlScanNow(prisma, { sheetId })
+
+  // If scan failed but user has acknowledged the warning, allow submission
+  // as pending_review for admin approval. Otherwise block.
   if (scan.status !== SCAN_STATUS.PASSED) {
-    const error = new Error('Security scan must pass before submit.')
-    error.statusCode = 409
-    error.findings = scan.findings
-    throw error
+    if (!sheet.htmlScanAcknowledgedAt) {
+      const error = new Error('Security scan must pass before submit, or acknowledge the findings first.')
+      error.statusCode = 409
+      error.findings = scan.findings
+      throw error
+    }
+    // User acknowledged — submit with flagged findings for admin review
   }
 
   return prisma.studySheet.update({
