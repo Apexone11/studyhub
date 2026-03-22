@@ -32,6 +32,7 @@ function ResetPasswordPage() {
       const res = await fetch(`${API}/api/auth/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ token, newPassword }),
       })
       const data = await res.json()

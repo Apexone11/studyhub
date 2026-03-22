@@ -6,12 +6,13 @@
  * on the split-origin beta stack, silently breaking authentication.
  *
  * HOW IT WORKS:
- * - Intercepts ALL requests to the API origin during real user flows
- * - Asserts each API request includes credentials (cookie header present)
+ * - Traces API fetch() calls inside the page during real user flows
+ * - Asserts each API fetch leaves the page with `credentials: 'include'`
  * - Covers: feed, sheets, search, upload, profile, dashboard, admin, sheetlab
  *
- * If this test fails, a new fetch() call was added without credentials.
- * Fix: add `credentials: 'include'` to the fetch options.
+ * StudyHub installs a global fetch shim in `src/main.jsx` via
+ * `installApiFetchShim()` from `src/lib/http.js`. This guardrail validates
+ * that real contract directly instead of guessing from cookie headers.
  *
  * @tags @smoke @regression @auth
  */
@@ -20,10 +21,8 @@ import { mockAuthenticatedApp } from './helpers/mockStudyHubApi'
 
 /* ── Constants ──────────────────────────────────────────────────────── */
 
-// Matches the API base URL pattern used in the app (default localhost:4000)
 const API_PATTERN = /\/api\//
 
-// Requests to ignore (not our API, or browser internals)
 const IGNORE_PATTERNS = [
   /posthog/i,
   /sentry/i,
@@ -41,14 +40,6 @@ const IGNORE_PATTERNS = [
 
 /* ── Helpers ──────────────────────────────────────────────────────── */
 
-function isApiRequest(url) {
-  if (!API_PATTERN.test(url)) return false
-  for (const pattern of IGNORE_PATTERNS) {
-    if (pattern.test(url)) return false
-  }
-  return true
-}
-
 async function disableTutorials(page) {
   await page.addInitScript(() => {
     window.localStorage.setItem('tutorial_feed_seen', '1')
@@ -59,65 +50,51 @@ async function disableTutorials(page) {
   })
 }
 
-/**
- * Collects all API requests during a page interaction and returns
- * any that are missing credentials (no cookie header).
- *
- * We check for the presence of a `cookie` header on the request,
- * which proves `credentials: 'include'` was set (the browser only
- * sends cookies when credentials mode is 'include' for cross-origin).
- *
- * For same-origin requests in tests, we inject a tracking cookie so
- * we can detect whether the browser attached it (proving credentials
- * were included).
- */
-function createCredentialsTracker(page) {
-  const apiRequests = []
-  const violations = []
+async function createCredentialsTracker(page) {
+  await page.addInitScript(({ apiPatternSource, ignorePatternSources }) => {
+    const apiPattern = new RegExp(apiPatternSource)
+    const ignorePatterns = ignorePatternSources.map((source) => new RegExp(source, 'i'))
 
-  // Inject a marker cookie so we can verify it gets sent
-  page.context().addCookies([
-    {
-      name: 'studyhub_test_session',
-      value: 'test-marker',
-      domain: '127.0.0.1',
-      path: '/',
-      httpOnly: false,
-      secure: false,
-      sameSite: 'Lax',
-    },
-  ])
+    window.__studyhubApiFetches = []
 
-  page.on('request', (request) => {
-    const url = request.url()
-    if (!isApiRequest(url)) return
+    const nativeFetch = window.fetch.bind(window)
+    window.fetch = async (input, init) => {
+      const url = typeof input === 'string' ? input : input?.url
+      const method = init?.method || (input instanceof Request ? input.method : 'GET')
+      const credentials = init?.credentials || (input instanceof Request ? input.credentials : '')
 
-    const method = request.method()
-    const headers = request.headers()
+      if (typeof url === 'string' && apiPattern.test(url) && !ignorePatterns.some((pattern) => pattern.test(url))) {
+        window.__studyhubApiFetches.push({
+          url,
+          method: String(method || 'GET').toUpperCase(),
+          credentials: credentials || '',
+        })
+      }
 
-    apiRequests.push({ url, method })
-
-    // In same-origin tests, the cookie header should exist if credentials: 'include'
-    // is set. If it's missing, the fetch didn't include credentials.
-    // Note: For mocked routes fulfilled via route.fulfill(), the request still
-    // goes through and we can inspect its headers.
-    const hasCookie = Boolean(headers['cookie'])
-
-    if (!hasCookie) {
-      violations.push({
-        url: url.replace(/^https?:\/\/[^/]+/, ''),
-        method,
-      })
+      return nativeFetch(input, init)
     }
+  }, {
+    apiPatternSource: API_PATTERN.source,
+    ignorePatternSources: IGNORE_PATTERNS.map((pattern) => pattern.source),
   })
 
   return {
-    getApiRequests: () => apiRequests,
-    getViolations: () => violations,
-    assertNoViolations: () => {
+    getApiRequests: async () => page.evaluate(() => window.__studyhubApiFetches || []),
+    assertNoViolations: async () => {
+      const violations = await page.evaluate(() => {
+        const calls = window.__studyhubApiFetches || []
+        return calls
+          .filter((call) => call.credentials !== 'include')
+          .map((call) => ({
+            url: call.url.replace(/^https?:\/\/[^/]+/, ''),
+            method: call.method,
+            credentials: call.credentials || '(empty)',
+          }))
+      })
+
       if (violations.length > 0) {
         const report = violations
-          .map((v) => `  ${v.method} ${v.url}`)
+          .map((violation) => `  ${violation.method} ${violation.url} [credentials=${violation.credentials}]`)
           .join('\n')
         throw new Error(
           `Found ${violations.length} API request(s) missing credentials: 'include':\n${report}\n\n` +
@@ -126,6 +103,11 @@ function createCredentialsTracker(page) {
       }
     },
   }
+}
+
+async function expectTrackedCredentialedRequests(tracker) {
+  expect((await tracker.getApiRequests()).length).toBeGreaterThan(0)
+  await tracker.assertNoViolations()
 }
 
 /* ── Additional mocks for pages not covered by mockAuthenticatedApp ─ */
@@ -222,32 +204,29 @@ test.describe('P0-4: API credentials guardrail @smoke @regression', () => {
     await mockAuthenticatedApp(page)
     await mockSearchEndpoints(page)
 
-    const tracker = createCredentialsTracker(page)
+    const tracker = await createCredentialsTracker(page)
 
     await page.goto('/feed')
     await page.waitForTimeout(1000)
 
-    // Interact with feed to trigger more API calls
     const starBtn = page.locator('[data-testid="star-button"], button:has-text("Star")').first()
     if (await starBtn.isVisible().catch(() => false)) {
       await starBtn.click().catch(() => {})
     }
 
-    expect(tracker.getApiRequests().length).toBeGreaterThan(0)
-    tracker.assertNoViolations()
+    await expectTrackedCredentialedRequests(tracker)
   })
 
   test('all sheets page API requests include credentials', async ({ page }) => {
     await disableTutorials(page)
     await mockAuthenticatedApp(page)
 
-    const tracker = createCredentialsTracker(page)
+    const tracker = await createCredentialsTracker(page)
 
     await page.goto('/sheets')
     await page.waitForTimeout(1000)
 
-    expect(tracker.getApiRequests().length).toBeGreaterThan(0)
-    tracker.assertNoViolations()
+    await expectTrackedCredentialedRequests(tracker)
   })
 
   test('all sheet viewer API requests include credentials', async ({ page }) => {
@@ -255,26 +234,24 @@ test.describe('P0-4: API credentials guardrail @smoke @regression', () => {
     await mockAuthenticatedApp(page)
     await mockContributionDiff(page)
 
-    const tracker = createCredentialsTracker(page)
+    const tracker = await createCredentialsTracker(page)
 
     await page.goto('/sheets/501')
     await page.waitForTimeout(1000)
 
-    expect(tracker.getApiRequests().length).toBeGreaterThan(0)
-    tracker.assertNoViolations()
+    await expectTrackedCredentialedRequests(tracker)
   })
 
   test('all dashboard API requests include credentials', async ({ page }) => {
     await disableTutorials(page)
     await mockAuthenticatedApp(page)
 
-    const tracker = createCredentialsTracker(page)
+    const tracker = await createCredentialsTracker(page)
 
     await page.goto('/dashboard')
     await page.waitForTimeout(1000)
 
-    expect(tracker.getApiRequests().length).toBeGreaterThan(0)
-    tracker.assertNoViolations()
+    await expectTrackedCredentialedRequests(tracker)
   })
 
   test('all profile page API requests include credentials', async ({ page }) => {
@@ -282,13 +259,12 @@ test.describe('P0-4: API credentials guardrail @smoke @regression', () => {
     await mockAuthenticatedApp(page)
     await mockUserProfileEndpoints(page, 'public_user')
 
-    const tracker = createCredentialsTracker(page)
+    const tracker = await createCredentialsTracker(page)
 
     await page.goto('/users/public_user')
     await page.waitForTimeout(1000)
 
-    expect(tracker.getApiRequests().length).toBeGreaterThan(0)
-    tracker.assertNoViolations()
+    await expectTrackedCredentialedRequests(tracker)
   })
 
   test('all SheetLab API requests include credentials', async ({ page }) => {
@@ -296,26 +272,52 @@ test.describe('P0-4: API credentials guardrail @smoke @regression', () => {
     await mockAuthenticatedApp(page)
     await mockSheetLabEndpoints(page)
 
-    const tracker = createCredentialsTracker(page)
+    const tracker = await createCredentialsTracker(page)
 
     await page.goto('/sheets/501/lab')
     await page.waitForTimeout(1000)
 
-    expect(tracker.getApiRequests().length).toBeGreaterThan(0)
-    tracker.assertNoViolations()
+    await expectTrackedCredentialedRequests(tracker)
   })
 
   test('all admin page API requests include credentials', async ({ page }) => {
     await disableTutorials(page)
     await mockAuthenticatedApp(page)
 
-    const tracker = createCredentialsTracker(page)
+    const tracker = await createCredentialsTracker(page)
 
     await page.goto('/admin')
     await page.waitForTimeout(1000)
 
-    expect(tracker.getApiRequests().length).toBeGreaterThan(0)
-    tracker.assertNoViolations()
+    await expectTrackedCredentialedRequests(tracker)
+  })
+
+  test('all announcements page API requests include credentials', async ({ page }) => {
+    await disableTutorials(page)
+    await mockAuthenticatedApp(page)
+
+    await page.route('**/api/announcements', async (route) => {
+      await route.fulfill({
+        status: 200,
+        json: [
+          {
+            id: 1,
+            title: 'Welcome',
+            body: 'Hello everyone!',
+            pinned: false,
+            createdAt: '2026-03-16T12:00:00.000Z',
+            author: { id: 1, username: 'admin' },
+          },
+        ],
+      })
+    })
+
+    const tracker = await createCredentialsTracker(page)
+
+    await page.goto('/announcements')
+    await page.waitForTimeout(1000)
+
+    await expectTrackedCredentialedRequests(tracker)
   })
 
   test('search modal API requests include credentials', async ({ page }) => {
@@ -323,22 +325,20 @@ test.describe('P0-4: API credentials guardrail @smoke @regression', () => {
     await mockAuthenticatedApp(page)
     await mockSearchEndpoints(page)
 
-    const tracker = createCredentialsTracker(page)
+    const tracker = await createCredentialsTracker(page)
 
     await page.goto('/sheets')
     await page.waitForTimeout(500)
 
-    // Open the search modal (Ctrl+K or click search)
     await page.keyboard.press('Control+k')
     await page.waitForTimeout(300)
 
-    // Type a search query to trigger API call
     const searchInput = page.locator('input[placeholder*="Search"], input[type="search"]').first()
     if (await searchInput.isVisible().catch(() => false)) {
       await searchInput.fill('recursion')
       await page.waitForTimeout(500)
     }
 
-    tracker.assertNoViolations()
+    await expectTrackedCredentialedRequests(tracker)
   })
 })

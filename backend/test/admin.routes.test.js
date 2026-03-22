@@ -16,6 +16,11 @@ const mocks = vi.hoisted(() => {
     studySheet: {
       count: vi.fn(),
       aggregate: vi.fn(),
+      findUnique: vi.fn(),
+      update: vi.fn(),
+    },
+    feedPost: {
+      count: vi.fn(),
     },
     comment: {
       count: vi.fn(),
@@ -30,6 +35,16 @@ const mocks = vi.hoisted(() => {
       count: vi.fn(),
     },
     reaction: {
+      count: vi.fn(),
+    },
+    moderationCase: {
+      count: vi.fn(),
+      findMany: vi.fn(),
+    },
+    strike: {
+      count: vi.fn(),
+    },
+    appeal: {
       count: vi.fn(),
     },
     emailSuppression: {
@@ -59,6 +74,9 @@ const mocks = vi.hoisted(() => {
     deleteUserAccount: vi.fn(),
     htmlSecurity: {
       validateHtmlForSubmission: vi.fn(() => ({ ok: true, issues: [] })),
+      validateHtmlForRuntime: vi.fn(() => ({ ok: true, issues: [] })),
+      classifyHtmlRisk: vi.fn(() => ({ tier: 0, reasons: [] })),
+      RISK_TIER: { CLEAN: 0, LOW: 1, MEDIUM: 2, HIGH: 3 },
     },
   }
 })
@@ -117,6 +135,11 @@ beforeEach(() => {
   mocks.prisma.note.count.mockResolvedValue(0)
   mocks.prisma.userFollow.count.mockResolvedValue(28)
   mocks.prisma.reaction.count.mockResolvedValue(4)
+  mocks.prisma.feedPost.count.mockResolvedValue(6)
+  mocks.prisma.moderationCase.count.mockResolvedValue(2)
+  mocks.prisma.strike.count.mockResolvedValue(1)
+  mocks.prisma.appeal.count.mockResolvedValue(3)
+  mocks.prisma.moderationCase.findMany.mockResolvedValue([])
 
   mocks.prisma.emailSuppression.count.mockResolvedValue(1)
   mocks.prisma.emailSuppression.findMany.mockResolvedValue([
@@ -306,5 +329,45 @@ describe('admin routes', () => {
     expect(mocks.prisma.emailSuppressionAudit.findMany).toHaveBeenCalledWith(expect.objectContaining({
       where: { suppressionId: 7 },
     }))
+  })
+
+  it('uses req.user.userId (not req.user.id) for reviewedById when reviewing sheets', async () => {
+    mocks.state.role = 'admin'
+
+    mocks.prisma.studySheet.findUnique.mockResolvedValue({
+      id: 100,
+      status: 'pending_review',
+      contentFormat: 'markdown',
+      content: '# Hello',
+      htmlScanFindings: [],
+    })
+    mocks.prisma.studySheet.update.mockResolvedValue({
+      id: 100,
+      status: 'published',
+      reviewedById: 42,
+      author: { id: 10, username: 'sheet_author' },
+      course: null,
+      reviewedBy: { id: 42, username: 'studyhub_owner' },
+    })
+
+    const response = await request(app)
+      .patch('/sheets/100/review')
+      .send({ action: 'approve' })
+
+    expect(response.status).toBe(200)
+    expect(response.body).toMatchObject({
+      message: 'Sheet approved and published.',
+    })
+
+    // The critical assertion: reviewedById must use req.user.userId (42),
+    // not req.user.id (which would be undefined)
+    expect(mocks.prisma.studySheet.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          reviewedById: 42,
+          status: 'published',
+        }),
+      }),
+    )
   })
 })
