@@ -1,10 +1,26 @@
 -- AlterTable: Add new columns to School
-ALTER TABLE "School" ADD COLUMN IF NOT EXISTS "city" TEXT NOT NULL DEFAULT '';
-ALTER TABLE "School" ADD COLUMN IF NOT EXISTS "state" TEXT NOT NULL DEFAULT 'MD';
-ALTER TABLE "School" ADD COLUMN IF NOT EXISTS "schoolType" TEXT NOT NULL DEFAULT 'public';
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='School' AND column_name='city') THEN
+    ALTER TABLE "School" ADD COLUMN "city" TEXT NOT NULL DEFAULT '';
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='School' AND column_name='state') THEN
+    ALTER TABLE "School" ADD COLUMN "state" TEXT NOT NULL DEFAULT 'MD';
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='School' AND column_name='schoolType') THEN
+    ALTER TABLE "School" ADD COLUMN "schoolType" TEXT NOT NULL DEFAULT 'public';
+  END IF;
+END $$;
 
 -- AlterTable: Add department column to Course
-ALTER TABLE "Course" ADD COLUMN IF NOT EXISTS "department" TEXT NOT NULL DEFAULT '';
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Course' AND column_name='department') THEN
+    ALTER TABLE "Course" ADD COLUMN "department" TEXT NOT NULL DEFAULT '';
+  END IF;
+END $$;
 
 -- CreateIndex: Unique constraint on School.short
 DO $$

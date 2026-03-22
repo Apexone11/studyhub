@@ -103,6 +103,7 @@ model StudySheet {
   htmlScanFindings Json?
   htmlScanUpdatedAt DateTime?
   htmlScanAcknowledgedAt DateTime?
+  htmlRiskTier           Int      @default(0)
   htmlOriginalArchivedAt DateTime?
   reviewedById           Int?
   reviewedAt             DateTime?
@@ -141,6 +142,7 @@ model StudySheet {
   @@index([userId, createdAt(sort: Desc)])
   @@index([status, createdAt(sort: Desc)])
   @@index([htmlScanStatus, updatedAt(sort: Desc)])
+  @@index([htmlRiskTier, status, createdAt(sort: Desc)])
 }
 
 model SheetHtmlVersion {

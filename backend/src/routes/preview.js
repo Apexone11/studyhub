@@ -4,6 +4,7 @@ const prisma = require('../lib/prisma')
 const { buildPreviewDocument, buildInteractiveDocument } = require('../lib/htmlPreviewDocument')
 const { verifyHtmlPreviewToken } = require('../lib/previewTokens')
 const { ERROR_CODES, sendError } = require('../middleware/errorEnvelope')
+const { RISK_TIER } = require('../lib/htmlSecurity')
 
 const router = express.Router()
 
@@ -13,7 +14,7 @@ function parseInteger(value) {
 }
 
 /**
- * Strict CSP for interactive (runtime) documents.
+ * Strict CSP for interactive (runtime) documents — Tier 0.
  * - Scripts/styles: inline only (no remote CDN/src)
  * - Images/media/fonts: data: and blob: only (no remote loading)
  * - connect-src 'none': no fetch/XHR/WebSocket
@@ -36,6 +37,11 @@ const RUNTIME_CSP = [
   "base-uri 'none'",
 ].join('; ')
 
+/**
+ * Safe preview CSP for Tier 1 — same as runtime but scripts completely blocked.
+ */
+const SAFE_PREVIEW_CSP = RUNTIME_CSP.replace("script-src 'unsafe-inline'", "script-src 'none'")
+
 const VALID_TOKEN_TYPES = ['html-preview', 'html-runtime']
 
 router.get('/html', async (req, res) => {
@@ -56,6 +62,7 @@ router.get('/html', async (req, res) => {
   const tokenVersion = typeof payload?.version === 'string' ? payload.version : ''
   const allowUnpublished = Boolean(payload?.allowUnpublished)
   const tokenType = VALID_TOKEN_TYPES.includes(payload?.type) ? payload.type : ''
+  const tier = Number.isInteger(payload?.tier) ? payload.tier : 0
 
   if (!tokenType || !sheetId || !tokenVersion) {
     return sendError(res, 403, 'Preview token is invalid or expired.', ERROR_CODES.PREVIEW_TOKEN_INVALID)
@@ -72,6 +79,7 @@ router.get('/html', async (req, res) => {
         content: true,
         contentFormat: true,
         updatedAt: true,
+        htmlRiskTier: true,
       },
     })
 
@@ -88,8 +96,40 @@ router.get('/html', async (req, res) => {
       return sendError(res, 403, 'Preview token is invalid or expired.', ERROR_CODES.PREVIEW_TOKEN_INVALID)
     }
 
+    // Tier 3 (quarantined): always block preview
+    const effectiveTier = Math.max(tier, sheet.htmlRiskTier || 0)
+    if (effectiveTier >= RISK_TIER.QUARANTINED) {
+      return sendError(res, 403, 'This sheet has been quarantined. Preview is disabled.', ERROR_CODES.PREVIEW_TOKEN_INVALID)
+    }
+
+    // Tier 2 (high risk): only serve if allowUnpublished (admin/owner)
+    if (effectiveTier >= RISK_TIER.HIGH_RISK && !allowUnpublished) {
+      return sendError(res, 403, 'This sheet is pending safety review. Preview is disabled.', ERROR_CODES.PREVIEW_TOKEN_INVALID)
+    }
+
     const isRuntime = tokenType === 'html-runtime'
 
+    // Tier 2 for admin: always use sanitized preview (never interactive)
+    if (effectiveTier >= RISK_TIER.HIGH_RISK) {
+      const outputHtml = buildPreviewDocument({ title: sheet.title, html: sheet.content })
+      res.setHeader('Cache-Control', 'private, no-store, max-age=0')
+      res.setHeader('Content-Type', 'text/html; charset=utf-8')
+      res.setHeader('Content-Security-Policy', SAFE_PREVIEW_CSP)
+      return res.status(200).send(outputHtml)
+    }
+
+    // Tier 1 (flagged): use interactive document but with safe CSP (no script execution)
+    if (effectiveTier >= RISK_TIER.FLAGGED) {
+      const outputHtml = isRuntime
+        ? buildInteractiveDocument({ title: sheet.title, html: sheet.content })
+        : buildPreviewDocument({ title: sheet.title, html: sheet.content })
+      res.setHeader('Cache-Control', 'private, no-store, max-age=0')
+      res.setHeader('Content-Type', 'text/html; charset=utf-8')
+      res.setHeader('Content-Security-Policy', SAFE_PREVIEW_CSP)
+      return res.status(200).send(outputHtml)
+    }
+
+    // Tier 0 (clean): current behavior
     const outputHtml = isRuntime
       ? buildInteractiveDocument({ title: sheet.title, html: sheet.content })
       : buildPreviewDocument({ title: sheet.title, html: sheet.content })

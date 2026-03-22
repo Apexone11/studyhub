@@ -115,6 +115,17 @@ function SheetListRow({ sheet, forking, onOpen, onStar, onFork }) {
           <span className={`sh-pill sheets-repo-row__format sheets-repo-row__format--${format}`}>
             {formatBadgeText(format)}
           </span>
+          {sheet.status === 'draft' ? (
+            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--sh-muted)', background: 'var(--sh-soft)', border: '1px solid var(--sh-border)', borderRadius: 6, padding: '1px 6px' }}>Draft</span>
+          ) : sheet.status === 'rejected' ? (
+            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--sh-danger)', background: 'var(--sh-danger-bg)', border: '1px solid var(--sh-danger)', borderRadius: 6, padding: '1px 6px' }}>Rejected</span>
+          ) : sheet.status === 'quarantined' ? (
+            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--sh-danger)', background: 'var(--sh-danger-bg)', border: '1px solid var(--sh-danger)', borderRadius: 6, padding: '1px 6px' }}>Quarantined</span>
+          ) : (sheet.htmlRiskTier || 0) === 1 ? (
+            <span style={{ fontSize: 10, fontWeight: 700, color: '#ca8a04', background: '#fefce8', border: '1px solid #fde68a', borderRadius: 6, padding: '1px 6px' }}>Flagged</span>
+          ) : (sheet.htmlRiskTier || 0) >= 2 || sheet.status === 'pending_review' ? (
+            <span style={{ fontSize: 10, fontWeight: 700, color: '#b45309', background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 6, padding: '1px 6px' }}>Pending Review</span>
+          ) : null}
         </div>
       </div>
 
@@ -630,6 +641,19 @@ export default function SheetsPage() {
                         Clear filters
                       </button>
                     </>
+                  ) : mine ? (
+                    <>
+                      <h2 className="sheets-page__empty-title">No sheets yet</h2>
+                      <p className="sheets-page__empty-copy">
+                        You haven&rsquo;t uploaded any sheets yet. Upload your notes or start with a template.
+                      </p>
+                      <div className="sheets-page__empty-actions">
+                        <Link to="/sheets/upload?new=1" className="sh-btn sh-btn--primary">
+                          <IconUpload size={14} />
+                          Upload a sheet
+                        </Link>
+                      </div>
+                    </>
                   ) : (
                     <>
                       <h2 className="sheets-page__empty-title">Be the first to share for this space</h2>
@@ -665,7 +689,14 @@ export default function SheetsPage() {
                         key={sheet.id}
                         sheet={sheet}
                         forking={forkingSheetId === sheet.id}
-                        onOpen={(sheetId) => navigate(`/sheets/${sheetId}`)}
+                        onOpen={(sheetId) => {
+                          const s = sheetsState.sheets.find((x) => x.id === sheetId)
+                          if (s && s.status === 'draft') {
+                            navigate(`/sheets/upload?draft=${sheetId}`)
+                          } else {
+                            navigate(`/sheets/${sheetId}`)
+                          }
+                        }}
                         onStar={toggleStar}
                         onFork={handleFork}
                       />

@@ -1,9 +1,19 @@
-ALTER TABLE "StudySheet"
-ADD COLUMN IF NOT EXISTS "attachmentName" TEXT,
-ADD COLUMN IF NOT EXISTS "allowDownloads" BOOLEAN NOT NULL DEFAULT true;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='StudySheet' AND column_name='attachmentName') THEN
+    ALTER TABLE "StudySheet" ADD COLUMN "attachmentName" TEXT;
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='StudySheet' AND column_name='allowDownloads') THEN
+    ALTER TABLE "StudySheet" ADD COLUMN "allowDownloads" BOOLEAN NOT NULL DEFAULT true;
+  END IF;
+END $$;
 
-ALTER TABLE "Notification"
-ADD COLUMN IF NOT EXISTS "linkPath" TEXT;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Notification' AND column_name='linkPath') THEN
+    ALTER TABLE "Notification" ADD COLUMN "linkPath" TEXT;
+  END IF;
+END $$;
 
 CREATE TABLE "FeedPost" (
     "id" SERIAL NOT NULL,

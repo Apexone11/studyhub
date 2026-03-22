@@ -1,6 +1,14 @@
 -- Add missing StudySheet upload columns expected by the current schema.
-ALTER TABLE "StudySheet" ADD COLUMN IF NOT EXISTS "attachmentUrl" TEXT;
-ALTER TABLE "StudySheet" ADD COLUMN IF NOT EXISTS "attachmentType" TEXT;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='StudySheet' AND column_name='attachmentUrl') THEN
+    ALTER TABLE "StudySheet" ADD COLUMN "attachmentUrl" TEXT;
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='StudySheet' AND column_name='attachmentType') THEN
+    ALTER TABLE "StudySheet" ADD COLUMN "attachmentType" TEXT;
+  END IF;
+END $$;
 
 -- Comments on study sheets.
 CREATE TABLE IF NOT EXISTS "Comment" (
