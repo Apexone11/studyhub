@@ -2,7 +2,6 @@ const express = require('express')
 const { captureError } = require('../monitoring/sentry')
 const prisma = require('../lib/prisma')
 const { buildPreviewDocument } = require('../lib/htmlPreviewDocument')
-const { validateHtmlForSubmission } = require('../lib/htmlSecurity')
 const { verifyHtmlPreviewToken } = require('../lib/previewTokens')
 const { ERROR_CODES, sendError } = require('../middleware/errorEnvelope')
 
@@ -62,17 +61,6 @@ router.get('/html', async (req, res) => {
     const canReadUnpublished = allowUnpublished || Number(sheet.userId) === userId
     if (sheet.status !== 'published' && !canReadUnpublished) {
       return sendError(res, 403, 'Preview token is invalid or expired.', ERROR_CODES.PREVIEW_TOKEN_INVALID)
-    }
-
-    const validation = validateHtmlForSubmission(sheet.content)
-    if (!validation.ok) {
-      return sendError(
-        res,
-        400,
-        'HTML preview blocked by security checks.',
-        ERROR_CODES.PREVIEW_HTML_BLOCKED,
-        { issues: validation.issues },
-      )
     }
 
     const previewHtml = buildPreviewDocument({

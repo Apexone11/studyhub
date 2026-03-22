@@ -27,6 +27,7 @@ export default function SheetHtmlPreviewPage() {
   const { id } = useParams()
   const sheetId = Number.parseInt(id, 10)
   const [state, setState] = useState({ loading: true, error: '', preview: null })
+  const [isFullscreen, setIsFullscreen] = useState(false)
 
   const loadPreview = useCallback(async () => {
     if (!Number.isInteger(sheetId)) {
@@ -95,6 +96,13 @@ export default function SheetHtmlPreviewPage() {
                 <Link to={`/sheets/${sheetId}`} style={buttonStyle()}>
                   Open sheet
                 </Link>
+                <button
+                  type="button"
+                  onClick={() => setIsFullscreen((v) => !v)}
+                  style={buttonStyle()}
+                >
+                  {isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+                </button>
               </div>
             </div>
           </section>
@@ -120,13 +128,63 @@ export default function SheetHtmlPreviewPage() {
                   <span><strong>Updated:</strong> {new Date(state.preview.updatedAt).toLocaleString()}</span>
                 </div>
               </section>
-              <section style={{ ...panelStyle(), padding: 0, overflow: 'hidden' }}>
+
+              {state.preview?.sanitized ? (
+                <section style={{ ...panelStyle(), borderColor: '#fde68a', background: '#fffbeb' }}>
+                  <div style={{ fontSize: 13, color: '#92400e', fontWeight: 800 }}>
+                    Sanitized preview
+                  </div>
+                  <div style={{ fontSize: 12, color: '#92400e', marginTop: 6, lineHeight: 1.6 }}>
+                    We removed unsafe HTML (scripts/iframes/etc) to keep preview safe. Fix the findings in the editor for a clean scan.
+                  </div>
+                  {Array.isArray(state.preview.issues) && state.preview.issues.length ? (
+                    <ul style={{ marginTop: 10, paddingLeft: 18, color: '#92400e', fontSize: 12, lineHeight: 1.6 }}>
+                      {state.preview.issues.slice(0, 8).map((issue, idx) => (
+                        <li key={idx}>{issue?.message || String(issue)}</li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </section>
+              ) : null}
+
+              <section
+                style={
+                  isFullscreen
+                    ? {
+                        position: 'fixed',
+                        inset: 0,
+                        zIndex: 9999,
+                        background: '#0b1220',
+                        padding: 12,
+                        display: 'grid',
+                        gridTemplateRows: '48px 1fr',
+                        gap: 10,
+                      }
+                    : { ...panelStyle(), padding: 0, overflow: 'hidden' }
+                }
+              >
+                {isFullscreen ? (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#fff' }}>
+                    <div style={{ fontWeight: 800 }}>HTML Preview</div>
+                    <button type="button" onClick={() => setIsFullscreen(false)} style={{ ...buttonStyle(), borderColor: '#334155' }}>
+                      Exit fullscreen
+                    </button>
+                  </div>
+                ) : null}
+
                 <iframe
                   title={`html-sheet-preview-${sheetId}`}
                   sandbox=""
                   referrerPolicy="no-referrer"
                   src={state.preview.previewUrl || ''}
-                  style={{ width: '100%', height: '80vh', border: 'none', background: '#fff' }}
+                  style={{
+                    width: '100%',
+                    height: isFullscreen ? '100%' : 'calc(100vh - 260px)',
+                    minHeight: isFullscreen ? 'unset' : 700,
+                    border: 'none',
+                    background: '#fff',
+                    borderRadius: isFullscreen ? 12 : 0,
+                  }}
                 />
               </section>
             </>
@@ -149,5 +207,6 @@ function buttonStyle() {
     fontSize: 12,
     fontWeight: 700,
     textDecoration: 'none',
+    cursor: 'pointer',
   }
 }

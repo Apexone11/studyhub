@@ -344,7 +344,7 @@ export default function UploadSheetPage() {
         setScanState((prev) => reduceScanState(prev, data))
 
         const normalizedStatus = String(data.status || '').toLowerCase()
-        if (!scanModalDismissed && ['queued', 'running', 'failed'].includes(normalizedStatus)) {
+        if (!scanModalDismissed && normalizedStatus === 'failed') {
           setShowScanModal(true)
         }
       } catch {
@@ -637,7 +637,7 @@ export default function UploadSheetPage() {
       if (data.scan) {
         setScanState((prev) => reduceScanState(prev, data.scan))
       }
-      setShowScanModal(true)
+      showToast('Security scan started. We\'ll show details only if something is flagged.', 'info')
       setScanModalDismissed(false)
       setSaved(true)
       setHasUnsavedChanges(false)
