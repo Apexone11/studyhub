@@ -7,6 +7,7 @@ import {
   clearAuthenticatedUser
 } from './lib/telemetry'
 import { useBootstrapPreferences } from './lib/useBootstrapPreferences'
+import { useIdleTimeout } from './lib/useIdleTimeout'
 import RouteErrorBoundary from './components/RouteErrorBoundary'
 import { getAuthenticatedHomePath } from './lib/authNavigation'
 import { SessionProvider, useSession } from './lib/session-context'
@@ -130,6 +131,9 @@ function RouteTelemetry() {
  */
 function PreferencesBootstrap() {
   useBootstrapPreferences()
+
+  const { isAuthenticated, signOut } = useSession()
+  useIdleTimeout(() => { void signOut() }, { enabled: isAuthenticated, timeoutMs: 30 * 60 * 1000 })
 
   return null
 }

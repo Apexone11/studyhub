@@ -1,6 +1,6 @@
 # StudyHub Design Specifications
 
-Per-page design specs for the v1.5.0 responsive redesign.
+Per-page design specs for the v1.5.0-beta responsive redesign.
 Direction: Clean Academic Pro - subtle, purposeful, accessible.
 
 ---

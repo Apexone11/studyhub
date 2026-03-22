@@ -5,6 +5,7 @@ const FONT_SIZE_MAP = {
 }
 
 export const APPEARANCE_STORAGE_KEY = 'studyhub_prefs'
+const GLOBAL_THEME_KEY = 'sh-theme'
 
 function getAppearanceStorageKey(userId) {
   if (!userId) {
@@ -140,5 +141,26 @@ export function clearLegacyCachedAppearancePreferences() {
     window.localStorage.removeItem(APPEARANCE_STORAGE_KEY)
   } catch {
     /* ignore */
+  }
+}
+
+/**
+ * Global (user-agnostic) theme persistence.
+ * Survives logout so unauthenticated pages keep the last chosen theme.
+ */
+export function writeGlobalTheme(theme) {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(GLOBAL_THEME_KEY, theme)
+  } catch { /* ignore */ }
+}
+
+export function applyGlobalTheme() {
+  if (typeof window === 'undefined') return
+  try {
+    const stored = window.localStorage.getItem(GLOBAL_THEME_KEY)
+    applyTheme(stored || 'system')
+  } catch {
+    applyTheme('system')
   }
 }

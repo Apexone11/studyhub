@@ -31,5 +31,8 @@
     "ci:lighthouse": "npm --prefix frontend/studyhub-app run build && npx --yes @lhci/cli@latest autorun --config frontend/studyhub-app/lighthouse.config.js",
     "ci:a11y": "echo 'Run a11y audit with: npx axe-cli http://localhost:4173'",
     "ci:quality": "npm run lint && npm run build && npm run test"
+  },
+  "overrides": {
+    "effect": "~3.21.0"
   }
 }

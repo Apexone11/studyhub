@@ -46,7 +46,7 @@ Backend:
 - The sheets page uses `GET /api/sheets` with query params like `search`, `schoolId`, `courseId`, `mine`, `starred`, and `sort`.
 - The global search modal uses `GET /api/search?q=...&type=all&limit=...`.
 - User profile visibility is enforced through `backend/src/lib/profileVisibility.js` and reused by both `backend/src/routes/users.js` and `backend/src/routes/search.js`.
-- As of the current v1.5.0 behavior, login issues a session directly. Login is no longer gated on email verification or 2FA during the login flow.
+- As of the current v1.5.0-beta behavior, login issues a session directly. Login is no longer gated on email verification or 2FA during the login flow.
 
 ## Repo Workflow Conventions
 

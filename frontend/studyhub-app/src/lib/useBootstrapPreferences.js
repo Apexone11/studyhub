@@ -2,10 +2,11 @@ import { useEffect, useRef } from 'react'
 import { API } from '../config'
 import {
   applyAppearancePreferences,
+  applyGlobalTheme,
   clearLegacyCachedAppearancePreferences,
   readCachedAppearancePreferences,
-  resetAppearancePreferences,
   writeCachedAppearancePreferences,
+  writeGlobalTheme,
 } from './appearance'
 import { useSession } from './session-context'
 
@@ -21,7 +22,7 @@ export function useBootstrapPreferences() {
       bootstrappedUserIdRef.current = ''
       requestIdRef.current += 1
       clearLegacyCachedAppearancePreferences()
-      resetAppearancePreferences()
+      applyGlobalTheme()
       return
     }
 
@@ -55,6 +56,7 @@ export function useBootstrapPreferences() {
 
         applyAppearancePreferences(appearancePreferences)
         writeCachedAppearancePreferences(appearancePreferences, userId)
+        if (appearancePreferences.theme) writeGlobalTheme(appearancePreferences.theme)
       })
       .catch(() => {})
   }, [isAuthenticated, user?.id])

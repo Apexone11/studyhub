@@ -7,9 +7,9 @@ function TermsPage() {
     <LegalPageLayout
       tone="blue"
       title="Terms of Use"
-      updated="Last updated: March 2026"
-      summary="The rules for using StudyHub responsibly, contributing content, and understanding how the platform is provided."
-      intro="StudyHub is a student-built, open-source platform. By using it, you agree to these terms. If you disagree, please do not use the platform."
+      updated="Effective Date: March 2026"
+      summary="By using StudyHub, you agree to these Terms. If you disagree, please do not use the platform."
+      intro="StudyHub provides student-generated study materials, tools, and collaboration features. These terms govern your use of the platform."
       icon={<IconInfoCircle size={26} />}
     >
       <LegalSection title="1. Who Can Use StudyHub">
@@ -17,42 +17,52 @@ function TermsPage() {
           StudyHub is open to any student, educator, or learner. You must be at least 13 years old to create an account.
           By registering, you confirm that you meet this requirement.
         </p>
+        <p>Jurisdiction: Maryland, USA.</p>
       </LegalSection>
 
-      <LegalSection title="2. Your Account">
+      <LegalSection title="2. Accounts">
         <p>
-          You are responsible for keeping your username and password secure. Do not share your credentials. You are
-          responsible for all activity that happens under your account. If you believe your account has been compromised,
-          contact an administrator immediately at{' '}
+          You must provide accurate account information. You are responsible for all activity on your account.
+          If you believe your account has been compromised, contact an administrator immediately at{' '}
           <a href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>.
         </p>
       </LegalSection>
 
-      <LegalSection title="3. Content You Upload">
-        <p>When you upload study sheets, practice tests, notes, or any other content to StudyHub, you agree that:</p>
+      <LegalSection title="3. Email Verification">
+        <p>
+          Verification protects StudyHub from abuse and ensures a safe environment.
+          StudyHub requires a verified email address to use write features such as uploading sheets, posting comments,
+          creating notes, forking sheets, and proposing contributions.
+        </p>
         <ul className="legal-list">
-          <li>The content is your own original work or is properly attributed.</li>
-          <li>You are not violating any copyright or intellectual property rights.</li>
-          <li>You are not uploading content from textbooks, commercial sources, or publishers without explicit permission.</li>
-          <li>You grant StudyHub a non-exclusive license to display your content to other users on the platform.</li>
+          <li>New accounts receive a <strong>3-day grace period</strong> during which all features are available without verification.</li>
+          <li>After the grace period, unverified accounts are limited to read-only access (browsing, viewing, and searching).</li>
+          <li>You can verify your email at any time from <strong>Settings &rarr; Account</strong> by requesting a verification code and entering the 6-digit code sent to your email.</li>
+        </ul>
+      </LegalSection>
+
+      <LegalSection title="4. Acceptable Use">
+        <p>You agree not to:</p>
+        <ul className="legal-list">
+          <li>Upload malicious, harmful, or deceptive content.</li>
+          <li>Attempt to bypass platform safeguards.</li>
+          <li>Interfere with other users or the service.</li>
+        </ul>
+      </LegalSection>
+
+      <LegalSection title="5. User Content">
+        <p>
+          You retain ownership of content you upload. You grant StudyHub a license to host and display it within the platform.
+          You are responsible for the content you submit.
+        </p>
+        <ul className="legal-list">
+          <li>The content must be your own original work or properly attributed.</li>
+          <li>You must not violate any copyright or intellectual property rights.</li>
           <li>You can request removal of your content at any time.</li>
         </ul>
       </LegalSection>
 
-      <LegalSection title="4. Prohibited Content">
-        <p>You may not upload or post content that:</p>
-        <ul className="legal-list">
-          <li>Contains malicious code, scripts, or anything designed to harm users.</li>
-          <li>Harasses, bullies, or targets other users.</li>
-          <li>Is sexually explicit or otherwise inappropriate.</li>
-          <li>Promotes violence, discrimination, or hate.</li>
-          <li>Violates any applicable law.</li>
-          <li>Is designed to cheat or deceive other students academically.</li>
-        </ul>
-        <p>Violations can result in content removal and account suspension.</p>
-      </LegalSection>
-
-      <LegalSection title="5. HTML File Safety">
+      <LegalSection title="6. HTML File Safety">
         <p>StudyHub allows users to upload HTML files for study sheets and practice tests. All uploaded HTML files are:</p>
         <ul className="legal-list">
           <li>Run inside a sandboxed environment that cannot access your account data.</li>
@@ -62,24 +72,17 @@ function TermsPage() {
         <p>Never upload HTML files designed to steal data, redirect users, or perform any action outside the study content itself.</p>
       </LegalSection>
 
-      <LegalSection title="6. Downloads">
+      <LegalSection title="7. Suspension &amp; Removal">
         <p>
-          StudyHub allows users to download study materials for personal offline use. Downloaded content remains subject to the
-          original contributor&apos;s rights. You may not redistribute downloaded content as your own work.
+          We may suspend or remove accounts or content that violate these terms or pose a security risk.
+          Appeals can be made by emailing <a href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>.
         </p>
       </LegalSection>
 
-      <LegalSection title="7. Open Source">
+      <LegalSection title="8. Disclaimers">
         <p>
-          StudyHub&apos;s codebase is open source under the MIT License. You are free to inspect, fork, and contribute to the code on
-          GitHub. The MIT License applies to the code only, not to user-submitted content.
-        </p>
-      </LegalSection>
-
-      <LegalSection title="8. No Warranty">
-        <p>
-          StudyHub is provided as-is by student developers. We make no guarantees about uptime, accuracy of content, or fitness for
-          any particular purpose. Study materials are user-generated and have not been verified by educators.
+          StudyHub is provided &quot;as-is&quot; without warranties. We do not guarantee uninterrupted access.
+          Study materials are user-generated and have not been verified by educators.
         </p>
       </LegalSection>
 
@@ -92,8 +95,7 @@ function TermsPage() {
 
       <LegalSection title="10. Contact">
         <p>
-          For questions about these terms, email{' '}
-          <a href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>.
+          Questions about these terms: <a href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>.
         </p>
       </LegalSection>
     </LegalPageLayout>

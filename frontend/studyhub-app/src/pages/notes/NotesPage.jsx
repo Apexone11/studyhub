@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════════
  * NotesPage.jsx — Personal markdown notes with split-panel editor
  *
- * Redesigned v1.5.1:
+ * Redesigned v1.5.0:
  *   - Light-themed editor (no more dark background)
  *   - Markdown formatting toolbar (bold, italic, heading, list, code, link)
  *   - Real markdown-to-HTML preview via marked + DOMPurify

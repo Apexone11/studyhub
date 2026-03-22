@@ -43,6 +43,16 @@
       gtag('config', 'AW-18019301841');
     </script>
     <title>StudyHub</title>
+    <script>
+      // Apply saved theme before React mounts to prevent light-mode flash
+      (function() {
+        try {
+          var t = localStorage.getItem('sh-theme') || 'system';
+          var dark = t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (dark) document.documentElement.setAttribute('data-theme', 'dark');
+        } catch(e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -14,17 +14,36 @@ This document tracks security measures, policies, and the algorithm protection s
 - **Account lockout**: failedAttempts tracking with lockedUntil timestamp
 - **CORS**: Origin whitelist with auto www/non-www expansion
 
+### CSRF Protection
+- **CSRF tokens**: Signed JWT bound to authenticated user, validated via `x-csrf-token` header
+- **Auth bootstrap exclusion**: `/api/auth/login`, `/api/auth/google`, `/api/auth/register` skip CSRF checks (these routes establish sessions and cannot have a valid CSRF token yet)
+
+### Email Verification Enforcement (2026-03-21)
+- **Grace period**: 3 days from `user.createdAt` — all features available during grace
+- **After grace**: Unverified users blocked from write actions (comments, uploads, drafts, submit-review, fork, contributions, notes)
+- **Allowed without verification**: Browse, read, view, search, star, react
+- **Response**: 403 with `code: 'EMAIL_NOT_VERIFIED'`
+- **Guarded routes**: 9 endpoints in sheets.js + 2 in notes.js
+
 ### Removed
-- Two-step verification (2FA) - Removed in v1.5.0 Cycle 8
-- Email verification gate - Removed in v1.5.0 Cycle 13 (registration is username + password only; Google handles its own verification)
+- Two-step verification (2FA) - Removed in v1.5.0-beta Cycle 8
+- Email verification login gate - Removed in v1.5.0-beta Cycle 13, replaced with post-login soft-gate with 3-day grace period (2026-03-21)
 
 ---
 
 ## Content Security
 
-### HTML Scanner
-- Forbidden tags: script, iframe, object, embed, form, link, style, meta, base, applet, svg
-- DOMPurify sanitization on all user HTML content
+### HTML Security (Updated 2026-03-21)
+
+- **Submission validation** (`validateHtmlForSubmission`): Blocks all scripts, forbidden tags (script, iframe, object, embed, form, link, style, meta, base, applet, svg)
+- **Runtime validation** (`validateHtmlForRuntime`): Allows inline scripts, blocks `<script src>`, remote assets (http/https in src/href/srcset), CSS url()/@import, `<base>`, `<meta refresh>`
+- **Risk scanning** (`scanInlineJsRisk`): Reports network keywords (fetch, XMLHttpRequest, WebSocket) and eval/obfuscation patterns — flags but does not block
+- **Dual document model**: `buildPreviewDocument` (sanitized, strips all scripts) vs `buildInteractiveDocument` (preserves inline scripts, strips dangerous tags)
+- **CSP headers** on runtime documents: `script-src 'unsafe-inline'`, `connect-src 'none'`, `form-action 'none'`, all remote loading blocked
+- **Iframe sandbox**: `allow-scripts` only (no same-origin, no popups, no forms, no modals)
+- **Warning gate**: Per-sheet localStorage acknowledgment before loading interactive HTML
+- **Admin review**: High-risk sheets trigger email alerts + in-app notifications to admins
+- DOMPurify sanitization on preview HTML content
 - sanitize-html on backend for additional validation
 
 ### Upload Security
@@ -33,7 +52,7 @@ This document tracks security measures, policies, and the algorithm protection s
 - Sharp for image processing (strips EXIF data)
 - HTML security scan on sheet content
 
-### Planned (v1.5.0+)
+### Planned (v1.5.0-beta+)
 - MIME + magic-byte verification
 - Quarantine path for suspicious uploads
 - AV/CDR pipeline for risky file classes

@@ -18,6 +18,7 @@ import { useSession } from '../../lib/session-context'
 import { useTutorial } from '../../lib/useTutorial'
 import { PROFILE_STEPS } from '../../lib/tutorialSteps'
 import { fadeInUp, staggerEntrance } from '../../lib/animations'
+import AvatarCropModal from '../../components/AvatarCropModal'
 import { showToast } from '../../lib/toast'
 import { usePageTitle } from '../../lib/usePageTitle'
 
@@ -31,7 +32,7 @@ export default function UserProfilePage() {
   const { username } = useParams()
   usePageTitle(username ? `${username}'s Profile` : 'Profile')
   const navigate = useNavigate()
-  const { user: currentUser, isAuthenticated } = useSession()
+  const { user: currentUser, isAuthenticated, setSessionUser } = useSession()
 
   /* ── State ───────────────────────────────────────────────────────────── */
   const [profile, setProfile] = useState(null)
@@ -45,6 +46,7 @@ export default function UserProfilePage() {
   const [followListLoading, setFollowListLoading] = useState(false)
 
   const isOwnProfile = currentUser?.username === username
+  const [showAvatarCrop, setShowAvatarCrop] = useState(false)
   const tutorial = useTutorial('profile', PROFILE_STEPS)
   const profileCardRef = useRef(null)
   const columnsRef = useRef(null)
@@ -165,21 +167,43 @@ export default function UserProfilePage() {
         <div ref={profileCardRef} style={{ background: '#fff', borderRadius: 18, border: '1px solid #e2e8f0', padding: 'clamp(20px, 3vw, 28px)', marginBottom: 20, boxShadow: '0 2px 10px rgba(15,23,42,0.05)' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'clamp(14px, 2vw, 20px)', flexWrap: 'wrap' }}>
             {/* Avatar — responsive sizing via clamp */}
-            <div style={{
-              width: 'clamp(56px, 8vw, 80px)',
-              height: 'clamp(56px, 8vw, 80px)',
-              borderRadius: '50%',
-              background: '#0f172a',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-              overflow: 'hidden',
-            }}>
+            <div
+              data-tutorial="profile-avatar"
+              style={{
+                position: 'relative',
+                width: 'clamp(56px, 8vw, 80px)',
+                height: 'clamp(56px, 8vw, 80px)',
+                borderRadius: '50%',
+                background: 'var(--sh-avatar-bg)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                overflow: 'hidden',
+                cursor: isOwnProfile ? 'pointer' : 'default',
+              }}
+              onClick={isOwnProfile ? () => setShowAvatarCrop(true) : undefined}
+              role={isOwnProfile ? 'button' : undefined}
+              tabIndex={isOwnProfile ? 0 : undefined}
+              onKeyDown={isOwnProfile ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowAvatarCrop(true) } } : undefined}
+              aria-label={isOwnProfile ? 'Upload profile photo' : undefined}
+            >
               {profile.avatarUrl
                 ? <img src={profile.avatarUrl.startsWith('http') ? profile.avatarUrl : `${API}${profile.avatarUrl}`} alt={profile.username} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
-                : <span style={{ fontSize: 'clamp(20px, 3vw, 28px)', fontWeight: 800, color: '#fff' }}>{initials}</span>
+                : <span style={{ fontSize: 'clamp(20px, 3vw, 28px)', fontWeight: 800, color: 'var(--sh-avatar-text)' }}>{initials}</span>
               }
+              {isOwnProfile && (
+                <div style={{
+                  position: 'absolute', inset: 0, borderRadius: '50%',
+                  background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  opacity: 0, transition: 'opacity 0.15s',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.opacity = '1' }}
+                onMouseLeave={(e) => { e.currentTarget.style.opacity = '0' }}
+                >
+                  <i className="fa-solid fa-camera" style={{ color: '#fff', fontSize: 'clamp(14px, 2vw, 18px)' }} />
+                </div>
+              )}
             </div>
 
             {/* Info column */}
@@ -421,13 +445,13 @@ export default function UserProfilePage() {
                     onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
                   >
                     <div style={{
-                      width: 38, height: 38, borderRadius: '50%', background: '#0f172a',
+                      width: 38, height: 38, borderRadius: '50%', background: 'var(--sh-avatar-bg)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       flexShrink: 0, overflow: 'hidden',
                     }}>
                       {u.avatarUrl
                         ? <img src={u.avatarUrl.startsWith('http') ? u.avatarUrl : `${API}${u.avatarUrl}`} alt={u.username} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
-                        : <span style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>{u.username.slice(0, 2).toUpperCase()}</span>
+                        : <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--sh-avatar-text)' }}>{u.username.slice(0, 2).toUpperCase()}</span>
                       }
                     </div>
                     <div>
@@ -442,6 +466,15 @@ export default function UserProfilePage() {
             </div>
           </div>
         </div>
+      )}
+      {showAvatarCrop && (
+        <AvatarCropModal
+          onClose={() => setShowAvatarCrop(false)}
+          onUploaded={(avatarUrl) => {
+            setProfile((p) => ({ ...p, avatarUrl }))
+            setSessionUser((u) => u ? { ...u, avatarUrl } : u)
+          }}
+        />
       )}
     </div>
   )

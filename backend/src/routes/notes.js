@@ -2,6 +2,7 @@ const express = require('express')
 const rateLimit = require('express-rate-limit')
 const { assertOwnerOrAdmin } = require('../lib/accessControl')
 const requireAuth = require('../middleware/auth')
+const requireVerifiedEmail = require('../middleware/requireVerifiedEmail')
 const { captureError } = require('../monitoring/sentry')
 const prisma = require('../lib/prisma')
 
@@ -52,7 +53,7 @@ router.get('/', async (req, res) => {
 })
 
 // ── POST /api/notes ────────────────────────────────────────────
-router.post('/', mutateLimiter, async (req, res) => {
+router.post('/', mutateLimiter, requireVerifiedEmail, async (req, res) => {
   const { title, content, courseId, private: priv } = req.body || {}
   const trimmedTitle = typeof title === 'string' ? title.trim() : ''
 
@@ -78,7 +79,7 @@ router.post('/', mutateLimiter, async (req, res) => {
 })
 
 // ── PATCH /api/notes/:id ───────────────────────────────────────
-router.patch('/:id', mutateLimiter, async (req, res) => {
+router.patch('/:id', mutateLimiter, requireVerifiedEmail, async (req, res) => {
   const noteId = parseInt(req.params.id)
   try {
     const note = await prisma.note.findUnique({ where: { id: noteId } })

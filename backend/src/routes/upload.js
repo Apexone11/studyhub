@@ -23,7 +23,7 @@ const router = express.Router()
 // ── Allowed types ─────────────────────────────────────────────
 const AVATAR_ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
 const AVATAR_ALLOWED_EXT  = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif'])
-const AVATAR_MAX_BYTES    = 2 * 1024 * 1024   // 2 MB
+const AVATAR_MAX_BYTES    = 5 * 1024 * 1024   // 5 MB
 
 const ATTACHMENT_ALLOWED_MIME = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'image/webp'])
 const ATTACHMENT_ALLOWED_EXT  = new Set(['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.webp'])
@@ -86,7 +86,7 @@ const avatarUpload = multer({
 router.post('/avatar', requireAuth, avatarUploadLimiter, (req, res) => {
   avatarUpload.single('avatar')(req, res, async (err) => {
     if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
-      return sendError(res, 400, 'Avatar must be 2 MB or smaller.', ERROR_CODES.UPLOAD_INVALID)
+      return sendError(res, 400, 'Avatar must be 5 MB or smaller.', ERROR_CODES.UPLOAD_INVALID)
     }
     if (err) return sendError(res, 400, err.message, ERROR_CODES.UPLOAD_INVALID)
     if (!req.file) return sendError(res, 400, 'No file uploaded.', ERROR_CODES.UPLOAD_MISSING_FILE)

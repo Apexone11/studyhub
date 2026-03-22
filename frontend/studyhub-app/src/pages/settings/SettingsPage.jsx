@@ -116,7 +116,7 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', background: '#edf0f5', fontFamily: FONT }}>
+      <div style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: FONT }}>
         <Navbar crumbs={[{ label: 'Settings', to: '/settings' }]} hideTabs />
         <div style={{ maxWidth: 1180, margin: '0 auto', padding: '28px 24px 60px' }}>
           <div style={{ display: 'grid', gap: 12 }}>
@@ -132,7 +132,7 @@ export default function SettingsPage() {
   function renderTab() {
     switch (tab) {
       case 'profile':
-        return <ProfileTab user={user} sessionUser={sessionUser} />
+        return <ProfileTab user={user} sessionUser={sessionUser} onAvatarChange={(url) => { setUser((u) => u ? { ...u, avatarUrl: url } : u); setSessionUser((u) => u ? { ...u, avatarUrl: url } : u) }} />
       case 'security':
         return (
           <SecurityTab
@@ -173,8 +173,8 @@ export default function SettingsPage() {
     <button
       onClick={() => signOut().then(() => navigate('/login', { replace: true }))}
       style={{
-        padding: '6px 14px', borderRadius: 8, border: '1px solid #334155',
-        background: 'transparent', color: '#94a3b8', fontSize: 12, fontWeight: 700,
+        padding: '6px 14px', borderRadius: 8, border: '1px solid var(--sh-border)',
+        background: 'transparent', color: 'var(--sh-muted)', fontSize: 12, fontWeight: 700,
         cursor: 'pointer', fontFamily: FONT,
       }}
     >
@@ -183,7 +183,7 @@ export default function SettingsPage() {
   )
 
   return (
-    <div style={{ minHeight: '100vh', background: '#edf0f5', fontFamily: FONT }}>
+    <div style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: FONT }}>
       <Navbar crumbs={[{ label: 'Settings', to: '/settings' }]} hideTabs actions={navActions} />
 
       <div className="settings-layout" style={{ maxWidth: 1180, margin: '0 auto', padding: '28px 24px 60px' }}>
@@ -203,12 +203,12 @@ export default function SettingsPage() {
                   marginBottom: 4,
                   borderRadius: 10,
                   border: 'none',
-                  background: tab === item.id ? '#fff' : 'transparent',
-                  color: tab === item.id ? '#0f172a' : '#64748b',
+                  background: tab === item.id ? 'var(--sh-surface)' : 'transparent',
+                  color: tab === item.id ? 'var(--sh-heading)' : 'var(--sh-muted)',
                   fontSize: 14,
                   fontWeight: tab === item.id ? 700 : 500,
                   cursor: 'pointer',
-                  boxShadow: tab === item.id ? '0 2px 10px rgba(15, 23, 42, 0.05)' : 'none',
+                  boxShadow: tab === item.id ? 'var(--shadow-sm)' : 'none',
                   fontFamily: 'inherit',
                 }}
               >
