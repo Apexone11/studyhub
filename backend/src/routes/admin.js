@@ -399,9 +399,8 @@ router.patch('/sheets/:id/review', async (req, res) => {
   if (!['approve', 'reject'].includes(action)) {
     return res.status(400).json({ error: 'Action must be "approve" or "reject".' })
   }
-  if (!reason) {
-    return res.status(400).json({ error: 'A review reason is required.' })
-  }
+  const effectiveReason = reason
+    || (action === 'approve' ? 'Approved by admin.' : 'Rejected by admin (quick reject).')
 
   try {
     const current = await prisma.studySheet.findUnique({
@@ -435,7 +434,7 @@ router.patch('/sheets/:id/review', async (req, res) => {
         status: nextStatus,
         reviewedById: req.user.id,
         reviewedAt: new Date(),
-        reviewReason: reason,
+        reviewReason: effectiveReason,
         reviewFindingsSnapshot: current.htmlScanFindings || [],
       },
       include: {

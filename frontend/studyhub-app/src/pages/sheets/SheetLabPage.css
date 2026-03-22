@@ -538,7 +538,7 @@
   width: 56px;
   height: 56px;
   border-radius: 14px;
-  background: linear-gradient(135deg, #e0e7ff, #c7d2fe);
+  background: linear-gradient(135deg, var(--sh-soft, #e0e7ff), var(--sh-border, #c7d2fe));
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -574,6 +574,7 @@
 
 .sheet-lab__modal {
   background: var(--sh-surface, #fff);
+  border: 1px solid var(--sh-border, #e2e8f0);
   border-radius: 18px;
   padding: 28px;
   width: 100%;
