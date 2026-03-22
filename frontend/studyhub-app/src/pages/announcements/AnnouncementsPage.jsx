@@ -56,7 +56,7 @@ export default function AnnouncementsPage() {
   /* ── Live polling (20s interval) ─────────────────────────────────────── */
   async function loadAnnouncements({ signal, startTransition } = {}) {
     try {
-      const response = await fetch(`${API}/api/announcements`, { signal })
+      const response = await fetch(`${API}/api/announcements`, { signal, credentials: 'include' })
       if (!response.ok) return
       const data = await response.json()
       startTransition(() => {
@@ -83,6 +83,7 @@ export default function AnnouncementsPage() {
       const response = await fetch(`${API}/api/announcements`, {
         method: 'POST',
         headers: authHeaders(),
+        credentials: 'include',
         body: JSON.stringify({ title: title.trim(), body: body.trim(), pinned }),
       })
       const data = await response.json()

@@ -1239,6 +1239,50 @@ Cycle 24 Deferred-Risk Notes
 
 ---
 
+Cycle 25 - Admin Review Identity Fix + Credentialed Fetch Guardrails [2026-03-22]
+
+Fixed:
+
+- Admin sheet review now records the correct reviewer identity:
+  - `backend/src/routes/admin.js`
+  - `reviewedById` now uses `req.user.userId` instead of `req.user.id`, which fixes review attribution and avoids writing `undefined` during approve/reject flows.
+
+Changed:
+
+- Strengthened admin route regression coverage to match the current stats route contract:
+  - `backend/test/admin.routes.test.js`
+  - Added missing Prisma mocks for feed and moderation counters used by `/api/admin/stats`.
+  - Added a focused regression asserting that sheet review writes `reviewedById` from `req.user.userId`.
+- Added frontend unit coverage for split-origin credential behavior:
+  - `frontend/studyhub-app/src/pages/announcements/AnnouncementsPage.test.jsx`
+  - `frontend/studyhub-app/src/pages/auth/ResetPasswordPage.test.jsx`
+  - New tests assert that announcements page fetches and reset-password submission include `credentials: 'include'`.
+
+Cycle 25 Validation Commands (Executed)
+
+- `npm --prefix backend run test -- test/admin.routes.test.js test/announcements.routes.test.js test/feed.routes.test.js test/notes.routes.test.js test/notifications.routes.test.js test/settings.routes.test.js test/users.routes.test.js`
+- `npm --prefix frontend/studyhub-app run test -- src/pages/announcements/AnnouncementsPage.test.jsx src/pages/auth/ResetPasswordPage.test.jsx`
+- VS Code Problems scan on touched backend and frontend test files
+
+Cycle 25 Validation Result
+
+- Targeted backend Vitest: `7` files passed, `88` tests passed.
+- Targeted frontend Vitest: `2` files passed, `3` tests passed.
+- VS Code diagnostics reported no issues in the new frontend test files.
+- Existing backend route-test harnesses still show `Dangerous dynamic require` editor warnings because they rely on the repo's current `Module._load` mocking pattern, but those tests executed successfully.
+
+Cycle 25 Deep Scan Summary
+
+- This cycle focused on pre-test bug hunting and contract repair before any broader validation run.
+- The concrete production defect was in admin review attribution, where the route mixed two user identity shapes (`id` vs `userId`). The fix was applied at the route itself, and the regression test locks the contract to the auth middleware's current payload shape.
+- The highest regression risk on the frontend was authenticated requests silently degrading on split-origin stacks when `credentials: 'include'` is omitted. The new announcements and reset-password unit tests cover that exact transport contract so these failures surface locally instead of after deployment.
+- The existing backend route-test additions for announcements, feed, notes, notifications, settings, and users were validated against the live route implementations during this pass; the only harness update needed was the admin stats mock surface.
+
+Cycle 25 Deferred-Risk Notes
+
+- Backend route tests still use the current dynamic `Module._load` interception pattern. It works in Vitest but continues to trigger non-blocking editor warnings until the harness strategy is modernized.
+- This cycle used targeted test execution rather than a full repo lint/build sweep because the code change surface was limited to one backend route and test coverage. A broader pass can be run next if you want full-repo confidence after the current stabilization batch.
+
 Cycle 25 — Week 1 UX: Draft Management, Notes Redesign, Fork/Contribute UI [2026-03-18]
 
 Added:
@@ -3290,3 +3334,45 @@ Populated empty School `city` and Course `department` fields in production datab
 - `npm --prefix frontend/studyhub-app run lint` — passed
 - `npm --prefix frontend/studyhub-app run build` — passed
 - All migrations audited — no remaining MySQL `ADD COLUMN IF NOT EXISTS` syntax
+
+---
+
+## Cycle: Registration Test Drift + Browser Credentials Guardrail Repair (2026-03-22)
+
+### Summary
+
+Repaired two stale validation layers discovered during the expanding dependency-web audit:
+
+- `RegisterScreen` unit coverage was still written against the removed one-step registration contract.
+- The Playwright credentials guardrail was incorrectly inferring auth transport from cookie headers instead of validating StudyHub's real fetch contract.
+
+### Changed
+
+- **Current registration flow coverage** — `frontend/studyhub-app/src/pages/auth/RegisterScreen.test.jsx`
+  - Replaced the obsolete `/api/auth/register` test assumptions with the live multi-step flow:
+    - `POST /api/auth/register/start`
+    - `POST /api/auth/register/verify`
+    - `POST /api/auth/register/complete`
+  - Updated the completion assertion to match current navigation to `/dashboard?welcome=1`.
+  - Added per-test cleanup so repeated renders do not leak between cases.
+
+- **Browser credentials guardrail** — `frontend/studyhub-app/tests/auth.credentials-guardrail.spec.js`
+  - Replaced the brittle cookie-header tracker with a fetch-level tracer injected before app startup.
+  - Guardrail now validates the actual contract enforced by `installApiFetchShim()` in `frontend/studyhub-app/src/lib/http.js`, which forces `credentials: 'include'` for API-origin fetches.
+  - Retained page coverage across feed, sheets, sheet viewer, dashboard, profile, SheetLab, admin, announcements, and search modal flows.
+
+### Deep Scan Summary
+
+- The broad Playwright failure surface initially looked like a repo-wide auth regression because it flagged `/api/auth/me`, `/api/feed`, `/api/sheets`, `/api/settings/preferences`, `/api/users/:username`, `/api/admin/stats`, and `/api/announcements` as missing credentials.
+- Tracing the app outward from those failures showed the frontend already has a global API fetch shim installed in `frontend/studyhub-app/src/main.jsx`. That shim wraps `window.fetch` and injects `credentials: 'include'` for StudyHub API requests.
+- That means the failing browser suite was testing the wrong signal. The fix was to validate fetch credentials at the page layer before the request leaves the browser, not to weaken the app or add redundant patches blindly across unrelated pages.
+
+### Validation
+
+- `npm --prefix frontend/studyhub-app run test -- src/pages/auth/RegisterScreen.test.jsx` — passed (`2` tests)
+- `npm --prefix frontend/studyhub-app run test:e2e -- tests/auth.credentials-guardrail.spec.js` — passed (`9` Playwright tests)
+- VS Code Problems scan on touched test files — no errors
+
+### Deferred / Notes
+
+- The app still contains a mix of explicit `credentials: 'include'` fetch calls and fetches that rely on the global shim. That is functionally safe under the current architecture, but if you want stricter local readability we can do a separate normalization pass later.

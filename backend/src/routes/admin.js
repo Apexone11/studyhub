@@ -441,7 +441,7 @@ router.patch('/sheets/:id/review', async (req, res) => {
         status: nextStatus,
         // On approve: clear risk tier (admin-verified safe). On reject: keep current tier.
         ...(action === 'approve' ? { htmlRiskTier: RISK_TIER.CLEAN, htmlScanStatus: 'passed' } : {}),
-        reviewedById: req.user.id,
+        reviewedById: req.user.userId,
         reviewedAt: new Date(),
         reviewReason: effectiveReason,
         reviewFindingsSnapshot: current.htmlScanFindings || [],

@@ -16,6 +16,10 @@ const mocks = vi.hoisted(() => {
     },
     studySheet: {
       findMany: vi.fn(),
+      count: vi.fn(),
+    },
+    feedPost: {
+      count: vi.fn(),
     },
   }
 
@@ -99,6 +103,8 @@ beforeEach(() => {
     ],
   })
   mocks.prisma.starredSheet.count.mockResolvedValue(3)
+  mocks.prisma.studySheet.count.mockResolvedValue(0)
+  mocks.prisma.feedPost.count.mockResolvedValue(0)
   mocks.prisma.studySheet.findMany.mockResolvedValue([
     {
       id: 900,

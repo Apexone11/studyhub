@@ -309,7 +309,7 @@ describe('auth routes', () => {
     expect(mocks.email.sendTwoFaCode).not.toHaveBeenCalled()
   })
 
-  it('keeps forgot-password restricted to verified emails', async () => {
+  it('sends forgot-password email to any user with an email address', async () => {
     mocks.prisma.user.findUnique.mockResolvedValue({
       id: 4,
       username: 'unverified_user',
@@ -323,7 +323,30 @@ describe('auth routes', () => {
 
     expect(response.status).toBe(200)
     expect(response.body).toEqual({
-      message: 'If we have a verified email on file for that account, a reset link has been sent.',
+      message: 'If an account exists with that username or email, a reset link has been sent.',
+    })
+    expect(mocks.email.sendPasswordReset).toHaveBeenCalledWith(
+      'unverified_user@studyhub.test',
+      'unverified_user',
+      expect.stringContaining('/reset-password?token='),
+    )
+  })
+
+  it('returns generic message for forgot-password when user has no email', async () => {
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      id: 5,
+      username: 'no_email_user',
+      email: null,
+      emailVerified: false,
+    })
+
+    const response = await request(app)
+      .post('/forgot-password')
+      .send({ username: 'no_email_user' })
+
+    expect(response.status).toBe(200)
+    expect(response.body).toEqual({
+      message: 'If an account exists with that username or email, a reset link has been sent.',
     })
     expect(mocks.email.sendPasswordReset).not.toHaveBeenCalled()
   })
