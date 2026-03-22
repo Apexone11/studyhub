@@ -355,7 +355,7 @@ router.get('/leaderboard', leaderboardLimiter, async (req, res) => {
   }
 })
 
-router.patch('/contributions/:contributionId', contributionReviewLimiter, requireAuth, async (req, res) => {
+router.patch('/contributions/:contributionId', contributionReviewLimiter, requireAuth, requireVerifiedEmail, async (req, res) => {
   const contributionId = Number.parseInt(req.params.contributionId, 10)
   const action = typeof req.body.action === 'string' ? req.body.action.trim().toLowerCase() : ''
 
@@ -716,7 +716,7 @@ router.get('/drafts/latest', requireAuth, async (req, res) => {
   }
 })
 
-router.post('/drafts/autosave', requireAuth, sheetWriteLimiter, async (req, res) => {
+router.post('/drafts/autosave', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (req, res) => {
   const draftId = Number.parseInt(req.body?.id, 10)
   const parsedCourseId = Number.parseInt(req.body?.courseId, 10)
   const contentFormat = normalizeContentFormat(req.body?.contentFormat)
@@ -822,7 +822,7 @@ router.post('/drafts/autosave', requireAuth, sheetWriteLimiter, async (req, res)
   }
 })
 
-router.post('/drafts/import-html', requireAuth, sheetWriteLimiter, async (req, res) => {
+router.post('/drafts/import-html', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (req, res) => {
   const draftId = Number.parseInt(req.body?.id, 10)
   const courseId = Number.parseInt(req.body?.courseId, 10)
 
@@ -863,7 +863,7 @@ router.post('/drafts/import-html', requireAuth, sheetWriteLimiter, async (req, r
   }
 })
 
-router.patch('/drafts/:id/working-html', requireAuth, sheetWriteLimiter, async (req, res) => {
+router.patch('/drafts/:id/working-html', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (req, res) => {
   const sheetId = Number.parseInt(req.params.id, 10)
 
   if (!Number.isInteger(sheetId)) {
@@ -948,7 +948,7 @@ router.post('/drafts/:id/scan-status/acknowledge', requireAuth, async (req, res)
   }
 })
 
-router.post('/:id/submit-review', requireAuth, sheetWriteLimiter, async (req, res) => {
+router.post('/:id/submit-review', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (req, res) => {
   const sheetId = Number.parseInt(req.params.id, 10)
   if (!Number.isInteger(sheetId)) {
     return res.status(400).json({ error: 'Sheet id must be an integer.' })
@@ -1547,7 +1547,7 @@ router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
   }
 })
 
-router.post('/:id/fork', requireAuth, sheetWriteLimiter, async (req, res) => {
+router.post('/:id/fork', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (req, res) => {
   const originalId = Number.parseInt(req.params.id, 10)
 
   try {
@@ -1632,7 +1632,7 @@ router.post('/:id/fork', requireAuth, sheetWriteLimiter, async (req, res) => {
   }
 })
 
-router.post('/:id/contributions', requireAuth, contributionRateLimiter, async (req, res) => {
+router.post('/:id/contributions', requireAuth, requireVerifiedEmail, contributionRateLimiter, async (req, res) => {
   const forkSheetId = Number.parseInt(req.params.id, 10)
   const message = typeof req.body.message === 'string' ? req.body.message.trim().slice(0, 500) : ''
 

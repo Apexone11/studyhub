@@ -3,6 +3,7 @@ import {
   applyFontSize,
   applyTheme,
   writeCachedAppearancePreferences,
+  writeGlobalTheme,
 } from '../../lib/appearance'
 import { useSession } from '../../lib/session-context'
 import { Button, FormField, MsgList, SectionCard, Select } from './settingsShared'
@@ -107,6 +108,7 @@ export default function AppearanceTab() {
         }
 
         writeCachedAppearancePreferences({ theme: prefs.theme, fontSize: prefs.fontSize }, user?.id)
+        writeGlobalTheme(prefs.theme)
       }}>
         {saving ? 'Saving...' : 'Save Appearance Preferences'}
       </Button>

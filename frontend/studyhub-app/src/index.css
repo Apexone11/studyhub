@@ -151,6 +151,10 @@
   --sh-link: #2563eb;
   --sh-focus-ring: 0 0 0 3px rgba(37, 99, 235, 0.12);
 
+  /* ── Avatar initials fallback ──────────────────────────────────── */
+  --sh-avatar-bg: #e2e8f0;
+  --sh-avatar-text: #0f172a;
+
   /* ── Navbar (dark chrome — same in both themes) ──────────────────── */
   --sh-nav-bg: #1a1a1a;
   --sh-nav-border: #2a2a2a;
@@ -261,6 +265,10 @@
 
   --sh-link: #60a5fa;
   --sh-focus-ring: 0 0 0 3px rgba(96, 165, 250, 0.25);
+
+  /* ── Avatar initials fallback (dark) ──────────────────────────── */
+  --sh-avatar-bg: #1f2937;
+  --sh-avatar-text: #f8fafc;
 
   /* ── Navbar (deeper dark) ───────────────────────────────────────── */
   --sh-nav-bg: #0a0a0a;

@@ -1,15 +1,15 @@
-StudyHub Beta V1.5.0 Release Log
+StudyHub Beta V1.5.0-beta Release Log
 
 Purpose
-- Implement the v1.5 master plan: algorithms, design, security, and rollout improvements.
+- Implement the v1.5.0 master plan: algorithms, design, security, and rollout improvements.
 - Run all risky changes in local beta first, validate, then ship.
 - Keep production safe while testing UX/security/algorithm updates.
 
 Version Scope
-- v1.5.0 covers a 6-week phased rollout of: search, Google OAuth, animations, settings rework, moderation, Sheet Lab, provenance, onboarding, and polish.
+- v1.5.0.0 covers a 6-week phased rollout of: search, Google OAuth, animations, settings rework, moderation, Sheet Lab, provenance, onboarding, and polish.
 - Feature flags gate all major additions: `FF_GOOGLE_AUTH`, `FF_MODERATION`, `FF_PROVENANCE`, `FF_TENSORFLOW`.
 
-Reuse Rules (Inherited from V1.0.0)
+Reuse Rules (Inherited from V1.0.0 (legacy))
 1. Keep this file as baseline + cycle log (do not rewrite from scratch).
 2. Add each new cycle under a new section.
 3. Reuse the same diagnostics directory and commands unless a cycle needs extra artifacts.
@@ -17,7 +17,7 @@ Reuse Rules (Inherited from V1.0.0)
 5. Use docs/beta-cycle-template.md as the copy/paste skeleton for each next cycle.
 6. For every future beta cycle, always include tests for every newly added feature and every touched page before moving to the next cycle.
 
-AI Beta Documentation Standard (Inherited from V1.0.0)
+AI Beta Documentation Standard (Inherited from V1.0.0 (legacy))
 1. Every beta-impacting change must be appended to this release log in the same working session.
 2. Every entry must include: change summary, validation commands, validation outcomes, known risks/deferred items.
 3. Every cycle must include a deep scan note if core logic, auth, or upload/security behavior changed.
@@ -213,7 +213,7 @@ Cycle 4 Deep Scan Summary
 Cycle 4 Deferred-Risk Notes
 - No automated test coverage yet for preferences endpoints or new tab components.
 - `prisma db push --accept-data-loss` was used for schema push; formal migration file not yet created.
-- Full end-to-end beta gate (`npm run beta:check`) not yet rerun on v1.5.0 branch.
+- Full end-to-end beta gate (`npm run beta:check`) not yet rerun on v1.5.0.0 branch.
 - Lock files regenerated with `--no-workspaces` flag to bypass workspace resolution for Railway Docker builds.
 
 ---
@@ -319,8 +319,8 @@ Implemented in beta lane:
 
 Fixed:
 
-- **P0 Production crash:** Backend crash-looping on Railway because `User.googleId` column did not exist in production database. Root cause: all v1.5.0 schema changes were applied locally with `prisma db push` but no migration files existed. Production runs `prisma migrate` which requires migration files.
-  - Created formal migration `20260318040000_add_v150_google_oauth_preferences_moderation` covering all v1.5.0 schema additions.
+- **P0 Production crash:** Backend crash-looping on Railway because `User.googleId` column did not exist in production database. Root cause: all v1.5.0.0 schema changes were applied locally with `prisma db push` but no migration files existed. Production runs `prisma migrate` which requires migration files.
+  - Created formal migration `20260318040000_add_v150_google_oauth_preferences_moderation` covering all v1.5.0.0 schema additions.
   - All statements use `IF NOT EXISTS` / `DROP CONSTRAINT IF EXISTS` guards matching existing migration patterns for idempotency.
   - Added `DEFAULT CURRENT_TIMESTAMP` on `ModerationCase.updatedAt` and `Appeal.updatedAt` (were missing, inconsistent with all other migrations).
 - **P0 Bootstrap crash amplifier:** `ensureAdminUser` in `bootstrap.js` selected `{ id, role, email }` but checked `existingUser.emailVerified` — always `undefined`, causing an unnecessary `update()` on every startup. Prisma's default `RETURNING *` on `update()` then asked PostgreSQL for the missing `googleId` column.
@@ -522,7 +522,7 @@ Cycle 9 Deferred-Risk Notes
 
 Cycle 10 — Moderation Engine + Settings Enforcement + Google Link [2026-03-18]
 
-Week 2 of the v1.5 roadmap. Builds the moderation runtime on top of the database schema provisioned in Cycle 5, enforces user preferences, and connects the Google link flow.
+Week 2 of the v1.5.0 roadmap. Builds the moderation runtime on top of the database schema provisioned in Cycle 5, enforces user preferences, and connects the Google link flow.
 
 Added:
 
@@ -992,7 +992,7 @@ Cycle 21 — Repo Health Cleanup (Auth Tests + Settings Retry) [2026-03-18]
 
 Fixed:
 
-- Backend auth/admin tests now match the current v1.5.0 contract:
+- Backend auth/admin tests now match the current v1.5.0.0 contract:
   - `backend/test/auth.routes.test.js`
   - `backend/test/admin.routes.test.js`
   - Removed stale expectations for login-time email verification and admin 2FA enforcement.
@@ -1024,7 +1024,7 @@ Cycle 21 Validation Result
 
 Cycle 21 Deep Scan Summary
 
-- Repo-wide validation confirmed the remaining backend failures were stale tests left behind after the v1.5.0 removal of login email-verification gating and admin 2FA enforcement, not active regressions in the application code.
+- Repo-wide validation confirmed the remaining backend failures were stale tests left behind after the v1.5.0.0 removal of login email-verification gating and admin 2FA enforcement, not active regressions in the application code.
 - Settings tabs now distinguish `loading` from `load failed`, which closes a real UX bug where a failed preferences fetch left users with no recovery path.
 - Full-frontend lint blockers were limited to dead code and a blocker-effect dependency issue; no additional runtime regressions surfaced during the production build.
 - GitHub/ecosystem research surfaced general React 19 `findDOMNode` incompatibilities around tour libraries, which is consistent with the existing `SafeJoyride` isolation. No new StudyHub-specific upstream bug required an additional patch in this cycle.
@@ -2258,7 +2258,7 @@ Comprehensive WCAG 2.2 AA accessibility audit and final CSS polish pass across t
 ### Added
 
 - **docs/v1.5.0-release-notes.md** — Comprehensive release notes for v1.5.0.
-- **docs/plans/v1.5-weekly-roadmap.md** — All Week 3–6 items marked complete (2026-03-19).
+- **docs/plans/v1.5-weekly-roadmap.md** — All Week 3-6 items marked complete (2026-03-19).
 
 ### Validation Commands
 
@@ -2912,3 +2912,210 @@ Migrated all 3 auth pages (ForgotPasswordPage, LoginPage, RegisterScreen) from i
 - `npm --prefix frontend/studyhub-app run lint` — passed
 - `npm --prefix frontend/studyhub-app run build` — passed
 - `npx playwright test visual-smoke` — 36 passed in ~39s
+
+---
+
+## 2026-03-21 — CSRF Auth Bootstrap Fix
+
+### Problem
+Login form showed "Missing CSRF token" error when a stale/expired session cookie was present. The CSRF middleware tried to verify the auth cookie, found it expired, and blocked the request before login could establish a new session.
+
+### Fix
+**`backend/src/middleware/csrf.js`** — Added auth bootstrap route exclusion. Routes that establish/refresh sessions (`/api/auth/login`, `/api/auth/google`, `/api/auth/register`) skip CSRF checks, since these endpoints cannot have a valid CSRF token yet.
+
+### Validation
+- `npm --prefix backend run lint` — passed
+- `npm --prefix frontend/studyhub-app run lint` — passed
+
+---
+
+## 2026-03-21 — Dark Mode Persistence After Logout
+
+### Problem
+Logging out reset the theme to light mode because `useBootstrapPreferences` called `resetAppearancePreferences()` on unauthenticated state, stripping the `data-theme` attribute.
+
+### Fix
+- **`frontend/studyhub-app/src/lib/appearance.js`** — Added `writeGlobalTheme()` and `applyGlobalTheme()` using a user-agnostic `sh-theme` localStorage key.
+- **`frontend/studyhub-app/src/lib/useBootstrapPreferences.js`** — On logout, calls `applyGlobalTheme()` instead of `resetAppearancePreferences()`. On login fetch, writes to global key.
+- **`frontend/studyhub-app/src/pages/settings/AppearanceTab.jsx`** — Save also writes to global key.
+- **`frontend/studyhub-app/index.html`** — Inline script applies saved theme before React mounts (prevents white flash).
+
+### Acceptance Test
+Login → set dark mode → log out → homepage stays dark.
+
+### Validation
+- `npm --prefix frontend/studyhub-app run lint` — passed
+- `npm --prefix frontend/studyhub-app run build` — passed
+
+---
+
+## 2026-03-21 — Unverified Users Restriction (3-Day Grace Period)
+
+### Policy (Locked)
+- Grace period: **3 days** from `user.createdAt`
+- After grace, unverified users blocked from: comments, sheet upload/import/autosave, submit review, fork, contributions, notes
+- Allowed without verification: browse, read, view, search, star, react
+
+### Backend Changes
+
+**`backend/src/middleware/requireVerifiedEmail.js`** — Added grace period logic. Queries `createdAt` alongside `emailVerified`. If `!emailVerified && now > createdAt + 3 days`, returns 403 with `code: 'EMAIL_NOT_VERIFIED'` and `gracePeriodDays: 3`.
+
+**`backend/src/middleware/errorEnvelope.js`** — Added `EMAIL_NOT_VERIFIED` to `ERROR_CODES`.
+
+**`backend/src/routes/sheets.js`** — Added `requireVerifiedEmail` to 7 previously ungated routes:
+- `POST /drafts/autosave`
+- `POST /drafts/import-html`
+- `PATCH /drafts/:id/working-html`
+- `POST /:id/submit-review`
+- `POST /:id/fork`
+- `POST /:id/contributions`
+- `PATCH /contributions/:contributionId`
+
+**`backend/src/routes/notes.js`** — Added `requireVerifiedEmail` to `POST /` and `PATCH /:id`.
+
+### Frontend Changes
+
+**`frontend/studyhub-app/src/components/EmailVerificationBanner.jsx`** — Added `EmailVerificationInline` named export for use inside forms after a blocked action. Shows verification prompt with link to Settings.
+
+**`frontend/studyhub-app/src/lib/http.js`** — Added `isEmailNotVerifiedError()` helper to detect the `EMAIL_NOT_VERIFIED` code.
+
+**`frontend/studyhub-app/src/pages/legal/TermsPage.jsx`** — Added Section 3 "Email Verification" explaining grace period, restricted features, and verification instructions. Renumbered remaining sections (4–11).
+
+### Intentionally Not Gated
+- Star/react (lightweight social actions)
+- Delete (self-destructive, user's own content)
+- GET routes (read-only access)
+
+### Validation
+
+- `npm --prefix backend run lint` — passed
+- `npm --prefix frontend/studyhub-app run lint` — passed
+- `npm --prefix frontend/studyhub-app run build` — passed
+
+---
+
+## 2026-03-21 — Bug #3: Session Expiry + Idle Logout + Logout Button
+
+### Problem
+
+No idle timeout existed. No logout button in the UI. Session expiry was event-driven only.
+
+### Changes
+
+**`frontend/studyhub-app/src/lib/useIdleTimeout.js`** (NEW) — Idle timeout hook. Tracks mousemove, keydown, click, touchstart, scroll. After 30 minutes of inactivity, calls the provided callback. Uses effect-based ref sync for React 19 compatibility.
+
+**`frontend/studyhub-app/src/App.jsx`** — Wired `useIdleTimeout` into `PreferencesBootstrap` component. Calls `signOut()` after 30 minutes idle when authenticated.
+
+**`frontend/studyhub-app/src/components/Navbar.jsx`** — Converted user avatar from simple click-to-navigate into a dropdown menu with: Dashboard, Profile, Settings, and **Log out** button. Avatar now shows user's uploaded photo if available. Dropdown has click-outside dismiss, chevron rotation animation, and dark mode token styling.
+
+### Existing Session Expiry (already working)
+
+- `SESSION_EXPIRED_FLAG` in `sessionStorage` set on `AUTH_SESSION_EXPIRED_EVENT`
+- LoginPage reads flag once, shows banner, removes it — shows once only
+- Tab close + reopen = no stale popup (sessionStorage cleared)
+
+### Validation
+
+- `npm --prefix frontend/studyhub-app run lint` — passed
+- `npm --prefix frontend/studyhub-app run build` — passed
+
+---
+
+## 2026-03-21 — Bug #4: Initials Visible in Dark Mode
+
+### Problem
+
+Avatar initials used hardcoded colors (`background: var(--sh-heading)`, `color: '#fff'`) which became invisible in dark mode when `--sh-heading` resolves to a light color.
+
+### Changes
+
+**`frontend/studyhub-app/src/index.css`** — Added `--sh-avatar-bg` and `--sh-avatar-text` tokens:
+- Light: `--sh-avatar-bg: #e2e8f0`, `--sh-avatar-text: #0f172a`
+- Dark: `--sh-avatar-bg: #1f2937`, `--sh-avatar-text: #f8fafc`
+
+**Components updated:**
+- `AppSidebar.jsx` — Avatar component uses `--sh-avatar-bg` / `--sh-avatar-text`
+- `FeedPage.jsx` — Avatar component uses tokens
+- `UserProfilePage.jsx` — Main avatar + followers list avatars use tokens
+- `SearchModal.jsx` — User search result avatar uses tokens
+
+### Validation
+
+- `npm --prefix frontend/studyhub-app run lint` — passed
+- `npm --prefix frontend/studyhub-app run build` — passed
+
+---
+
+## 2026-03-21 — Avatar Upload + Crop Feature
+
+### Decisions (Locked)
+
+- Crop shape: Circle
+- Max size: 5 MB (updated from 2 MB)
+- Output format: PNG
+- UI location: Both Profile page + Settings (Profile tab)
+- Library: react-easy-crop
+
+### Changes
+
+**`frontend/studyhub-app/src/components/AvatarCropModal.jsx`** (NEW) — Full crop modal with:
+- File selection with drag/zoom via react-easy-crop
+- Circle crop shape with zoom slider
+- Client-side 5 MB validation
+- Canvas-based PNG blob generation
+- Upload to `POST /api/upload/avatar`
+- Error handling with themed UI
+
+**`frontend/studyhub-app/src/pages/profile/UserProfilePage.jsx`** — Avatar is now clickable on own profile. Shows camera icon overlay on hover. Opens AvatarCropModal. On upload, updates both local profile state and session user.
+
+**`frontend/studyhub-app/src/pages/settings/ProfileTab.jsx`** — Added "Profile Photo" section with avatar preview + "Upload photo" button. Opens AvatarCropModal. On upload, updates session user via `onAvatarChange` prop. Also converted hardcoded colors to theme tokens.
+
+**`frontend/studyhub-app/src/pages/settings/SettingsPage.jsx`** — Passes `onAvatarChange` prop to ProfileTab.
+
+**`backend/src/routes/upload.js`** — Updated `AVATAR_MAX_BYTES` from 2 MB to 5 MB.
+
+### Tutorial Add-on
+
+**`frontend/studyhub-app/src/lib/tutorialSteps.js`** — Added avatar upload step to `PROFILE_STEPS` (first step, targets `[data-tutorial="profile-avatar"]`) and `SETTINGS_STEPS` (first step, targets `[data-tutorial="settings-avatar"]`). Shows once per user via existing localStorage-based tutorial system.
+
+### Validation
+
+- `npm --prefix backend run lint` — passed
+- `npm --prefix frontend/studyhub-app run lint` — passed
+- `npm --prefix frontend/studyhub-app run build` — passed
+
+---
+
+## Cycle: Version Bump + Settings Dark Mode + Policy Pages [2026-03-21]
+
+### Version References Normalized to v1.5.0-beta
+
+All version references normalized to v1.5.0-beta across:
+- `backend/package.json`, `frontend/studyhub-app/package.json`
+- Release log: `beta-v1.5.0-release-log.md`
+- Release notes: `v1.5.0-release-notes.md`
+- Roadmap: `v1.5-weekly-roadmap.md`
+- All docs: CHANGELOG, feature-tracker, dependency-tracker, security-overview, design-specs
+- CLAUDE.md, SKILL.md project references
+- Source code comments: auth.js, bootstrap.js, NotesPage.jsx
+
+### Settings Dark Mode Fix (CoursesTab + SettingsPage)
+
+Fixed:
+- **`frontend/studyhub-app/src/pages/settings/CoursesTab.jsx`** — School dropdown replaced inline hardcoded `<select>` (`color: '#0f172a'`, `border: '#cbd5e1'`) with shared `Select` component from `settingsShared.jsx` using CSS tokens. Loading text → `var(--sh-muted)`. Error text → `var(--sh-danger)`. Retry button → `var(--sh-brand)`. Removed unused `FONT` import.
+
+- **`frontend/studyhub-app/src/pages/settings/SettingsPage.jsx`** — Page background → `var(--sh-bg)`. Active tab → `var(--sh-surface)` / `var(--sh-heading)`. Inactive tab → `var(--sh-muted)`. Box shadow → `var(--shadow-sm)`. Sign Out button → `var(--sh-border)` / `var(--sh-muted)`.
+
+### Formal Policy Pages
+
+Rewrote all three policy pages with formal, real-world legal copy:
+
+- **TermsPage.jsx** — 10 sections: Who Can Use, Accounts, Email Verification, Acceptable Use, User Content, HTML File Safety, Suspension & Removal, Disclaimers, Changes, Contact.
+- **PrivacyPage.jsx** — 9 sections: What We Collect, How We Use Data, Data Sharing, What Is Public, Security, Data Retention, Your Rights, Changes, Contact.
+- **GuidelinesPage.jsx** — 7 sections: What We Expect, What We Encourage, What Is Not Allowed, Content Quality, Forking and Attribution, Enforcement, Reporting.
+
+### Validation
+
+- `npm --prefix backend run lint` — passed
+- `npm --prefix frontend/studyhub-app run lint` — passed
+- `npm --prefix frontend/studyhub-app run build` — passed

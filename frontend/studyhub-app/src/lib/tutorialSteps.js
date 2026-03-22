@@ -94,10 +94,15 @@ export const NOTES_STEPS = [
 
 export const SETTINGS_STEPS = [
   {
+    target: '[data-tutorial="settings-avatar"]',
+    title: 'Upload a profile photo',
+    content: 'Add a photo so other students can recognize you. Drag and zoom to crop it just right.',
+    disableBeacon: true,
+  },
+  {
     target: '[data-tutorial="settings-tabs"]',
     title: 'Settings categories',
     content: 'Navigate between profile, security, notifications, privacy, courses, appearance, and account settings.',
-    disableBeacon: true,
   },
   {
     target: '[data-tutorial="settings-appearance"]',
@@ -113,10 +118,15 @@ export const SETTINGS_STEPS = [
 
 export const PROFILE_STEPS = [
   {
+    target: '[data-tutorial="profile-avatar"]',
+    title: 'Upload a photo',
+    content: 'Click your avatar to upload and crop a profile photo. Drag and zoom to get the perfect crop.',
+    disableBeacon: true,
+  },
+  {
     target: '[data-tutorial="profile-stats"]',
     title: 'Profile stats',
     content: 'See sheet count, followers, and following. Click followers or following to view the full list.',
-    disableBeacon: true,
   },
   {
     target: '[data-tutorial="profile-sheets"]',

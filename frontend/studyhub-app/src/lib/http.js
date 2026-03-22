@@ -37,6 +37,10 @@ export function isAuthSessionFailure(response, data = {}) {
   return response.status === 401 || AUTH_ERROR_CODES.has(data?.code)
 }
 
+export function isEmailNotVerifiedError(data) {
+  return data?.code === 'EMAIL_NOT_VERIFIED'
+}
+
 export function getApiErrorMessage(data, fallback) {
   if (typeof data?.error === 'string' && data.error.trim()) {
     return data.error.trim()

@@ -196,7 +196,7 @@ When the user says "standup", "what happened", or "catch me up":
 ## Project Context
 
 - **Stack**: React 19 + Vite frontend, Express 5 + Prisma backend
-- **Current version**: v1.5.0 beta
+- **Current version**: v1.5.0-beta
 - **Repo conventions**: See CLAUDE.md for full details
 - **Key files to always check**: CLAUDE.md, docs/beta-v1.5.0-release-log.md
 - **Validation commands**: `npm run lint`, `npm run build`, `npm run test`

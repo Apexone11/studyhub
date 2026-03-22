@@ -5,8 +5,21 @@ const {
 } = require('../lib/authTokens')
 const { ERROR_CODES, sendError } = require('./errorEnvelope')
 
+const AUTH_BOOTSTRAP_PREFIXES = [
+  '/api/auth/login',
+  '/api/auth/google',
+  '/api/auth/register',
+]
+
 function csrfProtection(req, res, next) {
   if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') {
+    return next()
+  }
+
+  // Auth bootstrap routes establish/refresh sessions and cannot require CSRF
+  // upfront. A stale auth cookie must not block these endpoints.
+  const url = req.originalUrl || ''
+  if (AUTH_BOOTSTRAP_PREFIXES.some((prefix) => url.startsWith(prefix))) {
     return next()
   }
 

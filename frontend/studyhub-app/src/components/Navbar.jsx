@@ -154,6 +154,31 @@ const S = {
     color: 'var(--sh-nav-accent)',
     fontWeight: 600,
   },
+  userMenu: {
+    position: 'absolute',
+    top: 'calc(100% + 8px)',
+    right: 0,
+    minWidth: 180,
+    background: 'var(--sh-surface)',
+    border: '1px solid var(--sh-border)',
+    borderRadius: 12,
+    boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+    padding: '6px 0',
+    zIndex: 1100,
+  },
+  userMenuItem: {
+    display: 'block',
+    width: '100%',
+    padding: '9px 16px',
+    border: 'none',
+    background: 'none',
+    textAlign: 'left',
+    fontSize: 13,
+    fontWeight: 600,
+    color: 'var(--sh-text)',
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+  },
   tabsRow: {
     borderTop: '1px solid var(--sh-nav-border)',
     padding: '0 24px',
@@ -217,6 +242,11 @@ export default function Navbar({
   const { user } = useSession()
   const initials = user?.username?.slice(0, 2).toUpperCase() || '??'
 
+  // user menu dropdown state
+  const [showUserMenu, setShowUserMenu] = useState(false)
+  const userMenuRef = useRef(null)
+  const { signOut } = useSession()
+
   // search modal state
   const [searchOpen, setSearchOpen] = useState(false)
 
@@ -274,6 +304,16 @@ export default function Navbar({
     document.addEventListener('mousedown', onClickOutside)
     return () => document.removeEventListener('mousedown', onClickOutside)
   }, [showBell])
+
+  // close user menu dropdown on outside click
+  useEffect(() => {
+    if (!showUserMenu) return
+    function onClickOutside(e) {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target)) setShowUserMenu(false)
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [showUserMenu])
 
   async function markAllRead() {
     if (!user) return
@@ -533,19 +573,57 @@ export default function Navbar({
           </div>
         )}
 
-        {/* user avatar + name */}
+        {/* user avatar + dropdown menu */}
         {user && (
-          <div
-            style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
-            onClick={() => navigate('/dashboard')}
-            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate('/dashboard') } }}
-            role="button"
-            tabIndex={0}
-            aria-label={`Profile: ${user.username}`}
-          >
-            <div style={S.avatar} aria-hidden="true">{initials}</div>
-            <span style={S.username}>{user.username}</span>
-            <IconChevronDown size={13} style={{ color: 'var(--sh-nav-search-text)' }} aria-hidden="true" />
+          <div ref={userMenuRef} style={{ position: 'relative' }}>
+            <div
+              style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
+              onClick={() => setShowUserMenu((v) => !v)}
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowUserMenu((v) => !v) } }}
+              role="button"
+              tabIndex={0}
+              aria-label={`User menu: ${user.username}`}
+              aria-expanded={showUserMenu}
+              aria-haspopup="true"
+            >
+              {user.avatarUrl
+                ? <img src={user.avatarUrl.startsWith('http') ? user.avatarUrl : `${API}${user.avatarUrl}`} alt="" style={{ ...S.avatar, objectFit: 'cover' }} />
+                : <div style={S.avatar} aria-hidden="true">{initials}</div>
+              }
+              <span style={S.username}>{user.username}</span>
+              <IconChevronDown size={13} style={{ color: 'var(--sh-nav-search-text)', transform: showUserMenu ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} aria-hidden="true" />
+            </div>
+
+            {showUserMenu && (
+              <div style={S.userMenu}>
+                <button type="button" style={S.userMenuItem} onClick={() => { setShowUserMenu(false); navigate('/dashboard') }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--sh-soft)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                >
+                  Dashboard
+                </button>
+                <button type="button" style={S.userMenuItem} onClick={() => { setShowUserMenu(false); navigate(`/profile/${user.username}`) }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--sh-soft)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                >
+                  Profile
+                </button>
+                <button type="button" style={S.userMenuItem} onClick={() => { setShowUserMenu(false); navigate('/settings') }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--sh-soft)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                >
+                  Settings
+                </button>
+                <div style={{ borderTop: '1px solid var(--sh-border)', margin: '4px 0' }} />
+                <button type="button" style={{ ...S.userMenuItem, color: 'var(--sh-danger)' }}
+                  onClick={async () => { setShowUserMenu(false); await signOut(); navigate('/login') }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--sh-soft)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                >
+                  Log out
+                </button>
+              </div>
+            )}
           </div>
         )}
 

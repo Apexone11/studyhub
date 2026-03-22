@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { API } from '../../config'
 import CourseListPicker from '../../components/CourseListPicker'
-import { Button, FormField, MsgList, SectionCard } from './settingsShared'
-import { FONT } from './settingsState'
+import { Button, FormField, MsgList, SectionCard, Select } from './settingsShared'
 
 export default function CoursesTab({ user, busyKey, setBusyKey, syncUser }) {
   const [catalog, setCatalog] = useState([])
@@ -83,41 +82,31 @@ export default function CoursesTab({ user, busyKey, setBusyKey, syncUser }) {
   return (
     <SectionCard title="Courses" subtitle="Choose the courses you want to personalize around.">
       <FormField label="School">
-        <select
+        <Select
           value={courseSchoolId}
           onChange={(e) => {
             setCourseSchoolId(e.target.value)
             setSelectedCourseIds([])
             setCoursesMsg(null)
           }}
-          style={{
-            width: '100%',
-            padding: '10px 14px',
-            borderRadius: 10,
-            border: '1px solid #cbd5e1',
-            fontSize: 14,
-            fontFamily: FONT,
-            color: '#0f172a',
-          }}
         >
           <option value="">Select a school</option>
           {catalog.map((school) => (
             <option key={school.id} value={school.id}>{school.short} — {school.name}{school.city ? `, ${school.city}` : ''}</option>
           ))}
-        </select>
+        </Select>
       </FormField>
 
-      {catalogLoading && <div style={{ marginBottom: 14, color: '#64748b', fontSize: 13 }}>Loading course catalog...</div>}
+      {catalogLoading && <div style={{ marginBottom: 14, color: 'var(--sh-muted)', fontSize: 13 }}>Loading course catalog...</div>}
 
       {catalogError && (
-        <div style={{ marginBottom: 14, color: '#dc2626', fontSize: 13, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ marginBottom: 14, color: 'var(--sh-danger)', fontSize: 13, display: 'flex', alignItems: 'center', gap: 10 }}>
           <span>{catalogError}</span>
           <button
             onClick={() => { setCatalogError(''); setCatalog([]); }}
             style={{
-              background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 8,
+              background: 'var(--sh-brand)', color: 'var(--sh-btn-primary-text)', border: 'none', borderRadius: 8,
               padding: '5px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer',
-              fontFamily: FONT,
             }}
           >
             Retry

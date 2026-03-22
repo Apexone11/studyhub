@@ -5,7 +5,7 @@ Status: Planned | In Progress | Done | Deferred | Removed
 
 ---
 
-## v1.5.0 Features
+## v1.5.0-beta Features
 
 | Feature | Status | Notes |
 |---------|--------|-------|
@@ -21,11 +21,22 @@ Status: Planned | In Progress | Done | Deferred | Removed
 | Auth Pages Redesign | Done | Login + Register glass-morphism redesign (Cycle 8) |
 | HomePage Enhancement | Done | Testimonials, social proof, CTA (Cycle 8) |
 | Page-wide Responsive Redesign | In Progress | All pages need better space usage |
-| Tutorial Popup System | Planned | react-joyride for first-time user onboarding |
+| Tutorial Popup System | Done | react-joyride per-page tutorials with localStorage flags (2026-03-21) |
 | Upload Sheet Unsaved Warning | In Progress | beforeunload + confirmation dialog |
-| Moderation Runtime Engine | Planned | Content scanning, strike issuance, appeal workflow |
-| Sheet Lab (Version Control) | Planned | Route: /sheets/:id/lab |
-| Provenance + Creator Protection | Planned | AES-256-GCM encrypted tokens |
+| Moderation Runtime Engine | Done | Content scanning, moderation engine, admin review queue (Cycles 5+) |
+| Sheet Lab (Version Control) | Done | Route: /sheets/:id/lab, dark mode tokens (2026-03-21) |
+| Provenance + Creator Protection | Done | AES-256-GCM encrypted tokens |
+| HTML Preview Security Overhaul | Done | CSP headers, iframe sandbox, srcDoc→src migration, warning gate, dual document model (2026-03-21) |
+| Admin Sheet Review Pipeline | Done | Review queue, detail panel, approve/reject/quick-reject, scan findings, js-risk alerts (2026-03-21) |
+| Email Verification Enforcement | Done | 3-day grace period, 9 route guards, inline banner, Terms section (2026-03-21) |
+| CSRF Auth Bootstrap Fix | Done | Excluded login/google/register from CSRF checks (2026-03-21) |
+| Dark Mode Persistence | Done | Global sh-theme localStorage key, pre-React inline script (2026-03-21) |
+| Navbar User Dropdown + Logout | Done | Dropdown menu with Dashboard, Profile, Settings, Log out (2026-03-21) |
+| Idle Session Timeout | Done | 30-min useIdleTimeout hook, auto-logout on inactivity (2026-03-21) |
+| Avatar Upload + Circle Crop | Done | react-easy-crop, 5 MB max, PNG output, Profile + Settings UI (2026-03-21) |
+| Avatar Dark Mode Tokens | Done | --sh-avatar-bg/--sh-avatar-text tokens for all avatar components (2026-03-21) |
+| Settings Dark Mode Token Fix | Done | SettingsPage bg/nav + CoursesTab select use CSS tokens (2026-03-21) |
+| Formal Policy Pages | Done | Terms, Privacy, Community Guidelines rewritten with real-world legal copy (2026-03-21) |
 | Feature Flags System | Planned | OpenFeature-compatible |
 | PWA Offline Support | Planned | Downloaded study sheets |
 | WebAuthn Passkeys | Planned | Admin/power users optional |
@@ -35,5 +46,5 @@ Status: Planned | In Progress | Done | Deferred | Removed
 | Feature | Removed Date | Reason |
 |---------|-------------|--------|
 | Two-Step Verification (2FA) | 2026-03-18 | Replaced by Google OAuth MFA. Not needed for student platform. |
-| Email Verification Gate | 2026-03-18 | Google handles email verification. Simplified registration flow. |
+| Email Verification Gate (login-blocking) | 2026-03-18 | Removed login-time gate. Re-introduced as post-login soft-gate with 3-day grace period (2026-03-21). |
 | AdminMfaRequiredCard | 2026-03-18 | Depended on 2FA system which was removed. |
