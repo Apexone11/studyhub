@@ -4,7 +4,7 @@ import request from 'supertest'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const require = createRequire(import.meta.url)
-const usersRoutePath = require.resolve('../src/routes/users')
+const usersRoutePath = require.resolve('../src/modules/users')
 
 const mocks = vi.hoisted(() => {
   const prisma = {

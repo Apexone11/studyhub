@@ -5,7 +5,7 @@ import request from 'supertest'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const require = createRequire(import.meta.url)
-const authRoutePath = require.resolve('../src/routes/auth')
+const authRoutePath = require.resolve('../src/modules/auth')
 
 const mocks = vi.hoisted(() => {
   class MockVerificationError extends Error {

@@ -1,488 +1,53 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
 import { IconArrowLeft } from '../../components/Icons'
-import { API } from '../../config'
-import { getApiErrorMessage, isAuthSessionFailure, readJsonSafely } from '../../lib/http'
-import { useSession } from '../../lib/session-context'
 import { pageShell } from '../../lib/ui'
-import { staggerEntrance } from '../../lib/animations'
-import { showToast } from '../../lib/toast'
 import { usePageTitle } from '../../lib/usePageTitle'
+import { timeAgo, truncateChecksum } from './sheetLabConstants'
+import { DiffViewer } from './SheetLabPanels'
+import useSheetLab from './useSheetLab'
 import './SheetLabPage.css'
 
-function authHeaders() {
-  return { 'Content-Type': 'application/json' }
-}
-
-function timeAgo(value) {
-  if (!value) return 'recently'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return 'recently'
-  const seconds = Math.floor((Date.now() - date.getTime()) / 1000)
-  if (seconds < 60) return 'just now'
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`
-  if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`
-  return date.toLocaleDateString()
-}
-
-function truncateChecksum(checksum) {
-  if (!checksum) return ''
-  return checksum.slice(0, 8)
-}
-
-/* ── Word-level segment renderer ─────────────────────────────── */
-
-function WordSegments({ segments }) {
-  if (!segments || segments.length === 0) return null
-  return (
-    <>
-      {segments.map((seg, i) => {
-        if (seg.type === 'equal') return <span key={i}>{seg.text}</span>
-        return (
-          <span
-            key={i}
-            className={`sheet-lab__word-${seg.type}`}
-          >
-            {seg.text}
-          </span>
-        )
-      })}
-    </>
-  )
-}
-
-/* ── Unified Diff Viewer ──────────────────────────────────────── */
-
-function UnifiedDiffView({ diff }) {
-  if (!diff) return null
-  return (
-    <div className="sheet-lab__diff-hunks">
-      {(diff.hunks || []).map((hunk, hi) => (
-        <div key={hi}>
-          <div className="sheet-lab__diff-hunk-header">
-            @@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@
-          </div>
-          {hunk.lines.map((line, li) => (
-            <div
-              key={li}
-              className={`sheet-lab__diff-line sheet-lab__diff-line--${line.type}`}
-            >
-              <span className="sheet-lab__diff-gutter">
-                {line.type === 'add' ? '+' : line.type === 'remove' ? '-' : ' '}
-              </span>
-              <span className="sheet-lab__diff-content">
-                {line.segments ? <WordSegments segments={line.segments} /> : line.content}
-              </span>
-            </div>
-          ))}
-        </div>
-      ))}
-      {diff.hunks?.length === 0 ? (
-        <div style={{ padding: 16, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
-          No differences found.
-        </div>
-      ) : null}
-    </div>
-  )
-}
-
-/* ── Side-by-Side Diff Viewer ─────────────────────────────────── */
-
-function SplitDiffView({ diff }) {
-  if (!diff) return null
-
-  // Build paired rows from hunks for side-by-side display
-  const rows = []
-  for (const hunk of (diff.hunks || [])) {
-    rows.push({ type: 'header', text: `@@ -${hunk.oldStart},${hunk.oldLines} +${hunk.newStart},${hunk.newLines} @@` })
-
-    const lines = hunk.lines
-    let i = 0
-    while (i < lines.length) {
-      if (lines[i].type === 'equal') {
-        rows.push({ type: 'equal', left: lines[i], right: lines[i] })
-        i++
-      } else {
-        // Collect consecutive removes and adds
-        const removes = []
-        const adds = []
-        while (i < lines.length && lines[i].type === 'remove') {
-          removes.push(lines[i])
-          i++
-        }
-        while (i < lines.length && lines[i].type === 'add') {
-          adds.push(lines[i])
-          i++
-        }
-        const max = Math.max(removes.length, adds.length)
-        for (let j = 0; j < max; j++) {
-          rows.push({
-            type: 'change',
-            left: removes[j] || null,
-            right: adds[j] || null,
-          })
-        }
-      }
-    }
-  }
-
-  if (rows.length === 0) {
-    return (
-      <div style={{ padding: 16, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
-        No differences found.
-      </div>
-    )
-  }
-
-  return (
-    <div className="sheet-lab__split-diff">
-      <div className="sheet-lab__split-header">
-        <div className="sheet-lab__split-col-header">Old</div>
-        <div className="sheet-lab__split-col-header">New</div>
-      </div>
-      {rows.map((row, ri) => {
-        if (row.type === 'header') {
-          return (
-            <div key={ri} className="sheet-lab__split-hunk-header">
-              {row.text}
-            </div>
-          )
-        }
-
-        return (
-          <div key={ri} className="sheet-lab__split-row">
-            <div className={`sheet-lab__split-cell ${row.left?.type === 'remove' ? 'sheet-lab__split-cell--remove' : row.left?.type === 'equal' ? '' : 'sheet-lab__split-cell--empty'}`}>
-              {row.left ? (
-                row.left.segments ? <WordSegments segments={row.left.segments} /> : row.left.content
-              ) : ''}
-            </div>
-            <div className={`sheet-lab__split-cell ${row.right?.type === 'add' ? 'sheet-lab__split-cell--add' : row.right?.type === 'equal' ? '' : 'sheet-lab__split-cell--empty'}`}>
-              {row.right ? (
-                row.right.segments ? <WordSegments segments={row.right.segments} /> : row.right.content
-              ) : ''}
-            </div>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-/* ── DiffViewer with mode toggle ──────────────────────────────── */
-
-function DiffViewer({ diff, title }) {
-  const [mode, setMode] = useState('unified')
-
-  return (
-    <div className="sheet-lab__diff">
-      <div className="sheet-lab__diff-header">
-        <h3 className="sheet-lab__diff-title">{title || 'Diff'}</h3>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <div className="sheet-lab__diff-stats">
-            <span className="sheet-lab__diff-additions">+{diff.additions}</span>
-            <span className="sheet-lab__diff-deletions">-{diff.deletions}</span>
-          </div>
-          <div className="sheet-lab__diff-mode-toggle">
-            <button
-              type="button"
-              className={`sheet-lab__diff-mode-btn${mode === 'unified' ? ' active' : ''}`}
-              onClick={() => setMode('unified')}
-            >
-              Unified
-            </button>
-            <button
-              type="button"
-              className={`sheet-lab__diff-mode-btn${mode === 'split' ? ' active' : ''}`}
-              onClick={() => setMode('split')}
-            >
-              Split
-            </button>
-          </div>
-        </div>
-      </div>
-      {mode === 'unified' ? <UnifiedDiffView diff={diff} /> : <SplitDiffView diff={diff} />}
-    </div>
-  )
-}
-
 export default function SheetLabPage() {
-  const navigate = useNavigate()
-  const { id } = useParams()
-  const sheetId = Number.parseInt(id, 10)
   usePageTitle('Sheet Lab')
-  const { user, clearSession } = useSession()
 
-  const [sheet, setSheet] = useState(null)
-  const [commits, setCommits] = useState([])
-  const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-
-  const [expandedCommitId, setExpandedCommitId] = useState(null)
-  const [expandedContent, setExpandedContent] = useState(null)
-  const [loadingContent, setLoadingContent] = useState(false)
-
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  const [commitMessage, setCommitMessage] = useState('')
-  const [autoSummary, setAutoSummary] = useState('')
-  const [loadingSummary, setLoadingSummary] = useState(false)
-  const [creating, setCreating] = useState(false)
-
-  const [restoring, setRestoring] = useState(null)
-  const [restorePreview, setRestorePreview] = useState(null)
-  const [loadingRestorePreview, setLoadingRestorePreview] = useState(null)
-
-  const [compareMode, setCompareMode] = useState(false)
-  const [compareSelection, setCompareSelection] = useState([])
-  const [diff, setDiff] = useState(null)
-  const [loadingDiff, setLoadingDiff] = useState(false)
-
-  const timelineRef = useRef(null)
-  const animatedRef = useRef(false)
-
-  const isOwner = user && sheet && (user.role === 'admin' || user.id === sheet.userId)
-
-  // Load sheet info
-  useEffect(() => {
-    if (!Number.isInteger(sheetId)) {
-      setError('Invalid sheet ID.')
-      setLoading(false)
-      return
-    }
-
-    let cancelled = false
-    async function fetchSheet() {
-      try {
-        const response = await fetch(`${API}/api/sheets/${sheetId}`, {
-          headers: authHeaders(),
-          credentials: 'include',
-        })
-        const data = await readJsonSafely(response, {})
-        if (isAuthSessionFailure(response, data)) {
-          clearSession()
-          navigate('/login', { replace: true })
-          return
-        }
-        if (!response.ok) throw new Error(getApiErrorMessage(data, 'Could not load sheet.'))
-        if (!cancelled) setSheet(data)
-      } catch (err) {
-        if (!cancelled) setError(err.message)
-      }
-    }
-    fetchSheet()
-    return () => { cancelled = true }
-  }, [sheetId, clearSession, navigate])
-
-  // Load commits
-  const loadCommits = useCallback(async (targetPage = 1) => {
-    if (!Number.isInteger(sheetId)) return
-    setLoading(true)
-    try {
-      const response = await fetch(
-        `${API}/api/sheets/${sheetId}/lab/commits?page=${targetPage}&limit=20`,
-        { headers: authHeaders(), credentials: 'include' }
-      )
-      const data = await readJsonSafely(response, {})
-      if (isAuthSessionFailure(response, data)) {
-        clearSession()
-        navigate('/login', { replace: true })
-        return
-      }
-      if (!response.ok) throw new Error(getApiErrorMessage(data, 'Could not load commits.'))
-      setCommits(data.commits || [])
-      setTotal(data.total || 0)
-      setPage(data.page || 1)
-      setTotalPages(data.totalPages || 1)
-      setError('')
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setLoading(false)
-    }
-  }, [sheetId, clearSession, navigate])
-
-  useEffect(() => {
-    loadCommits(1)
-  }, [loadCommits])
-
-  // Animate timeline on first data load
-  useEffect(() => {
-    if (loading || animatedRef.current || commits.length === 0) return
-    animatedRef.current = true
-    if (timelineRef.current) {
-      const items = timelineRef.current.querySelectorAll('.sheet-lab__commit')
-      items.forEach((el) => el.classList.add('animate-init'))
-      if (items.length > 0) staggerEntrance(items, { staggerMs: 60, y: 16 })
-    }
-  }, [loading, commits.length])
-
-  // Expand / collapse commit content
-  const toggleCommitContent = async (commitId) => {
-    if (expandedCommitId === commitId) {
-      setExpandedCommitId(null)
-      setExpandedContent(null)
-      return
-    }
-    setExpandedCommitId(commitId)
-    setLoadingContent(true)
-    try {
-      const response = await fetch(
-        `${API}/api/sheets/${sheetId}/lab/commits/${commitId}`,
-        { headers: authHeaders(), credentials: 'include' }
-      )
-      const data = await readJsonSafely(response, {})
-      if (!response.ok) throw new Error(getApiErrorMessage(data, 'Could not load commit content.'))
-      setExpandedContent(data.commit?.content || '')
-    } catch (err) {
-      showToast(err.message, 'error')
-      setExpandedContent(null)
-    } finally {
-      setLoadingContent(false)
-    }
-  }
-
-  // Fetch auto-summary when create modal opens
-  const fetchAutoSummary = useCallback(async () => {
-    if (!Number.isInteger(sheetId)) return
-    setLoadingSummary(true)
-    try {
-      const response = await fetch(
-        `${API}/api/sheets/${sheetId}/lab/auto-summary`,
-        { headers: authHeaders(), credentials: 'include' }
-      )
-      const data = await readJsonSafely(response, {})
-      if (response.ok && data.summary) {
-        setAutoSummary(data.summary)
-        if (!commitMessage.trim()) setCommitMessage(data.summary)
-      }
-    } catch {
-      // Non-critical — silently skip
-    } finally {
-      setLoadingSummary(false)
-    }
-  }, [sheetId, commitMessage])
-
-  useEffect(() => {
-    if (showCreateModal) fetchAutoSummary()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showCreateModal])
-
-  // Create snapshot
-  const handleCreateCommit = async () => {
-    if (creating) return
-    setCreating(true)
-    try {
-      const response = await fetch(`${API}/api/sheets/${sheetId}/lab/commits`, {
-        method: 'POST',
-        headers: authHeaders(),
-        credentials: 'include',
-        body: JSON.stringify({ message: commitMessage.trim() || 'Snapshot' }),
-      })
-      const data = await readJsonSafely(response, {})
-      if (!response.ok) throw new Error(getApiErrorMessage(data, 'Could not create snapshot.'))
-      showToast('Snapshot created!', 'success')
-      setShowCreateModal(false)
-      setCommitMessage('')
-      setAutoSummary('')
-      animatedRef.current = false
-      loadCommits(1)
-    } catch (err) {
-      showToast(err.message, 'error')
-    } finally {
-      setCreating(false)
-    }
-  }
-
-  // Preview-before-restore
-  const handlePreviewRestore = async (commitId) => {
-    if (loadingRestorePreview) return
-    setLoadingRestorePreview(commitId)
-    try {
-      const response = await fetch(
-        `${API}/api/sheets/${sheetId}/lab/restore-preview/${commitId}`,
-        { headers: authHeaders(), credentials: 'include' }
-      )
-      const data = await readJsonSafely(response, {})
-      if (!response.ok) throw new Error(getApiErrorMessage(data, 'Could not preview restore.'))
-      setRestorePreview({ diff: data.diff, commit: data.commit, commitId })
-    } catch (err) {
-      showToast(err.message, 'error')
-    } finally {
-      setLoadingRestorePreview(null)
-    }
-  }
-
-  // Confirm restore
-  const handleRestore = async (commitId) => {
-    if (restoring) return
-    setRestoring(commitId)
-    try {
-      const response = await fetch(`${API}/api/sheets/${sheetId}/lab/restore/${commitId}`, {
-        method: 'POST',
-        headers: authHeaders(),
-        credentials: 'include',
-      })
-      const data = await readJsonSafely(response, {})
-      if (!response.ok) throw new Error(getApiErrorMessage(data, 'Could not restore snapshot.'))
-      showToast('Sheet restored to selected snapshot.', 'success')
-      setRestorePreview(null)
-      animatedRef.current = false
-      loadCommits(1)
-    } catch (err) {
-      showToast(err.message, 'error')
-    } finally {
-      setRestoring(null)
-    }
-  }
-
-  // Compare mode
-  const toggleCompareSelection = (commitId) => {
-    setCompareSelection((prev) => {
-      if (prev.includes(commitId)) return prev.filter((cid) => cid !== commitId)
-      if (prev.length >= 2) return [prev[1], commitId]
-      return [...prev, commitId]
-    })
-  }
-
-  useEffect(() => {
-    if (!compareMode) {
-      setCompareSelection([])
-      setDiff(null)
-    }
-  }, [compareMode])
-
-  const runDiff = async () => {
-    if (compareSelection.length !== 2) return
-    const [idA, idB] = compareSelection
-    setLoadingDiff(true)
-    try {
-      const response = await fetch(
-        `${API}/api/sheets/${sheetId}/lab/diff/${idA}/${idB}`,
-        { headers: authHeaders(), credentials: 'include' }
-      )
-      const data = await readJsonSafely(response, {})
-      if (!response.ok) throw new Error(getApiErrorMessage(data, 'Could not compute diff.'))
-      setDiff(data.diff)
-    } catch (err) {
-      showToast(err.message, 'error')
-    } finally {
-      setLoadingDiff(false)
-    }
-  }
-
-  useEffect(() => {
-    if (compareSelection.length === 2) runDiff()
-    else setDiff(null)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [compareSelection])
-
-  const handleBack = () => {
-    navigate(`/sheets/${sheetId}`)
-  }
+  const {
+    sheet,
+    commits,
+    total,
+    page,
+    totalPages,
+    loading,
+    error,
+    expandedCommitId,
+    expandedContent,
+    loadingContent,
+    showCreateModal,
+    setShowCreateModal,
+    commitMessage,
+    setCommitMessage,
+    autoSummary,
+    setAutoSummary,
+    loadingSummary,
+    creating,
+    restoring,
+    restorePreview,
+    setRestorePreview,
+    loadingRestorePreview,
+    compareMode,
+    setCompareMode,
+    compareSelection,
+    diff,
+    loadingDiff,
+    timelineRef,
+    isOwner,
+    loadCommits,
+    toggleCommitContent,
+    handleCreateCommit,
+    handlePreviewRestore,
+    handleRestore,
+    toggleCompareSelection,
+    handleBack,
+  } = useSheetLab()
 
   return (
     <>

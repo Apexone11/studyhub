@@ -4,7 +4,7 @@ import request from 'supertest'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const require = createRequire(import.meta.url)
-const adminRoutePath = require.resolve('../src/routes/admin')
+const adminRoutePath = require.resolve('../src/modules/admin')
 
 const mocks = vi.hoisted(() => {
   const state = { role: 'student' }
