@@ -1,8 +1,14 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
 import { GoogleLogin } from '@react-oauth/google'
 import { API, GOOGLE_CLIENT_ID } from '../../config'
 import { Button, FormField, Input, Message, MsgList, SectionCard } from './settingsShared'
-import { isWebAuthnSupported, registerPasskey, listPasskeys, removePasskey } from '../../lib/webauthn'
+import PasskeysSection from './PasskeysSection'
+import {
+  googleLinkedBadgeStyle,
+  googleOnlyHintStyle,
+  googlePopupWrapperStyle,
+  googlePopupCenterStyle,
+} from './securityConstants'
 
 export default function SecurityTab({ user, sessionUser, busyKey, setBusyKey, handlePatch, syncUser }) {
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
@@ -15,60 +21,6 @@ export default function SecurityTab({ user, sessionUser, busyKey, setBusyKey, ha
 
   const isGoogleOnly = user?.authProvider === 'google'
   const [showGooglePopup, setShowGooglePopup] = useState(false)
-
-  // ── Passkeys state (admin only) ─────────────────────────────────────
-  const isAdmin = user?.role === 'admin' || sessionUser?.role === 'admin'
-  const webauthnSupported = isWebAuthnSupported()
-  const [passkeys, setPasskeys] = useState([])
-  const [passkeyMsg, setPasskeyMsg] = useState(null)
-  const [passkeyName, setPasskeyName] = useState('')
-  const [loadingPasskeys, setLoadingPasskeys] = useState(false)
-
-  const loadPasskeys = useCallback(async () => {
-    if (!isAdmin || !webauthnSupported) return
-    setLoadingPasskeys(true)
-    try {
-      const creds = await listPasskeys()
-      setPasskeys(creds)
-    } catch {
-      // Silently fail on initial load
-    } finally {
-      setLoadingPasskeys(false)
-    }
-  }, [isAdmin, webauthnSupported])
-
-  useEffect(() => {
-    loadPasskeys()
-  }, [loadPasskeys])
-
-  async function handleRegisterPasskey() {
-    setPasskeyMsg(null)
-    setBusyKey('passkey-register')
-    try {
-      await registerPasskey(passkeyName || undefined)
-      setPasskeyMsg({ type: 'success', text: 'Passkey registered successfully.' })
-      setPasskeyName('')
-      await loadPasskeys()
-    } catch (err) {
-      setPasskeyMsg({ type: 'error', text: err.message || 'Failed to register passkey.' })
-    } finally {
-      setBusyKey('')
-    }
-  }
-
-  async function handleRemovePasskey(id) {
-    setPasskeyMsg(null)
-    setBusyKey(`passkey-remove-${id}`)
-    try {
-      await removePasskey(id)
-      setPasskeyMsg({ type: 'success', text: 'Passkey removed.' })
-      await loadPasskeys()
-    } catch (err) {
-      setPasskeyMsg({ type: 'error', text: err.message || 'Failed to remove passkey.' })
-    } finally {
-      setBusyKey('')
-    }
-  }
 
   async function handleGoogleLinkSuccess(credentialResponse) {
     if (!credentialResponse?.credential) {
@@ -194,7 +146,7 @@ export default function SecurityTab({ user, sessionUser, busyKey, setBusyKey, ha
           <MsgList msg={googleMsg} />
           {user?.googleId ? (
             <div>
-              <div style={{ padding: '12px 16px', borderRadius: 12, background: '#f0fdf4', border: '1px solid #bbf7d0', marginBottom: 14, fontSize: 13, color: '#166534' }}>
+              <div style={googleLinkedBadgeStyle}>
                 Google account is linked (provider: {user.authProvider})
               </div>
               {user.authProvider !== 'google' && (
@@ -208,14 +160,14 @@ export default function SecurityTab({ user, sessionUser, busyKey, setBusyKey, ha
                 </>
               )}
               {user.authProvider === 'google' && (
-                <div style={{ fontSize: 12, color: '#94a3b8' }}>
+                <div style={googleOnlyHintStyle}>
                   Set a password first before unlinking Google (your only sign-in method).
                 </div>
               )}
             </div>
           ) : showGooglePopup ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <div style={googlePopupWrapperStyle}>
+              <div style={googlePopupCenterStyle}>
                 <GoogleLogin
                   onSuccess={handleGoogleLinkSuccess}
                   onError={() => setGoogleMsg({ type: 'error', text: 'Google sign-in was cancelled or failed.' })}
@@ -235,71 +187,7 @@ export default function SecurityTab({ user, sessionUser, busyKey, setBusyKey, ha
         </SectionCard>
       )}
 
-      {isAdmin && (
-        <SectionCard title="Passkeys" subtitle="Register a passkey for passwordless admin sign-in.">
-          <MsgList msg={passkeyMsg} />
-          {!webauthnSupported ? (
-            <Message tone="info">Your browser does not support WebAuthn passkeys. Try Chrome, Safari, or Edge on a supported device.</Message>
-          ) : (
-            <>
-              {loadingPasskeys ? (
-                <div style={{ fontSize: 13, color: '#64748b', padding: '12px 0' }}>Loading passkeys...</div>
-              ) : passkeys.length === 0 ? (
-                <div style={{ fontSize: 13, color: '#64748b', padding: '8px 0 16px' }}>No passkeys registered yet.</div>
-              ) : (
-                <div style={{ marginBottom: 16 }}>
-                  {passkeys.map((pk) => (
-                    <div
-                      key={pk.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '12px 14px',
-                        borderRadius: 10,
-                        border: '1px solid #e2e8f0',
-                        marginBottom: 8,
-                        background: '#f8fafc',
-                      }}
-                    >
-                      <div>
-                        <div style={{ fontSize: 14, fontWeight: 600, color: '#0f172a' }}>{pk.name || 'Passkey'}</div>
-                        <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>
-                          Added {new Date(pk.createdAt).toLocaleDateString()}
-                          {pk.deviceType && ` \u00b7 ${pk.deviceType}`}
-                        </div>
-                      </div>
-                      <Button
-                        danger
-                        disabled={busyKey === `passkey-remove-${pk.id}`}
-                        onClick={() => handleRemovePasskey(pk.id)}
-                        style={{ padding: '6px 12px', fontSize: 12 }}
-                      >
-                        {busyKey === `passkey-remove-${pk.id}` ? 'Removing...' : 'Remove'}
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <FormField label="Passkey Name (optional)" hint="Give this passkey a name to identify it later.">
-                <Input
-                  value={passkeyName}
-                  onChange={(e) => setPasskeyName(e.target.value)}
-                  placeholder="e.g. MacBook Pro, iPhone"
-                  maxLength={60}
-                />
-              </FormField>
-              <Button
-                disabled={busyKey === 'passkey-register'}
-                onClick={handleRegisterPasskey}
-              >
-                {busyKey === 'passkey-register' ? 'Registering...' : 'Register New Passkey'}
-              </Button>
-            </>
-          )}
-        </SectionCard>
-      )}
+      <PasskeysSection user={user} sessionUser={sessionUser} busyKey={busyKey} setBusyKey={setBusyKey} />
     </>
   )
 }

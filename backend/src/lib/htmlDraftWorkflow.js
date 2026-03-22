@@ -1,301 +1,32 @@
-const crypto = require('node:crypto')
-const { normalizeContentFormat, classifyHtmlRisk, RISK_TIER } = require('./htmlSecurity')
-const { scanBufferWithClamAv } = require('./clamav')
+/**
+ * HTML draft workflow — orchestration layer and re-export barrel.
+ *
+ * Implementation split into:
+ *   ./htmlDraftStorage.js    — constants, checksums, DB helpers
+ *   ./htmlDraftValidation.js — scan logic, tier mapping, findings
+ */
+
+const { RISK_TIER } = require('./htmlSecurity')
 const { sendHighRiskSheetAlert } = require('./email')
 const { createNotification } = require('./notify')
 
-const SCAN_STATUS = {
-  QUEUED: 'queued',
-  RUNNING: 'running',
-  PASSED: 'passed',
-  FLAGGED: 'flagged',
-  PENDING_REVIEW: 'pending_review',
-  QUARANTINED: 'quarantined',
-}
+const {
+  SCAN_STATUS,
+  HTML_VERSION_KIND,
+  computeHtmlChecksum,
+  normalizeTitle,
+  normalizeDescription,
+  findVersionByKind,
+  upsertHtmlVersion,
+  ensureSheetOwnership,
+  upsertDraftSheet,
+} = require('./htmlDraftStorage')
 
-const HTML_VERSION_KIND = {
-  ORIGINAL: 'original',
-  WORKING: 'working',
-}
-
-const scanTimers = new Map()
-
-function computeHtmlChecksum(content) {
-  return crypto.createHash('sha256').update(String(content || ''), 'utf8').digest('hex')
-}
-
-function normalizeTitle(value, fallback = 'Untitled draft') {
-  const title = String(value || '').trim().slice(0, 160)
-  return title || fallback
-}
-
-function normalizeDescription(value) {
-  return String(value || '').trim().slice(0, 300)
-}
-
-/**
- * Map a risk tier to the corresponding scan status string.
- */
-function tierToScanStatus(tier) {
-  switch (tier) {
-    case RISK_TIER.CLEAN: return SCAN_STATUS.PASSED
-    case RISK_TIER.FLAGGED: return SCAN_STATUS.FLAGGED
-    case RISK_TIER.HIGH_RISK: return SCAN_STATUS.PENDING_REVIEW
-    case RISK_TIER.QUARANTINED: return SCAN_STATUS.QUARANTINED
-    default: return SCAN_STATUS.PASSED
-  }
-}
-
-/**
- * Build findings array from classifier output + AV result.
- */
-function normalizeFindings(classifierResult, avResult) {
-  const findings = []
-
-  for (const finding of classifierResult.findings) {
-    findings.push({
-      source: finding.category || 'policy',
-      severity: finding.severity || 'medium',
-      message: finding.message,
-    })
-  }
-
-  if (avResult) {
-    if (avResult.status === 'infected') {
-      findings.push({
-        source: 'av',
-        severity: 'critical',
-        message: avResult.threat || 'Malicious payload detected by antivirus.',
-      })
-    } else if (avResult.status === 'error') {
-      findings.push({
-        source: 'av',
-        severity: 'high',
-        message: avResult.message || 'Antivirus scanner unavailable.',
-      })
-    }
-  }
-
-  return findings
-}
-
-function findVersionByKind(sheet, kind) {
-  return (sheet.htmlVersions || []).find((entry) => entry.kind === kind) || null
-}
-
-async function upsertHtmlVersion(prisma, { sheetId, userId, kind, content, sourceName }) {
-  const checksum = computeHtmlChecksum(content)
-  return prisma.sheetHtmlVersion.upsert({
-    where: {
-      sheetId_kind: {
-        sheetId,
-        kind,
-      },
-    },
-    create: {
-      sheetId,
-      userId,
-      kind,
-      sourceName: sourceName || null,
-      content,
-      checksum,
-    },
-    update: {
-      sourceName: sourceName || null,
-      content,
-      checksum,
-      compressedContent: null,
-      compressionAlgo: null,
-      archivedAt: null,
-    },
-  })
-}
-
-async function ensureSheetOwnership(prisma, sheetId, user) {
-  const sheet = await prisma.studySheet.findUnique({
-    where: { id: sheetId },
-    include: {
-      htmlVersions: true,
-      author: { select: { id: true, username: true } },
-    },
-  })
-
-  if (!sheet) {
-    const error = new Error('Sheet not found.')
-    error.statusCode = 404
-    throw error
-  }
-  if (sheet.userId !== user.userId && user.role !== 'admin') {
-    const error = new Error('Not your sheet.')
-    error.statusCode = 403
-    throw error
-  }
-  return sheet
-}
-
-async function upsertDraftSheet(prisma, { sheetId, user, title, courseId, description, allowDownloads, content }) {
-  if (!Number.isInteger(courseId) || courseId <= 0) {
-    const error = new Error('Course is required.')
-    error.statusCode = 400
-    throw error
-  }
-
-  if (Number.isInteger(sheetId)) {
-    const existing = await ensureSheetOwnership(prisma, sheetId, user)
-    const updated = await prisma.studySheet.update({
-      where: { id: sheetId },
-      data: {
-        title: normalizeTitle(title),
-        courseId,
-        description: normalizeDescription(description),
-        allowDownloads: allowDownloads !== false,
-        content,
-        contentFormat: 'html',
-        status: 'draft',
-        htmlScanStatus: SCAN_STATUS.QUEUED,
-        htmlScanFindings: null,
-        htmlRiskTier: 0,
-      },
-      include: {
-        author: { select: { id: true, username: true } },
-        course: { include: { school: true } },
-        htmlVersions: true,
-      },
-    })
-
-    if (existing.contentFormat !== 'html') {
-      await prisma.sheetHtmlVersion.deleteMany({ where: { sheetId: existing.id } })
-    }
-
-    return updated
-  }
-
-  return prisma.studySheet.create({
-    data: {
-      title: normalizeTitle(title),
-      courseId,
-      description: normalizeDescription(description),
-      allowDownloads: allowDownloads !== false,
-      content,
-      contentFormat: normalizeContentFormat('html'),
-      status: 'draft',
-      userId: user.userId,
-      htmlScanStatus: SCAN_STATUS.QUEUED,
-      htmlScanFindings: null,
-      htmlRiskTier: 0,
-    },
-    include: {
-      author: { select: { id: true, username: true } },
-      course: { include: { school: true } },
-      htmlVersions: true,
-    },
-  })
-}
-
-async function runHtmlScanNow(prisma, { sheetId }) {
-  const sheet = await prisma.studySheet.findUnique({
-    where: { id: sheetId },
-    include: { htmlVersions: true, author: { select: { id: true, username: true } } },
-  })
-
-  if (!sheet || sheet.contentFormat !== 'html') {
-    return {
-      status: SCAN_STATUS.PASSED,
-      tier: RISK_TIER.CLEAN,
-      findings: [],
-    }
-  }
-
-  const workingVersion = findVersionByKind(sheet, HTML_VERSION_KIND.WORKING)
-  const htmlToScan = String(workingVersion?.content || sheet.content || '')
-
-  await prisma.studySheet.update({
-    where: { id: sheetId },
-    data: {
-      htmlScanStatus: SCAN_STATUS.RUNNING,
-      htmlScanUpdatedAt: new Date(),
-    },
-  })
-
-  // Phase 1: classify risk tier
-  const classifierResult = classifyHtmlRisk(htmlToScan)
-  let tier = classifierResult.tier
-
-  // Phase 2: always run ClamAV (regardless of classifier result)
-  const avResult = await scanBufferWithClamAv(Buffer.from(htmlToScan, 'utf8'))
-
-  // AV infected → escalate to Tier 3. AV error → log but don't escalate.
-  if (avResult && avResult.status === 'infected') {
-    tier = RISK_TIER.QUARANTINED
-  }
-
-  const findings = normalizeFindings(classifierResult, avResult)
-  const scanStatus = tierToScanStatus(tier)
-
-  await prisma.studySheet.update({
-    where: { id: sheetId },
-    data: {
-      htmlScanStatus: scanStatus,
-      htmlRiskTier: tier,
-      htmlScanFindings: findings,
-      htmlScanUpdatedAt: new Date(),
-      content: htmlToScan,
-      // If sheet was pending_review but scan now shows clean + not acknowledged, revert to draft
-      status: sheet.status === 'pending_review' && tier === RISK_TIER.CLEAN && !sheet.htmlScanAcknowledgedAt
-        ? 'draft'
-        : sheet.status,
-    },
-  })
-
-  return {
-    status: scanStatus,
-    tier,
-    findings,
-  }
-}
-
-function scheduleHtmlScan(prisma, { sheetId, delayMs = 450 }) {
-  const safeDelay = Number.isFinite(delayMs) ? Math.max(20, Math.round(delayMs)) : 450
-
-  const existing = scanTimers.get(sheetId)
-  if (existing) {
-    clearTimeout(existing)
-    scanTimers.delete(sheetId)
-  }
-
-  return prisma.studySheet.update({
-    where: { id: sheetId },
-    data: {
-      htmlScanStatus: SCAN_STATUS.QUEUED,
-      htmlScanUpdatedAt: new Date(),
-      htmlScanFindings: null,
-      htmlRiskTier: 0,
-    },
-  }).finally(() => {
-    const timer = setTimeout(async () => {
-      scanTimers.delete(sheetId)
-      try {
-        await runHtmlScanNow(prisma, { sheetId })
-      } catch (scanErr) {
-        console.error(`[htmlDraftWorkflow] Background scan failed for sheet ${sheetId}:`, scanErr)
-        await prisma.studySheet.update({
-          where: { id: sheetId },
-          data: {
-            htmlScanStatus: SCAN_STATUS.FLAGGED,
-            htmlRiskTier: RISK_TIER.FLAGGED,
-            htmlScanFindings: [{ source: 'system', severity: 'high', message: 'Background scan failed to complete.' }],
-            htmlScanUpdatedAt: new Date(),
-          },
-        }).catch((updateErr) => {
-          console.error(`[htmlDraftWorkflow] Failed to update scan status for sheet ${sheetId}:`, updateErr)
-        })
-      }
-    }, safeDelay)
-
-    if (typeof timer.unref === 'function') timer.unref()
-    scanTimers.set(sheetId, timer)
-  })
-}
+const {
+  normalizeFindings,
+  runHtmlScanNow,
+  scheduleHtmlScan,
+} = require('./htmlDraftValidation')
 
 async function importHtmlDraft(prisma, { sheetId, user, title, courseId, description, allowDownloads, html, sourceName }) {
   const content = String(html || '')
@@ -511,13 +242,16 @@ async function submitHtmlDraftForReview(prisma, { sheetId, user }) {
 }
 
 module.exports = {
+  // Re-exported from htmlDraftStorage
   SCAN_STATUS,
   HTML_VERSION_KIND,
   computeHtmlChecksum,
-  normalizeFindings,
   upsertHtmlVersion,
+  // Re-exported from htmlDraftValidation
+  normalizeFindings,
   runHtmlScanNow,
   scheduleHtmlScan,
+  // Workflow orchestration (defined in this file)
   importHtmlDraft,
   updateWorkingHtmlDraft,
   getHtmlScanStatus,

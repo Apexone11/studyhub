@@ -1,0 +1,251 @@
+const express = require('express')
+const prisma = require('../../lib/prisma')
+const { captureError } = require('../../monitoring/sentry')
+const { parsePositiveInt } = require('../../core/http/validate')
+const {
+  settleSection,
+  formatAnnouncement,
+  formatSheet,
+  formatPost,
+} = require('./feed.service')
+
+const router = express.Router()
+
+router.get('/', async (req, res) => {
+  const startedAt = Date.now()
+  const limit = parsePositiveInt(req.query.limit, 20)
+  const offset = Math.max(0, Number.parseInt(req.query.offset, 10) || 0)
+  const take = limit + offset + 8
+  const announcementTake = Math.min(6, Math.max(2, Math.ceil((limit + offset) / 3)))
+  const search = typeof req.query.search === 'string' ? req.query.search.trim() : ''
+
+  const sheetWhere = search
+    ? {
+        status: 'published',
+        htmlRiskTier: { lt: 3 },
+        OR: [
+          { title: { contains: search, mode: 'insensitive' } },
+          { content: { contains: search, mode: 'insensitive' } },
+          { description: { contains: search, mode: 'insensitive' } },
+        ],
+      }
+    : { status: 'published', htmlRiskTier: { lt: 3 } }
+  const postWhere = search
+    ? { content: { contains: search, mode: 'insensitive' } }
+    : undefined
+  const announcementWhere = search
+    ? {
+        OR: [
+          { title: { contains: search, mode: 'insensitive' } },
+          { body: { contains: search, mode: 'insensitive' } },
+        ],
+      }
+    : undefined
+
+  try {
+    const primarySections = await Promise.all([
+      settleSection('announcements', () => prisma.announcement.findMany({
+        where: announcementWhere,
+        include: { author: { select: { id: true, username: true } } },
+        orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
+        take: announcementTake,
+      })),
+      settleSection('sheets', () => prisma.studySheet.findMany({
+        where: sheetWhere,
+        include: {
+          author: { select: { id: true, username: true } },
+          course: { select: { id: true, code: true } },
+          forkSource: {
+            select: {
+              id: true,
+              title: true,
+              author: { select: { id: true, username: true } },
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        take,
+      })),
+      settleSection('posts', () => prisma.feedPost.findMany({
+        where: postWhere,
+        include: {
+          author: { select: { id: true, username: true } },
+          course: { select: { id: true, code: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take,
+      })),
+    ])
+
+    const announcements = primarySections.find((section) => section.label === 'announcements' && section.ok)?.data || []
+    const sheets = primarySections.find((section) => section.label === 'sheets' && section.ok)?.data || []
+    const posts = primarySections.find((section) => section.label === 'posts' && section.ok)?.data || []
+
+    const degradedSections = primarySections
+      .filter((section) => !section.ok)
+      .map((section) => `${section.label} temporarily unavailable`)
+
+    primarySections
+      .filter((section) => !section.ok)
+      .forEach((section) => {
+        captureError(section.error, {
+          route: req.originalUrl,
+          method: req.method,
+          feedSection: section.label,
+        })
+      })
+
+    if (!announcements.length && !sheets.length && !posts.length) {
+      console.error('[feed] all primary sections failed', {
+        userId: req.user.userId,
+        search,
+        durations: primarySections.map((section) => ({
+          label: section.label,
+          ok: section.ok,
+          durationMs: section.durationMs,
+        })),
+      })
+      return res.status(500).json({ error: 'Could not load the feed right now.' })
+    }
+
+    const sheetIds = sheets.map((sheet) => sheet.id)
+    const postIds = posts.map((post) => post.id)
+
+    const secondarySections = await Promise.all([
+      settleSection('starredRows', () => (
+        sheetIds.length > 0
+          ? prisma.starredSheet.findMany({
+              where: { userId: req.user.userId, sheetId: { in: sheetIds } },
+              select: { sheetId: true },
+            })
+          : []
+      )),
+      settleSection('sheetCommentRows', () => (
+        sheetIds.length > 0
+          ? prisma.comment.groupBy({
+              by: ['sheetId'],
+              where: { sheetId: { in: sheetIds } },
+              _count: { _all: true },
+            })
+          : []
+      )),
+      settleSection('postCommentRows', () => (
+        postIds.length > 0
+          ? prisma.feedPostComment.groupBy({
+              by: ['postId'],
+              where: { postId: { in: postIds } },
+              _count: { _all: true },
+            })
+          : []
+      )),
+      settleSection('sheetReactionRows', () => (
+        sheetIds.length > 0
+          ? prisma.reaction.groupBy({
+              by: ['sheetId', 'type'],
+              where: { sheetId: { in: sheetIds } },
+              _count: { _all: true },
+            })
+          : []
+      )),
+      settleSection('postReactionRows', () => (
+        postIds.length > 0
+          ? prisma.feedPostReaction.groupBy({
+              by: ['postId', 'type'],
+              where: { postId: { in: postIds } },
+              _count: { _all: true },
+            })
+          : []
+      )),
+      settleSection('currentSheetReactions', () => (
+        sheetIds.length > 0
+          ? prisma.reaction.findMany({
+              where: { userId: req.user.userId, sheetId: { in: sheetIds } },
+              select: { sheetId: true, type: true },
+            })
+          : []
+      )),
+      settleSection('currentPostReactions', () => (
+        postIds.length > 0
+          ? prisma.feedPostReaction.findMany({
+              where: { userId: req.user.userId, postId: { in: postIds } },
+              select: { postId: true, type: true },
+            })
+          : []
+      )),
+    ])
+
+    secondarySections
+      .filter((section) => !section.ok)
+      .forEach((section) => {
+        degradedSections.push(`${section.label} temporarily unavailable`)
+        captureError(section.error, {
+          route: req.originalUrl,
+          method: req.method,
+          feedSection: section.label,
+        })
+      })
+
+    const starredRows = secondarySections.find((section) => section.label === 'starredRows' && section.ok)?.data || []
+    const sheetCommentRows = secondarySections.find((section) => section.label === 'sheetCommentRows' && section.ok)?.data || []
+    const postCommentRows = secondarySections.find((section) => section.label === 'postCommentRows' && section.ok)?.data || []
+    const sheetReactionRows = secondarySections.find((section) => section.label === 'sheetReactionRows' && section.ok)?.data || []
+    const postReactionRows = secondarySections.find((section) => section.label === 'postReactionRows' && section.ok)?.data || []
+    const currentSheetReactions = secondarySections.find((section) => section.label === 'currentSheetReactions' && section.ok)?.data || []
+    const currentPostReactions = secondarySections.find((section) => section.label === 'currentPostReactions' && section.ok)?.data || []
+
+    const starredIds = new Set(starredRows.map((row) => row.sheetId))
+    const sheetCommentCounts = new Map(sheetCommentRows.map((row) => [row.sheetId, row._count._all]))
+    const postCommentCounts = new Map(postCommentRows.map((row) => [row.postId, row._count._all]))
+
+    const items = [
+      ...announcements.map(formatAnnouncement),
+      ...posts.map((post) => formatPost(post, postCommentCounts, postReactionRows, currentPostReactions)),
+      ...sheets.map((sheet) => formatSheet(sheet, starredIds, sheetCommentCounts, sheetReactionRows, currentSheetReactions)),
+    ]
+      .sort((left, right) => {
+        if (left.type === 'announcement' && right.type === 'announcement') {
+          if (left.pinned !== right.pinned) return left.pinned ? -1 : 1
+        } else if (left.type === 'announcement' && left.pinned) {
+          return -1
+        } else if (right.type === 'announcement' && right.pinned) {
+          return 1
+        }
+
+        return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
+      })
+
+    const payload = {
+      items: items.slice(offset, offset + limit),
+      total: items.length,
+      limit,
+      offset,
+      partial: degradedSections.length > 0,
+      degradedSections,
+    }
+
+    console.info('[feed] loaded', {
+      userId: req.user.userId,
+      search,
+      durationMs: Date.now() - startedAt,
+      partial: payload.partial,
+      counts: {
+        announcements: announcements.length,
+        posts: posts.length,
+        sheets: sheets.length,
+        returned: payload.items.length,
+      },
+      timings: [...primarySections, ...secondarySections].map((section) => ({
+        label: section.label,
+        ok: section.ok,
+        durationMs: section.durationMs,
+      })),
+    })
+
+    res.json(payload)
+  } catch (error) {
+    captureError(error, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+module.exports = router

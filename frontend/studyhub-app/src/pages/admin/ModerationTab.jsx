@@ -1,174 +1,29 @@
-/* ═══════════════════════════════════════════════════════════════════════════
- * ModerationTab.jsx — Admin moderation dashboard tab
- *
- * Extracted from AdminPage to keep that file from growing further.
- * Sub-tabs: Cases | Strikes | Appeals | Restrictions
- *
- * Relies on parent-provided helpers (apiJson, setConfirmAction,
- * formatDateTime) so the auth redirect, error handling, and confirm-dialog
- * pattern stay consistent with every other admin tab.
- * ═══════════════════════════════════════════════════════════════════════════ */
 import { useCallback, useEffect, useState } from 'react'
+import { FONT } from './adminConstants'
+import { SUB_TABS, createState } from './moderationHelpers'
+import CasesSubTab from './CasesSubTab'
+import StrikesSubTab from './StrikesSubTab'
+import AppealsSubTab from './AppealsSubTab'
+import RestrictionsSubTab from './RestrictionsSubTab'
 
-const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
-const PAGE_SIZE = 20
-
-/* ── Sub-tab definitions ──────────────────────────────────────────── */
-const SUB_TABS = [
-  ['cases', 'Cases'],
-  ['strikes', 'Strikes'],
-  ['appeals', 'Appeals'],
-  ['restrictions', 'Restrictions'],
-]
-
-/* ── Inline style helpers (mirror AdminPage patterns) ─────────────── */
-function pillButton(background, color, borderColor) {
-  return {
-    padding: '6px 12px',
-    borderRadius: 999,
-    border: `1px solid ${borderColor}`,
-    background,
-    color,
-    fontSize: 12,
-    fontWeight: 700,
-    cursor: 'pointer',
-    fontFamily: FONT,
-  }
-}
-
-function statusPill(status) {
-  const map = {
-    pending:   { bg: '#fffbeb', color: '#92400e', border: '#fde68a' },
-    dismissed: { bg: '#f8fafc', color: '#475569', border: '#cbd5e1' },
-    confirmed: { bg: '#fef2f2', color: '#b91c1c', border: '#fecaca' },
-    approved:  { bg: '#ecfdf5', color: '#047857', border: '#a7f3d0' },
-    rejected:  { bg: '#fef2f2', color: '#b91c1c', border: '#fecaca' },
-    active:    { bg: '#fef2f2', color: '#b91c1c', border: '#fecaca' },
-    lifted:    { bg: '#f8fafc', color: '#475569', border: '#cbd5e1' },
-    expired:   { bg: '#f8fafc', color: '#475569', border: '#cbd5e1' },
-    decayed:   { bg: '#f8fafc', color: '#475569', border: '#cbd5e1' },
-  }
-  const s = map[status] || map.pending
-  return {
-    display: 'inline-flex',
-    alignItems: 'center',
-    padding: '4px 10px',
-    borderRadius: 999,
-    border: `1px solid ${s.border}`,
-    background: s.bg,
-    color: s.color,
-    fontSize: 11,
-    fontWeight: 700,
-    textTransform: 'capitalize',
-  }
-}
-
-const tableHeadStyle = {
-  padding: '10px 14px',
-  textAlign: 'left',
-  fontWeight: 700,
-  color: '#64748b',
-  borderBottom: '1px solid #e2e8f0',
-  whiteSpace: 'nowrap',
-}
-
-const tableCell = {
-  padding: '10px 14px',
-  color: '#475569',
-  verticalAlign: 'top',
-}
-
-const tableCellStrong = {
-  ...tableCell,
-  fontWeight: 700,
-  color: '#0f172a',
-}
-
-const inputStyle = {
-  width: '100%',
-  boxSizing: 'border-box',
-  padding: '11px 12px',
-  borderRadius: 10,
-  border: '1px solid #dbe1e8',
-  fontSize: 13,
-  color: '#0f172a',
-  fontFamily: FONT,
-}
-
-/* ── Small pager (copied from AdminPage) ──────────────────────────── */
-function Pager({ page, total, onChange }) {
-  const totalPages = Math.max(1, Math.ceil((total || 0) / PAGE_SIZE))
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 16 }}>
-      <button
-        type="button"
-        onClick={() => onChange(Math.max(1, page - 1))}
-        disabled={page <= 1}
-        style={pagerBtn(page <= 1)}
-      >
-        Prev
-      </button>
-      <span style={{ fontSize: 12, color: '#64748b' }}>Page {page}</span>
-      <button
-        type="button"
-        onClick={() => onChange(Math.min(totalPages, page + 1))}
-        disabled={page >= totalPages}
-        style={pagerBtn(page >= totalPages)}
-      >
-        Next
-      </button>
-    </div>
-  )
-}
-
-function pagerBtn(disabled) {
-  return {
-    padding: '7px 14px',
-    borderRadius: 8,
-    border: '1px solid #e2e8f0',
-    background: '#fff',
-    color: disabled ? '#cbd5e1' : '#475569',
-    fontSize: 12,
-    fontWeight: 700,
-    cursor: disabled ? 'not-allowed' : 'pointer',
-    fontFamily: FONT,
-  }
-}
-
-/* ── Helper: default paged state ──────────────────────────────────── */
-function createState() {
-  return { loading: false, loaded: false, error: '', page: 1, total: 0, items: [] }
-}
-
-/* ═════════════════════════════════════════════════════════════════════ */
 export default function ModerationTab({ apiJson, setConfirmAction, formatDateTime }) {
   const [subTab, setSubTab] = useState('cases')
 
-  /* Each sub-tab maintains independent pagination state */
   const [casesState, setCasesState] = useState(createState)
   const [strikesState, setStrikesState] = useState(createState)
   const [appealsState, setAppealsState] = useState(createState)
   const [restrictionsState, setRestrictionsState] = useState(createState)
 
-  /* Filter: case status (pending / dismissed / confirmed) */
   const [caseStatus, setCaseStatus] = useState('pending')
-
-  /* Sort for cases */
   const [caseSort, setCaseSort] = useState('date')
-
-  /* Expanded case detail */
   const [expandedCase, setExpandedCase] = useState(null)
   const [expandedCaseLoading, setExpandedCaseLoading] = useState(false)
-
-  /* Filter: appeal status (pending / approved / rejected) */
   const [appealStatus, setAppealStatus] = useState('pending')
-
-  /* New-strike form state */
   const [strikeForm, setStrikeForm] = useState({ userId: '', reason: '', caseId: '' })
   const [strikeSaving, setStrikeSaving] = useState(false)
   const [strikeError, setStrikeError] = useState('')
 
-  /* ── Loaders ──────────────────────────────────────────────────── */
+  /* ── Loaders ─────────────────────────────────────────────────── */
   const loadCases = useCallback(async (page = 1) => {
     setCasesState((s) => ({ ...s, loading: true, error: '', page }))
     try {
@@ -209,29 +64,14 @@ export default function ModerationTab({ apiJson, setConfirmAction, formatDateTim
     }
   }, [apiJson])
 
-  /* Auto-load on sub-tab activation or filter change */
-  useEffect(() => {
-    if (subTab === 'cases') { void loadCases(1) }
-  }, [subTab, loadCases])
+  useEffect(() => { if (subTab === 'cases') void loadCases(1) }, [subTab, loadCases])
+  useEffect(() => { if (subTab === 'strikes' && !strikesState.loaded && !strikesState.loading) void loadStrikes(1) }, [subTab, strikesState.loaded, strikesState.loading, loadStrikes])
+  useEffect(() => { if (subTab === 'appeals') void loadAppeals(1) }, [subTab, loadAppeals])
+  useEffect(() => { if (subTab === 'restrictions' && !restrictionsState.loaded && !restrictionsState.loading) void loadRestrictions(1) }, [subTab, restrictionsState.loaded, restrictionsState.loading, loadRestrictions])
 
-  useEffect(() => {
-    if (subTab === 'strikes' && !strikesState.loaded && !strikesState.loading) { void loadStrikes(1) }
-  }, [subTab, strikesState.loaded, strikesState.loading, loadStrikes])
-
-  useEffect(() => {
-    if (subTab === 'appeals') { void loadAppeals(1) }
-  }, [subTab, loadAppeals])
-
-  useEffect(() => {
-    if (subTab === 'restrictions' && !restrictionsState.loaded && !restrictionsState.loading) { void loadRestrictions(1) }
-  }, [subTab, restrictionsState.loaded, restrictionsState.loading, loadRestrictions])
-
-  /* ── Load case detail ─────────────────────────────────────────── */
+  /* ── Case detail ─────────────────────────────────────────────── */
   async function loadCaseDetail(caseId) {
-    if (expandedCase?.id === caseId) {
-      setExpandedCase(null)
-      return
-    }
+    if (expandedCase?.id === caseId) { setExpandedCase(null); return }
     setExpandedCaseLoading(true)
     try {
       const data = await apiJson(`/api/admin/moderation/cases/${caseId}`)
@@ -243,7 +83,7 @@ export default function ModerationTab({ apiJson, setConfirmAction, formatDateTim
     }
   }
 
-  /* ── Actions ──────────────────────────────────────────────────── */
+  /* ── Actions ─────────────────────────────────────────────────── */
   function reviewCase(caseId, action) {
     const verb = action === 'dismiss' ? 'Dismiss' : 'Confirm'
     setConfirmAction({
@@ -254,32 +94,21 @@ export default function ModerationTab({ apiJson, setConfirmAction, formatDateTim
       variant: action === 'dismiss' ? 'default' : 'danger',
       onConfirm: async () => {
         setConfirmAction(null)
-        await apiJson(`/api/admin/moderation/cases/${caseId}/review`, {
-          method: 'PATCH',
-          body: JSON.stringify({ action }),
-        })
+        await apiJson(`/api/admin/moderation/cases/${caseId}/review`, { method: 'PATCH', body: JSON.stringify({ action }) })
         setExpandedCase(null)
         await loadCases(casesState.page)
       },
     })
   }
 
-  async function submitStrike(event) {
-    event.preventDefault()
+  async function submitStrike() {
     const userId = Number.parseInt(strikeForm.userId, 10)
-    if (!userId || !strikeForm.reason.trim()) {
-      setStrikeError('User ID and reason are required.')
-      return
-    }
-    setStrikeSaving(true)
-    setStrikeError('')
+    if (!userId || !strikeForm.reason.trim()) { setStrikeError('User ID and reason are required.'); return }
+    setStrikeSaving(true); setStrikeError('')
     try {
       const body = { userId, reason: strikeForm.reason.trim() }
       if (strikeForm.caseId) body.caseId = Number.parseInt(strikeForm.caseId, 10)
-      await apiJson('/api/admin/moderation/strikes', {
-        method: 'POST',
-        body: JSON.stringify(body),
-      })
+      await apiJson('/api/admin/moderation/strikes', { method: 'POST', body: JSON.stringify(body) })
       setStrikeForm({ userId: '', reason: '', caseId: '' })
       await loadStrikes(1)
     } catch (err) {
@@ -312,515 +141,44 @@ export default function ModerationTab({ apiJson, setConfirmAction, formatDateTim
       variant: action === 'approve' ? 'default' : 'danger',
       onConfirm: async () => {
         setConfirmAction(null)
-        await apiJson(`/api/admin/moderation/appeals/${appealId}/review`, {
-          method: 'PATCH',
-          body: JSON.stringify({ action }),
-        })
+        await apiJson(`/api/admin/moderation/appeals/${appealId}/review`, { method: 'PATCH', body: JSON.stringify({ action }) })
         await loadAppeals(appealsState.page)
       },
     })
   }
 
-  /* ── Render helpers ───────────────────────────────────────────── */
-  function renderError(state) {
-    if (!state.error) return null
-    return (
-      <div style={{ color: '#b91c1c', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, padding: '12px 14px', fontSize: 13, marginBottom: 14 }}>
-        {state.error}
-      </div>
-    )
-  }
-
-  function renderLoading(state) {
-    if (!state.loading || state.items.length > 0) return null
-    return <div style={{ color: '#94a3b8', fontSize: 13 }}>Loading...</div>
-  }
-
-  /* ── Sub-tab selector (reuses tab button pattern from AdminPage) ─ */
-  const subTabSelector = (
-    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 18 }}>
-      {SUB_TABS.map(([value, label]) => (
-        <button
-          key={value}
-          type="button"
-          onClick={() => setSubTab(value)}
-          style={{
-            padding: '6px 12px',
-            borderRadius: 8,
-            border: subTab === value ? '1px solid #2563eb' : '1px solid #e2e8f0',
-            background: subTab === value ? '#eff6ff' : '#fff',
-            color: subTab === value ? '#1d4ed8' : '#475569',
-            fontSize: 12,
-            fontWeight: 700,
-            cursor: 'pointer',
-            fontFamily: 'inherit',
-          }}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
-  )
-
-  /* ═════════════════ CASES sub-tab ═════════════════════════════════ */
-  function renderCaseDetail() {
-    if (!expandedCase) return null
-    if (expandedCase._error) {
-      return (
-        <div style={{ marginTop: 12, padding: '12px 14px', border: '1px solid #fecaca', borderRadius: 12, background: '#fef2f2', fontSize: 13, color: '#b91c1c' }}>
-          {expandedCase._error}
-        </div>
-      )
-    }
-
-    const c = expandedCase
-    return (
-      <div style={{ marginTop: 14, border: '1px solid #e2e8f0', borderRadius: 14, padding: '16px 18px', background: '#f8fafc' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
-          <div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', marginBottom: 4 }}>
-              Case #{c.id}
-            </div>
-            <div style={{ fontSize: 12, color: '#64748b' }}>
-              Type: {c.contentType || 'Unknown'} | Content ID: {c.contentId ?? '—'} | Category: {c.category || '—'}
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <span style={statusPill(c.status)}>{c.status}</span>
-            <button type="button" onClick={() => setExpandedCase(null)} style={pillButton('#fff', '#475569', '#cbd5e1')}>
-              Close
-            </button>
-          </div>
-        </div>
-
-        {/* User info */}
-        <div style={{ marginBottom: 12, padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 10, background: '#fff' }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', marginBottom: 4 }}>REPORTED USER</div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
-            {c.user?.username || `User #${c.userId}`}
-          </div>
-        </div>
-
-        {/* Confidence / evidence */}
-        {typeof c.confidence === 'number' ? (
-          <div style={{ marginBottom: 12, padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 10, background: '#fff' }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', marginBottom: 4 }}>CONFIDENCE SCORE</div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: c.confidence >= 0.7 ? '#dc2626' : c.confidence >= 0.4 ? '#f59e0b' : '#059669' }}>
-              {c.confidence.toFixed(2)}
-            </div>
-          </div>
-        ) : null}
-
-        {/* Content snippet */}
-        {c.flaggedText || c.snippet ? (
-          <div style={{ marginBottom: 12, padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 10, background: '#fff' }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', marginBottom: 4 }}>FLAGGED CONTENT</div>
-            <div style={{ fontSize: 13, color: '#475569', whiteSpace: 'pre-wrap', maxHeight: 200, overflow: 'auto' }}>
-              {c.flaggedText || c.snippet || '—'}
-            </div>
-          </div>
-        ) : null}
-
-        {/* Review note */}
-        {c.reviewNote ? (
-          <div style={{ marginBottom: 12, padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 10, background: '#fff' }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', marginBottom: 4 }}>REVIEW NOTE</div>
-            <div style={{ fontSize: 13, color: '#475569' }}>{c.reviewNote}</div>
-            {c.reviewer ? (
-              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>Reviewed by {c.reviewer.username}</div>
-            ) : null}
-          </div>
-        ) : null}
-
-        {/* Related strikes */}
-        {c.strikes && c.strikes.length > 0 ? (
-          <div style={{ marginBottom: 12, padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 10, background: '#fff' }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', marginBottom: 6 }}>LINKED STRIKES ({c.strikes.length})</div>
-            {c.strikes.map((s) => (
-              <div key={s.id} style={{ fontSize: 12, color: '#475569', marginBottom: 4 }}>
-                Strike #{s.id}: {s.reason || '—'} {s.decayedAt ? '(decayed)' : '(active)'}
-              </div>
-            ))}
-          </div>
-        ) : null}
-
-        {/* Related appeals */}
-        {c.appeals && c.appeals.length > 0 ? (
-          <div style={{ marginBottom: 12, padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: 10, background: '#fff' }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', marginBottom: 6 }}>LINKED APPEALS ({c.appeals.length})</div>
-            {c.appeals.map((a) => (
-              <div key={a.id} style={{ fontSize: 12, color: '#475569', marginBottom: 4 }}>
-                Appeal #{a.id}: {a.status} — {a.reason?.slice(0, 100) || '—'}
-              </div>
-            ))}
-          </div>
-        ) : null}
-
-        {/* Quick actions */}
-        {c.status === 'pending' ? (
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 14 }}>
-            <button type="button" onClick={() => reviewCase(c.id, 'confirm')} style={pillButton('#fef2f2', '#dc2626', '#fecaca')}>
-              Confirm Case
-            </button>
-            <button type="button" onClick={() => reviewCase(c.id, 'dismiss')} style={pillButton('#f8fafc', '#475569', '#cbd5e1')}>
-              Dismiss Case
-            </button>
-            <button type="button" onClick={() => {
-              setSubTab('strikes')
-              setStrikeForm({ userId: String(c.userId || ''), reason: `Case #${c.id}: `, caseId: String(c.id) })
-            }} style={pillButton('#eff6ff', '#1d4ed8', '#bfdbfe')}>
-              Issue Strike
-            </button>
-          </div>
-        ) : null}
-
-        <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 10 }}>
-          Created: {formatDateTime(c.createdAt)} | Updated: {formatDateTime(c.updatedAt)}
-        </div>
-      </div>
-    )
-  }
-
-  function renderCases() {
-    /* Sort items client-side based on caseSort */
-    const sortedItems = [...casesState.items].sort((a, b) => {
-      if (caseSort === 'confidence') {
-        return (b.confidence ?? 0) - (a.confidence ?? 0)
-      }
-      return new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
-    })
-
-    return (
-      <>
-        {/* Status filter + Sort */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
-          <div style={{ display: 'flex', gap: 6 }}>
-            {['pending', 'confirmed', 'dismissed'].map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => setCaseStatus(s)}
-                style={{
-                  padding: '5px 10px',
-                  borderRadius: 6,
-                  border: caseStatus === s ? '1px solid #3b82f6' : '1px solid #e2e8f0',
-                  background: caseStatus === s ? '#dbeafe' : '#fff',
-                  color: caseStatus === s ? '#1e40af' : '#64748b',
-                  fontSize: 11,
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  fontFamily: FONT,
-                  textTransform: 'capitalize',
-                }}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-          <select
-            value={caseSort}
-            onChange={(e) => setCaseSort(e.target.value)}
-            style={{
-              borderRadius: 8,
-              border: '1px solid #e2e8f0',
-              padding: '5px 10px',
-              fontSize: 11,
-              color: '#334155',
-              fontFamily: FONT,
-            }}
-          >
-            <option value="date">Sort by date</option>
-            <option value="confidence">Sort by confidence</option>
-          </select>
-        </div>
-
-        {renderError(casesState)}
-        {renderLoading(casesState)}
-
-        {sortedItems.length > 0 ? (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-              <thead>
-                <tr style={{ background: '#f8fafc' }}>
-                  {['ID', 'Type', 'User', 'Score', 'Status', 'Flagged At', 'Actions'].map((h) => (
-                    <th key={h} style={tableHeadStyle}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {sortedItems.map((c) => (
-                  <tr
-                    key={c.id}
-                    style={{
-                      borderBottom: '1px solid #f1f5f9',
-                      background: expandedCase?.id === c.id ? '#eff6ff' : 'transparent',
-                      cursor: 'pointer',
-                    }}
-                    onClick={() => void loadCaseDetail(c.id)}
-                  >
-                    <td style={tableCellStrong}>{c.id}</td>
-                    <td style={tableCell}>{c.contentType || '—'}</td>
-                    <td style={tableCell}>{c.user?.username || c.userId || '—'}</td>
-                    <td style={tableCell}>{typeof c.confidence === 'number' ? c.confidence.toFixed(2) : '—'}</td>
-                    <td style={tableCell}><span style={statusPill(c.status)}>{c.status}</span></td>
-                    <td style={tableCell}>{formatDateTime(c.createdAt)}</td>
-                    <td style={{ ...tableCell, display: 'flex', gap: 6, flexWrap: 'wrap' }} onClick={(e) => e.stopPropagation()}>
-                      {c.status === 'pending' ? (
-                        <>
-                          <button type="button" onClick={() => reviewCase(c.id, 'confirm')} style={pillButton('#fef2f2', '#dc2626', '#fecaca')}>
-                            Confirm
-                          </button>
-                          <button type="button" onClick={() => reviewCase(c.id, 'dismiss')} style={pillButton('#f8fafc', '#475569', '#cbd5e1')}>
-                            Dismiss
-                          </button>
-                        </>
-                      ) : (
-                        <span style={{ fontSize: 12, color: '#94a3b8' }}>Reviewed</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (!casesState.loading && casesState.loaded) ? (
-          <div style={{ fontSize: 13, color: '#94a3b8' }}>No {caseStatus} cases found.</div>
-        ) : null}
-
-        {expandedCaseLoading ? (
-          <div style={{ color: '#94a3b8', fontSize: 13, marginTop: 12 }}>Loading case details...</div>
-        ) : null}
-
-        {renderCaseDetail()}
-
-        <Pager page={casesState.page} total={casesState.total} onChange={(p) => void loadCases(p)} />
-      </>
-    )
-  }
-
-  /* ═════════════════ STRIKES sub-tab ══════════════════════════════ */
-  function renderStrikes() {
-    return (
-      <>
-        {/* New strike form */}
-        <form onSubmit={submitStrike} style={{ display: 'grid', gap: 10, marginBottom: 20, padding: 16, border: '1px solid #e2e8f0', borderRadius: 14, background: '#f8fafc' }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 2 }}>Issue New Strike</div>
-          <div className="mod-strike-form-grid" style={{ gap: 10 }}>
-            <input
-              type="number"
-              placeholder="User ID"
-              value={strikeForm.userId}
-              onChange={(e) => setStrikeForm((s) => ({ ...s, userId: e.target.value }))}
-              style={inputStyle}
-            />
-            <input
-              type="number"
-              placeholder="Case ID (optional)"
-              value={strikeForm.caseId}
-              onChange={(e) => setStrikeForm((s) => ({ ...s, caseId: e.target.value }))}
-              style={inputStyle}
-            />
-          </div>
-          <textarea
-            placeholder="Reason for strike (required)"
-            value={strikeForm.reason}
-            onChange={(e) => setStrikeForm((s) => ({ ...s, reason: e.target.value }))}
-            rows={2}
-            style={{ ...inputStyle, resize: 'vertical' }}
-          />
-          {strikeError ? <div style={{ color: '#b91c1c', fontSize: 12 }}>{strikeError}</div> : null}
-          <button type="submit" disabled={strikeSaving} style={{ ...pillButton('#eff6ff', '#1d4ed8', '#bfdbfe'), width: 'fit-content', padding: '8px 16px' }}>
-            {strikeSaving ? 'Issuing...' : 'Issue Strike'}
-          </button>
-        </form>
-
-        {renderError(strikesState)}
-        {renderLoading(strikesState)}
-
-        {strikesState.items.length > 0 ? (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-              <thead>
-                <tr style={{ background: '#f8fafc' }}>
-                  {['ID', 'User', 'Reason', 'Expires', 'Status', 'Issued'].map((h) => (
-                    <th key={h} style={tableHeadStyle}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {strikesState.items.map((s) => {
-                  const isActive = !s.decayedAt && (!s.expiresAt || new Date(s.expiresAt) > new Date())
-                  return (
-                    <tr key={s.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={tableCellStrong}>{s.id}</td>
-                      <td style={tableCell}>{s.user?.username || s.userId}</td>
-                      <td style={{ ...tableCell, maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.reason || '—'}</td>
-                      <td style={tableCell}>{formatDateTime(s.expiresAt)}</td>
-                      <td style={tableCell}>
-                        <span style={statusPill(s.decayedAt ? 'decayed' : isActive ? 'active' : 'expired')}>
-                          {s.decayedAt ? 'Decayed' : isActive ? 'Active' : 'Expired'}
-                        </span>
-                      </td>
-                      <td style={tableCell}>{formatDateTime(s.createdAt)}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        ) : (!strikesState.loading && strikesState.loaded) ? (
-          <div style={{ fontSize: 13, color: '#94a3b8' }}>No strikes found.</div>
-        ) : null}
-
-        <Pager page={strikesState.page} total={strikesState.total} onChange={(p) => void loadStrikes(p)} />
-      </>
-    )
-  }
-
-  /* ═════════════════ APPEALS sub-tab ═════════════════════════════ */
-  function renderAppeals() {
-    return (
-      <>
-        {/* Status filter */}
-        <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
-          {['pending', 'approved', 'rejected'].map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setAppealStatus(s)}
-              style={{
-                padding: '5px 10px',
-                borderRadius: 6,
-                border: appealStatus === s ? '1px solid #3b82f6' : '1px solid #e2e8f0',
-                background: appealStatus === s ? '#dbeafe' : '#fff',
-                color: appealStatus === s ? '#1e40af' : '#64748b',
-                fontSize: 11,
-                fontWeight: 700,
-                cursor: 'pointer',
-                fontFamily: FONT,
-                textTransform: 'capitalize',
-              }}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-
-        {renderError(appealsState)}
-        {renderLoading(appealsState)}
-
-        {appealsState.items.length > 0 ? (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-              <thead>
-                <tr style={{ background: '#f8fafc' }}>
-                  {['ID', 'User', 'Case', 'Reason', 'Status', 'Submitted', 'Actions'].map((h) => (
-                    <th key={h} style={tableHeadStyle}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {appealsState.items.map((a) => (
-                  <tr key={a.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={tableCellStrong}>{a.id}</td>
-                    <td style={tableCell}>{a.user?.username || a.userId}</td>
-                    <td style={tableCell}>{a.caseId || '—'}</td>
-                    <td style={{ ...tableCell, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.reason || '—'}</td>
-                    <td style={tableCell}><span style={statusPill(a.status)}>{a.status}</span></td>
-                    <td style={tableCell}>{formatDateTime(a.createdAt)}</td>
-                    <td style={{ ...tableCell, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      {a.status === 'pending' ? (
-                        <>
-                          <button type="button" onClick={() => reviewAppeal(a.id, 'approve')} style={pillButton('#ecfdf5', '#047857', '#a7f3d0')}>
-                            Approve
-                          </button>
-                          <button type="button" onClick={() => reviewAppeal(a.id, 'reject')} style={pillButton('#fef2f2', '#dc2626', '#fecaca')}>
-                            Reject
-                          </button>
-                        </>
-                      ) : (
-                        <span style={{ fontSize: 12, color: '#94a3b8' }}>Reviewed</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (!appealsState.loading && appealsState.loaded) ? (
-          <div style={{ fontSize: 13, color: '#94a3b8' }}>No {appealStatus} appeals found.</div>
-        ) : null}
-
-        <Pager page={appealsState.page} total={appealsState.total} onChange={(p) => void loadAppeals(p)} />
-      </>
-    )
-  }
-
-  /* ═════════════════ RESTRICTIONS sub-tab ════════════════════════ */
-  function renderRestrictions() {
-    return (
-      <>
-        {renderError(restrictionsState)}
-        {renderLoading(restrictionsState)}
-
-        {restrictionsState.items.length > 0 ? (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-              <thead>
-                <tr style={{ background: '#f8fafc' }}>
-                  {['ID', 'User', 'Type', 'Reason', 'Ends At', 'Actions'].map((h) => (
-                    <th key={h} style={tableHeadStyle}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {restrictionsState.items.map((r) => (
-                  <tr key={r.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={tableCellStrong}>{r.id}</td>
-                    <td style={tableCell}>{r.user?.username || r.userId}</td>
-                    <td style={tableCell}>{r.type || 'full'}</td>
-                    <td style={{ ...tableCell, maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.reason || '—'}</td>
-                    <td style={tableCell}>{r.endsAt ? formatDateTime(r.endsAt) : 'Permanent'}</td>
-                    <td style={tableCell}>
-                      <button type="button" onClick={() => liftRestriction(r.id)} style={pillButton('#ecfdf5', '#047857', '#a7f3d0')}>
-                        Lift
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (!restrictionsState.loading && restrictionsState.loaded) ? (
-          <div style={{ fontSize: 13, color: '#94a3b8' }}>No active restrictions.</div>
-        ) : null}
-
-        <Pager page={restrictionsState.page} total={restrictionsState.total} onChange={(p) => void loadRestrictions(p)} />
-      </>
-    )
-  }
-
-  /* ═════════════════ Main render ═════════════════════════════════ */
+  /* ── Render ─────────────────────────────────────────────────── */
   return (
-    <section
-      style={{
-        background: '#fff',
-        borderRadius: 18,
-        border: '1px solid #e2e8f0',
-        padding: '22px',
-      }}
-    >
-      <h1 style={{ margin: '0 0 4px', fontSize: 22, color: '#0f172a' }}>Moderation</h1>
-      <p style={{ margin: '0 0 16px', fontSize: 12, color: '#94a3b8', lineHeight: 1.6 }}>
-        Content moderation cases, user strikes, appeal reviews, and active restrictions.
-      </p>
+    <>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 18, borderBottom: '1px solid #e2e8f0', paddingBottom: 8 }}>
+        {SUB_TABS.map(([key, label]) => (
+          <button key={key} type="button" onClick={() => setSubTab(key)}
+            style={{ padding: '7px 16px', borderRadius: '8px 8px 0 0', border: 'none', background: subTab === key ? '#eff6ff' : 'transparent', color: subTab === key ? '#1d4ed8' : '#64748b', fontWeight: subTab === key ? 800 : 600, fontSize: 13, cursor: 'pointer', fontFamily: FONT, borderBottom: subTab === key ? '2px solid #3b82f6' : '2px solid transparent' }}>
+            {label}
+          </button>
+        ))}
+      </div>
 
-      {subTabSelector}
-
-      {subTab === 'cases' && renderCases()}
-      {subTab === 'strikes' && renderStrikes()}
-      {subTab === 'appeals' && renderAppeals()}
-      {subTab === 'restrictions' && renderRestrictions()}
-    </section>
+      {subTab === 'cases' && (
+        <CasesSubTab casesState={casesState} caseStatus={caseStatus} setCaseStatus={setCaseStatus}
+          caseSort={caseSort} setCaseSort={setCaseSort} expandedCase={expandedCase}
+          setExpandedCase={setExpandedCase} expandedCaseLoading={expandedCaseLoading}
+          loadCaseDetail={loadCaseDetail} loadCases={loadCases} reviewCase={reviewCase}
+          setSubTab={setSubTab} setStrikeForm={setStrikeForm} formatDateTime={formatDateTime} />
+      )}
+      {subTab === 'strikes' && (
+        <StrikesSubTab strikesState={strikesState} strikeForm={strikeForm} setStrikeForm={setStrikeForm}
+          strikeSaving={strikeSaving} strikeError={strikeError} submitStrike={submitStrike}
+          loadStrikes={loadStrikes} formatDateTime={formatDateTime} />
+      )}
+      {subTab === 'appeals' && (
+        <AppealsSubTab appealsState={appealsState} appealStatus={appealStatus} setAppealStatus={setAppealStatus}
+          loadAppeals={loadAppeals} reviewAppeal={reviewAppeal} formatDateTime={formatDateTime} />
+      )}
+      {subTab === 'restrictions' && (
+        <RestrictionsSubTab restrictionsState={restrictionsState} loadRestrictions={loadRestrictions}
+          liftRestriction={liftRestriction} formatDateTime={formatDateTime} />
+      )}
+    </>
   )
 }

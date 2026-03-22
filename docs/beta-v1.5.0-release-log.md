@@ -3376,3 +3376,60 @@ Repaired two stale validation layers discovered during the expanding dependency-
 ### Deferred / Notes
 
 - The app still contains a mix of explicit `credentials: 'include'` fetch calls and fetches that rely on the global shim. That is functionally safe under the current architecture, but if you want stricter local readability we can do a separate normalization pass later.
+
+---
+
+## Cycle: Backend Module Architecture — Complete Route Migration (2026-03-22)
+
+### Summary
+
+Completed the full backend migration from a flat `routes/` layout to a module-first architecture under `modules/`. Every route import in `backend/src/index.js` now points to `./modules/<name>` instead of `./routes/<name>`. No route registration, middleware order, or API contract was changed — the migration is purely structural.
+
+### Architecture
+
+All 21 route groups now resolve through `backend/src/modules/`:
+
+| Module | Strategy | Files Created | Routes |
+|--------|----------|---------------|--------|
+| auth | Full split (Phase 4) | 9 files | 14 |
+| sheets | Full split (Phase 2) | 13 files | 28 |
+| feed | Full split (Phase 3) | 7 files | 10 |
+| admin | Full split (Phase 5) | 7 files | 19 |
+| settings | Full split (Phase 6) | 8 files | 12 |
+| moderation | Full split (Phase 7) | 6 files | 12 |
+| sheetLab | Full split (Phase 7) | 5 files | 7 |
+| courses | Full split (Phase 7) | 5 files | 4 |
+| dashboard | Barrel wrap | 1 file | — |
+| announcements | Barrel wrap | 1 file | — |
+| upload | Barrel wrap | 1 file | — |
+| notes | Barrel wrap | 1 file | — |
+| notifications | Barrel wrap | 1 file | — |
+| users | Barrel wrap | 1 file | — |
+| preview | Barrel wrap | 1 file | — |
+| search | Barrel wrap | 1 file | — |
+| webhooks | Barrel wrap | 1 file | — |
+| provenance | Barrel wrap | 1 file | — |
+| featureFlags | Barrel wrap | 1 file | — |
+| webauthn | Barrel wrap | 1 file | — |
+| public | Barrel wrap | 1 file | — |
+
+**Full split modules** extract constants, services, and controllers into separate files (each under ~250 lines). Barrel-wrapped modules re-export the existing route file from `../../routes/<name>` via a one-line `modules/<name>/index.js`.
+
+Shared infrastructure lives in `backend/src/core/` (10 files): db/prisma, http/errors+asyncHandler+validate, auth/requireAuth+optionalAuth+requireAdmin+requireVerifiedEmail, monitoring/sentry, and a barrel index.
+
+### Changed
+
+- `backend/src/index.js` — All 21 route `require()` calls now point to `./modules/<name>` (zero `./routes/` imports remain)
+- Created 73 new files across `backend/src/modules/` and `backend/src/core/`
+- No API contracts, middleware ordering, or route paths were modified
+
+### Validation
+
+- `npx eslint src/ --no-warn-ignored` — **0 errors** (full backend)
+- All 21 test files run individually — **161/161 tests passed**:
+  - auth (7), settings (17), admin (8), feed (16), search (5), dashboard (1), users (15), notifications (10), notes (12), announcements (10), webhooks (7), preview (6), sheet.workflow.integration (4), htmlSecurity (19), htmlDraftWorkflow (5), htmlArchive (1), clamav (3), attachmentPreview (2), email.suppression (2), verificationChallenges (4), releaseA.stability.middleware (7)
+
+### Deferred / Notes
+
+- Original `routes/*.js` files are retained for now (strangler pattern) — barrel-wrapped modules delegate to them. They can be migrated into their module directories in a future cleanup pass.
+- Frontend restructuring (pages/ → features/) is the next phase.
