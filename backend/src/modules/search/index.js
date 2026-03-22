@@ -1,1 +1,1 @@
-module.exports = require('../../routes/search')
+module.exports = require('./search.routes')

@@ -1,1 +1,1 @@
-module.exports = require('../../routes/featureFlags')
+module.exports = require('./featureFlags.routes')

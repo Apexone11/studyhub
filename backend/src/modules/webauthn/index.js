@@ -1,1 +1,1 @@
-module.exports = require('../../routes/webauthn')
+module.exports = require('./webauthn.routes')

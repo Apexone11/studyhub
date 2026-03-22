@@ -4,7 +4,7 @@ import request from 'supertest'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const require = createRequire(import.meta.url)
-const searchRoutePath = require.resolve('../src/routes/search')
+const searchRoutePath = require.resolve('../src/modules/search')
 
 const SEARCH_SHEETS = [
   {

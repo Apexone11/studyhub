@@ -1,1 +1,1 @@
-module.exports = require('../../routes/public')
+module.exports = require('./public.routes')

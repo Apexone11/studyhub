@@ -4,7 +4,7 @@ import request from 'supertest'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const require = createRequire(import.meta.url)
-const previewRoutePath = require.resolve('../src/routes/preview')
+const previewRoutePath = require.resolve('../src/modules/preview')
 
 const mocks = vi.hoisted(() => {
   const state = {

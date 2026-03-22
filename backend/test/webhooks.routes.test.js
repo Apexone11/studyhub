@@ -4,7 +4,7 @@ import request from 'supertest'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const require = createRequire(import.meta.url)
-const webhooksRoutePath = require.resolve('../src/routes/webhooks')
+const webhooksRoutePath = require.resolve('../src/modules/webhooks')
 
 const mocks = vi.hoisted(() => {
   const prisma = {

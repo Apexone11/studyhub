@@ -1,1 +1,1 @@
-module.exports = require('../../routes/webhooks')
+module.exports = require('./webhooks.routes')

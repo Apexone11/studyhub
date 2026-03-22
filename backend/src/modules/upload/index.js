@@ -1,1 +1,1 @@
-module.exports = require('../../routes/upload')
+module.exports = require('./upload.routes')

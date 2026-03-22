@@ -1,1 +1,1 @@
-module.exports = require('../../routes/preview')
+module.exports = require('./preview.routes')

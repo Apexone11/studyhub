@@ -1,1 +1,1 @@
-module.exports = require('../../routes/notes')
+module.exports = require('./notes.routes')

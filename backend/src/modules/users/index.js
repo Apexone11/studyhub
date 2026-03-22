@@ -1,1 +1,1 @@
-module.exports = require('../../routes/users')
+module.exports = require('./users.routes')

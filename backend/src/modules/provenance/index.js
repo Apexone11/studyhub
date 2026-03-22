@@ -1,1 +1,1 @@
-module.exports = require('../../routes/provenance')
+module.exports = require('./provenance.routes')

@@ -1,1 +1,1 @@
-module.exports = require('../../routes/dashboard')
+module.exports = require('./dashboard.routes')

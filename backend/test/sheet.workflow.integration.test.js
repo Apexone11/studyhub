@@ -4,8 +4,8 @@ import request from 'supertest'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const require = createRequire(import.meta.url)
-const sheetsRoutePath = require.resolve('../src/routes/sheets')
-const adminRoutePath = require.resolve('../src/routes/admin')
+const sheetsRoutePath = require.resolve('../src/modules/sheets')
+const adminRoutePath = require.resolve('../src/modules/admin')
 
 const mocks = vi.hoisted(() => {
   const users = [

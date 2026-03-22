@@ -1,1 +1,1 @@
-module.exports = require('../../routes/notifications')
+module.exports = require('./notifications.routes')
