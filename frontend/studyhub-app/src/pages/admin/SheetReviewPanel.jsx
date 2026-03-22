@@ -67,11 +67,8 @@ export default function SheetReviewPanel({ sheetId, onClose, onReviewComplete })
     void loadDetail()
   }, [loadDetail])
 
-  async function handleReview(action) {
-    if (!reason.trim()) {
-      setSubmitError('A review reason is required.')
-      return
-    }
+  async function handleReview(action, quickReason) {
+    const finalReason = quickReason || reason.trim()
 
     setSubmitting(true)
     setSubmitError('')
@@ -81,7 +78,7 @@ export default function SheetReviewPanel({ sheetId, onClose, onReviewComplete })
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ action, reason: reason.trim() }),
+        body: JSON.stringify({ action, reason: finalReason }),
       })
       const data = await readJsonSafely(response, {})
 
@@ -295,7 +292,7 @@ export default function SheetReviewPanel({ sheetId, onClose, onReviewComplete })
           )}
 
           <label style={{ display: 'block', marginBottom: 8, fontSize: 12, fontWeight: 700, color: 'var(--sh-text)' }}>
-            Review reason (required)
+            Review reason (optional — defaults applied if empty)
           </label>
           <textarea
             value={reason}
@@ -336,6 +333,19 @@ export default function SheetReviewPanel({ sheetId, onClose, onReviewComplete })
               }}
             >
               Reject
+            </button>
+            <button
+              type="button"
+              disabled={submitting}
+              onClick={() => handleReview('reject', 'Rejected by admin (quick reject).')}
+              style={{
+                padding: '10px 20px', borderRadius: 10,
+                border: '1px solid var(--sh-border)', background: 'var(--sh-soft)',
+                color: 'var(--sh-muted)', fontSize: 13, fontWeight: 700, cursor: submitting ? 'not-allowed' : 'pointer',
+                opacity: submitting ? 0.6 : 1, fontFamily: FONT,
+              }}
+            >
+              Quick Reject
             </button>
           </div>
         </div>
