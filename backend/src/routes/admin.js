@@ -3,7 +3,7 @@ const requireAuth = require('../middleware/auth')
 const requireAdmin = require('../middleware/requireAdmin')
 const { captureError } = require('../monitoring/sentry')
 const { deleteUserAccount } = require('../lib/deleteUserAccount')
-const { validateHtmlForSubmission } = require('../lib/htmlSecurity')
+const { validateHtmlForSubmission, validateHtmlForRuntime } = require('../lib/htmlSecurity')
 const { sanitizePreviewHtml } = require('../lib/htmlPreviewDocument')
 const { isHtmlUploadsEnabled, setHtmlUploadsEnabled, readEnvOverride } = require('../lib/htmlKillSwitch')
 const prisma = require('../lib/prisma')
@@ -417,7 +417,9 @@ router.patch('/sheets/:id/review', async (req, res) => {
     if (!current) return res.status(404).json({ error: 'Sheet not found.' })
 
     if (current.contentFormat === 'html' && action === 'approve') {
-      const validation = validateHtmlForSubmission(current.content)
+      // Use runtime validation (allows inline scripts but blocks external scripts
+      // and remote assets). The CSP + sandbox make inline scripts safe.
+      const validation = validateHtmlForRuntime(current.content)
       if (!validation.ok) {
         return res.status(400).json({
           error: validation.issues[0],

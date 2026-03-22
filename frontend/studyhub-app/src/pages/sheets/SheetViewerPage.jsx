@@ -341,6 +341,9 @@ export default function SheetViewerPage() {
   const [showContributeModal, setShowContributeModal] = useState(false)
   const [contributeMessage, setContributeMessage] = useState('')
   const [reviewingId, setReviewingId] = useState(null)
+  const [runtimeUrl, setRuntimeUrl] = useState('')
+  const [runtimeLoading, setRuntimeLoading] = useState(false)
+  const [htmlWarningAcked, setHtmlWarningAcked] = useState(false)
   const tutorial = useTutorial('viewer', VIEWER_STEPS)
   const sheetPanelRef = useRef(null)
   const animatedRef = useRef(false)
@@ -460,6 +463,35 @@ export default function SheetViewerPage() {
   const isHtmlSheet = sheet?.contentFormat === 'html'
   const previewKind = attachmentPreviewKind(sheet?.attachmentType, sheet?.attachmentName)
   const attachmentPreviewUrl = sheet?.id ? `${API}/api/sheets/${sheet.id}/attachment/preview` : ''
+
+  /* ── HTML runtime URL + warning gate ──────────────────────── */
+  useEffect(() => {
+    if (!isHtmlSheet || !sheet?.id) return
+    const ackKey = `htmlSheetWarnAck:${sheet.id}`
+    if (localStorage.getItem(ackKey) === '1') setHtmlWarningAcked(true)
+  }, [isHtmlSheet, sheet?.id])
+
+  useEffect(() => {
+    if (!isHtmlSheet || !htmlWarningAcked || !sheet?.id) return
+    let cancelled = false
+    setRuntimeLoading(true)
+    fetch(`${API}/api/sheets/${sheet.id}/html-runtime`, {
+      headers: authHeaders(),
+      credentials: 'include',
+    })
+      .then((r) => r.json().catch(() => ({})))
+      .then((data) => {
+        if (!cancelled && data?.runtimeUrl) setRuntimeUrl(data.runtimeUrl)
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setRuntimeLoading(false) })
+    return () => { cancelled = true }
+  }, [isHtmlSheet, htmlWarningAcked, sheet?.id])
+
+  const acceptHtmlWarning = () => {
+    if (sheet?.id) localStorage.setItem(`htmlSheetWarnAck:${sheet.id}`, '1')
+    setHtmlWarningAcked(true)
+  }
 
   const handleBack = () => {
     if (window.history.length > 1) {
@@ -774,21 +806,67 @@ export default function SheetViewerPage() {
                   ) : null}
 
                   {isHtmlSheet ? (
-                    <div
-                      style={{
-                        borderRadius: 16,
-                        border: '1px solid #e2e8f0',
-                        overflow: 'hidden',
-                        background: '#fff',
-                      }}
-                    >
-                      <iframe
-                        title={`sheet-html-${sheet.id}`}
-                        sandbox="allow-forms allow-modals allow-pointer-lock allow-popups allow-scripts"
-                        srcDoc={sheet.content || ''}
-                        style={{ width: '100%', minHeight: 560, border: 'none' }}
-                      />
-                    </div>
+                    !htmlWarningAcked ? (
+                      <div
+                        style={{
+                          borderRadius: 16,
+                          border: '1px solid #fde68a',
+                          background: '#fffbeb',
+                          padding: 24,
+                          textAlign: 'center',
+                        }}
+                      >
+                        <div style={{ fontSize: 15, fontWeight: 800, color: '#92400e', marginBottom: 8 }}>
+                          Interactive HTML Sheet
+                        </div>
+                        <div style={{ fontSize: 13, color: '#92400e', lineHeight: 1.6, marginBottom: 16 }}>
+                          This sheet contains HTML with scripts. It runs in a secure sandbox with no network
+                          access, no popups, and no access to your session. Click below to load it.
+                        </div>
+                        <button
+                          type="button"
+                          onClick={acceptHtmlWarning}
+                          style={{
+                            padding: '9px 20px',
+                            borderRadius: 10,
+                            border: 'none',
+                            background: 'linear-gradient(135deg, #6366f1, #818cf8)',
+                            color: '#fff',
+                            fontSize: 13,
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            fontFamily: FONT,
+                          }}
+                        >
+                          Load interactive sheet
+                        </button>
+                      </div>
+                    ) : runtimeLoading ? (
+                      <div style={{ borderRadius: 16, border: '1px solid #e2e8f0', padding: 24, textAlign: 'center' }}>
+                        <div style={{ fontSize: 13, color: '#64748b' }}>Loading interactive sheet…</div>
+                      </div>
+                    ) : runtimeUrl ? (
+                      <div
+                        style={{
+                          borderRadius: 16,
+                          border: '1px solid #e2e8f0',
+                          overflow: 'hidden',
+                          background: '#fff',
+                        }}
+                      >
+                        <iframe
+                          title={`sheet-html-${sheet.id}`}
+                          sandbox="allow-scripts"
+                          referrerPolicy="no-referrer"
+                          src={runtimeUrl}
+                          style={{ width: '100%', minHeight: 560, border: 'none' }}
+                        />
+                      </div>
+                    ) : (
+                      <div style={{ borderRadius: 16, border: '1px solid #fecaca', background: '#fef2f2', padding: 18 }}>
+                        <div style={{ fontSize: 13, color: '#dc2626' }}>Could not load the interactive sheet runtime.</div>
+                      </div>
+                    )
                   ) : (
                     <div
                       style={{

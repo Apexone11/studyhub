@@ -1,6 +1,8 @@
 const crypto = require('node:crypto')
-const { normalizeContentFormat, validateHtmlForSubmission } = require('./htmlSecurity')
+const { normalizeContentFormat, validateHtmlForSubmission, scanInlineJsRisk } = require('./htmlSecurity')
 const { scanBufferWithClamAv } = require('./clamav')
+const { sendHighRiskSheetAlert } = require('./email')
+const { createNotification } = require('./notify')
 
 const SCAN_STATUS = {
   QUEUED: 'queued',
@@ -411,6 +413,52 @@ async function submitHtmlDraftForReview(prisma, { sheetId, user }) {
       throw error
     }
     // User acknowledged — submit with flagged findings for admin review
+  }
+
+  // Run inline JS risk scan for admin reporting
+  const riskResult = scanInlineJsRisk(sheet.content)
+
+  if (riskResult.highRisk) {
+    // Append risk flags to scan findings for admin review
+    const riskFindings = riskResult.flags.map((flag) => ({
+      source: 'js-risk',
+      severity: 'high',
+      message: flag,
+    }))
+    const existingFindings = Array.isArray(scan.findings) ? scan.findings : []
+
+    await prisma.studySheet.update({
+      where: { id: sheetId },
+      data: {
+        htmlScanFindings: [...existingFindings, ...riskFindings],
+        htmlScanStatus: SCAN_STATUS.FAILED,
+      },
+    })
+
+    // Fire-and-forget: email admin + dashboard notification
+    const username = sheet.author?.username || user.username || `User #${user.userId}`
+    sendHighRiskSheetAlert({
+      sheetId,
+      sheetTitle: sheet.title,
+      username,
+      flags: riskResult.flags,
+    }).catch((err) => console.error('[htmlDraftWorkflow] Failed to send high-risk alert:', err.message))
+
+    // Find admin users and notify them in-app
+    prisma.user.findMany({ where: { role: 'admin' }, select: { id: true } })
+      .then((admins) => {
+        for (const admin of admins) {
+          createNotification(prisma, {
+            userId: admin.id,
+            type: 'moderation',
+            message: `High-risk HTML sheet "${sheet.title || 'Untitled'}" submitted by ${username} — review required.`,
+            actorId: user.userId,
+            sheetId,
+            linkPath: `/admin?tab=sheets`,
+          }).catch(() => {})
+        }
+      })
+      .catch((err) => console.error('[htmlDraftWorkflow] Failed to notify admins:', err.message))
   }
 
   return prisma.studySheet.update({

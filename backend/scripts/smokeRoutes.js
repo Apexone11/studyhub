@@ -124,7 +124,7 @@ async function main() {
     || resolveRuntimePath('captures', 'smoke-uploads')
   const smokeId = Date.now().toString(36).slice(-8)
   const studentUsername = `smoke_${smokeId}`
-  const studentPassword = 'Password1A'
+  const studentPassword = `Smoke${smokeId}A1`
   const registrationEmail = `${studentUsername}@signup.example.com`
   const studentEmail = `${studentUsername}@example.com`
   const safeMethods = new Set(['GET', 'HEAD', 'OPTIONS'])

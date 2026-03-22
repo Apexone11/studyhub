@@ -2083,6 +2083,42 @@ Audited the following critical backend files:
 
 ### Security Fix
 
+Removed personal data from all JWT payloads (Checkmarx High — "Personal data inside JWT") and replaced hardcoded test credential (Checkmarx "Hardcoded Passwords"):
+
+**Changed** — `backend/src/lib/authTokens.js`
+- `signAuthToken`: renamed `userId` claim to RFC 7519-standard `sub` claim. `username` had already been removed in a prior cycle; `role` is retained as it is not PII.
+- `signCsrfToken`: same `userId` → `sub` rename.
+
+**Changed** — `backend/src/middleware/auth.js`
+- Updated DB lookup key from `decoded.userId` to `decoded.sub` to match the new claim name.
+
+**Changed** — `backend/src/middleware/csrf.js`
+- Updated CSRF ↔ auth token cross-check from `.userId` to `.sub`.
+
+**Changed** — `backend/src/lib/previewTokens.js`
+- `signHtmlPreviewToken`: removed `userId` parameter and the `sub: userId` claim from the JWT payload entirely. The `allowUnpublished` boolean flag already encodes the owner/moderator decision at token-issue time; the userId was a redundant fallback.
+
+**Changed** — `backend/src/routes/preview.js`
+- Removed `userId` extraction from preview token payload.
+- Removed `!userId` guard (field no longer present).
+- Simplified `canReadUnpublished` to `allowUnpublished` — the userId fallback check is no longer needed.
+
+**Changed** — `backend/src/routes/sheets.js`
+- Removed `userId: req.user.userId` from both `signHtmlPreviewToken` call sites (cleanup; field no longer accepted by the function).
+
+**Changed** — `backend/scripts/smokeRoutes.js`
+- Replaced static `'Password1A'` literal with `` `Smoke${smokeId}A1` `` (dynamic, per-run; satisfies uppercase, lowercase, and digit requirements).
+
+#### Validation
+- `npm --prefix backend run lint` — clean (no errors)
+- `npx vitest run test/releaseA.stability.middleware.test.js` — 7/7 passed
+
+#### Deep Scan Note
+- Auth and CSRF middleware now use the `sub` claim exclusively. Any token issued before this change will fail validation at the DB lookup step (the `id` lookup will get `decoded.sub = undefined` → Prisma returns null → 401 AUTH_EXPIRED). This is the safe and intended behavior — old tokens are invalidated, forcing re-login.
+- Preview tokens no longer carry any user identifier. Authorization is fully encoded in the `allowUnpublished` boolean set at issue time by `canModerateOrOwnSheet`. No data-flow regression risk.
+- `smokeRoutes.js` is a diagnostic/dev script only, not a production code path.
+
+
 - **Password reset complexity enforcement** (`backend/src/routes/auth.js`): The `POST /api/auth/reset-password` endpoint was missing the uppercase letter and digit requirement that registration enforces. Added the same `[A-Z]` and `\d` regex checks to ensure password complexity is consistent across all password-setting flows.
 
 ### Added — WebAuthn Passkeys for Admin Users

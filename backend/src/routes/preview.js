@@ -1,7 +1,7 @@
 const express = require('express')
 const { captureError } = require('../monitoring/sentry')
 const prisma = require('../lib/prisma')
-const { buildPreviewDocument } = require('../lib/htmlPreviewDocument')
+const { buildPreviewDocument, buildInteractiveDocument } = require('../lib/htmlPreviewDocument')
 const { verifyHtmlPreviewToken } = require('../lib/previewTokens')
 const { ERROR_CODES, sendError } = require('../middleware/errorEnvelope')
 
@@ -11,6 +11,32 @@ function parseInteger(value) {
   const parsed = Number.parseInt(value, 10)
   return Number.isInteger(parsed) ? parsed : null
 }
+
+/**
+ * Strict CSP for interactive (runtime) documents.
+ * - Scripts/styles: inline only (no remote CDN/src)
+ * - Images/media/fonts: data: and blob: only (no remote loading)
+ * - connect-src 'none': no fetch/XHR/WebSocket
+ * - form-action 'none': no form submissions
+ * - frame-src 'none': no nested iframes
+ */
+const RUNTIME_CSP = [
+  "default-src 'none'",
+  "script-src 'unsafe-inline'",
+  "style-src 'unsafe-inline'",
+  "img-src data: blob:",
+  "media-src data: blob:",
+  "font-src data: blob:",
+  "connect-src 'none'",
+  "form-action 'none'",
+  "frame-src 'none'",
+  "object-src 'none'",
+  "worker-src 'none'",
+  "frame-ancestors 'none'",
+  "base-uri 'none'",
+].join('; ')
+
+const VALID_TOKEN_TYPES = ['html-preview', 'html-runtime']
 
 router.get('/html', async (req, res) => {
   const rawToken = typeof req.query.token === 'string' ? req.query.token.trim() : ''
@@ -27,11 +53,11 @@ router.get('/html', async (req, res) => {
   }
 
   const sheetId = parseInteger(payload?.sheetId)
-  const userId = parseInteger(payload?.userId)
   const tokenVersion = typeof payload?.version === 'string' ? payload.version : ''
   const allowUnpublished = Boolean(payload?.allowUnpublished)
+  const tokenType = VALID_TOKEN_TYPES.includes(payload?.type) ? payload.type : ''
 
-  if (payload?.type !== 'html-preview' || !sheetId || !userId || !tokenVersion) {
+  if (!tokenType || !sheetId || !tokenVersion) {
     return sendError(res, 403, 'Preview token is invalid or expired.', ERROR_CODES.PREVIEW_TOKEN_INVALID)
   }
 
@@ -58,19 +84,24 @@ router.get('/html', async (req, res) => {
       return sendError(res, 403, 'Preview token is invalid or expired.', ERROR_CODES.PREVIEW_TOKEN_INVALID)
     }
 
-    const canReadUnpublished = allowUnpublished || Number(sheet.userId) === userId
-    if (sheet.status !== 'published' && !canReadUnpublished) {
+    if (sheet.status !== 'published' && !allowUnpublished) {
       return sendError(res, 403, 'Preview token is invalid or expired.', ERROR_CODES.PREVIEW_TOKEN_INVALID)
     }
 
-    const previewHtml = buildPreviewDocument({
-      title: sheet.title,
-      html: sheet.content,
-    })
+    const isRuntime = tokenType === 'html-runtime'
+
+    const outputHtml = isRuntime
+      ? buildInteractiveDocument({ title: sheet.title, html: sheet.content })
+      : buildPreviewDocument({ title: sheet.title, html: sheet.content })
 
     res.setHeader('Cache-Control', 'private, no-store, max-age=0')
     res.setHeader('Content-Type', 'text/html; charset=utf-8')
-    return res.status(200).send(previewHtml)
+
+    if (isRuntime) {
+      res.setHeader('Content-Security-Policy', RUNTIME_CSP)
+    }
+
+    return res.status(200).send(outputHtml)
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
     return sendError(res, 500, 'Could not render preview.', ERROR_CODES.SERVER_ERROR)
