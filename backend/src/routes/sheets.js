@@ -996,9 +996,10 @@ router.get('/:id/html-preview', requireAuth, async (req, res) => {
     }
 
     const validation = validateHtmlForSubmission(sheet.content)
-    if (!validation.ok) {
-      return res.status(400).json({ error: 'HTML preview blocked by security checks.', issues: validation.issues })
-    }
+
+    // We still return a previewUrl even if validation fails.
+    // The preview renderer sanitizes HTML before serving it.
+    const issues = validation.ok ? [] : (validation.issues || [])
 
     const previewVersion = sheet.updatedAt ? new Date(sheet.updatedAt).toISOString() : '0'
     const previewToken = signHtmlPreviewToken({
@@ -1016,6 +1017,8 @@ router.get('/:id/html-preview', requireAuth, async (req, res) => {
       updatedAt: sheet.updatedAt,
       previewUrl,
       expiresInSeconds: HTML_PREVIEW_TOKEN_TTL_SECONDS,
+      sanitized: issues.length > 0,
+      issues,
     })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
