@@ -174,7 +174,7 @@ export default function SheetHtmlPreviewPage() {
 
                 <iframe
                   title={`html-sheet-preview-${sheetId}`}
-                  sandbox=""
+                  sandbox="allow-scripts"
                   referrerPolicy="no-referrer"
                   src={state.preview.previewUrl || ''}
                   style={{

@@ -26,6 +26,7 @@ function formatDateTime(value) {
 
 function severityColor(severity) {
   if (severity === 'error' || severity === 'critical') return '#dc2626'
+  if (severity === 'high') return '#ea580c'
   if (severity === 'warning') return '#d97706'
   return '#64748b'
 }

@@ -14,7 +14,7 @@ function getJwtSecret() {
 
 function signAuthToken(user) {
   return jwt.sign(
-    { userId: user.id, username: user.username, role: user.role },
+    { sub: user.id, role: user.role },
     getJwtSecret(),
     { expiresIn: TOKEN_EXPIRES_IN }
   )
@@ -26,7 +26,7 @@ function verifyAuthToken(token) {
 
 function signCsrfToken(user) {
   return jwt.sign(
-    { userId: user.id, type: 'csrf' },
+    { sub: user.id, type: 'csrf' },
     getJwtSecret(),
     { expiresIn: TOKEN_EXPIRES_IN }
   )

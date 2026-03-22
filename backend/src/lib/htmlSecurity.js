@@ -180,7 +180,109 @@ function validateHtmlForSubmission(html) {
   }
 }
 
+/**
+ * Validate HTML for interactive runtime serving.
+ * Rejects:
+ *   - <script src="..."> (external script loading)
+ *   - any http:// or https:// URLs in src, href, srcset attributes
+ *   - CSS url() or @import with http/https
+ *   - <base> tags (can redirect relative URLs)
+ *   - <meta http-equiv="refresh"> (can redirect the page)
+ * Allows:
+ *   - inline <script>...</script> (CSP + sandbox protect execution)
+ *   - inline styles
+ *   - data: and blob: URLs
+ */
+function validateHtmlForRuntime(html) {
+  const value = String(html || '')
+  const lowered = value.toLowerCase()
+  const issues = []
+
+  // Reject <script src="...">
+  const scriptSrcPattern = /<\s*script[^>]+\bsrc\s*=/gi
+  if (scriptSrcPattern.test(value)) {
+    issues.push('External scripts (<script src="...">) are not allowed. Use inline scripts only.')
+  }
+
+  // Reject <base> tags
+  if (/<\s*base[\s>]/i.test(value)) {
+    issues.push('<base> tags are not allowed.')
+  }
+
+  // Reject <meta http-equiv="refresh">
+  if (/<\s*meta[^>]+http-equiv\s*=\s*["']?\s*refresh/i.test(value)) {
+    issues.push('<meta http-equiv="refresh"> is not allowed.')
+  }
+
+  // Reject remote URLs (http/https) in src, href, srcset attributes
+  const remoteAttrPattern = /\b(?:src|href|srcset)\s*=\s*["']?\s*https?:\/\//gi
+  if (remoteAttrPattern.test(value)) {
+    issues.push('Remote assets (http/https URLs in src, href, or srcset) are not allowed. Use inline content or data: URLs.')
+  }
+
+  // Reject remote URLs in CSS url() or @import
+  const cssUrlPattern = /url\s*\(\s*["']?\s*https?:\/\//gi
+  const cssImportPattern = /@import\s+["']?\s*https?:\/\//gi
+  if (cssUrlPattern.test(lowered) || cssImportPattern.test(lowered)) {
+    issues.push('Remote CSS assets (url() or @import with http/https) are not allowed.')
+  }
+
+  return {
+    ok: issues.length === 0,
+    issues,
+  }
+}
+
+/**
+ * Scan inline JS for high-risk patterns.
+ * Returns { highRisk: boolean, flags: string[] }
+ *
+ * High risk = network attempt keywords OR eval/obfuscation patterns.
+ * This runs at publish/submit time for reporting — it does NOT block.
+ */
+function scanInlineJsRisk(html) {
+  const value = String(html || '')
+  const flags = []
+
+  // Network attempt keywords
+  const networkPatterns = [
+    { pattern: /\bfetch\s*\(/gi, label: 'fetch() call detected' },
+    { pattern: /\bXMLHttpRequest\b/gi, label: 'XMLHttpRequest usage detected' },
+    { pattern: /\bnew\s+WebSocket\b/gi, label: 'WebSocket usage detected' },
+    { pattern: /\bnavigator\s*\.\s*sendBeacon\b/gi, label: 'sendBeacon() usage detected' },
+    { pattern: /\bEventSource\b/gi, label: 'EventSource usage detected' },
+    { pattern: /\bimportScripts\b/gi, label: 'importScripts() usage detected' },
+  ]
+
+  // Eval / obfuscation patterns
+  const evalPatterns = [
+    { pattern: /\beval\s*\(/gi, label: 'eval() call detected' },
+    { pattern: /\bFunction\s*\(/gi, label: 'Function() constructor detected' },
+    { pattern: /\bsetTimeout\s*\(\s*["'`]/gi, label: 'setTimeout() with string argument detected' },
+    { pattern: /\bsetInterval\s*\(\s*["'`]/gi, label: 'setInterval() with string argument detected' },
+    { pattern: /\batob\s*\(/gi, label: 'atob() (base64 decode) detected' },
+    { pattern: /\\x[0-9a-f]{2}/gi, label: 'Hex-encoded string escape detected' },
+    { pattern: /\\u00[0-9a-f]{2}/gi, label: 'Unicode escape obfuscation detected' },
+    { pattern: /document\s*\.\s*cookie/gi, label: 'document.cookie access detected' },
+    { pattern: /document\s*\.\s*domain/gi, label: 'document.domain access detected' },
+  ]
+
+  for (const { pattern, label } of networkPatterns) {
+    if (pattern.test(value)) flags.push(label)
+  }
+  for (const { pattern, label } of evalPatterns) {
+    if (pattern.test(value)) flags.push(label)
+  }
+
+  return {
+    highRisk: flags.length > 0,
+    flags,
+  }
+}
+
 module.exports = {
   normalizeContentFormat,
   validateHtmlForSubmission,
+  validateHtmlForRuntime,
+  scanInlineJsRisk,
 }

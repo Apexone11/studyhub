@@ -548,11 +548,58 @@ async function sendCourseRequestNotice({
   await deliverMail(mailOptions, 'course-request')
 }
 
+async function sendHighRiskSheetAlert({ sheetId, sheetTitle, username, flags }) {
+  const adminEmail = getAdminEmail()
+  if (!adminEmail) {
+    console.warn('[email] ADMIN_EMAIL not set — skipping high-risk sheet alert')
+    return
+  }
+
+  const flagList = (flags || []).map((f) => `<li style="color:#991b1b;font-size:13px;">${escapeHtml(f)}</li>`).join('')
+
+  const body = `
+    <h2 style="margin:0 0 8px;color:#991b1b;font-size:22px;">High-Risk HTML Sheet Flagged</h2>
+    <p style="margin:0 0 24px;color:#6b7280;font-size:15px;">
+      An HTML sheet was automatically flagged during submission and set to pending review.
+    </p>
+    <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:18px 20px;margin:0 0 24px;">
+      <p style="margin:0 0 10px;color:#334155;font-size:14px;"><strong>Sheet ID:</strong> ${escapeHtml(sheetId)}</p>
+      <p style="margin:0 0 10px;color:#334155;font-size:14px;"><strong>Title:</strong> ${escapeHtml(sheetTitle || 'Untitled')}</p>
+      <p style="margin:0 0 10px;color:#334155;font-size:14px;"><strong>Author:</strong> ${escapeHtml(username || 'Unknown')}</p>
+      <p style="margin:0 0 10px;color:#334155;font-size:14px;"><strong>Flags:</strong></p>
+      <ul style="margin:4px 0 0;padding-left:18px;">${flagList}</ul>
+    </div>
+    <p style="margin:0;color:#9ca3af;font-size:13px;">
+      Review this sheet from the admin dashboard before approving.
+    </p>
+  `
+
+  const mailOptions = {
+    from: `"StudyHub" <${getFromAddress()}>`,
+    to: adminEmail,
+    subject: `High-risk HTML sheet flagged: ${sheetTitle || `Sheet #${sheetId}`}`,
+    text: [
+      'An HTML sheet was automatically flagged during submission.',
+      '',
+      `Sheet ID: ${sheetId}`,
+      `Title: ${sheetTitle || 'Untitled'}`,
+      `Author: ${username || 'Unknown'}`,
+      `Flags: ${(flags || []).join(', ')}`,
+      '',
+      'Review this sheet from the admin dashboard before approving.',
+    ].join('\n'),
+    html: htmlWrap('High-Risk Sheet Alert', body),
+  }
+
+  await deliverMail(mailOptions, 'high-risk-sheet')
+}
+
 module.exports = {
   getAdminEmail,
   sendPasswordReset,
   sendEmailVerification,
   sendCourseRequestNotice,
+  sendHighRiskSheetAlert,
   sendEmailSmoke,
   validateEmailTransport,
 }

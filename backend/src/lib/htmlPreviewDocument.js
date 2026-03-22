@@ -107,7 +107,68 @@ function buildPreviewDocument({ title, html }) {
 </html>`
 }
 
+/**
+ * Build an interactive HTML document that preserves inline scripts/styles
+ * but is locked down via CSP headers set by the serving route.
+ * This is used for published sheet viewing where the author's JS must run.
+ * Security layers:
+ *   1. CSP headers (set by the serving route, NOT in the document)
+ *   2. iframe sandbox="allow-scripts" (no same-origin, no popups, no forms)
+ *   3. No remote script/stylesheet/image loading (CSP blocks it)
+ */
+function stripDangerousTags(value) {
+  return String(value || '')
+    .replace(/<\s*base[\s>][^>]*>/gi, '')
+    .replace(/<\s*meta[^>]+http-equiv\s*=\s*["']?\s*refresh[^>]*>/gi, '')
+}
+
+function buildInteractiveDocument({ title, html }) {
+  const safeTitle = sanitizeHtml(String(title || 'StudyHub Sheet'), { allowedTags: [], allowedAttributes: {} })
+  const cleanedHtml = stripDangerousTags(html)
+
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${safeTitle}</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: system-ui, sans-serif;
+      }
+
+      html, body {
+        margin: 0;
+        min-height: 100%;
+        background: #ffffff;
+        color: #0f172a;
+      }
+
+      body {
+        padding: 16px;
+        box-sizing: border-box;
+      }
+
+      img, svg, video, canvas {
+        max-width: 100%;
+        height: auto;
+      }
+
+      table {
+        max-width: 100%;
+        border-collapse: collapse;
+      }
+    </style>
+  </head>
+  <body>
+    ${cleanedHtml}
+  </body>
+</html>`
+}
+
 module.exports = {
   buildPreviewDocument,
+  buildInteractiveDocument,
   sanitizePreviewHtml,
 }

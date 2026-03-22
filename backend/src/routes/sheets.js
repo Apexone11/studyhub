@@ -11,7 +11,7 @@ const { getAuthTokenFromRequest, verifyAuthToken } = require('../lib/authTokens'
 const prisma = require('../lib/prisma')
 const { cleanupAttachmentIfUnused, resolveAttachmentPath } = require('../lib/storage')
 const { sendAttachmentPreview } = require('../lib/attachmentPreview')
-const { normalizeContentFormat, validateHtmlForSubmission } = require('../lib/htmlSecurity')
+const { normalizeContentFormat, validateHtmlForSubmission, validateHtmlForRuntime } = require('../lib/htmlSecurity')
 const { HTML_PREVIEW_TOKEN_TTL_SECONDS, signHtmlPreviewToken } = require('../lib/previewTokens')
 const { buildSheetTextSearchClauses } = require('../lib/sheetSearch')
 const { computeLineDiff, addWordSegments } = require('../lib/diff')
@@ -1004,7 +1004,6 @@ router.get('/:id/html-preview', requireAuth, async (req, res) => {
     const previewVersion = sheet.updatedAt ? new Date(sheet.updatedAt).toISOString() : '0'
     const previewToken = signHtmlPreviewToken({
       sheetId: sheet.id,
-      userId: req.user.userId,
       version: previewVersion,
       allowUnpublished: canModerateOrOwnSheet(sheet, req.user),
     })
@@ -1019,6 +1018,65 @@ router.get('/:id/html-preview', requireAuth, async (req, res) => {
       expiresInSeconds: HTML_PREVIEW_TOKEN_TTL_SECONDS,
       sanitized: issues.length > 0,
       issues,
+    })
+  } catch (error) {
+    captureError(error, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+router.get('/:id/html-runtime', requireAuth, async (req, res) => {
+  const sheetId = Number.parseInt(req.params.id, 10)
+
+  try {
+    const sheet = await prisma.studySheet.findUnique({
+      where: { id: sheetId },
+      select: {
+        id: true,
+        title: true,
+        userId: true,
+        content: true,
+        contentFormat: true,
+        status: true,
+        updatedAt: true,
+      },
+    })
+
+    if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
+    if (!canReadSheet(sheet, req.user || null)) return res.status(404).json({ error: 'Sheet not found.' })
+    if (sheet.contentFormat !== 'html') {
+      return res.status(400).json({ error: 'This sheet is not in HTML mode.' })
+    }
+
+    // Pending-review sheets: only owner or admin can get a runtime URL
+    if (sheet.status === SHEET_STATUS.PENDING_REVIEW && !canModerateOrOwnSheet(sheet, req.user)) {
+      return res.status(403).json({ error: 'This sheet is under review. Only the author or an admin can preview it interactively.' })
+    }
+
+    const runtimeCheck = validateHtmlForRuntime(sheet.content)
+    if (!runtimeCheck.ok) {
+      return res.status(400).json({
+        error: 'This sheet contains blocked content for interactive viewing.',
+        issues: runtimeCheck.issues,
+      })
+    }
+
+    const runtimeVersion = sheet.updatedAt ? new Date(sheet.updatedAt).toISOString() : '0'
+    const runtimeToken = signHtmlPreviewToken({
+      sheetId: sheet.id,
+      version: runtimeVersion,
+      allowUnpublished: canModerateOrOwnSheet(sheet, req.user),
+      tokenType: 'html-runtime',
+    })
+    const runtimeUrl = `${resolvePreviewOrigin(req)}/preview/html?token=${encodeURIComponent(runtimeToken)}`
+
+    res.json({
+      id: sheet.id,
+      title: sheet.title,
+      status: sheet.status,
+      updatedAt: sheet.updatedAt,
+      runtimeUrl,
+      expiresInSeconds: HTML_PREVIEW_TOKEN_TTL_SECONDS,
     })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })

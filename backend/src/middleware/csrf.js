@@ -31,7 +31,7 @@ function csrfProtection(req, res, next) {
 
   try {
     const csrfPayload = verifyCsrfToken(csrfToken)
-    if (csrfPayload?.type !== 'csrf' || csrfPayload?.userId !== authPayload?.userId) {
+    if (csrfPayload?.type !== 'csrf' || csrfPayload?.sub !== authPayload?.sub) {
       return sendError(res, 403, 'Invalid CSRF token.', ERROR_CODES.CSRF_INVALID)
     }
   } catch {

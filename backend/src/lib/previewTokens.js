@@ -6,12 +6,11 @@ const HTML_PREVIEW_TOKEN_TTL_SECONDS = Number.parseInt(
   10,
 )
 
-function signHtmlPreviewToken({ sheetId, userId, version, allowUnpublished = false }) {
+function signHtmlPreviewToken({ sheetId, version, allowUnpublished = false, tokenType = 'html-preview' }) {
   return jwt.sign(
     {
-      type: 'html-preview',
+      type: tokenType,
       sheetId,
-      userId,
       version,
       allowUnpublished: Boolean(allowUnpublished),
     },
