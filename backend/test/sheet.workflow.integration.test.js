@@ -363,7 +363,7 @@ describe('sheet workflow integration', () => {
       .send({})
 
     expect(submitResponse.status).toBe(200)
-    expect(submitResponse.body.status).toBe('pending_review')
+    expect(submitResponse.body.status).toBe('published')
   })
 
   it('blocks submit when html content fails policy checks', async () => {
@@ -398,7 +398,7 @@ describe('sheet workflow integration', () => {
       .set('x-test-role', 'student')
 
     expect(submitResponse.status).toBe(409)
-    expect(submitResponse.body.error).toMatch(/Security scan must pass/i)
+    expect(submitResponse.body.error).toMatch(/flagged HTML features/i)
   })
 
   it('supports draft create, edit, and resume', async () => {

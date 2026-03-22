@@ -1,9 +1,29 @@
 -- Add missing auth/profile columns expected by the current Prisma schema.
-ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "email" TEXT;
-ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "emailVerified" BOOLEAN NOT NULL DEFAULT false;
-ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "failedAttempts" INTEGER NOT NULL DEFAULT 0;
-ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "lockedUntil" TIMESTAMP(3);
-ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "avatarUrl" TEXT;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='User' AND column_name='email') THEN
+    ALTER TABLE "User" ADD COLUMN "email" TEXT;
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='User' AND column_name='emailVerified') THEN
+    ALTER TABLE "User" ADD COLUMN "emailVerified" BOOLEAN NOT NULL DEFAULT false;
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='User' AND column_name='failedAttempts') THEN
+    ALTER TABLE "User" ADD COLUMN "failedAttempts" INTEGER NOT NULL DEFAULT 0;
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='User' AND column_name='lockedUntil') THEN
+    ALTER TABLE "User" ADD COLUMN "lockedUntil" TIMESTAMP(3);
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='User' AND column_name='avatarUrl') THEN
+    ALTER TABLE "User" ADD COLUMN "avatarUrl" TEXT;
+  END IF;
+END $$;
 
 -- Normalize any historical email values before adding uniqueness protection.
 UPDATE "User"

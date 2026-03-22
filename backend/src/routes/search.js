@@ -89,6 +89,7 @@ router.get('/', optionalAuth, async (req, res) => {
           prisma.studySheet.findMany({
             where: {
               status: 'published',
+              htmlRiskTier: { lt: 3 },
               OR: sheetTextSearchClauses,
             },
             select: {

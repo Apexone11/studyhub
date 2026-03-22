@@ -11,7 +11,7 @@ const { getAuthTokenFromRequest, verifyAuthToken } = require('../lib/authTokens'
 const prisma = require('../lib/prisma')
 const { cleanupAttachmentIfUnused, resolveAttachmentPath } = require('../lib/storage')
 const { sendAttachmentPreview } = require('../lib/attachmentPreview')
-const { normalizeContentFormat, validateHtmlForSubmission, validateHtmlForRuntime } = require('../lib/htmlSecurity')
+const { normalizeContentFormat, validateHtmlForSubmission, RISK_TIER } = require('../lib/htmlSecurity')
 const { HTML_PREVIEW_TOKEN_TTL_SECONDS, signHtmlPreviewToken } = require('../lib/previewTokens')
 const { buildSheetTextSearchClauses } = require('../lib/sheetSearch')
 const { computeLineDiff, addWordSegments } = require('../lib/diff')
@@ -37,6 +37,7 @@ const SHEET_STATUS = {
   PENDING_REVIEW: 'pending_review',
   PUBLISHED: 'published',
   REJECTED: 'rejected',
+  QUARANTINED: 'quarantined',
 }
 
 const reactLimiter = rateLimit({
@@ -117,6 +118,7 @@ function normalizeSheetStatus(value, fallback = SHEET_STATUS.PUBLISHED) {
   if (normalized === SHEET_STATUS.PENDING_REVIEW) return SHEET_STATUS.PENDING_REVIEW
   if (normalized === SHEET_STATUS.PUBLISHED) return SHEET_STATUS.PUBLISHED
   if (normalized === SHEET_STATUS.REJECTED) return SHEET_STATUS.REJECTED
+  if (normalized === SHEET_STATUS.QUARANTINED) return SHEET_STATUS.QUARANTINED
   return fallback
 }
 
@@ -224,6 +226,7 @@ function serializeSheet(sheet, { starred = false, reactions = null, commentCount
     commentCount,
     htmlWorkflow: {
       scanStatus: sheet.htmlScanStatus || SCAN_STATUS.QUEUED,
+      riskTier: sheet.htmlRiskTier || 0,
       scanFindings: Array.isArray(sheet.htmlScanFindings) ? sheet.htmlScanFindings : [],
       scanUpdatedAt: sheet.htmlScanUpdatedAt || null,
       scanAcknowledgedAt: sheet.htmlScanAcknowledgedAt || null,
@@ -496,6 +499,7 @@ router.get('/', optionalAuth, async (req, res) => {
       where.userId = req.user.userId
     } else {
       where.status = SHEET_STATUS.PUBLISHED
+      where.htmlRiskTier = { lt: RISK_TIER.QUARANTINED }
     }
 
     if (courseId) where.courseId = Number.parseInt(courseId, 10)
@@ -986,6 +990,7 @@ router.get('/:id/html-preview', requireAuth, async (req, res) => {
         contentFormat: true,
         status: true,
         updatedAt: true,
+        htmlRiskTier: true,
       },
     })
 
@@ -995,6 +1000,7 @@ router.get('/:id/html-preview', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'This sheet is not in HTML mode.' })
     }
 
+    const tier = sheet.htmlRiskTier || 0
     const validation = validateHtmlForSubmission(sheet.content)
 
     // We still return a previewUrl even if validation fails.
@@ -1006,6 +1012,7 @@ router.get('/:id/html-preview', requireAuth, async (req, res) => {
       sheetId: sheet.id,
       version: previewVersion,
       allowUnpublished: canModerateOrOwnSheet(sheet, req.user),
+      tier,
     })
     const previewUrl = `${resolvePreviewOrigin(req)}/preview/html?token=${encodeURIComponent(previewToken)}`
 
@@ -1013,6 +1020,7 @@ router.get('/:id/html-preview', requireAuth, async (req, res) => {
       id: sheet.id,
       title: sheet.title,
       status: sheet.status,
+      htmlRiskTier: tier,
       updatedAt: sheet.updatedAt,
       previewUrl,
       expiresInSeconds: HTML_PREVIEW_TOKEN_TTL_SECONDS,
@@ -1039,6 +1047,7 @@ router.get('/:id/html-runtime', requireAuth, async (req, res) => {
         contentFormat: true,
         status: true,
         updatedAt: true,
+        htmlRiskTier: true,
       },
     })
 
@@ -1048,17 +1057,16 @@ router.get('/:id/html-runtime', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'This sheet is not in HTML mode.' })
     }
 
-    // Pending-review sheets: only owner or admin can get a runtime URL
-    if (sheet.status === SHEET_STATUS.PENDING_REVIEW && !canModerateOrOwnSheet(sheet, req.user)) {
-      return res.status(403).json({ error: 'This sheet is under review. Only the author or an admin can preview it interactively.' })
+    const tier = sheet.htmlRiskTier || 0
+
+    // Quarantined sheets: no runtime access
+    if (tier >= RISK_TIER.QUARANTINED) {
+      return res.status(403).json({ error: 'This sheet has been quarantined. Preview is disabled.' })
     }
 
-    const runtimeCheck = validateHtmlForRuntime(sheet.content)
-    if (!runtimeCheck.ok) {
-      return res.status(400).json({
-        error: 'This sheet contains blocked content for interactive viewing.',
-        issues: runtimeCheck.issues,
-      })
+    // Pending-review / high-risk sheets: only owner or admin
+    if ((sheet.status === SHEET_STATUS.PENDING_REVIEW || tier >= RISK_TIER.HIGH_RISK) && !canModerateOrOwnSheet(sheet, req.user)) {
+      return res.status(403).json({ error: 'This sheet is under review. Only the author or an admin can preview it interactively.' })
     }
 
     const runtimeVersion = sheet.updatedAt ? new Date(sheet.updatedAt).toISOString() : '0'
@@ -1067,6 +1075,7 @@ router.get('/:id/html-runtime', requireAuth, async (req, res) => {
       version: runtimeVersion,
       allowUnpublished: canModerateOrOwnSheet(sheet, req.user),
       tokenType: 'html-runtime',
+      tier,
     })
     const runtimeUrl = `${resolvePreviewOrigin(req)}/preview/html?token=${encodeURIComponent(runtimeToken)}`
 
@@ -1074,6 +1083,7 @@ router.get('/:id/html-runtime', requireAuth, async (req, res) => {
       id: sheet.id,
       title: sheet.title,
       status: sheet.status,
+      htmlRiskTier: tier,
       updatedAt: sheet.updatedAt,
       runtimeUrl,
       expiresInSeconds: HTML_PREVIEW_TOKEN_TTL_SECONDS,

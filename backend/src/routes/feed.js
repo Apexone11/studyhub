@@ -214,13 +214,14 @@ router.get('/', async (req, res) => {
   const sheetWhere = search
     ? {
         status: 'published',
+        htmlRiskTier: { lt: 3 },
         OR: [
           { title: { contains: search, mode: 'insensitive' } },
           { content: { contains: search, mode: 'insensitive' } },
           { description: { contains: search, mode: 'insensitive' } },
         ],
       }
-    : { status: 'published' }
+    : { status: 'published', htmlRiskTier: { lt: 3 } }
   const postWhere = search
     ? { content: { contains: search, mode: 'insensitive' } }
     : undefined

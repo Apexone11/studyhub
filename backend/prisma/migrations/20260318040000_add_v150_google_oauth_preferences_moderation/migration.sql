@@ -1,8 +1,16 @@
 -- v1.5.0-beta.1: Google OAuth fields, UserPreferences, Moderation tables
 
 -- Google OAuth columns on User
-ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "googleId" TEXT;
-ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "authProvider" TEXT NOT NULL DEFAULT 'local';
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='User' AND column_name='googleId') THEN
+    ALTER TABLE "User" ADD COLUMN "googleId" TEXT;
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='User' AND column_name='authProvider') THEN
+    ALTER TABLE "User" ADD COLUMN "authProvider" TEXT NOT NULL DEFAULT 'local';
+  END IF;
+END $$;
 CREATE UNIQUE INDEX IF NOT EXISTS "User_googleId_key" ON "User"("googleId");
 
 -- UserPreferences table

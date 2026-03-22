@@ -3,7 +3,7 @@ const requireAuth = require('../middleware/auth')
 const requireAdmin = require('../middleware/requireAdmin')
 const { captureError } = require('../monitoring/sentry')
 const { deleteUserAccount } = require('../lib/deleteUserAccount')
-const { validateHtmlForSubmission, validateHtmlForRuntime } = require('../lib/htmlSecurity')
+const { validateHtmlForRuntime, classifyHtmlRisk, RISK_TIER } = require('../lib/htmlSecurity')
 const { sanitizePreviewHtml } = require('../lib/htmlPreviewDocument')
 const { isHtmlUploadsEnabled, setHtmlUploadsEnabled, readEnvOverride } = require('../lib/htmlKillSwitch')
 const prisma = require('../lib/prisma')
@@ -297,21 +297,25 @@ router.get('/sheets', async (req, res) => {
 router.get('/sheets/review', async (req, res) => {
   const page = parsePage(req.query.page)
   const rawStatus = String(req.query.status || 'pending_review').trim().toLowerCase()
-  const status = ['pending_review', 'rejected', 'draft', 'published'].includes(rawStatus)
+  const status = ['pending_review', 'rejected', 'draft', 'published', 'quarantined'].includes(rawStatus)
     ? rawStatus
     : 'pending_review'
 
-  /* Optional filters: contentFormat and htmlScanStatus */
+  /* Optional filters: contentFormat, htmlScanStatus, tier */
   const rawFormat = String(req.query.contentFormat || '').trim().toLowerCase()
   const contentFormat = ['html', 'markdown'].includes(rawFormat) ? rawFormat : undefined
 
   const rawScan = String(req.query.htmlScanStatus || '').trim().toLowerCase()
-  const htmlScanStatus = ['queued', 'running', 'passed', 'failed'].includes(rawScan) ? rawScan : undefined
+  const htmlScanStatus = ['queued', 'running', 'passed', 'flagged', 'pending_review', 'quarantined'].includes(rawScan) ? rawScan : undefined
+
+  const rawTier = parseInt(req.query.tier, 10)
+  const tierFilter = Number.isInteger(rawTier) && rawTier >= 0 && rawTier <= 3 ? rawTier : undefined
 
   const where = {
     status,
     ...(contentFormat ? { contentFormat } : {}),
     ...(htmlScanStatus ? { htmlScanStatus } : {}),
+    ...(tierFilter !== undefined ? { htmlRiskTier: tierFilter } : {}),
   }
 
   try {
@@ -358,7 +362,7 @@ router.get('/sheets/:id/review-detail', async (req, res) => {
 
     const rawHtml = sheet.contentFormat === 'html' ? sheet.content : null
     const sanitizedHtml = rawHtml ? sanitizePreviewHtml(rawHtml) : null
-    const validation = rawHtml ? validateHtmlForSubmission(rawHtml) : { ok: true, issues: [] }
+    const liveClassification = rawHtml ? classifyHtmlRisk(rawHtml) : { tier: 0, findings: [], summary: 'N/A' }
 
     res.json({
       id: sheet.id,
@@ -368,7 +372,10 @@ router.get('/sheets/:id/review-detail', async (req, res) => {
       status: sheet.status,
       rawHtml,
       sanitizedHtml,
-      validationIssues: validation.issues,
+      validationIssues: liveClassification.findings.map((f) => f.message),
+      htmlRiskTier: sheet.htmlRiskTier || 0,
+      liveRiskTier: liveClassification.tier,
+      liveRiskSummary: liveClassification.summary,
       htmlScanStatus: sheet.htmlScanStatus,
       htmlScanFindings: sheet.htmlScanFindings || [],
       htmlScanAcknowledgedAt: sheet.htmlScanAcknowledgedAt,
@@ -432,6 +439,8 @@ router.patch('/sheets/:id/review', async (req, res) => {
       where: { id: sheetId },
       data: {
         status: nextStatus,
+        // On approve: clear risk tier (admin-verified safe). On reject: keep current tier.
+        ...(action === 'approve' ? { htmlRiskTier: RISK_TIER.CLEAN, htmlScanStatus: 'passed' } : {}),
         reviewedById: req.user.id,
         reviewedAt: new Date(),
         reviewReason: effectiveReason,

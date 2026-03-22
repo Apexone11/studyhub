@@ -14,10 +14,16 @@ async function getVisibilityByUserId(prisma, userIds) {
     return visibilityByUserId
   }
 
-  const preferences = await prisma.userPreferences.findMany({
-    where: { userId: { in: uniqueUserIds } },
-    select: { userId: true, profileVisibility: true },
-  })
+  let preferences = []
+  try {
+    preferences = await prisma.userPreferences.findMany({
+      where: { userId: { in: uniqueUserIds } },
+      select: { userId: true, profileVisibility: true },
+    })
+  } catch {
+    // If the UserPreferences table is not yet migrated, treat all users as public
+    return visibilityByUserId
+  }
 
   for (const preference of preferences) {
     visibilityByUserId.set(

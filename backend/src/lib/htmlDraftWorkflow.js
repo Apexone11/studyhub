@@ -1,5 +1,5 @@
 const crypto = require('node:crypto')
-const { normalizeContentFormat, validateHtmlForSubmission, scanInlineJsRisk } = require('./htmlSecurity')
+const { normalizeContentFormat, classifyHtmlRisk, RISK_TIER } = require('./htmlSecurity')
 const { scanBufferWithClamAv } = require('./clamav')
 const { sendHighRiskSheetAlert } = require('./email')
 const { createNotification } = require('./notify')
@@ -8,7 +8,9 @@ const SCAN_STATUS = {
   QUEUED: 'queued',
   RUNNING: 'running',
   PASSED: 'passed',
-  FAILED: 'failed',
+  FLAGGED: 'flagged',
+  PENDING_REVIEW: 'pending_review',
+  QUARANTINED: 'quarantined',
 }
 
 const HTML_VERSION_KIND = {
@@ -31,17 +33,31 @@ function normalizeDescription(value) {
   return String(value || '').trim().slice(0, 300)
 }
 
-function normalizeFindings(policyValidation, avResult) {
+/**
+ * Map a risk tier to the corresponding scan status string.
+ */
+function tierToScanStatus(tier) {
+  switch (tier) {
+    case RISK_TIER.CLEAN: return SCAN_STATUS.PASSED
+    case RISK_TIER.FLAGGED: return SCAN_STATUS.FLAGGED
+    case RISK_TIER.HIGH_RISK: return SCAN_STATUS.PENDING_REVIEW
+    case RISK_TIER.QUARANTINED: return SCAN_STATUS.QUARANTINED
+    default: return SCAN_STATUS.PASSED
+  }
+}
+
+/**
+ * Build findings array from classifier output + AV result.
+ */
+function normalizeFindings(classifierResult, avResult) {
   const findings = []
 
-  if (!policyValidation.ok) {
-    for (const issue of policyValidation.issues) {
-      findings.push({
-        source: 'policy',
-        severity: 'high',
-        message: issue,
-      })
-    }
+  for (const finding of classifierResult.findings) {
+    findings.push({
+      source: finding.category || 'policy',
+      severity: finding.severity || 'medium',
+      message: finding.message,
+    })
   }
 
   if (avResult) {
@@ -100,6 +116,7 @@ async function ensureSheetOwnership(prisma, sheetId, user) {
     where: { id: sheetId },
     include: {
       htmlVersions: true,
+      author: { select: { id: true, username: true } },
     },
   })
 
@@ -137,6 +154,7 @@ async function upsertDraftSheet(prisma, { sheetId, user, title, courseId, descri
         status: 'draft',
         htmlScanStatus: SCAN_STATUS.QUEUED,
         htmlScanFindings: null,
+        htmlRiskTier: 0,
       },
       include: {
         author: { select: { id: true, username: true } },
@@ -164,6 +182,7 @@ async function upsertDraftSheet(prisma, { sheetId, user, title, courseId, descri
       userId: user.userId,
       htmlScanStatus: SCAN_STATUS.QUEUED,
       htmlScanFindings: null,
+      htmlRiskTier: 0,
     },
     include: {
       author: { select: { id: true, username: true } },
@@ -176,12 +195,13 @@ async function upsertDraftSheet(prisma, { sheetId, user, title, courseId, descri
 async function runHtmlScanNow(prisma, { sheetId }) {
   const sheet = await prisma.studySheet.findUnique({
     where: { id: sheetId },
-    include: { htmlVersions: true },
+    include: { htmlVersions: true, author: { select: { id: true, username: true } } },
   })
 
   if (!sheet || sheet.contentFormat !== 'html') {
     return {
       status: SCAN_STATUS.PASSED,
+      tier: RISK_TIER.CLEAN,
       findings: [],
     }
   }
@@ -197,31 +217,39 @@ async function runHtmlScanNow(prisma, { sheetId }) {
     },
   })
 
-  const policyValidation = validateHtmlForSubmission(htmlToScan)
-  let avResult = null
+  // Phase 1: classify risk tier
+  const classifierResult = classifyHtmlRisk(htmlToScan)
+  let tier = classifierResult.tier
 
-  if (policyValidation.ok) {
-    avResult = await scanBufferWithClamAv(Buffer.from(htmlToScan, 'utf8'))
+  // Phase 2: always run ClamAV (regardless of classifier result)
+  const avResult = await scanBufferWithClamAv(Buffer.from(htmlToScan, 'utf8'))
+
+  // AV infected → escalate to Tier 3. AV error → log but don't escalate.
+  if (avResult && avResult.status === 'infected') {
+    tier = RISK_TIER.QUARANTINED
   }
 
-  const findings = normalizeFindings(policyValidation, avResult)
-  const nextStatus = findings.length > 0 ? SCAN_STATUS.FAILED : SCAN_STATUS.PASSED
+  const findings = normalizeFindings(classifierResult, avResult)
+  const scanStatus = tierToScanStatus(tier)
 
   await prisma.studySheet.update({
     where: { id: sheetId },
     data: {
-      htmlScanStatus: nextStatus,
+      htmlScanStatus: scanStatus,
+      htmlRiskTier: tier,
       htmlScanFindings: findings,
       htmlScanUpdatedAt: new Date(),
       content: htmlToScan,
-      status: sheet.status === 'pending_review' && nextStatus !== SCAN_STATUS.PASSED && !sheet.htmlScanAcknowledgedAt
+      // If sheet was pending_review but scan now shows clean + not acknowledged, revert to draft
+      status: sheet.status === 'pending_review' && tier === RISK_TIER.CLEAN && !sheet.htmlScanAcknowledgedAt
         ? 'draft'
         : sheet.status,
     },
   })
 
   return {
-    status: nextStatus,
+    status: scanStatus,
+    tier,
     findings,
   }
 }
@@ -241,6 +269,7 @@ function scheduleHtmlScan(prisma, { sheetId, delayMs = 450 }) {
       htmlScanStatus: SCAN_STATUS.QUEUED,
       htmlScanUpdatedAt: new Date(),
       htmlScanFindings: null,
+      htmlRiskTier: 0,
     },
   }).finally(() => {
     const timer = setTimeout(async () => {
@@ -252,7 +281,8 @@ function scheduleHtmlScan(prisma, { sheetId, delayMs = 450 }) {
         await prisma.studySheet.update({
           where: { id: sheetId },
           data: {
-            htmlScanStatus: SCAN_STATUS.FAILED,
+            htmlScanStatus: SCAN_STATUS.FLAGGED,
+            htmlRiskTier: RISK_TIER.FLAGGED,
             htmlScanFindings: [{ source: 'system', severity: 'high', message: 'Background scan failed to complete.' }],
             htmlScanUpdatedAt: new Date(),
           },
@@ -339,6 +369,7 @@ async function updateWorkingHtmlDraft(prisma, { sheetId, user, title, courseId, 
       status: 'draft',
       htmlScanStatus: SCAN_STATUS.QUEUED,
       htmlScanFindings: null,
+      htmlRiskTier: 0,
     },
   })
 
@@ -358,6 +389,7 @@ async function getHtmlScanStatus(prisma, { sheetId, user }) {
 
   return {
     status: sheet.htmlScanStatus || SCAN_STATUS.QUEUED,
+    tier: sheet.htmlRiskTier || 0,
     findings: Array.isArray(sheet.htmlScanFindings) ? sheet.htmlScanFindings : [],
     updatedAt: sheet.htmlScanUpdatedAt,
     acknowledgedAt: sheet.htmlScanAcknowledgedAt,
@@ -401,50 +433,54 @@ async function submitHtmlDraftForReview(prisma, { sheetId, user }) {
     throw error
   }
 
+  // Run scan and get tier
   const scan = await runHtmlScanNow(prisma, { sheetId })
+  const tier = scan.tier
 
-  // If scan failed but user has acknowledged the warning, allow submission
-  // as pending_review for admin approval. Otherwise block.
-  if (scan.status !== SCAN_STATUS.PASSED) {
-    if (!sheet.htmlScanAcknowledgedAt) {
-      const error = new Error('Security scan must pass before submit, or acknowledge the findings first.')
-      error.statusCode = 409
-      error.findings = scan.findings
-      throw error
-    }
-    // User acknowledged — submit with flagged findings for admin review
+  // Route by tier
+  let nextStatus
+  switch (tier) {
+    case RISK_TIER.CLEAN:
+      // Tier 0: auto-publish
+      nextStatus = 'published'
+      break
+
+    case RISK_TIER.FLAGGED:
+      // Tier 1: auto-publish but require acknowledgement
+      if (!sheet.htmlScanAcknowledgedAt) {
+        const error = new Error('This sheet contains flagged HTML features. Acknowledge the findings before publishing.')
+        error.statusCode = 409
+        error.findings = scan.findings
+        error.tier = tier
+        throw error
+      }
+      nextStatus = 'published'
+      break
+
+    case RISK_TIER.HIGH_RISK:
+      // Tier 2: pending admin review
+      nextStatus = 'pending_review'
+      break
+
+    case RISK_TIER.QUARANTINED:
+      // Tier 3: quarantined
+      nextStatus = 'quarantined'
+      break
+
+    default:
+      nextStatus = 'published'
   }
 
-  // Run inline JS risk scan for admin reporting
-  const riskResult = scanInlineJsRisk(sheet.content)
-
-  if (riskResult.highRisk) {
-    // Append risk flags to scan findings for admin review
-    const riskFindings = riskResult.flags.map((flag) => ({
-      source: 'js-risk',
-      severity: 'high',
-      message: flag,
-    }))
-    const existingFindings = Array.isArray(scan.findings) ? scan.findings : []
-
-    await prisma.studySheet.update({
-      where: { id: sheetId },
-      data: {
-        htmlScanFindings: [...existingFindings, ...riskFindings],
-        htmlScanStatus: SCAN_STATUS.FAILED,
-      },
-    })
-
-    // Fire-and-forget: email admin + dashboard notification
+  // Notify admins for Tier 2+
+  if (tier >= RISK_TIER.HIGH_RISK) {
     const username = sheet.author?.username || user.username || `User #${user.userId}`
     sendHighRiskSheetAlert({
       sheetId,
       sheetTitle: sheet.title,
       username,
-      flags: riskResult.flags,
+      flags: scan.findings.map((f) => f.message),
     }).catch((err) => console.error('[htmlDraftWorkflow] Failed to send high-risk alert:', err.message))
 
-    // Find admin users and notify them in-app
     prisma.user.findMany({ where: { role: 'admin' }, select: { id: true } })
       .then((admins) => {
         for (const admin of admins) {
@@ -454,7 +490,7 @@ async function submitHtmlDraftForReview(prisma, { sheetId, user }) {
             message: `High-risk HTML sheet "${sheet.title || 'Untitled'}" submitted by ${username} — review required.`,
             actorId: user.userId,
             sheetId,
-            linkPath: `/admin?tab=sheets`,
+            linkPath: '/admin?tab=sheets',
           }).catch(() => {})
         }
       })
@@ -464,7 +500,7 @@ async function submitHtmlDraftForReview(prisma, { sheetId, user }) {
   return prisma.studySheet.update({
     where: { id: sheetId },
     data: {
-      status: 'pending_review',
+      status: nextStatus,
     },
     include: {
       author: { select: { id: true, username: true } },

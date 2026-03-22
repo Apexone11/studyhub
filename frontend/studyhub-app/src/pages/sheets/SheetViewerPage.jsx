@@ -785,7 +785,11 @@ export default function SheetViewerPage() {
                           <span style={{ fontSize: 11, fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase' }}>
                             HTML sheet
                           </span>
-                          {sheet.status === 'pending_review' ? (
+                          {(sheet.htmlRiskTier || 0) === 1 ? (
+                            <span style={{ fontSize: 10, fontWeight: 700, color: '#ca8a04', background: '#fefce8', border: '1px solid #fde68a', borderRadius: 6, padding: '2px 8px', textTransform: 'uppercase' }}>
+                              Flagged
+                            </span>
+                          ) : (sheet.htmlRiskTier || 0) >= 2 || sheet.status === 'pending_review' ? (
                             <span style={{ fontSize: 10, fontWeight: 700, color: '#b45309', background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 6, padding: '2px 8px', textTransform: 'uppercase' }}>
                               Pending Review
                             </span>
@@ -806,22 +810,37 @@ export default function SheetViewerPage() {
                   ) : null}
 
                   {isHtmlSheet ? (
-                    !htmlWarningAcked ? (
+                    (sheet.htmlRiskTier || 0) >= 3 ? (
+                      <div style={{ borderRadius: 16, border: '1px solid #fecaca', background: '#fef2f2', padding: 24, textAlign: 'center' }}>
+                        <div style={{ fontSize: 15, fontWeight: 800, color: '#dc2626', marginBottom: 8 }}>Quarantined</div>
+                        <div style={{ fontSize: 13, color: '#dc2626', lineHeight: 1.6 }}>
+                          This sheet has been quarantined due to a security concern. Preview is disabled.
+                        </div>
+                      </div>
+                    ) : (sheet.htmlRiskTier || 0) >= 2 && !canEdit ? (
+                      <div style={{ borderRadius: 16, border: '1px solid #fed7aa', background: '#fff7ed', padding: 24, textAlign: 'center' }}>
+                        <div style={{ fontSize: 15, fontWeight: 800, color: '#9a3412', marginBottom: 8 }}>Pending Safety Review</div>
+                        <div style={{ fontSize: 13, color: '#9a3412', lineHeight: 1.6 }}>
+                          This sheet is awaiting admin review. The preview is disabled until it has been approved.
+                        </div>
+                      </div>
+                    ) : !htmlWarningAcked ? (
                       <div
                         style={{
                           borderRadius: 16,
-                          border: '1px solid #fde68a',
-                          background: '#fffbeb',
+                          border: (sheet.htmlRiskTier || 0) >= 1 ? '1px solid #fde68a' : '1px solid #e2e8f0',
+                          background: (sheet.htmlRiskTier || 0) >= 1 ? '#fffbeb' : '#f8fafc',
                           padding: 24,
                           textAlign: 'center',
                         }}
                       >
-                        <div style={{ fontSize: 15, fontWeight: 800, color: '#92400e', marginBottom: 8 }}>
-                          Interactive HTML Sheet
+                        <div style={{ fontSize: 15, fontWeight: 800, color: (sheet.htmlRiskTier || 0) >= 1 ? '#92400e' : '#334155', marginBottom: 8 }}>
+                          {(sheet.htmlRiskTier || 0) >= 1 ? 'Flagged HTML Sheet' : 'Interactive HTML Sheet'}
                         </div>
-                        <div style={{ fontSize: 13, color: '#92400e', lineHeight: 1.6, marginBottom: 16 }}>
-                          This sheet contains HTML with scripts. It runs in a secure sandbox with no network
-                          access, no popups, and no access to your session. Click below to load it.
+                        <div style={{ fontSize: 13, color: (sheet.htmlRiskTier || 0) >= 1 ? '#92400e' : '#64748b', lineHeight: 1.6, marginBottom: 16 }}>
+                          {(sheet.htmlRiskTier || 0) >= 1
+                            ? 'This sheet contains flagged HTML features. Scripts are disabled in the preview. It runs in a secure sandbox with no network access.'
+                            : 'This sheet contains HTML with scripts. It runs in a secure sandbox with no network access, no popups, and no access to your session. Click below to load it.'}
                         </div>
                         <button
                           type="button"
@@ -838,12 +857,12 @@ export default function SheetViewerPage() {
                             fontFamily: FONT,
                           }}
                         >
-                          Load interactive sheet
+                          {(sheet.htmlRiskTier || 0) >= 1 ? 'Load safe preview' : 'Load interactive sheet'}
                         </button>
                       </div>
                     ) : runtimeLoading ? (
                       <div style={{ borderRadius: 16, border: '1px solid #e2e8f0', padding: 24, textAlign: 'center' }}>
-                        <div style={{ fontSize: 13, color: '#64748b' }}>Loading interactive sheet…</div>
+                        <div style={{ fontSize: 13, color: '#64748b' }}>Loading {(sheet.htmlRiskTier || 0) >= 1 ? 'safe preview' : 'interactive sheet'}…</div>
                       </div>
                     ) : runtimeUrl ? (
                       <div
@@ -856,7 +875,7 @@ export default function SheetViewerPage() {
                       >
                         <iframe
                           title={`sheet-html-${sheet.id}`}
-                          sandbox="allow-scripts"
+                          sandbox={(sheet.htmlRiskTier || 0) >= 1 ? '' : 'allow-scripts'}
                           referrerPolicy="no-referrer"
                           src={runtimeUrl}
                           style={{ width: '100%', minHeight: 560, border: 'none' }}

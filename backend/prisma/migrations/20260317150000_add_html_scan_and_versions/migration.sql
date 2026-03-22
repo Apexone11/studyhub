@@ -1,10 +1,29 @@
 -- Add HTML scan metadata to StudySheet
-ALTER TABLE "StudySheet"
-  ADD COLUMN IF NOT EXISTS "htmlScanStatus" TEXT NOT NULL DEFAULT 'queued',
-  ADD COLUMN IF NOT EXISTS "htmlScanFindings" JSONB,
-  ADD COLUMN IF NOT EXISTS "htmlScanUpdatedAt" TIMESTAMP(3),
-  ADD COLUMN IF NOT EXISTS "htmlScanAcknowledgedAt" TIMESTAMP(3),
-  ADD COLUMN IF NOT EXISTS "htmlOriginalArchivedAt" TIMESTAMP(3);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='StudySheet' AND column_name='htmlScanStatus') THEN
+    ALTER TABLE "StudySheet" ADD COLUMN "htmlScanStatus" TEXT NOT NULL DEFAULT 'queued';
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='StudySheet' AND column_name='htmlScanFindings') THEN
+    ALTER TABLE "StudySheet" ADD COLUMN "htmlScanFindings" JSONB;
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='StudySheet' AND column_name='htmlScanUpdatedAt') THEN
+    ALTER TABLE "StudySheet" ADD COLUMN "htmlScanUpdatedAt" TIMESTAMP(3);
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='StudySheet' AND column_name='htmlScanAcknowledgedAt') THEN
+    ALTER TABLE "StudySheet" ADD COLUMN "htmlScanAcknowledgedAt" TIMESTAMP(3);
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='StudySheet' AND column_name='htmlOriginalArchivedAt') THEN
+    ALTER TABLE "StudySheet" ADD COLUMN "htmlOriginalArchivedAt" TIMESTAMP(3);
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS "StudySheet_htmlScanStatus_updatedAt_idx"
   ON "StudySheet"("htmlScanStatus", "updatedAt" DESC);

@@ -1,9 +1,21 @@
 -- V1 Complete — adds 2FA fields, Note, Notification, UserFollow, Reaction, DeletionReason
 
 -- Add 2FA fields to User
-ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "twoFaEnabled" BOOLEAN NOT NULL DEFAULT false;
-ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "twoFaCode" TEXT;
-ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "twoFaExpiry" TIMESTAMP(3);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='User' AND column_name='twoFaEnabled') THEN
+    ALTER TABLE "User" ADD COLUMN "twoFaEnabled" BOOLEAN NOT NULL DEFAULT false;
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='User' AND column_name='twoFaCode') THEN
+    ALTER TABLE "User" ADD COLUMN "twoFaCode" TEXT;
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='User' AND column_name='twoFaExpiry') THEN
+    ALTER TABLE "User" ADD COLUMN "twoFaExpiry" TIMESTAMP(3);
+  END IF;
+END $$;
 
 -- Note table
 CREATE TABLE IF NOT EXISTS "Note" (

@@ -1,5 +1,9 @@
 -- AlterTable: add userId column to ModerationCase
-ALTER TABLE "ModerationCase" ADD COLUMN IF NOT EXISTS "userId" INTEGER;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='ModerationCase' AND column_name='userId') THEN
+    ALTER TABLE "ModerationCase" ADD COLUMN "userId" INTEGER;
+  END IF;
+END $$;
 
 -- AddForeignKey
 DO $$ BEGIN

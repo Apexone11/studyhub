@@ -1,6 +1,13 @@
-ALTER TABLE "StudySheet"
-ADD COLUMN IF NOT EXISTS "contentFormat" TEXT NOT NULL DEFAULT 'markdown',
-ADD COLUMN IF NOT EXISTS "status" TEXT NOT NULL DEFAULT 'published';
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='StudySheet' AND column_name='contentFormat') THEN
+    ALTER TABLE "StudySheet" ADD COLUMN "contentFormat" TEXT NOT NULL DEFAULT 'markdown';
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='StudySheet' AND column_name='status') THEN
+    ALTER TABLE "StudySheet" ADD COLUMN "status" TEXT NOT NULL DEFAULT 'published';
+  END IF;
+END $$;
 
 UPDATE "StudySheet"
 SET "status" = 'published'

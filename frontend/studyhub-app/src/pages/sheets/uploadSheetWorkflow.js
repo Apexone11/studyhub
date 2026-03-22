@@ -7,14 +7,30 @@ export function canEditHtmlWorkingCopy() {
 export function canSubmitHtmlReview({
   scanStatus,
   scanAcknowledged,
+  tier,
   title,
   courseId,
   description,
   html,
 }) {
-  const scanOk =
-    String(scanStatus || '').toLowerCase() === 'passed' ||
-    Boolean(scanAcknowledged)
+  const effectiveTier = typeof tier === 'number' ? tier : 0
+
+  // Tier 0: always submittable (auto-publishes)
+  // Tier 1: requires acknowledgement
+  // Tier 2: always submittable (routes to pending_review)
+  // Tier 3: never submittable (quarantined)
+  let scanOk = false
+  if (effectiveTier === 3) {
+    scanOk = false
+  } else if (effectiveTier === 0 || String(scanStatus || '').toLowerCase() === 'passed') {
+    scanOk = true
+  } else if (effectiveTier === 1) {
+    scanOk = Boolean(scanAcknowledged)
+  } else {
+    // Tier 2 or unknown — always submittable
+    scanOk = true
+  }
+
   return (
     scanOk &&
     String(title || '').trim().length > 0 &&
@@ -27,6 +43,7 @@ export function canSubmitHtmlReview({
 export function reduceScanState(previousState, patch = {}) {
   const next = {
     status: patch.status || previousState.status || 'queued',
+    tier: typeof patch.tier === 'number' ? patch.tier : (previousState.tier || 0),
     findings: Array.isArray(patch.findings) ? patch.findings : (previousState.findings || []),
     updatedAt: patch.updatedAt || previousState.updatedAt || null,
     acknowledgedAt: patch.acknowledgedAt || previousState.acknowledgedAt || null,

@@ -86,11 +86,21 @@ function MiniPreview({ md }) {
   )
 }
 
-function statusColor(status) {
-  const normalized = String(status || '').toLowerCase()
-  if (normalized === 'passed') return '#16a34a'
-  if (normalized === 'failed') return '#dc2626'
-  if (normalized === 'running') return '#1d4ed8'
+
+
+function tierLabel(tier) {
+  if (tier === 0) return 'Clean'
+  if (tier === 1) return 'Flagged'
+  if (tier === 2) return 'High Risk'
+  if (tier === 3) return 'Quarantined'
+  return 'Unknown'
+}
+
+function tierColor(tier) {
+  if (tier === 0) return '#16a34a'
+  if (tier === 1) return '#ca8a04'
+  if (tier === 2) return '#ea580c'
+  if (tier === 3) return '#dc2626'
   return '#64748b'
 }
 
@@ -119,6 +129,7 @@ export default function UploadSheetPage() {
 
   const [scanState, setScanState] = useState({
     status: 'passed',
+    tier: 0,
     findings: [],
     updatedAt: null,
     acknowledgedAt: null,
@@ -164,6 +175,7 @@ export default function UploadSheetPage() {
   const canSubmitHtml = canSubmitHtmlReview({
     hasOriginalVersion: scanState.hasOriginalVersion,
     scanStatus: scanState.status,
+    tier: scanState.tier,
     scanAcknowledged: Boolean(scanState.acknowledgedAt) || scanModalDismissed,
     title,
     courseId,
@@ -343,8 +355,8 @@ export default function UploadSheetPage() {
 
         setScanState((prev) => reduceScanState(prev, data))
 
-        const normalizedStatus = String(data.status || '').toLowerCase()
-        if (!scanModalDismissed && normalizedStatus === 'failed') {
+        const effectiveTier = typeof data.tier === 'number' ? data.tier : 0
+        if (!scanModalDismissed && effectiveTier >= 1) {
           setShowScanModal(true)
         }
       } catch {
@@ -882,10 +894,10 @@ export default function UploadSheetPage() {
         }}
       >
         <IconUpload size={13} />
-        {loading ? 'Saving…' : legacyMarkdownMode ? (isEditing ? 'Save Changes' : 'Publish Sheet') : 'Submit For Review'}
+        {loading ? 'Saving…' : legacyMarkdownMode ? (isEditing ? 'Save Changes' : 'Publish Sheet') : scanState.tier === 3 ? 'Quarantined' : scanState.tier === 2 ? 'Submit for Review' : scanState.tier === 1 ? 'Publish with Warnings' : 'Publish'}
       </button>
     </div>
-  ), [attachUploading, canSubmitHtml, handleSubmit, isEditing, isHtmlMode, legacyMarkdownMode, loading, openHtmlPreview, saved, saveDraftNow])
+  ), [attachUploading, canSubmitHtml, handleSubmit, isEditing, isHtmlMode, legacyMarkdownMode, loading, openHtmlPreview, saved, saveDraftNow, scanState.tier])
 
   if (initializing) {
     return (
@@ -972,8 +984,8 @@ export default function UploadSheetPage() {
               {scanState.originalSourceName ? (
                 <span style={{ fontSize: 12, color: '#334155', fontWeight: 600 }}>{scanState.originalSourceName}</span>
               ) : null}
-              <span style={{ fontSize: 12, fontWeight: 700, color: statusColor(scanState.status) }}>
-                Scan: {scanState.status}
+              <span style={{ fontSize: 12, fontWeight: 700, color: tierColor(scanState.tier) }}>
+                {tierLabel(scanState.tier)} {scanState.status === 'running' || scanState.status === 'queued' ? `(${scanState.status})` : ''}
               </span>
             </div>
             {canEditHtml ? null : (
@@ -1141,7 +1153,7 @@ export default function UploadSheetPage() {
               <div>2. Import an <strong>.html</strong> file to create original + working copies.</div>
               <div>3. Fix issues in editor while security scan runs.</div>
               <div>4. Use preview to test full-page behavior.</div>
-              <div>5. Submit only after scan status shows <strong>passed</strong>.</div>
+              <div>5. Submit anytime — sheets with flagged content will be published with warnings or sent for review.</div>
             </div>
             <div style={{ borderTop: '1px solid var(--sh-border)', padding: 14, display: 'flex', justifyContent: 'flex-end' }}>
               <button onClick={dismissTutorial} style={{ background: 'var(--sh-brand)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: FONT }}>
@@ -1157,15 +1169,15 @@ export default function UploadSheetPage() {
           <div style={{ width: 'min(720px, 100%)', background: 'var(--sh-surface)', borderRadius: 16, border: '1px solid var(--sh-border)', overflow: 'hidden' }}>
             <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--sh-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--sh-heading)' }}>HTML Security Scan</div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: statusColor(scanState.status) }}>{scanState.status}</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: tierColor(scanState.tier) }}>{tierLabel(scanState.tier)}</div>
             </div>
             <div style={{ padding: 16, display: 'grid', gap: 10 }}>
               <div style={{ fontSize: 13, color: 'var(--sh-subtext)' }}>
-                Scan checks policy rules + antivirus before review submission.
+                StudyHub allows rich HTML like GitHub. We scan submissions and classify risk. Harmful content can lead to restrictions.
               </div>
               {scanState.findings?.length ? (
                 <div style={{ border: '1px solid #fecaca', background: '#fff1f2', borderRadius: 10, padding: 12 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#b91c1c', marginBottom: 6 }}>Findings</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#b91c1c', marginBottom: 6 }}>Scan Report ({scanState.findings.length} finding{scanState.findings.length !== 1 ? 's' : ''})</div>
                   <ul style={{ margin: 0, paddingLeft: 18, color: '#991b1b', fontSize: 12, lineHeight: 1.7 }}>
                     {scanState.findings.map((finding, index) => (
                       <li key={`${index}-${finding?.message || finding}`}>{finding?.message || finding}</li>
@@ -1174,16 +1186,30 @@ export default function UploadSheetPage() {
                 </div>
               ) : null}
 
-              {scanState.status === 'failed' ? (
+              {scanState.tier === 1 ? (
                 <div style={{ border: '1px solid #fde68a', background: '#fffbeb', borderRadius: 10, padding: 12, fontSize: 12, color: '#92400e', lineHeight: 1.6 }}>
-                  You can still submit this sheet for review. It will be placed in <strong>Pending</strong> status and sent to an admin for approval. Other users will see it listed but the HTML preview will be disabled until an admin approves it.
+                  This sheet contains flagged HTML features (scripts, iframes, or inline handlers). It will be published with a warning banner and scripts will be disabled in the preview.
                 </div>
               ) : null}
 
-              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: 'var(--sh-subtext)' }}>
-                <input type="checkbox" checked={scanAckChecked} onChange={(event) => setScanAckChecked(event.target.checked)} style={{ marginTop: 2 }} />
-                I understand this sheet may contain flagged HTML. I acknowledge it will be sent to an admin for review and will remain in Pending status until approved.
-              </label>
+              {scanState.tier === 2 ? (
+                <div style={{ border: '1px solid #fed7aa', background: '#fff7ed', borderRadius: 10, padding: 12, fontSize: 12, color: '#9a3412', lineHeight: 1.6 }}>
+                  This sheet contains high-risk behavioral patterns. It will be submitted for admin review. The preview will be disabled for other users until an admin approves it.
+                </div>
+              ) : null}
+
+              {scanState.tier === 3 ? (
+                <div style={{ border: '1px solid #fecaca', background: '#fef2f2', borderRadius: 10, padding: 12, fontSize: 12, color: '#dc2626', lineHeight: 1.6 }}>
+                  This sheet has been quarantined due to a malware or phishing signature match. It cannot be published. If you believe this is an error, please contact an admin.
+                </div>
+              ) : null}
+
+              {scanState.tier === 1 ? (
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: 'var(--sh-subtext)' }}>
+                  <input type="checkbox" checked={scanAckChecked} onChange={(event) => setScanAckChecked(event.target.checked)} style={{ marginTop: 2 }} />
+                  I understand this sheet contains flagged HTML features. I acknowledge it may be flagged and reviewed. Harmful content can lead to account restrictions.
+                </label>
+              ) : null}
             </div>
             <div style={{ borderTop: '1px solid var(--sh-border)', padding: 14, display: 'flex', justifyContent: 'space-between', gap: 10 }}>
               <button
@@ -1191,16 +1217,26 @@ export default function UploadSheetPage() {
                 onClick={() => setShowScanModal(false)}
                 style={{ background: 'var(--sh-surface)', color: 'var(--sh-muted)', border: '1px solid var(--sh-border)', borderRadius: 8, padding: '8px 12px', fontSize: 12, cursor: 'pointer', fontFamily: FONT }}
               >
-                Keep open
+                {scanState.tier >= 2 ? 'Close' : 'Keep open'}
               </button>
-              <button
-                type="button"
-                disabled={!scanAckChecked}
-                onClick={acknowledgeScanAndDismiss}
-                style={{ background: scanAckChecked ? 'var(--sh-brand)' : '#93c5fd', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 12px', fontSize: 12, fontWeight: 700, cursor: scanAckChecked ? 'pointer' : 'not-allowed', fontFamily: FONT }}
-              >
-                Acknowledge and dismiss
-              </button>
+              {scanState.tier === 1 ? (
+                <button
+                  type="button"
+                  disabled={!scanAckChecked}
+                  onClick={acknowledgeScanAndDismiss}
+                  style={{ background: scanAckChecked ? 'var(--sh-brand)' : '#93c5fd', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 12px', fontSize: 12, fontWeight: 700, cursor: scanAckChecked ? 'pointer' : 'not-allowed', fontFamily: FONT }}
+                >
+                  Acknowledge and dismiss
+                </button>
+              ) : scanState.tier === 2 ? (
+                <button
+                  type="button"
+                  onClick={() => { setScanModalDismissed(true); setShowScanModal(false) }}
+                  style={{ background: 'var(--sh-brand)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: FONT }}
+                >
+                  Understood
+                </button>
+              ) : null}
             </div>
           </div>
         </div>

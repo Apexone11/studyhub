@@ -82,40 +82,50 @@ router.get('/:username', optionalAuth, async (req, res) => {
     }
 
     /* Fetch shared (non-private) notes for profile display */
-    const sharedNotes = await prisma.note.findMany({
-      where: { userId: user.id, private: false },
-      orderBy: { updatedAt: 'desc' },
-      take: 10,
-      select: {
-        id: true,
-        title: true,
-        updatedAt: true,
-        course: { select: { id: true, code: true } },
-      },
-    })
+    let sharedNotes = []
+    try {
+      sharedNotes = await prisma.note.findMany({
+        where: { userId: user.id, private: false },
+        orderBy: { updatedAt: 'desc' },
+        take: 10,
+        select: {
+          id: true,
+          title: true,
+          updatedAt: true,
+          course: { select: { id: true, code: true } },
+        },
+      })
+    } catch {
+      // Degrade gracefully if notes query fails
+    }
 
     /* Fetch starred sheets for profile display */
-    const starredRows = await prisma.starredSheet.findMany({
-      where: { userId: user.id },
-      orderBy: { sheetId: 'desc' },
-      take: 10,
-      select: {
-        sheet: {
-          select: {
-            id: true,
-            title: true,
-            stars: true,
-            updatedAt: true,
-            status: true,
-            author: { select: { id: true, username: true } },
-            course: { select: { id: true, code: true } },
+    let starredSheets = []
+    try {
+      const starredRows = await prisma.starredSheet.findMany({
+        where: { userId: user.id },
+        orderBy: { sheetId: 'desc' },
+        take: 10,
+        select: {
+          sheet: {
+            select: {
+              id: true,
+              title: true,
+              stars: true,
+              updatedAt: true,
+              status: true,
+              author: { select: { id: true, username: true } },
+              course: { select: { id: true, code: true } },
+            },
           },
         },
-      },
-    })
-    const starredSheets = starredRows
-      .map((r) => r.sheet)
-      .filter((s) => s && s.status === 'published')
+      })
+      starredSheets = starredRows
+        .map((r) => r.sheet)
+        .filter((s) => s && s.status === 'published')
+    } catch {
+      // Degrade gracefully if starred query fails
+    }
 
     res.json({
       id: user.id,

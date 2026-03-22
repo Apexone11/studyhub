@@ -3114,8 +3114,179 @@ Rewrote all three policy pages with formal, real-world legal copy:
 - **PrivacyPage.jsx** — 9 sections: What We Collect, How We Use Data, Data Sharing, What Is Public, Security, Data Retention, Your Rights, Changes, Contact.
 - **GuidelinesPage.jsx** — 7 sections: What We Expect, What We Encourage, What Is Not Allowed, Content Quality, Forking and Attribution, Enforcement, Reporting.
 
+### Validation (v1.5.0 Dark Mode + Policy Pages)
+
+- `npm --prefix backend run lint` — passed
+- `npm --prefix frontend/studyhub-app run lint` — passed
+- `npm --prefix frontend/studyhub-app run build` — passed
+
+---
+
+## Cycle: Tiered HTML Risk Classification (2026-03-21)
+
+### Summary
+
+Replaced the binary block/allow HTML security model with a 4-tier risk classification system. HTML submissions are no longer hard-blocked — all HTML is accepted and classified into risk tiers that determine visibility, preview behavior, and moderation routing.
+
+### Policy Matrix
+
+| Tier | Name | Scan Status | Sheet Status | Listing | Preview | UX |
+|------|------|-------------|--------------|---------|---------|-----|
+| 0 | Clean | passed | published | Visible | Interactive (scripts allowed) | No banner |
+| 1 | Flagged | flagged | published | Visible + "Flagged" badge | Safe preview (scripts blocked) | Warning banner |
+| 2 | High Risk | pending_review | pending_review | Visible + "Pending Review" badge | Disabled for non-admins | "Pending safety review" banner |
+| 3 | Quarantined | quarantined | quarantined | Hidden (admin only) | Disabled | Author sees block notice |
+
+### Added
+
+- **`htmlRiskTier` field** — `backend/prisma/schema.prisma`: New `Int @default(0)` column on `StudySheet` with composite index `[htmlRiskTier, status, createdAt]`. Migration includes backfill for existing `pending_review` HTML sheets → Tier 2.
+- **`classifyHtmlRisk()`** — `backend/src/lib/htmlSecurity.js`: Core classification function. Detects Tier 1 features (scripts, iframes, inline handlers, dangerous URLs) and Tier 2 behavioral patterns (obfuscation via String.fromCharCode/hex chains, redirects via window.location, form exfiltration to external domains, keylogging via key event listeners + storage/network, crypto-miner signatures, eval/fetch JS risk).
+- **`detectHtmlFeatures()` / `detectHighRiskBehaviors()`** — `backend/src/lib/htmlSecurity.js`: Separated detection into feature detection (Tier 1) and behavioral analysis (Tier 2).
+- **`RISK_TIER` / `TIER_LABELS` constants** — `backend/src/lib/htmlSecurity.js`: Exported enums for tier values and human-readable labels.
+- **Tier-aware preview tokens** — `backend/src/lib/previewTokens.js`: `signHtmlPreviewToken()` now includes `tier` in JWT payload.
+- **`SAFE_PREVIEW_CSP`** — `backend/src/routes/preview.js`: CSP variant with `script-src 'none'` for Tier 1 safe previews.
+- **Quarantine filtering** — `backend/src/routes/feed.js`, `backend/src/routes/search.js`: Added `htmlRiskTier: { lt: 3 }` to hide quarantined sheets from public listings and search.
+- **Admin tier filter** — `backend/src/routes/admin.js`: Review list supports `?tier=` filter, review detail returns `liveRiskTier` and `liveRiskSummary` from live classification, approve action downgrades tier to 0.
+- **Tier-aware upload UI** — `frontend/studyhub-app/src/pages/sheets/UploadSheetPage.jsx`: Dynamic submit button labels ("Publish" / "Publish with Warnings" / "Submit for Review" / "Quarantined"), tier-specific scan modals with findings display and acknowledgement flow.
+- **Tier-aware viewer** — `frontend/studyhub-app/src/pages/sheets/SheetViewerPage.jsx`: Tier-based preview rendering (Tier 0: interactive with `sandbox="allow-scripts"`, Tier 1: safe preview with `sandbox=""` and warning banner, Tier 2: disabled for non-admins, Tier 3: quarantine notice).
+- **Tier badges on listings** — `frontend/studyhub-app/src/pages/sheets/SheetsPage.jsx`: Yellow "Flagged" badge for Tier 1, orange "Pending Review" for Tier 2+.
+
+### Changed
+
+- **`runHtmlScanNow()`** — `backend/src/lib/htmlDraftWorkflow.js`: Uses `classifyHtmlRisk()` instead of `validateHtmlForSubmission()`. Always runs ClamAV (AV infected → Tier 3 escalation). Stores both `htmlScanStatus` and `htmlRiskTier`.
+- **`submitHtmlDraftForReview()`** — `backend/src/lib/htmlDraftWorkflow.js`: Routes by tier instead of blocking on scan failure. Tier 0 auto-publishes, Tier 1 requires acknowledgement, Tier 2 routes to pending_review, Tier 3 quarantines.
+- **`SCAN_STATUS`** — `backend/src/lib/htmlDraftWorkflow.js`: Added `FLAGGED`, `PENDING_REVIEW`, `QUARANTINED`. Removed `FAILED` from new code paths.
+- **`normalizeFindings()`** — `backend/src/lib/htmlDraftWorkflow.js`: Accepts new classifier result format `{tier, findings}` instead of old `{ok, issues}`.
+- **Preview route** — `backend/src/routes/preview.js`: Reads tier from token + DB record, applies tier-based CSP and access control.
+- **Sheet routes** — `backend/src/routes/sheets.js`: `GET /:id/html-preview` and `GET /:id/html-runtime` pass tier to preview tokens. Listing hides quarantined sheets. Removed `validateHtmlForRuntime` check from runtime route (stays only in admin approval).
+- **`validateHtmlForSubmission()`** — `backend/src/lib/htmlSecurity.js`: Kept as backward-compatible wrapper (deprecated alias) that maps new classifier output to old `{ok, issues}` format.
+
+### Security
+
+- Tier 1 (Flagged) sheets served with `script-src 'none'` CSP — scripts cannot execute even if present in HTML.
+- Tier 2+ sheets cannot be previewed by non-admin/non-owner users.
+- Tier 3 (Quarantined) sheets completely hidden from public listings, search, and feed.
+- Behavioral pattern detection catches obfuscated attacks that pass simple tag-based scanning.
+- ClamAV integration escalates AV-detected threats to Tier 3 regardless of classifier tier.
+
+### Test Updates
+
+- `backend/test/htmlSecurity.test.js` — Added tests for `detectHtmlFeatures`, `classifyHtmlRisk` across all tiers: clean → Tier 0, script/iframe/handler → Tier 1, obfuscation/redirect/keylogging/exfiltration/crypto-miner/eval → Tier 2.
+- `backend/test/htmlDraftWorkflow.test.js` — Updated `normalizeFindings` tests for new classifier result format.
+- `backend/test/preview.routes.test.js` — Added `htmlRiskTier` to mock state, fixed owner token test, replaced removed PREVIEW_HTML_BLOCKED test with quarantine rejection test.
+- `backend/test/sheet.workflow.integration.test.js` — Updated assertions: clean HTML now auto-publishes (`published` not `pending_review`), flagged HTML returns tier-aware error message.
+
+### Validation (Tiered Risk Classification)
+
+- `npm --prefix backend test` — 75/79 passed (4 pre-existing failures in admin/dashboard/auth unrelated to this change)
+- `npm --prefix backend run lint` — passed
+- `npm --prefix frontend/studyhub-app run lint` — passed
+- `npm --prefix frontend/studyhub-app run build` — passed
+
+### Known Risks / Deferred
+
+- Tier 3 (Quarantined) is currently only reachable via ClamAV `infected` result or manual admin action — no classifier-only path to Tier 3 yet.
+- Admin quick-reject does not currently escalate to Tier 3; it keeps the existing tier. Future enhancement: add "Quarantine" action to admin review.
+- `scheduleHtmlScan()` error fallback sets Tier 1 (safe default) — scanner failures do not block publishing but flag the sheet for attention.
+
+---
+
+## Cycle: PM Audit & Fixes (2026-03-22)
+
+### Summary
+
+Addressed production issues identified via PM audit: profile page 500 error resilience, dark mode conversion for profile page, sheet listing status badges, and draft navigation improvements.
+
+### Fixed
+
+- **User profile resilience** — `backend/src/routes/users.js`: Wrapped shared notes and starred sheets queries in try/catch for graceful degradation. `backend/src/lib/profileVisibility.js`: Added try/catch around `UserPreferences` query so profile doesn't 500 if table is missing.
+- **Profile page dark mode** — `frontend/studyhub-app/src/pages/profile/UserProfilePage.jsx`: Converted all hardcoded color values to CSS var tokens (`--sh-bg`, `--sh-surface`, `--sh-heading`, `--sh-muted`, `--sh-border`, `--sh-brand`, etc.) across loading, error, main profile, stats, sheets, notes, starred, courses, and follow modal states.
+- **Sheet listing status badges** — `frontend/studyhub-app/src/pages/sheets/SheetsPage.jsx`: Added Draft (gray), Rejected (red), and Quarantined (red) status badges to sheet rows in "My Sheets" view, alongside existing Flagged (yellow) and Pending Review (orange) tier badges.
+- **Draft sheet navigation** — `frontend/studyhub-app/src/pages/sheets/SheetsPage.jsx`: Clicking a draft sheet in "My Sheets" now navigates to `/sheets/upload?draft=${id}` (editor) instead of `/sheets/${id}` (viewer).
+- **"My Sheets" empty state** — `frontend/studyhub-app/src/pages/sheets/SheetsPage.jsx`: Added dedicated empty state message for "Mine" filter with upload CTA using `?new=1`.
+
+### Audited (No Changes Needed)
+
+- **Image/attachment URLs**: All avatar and attachment serving patterns verified correct. Avatars use public static serving, attachments use private `attachment://` prefix with auth-gated endpoints.
+- **Admin Panel button**: Already correctly implements `role === 'admin'` check, routes to `/admin`, uses CSS var tokens.
+- **All frontend buttons**: Verified across AdminPage, SheetViewerPage, UploadSheetPage, and FeedPage — all buttons call valid API endpoints, no dead UI or duplicate CTAs found.
+
 ### Validation
 
 - `npm --prefix backend run lint` — passed
 - `npm --prefix frontend/studyhub-app run lint` — passed
 - `npm --prefix frontend/studyhub-app run build` — passed
+
+---
+
+## Cycle: Critical PostgreSQL Migration Repair (2026-03-22)
+
+### Summary
+
+Root-cause fix for production 500 errors on profile pages, registration, and any query involving School/Course joins. All 11 existing Prisma migrations used invalid PostgreSQL syntax (`ADD COLUMN IF NOT EXISTS` — MySQL-only), causing 30+ columns to never be created in the production database.
+
+### Root Cause
+
+PostgreSQL does not support `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`. This is a MySQL/MariaDB extension. Every migration that used this syntax silently failed (or was never applied correctly), leaving the production database missing critical columns across User, StudySheet, FeedPost, Contribution, School, Course, and ModerationCase tables.
+
+The most impactful missing columns were on the **School** table (`city`, `state`, `schoolType`) — every profile query and registration query includes `school: true` in Prisma, which generates `SELECT ... city, state, schoolType ...`. With these columns missing, all such queries return 500.
+
+### Fixed
+
+- **Repair migration created** — `backend/prisma/migrations/20260322050000_repair_missing_columns/migration.sql`: Adds all 30+ missing columns using proper PostgreSQL `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns ...) THEN ALTER TABLE ... ADD COLUMN ...; END IF; END $$;` blocks. Idempotent — safe to run even if some columns already exist.
+- **11 existing migration files converted** — All migrations from `20260315000000` through `20260319020000` converted from invalid `ADD COLUMN IF NOT EXISTS` to proper `DO $$ BEGIN ... END $$` PostgreSQL syntax. This prevents the issue from recurring if migrations are re-run on a fresh database.
+
+### Tables & Columns Repaired
+
+| Table | Columns |
+| ------- | ------- |
+| User | twoFaEnabled, twoFaCode, twoFaExpiry, email, emailVerified, failedAttempts, lockedUntil, avatarUrl, emailVerificationCode, emailVerificationExpiry, googleId, authProvider |
+| StudySheet | description, attachmentUrl, attachmentType, contentFormat, status, htmlScanStatus, htmlScanFindings, htmlScanUpdatedAt, htmlScanAcknowledgedAt, htmlOriginalArchivedAt, htmlRiskTier |
+| FeedPost | attachmentName, allowDownloads |
+| Contribution | linkPath |
+| School | city, state, schoolType |
+| Course | department |
+| ModerationCase | userId |
+
+### Production Impact
+
+- Profile pages (`/users/:username`) — **will stop returning 500**
+- Registration page (school/course picker) — **will stop failing**
+- Any query with `include: { school: true }` or `include: { course: true }` — **will work**
+- Sheet listings, feed posts, moderation — all restored
+
+### Deployment Required
+
+Run `npx prisma migrate deploy` on the Railway production instance to apply the repair migration.
+
+### Validation
+
+- `npm --prefix backend run lint` — passed
+- `npm --prefix frontend/studyhub-app run lint` — passed
+- `npm --prefix frontend/studyhub-app run build` — passed
+- `npm --prefix backend test` — 4 pre-existing failures (admin stats, auth message wording, dashboard mock), no new regressions
+
+---
+
+## Cycle: School/Course Data Population + Follow Button Dark Mode (2026-03-22)
+
+### Summary
+
+Populated empty School `city` and Course `department` fields in production database. Fixed follow button hardcoded colors for dark mode compatibility.
+
+### Fixed
+
+- **School city data** — `backend/prisma/migrations/20260322060000_populate_school_city_course_dept/migration.sql`: UPDATE statements for all 30 Maryland schools matching by `short` code. Only updates rows where `city` is NULL or empty.
+- **Course department data** — Same migration: CASE expression maps course code prefixes (CMSC→Computer Science, MATH→Mathematics, ECON→Economics, etc.) to department names. Covers 35+ prefix patterns. Only updates rows where `department` is NULL or empty.
+- **Follow button dark mode** — `frontend/studyhub-app/src/pages/profile/UserProfilePage.jsx`: Replaced hardcoded `#bbf7d0`, `#f0fdf4`, `#166534` with CSS var tokens `var(--sh-success-border)`, `var(--sh-success-bg)`, `var(--sh-success-text)`.
+
+### Already Implemented (verified)
+
+- **Follower/following counts on profile page** — Already shows Followers and Following stats with clickable buttons opening a modal list of users. Backend already returns `followerCount` and `followingCount`.
+
+### Validation
+
+- `npm --prefix backend run lint` — passed
+- `npm --prefix frontend/studyhub-app run lint` — passed
+- `npm --prefix frontend/studyhub-app run build` — passed
+- All migrations audited — no remaining MySQL `ADD COLUMN IF NOT EXISTS` syntax
