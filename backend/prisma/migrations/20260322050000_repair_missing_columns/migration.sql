@@ -158,12 +158,6 @@ DO $$ BEGIN
   END IF;
 END $$;
 
-DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Contribution' AND column_name='linkPath') THEN
-    ALTER TABLE "Contribution" ADD COLUMN "linkPath" TEXT;
-  END IF;
-END $$;
-
 -- ═══════════════════════════════════════════════════════════════════════════
 -- School table columns (CRITICAL — causes profile + registration 500s)
 -- ═══════════════════════════════════════════════════════════════════════════
