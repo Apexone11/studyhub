@@ -1,23 +1,19 @@
 /* ═══════════════════════════════════════════════════════════════════════════
- * FeedPage.jsx — Social feed with posts, sheet shares, and announcements
+ * FeedPage.jsx — Social feed shell (thin orchestrator)
  *
  * Layout (responsive via CSS class `app-three-col-grid` in responsive.css):
  *   Desktop: sidebar (250px) | feed column (flex) | leaderboard aside (300px)
  *   Tablet:  sidebar trigger (auto) | feed | aside (280px)
  *   Phone:   single stacked column
  *
- * Features: live polling, post composer with attachments, per-course filters,
- * inline search, leaderboard panels, like/star/helpful reactions (anime.js).
- *
- * Tutorial: First-visit Joyride walkthrough highlights composer, filters,
- * search, and leaderboards. Re-trigger via floating "?" button.
+ * Components: FeedComposer, FeedCard, FeedAside, FeedWidgets
+ * Data: useFeedData
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
 import AppSidebar from '../../components/AppSidebar'
 import ConfirmDialog from '../../components/ConfirmDialog'
-import { IconPlus, IconUpload, IconX } from '../../components/Icons'
 import { useSession } from '../../lib/session-context'
 import { pageShell, useResponsiveAppLayout } from '../../lib/ui'
 import { staggerEntrance } from '../../lib/animations'
@@ -27,9 +23,11 @@ import SafeJoyride from '../../components/SafeJoyride'
 import { useTutorial } from '../../lib/useTutorial'
 import { FEED_STEPS } from '../../lib/tutorialSteps'
 
-import { FONT, FILTERS, COMPOSER_PROMPTS, linkButton } from './feedConstants'
-import { Panel, LeaderboardPanel, EmptyFeed } from './FeedWidgets'
+import { FONT, FILTERS } from './feedConstants'
+import { Panel, EmptyFeed } from './FeedWidgets'
+import FeedComposer from './FeedComposer'
 import FeedCard from './FeedCard'
+import FeedAside from './FeedAside'
 import { useFeedData } from './useFeedData'
 
 export default function FeedPage() {
@@ -42,23 +40,11 @@ export default function FeedPage() {
   const search = searchParams.get('search') || ''
 
   const {
-    feedState,
-    leaderboards,
-    loadingMore,
-    deletingPostIds,
-    loadMoreFeed,
-    toggleReaction,
-    toggleStar,
-    canDeletePost,
-    deletePost,
-    submitPost,
-    retryFeed,
+    feedState, leaderboards, loadingMore, deletingPostIds,
+    loadMoreFeed, toggleReaction, toggleStar,
+    canDeletePost, deletePost, submitPost, retryFeed,
   } = useFeedData({ user, clearSession, search })
 
-  const [composer, setComposer] = useState({ content: '', courseId: '' })
-  const [composeState, setComposeState] = useState({ saving: false, error: '' })
-  const [attachedFile, setAttachedFile] = useState(null)
-  const fileInputRef = useRef(null)
   const feedListRef = useRef(null)
   const feedAnimatedRef = useRef(false)
   const [deleteTarget, setDeleteTarget] = useState(null)
@@ -79,35 +65,12 @@ export default function FeedPage() {
     return feedState.items.filter((item) => item.type === nextType)
   }, [activeFilter, feedState.items])
 
-  const [composerPromptIndex] = useState(
-    () => Math.floor(Date.now() / 60000) % COMPOSER_PROMPTS.length
-  )
-  const composerPrompt = COMPOSER_PROMPTS[composerPromptIndex]
-
   useEffect(() => {
     if (!feedState.loading && visibleItems.length > 0 && feedListRef.current && !feedAnimatedRef.current) {
       feedAnimatedRef.current = true
       staggerEntrance(feedListRef.current.children, { staggerMs: 50, duration: 450, y: 16 })
     }
   }, [feedState.loading, visibleItems.length])
-
-  const handleSubmitPost = async (event) => {
-    event.preventDefault()
-    if (!composer.content.trim()) {
-      setComposeState({ saving: false, error: 'Write something before posting.' })
-      return
-    }
-
-    setComposeState({ saving: true, error: '' })
-    try {
-      await submitPost({ content: composer.content, courseId: composer.courseId, attachedFile })
-      setComposer({ content: '', courseId: '' })
-      setAttachedFile(null)
-      setComposeState({ saving: false, error: '' })
-    } catch (error) {
-      setComposeState({ saving: false, error: error.message || 'Could not post to the feed.' })
-    }
-  }
 
   const confirmDeletePost = (item) => {
     if (!canDeletePost(item)) return
@@ -130,65 +93,9 @@ export default function FeedPage() {
 
             <main id="main-content" style={{ display: 'grid', gap: 18 }}>
               <div data-tutorial="feed-composer">
-              <Panel title="Share with your classmates" helper="Post class notes, course questions, or links to your latest sheet.">
-                <form onSubmit={handleSubmitPost} style={{ display: 'grid', gap: 12 }}>
-                  <textarea
-                    value={composer.content}
-                    onChange={(event) => setComposer((current) => ({ ...current, content: event.target.value }))}
-                    placeholder={composerPrompt}
-                    rows={4}
-                    className="sh-input"
-                    style={{ width: '100%', resize: 'vertical', borderRadius: 'var(--radius-card)', padding: 14, font: 'inherit' }}
-                  />
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                    <select
-                      value={composer.courseId}
-                      onChange={(event) => setComposer((current) => ({ ...current, courseId: event.target.value }))}
-                      className="sh-input"
-                      style={{ minWidth: 140, maxWidth: 200, width: 'auto' }}
-                    >
-                      <option value="">All courses</option>
-                      {(user?.enrollments || []).map((enrollment) => (
-                        <option key={enrollment.course.id} value={enrollment.course.id}>{enrollment.course.code}</option>
-                      ))}
-                    </select>
-                    <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept=".pdf,.jpg,.jpeg,.png,.gif,.webp"
-                        style={{ display: 'none' }}
-                        onChange={(e) => {
-                          const file = e.target.files?.[0]
-                          if (file) {
-                            if (file.size > 10 * 1024 * 1024) {
-                              setComposeState((s) => ({ ...s, error: 'File must be under 10 MB.' }))
-                              return
-                            }
-                            setAttachedFile(file)
-                          }
-                          e.target.value = ''
-                        }}
-                      />
-                      <button type="button" onClick={() => fileInputRef.current?.click()} style={linkButton()}>
-                        <IconUpload size={14} /> Attach file
-                      </button>
-                      <button type="submit" disabled={composeState.saving} className="sh-btn sh-btn--primary" style={{ fontWeight: 800, cursor: composeState.saving ? 'wait' : 'pointer' }}>
-                        {composeState.saving ? 'Posting...' : 'Post'}
-                      </button>
-                    </div>
-                  </div>
-                  {attachedFile && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: 'var(--sh-soft)', borderRadius: 8, fontSize: 12, color: 'var(--sh-subtext)' }}>
-                      <IconUpload size={12} />
-                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{attachedFile.name}</span>
-                      <span style={{ color: 'var(--sh-muted)', flexShrink: 0 }}>{(attachedFile.size / 1024).toFixed(0)} KB</span>
-                      <button type="button" onClick={() => setAttachedFile(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sh-muted)', display: 'flex', padding: 2 }}><IconX size={12} /></button>
-                    </div>
-                  )}
-                  {composeState.error ? <div style={{ color: 'var(--sh-danger)', fontSize: 13 }}>{composeState.error}</div> : null}
-                </form>
-              </Panel>
+                <Panel title="Share with your classmates" helper="Post class notes, course questions, or links to your latest sheet.">
+                  <FeedComposer user={user} onSubmitPost={submitPost} />
+                </Panel>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
@@ -244,18 +151,7 @@ export default function FeedPage() {
               )}
             </main>
 
-            <aside className="feed-aside" data-tutorial="feed-leaderboards" style={{ display: 'grid', gap: 16 }}>
-              <LeaderboardPanel title="Top Starred" items={leaderboards.stars} empty="No starred sheets yet." renderLabel={(item) => item.title} />
-              <LeaderboardPanel title="Most Downloaded" items={leaderboards.downloads} empty="No downloads yet." renderLabel={(item) => item.title} />
-              <LeaderboardPanel title="Top Contributors" items={leaderboards.contributors} empty="No contributor activity yet." renderLabel={(item) => item.username} />
-              <Panel title="Version 1 collaboration tips">
-                <div style={{ display: 'grid', gap: 10, color: 'var(--sh-subtext)', fontSize: 13, lineHeight: 1.7 }}>
-                  <div>Post updates with @mentions, fork a sheet before improving it, and send contributions back from your fork so the original author can review safely.</div>
-                  <Link to="/sheets/upload" style={{ ...linkButton(), justifyContent: 'center' }}><IconPlus size={13} /> New Sheet</Link>
-                </div>
-              </Panel>
-              {leaderboards.error ? <div style={{ color: 'var(--sh-danger)', fontSize: 13 }}>{leaderboards.error}</div> : null}
-            </aside>
+            <FeedAside leaderboards={leaderboards} />
           </div>
         </div>
       </div>

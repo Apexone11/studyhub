@@ -23,13 +23,13 @@ export function StatsGrid({ stats }) {
         <div
           key={label}
           style={{
-            background: '#fff',
+            background: 'var(--sh-surface)',
             borderRadius: 16,
-            border: '1px solid #e2e8f0',
+            border: '1px solid var(--sh-border)',
             padding: '18px 18px 20px',
           }}
         >
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '.08em', marginBottom: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--sh-muted)', letterSpacing: '.08em', marginBottom: 8 }}>
             {label.toUpperCase()}
           </div>
           <div style={{ fontSize: 30, fontWeight: 800, color: tone }}>{value ?? 0}</div>
@@ -49,7 +49,7 @@ export function ModerationOverview({ stats }) {
 
   return (
     <div style={{ marginTop: 20 }}>
-      <div style={{ fontSize: 14, fontWeight: 800, color: '#0f172a', marginBottom: 12 }}>
+      <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--sh-heading)', marginBottom: 12 }}>
         Moderation Status
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
@@ -57,16 +57,16 @@ export function ModerationOverview({ stats }) {
           <div
             key={label}
             style={{
-              background: value > 0 ? '#fef2f2' : '#f8fafc',
+              background: value > 0 ? 'var(--sh-danger-bg)' : 'var(--sh-soft)',
               borderRadius: 14,
-              border: value > 0 ? '1px solid #fecaca' : '1px solid #e2e8f0',
+              border: value > 0 ? '1px solid var(--sh-danger-border)' : '1px solid var(--sh-border)',
               padding: '14px 16px',
             }}
           >
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '.06em', marginBottom: 6 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--sh-muted)', letterSpacing: '.06em', marginBottom: 6 }}>
               {label.toUpperCase()}
             </div>
-            <div style={{ fontSize: 26, fontWeight: 800, color: value > 0 ? tone : '#94a3b8' }}>{value}</div>
+            <div style={{ fontSize: 26, fontWeight: 800, color: value > 0 ? tone : 'var(--sh-muted)' }}>{value}</div>
           </div>
         ))}
       </div>
@@ -79,7 +79,7 @@ export function ModerationActivityLog({ actions }) {
 
   return (
     <div style={{ marginTop: 20 }}>
-      <div style={{ fontSize: 14, fontWeight: 800, color: '#0f172a', marginBottom: 12 }}>
+      <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--sh-heading)', marginBottom: 12 }}>
         Recent Moderation Activity
       </div>
       <div style={{ display: 'grid', gap: 8 }}>
@@ -91,35 +91,35 @@ export function ModerationActivityLog({ actions }) {
               alignItems: 'flex-start',
               gap: 12,
               padding: '10px 14px',
-              border: '1px solid #e2e8f0',
+              border: '1px solid var(--sh-border)',
               borderRadius: 12,
-              background: '#f8fafc',
+              background: 'var(--sh-soft)',
             }}
           >
             <div
               style={{
                 width: 8, height: 8, borderRadius: '50%', marginTop: 5, flexShrink: 0,
-                background: action.status === 'confirmed' ? '#dc2626' : action.status === 'dismissed' ? '#94a3b8' : '#3b82f6',
+                background: action.status === 'confirmed' ? 'var(--sh-danger)' : action.status === 'dismissed' ? 'var(--sh-muted)' : 'var(--sh-brand)',
               }}
             />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--sh-heading)' }}>
                 Case #{action.id} — {action.contentType || 'content'} — <span style={{
-                  color: action.status === 'confirmed' ? '#dc2626' : action.status === 'dismissed' ? '#64748b' : '#1d4ed8',
+                  color: action.status === 'confirmed' ? 'var(--sh-danger)' : action.status === 'dismissed' ? 'var(--sh-slate-500)' : 'var(--sh-info-text)',
                   textTransform: 'capitalize',
                 }}>{action.status}</span>
               </div>
-              <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+              <div style={{ fontSize: 12, color: 'var(--sh-slate-500)', marginTop: 2 }}>
                 User: {action.user?.username || 'Unknown'}
                 {action.reviewer ? ` — Reviewed by ${action.reviewer.username}` : ''}
               </div>
               {action.reviewNote ? (
-                <div style={{ fontSize: 12, color: '#475569', marginTop: 4, fontStyle: 'italic' }}>
+                <div style={{ fontSize: 12, color: 'var(--sh-slate-600)', marginTop: 4, fontStyle: 'italic' }}>
                   {action.reviewNote}
                 </div>
               ) : null}
             </div>
-            <div style={{ fontSize: 11, color: '#94a3b8', whiteSpace: 'nowrap', flexShrink: 0 }}>
+            <div style={{ fontSize: 11, color: 'var(--sh-muted)', whiteSpace: 'nowrap', flexShrink: 0 }}>
               {action.updatedAt ? new Date(action.updatedAt).toLocaleDateString() : ''}
             </div>
           </div>
@@ -136,7 +136,7 @@ export function Pager({ page, total, onChange }) {
       <button type="button" onClick={() => onChange(Math.max(1, page - 1))} disabled={page <= 1} style={pagerButton(page <= 1)}>
         Prev
       </button>
-      <span style={{ fontSize: 12, color: '#64748b' }}>Page {page}</span>
+      <span style={{ fontSize: 12, color: 'var(--sh-slate-500)' }}>Page {page}</span>
       <button type="button" onClick={() => onChange(Math.min(totalPages, page + 1))} disabled={page >= totalPages} style={pagerButton(page >= totalPages)}>
         Next
       </button>
@@ -148,18 +148,18 @@ export function AccessDeniedCard({ user }) {
   return (
     <section
       style={{
-        background: '#fff',
+        background: 'var(--sh-surface)',
         borderRadius: 18,
-        border: '1px solid #fecaca',
+        border: '1px solid var(--sh-danger-border)',
         padding: '26px 24px',
         boxShadow: '0 8px 24px rgba(15, 23, 42, 0.06)',
       }}
     >
-      <div style={{ fontSize: 11, fontWeight: 800, color: '#b91c1c', letterSpacing: '.08em', marginBottom: 10 }}>
+      <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--sh-danger-text)', letterSpacing: '.08em', marginBottom: 10 }}>
         ACCESS DENIED
       </div>
-      <h1 style={{ margin: '0 0 10px', fontSize: 24, color: '#0f172a' }}>Admin access required</h1>
-      <p style={{ margin: '0 0 16px', fontSize: 14, color: '#475569', lineHeight: 1.8, maxWidth: 720 }}>
+      <h1 style={{ margin: '0 0 10px', fontSize: 24, color: 'var(--sh-heading)' }}>Admin access required</h1>
+      <p style={{ margin: '0 0 16px', fontSize: 14, color: 'var(--sh-slate-600)', lineHeight: 1.8, maxWidth: 720 }}>
         You are signed in as <strong>{user?.username || 'this account'}</strong>, but admin tools are only available to admin accounts.
         Your session is still active, and you can safely return to the regular app.
       </p>

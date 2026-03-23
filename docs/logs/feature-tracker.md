@@ -37,6 +37,20 @@ Status: Planned | In Progress | Done | Deferred | Removed
 | Avatar Dark Mode Tokens | Done | --sh-avatar-bg/--sh-avatar-text tokens for all avatar components (2026-03-21) |
 | Settings Dark Mode Token Fix | Done | SettingsPage bg/nav + CoursesTab select use CSS tokens (2026-03-21) |
 | Formal Policy Pages | Done | Terms, Privacy, Community Guidelines rewritten with real-world legal copy (2026-03-21) |
+| Feed Avatar Images | Done | Backend returns avatarUrl, Avatar component renders images with onError fallback (2026-03-23) |
+| Avatar Error Fallback (all pages) | Done | Graceful degradation to initials on broken image URLs across Feed, Profile, Settings, FollowModal (2026-03-23) |
+| Attachment Preview Iframe Sandbox | Done | sandbox="allow-same-origin" + referrerPolicy on all preview iframes (2026-03-23) |
+| Sheets Status Filter | Done | Status pills (Drafts, Pending review, Published, Rejected) on Sheets page when Mine active, backend ?status= param (2026-03-23) |
+| Sheets Status-Aware Empty States | Done | Custom empty-state messaging per status filter on Sheets page (2026-03-23) |
+| Settings Load Error UI | Done | SettingsPage shows error screen with refresh button instead of silent failure (2026-03-23) |
+| Error Message Sanitization | Done | All frontend error display uses getApiErrorMessage() helper — 15 call sites fixed (2026-03-23) |
+| HTML Workflow Copy Cleanup | Done | 6 copy fixes across preview, upload, scan modal, viewer, actions — constructive framing (2026-03-23) |
+| Frontend Feature Folder Scaffolding | Done | 8 barrel exports under `src/features/` for incremental migration from pages/ (2026-03-23) |
+| Lint Error Cleanup (22 errors → 0) | Done | JSX component extraction from 5 mixed-export files, .jsx → .js rename with re-exports (2026-03-23) |
+| Page Decomposition (Feed, Sheets, Upload) | Done | 3 pages rewritten as thin orchestrators, 5 child components extracted (2026-03-23) |
+| Design Token Migration (Slate + Info) | Done | 14 new tokens, 10 files migrated from hardcoded hex to CSS custom properties (2026-03-23) |
+| Media/Storage Ownership Audit | Done | Canonical path rules, cleanup chain, ownership enforcement documented in security-overview.md (2026-03-23) |
+| Decomposed Pages Smoke Tests | Done | 8 Playwright tests for upload, admin, profile across light + dark themes (2026-03-23) |
 | Feature Flags System | Planned | OpenFeature-compatible |
 | PWA Offline Support | Planned | Downloaded study sheets |
 | WebAuthn Passkeys | Planned | Admin/power users optional |

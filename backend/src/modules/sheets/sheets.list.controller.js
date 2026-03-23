@@ -82,6 +82,12 @@ router.get('/', optionalAuth, async (req, res) => {
     if (includeUnpublishedMine) {
       if (!req.user) return res.status(401).json({ error: 'Login required.' })
       where.userId = req.user.userId
+
+      const validStatuses = Object.values(SHEET_STATUS)
+      const statusParam = typeof req.query.status === 'string' ? req.query.status.trim().toLowerCase() : ''
+      if (statusParam && validStatuses.includes(statusParam)) {
+        where.status = statusParam
+      }
     } else {
       where.status = SHEET_STATUS.PUBLISHED
       where.htmlRiskTier = { lt: RISK_TIER.QUARANTINED }

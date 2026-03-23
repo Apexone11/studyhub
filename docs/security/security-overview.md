@@ -46,14 +46,71 @@ This document tracks security measures, policies, and the algorithm protection s
 - DOMPurify sanitization on preview HTML content
 - sanitize-html on backend for additional validation
 
+### Attachment Preview Security (Updated 2026-03-23)
+
+- All attachment preview iframes use `sandbox="allow-same-origin"` (no script execution, no popups, no forms)
+- `referrerPolicy="no-referrer"` on all preview iframes to prevent origin leakage
+- Applied across: FeedCard, SheetViewerSidebar, AttachmentPreviewPage
+
+### Error Message Sanitization (Updated 2026-03-23)
+
+- All frontend error displays use `getApiErrorMessage(data, fallback)` helper
+- Prevents raw API error strings (which may contain implementation details) from reaching user UI
+- 15 call sites across `useSheetViewer.js`, `useFeedData.js`, `CommentSection.jsx` standardized
+
 ### Upload Security
 - File type validation (PDF, PNG, JPEG, GIF, WebP)
-- 10MB size limit
-- Sharp for image processing (strips EXIF data)
+- 10MB size limit for attachments, 5MB for avatars
+- Magic-byte signature verification on all uploads (MIME must match binary signature)
 - HTML security scan on sheet content
+- Rate limiting: 20 avatar uploads / 40 attachment uploads per 15 minutes per user
+
+### Media Storage Ownership Model (Audited 2026-03-23)
+
+**Directory Structure:**
+```
+uploads/
+├── avatars/        → Public static serving via /uploads/avatars (5min cache, nosniff)
+└── attachments/    → Auth-protected download/preview routes only
+```
+
+**Path Resolution:**
+- Dev (Windows): `backend/uploads/`
+- Production (Railway): `/data/uploads/` (persistent volume)
+- Custom: `UPLOADS_DIR` env var
+- Central module: `backend/src/lib/storage.js`
+
+**Canonical Path Rules:**
+| Asset Type | Path Pattern | URL Format | Served Via |
+|---|---|---|---|
+| Avatar | `uploads/avatars/user-{userId}-{name}-{ts}.ext` | `/uploads/avatars/filename` | Static middleware |
+| Sheet attachment | `uploads/attachments/sheet-{name}-{ts}.ext` | `attachment://filename` | Auth download route |
+| Post attachment | `uploads/attachments/sheet-{name}-{ts}.ext` | `attachment://filename` | Auth download route |
+| HTML content | Database (`StudySheet.content`) | N/A (in DB) | Preview token route |
+
+**Ownership Enforcement:**
+- Avatars: User can only update own avatar (userId embedded in filename)
+- Sheet attachments: `assertOwnerOrAdmin()` checks sheet ownership before upload
+- Post attachments: `assertOwnerOrAdmin()` checks post ownership before upload
+- Path traversal blocked: `resolveManagedUploadPath()` validates leaf filenames only
+
+**Cleanup Chain:**
+| Trigger | Cleanup Function | Strategy |
+|---|---|---|
+| Upload failure | `safeUnlinkFile(path)` | Immediate delete of just-uploaded file |
+| Signature mismatch | `safeUnlinkFile(path)` | Immediate delete + 400 response |
+| Ownership denied | `safeUnlinkFile(path)` | Immediate delete + 403 response |
+| Sheet deletion | `cleanupAttachmentIfUnused()` | Ref-count check across StudySheet + FeedPost |
+| Post deletion | `cleanupAttachmentIfUnused()` | Ref-count check across StudySheet + FeedPost |
+| User deletion | Cascading cleanup | Avatar + all sheet/post attachments cleaned up |
+| Avatar replacement | `cleanupAvatarIfUnused()` | Ref-count check across User table |
+
+**Known Design Choices:**
+- No automated orphan cleanup scheduler (cleanup is inline during deletion)
+- No S3/cloud storage (local filesystem with Railway persistent volume)
+- Cleanup failures logged to Sentry but don't block primary operations
 
 ### Planned (v1.5.0-beta+)
-- MIME + magic-byte verification
 - Quarantine path for suspicious uploads
 - AV/CDR pipeline for risky file classes
 
@@ -96,6 +153,17 @@ The StudyHub algorithms (moderation, provenance, recommendation) are proprietary
 - Primary: OpenAI Moderation API
 - Fallback: TF.js backend worker process
 - 3-tier confidence: High (auto-enforce), Medium (review queue), Low (allow + monitor)
+
+---
+
+## HTML Security Communication
+
+### User-Facing Language (Cycle 35)
+- Security scan findings use constructive framing: "community guidelines" instead of "harmful content"
+- Preview mode clearly explains what is disabled: "scripts and embeds disabled for safety"
+- Quarantine messages include contact support CTA for false positives
+- Acknowledgement checkbox explains consequences transparently (warning badge, scripts disabled)
+- Error messages use `getApiErrorMessage()` to prevent API detail leakage
 
 ---
 

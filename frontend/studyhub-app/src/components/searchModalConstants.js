@@ -1,15 +1,11 @@
-export const DEBOUNCE_MS = 300
+/* ═══════════════════════════════════════════════════════════════════════════
+ * searchModalConstants.js — Constants and styles for SearchModal.
+ *
+ * The Highlight component lives in searchModalComponents.jsx and is
+ * re-exported here for backward-compatible imports.
+ * ═══════════════════════════════════════════════════════════════════════════ */
 
-export function Highlight({ text, query }) {
-  if (!query || query.length < 2 || !text) return text
-  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const parts = text.split(new RegExp(`(${escaped})`, 'gi'))
-  return parts.map((part, i) =>
-    part.toLowerCase() === query.toLowerCase()
-      ? <mark key={i} style={{ background: '#fef08a', color: 'inherit', borderRadius: 2, padding: '0 1px' }}>{part}</mark>
-      : part
-  )
-}
+export const DEBOUNCE_MS = 300
 
 export const styles = {
   overlay: {
@@ -121,3 +117,6 @@ export const styles = {
     color: 'var(--sh-avatar-text)',
   },
 }
+
+/* ── Re-export JSX component from searchModalComponents.jsx ────────── */
+export { Highlight } from './searchModalComponents.jsx'

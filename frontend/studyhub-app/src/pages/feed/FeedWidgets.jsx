@@ -1,7 +1,14 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { API } from '../../config'
 
-export function Avatar({ username, role, size = 42 }) {
+export function Avatar({ username, role, size = 42, avatarUrl }) {
   const initials = (username || '?').slice(0, 2).toUpperCase()
+  const [imgError, setImgError] = useState(false)
+  const resolvedUrl = avatarUrl && !imgError
+    ? (avatarUrl.startsWith('http') ? avatarUrl : `${API}${avatarUrl}`)
+    : null
+
   return (
     <div
       style={{
@@ -15,9 +22,13 @@ export function Avatar({ username, role, size = 42 }) {
         fontSize: size * 0.35,
         fontWeight: 800,
         flexShrink: 0,
+        overflow: 'hidden',
       }}
     >
-      {initials}
+      {resolvedUrl
+        ? <img src={resolvedUrl} alt={username} onError={() => setImgError(true)} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+        : initials
+      }
     </div>
   )
 }

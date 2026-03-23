@@ -144,7 +144,7 @@ export function useFeedData({ user, clearSession, search }) {
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
-        throw new Error(data.error || 'Could not update the reaction.')
+        throw new Error(getApiErrorMessage(data, 'Could not update the reaction.'))
       }
 
       setFeedState((current) => ({
@@ -169,7 +169,7 @@ export function useFeedData({ user, clearSession, search }) {
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
-        throw new Error(data.error || 'Could not update the star.')
+        throw new Error(getApiErrorMessage(data, 'Could not update the star.'))
       }
 
       setFeedState((current) => ({
@@ -210,7 +210,7 @@ export function useFeedData({ user, clearSession, search }) {
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
-        throw new Error(data.error || 'Could not delete this post.')
+        throw new Error(getApiErrorMessage(data, 'Could not delete this post.'))
       }
     } catch (error) {
       showToast(error.message || 'Could not delete this post.', 'error')
@@ -252,7 +252,7 @@ export function useFeedData({ user, clearSession, search }) {
 
     const data = await response.json().catch(() => ({}))
     if (!response.ok) {
-      throw new Error(data.error || 'Could not post to the feed.')
+      throw new Error(getApiErrorMessage(data, 'Could not post to the feed.'))
     }
 
     let finalPost = data

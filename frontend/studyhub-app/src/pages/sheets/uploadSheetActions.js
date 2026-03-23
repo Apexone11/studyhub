@@ -367,7 +367,7 @@ export function useHandleSubmit({
         const findings = Array.isArray(data.findings)
           ? data.findings.map((entry) => entry?.message || entry).filter(Boolean).join(' | ')
           : ''
-        throw new Error(findings ? `${data.error || 'Submit blocked.'} ${findings}` : (data.error || 'Submit blocked.'))
+        throw new Error(findings ? `${data.error || 'Could not submit sheet.'} ${findings}` : (data.error || 'Could not submit sheet.'))
       }
 
       if (attachFile) {

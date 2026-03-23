@@ -14,6 +14,7 @@ const router = express.Router()
 
 router.get('/:id/download', attachmentDownloadLimiter, async (req, res) => {
   const sheetId = Number.parseInt(req.params.id, 10)
+  if (!Number.isInteger(sheetId)) return res.status(400).json({ error: 'Invalid sheet id.' })
 
   try {
     const sheet = await prisma.studySheet.findUnique({
@@ -59,6 +60,7 @@ router.get('/:id/download', attachmentDownloadLimiter, async (req, res) => {
 
 router.get('/:id/attachment', requireAuth, attachmentDownloadLimiter, async (req, res) => {
   const sheetId = Number.parseInt(req.params.id, 10)
+  if (!Number.isInteger(sheetId)) return res.status(400).json({ error: 'Invalid sheet id.' })
 
   try {
     const sheet = await prisma.studySheet.findUnique({
@@ -100,6 +102,7 @@ router.get('/:id/attachment', requireAuth, attachmentDownloadLimiter, async (req
 
 router.get('/:id/attachment/preview', requireAuth, attachmentDownloadLimiter, async (req, res) => {
   const sheetId = Number.parseInt(req.params.id, 10)
+  if (!Number.isInteger(sheetId)) return res.status(400).json({ error: 'Invalid sheet id.' })
 
   try {
     const sheet = await prisma.studySheet.findUnique({
@@ -138,6 +141,7 @@ router.get('/:id/attachment/preview', requireAuth, attachmentDownloadLimiter, as
 
 router.post('/:id/download', attachmentDownloadLimiter, async (req, res) => {
   const sheetId = Number.parseInt(req.params.id, 10)
+  if (!Number.isInteger(sheetId)) return res.status(400).json({ error: 'Invalid sheet id.' })
 
   try {
     const sheet = await prisma.studySheet.findUnique({

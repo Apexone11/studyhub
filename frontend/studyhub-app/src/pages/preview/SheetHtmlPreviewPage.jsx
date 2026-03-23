@@ -132,10 +132,10 @@ export default function SheetHtmlPreviewPage() {
               {state.preview?.sanitized ? (
                 <section style={{ ...panelStyle(), borderColor: '#fde68a', background: '#fffbeb' }}>
                   <div style={{ fontSize: 13, color: '#92400e', fontWeight: 800 }}>
-                    Sanitized preview
+                    Safe preview mode
                   </div>
                   <div style={{ fontSize: 12, color: '#92400e', marginTop: 6, lineHeight: 1.6 }}>
-                    We removed unsafe HTML (scripts/iframes/etc) to keep preview safe. Fix the findings in the editor for a clean scan.
+                    This preview has scripts and embeds disabled for safety. The full interactive version will be available after publishing. Review the scan findings below if you want a clean report.
                   </div>
                   {Array.isArray(state.preview.issues) && state.preview.issues.length ? (
                     <ul style={{ marginTop: 10, paddingLeft: 18, color: '#92400e', fontSize: 12, lineHeight: 1.6 }}>

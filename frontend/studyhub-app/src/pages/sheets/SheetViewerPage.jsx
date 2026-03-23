@@ -187,7 +187,7 @@ export default function SheetViewerPage() {
                       <div style={{ borderRadius: 16, border: '1px solid #fecaca', background: '#fef2f2', padding: 24, textAlign: 'center' }}>
                         <div style={{ fontSize: 15, fontWeight: 800, color: '#dc2626', marginBottom: 8 }}>Quarantined</div>
                         <div style={{ fontSize: 13, color: '#dc2626', lineHeight: 1.6 }}>
-                          This sheet has been quarantined due to a security concern. Preview is disabled.
+                          This sheet has been quarantined because our scanner detected a security risk. Preview is disabled. If you believe this is an error, contact support.
                         </div>
                       </div>
                     ) : (sheet.htmlRiskTier || 0) >= 2 && !canEdit ? (

@@ -123,6 +123,8 @@ export default function SheetViewerSidebar({ sheet, canEdit, previewKind, attach
               <iframe
                 src={attachmentPreviewUrl}
                 title={`Sheet attachment preview ${sheet.id}`}
+                sandbox="allow-same-origin"
+                referrerPolicy="no-referrer"
                 loading="lazy"
                 style={{ width: '100%', height: 220, border: 'none' }}
               />

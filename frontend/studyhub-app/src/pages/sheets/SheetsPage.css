@@ -91,6 +91,27 @@
   flex-wrap: wrap;
 }
 
+.sheets-page__status-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  flex-basis: 100%;
+  padding-top: 6px;
+  border-top: 1px solid var(--sh-border);
+  margin-top: 2px;
+}
+
+.sh-chip--status {
+  font-size: 12px;
+}
+
+.sh-chip__icon {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+}
+
 .sheets-page__list-shell {
   overflow: hidden;
 }

@@ -1,3 +1,10 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+ * sheetViewerConstants.js — Constants and style helpers for SheetViewerPage.
+ *
+ * JSX-rendering helpers (errorBanner) live in sheetViewerComponents.jsx
+ * and are re-exported here for backward-compatible imports.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'avif'])
 
@@ -32,21 +39,21 @@ function attachmentPreviewKind(attachmentType, attachmentName) {
 
 function panelStyle() {
   return {
-    background: '#fff',
+    background: 'var(--sh-surface)',
     borderRadius: 18,
-    border: '1px solid #e2e8f0',
+    border: '1px solid var(--sh-border)',
     padding: 18,
   }
 }
 
-function actionButton(color = '#475569') {
+function actionButton(color = 'var(--sh-slate-600)') {
   return {
     display: 'inline-flex',
     alignItems: 'center',
     gap: 6,
     borderRadius: 999,
-    border: '1px solid #e2e8f0',
-    background: '#fff',
+    border: '1px solid var(--sh-border)',
+    background: 'var(--sh-surface)',
     color,
     padding: '8px 12px',
     fontSize: 12,
@@ -62,9 +69,9 @@ function linkButton() {
     alignItems: 'center',
     gap: 6,
     borderRadius: 999,
-    border: '1px solid #dbeafe',
-    background: '#eff6ff',
-    color: '#1d4ed8',
+    border: '1px solid var(--sh-info-border)',
+    background: 'var(--sh-info-bg)',
+    color: 'var(--sh-info-text)',
     padding: '8px 12px',
     fontSize: 12,
     fontWeight: 700,
@@ -72,29 +79,11 @@ function linkButton() {
   }
 }
 
-function errorBanner(message) {
-  if (!message) return null
-  return (
-    <div
-      style={{
-        background: '#fef2f2',
-        color: '#dc2626',
-        border: '1px solid #fecaca',
-        borderRadius: 14,
-        padding: '12px 14px',
-        fontSize: 13,
-      }}
-    >
-      {message}
-    </div>
-  )
-}
-
 function statusBadge(status) {
   const colors = {
-    pending: { bg: '#fef3c7', color: '#92400e' },
-    accepted: { bg: '#dcfce7', color: '#166534' },
-    rejected: { bg: '#fee2e2', color: '#991b1b' },
+    pending: { bg: 'var(--sh-warning-bg)', color: 'var(--sh-warning-text)' },
+    accepted: { bg: 'var(--sh-success-bg)', color: 'var(--sh-success-text)' },
+    rejected: { bg: 'var(--sh-danger-bg)', color: 'var(--sh-danger-text)' },
   }
   const c = colors[status] || colors.pending
   return {
@@ -114,6 +103,8 @@ export {
   panelStyle,
   actionButton,
   linkButton,
-  errorBanner,
   statusBadge,
 }
+
+/* ── Re-export JSX helpers from sheetViewerComponents.jsx ──────────────── */
+export { errorBanner } from './sheetViewerComponents.jsx'

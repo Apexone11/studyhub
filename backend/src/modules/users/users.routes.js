@@ -74,7 +74,7 @@ router.get('/:username', optionalAuth, async (req, res) => {
     }
 
     let isFollowing = false
-    if (req.user && req.user.userId !== user.id) {
+    if (req.user?.userId && req.user.userId !== user.id) {
       const follow = await prisma.userFollow.findUnique({
         where: { followerId_followingId: { followerId: req.user.userId, followingId: user.id } }
       })

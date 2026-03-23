@@ -6,7 +6,41 @@ Version naming: v1.5.x-beta (weekly), v1.5.x.y-beta (hotfixes).
 
 ---
 
-## [v1.5.0-beta] - 2026-03-21 (ongoing)
+## [v1.5.0-beta] - 2026-03-23 (ongoing)
+
+### Added (2026-03-23)
+- Page decomposition: FeedPage (-38%), SheetsPage (-44%), UploadSheetPage (-36%) rewritten as thin orchestrators with extracted child components
+- New components: FeedComposer, FeedAside, SheetsEmptyState, SheetsAside, UploadNavActions
+- Design token expansion: 10 slate-scale tokens + 4 info-semantic tokens added to index.css (light + dark themes)
+- Design token migration: 10 files converted from hardcoded hex colors to CSS custom properties (~100+ instances)
+- Media/storage ownership documentation: canonical path rules, cleanup chain, ownership enforcement audit
+- Smoke tests for decomposed pages: 8 Playwright tests covering upload, admin, and profile flows (light + dark)
+- Frontend feature-folder scaffolding: 8 barrel exports under `src/features/` (sheets, feed, admin, users, dashboard, notes, auth, settings)
+- Convention: new feature logic goes in `src/features/<name>/`, pages import from barrels
+- HTML workflow copy improvements: safe preview mode, security scan explanations, community guidelines language
+- Sheet status filter pills on Sheets page (Drafts, Pending review, Published, Rejected) visible when "Mine" is active
+- Backend `status` query param for `GET /api/sheets?mine=1&status=draft` filtering own sheets by status
+- Status-aware empty states on Sheets page (custom messaging per filter: "No drafts", "Nothing pending", "No rejected sheets")
+- `STATUS_OPTIONS` constant and `toggleMine` callback for atomic URL param handling
+- SettingsPage error state UI — "Settings unavailable" screen with refresh button (was silently swallowed)
+- Feed avatars now render actual user images (backend returns `avatarUrl`, frontend `Avatar` component resolves URLs)
+- Avatar `onError` fallback to initials across all avatar components (Feed, Profile, Settings, FollowModal)
+- `sandbox="allow-same-origin"` and `referrerPolicy="no-referrer"` on all attachment preview iframes
+- Load-more failure toast notification on Sheets page (was silent)
+
+### Fixed (2026-03-23)
+- 22 `react-refresh/only-export-components` lint errors — extracted JSX components from mixed-export `.jsx` files into dedicated component files (5 files split)
+- HTML workflow copy: replaced negative/vague framing with clear, helpful language across 5 files (preview, upload, scan modal, viewer, actions)
+- Feed `settleSection` crash — `.then()` called on non-Promise return from loader short-circuits (wrapped in `Promise.resolve()`)
+- User profile crash — `optionalAuth` sets truthy `req.user` but `userId` can be undefined (added `req.user?.userId` guard)
+- Sheet detail crash — same `optionalAuth`/`userId` issue on starred + reaction lookups
+- 14 Prisma validation errors from `parseInt` producing `NaN` on invalid route params (added `Number.isInteger()` guards)
+- Feed post reaction delete race condition — `P2025` not caught on already-deleted row
+- 11 raw `data.error` patterns in `useSheetViewer.js` and `useFeedData.js` replaced with safe `getApiErrorMessage()` helper
+
+### Security (2026-03-23)
+- Attachment preview iframes now sandboxed (`allow-same-origin` only) across Feed, Sheet Viewer, and Preview pages
+- Error messages sanitized through `getApiErrorMessage()` to prevent API implementation detail leakage
 
 ### Added (2026-03-21)
 - Unverified user restriction with 3-day grace period (backend middleware + 9 route guards)

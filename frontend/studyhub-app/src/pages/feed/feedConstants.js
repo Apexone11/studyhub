@@ -84,7 +84,7 @@ export function commentButtonStyle(hasValue, posting) {
     borderRadius: 8,
     border: 'none',
     background: hasValue ? 'var(--sh-brand)' : 'var(--sh-border)',
-    color: hasValue ? '#fff' : 'var(--sh-muted)',
+    color: hasValue ? 'var(--sh-surface)' : 'var(--sh-muted)',
     padding: '6px 14px',
     fontSize: 12,
     fontWeight: 700,

@@ -26,6 +26,7 @@ export default function useSheetsData() {
   const courseId = searchParams.get('courseId') || ''
   const mine = searchParams.get('mine') === '1'
   const starred = searchParams.get('starred') === '1'
+  const statusFilter = searchParams.get('status') || ''
   const sortValue = SORT_OPTIONS.some((option) => option.value === searchParams.get('sort'))
     ? searchParams.get('sort')
     : 'createdAt'
@@ -100,7 +101,7 @@ export default function useSheetsData() {
   }, [activeSchool, selectedCourse])
 
   const hasActiveFilters = Boolean(
-    search || schoolId || courseId || mine || starred || formatValue !== 'all' || sortValue !== 'createdAt',
+    search || schoolId || courseId || mine || starred || statusFilter || formatValue !== 'all' || sortValue !== 'createdAt',
   )
 
   useEffect(() => {
@@ -162,6 +163,7 @@ export default function useSheetsData() {
     if (schoolId) params.set('schoolId', schoolId)
     if (courseId) params.set('courseId', courseId)
     if (mine) params.set('mine', '1')
+    if (mine && statusFilter) params.set('status', statusFilter)
     if (starred) params.set('starred', '1')
     if (formatValue !== 'all') params.set('format', formatValue)
 
@@ -212,7 +214,7 @@ export default function useSheetsData() {
         }))
       })
     }
-  }, [clearSession, courseId, formatValue, mine, schoolId, search, sortValue, starred])
+  }, [clearSession, courseId, formatValue, mine, schoolId, search, sortValue, starred, statusFilter])
 
   const loadMoreSheets = useCallback(async () => {
     setLoadingMore(true)
@@ -225,6 +227,7 @@ export default function useSheetsData() {
     if (schoolId) params.set('schoolId', schoolId)
     if (courseId) params.set('courseId', courseId)
     if (mine) params.set('mine', '1')
+    if (mine && statusFilter) params.set('status', statusFilter)
     if (starred) params.set('starred', '1')
     if (formatValue !== 'all') params.set('format', formatValue)
 
@@ -242,11 +245,11 @@ export default function useSheetsData() {
         }))
       }
     } catch {
-      // Keep current list if load-more fails.
+      showToast('Could not load more sheets. Try again.', 'error')
     } finally {
       setLoadingMore(false)
     }
-  }, [courseId, formatValue, mine, schoolId, search, sheetsState.sheets.length, sortValue, starred])
+  }, [courseId, formatValue, mine, schoolId, search, sheetsState.sheets.length, sortValue, starred, statusFilter])
 
   useLivePolling(loadCatalog, {
     enabled: Boolean(user),
@@ -256,8 +259,19 @@ export default function useSheetsData() {
   useLivePolling(loadSheets, {
     enabled: Boolean(user),
     intervalMs: 45000,
-    refreshKey: `${search}|${schoolId}|${courseId}|${mine}|${starred}|${sortValue}|${formatValue}`,
+    refreshKey: `${search}|${schoolId}|${courseId}|${mine}|${starred}|${sortValue}|${formatValue}|${statusFilter}`,
   })
+
+  const toggleMine = useCallback(() => {
+    const next = new URLSearchParams(searchParams)
+    if (mine) {
+      next.delete('mine')
+      next.delete('status')
+    } else {
+      next.set('mine', '1')
+    }
+    setSearchParams(next, { replace: true })
+  }, [mine, searchParams, setSearchParams])
 
   const clearAllFilters = useCallback(() => {
     setSearchParams(new URLSearchParams(), { replace: true })
@@ -322,6 +336,7 @@ export default function useSheetsData() {
     courseId,
     mine,
     starred,
+    statusFilter,
     sortValue,
     formatValue,
     catalog,
@@ -338,6 +353,7 @@ export default function useSheetsData() {
     hasActiveFilters,
     setQueryParam,
     handleSchoolChange,
+    toggleMine,
     clearAllFilters,
     toggleStar,
     handleFork,

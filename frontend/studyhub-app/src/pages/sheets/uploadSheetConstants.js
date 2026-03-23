@@ -1,8 +1,10 @@
 /* ═══════════════════════════════════════════════════════════════════════════
- * uploadSheetConstants.js — Shared constants, helpers, and small components
- * for the UploadSheet feature.
+ * uploadSheetConstants.js — Shared constants and helpers for UploadSheet.
+ *
+ * The MiniPreview component lives in uploadSheetComponents.jsx to satisfy
+ * react-refresh/only-export-components. It is re-exported here for
+ * backward-compatible imports.
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useBlocker } from 'react-router-dom'
 
 /* ── Shared constants ──────────────────────────────────────────────────── */
 export const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
@@ -37,12 +39,15 @@ export function tierLabel(tier) {
 }
 
 export function tierColor(tier) {
-  if (tier === 0) return '#16a34a'
-  if (tier === 1) return '#ca8a04'
-  if (tier === 2) return '#ea580c'
-  if (tier === 3) return '#dc2626'
-  return '#64748b'
+  if (tier === 0) return 'var(--sh-success)'
+  if (tier === 1) return 'var(--sh-warning)'
+  if (tier === 2) return 'var(--sh-warning)'
+  if (tier === 3) return 'var(--sh-danger)'
+  return 'var(--sh-slate-500)'
 }
+
+/* ── Hook: useSafeBlocker ──────────────────────────────────────────────── */
+import { useBlocker } from 'react-router-dom'
 
 export function useSafeBlocker(predicate) {
   try {
@@ -52,22 +57,5 @@ export function useSafeBlocker(predicate) {
   }
 }
 
-export function MiniPreview({ md }) {
-  if (!md) return <div style={{ fontSize: 12, color: 'var(--sh-muted)', fontStyle: 'italic' }}>Start typing to preview…</div>
-  return (
-    <div
-      style={{
-        borderRadius: 12,
-        border: '1px solid var(--sh-border)',
-        background: 'var(--sh-soft)',
-        padding: 14,
-        color: 'var(--sh-text)',
-        fontSize: 13,
-        lineHeight: 1.8,
-        whiteSpace: 'pre-wrap',
-      }}
-    >
-      {md}
-    </div>
-  )
-}
+/* ── Re-export from uploadSheetComponents.jsx ──────────────────────────── */
+export { MiniPreview } from './uploadSheetComponents.jsx'

@@ -222,6 +222,8 @@ export default function AttachmentPreviewPage() {
                     <iframe
                       src={config.previewUrl}
                       title={`Attachment preview ${scope}-${numericId}`}
+                      sandbox="allow-same-origin"
+                      referrerPolicy="no-referrer"
                       style={{ width: '100%', height: '80vh', border: 'none' }}
                     />
                   )}

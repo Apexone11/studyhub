@@ -62,7 +62,7 @@ If the frontend is hosted separately, make sure it points to the deployed backen
 ## 6. First deploy checks
 - Confirm Railway build logs show `npx prisma generate` during build and `npx prisma migrate deploy` during pre-deploy for the backend.
 - Open the backend root URL and confirm it returns the health payload.
-- Register a user, verify email delivery, enable 2-step verification, upload a sheet attachment, and download it.
+- Register a user, verify email delivery, upload a sheet attachment, and download it.
 - Restart the backend service once and confirm the uploaded file still exists.
 
 ## 7. Security checks before launch

@@ -3,7 +3,8 @@ const path = require('node:path')
 function settleSection(label, loader) {
   const startedAt = Date.now()
 
-  return loader()
+  return Promise.resolve()
+    .then(() => loader())
     .then((data) => ({ ok: true, label, data, durationMs: Date.now() - startedAt }))
     .catch((error) => ({ ok: false, label, error, durationMs: Date.now() - startedAt }))
 }
@@ -42,7 +43,7 @@ function formatAnnouncement(item) {
     createdAt: item.createdAt,
     title: item.title,
     body: item.body,
-    author: item.author ? { id: item.author.id, username: item.author.username } : null,
+    author: item.author ? { id: item.author.id, username: item.author.username, avatarUrl: item.author.avatarUrl || null } : null,
   }
 }
 
@@ -55,7 +56,7 @@ function formatSheet(item, starredIds, commentCounts, reactionRows, currentReact
     title: item.title,
     description: item.description || '',
     preview: summarizeText(item.content, 190),
-    author: item.author ? { id: item.author.id, username: item.author.username } : null,
+    author: item.author ? { id: item.author.id, username: item.author.username, avatarUrl: item.author.avatarUrl || null } : null,
     course: item.course ? { id: item.course.id, code: item.course.code } : null,
     stars: item.stars || 0,
     forks: item.forks || 0,
@@ -89,7 +90,7 @@ function formatPost(item, commentCounts, reactionRows, currentReactions) {
     updatedAt: item.updatedAt,
     content: item.content,
     preview: summarizeText(item.content, 220),
-    author: item.author ? { id: item.author.id, username: item.author.username } : null,
+    author: item.author ? { id: item.author.id, username: item.author.username, avatarUrl: item.author.avatarUrl || null } : null,
     course: item.course ? { id: item.course.id, code: item.course.code } : null,
     commentCount: commentCounts.get(item.id) || 0,
     reactions: reactionSummary(reactionRows, 'postId', item.id, currentReactions, 'postId'),
@@ -108,7 +109,7 @@ function formatFeedPostDetail(item, commentCount, reactionRows, currentReactions
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
     content: item.content,
-    author: item.author ? { id: item.author.id, username: item.author.username } : null,
+    author: item.author ? { id: item.author.id, username: item.author.username, avatarUrl: item.author.avatarUrl || null } : null,
     course: item.course ? { id: item.course.id, code: item.course.code } : null,
     commentCount,
     reactions: reactionSummary(reactionRows, 'postId', item.id, currentReactions, 'postId'),

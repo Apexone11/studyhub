@@ -193,7 +193,7 @@ export default function useSheetViewer() {
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
-        throw new Error(data.error || 'Could not update the star.')
+        throw new Error(getApiErrorMessage(data, 'Could not update the star.'))
       }
       setSheetState((current) => ({
         ...current,
@@ -219,7 +219,7 @@ export default function useSheetViewer() {
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
-        throw new Error(data.error || 'Could not update the reaction.')
+        throw new Error(getApiErrorMessage(data, 'Could not update the reaction.'))
       }
       setSheetState((current) => ({
         ...current,
@@ -242,7 +242,7 @@ export default function useSheetViewer() {
         body: JSON.stringify({}),
       })
       const data = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(data.error || 'Could not fork this sheet.')
+      if (!response.ok) throw new Error(getApiErrorMessage(data, 'Could not fork this sheet.'))
       showToast('Sheet forked! Redirecting to editor…', 'success')
       trackEvent('sheet_forked', { sheetId: sheet.id })
       navigate(`/sheets/${data.id}/edit`)
@@ -274,7 +274,7 @@ export default function useSheetViewer() {
         body: JSON.stringify({ message: contributeMessage.trim() }),
       })
       const data = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(data.error || 'Could not submit contribution.')
+      if (!response.ok) throw new Error(getApiErrorMessage(data, 'Could not submit contribution.'))
       showToast('Contribution submitted!', 'success')
       setShowContributeModal(false)
       setContributeMessage('')
@@ -298,7 +298,7 @@ export default function useSheetViewer() {
         body: JSON.stringify({ action }),
       })
       const data = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(data.error || `Could not ${action} contribution.`)
+      if (!response.ok) throw new Error(getApiErrorMessage(data, `Could not ${action} contribution.`))
       showToast(`Contribution ${action}ed`, 'success')
       loadSheet()
     } catch (error) {
@@ -323,7 +323,7 @@ export default function useSheetViewer() {
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
-        throw new Error(data.error || 'Could not post the comment.')
+        throw new Error(getApiErrorMessage(data, 'Could not post the comment.'))
       }
 
       setCommentDraft('')
@@ -353,7 +353,7 @@ export default function useSheetViewer() {
       })
       if (!response.ok) {
         const data = await response.json().catch(() => ({}))
-        throw new Error(data.error || 'Could not delete comment.')
+        throw new Error(getApiErrorMessage(data, 'Could not delete comment.'))
       }
       setCommentsState((current) => ({
         ...current,

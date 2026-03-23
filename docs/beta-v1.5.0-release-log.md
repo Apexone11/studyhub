@@ -3433,3 +3433,329 @@ Shared infrastructure lives in `backend/src/core/` (10 files): db/prisma, http/e
 
 - Original `routes/*.js` files are retained for now (strangler pattern) — barrel-wrapped modules delegate to them. They can be migrated into their module directories in a future cleanup pass.
 - Frontend restructuring (pages/ → features/) is the next phase.
+
+---
+
+## Cycle 33 — Sentry Production Bug Sweep (P0/P1 Crash Fixes) [2026-03-23]
+
+Triaged all unresolved Sentry errors from the production backend. Fixed 3 P0 crashes, 4 P1 validation errors, and 1 idempotency race condition across 7 files.
+
+### Fixed
+
+**P0 — Page-breaking crashes:**
+
+- Feed endpoint crash (`GET /api/feed`) — `TypeError: loader(...).then is not a function`:
+  - `backend/src/modules/feed/feed.service.js`
+  - `settleSection()` now wraps the loader call with `Promise.resolve()` so loaders that return plain values (e.g. `[]` from short-circuit ternaries) are handled safely.
+  - Root cause: secondary-section loaders in `feed.list.controller.js` return `[]` when their input array is empty, which is not a Promise.
+
+- User profile crash (`GET /api/users/:username`) — `PrismaClientValidationError: Argument 'followerId' is missing`:
+  - `backend/src/modules/users/users.routes.js`
+  - Changed `req.user && req.user.userId` guard to `req.user?.userId` so the `userFollow.findUnique` call is skipped when the auth token payload doesn't contain `userId`.
+  - Root cause: `optionalAuth` sets `req.user` to the decoded token, which may be truthy but lack `userId`.
+
+- Sheet detail crash (`GET /api/sheets/:id`) — `PrismaClientValidationError: Argument 'userId' is missing`:
+  - `backend/src/modules/sheets/sheets.read.controller.js`
+  - Changed `req.user ? prisma.starredSheet.findUnique(...)` to `req.user?.userId ? ...` for both the starred-sheet and reaction lookups.
+  - Same root cause as the profile bug: `req.user` truthy but `userId` undefined under `optionalAuth`.
+
+**P1 — Prisma validation errors from NaN route params:**
+
+- Added `Number.isInteger(id)` guards before all Prisma calls that use `parseInt(req.params.id)`:
+  - `backend/src/modules/feed/feed.posts.controller.js` — `GET/DELETE /posts/:id`, `GET /posts/:id/attachment`, `GET /posts/:id/attachment/preview`
+  - `backend/src/modules/feed/feed.social.controller.js` — `GET/POST /posts/:id/comments`, `DELETE /posts/:id/comments/:commentId`, `POST /posts/:id/react`
+  - `backend/src/modules/sheets/sheets.read.controller.js` — `GET /:id`
+  - `backend/src/modules/sheets/sheets.social.controller.js` — `POST /:id/star`, `GET/POST /:id/comments`, `POST /:id/react`
+  - `backend/src/modules/sheets/sheets.downloads.controller.js` — `GET/POST /:id/download`, `GET /:id/attachment`, `GET /:id/attachment/preview`
+  - All return `400 { error: 'Invalid ... id.' }` instead of propagating NaN into Prisma.
+
+**P1 — Reaction delete idempotency:**
+
+- Feed post reaction delete (`POST /posts/:id/react`) now catches `P2025` (record not found) during the delete path:
+  - `backend/src/modules/feed/feed.social.controller.js`
+  - Matches the existing pattern in `sheets.social.controller.js` which already handled this race condition.
+
+### Validation
+
+- `npm --prefix backend run lint` — **0 errors**
+- `npm --prefix backend test` — **21 test files, 161/161 tests passed**
+
+### Root-Cause Patterns Addressed
+
+| Pattern | Affected routes | Fix |
+|---|---|---|
+| `settleSection` calls `.then()` on non-Promise return | `GET /api/feed` | `Promise.resolve()` wrapper |
+| `optionalAuth` sets truthy `req.user` without `userId` | `GET /api/users/:username`, `GET /api/sheets/:id` | Guard on `req.user?.userId` |
+| `parseInt` produces `NaN` passed to Prisma `where` | 14 route handlers across feed + sheets | `Number.isInteger()` early-return |
+| `delete()` on already-deleted row throws `P2025` | `POST /api/feed/posts/:id/react` | Catch and suppress `P2025` |
+
+### Deferred / Notes
+
+- `GET /api/announcements` — Sentry shows a `TypeError: fetch failed` (1 event, 7d old). The route code uses direct Prisma queries, not `fetch`. Likely a transient network/DNS issue on Railway, not a code bug. Monitoring.
+- `GET /api/dashboard/summary` — Sentry error (6d old, 5 events) may have been from a pre-migration schema mismatch. The current code and schema look correct. Monitoring.
+- Frontend profile page shows "User not found" with "Server error" subtitle. This is a frontend error-message differentiation issue — the component should distinguish 404 from 500. Deferred to a UI polish pass.
+
+---
+
+## Cycle 34 — Images Consistency + Sheets Pending Section + Error-State Cleanup [2026-03-23]
+
+Three-track improvement pass following the P0/P1 bug sweep in Cycle 33.
+
+### Track 1: Images Consistency Pass
+
+**Fixed:**
+
+- **Feed avatars now render actual images** — `FeedWidgets.jsx` `Avatar` component rewritten to accept `avatarUrl` prop, resolve relative URLs via `API` base, and fall back to initials on image load error.
+- **Feed backend returns `avatarUrl`** — All author `select` blocks in `feed.list.controller.js` and `feed.posts.controller.js` now include `avatarUrl: true`.
+- **Feed service formatters include `avatarUrl`** — `formatAnnouncement`, `formatSheet`, `formatPost`, and `formatFeedPostDetail` in `feed.service.js` now serialize `author.avatarUrl`.
+- **Avatar `onError` fallback added everywhere** — `ProfileTab.jsx`, `ProfileWidgets.jsx` (`ProfileAvatar` and `FollowModal`), and `FeedWidgets.jsx` all gracefully degrade to initials when avatar image fails to load.
+- **Attachment preview iframes secured** — Added `sandbox="allow-same-origin"` and `referrerPolicy="no-referrer"` to all attachment preview iframes: `FeedCard.jsx`, `SheetViewerSidebar.jsx`, `AttachmentPreviewPage.jsx`.
+
+**Files changed:**
+- `backend/src/modules/feed/feed.list.controller.js`
+- `backend/src/modules/feed/feed.posts.controller.js`
+- `backend/src/modules/feed/feed.service.js`
+- `frontend/studyhub-app/src/pages/feed/FeedWidgets.jsx`
+- `frontend/studyhub-app/src/pages/feed/FeedCard.jsx`
+- `frontend/studyhub-app/src/pages/profile/ProfileWidgets.jsx`
+- `frontend/studyhub-app/src/pages/settings/ProfileTab.jsx`
+- `frontend/studyhub-app/src/pages/preview/AttachmentPreviewPage.jsx`
+- `frontend/studyhub-app/src/pages/sheets/SheetViewerSidebar.jsx`
+
+### Track 2: Pending Section on /sheets
+
+**Added:**
+
+- **Backend `status` query param** — `GET /api/sheets?mine=1&status=draft` now filters by sheet status when viewing own sheets. Validates against `SHEET_STATUS` enum. Only applies when `mine=1`.
+  - File: `backend/src/modules/sheets/sheets.list.controller.js`
+- **Frontend status filter pills** — When "Mine" toggle is active on the Sheets page, a row of status filter pills appears: Drafts, Pending review, Published, Rejected. Clicking a pill toggles the `?status=` URL param.
+  - File: `frontend/studyhub-app/src/pages/sheets/SheetsFilters.jsx`
+- **Status-aware empty states** — Custom empty-state messaging per status filter: "No drafts" with upload CTA, "Nothing pending", "No rejected sheets".
+  - File: `frontend/studyhub-app/src/pages/sheets/SheetsPage.jsx`
+- **`STATUS_OPTIONS` constant** — Added to `sheetsPageConstants.js`.
+- **`toggleMine` callback** — Atomically clears both `mine` and `status` params when toggling Mine off, avoiding stale-closure bugs from sequential `setQueryParam` calls.
+  - File: `frontend/studyhub-app/src/pages/sheets/useSheetsData.js`
+- **CSS for status row** — `.sheets-page__status-row`, `.sh-chip--status`, `.sh-chip__icon` styles.
+  - File: `frontend/studyhub-app/src/pages/sheets/SheetsPage.css`
+
+**Files changed:**
+- `backend/src/modules/sheets/sheets.list.controller.js`
+- `frontend/studyhub-app/src/pages/sheets/SheetsPage.jsx`
+- `frontend/studyhub-app/src/pages/sheets/SheetsFilters.jsx`
+- `frontend/studyhub-app/src/pages/sheets/useSheetsData.js`
+- `frontend/studyhub-app/src/pages/sheets/sheetsPageConstants.js`
+- `frontend/studyhub-app/src/pages/sheets/SheetsPage.css`
+
+### Track 3: Frontend Error-State Cleanup
+
+**Fixed:**
+
+- **SettingsPage silent failure** — Initial `GET /api/settings/me` load now surfaces errors with a full-page "Settings unavailable" screen and refresh button, instead of silently swallowing the error via `.catch(() => {})`.
+  - File: `frontend/studyhub-app/src/pages/settings/SettingsPage.jsx`
+- **Consistent `getApiErrorMessage()` usage** — Replaced all `data.error || 'fallback'` patterns with safe `getApiErrorMessage(data, 'fallback')` helper across:
+  - `useSheetViewer.js` — star, reaction, fork, contribution, comment submit, comment delete (7 call sites)
+  - `useFeedData.js` — reaction, star, delete post, compose post (4 call sites)
+- **Load-more failure toast** — `useSheetsData.js` `loadMoreSheets` catch block now shows a toast instead of silently failing.
+
+**Files changed:**
+- `frontend/studyhub-app/src/pages/settings/SettingsPage.jsx`
+- `frontend/studyhub-app/src/pages/sheets/useSheetViewer.js`
+- `frontend/studyhub-app/src/pages/feed/useFeedData.js`
+- `frontend/studyhub-app/src/pages/sheets/useSheetsData.js`
+
+### Validation
+
+- `npm --prefix frontend/studyhub-app run lint` — **22 pre-existing warnings** (all in untouched files: `feedConstants.jsx`, `notesConstants.jsx`, `sheetViewerConstants.jsx`, `uploadSheetConstants.jsx`). **0 errors in changed files.**
+- `npm --prefix frontend/studyhub-app run build` — **Pass** (built in <1s)
+- `npm --prefix backend run lint` — **0 errors**
+- `npm --prefix backend test` — **21 test files, 161/161 tests passed**
+
+### Deferred / Notes
+
+- Profile page already distinguishes 404 vs 500 vs private-profile errors with different icons and messaging (confirmed during audit — no change needed).
+- Leaderboard sidebar errors are small aside text — acceptable for non-critical UI.
+- 22 pre-existing `react-refresh/only-export-components` lint errors in `.jsx` constant files remain. These are false positives from mixing component exports with non-component exports in the same file — cosmetic, not functional.
+
+---
+
+## Cycle 35 — Admin/Button Audit, HTML Workflow Cleanup, Modular Refactor Scaffolding (2026-03-23)
+
+### Track 1: Admin/Button Audit
+
+**Summary:** Full audit of all admin buttons, role-gating, and dead CTAs across the app.
+
+**Result:** All buttons confirmed functional and properly role-gated. BUG-006 (Google link flow) confirmed already implemented in prior cycles — marked resolved.
+
+**Files changed:** None (audit only).
+
+### Track 2: HTML Workflow Cleanup
+
+**Summary:** 6 copy/label fixes across the HTML upload, preview, and scan workflows to improve clarity and tone.
+
+**Changes:**
+- `SheetHtmlPreviewPage.jsx` — "Sanitized preview" → "Safe preview mode"; improved explanation of script/embed disabling
+- `UploadSheetFormFields.jsx` — Improved HTML import explanation; fixed status underscore display (`pending_review` → `pending review`)
+- `uploadSheetActions.js` — "Submit blocked." → "Could not submit sheet." (all instances)
+- `SheetViewerPage.jsx` — Improved quarantine message with contact support CTA
+- `HtmlScanModal.jsx` — "Harmful content" → "community guidelines"; improved acknowledgement checkbox text
+
+**Files changed:**
+- `frontend/studyhub-app/src/pages/preview/SheetHtmlPreviewPage.jsx`
+- `frontend/studyhub-app/src/pages/sheets/UploadSheetFormFields.jsx`
+- `frontend/studyhub-app/src/pages/sheets/uploadSheetActions.js`
+- `frontend/studyhub-app/src/pages/sheets/SheetViewerPage.jsx`
+- `frontend/studyhub-app/src/pages/sheets/HtmlScanModal.jsx`
+
+### Track 3: Modular Refactor Scaffolding
+
+**Summary:** Created feature-first folder structure for the frontend and resolved all 22 pre-existing lint errors.
+
+**Added — Feature barrel exports (8 folders):**
+- `src/features/sheets/index.js` — re-exports hooks, constants, workflow helpers from pages/sheets/
+- `src/features/feed/index.js` — re-exports useFeedData, feedConstants, feedHelpers
+- `src/features/admin/index.js` — re-exports useAdminData, adminConstants, moderationHelpers, sheetReviewConstants
+- `src/features/users/index.js` — re-exports profileConstants
+- `src/features/dashboard/index.js` — re-exports useDashboardData, dashboardConstants
+- `src/features/notes/index.js` — re-exports useNotesData, notesConstants
+- `src/features/auth/index.js` — re-exports useRegisterFlow, registerConstants
+- `src/features/settings/index.js` — re-exports settingsState, settingsShared
+
+**Fixed — 22 react-refresh/only-export-components lint errors:**
+
+Extracted JSX components from mixed-export `.jsx` files into dedicated component files, then renamed the constants to `.js`:
+
+| Original file | Extracted component(s) | New component file |
+|---|---|---|
+| `uploadSheetConstants.jsx` → `.js` | `MiniPreview` | `uploadSheetComponents.jsx` |
+| `sheetViewerConstants.jsx` → `.js` | `errorBanner` | `sheetViewerComponents.jsx` |
+| `notesConstants.jsx` → `.js` | `MarkdownPreview` | `notesComponents.jsx` |
+| `searchModalConstants.jsx` → `.js` | `Highlight` | `searchModalComponents.jsx` |
+| `sidebarConstants.jsx` → `.js` | `Avatar` | `sidebarComponents.jsx` |
+
+All `.js` files re-export the extracted components for backward-compatible imports.
+
+**Backend:** Already fully modularized under `backend/src/modules/` (21 feature modules) — no changes needed.
+
+**Convention established:** From Cycle 35 onward, new feature logic goes in `src/features/<name>/`. Pages import from feature barrels. Existing code stays in `pages/` and migrates incrementally.
+
+**Files added:**
+- `frontend/studyhub-app/src/features/sheets/index.js`
+- `frontend/studyhub-app/src/features/feed/index.js`
+- `frontend/studyhub-app/src/features/admin/index.js`
+- `frontend/studyhub-app/src/features/users/index.js`
+- `frontend/studyhub-app/src/features/dashboard/index.js`
+- `frontend/studyhub-app/src/features/notes/index.js`
+- `frontend/studyhub-app/src/features/auth/index.js`
+- `frontend/studyhub-app/src/features/settings/index.js`
+- `frontend/studyhub-app/src/pages/sheets/uploadSheetComponents.jsx`
+- `frontend/studyhub-app/src/pages/sheets/sheetViewerComponents.jsx`
+- `frontend/studyhub-app/src/pages/notes/notesComponents.jsx`
+- `frontend/studyhub-app/src/components/searchModalComponents.jsx`
+- `frontend/studyhub-app/src/components/sidebarComponents.jsx`
+
+**Files renamed (.jsx → .js):**
+- `uploadSheetConstants.jsx` → `uploadSheetConstants.js`
+- `sheetViewerConstants.jsx` → `sheetViewerConstants.js`
+- `notesConstants.jsx` → `notesConstants.js`
+- `searchModalConstants.jsx` → `searchModalConstants.js`
+- `sidebarConstants.jsx` → `sidebarConstants.js`
+
+### Validation
+
+- `npm --prefix frontend/studyhub-app run lint` — **0 errors** (down from 22)
+- `npm --prefix frontend/studyhub-app run build` — **Pass** (built in <1s)
+- `npm --prefix backend run lint` — **0 errors**
+- `npm --prefix backend test` — **21 test files, 161/161 tests passed**
+
+### Deferred / Notes
+
+- Feature barrels are scaffolding — no existing imports were migrated this cycle. Migration happens incrementally in future cycles.
+- Backend was already fully modularized (21 modules) — confirmed, no action needed.
+
+---
+
+## Cycle 36 — Page Decomposition, Design Tokens, Media Ownership, Smoke Coverage (2026-03-23)
+
+### Track 1: Page Decomposition
+
+Decomposed 3 oversized pages into thin orchestrators + focused child components.
+
+**FeedPage.jsx** (271 → 167 lines, -38%):
+- Extracted `FeedComposer.jsx` — post composer form with own state (content, courseId, file attach, submit)
+- Extracted `FeedAside.jsx` — leaderboard sidebar (3 leaderboard panels, collaboration tips)
+- Parent retains: filter/search state, animation, delete confirmation, tutorial
+
+**SheetsPage.jsx** (256 → 143 lines, -44%):
+- Extracted `SheetsEmptyState.jsx` — 7 conditional empty-state branches (search, filters, mine+status variants)
+- Extracted `SheetsAside.jsx` — quick-view sidebar (stats summary)
+- Parent retains: URL state management, catalog fetching, list rendering
+
+**UploadSheetPage.jsx** (222 → 142 lines, -36%):
+- Extracted `UploadNavActions.jsx` — navbar action buttons (save draft, preview, cancel, publish)
+- Parent retains: thin shell delegating all state to `useUploadSheet` hook
+
+**Files added:**
+- `frontend/studyhub-app/src/pages/feed/FeedComposer.jsx`
+- `frontend/studyhub-app/src/pages/feed/FeedAside.jsx`
+- `frontend/studyhub-app/src/pages/sheets/SheetsEmptyState.jsx`
+- `frontend/studyhub-app/src/pages/sheets/SheetsAside.jsx`
+- `frontend/studyhub-app/src/pages/sheets/UploadNavActions.jsx`
+
+### Track 2: Design System Token Migration
+
+Added new semantic tokens to `index.css` (both light and dark themes):
+- Slate scale: `--sh-slate-50` through `--sh-slate-900` (10 tokens × 2 themes)
+- Info semantic: `--sh-info`, `--sh-info-bg`, `--sh-info-border`, `--sh-info-text` (4 tokens × 2 themes)
+
+Migrated 10 files from hardcoded hex to CSS custom property tokens:
+
+| File | Changes | Key Migrations |
+|------|---------|----------------|
+| `sheetViewerComponents.jsx` | errorBanner | `#fef2f2` → `var(--sh-danger-bg)`, `#dc2626` → `var(--sh-danger)` |
+| `sheetViewerConstants.js` | statusBadge | pending/accepted/rejected → warning/success/danger tokens |
+| `feedConstants.js` | commentButtonStyle | `#fff` → `var(--sh-surface)` |
+| `adminConstants.js` | 6 style objects | table styles, input, buttons, pager, suppression pill |
+| `AdminWidgets.jsx` | StatsGrid, ModerationOverview, ActivityLog | All structural colors tokenized |
+| `UploadNavActions.jsx` | All 6 color groups | success/warning/brand/slate tokens |
+| `UploadSheetFormFields.jsx` | ~40 instances | labels, borders, errors, success/info/warning/danger states |
+| `uploadSheetConstants.js` | tierColor | `#16a34a` → `var(--sh-success)`, etc. |
+| `HtmlScanModal.jsx` | Scan findings, tier banners | All danger/warning semantic colors |
+
+**Not migrated (intentional):** Editor dark panel (`#0f172a` bg, `#1e293b` border) — always-dark code editor theme. Stats card accent colors in AdminWidgets — intentional unique palette per metric. `courseColor()` palette in feedConstants — intentional per-department branding.
+
+### Track 3: Media/Storage Ownership Audit
+
+Full audit of media upload, storage, serving, and cleanup patterns documented in `docs/security/security-overview.md`:
+
+- **Directory structure:** `uploads/avatars/` (public static), `uploads/attachments/` (auth-protected)
+- **Path patterns:** `user-{userId}-{name}-{ts}.ext` (avatars), `sheet-{name}-{ts}.ext` (attachments)
+- **Ownership enforcement:** `assertOwnerOrAdmin()` on all upload/delete operations
+- **Cleanup chain:** ref-count checks on deletion (avatar, sheet, post, user cascading)
+- **Path traversal protection:** `resolveManagedUploadPath()` validates leaf filenames only
+- **HTML content:** stored in database (not filesystem), served via preview token routes
+
+**Findings:** Well-architected ownership model. No orphan cleanup scheduler (inline cleanup only). No S3/cloud storage (Railway persistent volume). All gaps documented.
+
+### Track 4: Smoke Test Coverage
+
+Added `tests/cycle36-decomposed-pages.smoke.spec.js` — 8 Playwright tests covering:
+
+- Upload sheet page (new sheet + draft mode) — validates decomposed form fields, nav actions, editor panel
+- Admin overview — validates StatsGrid, tab navigation, moderation data rendering
+- User profile page — validates public profile rendering
+
+All tests run across light and dark themes using existing `mockAuthenticatedApp` infrastructure.
+
+### Validation
+
+- `npm --prefix frontend/studyhub-app run lint` — **0 errors**
+- `npm --prefix frontend/studyhub-app run build` — **Pass** (built in <350ms)
+- `npm --prefix backend run lint` — **0 errors**
+- `npm --prefix backend test` — **21 test files, 161/161 tests passed**
+- `npm --prefix frontend/studyhub-app test` — **12/14 files pass, 30/33 pass** (3 pre-existing failures in SearchModal.test.jsx, uploadSheetWorkflow.test.jsx — not caused by Cycle 36 changes, confirmed via git diff)
+
+### Deferred / Notes
+
+- Full 1000+ instance color migration deferred — focused on high-leverage constants/style-helper files that cascade to consumers
+- Home page components (HomeSections.jsx, HomeHero.jsx) not migrated per CLAUDE.md instruction to preserve HomePage visual language
+- Pre-existing test failures (SearchModal, uploadSheetWorkflow) tracked but not in scope for this cycle

@@ -42,22 +42,22 @@ export const tableHeadStyle = {
   padding: '10px 14px',
   textAlign: 'left',
   fontWeight: 700,
-  color: '#64748b',
-  borderBottom: '1px solid #e2e8f0',
+  color: 'var(--sh-slate-500)',
+  borderBottom: '1px solid var(--sh-border)',
   whiteSpace: 'nowrap',
 }
 
-export const tableCell = { padding: '10px 14px', color: '#475569', verticalAlign: 'top' }
-export const tableCellStrong = { ...tableCell, fontWeight: 700, color: '#0f172a' }
+export const tableCell = { padding: '10px 14px', color: 'var(--sh-slate-600)', verticalAlign: 'top' }
+export const tableCellStrong = { ...tableCell, fontWeight: 700, color: 'var(--sh-slate-900)' }
 
 export const inputStyle = {
   width: '100%',
   boxSizing: 'border-box',
   padding: '11px 12px',
   borderRadius: 10,
-  border: '1px solid #dbe1e8',
+  border: '1px solid var(--sh-input-border)',
   fontSize: 13,
-  color: '#0f172a',
+  color: 'var(--sh-input-text)',
   fontFamily: FONT,
 }
 
@@ -66,7 +66,7 @@ export const primaryButton = {
   padding: '10px 16px',
   borderRadius: 10,
   border: 'none',
-  background: '#3b82f6',
+  background: 'var(--sh-brand)',
   color: '#fff',
   fontSize: 13,
   fontWeight: 700,
@@ -80,7 +80,7 @@ export const primaryButtonLink = {
   justifyContent: 'center',
   padding: '10px 16px',
   borderRadius: 10,
-  background: '#3b82f6',
+  background: 'var(--sh-brand)',
   color: '#fff',
   fontSize: 13,
   fontWeight: 700,
@@ -88,10 +88,10 @@ export const primaryButtonLink = {
 }
 
 export const settingsCardStyle = {
-  border: '1px solid #e2e8f0',
+  border: '1px solid var(--sh-border)',
   borderRadius: 14,
   padding: '16px 18px',
-  background: '#f8fafc',
+  background: 'var(--sh-soft)',
 }
 
 export const filterSelectStyle = {
@@ -122,9 +122,9 @@ export function pagerButton(disabled) {
   return {
     padding: '7px 14px',
     borderRadius: 8,
-    border: '1px solid #e2e8f0',
-    background: '#fff',
-    color: disabled ? '#cbd5e1' : '#475569',
+    border: '1px solid var(--sh-border)',
+    background: 'var(--sh-surface)',
+    color: disabled ? 'var(--sh-slate-300)' : 'var(--sh-slate-600)',
     fontSize: 12,
     fontWeight: 700,
     cursor: disabled ? 'not-allowed' : 'pointer',
@@ -138,9 +138,9 @@ export function suppressionStatusPill(active) {
     alignItems: 'center',
     padding: '4px 10px',
     borderRadius: 999,
-    border: active ? '1px solid #a7f3d0' : '1px solid #cbd5e1',
-    background: active ? '#ecfdf5' : '#f8fafc',
-    color: active ? '#047857' : '#475569',
+    border: active ? '1px solid var(--sh-success-border)' : '1px solid var(--sh-slate-300)',
+    background: active ? 'var(--sh-success-bg)' : 'var(--sh-soft)',
+    color: active ? 'var(--sh-success-text)' : 'var(--sh-slate-600)',
     fontSize: 11,
     fontWeight: 700,
   }

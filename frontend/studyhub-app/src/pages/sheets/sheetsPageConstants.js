@@ -12,6 +12,13 @@ export const FORMAT_OPTIONS = [
   { value: 'pdf', label: 'PDF' },
 ]
 
+export const STATUS_OPTIONS = [
+  { value: 'draft', label: 'Drafts' },
+  { value: 'pending_review', label: 'Pending review' },
+  { value: 'published', label: 'Published' },
+  { value: 'rejected', label: 'Rejected' },
+]
+
 export function authHeaders() {
   return { 'Content-Type': 'application/json' }
 }

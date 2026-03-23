@@ -1,3 +1,9 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+ * SheetsPage.jsx — Study sheets listing (thin orchestrator)
+ *
+ * Components: SheetsFilters, SheetsEmptyState, SheetsAside, SheetListItem
+ * Data: useSheetsData
+ * ═══════════════════════════════════════════════════════════════════════════ */
 import { Link } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
 import AppSidebar from '../../components/AppSidebar'
@@ -10,6 +16,8 @@ import { useTutorial } from '../../lib/useTutorial'
 import { SHEETS_STEPS } from '../../lib/tutorialSteps'
 import SheetListRow from './SheetListItem'
 import SheetsFilters from './SheetsFilters'
+import SheetsEmptyState from './SheetsEmptyState'
+import SheetsAside from './SheetsAside'
 import useSheetsData from './useSheetsData'
 import './SheetsPage.css'
 
@@ -19,33 +27,15 @@ export default function SheetsPage() {
   const tutorial = useTutorial('sheets', SHEETS_STEPS)
 
   const {
-    user,
-    navigate,
-    search,
-    schoolId,
-    courseId,
-    mine,
-    starred,
-    sortValue,
-    formatValue,
-    catalog,
-    catalogError,
-    sheetsState,
-    loadingMore,
-    mobileFiltersOpen,
-    setMobileFiltersOpen,
-    forkingSheetId,
-    cardsRef,
-    activeSchool,
-    availableCourses,
-    subtitle,
-    hasActiveFilters,
-    setQueryParam,
-    handleSchoolChange,
-    clearAllFilters,
-    toggleStar,
-    handleFork,
-    loadMoreSheets,
+    user, navigate,
+    search, schoolId, courseId, mine, starred, statusFilter,
+    sortValue, formatValue,
+    catalog, catalogError, sheetsState, loadingMore,
+    mobileFiltersOpen, setMobileFiltersOpen,
+    forkingSheetId, cardsRef,
+    activeSchool, availableCourses, subtitle, hasActiveFilters,
+    setQueryParam, handleSchoolChange, toggleMine, clearAllFilters,
+    toggleStar, handleFork, loadMoreSheets,
   } = useSheetsData()
 
   return (
@@ -71,20 +61,12 @@ export default function SheetsPage() {
               </section>
 
               <SheetsFilters
-                search={search}
-                schoolId={schoolId}
-                courseId={courseId}
-                sortValue={sortValue}
-                formatValue={formatValue}
-                mine={mine}
-                starred={starred}
-                mobileFiltersOpen={mobileFiltersOpen}
-                setMobileFiltersOpen={setMobileFiltersOpen}
-                catalog={catalog}
-                activeSchool={activeSchool}
-                availableCourses={availableCourses}
-                setQueryParam={setQueryParam}
-                handleSchoolChange={handleSchoolChange}
+                search={search} schoolId={schoolId} courseId={courseId}
+                sortValue={sortValue} formatValue={formatValue}
+                mine={mine} starred={starred} statusFilter={statusFilter}
+                mobileFiltersOpen={mobileFiltersOpen} setMobileFiltersOpen={setMobileFiltersOpen}
+                catalog={catalog} activeSchool={activeSchool} availableCourses={availableCourses}
+                setQueryParam={setQueryParam} handleSchoolChange={handleSchoolChange} toggleMine={toggleMine}
               />
 
               {catalogError ? <div className="sh-alert sh-alert--danger">{catalogError}</div> : null}
@@ -93,58 +75,10 @@ export default function SheetsPage() {
               {sheetsState.loading ? (
                 <SkeletonSheetGrid count={4} />
               ) : sheetsState.sheets.length === 0 ? (
-                <section className="sh-card sheets-page__empty-state">
-                  {search.trim() ? (
-                    <>
-                      <h2 className="sheets-page__empty-title">No results for &ldquo;{search}&rdquo;</h2>
-                      <p className="sheets-page__empty-copy">
-                        Try another query or clear your filters to scan the full sheet index.
-                      </p>
-                      <button type="button" className="sh-btn sh-btn--secondary" onClick={clearAllFilters}>
-                        Clear filters
-                      </button>
-                    </>
-                  ) : hasActiveFilters ? (
-                    <>
-                      <h2 className="sheets-page__empty-title">No sheets matched your filters</h2>
-                      <p className="sheets-page__empty-copy">
-                        Your current filters are too narrow. Clear them to return to the full list.
-                      </p>
-                      <button type="button" className="sh-btn sh-btn--secondary" onClick={clearAllFilters}>
-                        Clear filters
-                      </button>
-                    </>
-                  ) : mine ? (
-                    <>
-                      <h2 className="sheets-page__empty-title">No sheets yet</h2>
-                      <p className="sheets-page__empty-copy">
-                        You haven&rsquo;t uploaded any sheets yet. Upload your notes or start with a template.
-                      </p>
-                      <div className="sheets-page__empty-actions">
-                        <Link to="/sheets/upload?new=1" className="sh-btn sh-btn--primary">
-                          <IconUpload size={14} />
-                          Upload a sheet
-                        </Link>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <h2 className="sheets-page__empty-title">Be the first to share for this space</h2>
-                      <p className="sheets-page__empty-copy">
-                        No published sheets yet. Upload your notes or start with a template to kick off the course repo.
-                      </p>
-                      <div className="sheets-page__empty-actions">
-                        <Link to="/sheets/upload" className="sh-btn sh-btn--primary">
-                          <IconUpload size={14} />
-                          Upload a sheet
-                        </Link>
-                        <Link to="/sheets/upload?template=starter" className="sh-btn sh-btn--secondary">
-                          Use a template
-                        </Link>
-                      </div>
-                    </>
-                  )}
-                </section>
+                <SheetsEmptyState
+                  search={search} hasActiveFilters={hasActiveFilters}
+                  mine={mine} statusFilter={statusFilter} clearAllFilters={clearAllFilters}
+                />
               ) : (
                 <section className="sh-card sh-card--flat sh-card--flush sheets-page__list-shell">
                   <div className="sheets-page__list-head">
@@ -189,27 +123,11 @@ export default function SheetsPage() {
               )}
             </main>
 
-            <aside className="feed-aside sheets-page__aside">
-              <section className="sh-card">
-                <h2 className="sh-card-title">Quick view</h2>
-                <p className="sh-card-helper">Live index context</p>
-                <div className="sheets-page__aside-stats">
-                  <div>{sheetsState.total} sheets found</div>
-                  <div>{catalog.length} schools available</div>
-                  <div>{user?.enrollments?.length || 0} courses in your profile</div>
-                </div>
-              </section>
-
-              <section className="sh-card">
-                <h2 className="sh-card-title">Workflow</h2>
-                <p className="sheets-page__aside-copy">
-                  Use the filters to narrow the repo list, open a sheet row, then fork or star from the same view.
-                </p>
-                <Link to="/feed" className="sh-btn sh-btn--secondary sh-btn--sm">
-                  Back to feed
-                </Link>
-              </section>
-            </aside>
+            <SheetsAside
+              sheetsTotal={sheetsState.total}
+              catalogCount={catalog.length}
+              enrollmentCount={user?.enrollments?.length || 0}
+            />
           </div>
         </div>
       </div>

@@ -45,12 +45,12 @@ export function HtmlScanModal({
         </div>
         <div style={{ padding: 16, display: 'grid', gap: 10 }}>
           <div style={{ fontSize: 13, color: 'var(--sh-subtext)' }}>
-            StudyHub allows rich HTML like GitHub. We scan submissions and classify risk. Harmful content can lead to restrictions.
+            StudyHub allows rich HTML like GitHub. We scan all submissions and classify risk level. Content that violates community guidelines may lead to restrictions.
           </div>
           {scanState.findings?.length ? (
-            <div style={{ border: '1px solid #fecaca', background: '#fff1f2', borderRadius: 10, padding: 12 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#b91c1c', marginBottom: 6 }}>Scan Report ({scanState.findings.length} finding{scanState.findings.length !== 1 ? 's' : ''})</div>
-              <ul style={{ margin: 0, paddingLeft: 18, color: '#991b1b', fontSize: 12, lineHeight: 1.7 }}>
+            <div style={{ border: '1px solid var(--sh-danger-border)', background: 'var(--sh-danger-bg)', borderRadius: 10, padding: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--sh-danger-text)', marginBottom: 6 }}>Scan Report ({scanState.findings.length} finding{scanState.findings.length !== 1 ? 's' : ''})</div>
+              <ul style={{ margin: 0, paddingLeft: 18, color: 'var(--sh-danger-text)', fontSize: 12, lineHeight: 1.7 }}>
                 {scanState.findings.map((finding, index) => (
                   <li key={`${index}-${finding?.message || finding}`}>{finding?.message || finding}</li>
                 ))}
@@ -59,19 +59,19 @@ export function HtmlScanModal({
           ) : null}
 
           {scanState.tier === 1 ? (
-            <div style={{ border: '1px solid #fde68a', background: '#fffbeb', borderRadius: 10, padding: 12, fontSize: 12, color: '#92400e', lineHeight: 1.6 }}>
+            <div style={{ border: '1px solid var(--sh-warning-border)', background: 'var(--sh-warning-bg)', borderRadius: 10, padding: 12, fontSize: 12, color: 'var(--sh-warning-text)', lineHeight: 1.6 }}>
               This sheet contains flagged HTML features (scripts, iframes, or inline handlers). It will be published with a warning banner and scripts will be disabled in the preview.
             </div>
           ) : null}
 
           {scanState.tier === 2 ? (
-            <div style={{ border: '1px solid #fed7aa', background: '#fff7ed', borderRadius: 10, padding: 12, fontSize: 12, color: '#9a3412', lineHeight: 1.6 }}>
+            <div style={{ border: '1px solid var(--sh-warning-border)', background: 'var(--sh-warning-bg)', borderRadius: 10, padding: 12, fontSize: 12, color: 'var(--sh-warning-text)', lineHeight: 1.6 }}>
               This sheet contains high-risk behavioral patterns. It will be submitted for admin review. The preview will be disabled for other users until an admin approves it.
             </div>
           ) : null}
 
           {scanState.tier === 3 ? (
-            <div style={{ border: '1px solid #fecaca', background: '#fef2f2', borderRadius: 10, padding: 12, fontSize: 12, color: '#dc2626', lineHeight: 1.6 }}>
+            <div style={{ border: '1px solid var(--sh-danger-border)', background: 'var(--sh-danger-bg)', borderRadius: 10, padding: 12, fontSize: 12, color: 'var(--sh-danger)', lineHeight: 1.6 }}>
               This sheet has been quarantined due to a malware or phishing signature match. It cannot be published. If you believe this is an error, please contact an admin.
             </div>
           ) : null}
@@ -79,7 +79,7 @@ export function HtmlScanModal({
           {scanState.tier === 1 ? (
             <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: 'var(--sh-subtext)' }}>
               <input type="checkbox" checked={scanAckChecked} onChange={(event) => setScanAckChecked(event.target.checked)} style={{ marginTop: 2 }} />
-              I understand this sheet contains flagged HTML features. I acknowledge it may be flagged and reviewed. Harmful content can lead to account restrictions.
+              I understand this sheet contains flagged HTML features. It will be published with a warning badge and scripts disabled in preview. Violating community guidelines may lead to account restrictions.
             </label>
           ) : null}
         </div>
@@ -96,7 +96,7 @@ export function HtmlScanModal({
               type="button"
               disabled={!scanAckChecked}
               onClick={onAcknowledge}
-              style={{ background: scanAckChecked ? 'var(--sh-brand)' : '#93c5fd', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 12px', fontSize: 12, fontWeight: 700, cursor: scanAckChecked ? 'pointer' : 'not-allowed', fontFamily: FONT }}
+              style={{ background: scanAckChecked ? 'var(--sh-brand)' : 'var(--sh-slate-300)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 12px', fontSize: 12, fontWeight: 700, cursor: scanAckChecked ? 'pointer' : 'not-allowed', fontFamily: FONT }}
             >
               Acknowledge and dismiss
             </button>

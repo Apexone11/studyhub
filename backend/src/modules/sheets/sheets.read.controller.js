@@ -9,6 +9,7 @@ const router = express.Router()
 
 router.get('/:id', optionalAuth, async (req, res) => {
   const sheetId = Number.parseInt(req.params.id, 10)
+  if (!Number.isInteger(sheetId)) return res.status(400).json({ error: 'Invalid sheet id.' })
 
   try {
     const sheet = await prisma.studySheet.findUnique({
@@ -31,18 +32,19 @@ router.get('/:id', optionalAuth, async (req, res) => {
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
     if (!canReadSheet(sheet, req.user || null)) return res.status(404).json({ error: 'Sheet not found.' })
 
+    const userId = req.user?.userId
     const [likeCount, dislikeCount, commentCount, starredRow, reactionRow, contributionCollections] = await Promise.all([
       prisma.reaction.count({ where: { sheetId, type: 'like' } }),
       prisma.reaction.count({ where: { sheetId, type: 'dislike' } }),
       prisma.comment.count({ where: { sheetId } }),
-      req.user
+      userId
         ? prisma.starredSheet.findUnique({
-            where: { userId_sheetId: { userId: req.user.userId, sheetId } },
+            where: { userId_sheetId: { userId, sheetId } },
           })
         : null,
-      req.user
+      userId
         ? prisma.reaction.findUnique({
-            where: { userId_sheetId: { userId: req.user.userId, sheetId } },
+            where: { userId_sheetId: { userId, sheetId } },
           })
         : null,
       fetchContributionCollections(sheet, req.user || null),
