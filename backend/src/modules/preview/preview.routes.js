@@ -14,16 +14,13 @@ function parseInteger(value) {
 }
 
 /**
- * Strict CSP for interactive (runtime) documents — Tier 0.
- * - Scripts/styles: inline only (no remote CDN/src)
- * - Images/media/fonts: data: and blob: only (no remote loading)
- * - connect-src 'none': no fetch/XHR/WebSocket
- * - form-action 'none': no form submissions
- * - frame-src 'none': no nested iframes
+ * Base CSP directives shared by all preview modes.
+ * frame-ancestors is NOT included here — it is appended per-request from
+ * res.locals.frameAncestorsDirective (set by the security-header middleware)
+ * so that the trusted-origin list stays in one place.
  */
-const RUNTIME_CSP = [
+const BASE_PREVIEW_DIRECTIVES = [
   "default-src 'none'",
-  "script-src 'unsafe-inline'",
   "style-src 'unsafe-inline'",
   "img-src data: blob:",
   "media-src data: blob:",
@@ -33,14 +30,20 @@ const RUNTIME_CSP = [
   "frame-src 'none'",
   "object-src 'none'",
   "worker-src 'none'",
-  "frame-ancestors 'none'",
   "base-uri 'none'",
-].join('; ')
+]
 
-/**
- * Safe preview CSP for Tier 1 — same as runtime but scripts completely blocked.
- */
-const SAFE_PREVIEW_CSP = RUNTIME_CSP.replace("script-src 'unsafe-inline'", "script-src 'none'")
+/** Tier 0 runtime: scripts allowed (inline only). */
+const RUNTIME_DIRECTIVES = [...BASE_PREVIEW_DIRECTIVES, "script-src 'unsafe-inline'"]
+
+/** Tier 1+ safe preview: scripts completely blocked. */
+const SAFE_PREVIEW_DIRECTIVES = [...BASE_PREVIEW_DIRECTIVES, "script-src 'none'"]
+
+/** Build final CSP string with the correct frame-ancestors for this request. */
+function buildPreviewCsp(directives, res) {
+  const frameAncestors = res.locals.frameAncestorsDirective || "frame-ancestors 'none'"
+  return [...directives, frameAncestors].join('; ')
+}
 
 const VALID_TOKEN_TYPES = ['html-preview', 'html-runtime']
 
@@ -114,7 +117,7 @@ router.get('/html', async (req, res) => {
       const outputHtml = buildPreviewDocument({ title: sheet.title, html: sheet.content })
       res.setHeader('Cache-Control', 'private, no-store, max-age=0')
       res.setHeader('Content-Type', 'text/html; charset=utf-8')
-      res.setHeader('Content-Security-Policy', SAFE_PREVIEW_CSP)
+      res.setHeader('Content-Security-Policy', buildPreviewCsp(SAFE_PREVIEW_DIRECTIVES, res))
       return res.status(200).send(outputHtml)
     }
 
@@ -125,7 +128,7 @@ router.get('/html', async (req, res) => {
         : buildPreviewDocument({ title: sheet.title, html: sheet.content })
       res.setHeader('Cache-Control', 'private, no-store, max-age=0')
       res.setHeader('Content-Type', 'text/html; charset=utf-8')
-      res.setHeader('Content-Security-Policy', SAFE_PREVIEW_CSP)
+      res.setHeader('Content-Security-Policy', buildPreviewCsp(SAFE_PREVIEW_DIRECTIVES, res))
       return res.status(200).send(outputHtml)
     }
 
@@ -138,7 +141,7 @@ router.get('/html', async (req, res) => {
     res.setHeader('Content-Type', 'text/html; charset=utf-8')
 
     if (isRuntime) {
-      res.setHeader('Content-Security-Policy', RUNTIME_CSP)
+      res.setHeader('Content-Security-Policy', buildPreviewCsp(RUNTIME_DIRECTIVES, res))
     }
 
     return res.status(200).send(outputHtml)
