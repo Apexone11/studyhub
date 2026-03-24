@@ -40,26 +40,26 @@ export default function ContributionInlineDiff({ contributionId }) {
         disabled={loading}
         style={{
           display: 'inline-flex', alignItems: 'center', gap: 4,
-          padding: '4px 8px', borderRadius: 6, border: '1px solid #e0e7ff',
-          background: '#f5f3ff', color: '#6366f1', fontSize: 11, fontWeight: 700,
+          padding: '4px 8px', borderRadius: 6, border: '1px solid var(--sh-info-border)',
+          background: 'var(--sh-info-bg)', color: 'var(--sh-brand)', fontSize: 11, fontWeight: 700,
           cursor: loading ? 'wait' : 'pointer', fontFamily: FONT,
         }}
       >
         {loading ? 'Loading...' : visible ? 'Hide changes' : 'View changes'}
       </button>
-      {error ? <div style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>{error}</div> : null}
+      {error ? <div style={{ fontSize: 11, color: 'var(--sh-danger)', marginTop: 4 }}>{error}</div> : null}
       {visible && diff ? (
-        <div style={{ marginTop: 8, border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden', background: '#fff' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+        <div style={{ marginTop: 8, border: '1px solid var(--sh-border)', borderRadius: 12, overflow: 'hidden', background: 'var(--sh-surface)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', background: 'var(--sh-soft)', borderBottom: '1px solid var(--sh-border)' }}>
             <div style={{ display: 'flex', gap: 10, fontSize: 11, fontWeight: 700 }}>
-              <span style={{ color: '#16a34a' }}>+{diff.additions}</span>
-              <span style={{ color: '#dc2626' }}>-{diff.deletions}</span>
+              <span style={{ color: 'var(--sh-success)' }}>+{diff.additions}</span>
+              <span style={{ color: 'var(--sh-danger)' }}>-{diff.deletions}</span>
             </div>
-            <div style={{ display: 'inline-flex', border: '1px solid #e2e8f0', borderRadius: 6, overflow: 'hidden' }}>
-              <button type="button" onClick={() => setDiffMode('unified')} style={{ padding: '2px 8px', fontSize: 10, fontWeight: 700, fontFamily: FONT, border: 'none', background: diffMode === 'unified' ? '#6366f1' : '#fff', color: diffMode === 'unified' ? '#fff' : '#64748b', cursor: 'pointer' }}>
+            <div style={{ display: 'inline-flex', border: '1px solid var(--sh-border)', borderRadius: 6, overflow: 'hidden' }}>
+              <button type="button" onClick={() => setDiffMode('unified')} style={{ padding: '2px 8px', fontSize: 10, fontWeight: 700, fontFamily: FONT, border: 'none', background: diffMode === 'unified' ? 'var(--sh-brand)' : 'var(--sh-surface)', color: diffMode === 'unified' ? 'var(--sh-btn-primary-text)' : 'var(--sh-subtext)', cursor: 'pointer' }}>
                 Unified
               </button>
-              <button type="button" onClick={() => setDiffMode('split')} style={{ padding: '2px 8px', fontSize: 10, fontWeight: 700, fontFamily: FONT, border: 'none', borderLeft: '1px solid #e2e8f0', background: diffMode === 'split' ? '#6366f1' : '#fff', color: diffMode === 'split' ? '#fff' : '#64748b', cursor: 'pointer' }}>
+              <button type="button" onClick={() => setDiffMode('split')} style={{ padding: '2px 8px', fontSize: 10, fontWeight: 700, fontFamily: FONT, border: 'none', borderLeft: '1px solid var(--sh-border)', background: diffMode === 'split' ? 'var(--sh-brand)' : 'var(--sh-surface)', color: diffMode === 'split' ? 'var(--sh-btn-primary-text)' : 'var(--sh-subtext)', cursor: 'pointer' }}>
                 Split
               </button>
             </div>
@@ -68,13 +68,13 @@ export default function ContributionInlineDiff({ contributionId }) {
             {diffMode === 'unified' ? (
               (diff.hunks || []).map((hunk, hi) => (
                 <div key={hi}>
-                  <div style={{ background: '#eff6ff', color: '#3b82f6', padding: '2px 10px', fontSize: 10, fontWeight: 600 }}>
+                  <div style={{ background: 'var(--sh-info-bg)', color: 'var(--sh-brand)', padding: '2px 10px', fontSize: 10, fontWeight: 600 }}>
                     @@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@
                   </div>
                   {hunk.lines.map((line, li) => (
-                    <div key={li} style={{ padding: '1px 10px', whiteSpace: 'pre-wrap', wordBreak: 'break-all', background: line.type === 'add' ? '#f0fdf4' : line.type === 'remove' ? '#fef2f2' : 'transparent', color: line.type === 'add' ? '#166534' : line.type === 'remove' ? '#991b1b' : '#64748b' }}>
+                    <div key={li} style={{ padding: '1px 10px', whiteSpace: 'pre-wrap', wordBreak: 'break-all', background: line.type === 'add' ? 'var(--sh-success-bg)' : line.type === 'remove' ? 'var(--sh-danger-bg)' : 'transparent', color: line.type === 'add' ? 'var(--sh-success-text)' : line.type === 'remove' ? 'var(--sh-danger-text)' : 'var(--sh-subtext)' }}>
                       {line.type === 'add' ? '+' : line.type === 'remove' ? '-' : ' '} {line.segments ? line.segments.map((seg, si) => (
-                        <span key={si} style={seg.type === 'add' ? { background: '#bbf7d0', borderRadius: 2 } : seg.type === 'remove' ? { background: '#fecaca', borderRadius: 2, textDecoration: 'line-through' } : {}}>{seg.text}</span>
+                        <span key={si} style={seg.type === 'add' ? { background: 'var(--sh-success-border)', borderRadius: 2 } : seg.type === 'remove' ? { background: 'var(--sh-danger-border)', borderRadius: 2, textDecoration: 'line-through' } : {}}>{seg.text}</span>
                       )) : line.content}
                     </div>
                   ))}
@@ -100,16 +100,16 @@ export default function ContributionInlineDiff({ contributionId }) {
                 }
                 return (
                   <div key={hi}>
-                    <div style={{ background: '#eff6ff', color: '#3b82f6', padding: '2px 10px', fontSize: 10, fontWeight: 600 }}>
+                    <div style={{ background: 'var(--sh-info-bg)', color: 'var(--sh-brand)', padding: '2px 10px', fontSize: 10, fontWeight: 600 }}>
                       @@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@
                     </div>
                     {rows.map((row, ri) => (
                       <div key={ri} className="sheet-diff-split">
-                        <div style={{ padding: '1px 8px', whiteSpace: 'pre-wrap', wordBreak: 'break-all', borderRight: '1px solid #e2e8f0', background: row.left?.type === 'remove' ? '#fef2f2' : 'transparent', color: row.left?.type === 'remove' ? '#991b1b' : '#64748b', minHeight: '1.5em' }}>
-                          {row.left ? (row.left.segments ? row.left.segments.map((seg, si) => <span key={si} style={seg.type === 'remove' ? { background: '#fecaca', borderRadius: 2 } : {}}>{seg.text}</span>) : row.left.content) : ''}
+                        <div style={{ padding: '1px 8px', whiteSpace: 'pre-wrap', wordBreak: 'break-all', borderRight: '1px solid var(--sh-border)', background: row.left?.type === 'remove' ? 'var(--sh-danger-bg)' : 'transparent', color: row.left?.type === 'remove' ? 'var(--sh-danger-text)' : 'var(--sh-subtext)', minHeight: '1.5em' }}>
+                          {row.left ? (row.left.segments ? row.left.segments.map((seg, si) => <span key={si} style={seg.type === 'remove' ? { background: 'var(--sh-danger-border)', borderRadius: 2 } : {}}>{seg.text}</span>) : row.left.content) : ''}
                         </div>
-                        <div style={{ padding: '1px 8px', whiteSpace: 'pre-wrap', wordBreak: 'break-all', background: row.right?.type === 'add' ? '#f0fdf4' : 'transparent', color: row.right?.type === 'add' ? '#166534' : '#64748b', minHeight: '1.5em' }}>
-                          {row.right ? (row.right.segments ? row.right.segments.map((seg, si) => <span key={si} style={seg.type === 'add' ? { background: '#bbf7d0', borderRadius: 2 } : {}}>{seg.text}</span>) : row.right.content) : ''}
+                        <div style={{ padding: '1px 8px', whiteSpace: 'pre-wrap', wordBreak: 'break-all', background: row.right?.type === 'add' ? 'var(--sh-success-bg)' : 'transparent', color: row.right?.type === 'add' ? 'var(--sh-success-text)' : 'var(--sh-subtext)', minHeight: '1.5em' }}>
+                          {row.right ? (row.right.segments ? row.right.segments.map((seg, si) => <span key={si} style={seg.type === 'add' ? { background: 'var(--sh-success-border)', borderRadius: 2 } : {}}>{seg.text}</span>) : row.right.content) : ''}
                         </div>
                       </div>
                     ))}
@@ -118,7 +118,7 @@ export default function ContributionInlineDiff({ contributionId }) {
               })
             )}
             {diff.hunks?.length === 0 ? (
-              <div style={{ padding: 12, textAlign: 'center', color: '#94a3b8', fontSize: 11 }}>No differences found.</div>
+              <div style={{ padding: 12, textAlign: 'center', color: 'var(--sh-muted)', fontSize: 11 }}>No differences found.</div>
             ) : null}
           </div>
         </div>

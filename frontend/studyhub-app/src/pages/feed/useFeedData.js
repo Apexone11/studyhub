@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { API } from '../../config'
 import { getApiErrorMessage, isAuthSessionFailure, readJsonSafely } from '../../lib/http'
 import { useLivePolling } from '../../lib/useLivePolling'
@@ -6,6 +6,19 @@ import { showToast } from '../../lib/toast'
 import { trackEvent } from '../../lib/telemetry'
 import { canUserDeletePost } from './feedHelpers'
 import { authHeaders } from './feedConstants'
+
+const LAST_FEED_VISIT_KEY = 'studyhub.feed.lastVisit'
+
+function getLastFeedVisit() {
+  try {
+    const raw = localStorage.getItem(LAST_FEED_VISIT_KEY)
+    return raw ? new Date(raw).getTime() : 0
+  } catch { return 0 }
+}
+
+function markFeedVisit() {
+  try { localStorage.setItem(LAST_FEED_VISIT_KEY, new Date().toISOString()) } catch { /* ignore */ }
+}
 
 export function useFeedData({ user, clearSession, search }) {
   const [feedState, setFeedState] = useState({ items: [], total: 0, loading: true, error: '', partial: false, degradedSections: [] })
@@ -309,12 +322,23 @@ export function useFeedData({ user, clearSession, search }) {
     loadFeed()
   }
 
+  /* "Since your last visit" — count new items */
+  const [lastFeedVisit] = useState(getLastFeedVisit)
+  const newSinceLastVisit = useMemo(() => {
+    if (!lastFeedVisit || feedState.loading || feedState.items.length === 0) return 0
+    return feedState.items.filter((item) => new Date(item.createdAt).getTime() > lastFeedVisit).length
+  }, [feedState.items, feedState.loading, lastFeedVisit])
+
+  // Mark visit once feed loads
+  useEffect(() => { if (!feedState.loading && feedState.items.length > 0) markFeedVisit() }, [feedState.loading, feedState.items.length])
+
   return {
     feedState,
     leaderboards,
     starredUpdates,
     loadingMore,
     deletingPostIds,
+    newSinceLastVisit,
     loadMoreFeed,
     toggleReaction,
     toggleStar,

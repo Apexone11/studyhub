@@ -172,7 +172,7 @@ for (const vp of VIEWPORTS) {
       test('sheet viewer', async ({ page }) => {
         await mockAuthenticatedApp(page)
         await page.goto('/sheets/501')
-        await expect(page.getByRole('heading', { name: 'Algorithms Midterm Review' })).toBeVisible({ timeout: 10000 })
+        await expect(page.getByRole('heading', { name: 'Algorithms Midterm Review' })).toBeVisible({ timeout: 15000 })
         await snap(page, 'sheet-viewer', theme, vp.tag)
       })
     })

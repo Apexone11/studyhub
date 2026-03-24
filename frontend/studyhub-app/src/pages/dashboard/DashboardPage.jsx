@@ -28,7 +28,10 @@ import {
   DashboardSkeleton,
   QuickActions,
   RecentSheets,
+  ResumeStudying,
   StatCards,
+  StudyActivity,
+  StudyQueue,
 } from './DashboardWidgets'
 
 export default function DashboardPage() {
@@ -55,6 +58,12 @@ export default function DashboardPage() {
     hero,
     courses,
     recentSheets,
+    recentlyViewed,
+    studyActivity,
+    newSheetCount,
+    studyQueueCounts,
+    studyToReview,
+    studyStudying,
   } = useDashboardData()
 
   /* Tutorial popup — first-visit or re-trigger via floating "?" button */
@@ -228,13 +237,18 @@ export default function DashboardPage() {
             <>
               <StatCards statsRef={statsRef} cards={cards} />
 
+              <StudyActivity activity={studyActivity} />
+
               <ActivationChecklist activation={summary?.activation} />
+
+              <ResumeStudying entries={recentlyViewed} />
 
               {/* Content: Recent Sheets (wider) | Course Focus + Quick Actions */}
               <section ref={contentRef} className="dashboard-content-grid" data-tutorial="dashboard-sheets">
-                <RecentSheets recentSheets={recentSheets} />
+                <RecentSheets recentSheets={recentSheets} newCount={newSheetCount} />
 
                 <div style={{ display: 'grid', gap: 16 }}>
+                  <StudyQueue counts={studyQueueCounts} toReview={studyToReview} studying={studyStudying} />
                   <CourseFocus courses={courses} />
                   <QuickActions />
                 </div>

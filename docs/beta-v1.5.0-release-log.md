@@ -4131,3 +4131,253 @@ Validation:
 - Frontend lint: 0 errors
 - Frontend build: passes
 - Backend tests: 184/184 pass
+
+---
+
+### Cycle 41 — Discovery + engagement + content quality signals (2026-03-23)
+
+Theme: Turn StudyHub from "easy to understand" into "useful enough to come back to regularly" by improving search ranking, course discovery, content quality signals, and engagement surfaces.
+
+#### Sub-cycle 41.1 — Search/ranking improvements
+
+Added:
+
+- Backend composite ranking algorithm: `score = stars*3 + forks*2 + downloads + freshness(max(0, 10 - log2(ageDays)))` for "recommended" sort
+- `recommended` added to `allowedSort` in `sheets.list.controller.js` — fetches up to 500 recent sheets, scores in-memory, then paginates
+- "Best" sort option added as first/default option in `sheetsPageConstants.js`
+- `IconComment` SVG icon added to `Icons.jsx`
+- Comment count display on sheet list rows in `SheetListItem.jsx` (visible when > 0)
+- Default sort changed from `createdAt` to `recommended` in `useSheetsData.js`
+
+#### Sub-cycle 41.2 — Course-level discovery
+
+Added:
+
+- Backend `GET /api/courses/popular` endpoint: returns top 8 courses by published sheet count, rate-limited (120/15min), public
+- `POPULAR_COURSES_LIMIT` constant in `courses.constants.js`
+- Frontend: `useSheetsData` now fetches popular courses (polled every 5min) and tracks recent course filters in localStorage (`studyhub.sheets.recentCourses`, max 5 entries)
+- `handleCourseFilter` callback: batched `courseId` + `schoolId` URL update (avoids double-render from separate `setQueryParam` calls)
+- `SheetsAside` rewritten with 3 discovery sections: Quick view, Recent courses (clickable chips with toggle), Popular courses (ranked list with sheet counts)
+- Course-specific empty state in `SheetsEmptyState`: when filtering by a course with no sheets, shows "No sheets for CS101 yet — Be the first to share" with contextual upload CTA
+- CSS: `.sheets-page__course-chips`, `.sheets-page__popular-list`, `.sheets-page__popular-row` with active/hover states
+
+#### Sub-cycle 41.3 — Content quality signals on cards/rows
+
+Added:
+
+- `computeSignalBadge()` helper: classifies sheets as "Popular" (>=10 stars or >=5 forks+3 stars), "Trending" (<=7 days + >=3 stars), "New" (<=3 days), or "Well used" (>=20 downloads)
+- `SIGNAL_BADGE_CONFIG` constant: label + CSS class for each signal type
+- Signal badges rendered inline after sheet title in `SheetListItem.jsx`
+- Fork lineage indicator: shows "Forked from {title} by {author}" below sheet title when `forkSource` exists
+- Status badges migrated from inline styles with hardcoded hex to CSS classes: `sheets-repo-row__status-badge--draft`, `--danger`, `--warning`, `--review` using CSS tokens
+- CSS: signal badge styles (`.sheets-repo-row__signal--popular/trending/new/well-used`), fork lineage styles, status badge class styles
+
+#### Sub-cycle 41.4 — Dashboard/feed engagement + collaboration polish
+
+Added:
+
+- "Your starred sheets — Recently updated" widget in `FeedAside`: shows top 5 recently-updated starred sheets with course, author, and time-ago metadata; links to `/sheets?starred=1`
+- `starredUpdates` state in `useFeedData`: fetches `GET /api/sheets?starred=1&sort=updatedAt&limit=5`, polled every 2min
+- Fork lineage visibility in dashboard `RecentSheets` widget: shows "Forked from {title} by {author}" when `forkSource` exists
+
+Changed:
+
+- Feed page alert banners migrated from hardcoded hex (`#fffbeb`, `#b45309`, `#fef2f2`, `#dc2626`) to CSS tokens (`var(--sh-warning-bg)`, `var(--sh-warning-text)`, `var(--sh-danger-bg)`, `var(--sh-danger-text)`)
+
+#### Sub-cycle 41.5 — Visual QA + validation + release notes
+
+Files changed:
+| File | Change |
+|------|--------|
+| `backend/src/modules/courses/courses.schools.controller.js` | New: GET /api/courses/popular endpoint |
+| `backend/src/modules/courses/courses.constants.js` | New: POPULAR_COURSES_LIMIT constant |
+| `backend/src/modules/sheets/sheets.list.controller.js` | Composite recommended sort algorithm |
+| `frontend/.../pages/sheets/sheetsPageConstants.js` | "Best" sort option, computeSignalBadge(), SIGNAL_BADGE_CONFIG |
+| `frontend/.../pages/sheets/useSheetsData.js` | Popular courses, recent courses, handleCourseFilter, recommended default |
+| `frontend/.../pages/sheets/SheetListItem.jsx` | Signal badges, fork lineage, status badge CSS classes |
+| `frontend/.../pages/sheets/SheetsAside.jsx` | Popular courses, recent courses, course discovery |
+| `frontend/.../pages/sheets/SheetsEmptyState.jsx` | Course-specific empty state |
+| `frontend/.../pages/sheets/SheetsPage.jsx` | Wire new data to aside + empty state |
+| `frontend/.../pages/sheets/SheetsPage.css` | Signal badges, fork lineage, popular courses, status badge CSS |
+| `frontend/.../components/Icons.jsx` | IconComment SVG |
+| `frontend/.../pages/feed/useFeedData.js` | starredUpdates loader |
+| `frontend/.../pages/feed/FeedPage.jsx` | Wire starredUpdates, fix alert hex colors |
+| `frontend/.../pages/feed/FeedAside.jsx` | Starred updates widget |
+| `frontend/.../pages/dashboard/DashboardWidgets.jsx` | Fork lineage in RecentSheets |
+
+Validation:
+
+- Frontend lint: 0 errors, 0 warnings
+- Frontend build: passes
+- Backend lint: 0 errors
+- Backend tests: 184/184 pass
+- Visual smoke: 34/36 pass (2 pre-existing sheet-viewer timeouts)
+- Gallery: 34 screenshots across 6 pages
+
+---
+
+## Cycle 42 — Sheet experience + collaboration depth + viewer reliability (2026-03-23)
+
+### 42.1 — Sheet Viewer Reliability and Stability
+
+Added:
+
+- Catch-all `**/api/**` route in mockStudyHubApi.js to prevent unmocked endpoints from causing network hangs in parallel tests
+- `courses/popular` route mock and complete `htmlWorkflow`/`contentFormat`/`status` fields on sheet mock object
+- Proper AbortController in HTML runtime fetch (replaces manual `cancelled` flag)
+- Catch-all registered FIRST in mockStudyHubApi.js for lowest priority in Playwright's LIFO route matching
+
+Changed:
+
+- Comments loading state: plain "Loading comments..." text → SkeletonCard shimmer
+- Secondary operations (star, react, fork, contribute, review) no longer set `sheetState.error` — use toast-only error display to prevent sheet-level banner pollution
+- Sheet viewer test timeout increased from 10s to 15s for mobile viewport resilience
+
+### 42.2 — Sheet Viewer Experience Polish
+
+Changed:
+
+- Full CSS token migration across 4 viewer files (~30+ hardcoded hex → CSS custom properties):
+  - `SheetViewerPage.jsx`: page bg, action buttons, headings, meta text, content box, comment form, comment items, contribute modal
+  - `SheetViewerSidebar.jsx`: stats headings, contribution buttons, attachment preview border, empty states
+  - `ContributionInlineDiff.jsx`: diff button, diff container, hunk headers, line highlights, segment highlights, mode toggle
+  - `useSheetViewer.js`: toast-only error pattern for secondary operations
+- All viewer colors now respond to dark mode via `[data-theme='dark']` token overrides
+
+### 42.3 — Collaboration and Contribution UX
+
+Added:
+
+- Fork lineage in viewer header now links to original sheet and shows author: "Forked from {title} by {author}" with clickable links
+- Collaboration summary section in sidebar: fork count, pending contributions count (warning-colored), accepted contributions count
+- "View version history" link in sidebar stats panel (links to Sheet Lab)
+- Improved empty contribution state: explains the fork→contribute workflow ("Fork this sheet, make edits, then use Contribute Back")
+
+### 42.4 — Continue Learning and Revisit Loop
+
+Added:
+
+- Related sheets fetching in `useSheetViewer.js`: loads up to 4 sheets from same course (sorted by stars, excluding current sheet) via existing `GET /api/sheets?courseId=X&limit=5&sort=stars` endpoint
+- "More from {course code}" / "Related sheets" section below comments with card-style links showing title, author, stars, forks
+- "Browse all {code} sheets →" link at bottom of related section
+
+### 42.5 — Commenting / Feedback Quality Pass
+
+Changed:
+
+- Comment heading now shows count: "Comments (N)" when comments exist
+- Comment placeholder changed from generic "Add a comment" to "Share a clarification, correction, or study tip…"
+- Empty comment state improved: centered layout with encouraging message ("Be the first to leave feedback — corrections, study tips, and clarifications help everyone.")
+
+### 42.6 — Visual QA + Validation
+
+Validation:
+
+- Frontend lint: 0 errors, 0 warnings
+- Frontend build: passes (257ms)
+- Backend lint: 0 errors
+- Backend tests: 184/184 pass
+- Visual smoke: 36/36 pass
+- Previously flaky sheet-viewer tests now stable (root cause: LIFO route matching + missing mocks)
+
+Files changed:
+
+| File | Change |
+| ---- | ------ |
+| `tests/helpers/mockStudyHubApi.js` | Catch-all route (LIFO-safe), courses/popular mock, complete sheet mock |
+| `tests/visual-smoke.spec.js` | Sheet viewer timeout 10s → 15s |
+| `frontend/.../pages/sheets/useSheetViewer.js` | AbortController fix, degraded-mode error isolation, related sheets fetch |
+| `frontend/.../pages/sheets/SheetViewerPage.jsx` | Full token migration, fork lineage links, related sheets, comment UX |
+| `frontend/.../pages/sheets/SheetViewerSidebar.jsx` | Token migration, collaboration section, version history link, contribution explainer |
+| `frontend/.../pages/sheets/ContributionInlineDiff.jsx` | Full token migration (diff colors, buttons, hunk headers) |
+| `frontend/.../pages/sheets/sheetViewerConstants.js` | No changes (already tokenized) |
+
+---
+
+## Cycle 43 — Study Continuity + Personal Workflow Value + Return-User Habit Loops [2026-03-24]
+
+Product objective: Make StudyHub feel like the user's personal study workspace — not just a content repository. Add study continuity signals (recently viewed, resume studying), personal value surfaces (study activity, what's-new, study queue), and return triggers (since-you-were-last-here, why-revisit signals).
+
+### 43.1 — Recently Viewed + Resume Studying
+
+Added:
+
+- `useRecentlyViewed` hook in `src/lib/useRecentlyViewed.js`: localStorage-based tracking, max 10 entries, cross-tab sync via visibilitychange
+- `recordSheetView()` function: captures id, title, courseCode, authorUsername, viewedAt on each sheet view
+- Sheet viewer integration: `useSheetViewer.js` records every sheet view on load via `useEffect`
+- `ResumeStudying` dashboard widget: shows up to 5 recently viewed sheets with title, course, author, relative time, purple clock icon
+- `IconClock` icon added to `Icons.jsx`
+- Feed aside "Resume studying" section: compact 3-item panel showing recently viewed sheets
+- `useRecentlyViewed` hook wired into `useDashboardData.js` and `FeedPage.jsx`
+
+### 43.2 — Personal Study Dashboard Value
+
+Added:
+
+- `StudyActivity` compact banner widget: shows "X sheets studied this week" with relative last-studied time, derived from localStorage recently-viewed data
+- "What's new" badge on Recent Sheets heading: blue pill showing "N new" sheets since last dashboard visit
+- Last dashboard visit tracking via localStorage (`studyhub.dashboard.lastVisit`)
+- Clickable stat cards: Courses → `/settings?tab=courses`, Sheets → `/sheets?mine=1`, Stars → `/sheets?starred=1`
+- `summaryCard()` helper updated with optional `to` link target
+
+Changed:
+
+- `StatCards` component renders each card as a `Link` when `to` is provided, with pointer cursor
+- `RecentSheets` accepts `newCount` prop for the "N new" badge
+- `recentSheets` wrapped in `useMemo` to fix `react-hooks/exhaustive-deps` warning
+
+### 43.3 — Save, Star, and Revisit Loop Polish
+
+Added:
+
+- "Why revisit" signals on starred sheets in FeedAside: comment count and fork count micro-badges (blue/green) below each starred sheet row
+- Star confirmation toast in sheet viewer: "Starred! Find it in your feed sidebar or browse starred sheets."
+
+### 43.4 — Personal Notes / Lightweight Study-Status Marker
+
+Added:
+
+- `useStudyStatus` hook in `src/lib/useStudyStatus.js`: localStorage-based per-sheet status marker (to-review, studying, done), cross-tab sync
+- `useAllStudyStatuses` hook: reads all statuses for dashboard display with counts and filtered lists
+- Study-status dropdown menu in sheet viewer action bar: three status options with colored dots, clear option, checkmark on active
+- `StudyQueue` dashboard widget: shows studying/to-review/done counts and up to 4 active items with status badges
+- Widget placed in dashboard right column alongside CourseFocus and QuickActions
+
+### 43.5 — Notifications / Return Triggers
+
+Added:
+
+- "Since your last visit" feed banner: blue info banner showing "N new posts since your last visit" at top of feed
+- Last feed visit tracking via localStorage (`studyhub.feed.lastVisit`), timestamp captured after feed loads
+- `newSinceLastVisit` computed value in `useFeedData.js` comparing feed item `createdAt` timestamps against stored last visit
+
+Verified:
+
+- Notification bell already has unread count badge with 30-second live polling — no changes needed
+
+### 43.6 — Visual QA + Validation
+
+Validation:
+
+- Frontend lint: 0 errors, 0 warnings
+- Frontend build: passes (273ms)
+- Backend lint: 0 errors
+- Backend tests: 184/184 pass
+- Visual smoke: 35/36 first run, 36/36 on targeted retry (1 transient tablet/dark race — same as Cycle 42)
+
+Files changed:
+
+| File | Change |
+| ---- | ------ |
+| `src/components/Icons.jsx` | Added `IconClock` |
+| `src/lib/useRecentlyViewed.js` | New: recently viewed localStorage hook |
+| `src/lib/useStudyStatus.js` | New: study-status localStorage hook |
+| `src/pages/sheets/useSheetViewer.js` | Record sheet view, study status hook, star toast |
+| `src/pages/sheets/SheetViewerPage.jsx` | Study-status dropdown menu in action bar |
+| `src/pages/dashboard/DashboardWidgets.jsx` | `ResumeStudying`, `StudyActivity`, `StudyQueue` widgets, clickable `StatCards`, `RecentSheets` new-count badge |
+| `src/pages/dashboard/DashboardPage.jsx` | Wire new widgets and data |
+| `src/pages/dashboard/useDashboardData.js` | `useRecentlyViewed`, `useAllStudyStatuses`, study activity, what's-new, last-visit tracking |
+| `src/pages/dashboard/dashboardConstants.js` | `summaryCard()` with optional `to` field |
+| `src/pages/feed/FeedPage.jsx` | `useRecentlyViewed`, since-last-visit banner, pass to FeedAside |
+| `src/pages/feed/FeedAside.jsx` | Recently viewed panel, why-revisit signals on starred sheets |
+| `src/pages/feed/useFeedData.js` | Last feed visit tracking, `newSinceLastVisit` |

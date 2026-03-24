@@ -8,6 +8,8 @@ import { fadeInUp } from '../../lib/animations'
 import { showToast } from '../../lib/toast'
 import { usePageTitle } from '../../lib/usePageTitle'
 import { trackEvent } from '../../lib/telemetry'
+import { recordSheetView } from '../../lib/useRecentlyViewed'
+import { useStudyStatus } from '../../lib/useStudyStatus'
 import { authHeaders, attachmentPreviewKind } from './sheetViewerConstants'
 
 export default function useSheetViewer() {
@@ -27,6 +29,7 @@ export default function useSheetViewer() {
   const [runtimeUrl, setRuntimeUrl] = useState('')
   const [runtimeLoading, setRuntimeLoading] = useState(false)
   const [htmlWarningAcked, setHtmlWarningAcked] = useState(false)
+  const [relatedSheets, setRelatedSheets] = useState([])
   const sheetPanelRef = useRef(null)
   const animatedRef = useRef(false)
 
@@ -37,7 +40,13 @@ export default function useSheetViewer() {
     if (sheetPanelRef.current) fadeInUp(sheetPanelRef.current, { duration: 450, y: 16 })
   }, [sheetState.loading, sheetState.sheet])
 
+  /* Record sheet view for recently-viewed tracking */
+  useEffect(() => {
+    if (sheetState.sheet) recordSheetView(sheetState.sheet)
+  }, [sheetState.sheet])
+
   const sheetId = Number.parseInt(id, 10)
+  const { studyStatus, setStudyStatus, STUDY_STATUSES } = useStudyStatus(sheetId)
 
   useEffect(() => {
     if (Number.isInteger(sheetId)) return
@@ -146,6 +155,25 @@ export default function useSheetViewer() {
   const previewKind = attachmentPreviewKind(sheet?.attachmentType, sheet?.attachmentName)
   const attachmentPreviewUrl = sheet?.id ? `${API}/api/sheets/${sheet.id}/attachment/preview` : ''
 
+  /* ── Related sheets (same course, exclude self) ─────────────── */
+  useEffect(() => {
+    if (!sheet?.course?.id || !sheet?.id) return
+    const controller = new AbortController()
+    fetch(`${API}/api/sheets?courseId=${sheet.course.id}&limit=5&sort=stars`, {
+      headers: authHeaders(),
+      credentials: 'include',
+      signal: controller.signal,
+    })
+      .then((r) => r.json().catch(() => ({})))
+      .then((data) => {
+        if (!controller.signal.aborted && Array.isArray(data.sheets)) {
+          setRelatedSheets(data.sheets.filter((s) => s.id !== sheet.id).slice(0, 4))
+        }
+      })
+      .catch(() => {})
+    return () => { controller.abort() }
+  }, [sheet?.course?.id, sheet?.id])
+
   /* ── HTML runtime URL + warning gate ──────────────────────── */
   useEffect(() => {
     if (!isHtmlSheet || !sheet?.id) return
@@ -155,19 +183,20 @@ export default function useSheetViewer() {
 
   useEffect(() => {
     if (!isHtmlSheet || !htmlWarningAcked || !sheet?.id) return
-    let cancelled = false
+    const controller = new AbortController()
     setRuntimeLoading(true)
     fetch(`${API}/api/sheets/${sheet.id}/html-runtime`, {
       headers: authHeaders(),
       credentials: 'include',
+      signal: controller.signal,
     })
       .then((r) => r.json().catch(() => ({})))
       .then((data) => {
-        if (!cancelled && data?.runtimeUrl) setRuntimeUrl(data.runtimeUrl)
+        if (!controller.signal.aborted && data?.runtimeUrl) setRuntimeUrl(data.runtimeUrl)
       })
       .catch(() => {})
-      .finally(() => { if (!cancelled) setRuntimeLoading(false) })
-    return () => { cancelled = true }
+      .finally(() => { if (!controller.signal.aborted) setRuntimeLoading(false) })
+    return () => { controller.abort() }
   }, [isHtmlSheet, htmlWarningAcked, sheet?.id])
 
   const acceptHtmlWarning = () => {
@@ -201,9 +230,9 @@ export default function useSheetViewer() {
         error: '',
       }))
       trackEvent(data.starred ? 'sheet_starred' : 'sheet_unstarred', { sheetId: sheet.id })
+      if (data.starred) showToast('Starred! Find it in your feed sidebar or browse starred sheets.', 'success')
     } catch (error) {
       showToast(error.message || 'Could not update the star.', 'error')
-      setSheetState((current) => ({ ...current, error: error.message || 'Could not update the star.' }))
     }
   }
 
@@ -227,7 +256,7 @@ export default function useSheetViewer() {
         error: '',
       }))
     } catch (error) {
-      setSheetState((current) => ({ ...current, error: error.message || 'Could not update the reaction.' }))
+      showToast(error.message || 'Could not update the reaction.', 'error')
     }
   }
 
@@ -248,7 +277,6 @@ export default function useSheetViewer() {
       navigate(`/sheets/${data.id}/edit`)
     } catch (error) {
       showToast(error.message || 'Could not fork this sheet.', 'error')
-      setSheetState((current) => ({ ...current, error: error.message }))
     } finally {
       setForking(false)
     }
@@ -281,7 +309,6 @@ export default function useSheetViewer() {
       loadSheet()
     } catch (error) {
       showToast(error.message || 'Could not submit contribution.', 'error')
-      setSheetState((current) => ({ ...current, error: error.message }))
     } finally {
       setContributing(false)
     }
@@ -303,7 +330,6 @@ export default function useSheetViewer() {
       loadSheet()
     } catch (error) {
       showToast(error.message, 'error')
-      setSheetState((current) => ({ ...current, error: error.message }))
     } finally {
       setReviewingId(null)
     }
@@ -387,6 +413,7 @@ export default function useSheetViewer() {
     runtimeUrl,
     runtimeLoading,
     htmlWarningAcked,
+    relatedSheets,
     sheetPanelRef,
     canEdit,
     isHtmlSheet,
@@ -402,5 +429,8 @@ export default function useSheetViewer() {
     handleReviewContribution,
     submitComment,
     deleteComment,
+    studyStatus,
+    setStudyStatus,
+    STUDY_STATUSES,
   }
 }

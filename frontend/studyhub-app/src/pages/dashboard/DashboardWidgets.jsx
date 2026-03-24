@@ -3,12 +3,14 @@
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { Link } from 'react-router-dom'
 import {
+  IconClock,
   IconNotes,
   IconProfile,
   IconSheets,
   IconTests,
   IconUpload,
 } from '../../components/Icons'
+import { timeAgo } from '../sheets/sheetsPageConstants'
 
 /* ── Empty state placeholder ─────────────────────────────────────────────── */
 export function EmptyState({ title, body, actionLabel, actionTo }) {
@@ -71,27 +73,85 @@ export function DashboardSkeleton() {
 export function StatCards({ statsRef, cards }) {
   return (
     <section ref={statsRef} className="dashboard-stats-grid" data-tutorial="dashboard-stats">
-      {cards.map((card) => (
+      {cards.map((card) => {
+        const Wrapper = card.to ? Link : 'div'
+        const wrapperProps = card.to ? { to: card.to, style: { textDecoration: 'none' } } : {}
+        return (
+          <Wrapper
+            key={card.label}
+            {...wrapperProps}
+          >
+            <div
+              style={{
+                background: 'var(--sh-surface)',
+                borderRadius: 16,
+                border: '1px solid var(--sh-border)',
+                padding: '18px 18px 20px',
+                boxShadow: '0 4px 20px rgba(15,23,42,0.04)',
+                cursor: card.to ? 'pointer' : 'default',
+              }}
+            >
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--sh-muted)', letterSpacing: '.08em', marginBottom: 10 }}>
+                {card.label.toUpperCase()}
+              </div>
+              <div data-stat-value={card.value} style={{ fontSize: 32, fontWeight: 800, color: card.accent, marginBottom: 4 }}>
+                {card.value}
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--sh-subtext)' }}>{card.helper}</div>
+            </div>
+          </Wrapper>
+        )
+      })}
+    </section>
+  )
+}
+
+/* ── Study activity compact banner ──────────────────────────────────────── */
+export function StudyActivity({ activity }) {
+  if (!activity) return null
+  return (
+    <div
+      style={{
+        background: 'var(--sh-surface)',
+        borderRadius: 14,
+        border: '1px solid var(--sh-border)',
+        padding: '14px 18px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+        flexWrap: 'wrap',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <div
-          key={card.label}
           style={{
-            background: 'var(--sh-surface)',
-            borderRadius: 16,
-            border: '1px solid var(--sh-border)',
-            padding: '18px 18px 20px',
-            boxShadow: '0 4px 20px rgba(15,23,42,0.04)',
+            width: 34,
+            height: 34,
+            borderRadius: 10,
+            background: 'linear-gradient(135deg, #ecfdf5, #d1fae5)',
+            color: '#059669',
+            display: 'grid',
+            placeItems: 'center',
           }}
         >
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--sh-muted)', letterSpacing: '.08em', marginBottom: 10 }}>
-            {card.label.toUpperCase()}
-          </div>
-          <div data-stat-value={card.value} style={{ fontSize: 32, fontWeight: 800, color: card.accent, marginBottom: 4 }}>
-            {card.value}
-          </div>
-          <div style={{ fontSize: 13, color: 'var(--sh-subtext)' }}>{card.helper}</div>
+          <IconClock size={16} />
         </div>
-      ))}
-    </section>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--sh-heading)' }}>
+            {activity.weeklyCount} {activity.weeklyCount === 1 ? 'sheet' : 'sheets'} studied this week
+          </div>
+          {activity.lastStudied ? (
+            <div style={{ fontSize: 12, color: 'var(--sh-muted)' }}>
+              Last studied {timeAgo(activity.lastStudied)}
+            </div>
+          ) : null}
+        </div>
+      </div>
+      <Link to="/sheets" style={{ fontSize: 12, fontWeight: 700, color: 'var(--sh-brand)', textDecoration: 'none' }}>
+        Find more →
+      </Link>
+    </div>
   )
 }
 
@@ -188,7 +248,7 @@ export function ActivationChecklist({ activation }) {
 }
 
 /* ── Recent sheets list ──────────────────────────────────────────────────── */
-export function RecentSheets({ recentSheets }) {
+export function RecentSheets({ recentSheets, newCount = 0 }) {
   return (
     <div
       style={{
@@ -199,11 +259,30 @@ export function RecentSheets({ recentSheets }) {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: 18, color: 'var(--sh-heading)' }}>Recent Sheets</h2>
-          <div style={{ fontSize: 12, color: 'var(--sh-muted)', marginTop: 4 }}>
-            Latest sheets from your enrolled courses.
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 18, color: 'var(--sh-heading)' }}>Recent Sheets</h2>
+            <div style={{ fontSize: 12, color: 'var(--sh-muted)', marginTop: 4 }}>
+              Latest sheets from your enrolled courses.
+            </div>
           </div>
+          {newCount > 0 ? (
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                padding: '2px 8px',
+                borderRadius: 999,
+                background: 'var(--sh-brand)',
+                color: '#fff',
+                fontSize: 11,
+                fontWeight: 800,
+                lineHeight: 1.6,
+              }}
+            >
+              {newCount} new
+            </span>
+          ) : null}
         </div>
         <Link to="/sheets" style={{ fontSize: 12, fontWeight: 700, color: 'var(--sh-brand)', textDecoration: 'none' }}>
           Browse all
@@ -268,6 +347,156 @@ export function RecentSheets({ recentSheets }) {
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+/* ── Resume studying widget ─────────────────────────────────────────────── */
+export function ResumeStudying({ entries }) {
+  if (!entries || entries.length === 0) return null
+  return (
+    <div
+      style={{
+        background: 'var(--sh-surface)',
+        borderRadius: 18,
+        border: '1px solid var(--sh-border)',
+        padding: '20px 22px',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 18, color: 'var(--sh-heading)' }}>Resume Studying</h2>
+          <div style={{ fontSize: 12, color: 'var(--sh-muted)', marginTop: 4 }}>
+            Pick up where you left off.
+          </div>
+        </div>
+        <Link to="/sheets" style={{ fontSize: 12, fontWeight: 700, color: 'var(--sh-brand)', textDecoration: 'none' }}>
+          Browse sheets
+        </Link>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {entries.slice(0, 5).map((entry) => (
+          <Link
+            key={entry.id}
+            to={`/sheets/${entry.id}`}
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '42px 1fr auto',
+              gap: 12,
+              alignItems: 'center',
+              padding: '14px 16px',
+              borderRadius: 14,
+              border: '1px solid var(--sh-border)',
+              textDecoration: 'none',
+              background: 'var(--sh-soft)',
+            }}
+          >
+            <div
+              style={{
+                width: 42,
+                height: 42,
+                borderRadius: 12,
+                background: 'linear-gradient(135deg, #faf5ff, #ede9fe)',
+                color: '#7c3aed',
+                display: 'grid',
+                placeItems: 'center',
+              }}
+            >
+              <IconClock size={18} />
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--sh-heading)', marginBottom: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {entry.title}
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--sh-subtext)' }}>
+                {entry.courseCode || 'General'} · by {entry.authorUsername || 'unknown'}
+              </div>
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--sh-muted)', textAlign: 'right', whiteSpace: 'nowrap' }}>
+              {timeAgo(entry.viewedAt)}
+            </div>
+          </Link>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/* ── Study queue widget ─────────────────────────────────────────────────── */
+export function StudyQueue({ counts, toReview, studying }) {
+  const items = [...studying, ...toReview].slice(0, 4)
+  if (items.length === 0 && counts.done === 0) return null
+  return (
+    <div
+      style={{
+        background: 'var(--sh-surface)',
+        borderRadius: 18,
+        border: '1px solid var(--sh-border)',
+        padding: '20px 22px',
+      }}
+    >
+      <h2 style={{ margin: '0 0 10px', fontSize: 18, color: 'var(--sh-heading)' }}>Study Queue</h2>
+      <div style={{ display: 'flex', gap: 12, marginBottom: items.length > 0 ? 14 : 0, flexWrap: 'wrap' }}>
+        {counts.studying > 0 ? (
+          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--sh-brand)' }}>
+            {counts.studying} studying
+          </span>
+        ) : null}
+        {counts.toReview > 0 ? (
+          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--sh-warning-text, #92400e)' }}>
+            {counts.toReview} to review
+          </span>
+        ) : null}
+        {counts.done > 0 ? (
+          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--sh-success-text)' }}>
+            {counts.done} done
+          </span>
+        ) : null}
+      </div>
+      {items.length > 0 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {items.map((entry) => (
+            <Link
+              key={entry.id}
+              to={`/sheets/${entry.id}`}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 10,
+                padding: '10px 12px',
+                borderRadius: 12,
+                border: '1px solid var(--sh-border)',
+                background: 'var(--sh-soft)',
+                textDecoration: 'none',
+              }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--sh-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {entry.title}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--sh-muted)' }}>
+                  {entry.courseCode || 'General'}
+                </div>
+              </div>
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 800,
+                  padding: '2px 7px',
+                  borderRadius: 999,
+                  background: entry.status === 'studying' ? 'var(--sh-info-bg)' : 'var(--sh-warning-bg)',
+                  color: entry.status === 'studying' ? 'var(--sh-brand)' : 'var(--sh-warning-text, #92400e)',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                }}
+              >
+                {entry.status === 'studying' ? 'Studying' : 'To review'}
+              </span>
+            </Link>
+          ))}
+        </div>
+      ) : null}
     </div>
   )
 }

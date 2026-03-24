@@ -78,6 +78,33 @@ Status: Planned | In Progress | Done | Deferred | Removed
 | Upload Scan Language Polish | Done | Supportive tierLabel names, HtmlScanModal/TutorialModal language rewrite (Cycle 40.3, 2026-03-23) |
 | Dashboard Full Dark Mode Tokens | Done | RecentSheets, CourseFocus, QuickActions, EmptyState, DashboardSkeleton migrated (Cycle 40.4, 2026-03-23) |
 | SheetsAside Browse Guidance | Done | Zero-enrollment CTA, upload CTA, better workflow copy (Cycle 40.4, 2026-03-23) |
+| Composite "Best" Ranking Sort | Done | `stars*3 + forks*2 + downloads + freshnessBonus` as default, in-memory scoring (Cycle 41.1, 2026-03-23) |
+| Comment Count on Sheet Rows | Done | IconComment + count display when > 0 (Cycle 41.1, 2026-03-23) |
+| Popular Courses Endpoint | Done | `GET /api/courses/popular` — top 8 by published sheet count (Cycle 41.2, 2026-03-23) |
+| Course Discovery Sidebar | Done | Popular courses ranked list + recent courses chips in SheetsAside (Cycle 41.2, 2026-03-23) |
+| Course-Specific Empty State | Done | Contextual "No sheets for {code}" with upload CTA (Cycle 41.2, 2026-03-23) |
+| Content Quality Signal Badges | Done | Popular, Trending, New, Well used badges on sheet rows (Cycle 41.3, 2026-03-23) |
+| Fork Lineage Indicators | Done | "Forked from {title} by {author}" on sheet rows + dashboard (Cycle 41.3-41.4, 2026-03-23) |
+| Starred Updates Feed Widget | Done | "Your starred sheets — Recently updated" in feed aside (Cycle 41.4, 2026-03-23) |
+| Feed Alert Token Migration | Done | Partial/error banners migrated from hardcoded hex to CSS tokens (Cycle 41.4, 2026-03-23) |
+| Sheet Viewer Reliability (Mock + AbortController) | Done | Catch-all LIFO-safe mock route, AbortController in HTML runtime fetch, complete mock fields (Cycle 42.1, 2026-03-23) |
+| Sheet Viewer Degraded-Mode Isolation | Done | Secondary ops (star/react/fork/contribute) use toast-only errors, SkeletonCard for comments loading (Cycle 42.1, 2026-03-23) |
+| Sheet Viewer CSS Token Migration | Done | ~30+ hardcoded hex → CSS tokens across SheetViewerPage, Sidebar, ContributionInlineDiff (Cycle 42.2, 2026-03-23) |
+| Viewer Fork Lineage Links | Done | Clickable links to original sheet + author in viewer header and sidebar (Cycle 42.3, 2026-03-23) |
+| Viewer Collaboration Summary | Done | Sidebar section with fork count, pending/accepted contributions, version history link (Cycle 42.3, 2026-03-23) |
+| Related Sheets Section | Done | "More from {course}" block below comments, up to 4 same-course sheets sorted by stars (Cycle 42.4, 2026-03-23) |
+| Comment UX Improvements | Done | Count in heading, encouraging empty state, study-tip-oriented placeholder (Cycle 42.5, 2026-03-23) |
+| Recently Viewed Tracking (localStorage) | Done | `useRecentlyViewed` hook, `recordSheetView()`, max 10 entries, cross-tab sync (Cycle 43.1, 2026-03-24) |
+| Resume Studying Dashboard Widget | Done | Up to 5 recently viewed sheets in dashboard + 3 in feed aside (Cycle 43.1, 2026-03-24) |
+| Study Activity Banner | Done | "X sheets studied this week" + "Last studied" derived from localStorage (Cycle 43.2, 2026-03-24) |
+| Dashboard "What's New" Badge | Done | "N new" pill on Recent Sheets heading, tracks via localStorage lastVisit (Cycle 43.2, 2026-03-24) |
+| Clickable Stat Cards | Done | Courses/Sheets/Stars link to relevant filtered pages (Cycle 43.2, 2026-03-24) |
+| Starred Sheet "Why Revisit" Signals | Done | Comment count + fork count badges on starred updates in feed aside (Cycle 43.3, 2026-03-24) |
+| Star Confirmation Toast | Done | "Starred! Find it in your feed sidebar…" message on star action (Cycle 43.3, 2026-03-24) |
+| Study-Status Marker (localStorage) | Done | `useStudyStatus` hook, to-review/studying/done states, cross-tab sync (Cycle 43.4, 2026-03-24) |
+| Study-Status Viewer Dropdown | Done | Dropdown menu in sheet viewer action bar with colored indicators (Cycle 43.4, 2026-03-24) |
+| Study Queue Dashboard Widget | Done | Studying/to-review/done counts + active item list (Cycle 43.4, 2026-03-24) |
+| "Since Your Last Visit" Feed Banner | Done | "N new posts since your last visit" with localStorage tracking (Cycle 43.5, 2026-03-24) |
 | Feature Flags System | Planned | OpenFeature-compatible |
 | PWA Offline Support | Planned | Downloaded study sheets |
 | WebAuthn Passkeys | Planned | Admin/power users optional |

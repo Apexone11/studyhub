@@ -29,6 +29,7 @@ import FeedComposer from './FeedComposer'
 import FeedCard from './FeedCard'
 import FeedAside from './FeedAside'
 import { useFeedData } from './useFeedData'
+import { useRecentlyViewed } from '../../lib/useRecentlyViewed'
 
 export default function FeedPage() {
   usePageTitle('Feed')
@@ -41,6 +42,7 @@ export default function FeedPage() {
 
   const {
     feedState, leaderboards, starredUpdates, loadingMore, deletingPostIds,
+    newSinceLastVisit,
     loadMoreFeed, toggleReaction, toggleStar,
     canDeletePost, deletePost, submitPost, retryFeed,
   } = useFeedData({ user, clearSession, search })
@@ -50,6 +52,7 @@ export default function FeedPage() {
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [openPostMenuId, setOpenPostMenuId] = useState(null)
 
+  const { recentlyViewed } = useRecentlyViewed()
   const tutorial = useTutorial('feed', FEED_STEPS)
 
   const setQueryParam = useCallback((key, value) => {
@@ -93,6 +96,25 @@ export default function FeedPage() {
 
             <main id="main-content" style={{ display: 'grid', gap: 18 }}>
               <GettingStartedCard user={user} />
+              {newSinceLastVisit > 0 ? (
+                <div
+                  style={{
+                    background: 'var(--sh-info-bg)',
+                    border: '1px solid var(--sh-info-border)',
+                    borderRadius: 12,
+                    padding: '10px 14px',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: 'var(--sh-brand)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                  }}
+                >
+                  <span style={{ fontSize: 15 }}>&#9679;</span>
+                  {newSinceLastVisit} new {newSinceLastVisit === 1 ? 'post' : 'posts'} since your last visit
+                </div>
+              ) : null}
               <div data-tutorial="feed-composer">
                 <Panel title="Share with your classmates" helper="Post class notes, course questions, or links to your latest sheet.">
                   <FeedComposer user={user} onSubmitPost={submitPost} />
@@ -152,7 +174,7 @@ export default function FeedPage() {
               )}
             </main>
 
-            <FeedAside leaderboards={leaderboards} starredUpdates={starredUpdates} />
+            <FeedAside leaderboards={leaderboards} starredUpdates={starredUpdates} recentlyViewed={recentlyViewed} />
           </div>
         </div>
       </div>
