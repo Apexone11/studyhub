@@ -18,6 +18,7 @@ import { useTutorial } from '../../lib/useTutorial'
 import { PROFILE_STEPS } from '../../lib/tutorialSteps'
 import { fadeInUp, staggerEntrance } from '../../lib/animations'
 import AvatarCropModal from '../../components/AvatarCropModal'
+import ActivityHeatmap from '../../components/ActivityHeatmap'
 import { showToast } from '../../lib/toast'
 import { usePageTitle } from '../../lib/usePageTitle'
 
@@ -26,6 +27,8 @@ import {
   ProfileAvatar,
   ProfileStatsRow,
   ProfileActionButtons,
+  BadgesSection,
+  PinnedSheetsSection,
   RecentSheetsSection,
   SharedNotesSection,
   StarredSheetsSection,
@@ -50,6 +53,8 @@ export default function UserProfilePage() {
   const [followList, setFollowList] = useState([])
   const [followListLoading, setFollowListLoading] = useState(false)
 
+  const [activityData, setActivityData] = useState([])
+  const [badges, setBadges] = useState([])
   const isOwnProfile = currentUser?.username === username
   const [showAvatarCrop, setShowAvatarCrop] = useState(false)
   const tutorial = useTutorial('profile', PROFILE_STEPS)
@@ -101,6 +106,26 @@ export default function UserProfilePage() {
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
   }, [username])
+
+  /* ── Load activity heatmap + badges data ─────────────────────────────── */
+  useEffect(() => {
+    if (!profile) return
+    fetch(`${API}/api/users/${username}/activity?weeks=12`, {
+      headers: authHeaders(),
+      credentials: 'include',
+    })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => { if (Array.isArray(data)) setActivityData(data) })
+      .catch(() => {})
+
+    fetch(`${API}/api/users/${username}/badges`, {
+      headers: authHeaders(),
+      credentials: 'include',
+    })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => { if (Array.isArray(data)) setBadges(data) })
+      .catch(() => {})
+  }, [profile, username])
 
   /* ── Follow/Unfollow toggle ──────────────────────────────────────────── */
   async function handleFollowToggle() {
@@ -167,48 +192,85 @@ export default function UserProfilePage() {
       <Navbar crumbs={[{ label: profile.username, to: `/users/${username}` }]} hideTabs />
 
       <div style={containerStyle}>
-        {/* ── Profile card ─────────────────────────────────────────────── */}
-        <div ref={profileCardRef} style={{ background: 'var(--sh-surface)', borderRadius: 18, border: '1px solid var(--sh-border)', padding: 'clamp(20px, 3vw, 28px)', marginBottom: 20, boxShadow: 'var(--shadow-sm, 0 2px 10px rgba(15,23,42,0.05))' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'clamp(14px, 2vw, 20px)', flexWrap: 'wrap' }}>
-            <ProfileAvatar
-              profile={profile}
-              initials={initials}
-              isOwnProfile={isOwnProfile}
-              onAvatarClick={() => setShowAvatarCrop(true)}
-            />
+        {/* ── Profile card with cover ──────────────────────────────────── */}
+        <div ref={profileCardRef} style={{ background: 'var(--sh-surface)', borderRadius: 18, border: '1px solid var(--sh-border)', overflow: 'hidden', marginBottom: 20, boxShadow: 'var(--shadow-sm, 0 2px 10px rgba(15,23,42,0.05))' }}>
+          {/* Cover banner */}
+          <div style={{
+            position: 'relative',
+            height: profile.coverImageUrl ? 'clamp(120px, 18vw, 180px)' : 72,
+            background: profile.coverImageUrl ? 'var(--sh-slate-900)' : 'linear-gradient(135deg, var(--sh-brand), var(--sh-brand-soft, #818cf8))',
+            transition: 'height 0.3s ease',
+          }}>
+            {profile.coverImageUrl && (
+              <img
+                src={profile.coverImageUrl.startsWith('http') ? profile.coverImageUrl : `${API}${profile.coverImageUrl}`}
+                alt=""
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              />
+            )}
+            {/* Gradient overlay for contrast-safe text */}
+            <div style={{
+              position: 'absolute', inset: 0,
+              background: profile.coverImageUrl
+                ? 'linear-gradient(to top, rgba(15,23,42,0.7) 0%, rgba(15,23,42,0.15) 60%, transparent 100%)'
+                : 'none',
+              pointerEvents: 'none',
+            }} />
+          </div>
 
-            {/* Info column */}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
-                <h1 style={{ margin: 0, fontSize: 'clamp(18px, 2.5vw, 22px)', fontWeight: 800, color: 'var(--sh-heading)' }}>{profile.username}</h1>
-                {profile.role === 'admin'
-                  ? <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 99, background: 'var(--sh-warning-bg, #fef9ec)', color: 'var(--sh-warning-text, #92400e)', border: '1px solid var(--sh-warning-border, #fde68a)' }}>Admin</span>
-                  : <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 99, background: 'var(--sh-pill-bg)', color: 'var(--sh-pill-text)', border: '1px solid var(--sh-brand-soft)' }}>Student</span>
-                }
-              </div>
-              <div style={{ fontSize: 13, color: 'var(--sh-muted)', marginBottom: 16 }}>
-                Joined {fmtDate(profile.createdAt)}
+          {/* Profile info section — avatar overlaps cover */}
+          <div style={{ padding: 'clamp(0px, 1vw, 4px) clamp(20px, 3vw, 28px) clamp(20px, 3vw, 28px)', marginTop: -40 }}>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 'clamp(14px, 2vw, 20px)', flexWrap: 'wrap', marginBottom: 12 }}>
+              <div style={{ position: 'relative', zIndex: 2, border: '3px solid var(--sh-surface)', borderRadius: '50%', lineHeight: 0 }}>
+                <ProfileAvatar
+                  profile={profile}
+                  initials={initials}
+                  isOwnProfile={isOwnProfile}
+                  onAvatarClick={() => setShowAvatarCrop(true)}
+                />
               </div>
 
-              <ProfileStatsRow
-                profile={profile}
-                followers={followers}
-                onLoadFollowList={loadFollowList}
+              <div style={{ flex: 1, minWidth: 0, paddingTop: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
+                  <h1 style={{ margin: 0, fontSize: 'clamp(18px, 2.5vw, 22px)', fontWeight: 800, color: 'var(--sh-heading)' }}>{profile.username}</h1>
+                  {profile.role === 'admin'
+                    ? <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 99, background: 'var(--sh-warning-bg, #fef9ec)', color: 'var(--sh-warning-text, #92400e)', border: '1px solid var(--sh-warning-border, #fde68a)' }}>Admin</span>
+                    : <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 99, background: 'var(--sh-pill-bg)', color: 'var(--sh-pill-text)', border: '1px solid var(--sh-brand-soft)' }}>Student</span>
+                  }
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--sh-muted)', marginBottom: 16 }}>
+                  Joined {fmtDate(profile.createdAt)}
+                </div>
+
+                <ProfileStatsRow
+                  profile={profile}
+                  followers={followers}
+                  onLoadFollowList={loadFollowList}
+                />
+              </div>
+
+              <ProfileActionButtons
+                isOwnProfile={isOwnProfile}
+                currentUser={currentUser}
+                following={following}
+                toggling={toggling}
+                onFollowToggle={handleFollowToggle}
               />
             </div>
-
-            <ProfileActionButtons
-              isOwnProfile={isOwnProfile}
-              currentUser={currentUser}
-              following={following}
-              toggling={toggling}
-              onFollowToggle={handleFollowToggle}
-            />
           </div>
         </div>
 
+        {/* ── Activity heatmap ─────────────────────────────────────────── */}
+        {activityData.length > 0 && (
+          <div style={{ background: 'var(--sh-surface)', borderRadius: 18, border: '1px solid var(--sh-border)', padding: 'clamp(16px, 2vw, 24px)', marginBottom: 20, boxShadow: 'var(--shadow-sm, 0 2px 10px rgba(15,23,42,0.05))' }}>
+            <ActivityHeatmap data={activityData} weeks={12} />
+          </div>
+        )}
+
         {/* ── Two-column content: sheets | courses ─────────────────────── */}
         <div ref={columnsRef} className="profile-columns">
+          <BadgesSection badges={badges} />
+          <PinnedSheetsSection sheets={profile.pinnedSheets} />
           <RecentSheetsSection sheets={profile.recentSheets} />
           <SharedNotesSection notes={profile.sharedNotes} />
           <StarredSheetsSection sheets={profile.starredSheets} isOwnProfile={isOwnProfile} />

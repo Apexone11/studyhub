@@ -145,6 +145,9 @@ app.use((req, res, next) => {
     res.setHeader('Content-Security-Policy', previewSurfaceCsp)
     res.setHeader('Referrer-Policy', 'no-referrer')
     res.removeHeader('X-Frame-Options')
+    // Pass computed frame-ancestors to preview route handlers so they can
+    // include it when they override CSP with route-specific directives.
+    res.locals.frameAncestorsDirective = `frame-ancestors ${previewFrameAncestors.length > 0 ? previewFrameAncestors.join(' ') : "'none'"}`
   } else {
     res.setHeader('Content-Security-Policy', appSurfaceCsp)
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin')

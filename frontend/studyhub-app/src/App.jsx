@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect, useRef } from 'react'
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom'
 import { GoogleOAuthProvider } from '@react-oauth/google'
 import {
   trackPageView,
@@ -58,6 +58,11 @@ function PrivateRoute({ children }) {
   if (!isAuthenticated) return <Navigate to="/login" replace />
 
   return <RouteErrorBoundary>{children}</RouteErrorBoundary>
+}
+
+function EditRedirect() {
+  const { id } = useParams()
+  return <Navigate to={`/sheets/${id}/lab`} replace />
 }
 
 /* Route-change announcer for screen readers */
@@ -173,7 +178,7 @@ function AppRoutes() {
             <Route path="/feed"          element={<PrivateRoute><FeedPage /></PrivateRoute>} />
             <Route path="/sheets"        element={<PrivateRoute><SheetsPage /></PrivateRoute>} />
             <Route path="/sheets/upload" element={<PrivateRoute><UploadSheetPage /></PrivateRoute>} />
-            <Route path="/sheets/:id/edit" element={<PrivateRoute><UploadSheetPage /></PrivateRoute>} />
+            <Route path="/sheets/:id/edit" element={<PrivateRoute><EditRedirect /></PrivateRoute>} />
             <Route path="/sheets/:id/lab" element={<PrivateRoute><SheetLabPage /></PrivateRoute>} />
             <Route path="/sheets/:id"    element={<PrivateRoute><SheetViewerPage /></PrivateRoute>} />
             <Route path="/sheets/preview/html/:id" element={<PrivateRoute><SheetHtmlPreviewPage /></PrivateRoute>} />

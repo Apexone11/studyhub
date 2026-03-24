@@ -8,6 +8,8 @@ const { isModerationEnabled, scanContent } = require('../../lib/moderationEngine
 const { createProvenanceToken } = require('../../lib/provenance')
 const { isHtmlUploadsEnabled } = require('../../lib/htmlKillSwitch')
 const { SHEET_STATUS, sheetWriteLimiter } = require('./sheets.constants')
+const { trackActivity } = require('../../lib/activityTracker')
+const { checkAndAwardBadges } = require('../../lib/badges')
 const {
   resolveNextSheetStatus,
   normalizeContentFormat,
@@ -67,6 +69,9 @@ router.post('/', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (re
         htmlVersions: true,
       },
     })
+
+    trackActivity(prisma, req.user.userId, 'sheets')
+    checkAndAwardBadges(prisma, req.user.userId)
 
     res.status(201).json({
       ...serializeSheet(sheet),

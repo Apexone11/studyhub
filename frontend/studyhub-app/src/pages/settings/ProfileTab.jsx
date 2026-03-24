@@ -1,16 +1,92 @@
 import { useState } from 'react'
 import AvatarCropModal from '../../components/AvatarCropModal'
+import CoverCropModal from '../../components/CoverCropModal'
 import { API } from '../../config'
+import { readJsonSafely } from '../../lib/http'
 import { SectionCard } from './settingsShared'
 
-export default function ProfileTab({ user, sessionUser, onAvatarChange }) {
+export default function ProfileTab({ user, sessionUser, onAvatarChange, onCoverChange }) {
   const [showCrop, setShowCrop] = useState(false)
+  const [showCoverCrop, setShowCoverCrop] = useState(false)
   const [imgError, setImgError] = useState(false)
+  const [coverImgError, setCoverImgError] = useState(false)
+  const [removingCover, setRemovingCover] = useState(false)
   const avatarUrl = user?.avatarUrl || sessionUser?.avatarUrl
+  const coverUrl = user?.coverImageUrl || sessionUser?.coverImageUrl
   const initials = (user?.username || '??').slice(0, 2).toUpperCase()
+
+  async function handleRemoveCover() {
+    setRemovingCover(true)
+    try {
+      const response = await fetch(`${API}/api/upload/cover`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      const data = await readJsonSafely(response, {})
+      if (response.ok) {
+        if (onCoverChange) onCoverChange(data.coverImageUrl)
+      }
+    } catch {
+      // silent
+    } finally {
+      setRemovingCover(false)
+    }
+  }
 
   return (
     <>
+      <SectionCard title="Cover Image" subtitle="Add a banner image to your profile page.">
+        <div style={{ borderRadius: 14, overflow: 'hidden', border: '1px solid var(--sh-border)', marginBottom: 14 }}>
+          {coverUrl && !coverImgError ? (
+            <img
+              src={coverUrl.startsWith('http') ? coverUrl : `${API}${coverUrl}`}
+              alt="Profile cover"
+              onError={() => setCoverImgError(true)}
+              style={{ width: '100%', height: 120, objectFit: 'cover', display: 'block' }}
+            />
+          ) : (
+            <div style={{ width: '100%', height: 120, background: 'var(--sh-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ fontSize: 13, color: 'var(--sh-muted)', fontWeight: 600 }}>No cover image</span>
+            </div>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button
+            type="button"
+            onClick={() => setShowCoverCrop(true)}
+            style={{
+              padding: '9px 18px', borderRadius: 10, border: 'none',
+              background: 'var(--sh-brand)', color: '#fff',
+              fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              fontFamily: 'inherit',
+            }}
+          >
+            {coverUrl ? 'Change cover' : 'Upload cover'}
+          </button>
+          {coverUrl && (
+            <button
+              type="button"
+              disabled={removingCover}
+              onClick={handleRemoveCover}
+              style={{
+                padding: '9px 18px', borderRadius: 10,
+                border: '1px solid var(--sh-danger-border)',
+                background: 'var(--sh-danger-bg)', color: 'var(--sh-danger)',
+                fontSize: 13, fontWeight: 700,
+                cursor: removingCover ? 'not-allowed' : 'pointer',
+                opacity: removingCover ? 0.6 : 1,
+                fontFamily: 'inherit',
+              }}
+            >
+              {removingCover ? 'Removing\u2026' : 'Remove cover'}
+            </button>
+          )}
+        </div>
+        <p style={{ margin: '8px 0 0', fontSize: 11, color: 'var(--sh-muted)' }}>
+          JPG, PNG, or WebP. Max 8 MB. Cropped to 16:5 banner ratio.
+        </p>
+      </SectionCard>
+
       <SectionCard title="Profile Photo" subtitle="Upload a photo so other students can recognize you.">
         <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
           <div
@@ -73,6 +149,16 @@ export default function ProfileTab({ user, sessionUser, onAvatarChange }) {
           onClose={() => setShowCrop(false)}
           onUploaded={(newUrl) => {
             if (onAvatarChange) onAvatarChange(newUrl)
+          }}
+        />
+      )}
+
+      {showCoverCrop && (
+        <CoverCropModal
+          onClose={() => setShowCoverCrop(false)}
+          onUploaded={(newUrl) => {
+            setCoverImgError(false)
+            if (onCoverChange) onCoverChange(newUrl)
           }}
         />
       )}

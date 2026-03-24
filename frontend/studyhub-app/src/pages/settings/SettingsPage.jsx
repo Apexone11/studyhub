@@ -159,7 +159,14 @@ export default function SettingsPage() {
   function renderTab() {
     switch (tab) {
       case 'profile':
-        return <ProfileTab user={user} sessionUser={sessionUser} onAvatarChange={(url) => { setUser((u) => u ? { ...u, avatarUrl: url } : u); setSessionUser((u) => u ? { ...u, avatarUrl: url } : u) }} />
+        return (
+          <ProfileTab
+            user={user}
+            sessionUser={sessionUser}
+            onAvatarChange={(url) => { setUser((u) => u ? { ...u, avatarUrl: url } : u); setSessionUser((u) => u ? { ...u, avatarUrl: url } : u) }}
+            onCoverChange={(url) => { setUser((u) => u ? { ...u, coverImageUrl: url } : u); setSessionUser((u) => u ? { ...u, coverImageUrl: url } : u) }}
+          />
+        )
       case 'security':
         return (
           <SecurityTab

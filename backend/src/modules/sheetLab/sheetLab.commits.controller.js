@@ -4,6 +4,8 @@ const { assertOwnerOrAdmin } = require('../../lib/accessControl')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
 const { optionalAuth, canReadSheet, parsePositiveInt, computeChecksum } = require('./sheetLab.constants')
+const { trackActivity } = require('../../lib/activityTracker')
+const { checkAndAwardBadges } = require('../../lib/badges')
 
 const router = express.Router()
 
@@ -34,6 +36,7 @@ router.get('/:id/lab/commits', optionalAuth, async (req, res) => {
         select: {
           id: true,
           message: true,
+          kind: true,
           checksum: true,
           contentFormat: true,
           parentId: true,
@@ -150,6 +153,9 @@ router.post('/:id/lab/commits', requireAuth, async (req, res) => {
         author: { select: { id: true, username: true, avatarUrl: true } },
       },
     })
+
+    trackActivity(prisma, req.user.userId, 'commits')
+    checkAndAwardBadges(prisma, req.user.userId)
 
     res.status(201).json({
       commit: {

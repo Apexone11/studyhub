@@ -11,10 +11,13 @@ const prisma = require('../../lib/prisma')
 const {
   ATTACHMENTS_DIR,
   AVATARS_DIR,
+  COVERS_DIR,
   buildAttachmentUrl,
   buildAvatarUrl,
+  buildCoverUrl,
   cleanupAttachmentIfUnused,
   cleanupAvatarIfUnused,
+  cleanupCoverIfUnused,
   safeUnlinkFile,
 } = require('../../lib/storage')
 
@@ -125,6 +128,109 @@ router.post('/avatar', requireAuth, avatarUploadLimiter, (req, res) => {
       return sendError(res, 500, 'Failed to save avatar.', ERROR_CODES.UPLOAD_SAVE_FAILED)
     }
   })
+})
+
+// ── Cover image upload ───────────────────────────────────────
+const COVER_ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp'])
+const COVER_ALLOWED_EXT  = new Set(['.jpg', '.jpeg', '.png', '.webp'])
+const COVER_MAX_BYTES    = 8 * 1024 * 1024   // 8 MB
+
+const coverUploadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: 'Too many cover uploads. Please wait a bit.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
+const coverStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, COVERS_DIR),
+  filename: (req, file, cb) => cb(null, `cover-${req.user.userId}-${safeName(file.originalname)}`),
+})
+
+const coverUpload = multer({
+  storage: coverStorage,
+  limits: { fileSize: COVER_MAX_BYTES },
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase()
+    if (!COVER_ALLOWED_MIME.has(file.mimetype) || !COVER_ALLOWED_EXT.has(ext)) {
+      return cb(new Error('Cover image must be a JPEG, PNG, or WebP image.'))
+    }
+    cb(null, true)
+  },
+})
+
+// POST /api/upload/cover
+router.post('/cover', requireAuth, coverUploadLimiter, (req, res) => {
+  coverUpload.single('cover')(req, res, async (err) => {
+    if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+      return sendError(res, 400, 'Cover image must be 8 MB or smaller.', ERROR_CODES.UPLOAD_INVALID)
+    }
+    if (err) return sendError(res, 400, err.message, ERROR_CODES.UPLOAD_INVALID)
+    if (!req.file) return sendError(res, 400, 'No file uploaded.', ERROR_CODES.UPLOAD_MISSING_FILE)
+    if (!signatureMatchesExpected(req.file.path, Array.from(COVER_ALLOWED_MIME)).ok) {
+      return rejectSignatureMismatch(res, req.file, 'Cover image contents do not match a supported image format.')
+    }
+    const coverMagic = validateMagicBytes(req.file.path, req.file.mimetype)
+    if (!coverMagic.valid) {
+      return rejectSignatureMismatch(res, req.file,
+        `Cover file signature does not match declared type (detected: ${coverMagic.detectedType || 'unknown'}, declared: ${coverMagic.declaredType}).`)
+    }
+
+    try {
+      const oldUser = await prisma.user.findUnique({
+        where: { id: req.user.userId },
+        select: { coverImageUrl: true },
+      })
+
+      const coverImageUrl = buildCoverUrl(req.file.filename)
+      const user = await prisma.user.update({
+        where: { id: req.user.userId },
+        data: { coverImageUrl },
+        select: { id: true, username: true, coverImageUrl: true },
+      })
+
+      await cleanupCoverIfUnused(prisma, oldUser?.coverImageUrl, {
+        route: req.originalUrl,
+        userId: req.user.userId,
+      })
+
+      res.json({ coverImageUrl: user.coverImageUrl })
+    } catch (dbErr) {
+      safeUnlinkFile(req.file?.path)
+      captureError(dbErr, { route: req.originalUrl })
+      return sendError(res, 500, 'Failed to save cover image.', ERROR_CODES.UPLOAD_SAVE_FAILED)
+    }
+  })
+})
+
+// DELETE /api/upload/cover
+router.delete('/cover', requireAuth, async (req, res) => {
+  try {
+    const oldUser = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: { coverImageUrl: true },
+    })
+
+    if (!oldUser?.coverImageUrl) {
+      return res.json({ coverImageUrl: null })
+    }
+
+    await prisma.user.update({
+      where: { id: req.user.userId },
+      data: { coverImageUrl: null },
+    })
+
+    await cleanupCoverIfUnused(prisma, oldUser.coverImageUrl, {
+      route: req.originalUrl,
+      userId: req.user.userId,
+    })
+
+    res.json({ coverImageUrl: null })
+  } catch (error) {
+    captureError(error, { route: req.originalUrl })
+    return sendError(res, 500, 'Failed to remove cover image.', ERROR_CODES.UPLOAD_SAVE_FAILED)
+  }
 })
 
 // ── Sheet attachment upload ───────────────────────────────────

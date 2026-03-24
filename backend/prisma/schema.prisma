@@ -19,6 +19,7 @@ model User {
   failedAttempts Int       @default(0)
   lockedUntil    DateTime?
   avatarUrl      String?
+  coverImageUrl  String?
   twoFaEnabled   Boolean   @default(false)
   twoFaCode      String?
   twoFaExpiry    DateTime?
@@ -56,6 +57,9 @@ model User {
   sheetCommits               SheetCommit[]
   webauthnCredentials        WebAuthnCredential[]
   reviewedSheets             StudySheet[] @relation("SheetReviewer")
+  pinnedSheets               UserPinnedSheet[]
+  dailyActivity              UserDailyActivity[]
+  badges                     UserBadge[]
 }
 
 model School {
@@ -112,6 +116,7 @@ model StudySheet {
   courseId  Int
   userId    Int
   forkOf    Int?
+  rootSheetId Int?
   stars     Int      @default(0)
   downloads Int      @default(0)
   forks          Int      @default(0)
@@ -136,6 +141,7 @@ model StudySheet {
   htmlVersions SheetHtmlVersion[]
   commits      SheetCommit[]
   provenance   ProvenanceManifest?
+  pinnedBy     UserPinnedSheet[]
 
   @@index([createdAt(sort: Desc)])
   @@index([courseId, createdAt(sort: Desc)])
@@ -508,6 +514,7 @@ model SheetCommit {
   id            Int       @id @default(autoincrement())
   sheetId       Int
   userId        Int
+  kind          String    @default("snapshot")
   message       String    @default("")
   content       String
   contentFormat String    @default("markdown")
@@ -535,6 +542,61 @@ model ProvenanceManifest {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   sheet          StudySheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+}
+
+// ── Profile: pinned sheets ──────────────────────────────────
+model UserPinnedSheet {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  sheetId   Int
+  position  Int       @default(0)
+  pinnedAt  DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sheet     StudySheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, sheetId])
+  @@index([userId, position])
+}
+
+// ── Profile: daily activity for contribution graph ──────────
+model UserDailyActivity {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  date      DateTime @db.Date
+  commits   Int      @default(0)
+  sheets    Int      @default(0)
+  reviews   Int      @default(0)
+  comments  Int      @default(0)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId, date(sort: Desc)])
+}
+
+// ── Achievements: badge catalog & unlocks ───────────────────
+model Badge {
+  id          Int         @id @default(autoincrement())
+  slug        String      @unique
+  name        String
+  description String
+  category    String
+  tier        String      @default("bronze")
+  iconUrl     String?
+  threshold   Int         @default(1)
+  createdAt   DateTime    @default(now())
+  unlocks     UserBadge[]
+}
+
+model UserBadge {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  badgeId    Int
+  unlockedAt DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge      Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeId])
+  @@index([userId, unlockedAt(sort: Desc)])
 }
 
 // ── Feature flags ───────────────────────────────────────────

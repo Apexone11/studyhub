@@ -166,6 +166,7 @@ async function getAuthenticatedUser(userId) {
       email: true,
       emailVerified: true,
       avatarUrl: true,
+      coverImageUrl: true,
       authProvider: true,
       createdAt: true,
       enrollments: {

@@ -372,8 +372,8 @@ export default function useSheetsData() {
       if (!response.ok) {
         throw new Error(data.error || 'Could not fork this sheet.')
       }
-      showToast('Sheet forked! Redirecting to editor\u2026', 'success')
-      navigate(`/sheets/${data.id}/edit`)
+      showToast('Sheet forked! Opening in SheetLab\u2026', 'success')
+      navigate(`/sheets/${data.id}/lab`)
     } catch (error) {
       showToast(error.message || 'Could not fork this sheet.', 'error')
     } finally {

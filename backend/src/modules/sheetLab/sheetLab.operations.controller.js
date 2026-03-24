@@ -8,6 +8,146 @@ const { optionalAuth, canReadSheet, parsePositiveInt, computeChecksum } = requir
 
 const router = express.Router()
 
+// ── POST /api/sheets/:id/lab/sync-upstream — pull latest content from the original sheet into this fork ──
+
+router.post('/:id/lab/sync-upstream', requireAuth, async (req, res) => {
+  const sheetId = parsePositiveInt(req.params.id, 0)
+  if (!sheetId) return res.status(400).json({ error: 'Invalid sheet ID.' })
+
+  try {
+    const fork = await prisma.studySheet.findUnique({
+      where: { id: sheetId },
+      select: { id: true, userId: true, forkOf: true, content: true, contentFormat: true },
+    })
+
+    if (!fork) return res.status(404).json({ error: 'Sheet not found.' })
+    if (!fork.forkOf) return res.status(400).json({ error: 'This sheet is not a fork.' })
+    if (!assertOwnerOrAdmin({
+      res,
+      user: req.user,
+      ownerId: fork.userId,
+      message: 'Only the fork owner can sync from the original.',
+      targetType: 'sheet-lab',
+      targetId: sheetId,
+    })) return
+
+    const original = await prisma.studySheet.findUnique({
+      where: { id: fork.forkOf },
+      select: { id: true, title: true, content: true, contentFormat: true },
+    })
+
+    if (!original) return res.status(404).json({ error: 'Original sheet not found or was deleted.' })
+
+    // Check if content is already identical
+    if (fork.content === original.content) {
+      return res.json({ synced: false, message: 'Already up to date with the original.' })
+    }
+
+    const checksum = computeChecksum(original.content)
+
+    const latestCommit = await prisma.sheetCommit.findFirst({
+      where: { sheetId },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+    })
+
+    const [newCommit] = await prisma.$transaction([
+      prisma.sheetCommit.create({
+        data: {
+          sheetId,
+          userId: req.user.userId,
+          kind: 'merge',
+          message: `Synced from "${original.title}"`,
+          content: original.content,
+          contentFormat: original.contentFormat || 'markdown',
+          checksum,
+          parentId: latestCommit ? latestCommit.id : null,
+        },
+        include: {
+          author: { select: { id: true, username: true, avatarUrl: true } },
+        },
+      }),
+      prisma.studySheet.update({
+        where: { id: sheetId },
+        data: {
+          content: original.content,
+          contentFormat: original.contentFormat || 'markdown',
+        },
+      }),
+    ])
+
+    res.json({
+      synced: true,
+      message: 'Fork synced with the original.',
+      commit: {
+        id: newCommit.id,
+        message: newCommit.message,
+        kind: newCommit.kind,
+        checksum: newCommit.checksum,
+        createdAt: newCommit.createdAt,
+      },
+    })
+  } catch (error) {
+    captureError(error, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── GET /api/sheets/:id/lab/uncommitted-diff — diff between last commit and current content ──
+
+router.get('/:id/lab/uncommitted-diff', requireAuth, async (req, res) => {
+  const sheetId = parsePositiveInt(req.params.id, 0)
+  if (!sheetId) return res.status(400).json({ error: 'Invalid sheet ID.' })
+
+  try {
+    const sheet = await prisma.studySheet.findUnique({
+      where: { id: sheetId },
+      select: { id: true, userId: true, content: true, contentFormat: true },
+    })
+
+    if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
+    if (!assertOwnerOrAdmin({
+      res,
+      user: req.user,
+      ownerId: sheet.userId,
+      message: 'Only the sheet owner can view uncommitted changes.',
+      targetType: 'sheet-lab',
+      targetId: sheetId,
+    })) return
+
+    const latestCommit = await prisma.sheetCommit.findFirst({
+      where: { sheetId },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, content: true, message: true, createdAt: true },
+    })
+
+    const previousContent = latestCommit ? latestCommit.content : ''
+    const currentContent = sheet.content || ''
+
+    if (previousContent === currentContent) {
+      return res.json({ hasChanges: false, diff: null, summary: 'No changes' })
+    }
+
+    const diff = computeLineDiff(previousContent, currentContent)
+    addWordSegments(diff.hunks)
+    const summary = generateChangeSummary(previousContent, currentContent)
+
+    res.json({
+      hasChanges: true,
+      diff,
+      summary,
+      lastCommit: latestCommit ? {
+        id: latestCommit.id,
+        message: latestCommit.message,
+        createdAt: latestCommit.createdAt,
+      } : null,
+    })
+  } catch (error) {
+    captureError(error, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
 // ── POST /api/sheets/:id/lab/restore/:commitId — restore to a commit ──
 
 router.post('/:id/lab/restore/:commitId', requireAuth, async (req, res) => {
@@ -51,6 +191,7 @@ router.post('/:id/lab/restore/:commitId', requireAuth, async (req, res) => {
           sheetId,
           userId: req.user.userId,
           message: `Restored to commit #${commitId}`,
+          kind: 'restore',
           content: targetCommit.content,
           contentFormat: targetCommit.contentFormat,
           checksum,

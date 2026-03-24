@@ -9,6 +9,7 @@ const { createNotification } = require('../../lib/notify')
 const { notifyMentionedUsers } = require('../../lib/mentions')
 const { SHEET_STATUS, reactLimiter, commentLimiter } = require('./sheets.constants')
 const { canReadSheet } = require('./sheets.service')
+const { trackActivity } = require('../../lib/activityTracker')
 
 const router = express.Router()
 
@@ -139,6 +140,8 @@ router.post('/:id/comments', requireAuth, requireVerifiedEmail, commentLimiter, 
       data: { content, sheetId, userId: req.user.userId },
       include: { author: { select: { id: true, username: true } } },
     })
+
+    trackActivity(prisma, req.user.userId, 'comments')
 
     await createNotification(prisma, {
       userId: sheet.userId,

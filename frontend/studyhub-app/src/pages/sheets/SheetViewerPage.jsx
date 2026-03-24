@@ -124,19 +124,13 @@ export default function SheetViewerPage() {
                       </a>
                     )}
                     {canEdit ? (
-                      <Link to={`/sheets/${sheet.id}/edit`} style={linkButton()}>
-                        Edit
-                      </Link>
-                    ) : null}
-                    {user ? (
                       <Link to={`/sheets/${sheet.id}/lab`} style={linkButton()}>
-                        Sheet Lab
+                        Edit in SheetLab
                       </Link>
-                    ) : null}
-                    {user && sheet.userId !== user.id ? (
+                    ) : user && sheet.userId !== user.id ? (
                       <button type="button" onClick={handleFork} disabled={forking} style={actionButton('var(--sh-brand)')}>
                         <IconFork size={13} />
-                        {forking ? 'Forking…' : 'Fork'}
+                        {forking ? 'Forking…' : 'Edit your copy'}
                       </button>
                     ) : null}
                     {user && sheet.forkOf && sheet.userId === user.id ? (
