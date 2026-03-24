@@ -73,7 +73,7 @@ export default function CoursesTab({ user, busyKey, setBusyKey, syncUser }) {
       if (data.user) syncUser(data.user)
       setCoursesMsg({ type: 'success', text: data.message || 'Courses updated.' })
     } catch {
-      setCoursesMsg({ type: 'error', text: 'Could not connect to the server.' })
+      setCoursesMsg({ type: 'error', text: 'Check your connection and try again.' })
     } finally {
       setBusyKey('')
     }

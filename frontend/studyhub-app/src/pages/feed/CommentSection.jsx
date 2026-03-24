@@ -98,7 +98,7 @@ function useComments(postId, initialCount = 0) {
       setTotal((current) => current + 1)
       return true
     } catch {
-      setError('Could not connect to the server.')
+      setError('Check your connection and try again.')
       return false
     } finally {
       setPosting(false)

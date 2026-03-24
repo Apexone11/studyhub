@@ -45,7 +45,7 @@ export default function SecurityTab({ user, sessionUser, busyKey, setBusyKey, ha
       setGoogleMsg({ type: 'success', text: data.message || 'Google account linked successfully.' })
       setShowGooglePopup(false)
     } catch {
-      setGoogleMsg({ type: 'error', text: 'Could not connect to the server.' })
+      setGoogleMsg({ type: 'error', text: 'Check your connection and try again.' })
     } finally {
       setBusyKey('')
     }
@@ -77,7 +77,7 @@ export default function SecurityTab({ user, sessionUser, busyKey, setBusyKey, ha
       setGoogleUnlinkPassword('')
       setGoogleMsg({ type: 'success', text: data.message || 'Google account unlinked.' })
     } catch {
-      setGoogleMsg({ type: 'error', text: 'Could not connect to the server.' })
+      setGoogleMsg({ type: 'error', text: 'Check your connection and try again.' })
     } finally {
       setBusyKey('')
     }

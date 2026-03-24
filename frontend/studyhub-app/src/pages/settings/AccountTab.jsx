@@ -79,7 +79,7 @@ export default function AccountTab({ user, busyKey, setBusyKey, handlePatch, syn
       setVerificationCode('')
       setEmailMsg({ type: 'success', text: data.message || 'Email verified successfully.' })
     } catch {
-      setEmailMsg({ type: 'error', text: 'Could not connect to the server.' })
+      setEmailMsg({ type: 'error', text: 'Check your connection and try again.' })
     } finally {
       setBusyKey('')
     }
@@ -107,7 +107,7 @@ export default function AccountTab({ user, busyKey, setBusyKey, handlePatch, syn
       if (data.user) syncUser(data.user)
       setEmailMsg({ type: 'success', text: data.message || 'A new verification code was sent.' })
     } catch {
-      setEmailMsg({ type: 'error', text: 'Could not connect to the server.' })
+      setEmailMsg({ type: 'error', text: 'Check your connection and try again.' })
     } finally {
       setBusyKey('')
     }
@@ -140,7 +140,7 @@ export default function AccountTab({ user, busyKey, setBusyKey, handlePatch, syn
       clearSession()
       navigate('/', { replace: true })
     } catch {
-      setDeleteMsg({ type: 'error', text: 'Could not connect to the server.' })
+      setDeleteMsg({ type: 'error', text: 'Check your connection and try again.' })
     } finally {
       setBusyKey('')
     }

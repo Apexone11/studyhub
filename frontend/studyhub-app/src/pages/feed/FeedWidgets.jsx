@@ -166,7 +166,7 @@ const QUICK_ACTIONS = [
     ),
     label: 'Set up your profile',
     helper: 'Add a photo and details',
-    path: '/dashboard',
+    path: '/settings?tab=profile',
     check: (u) => Boolean(u?.avatarUrl),
   },
 ]

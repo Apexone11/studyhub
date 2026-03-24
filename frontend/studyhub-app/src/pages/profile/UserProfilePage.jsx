@@ -150,7 +150,7 @@ export default function UserProfilePage() {
       .then(async (r) => {
         if (!r.ok) {
           const body = await r.json().catch(() => ({}))
-          throw new Error(body.error || (r.status === 404 ? 'This user does not exist.' : 'Could not load this profile.'))
+          throw new Error(body.error || (r.status === 404 ? 'User not found.' : 'Could not load this profile. Please try again.'))
         }
         return r.json()
       })
@@ -203,7 +203,7 @@ export default function UserProfilePage() {
       } else {
         showToast(data.error || 'Could not update follow status.', 'error')
       }
-    } catch { showToast('Could not connect to the server.', 'error') }
+    } catch { showToast('Check your connection and try again.', 'error') }
     finally { setToggling(false) }
   }
 
@@ -293,7 +293,7 @@ export default function UserProfilePage() {
                   </h1>
                   {profile.role === 'admin'
                     ? <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 99, background: 'rgba(245,158,11,0.25)', color: '#fbbf24', border: '1px solid rgba(245,158,11,0.4)' }}>Admin</span>
-                    : <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 99, background: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.8)', border: '1px solid rgba(255,255,255,0.2)' }}>Student</span>
+                    : <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 99, background: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.8)', border: '1px solid rgba(255,255,255,0.2)' }}>{profile.accountType === 'teacher' ? 'Teacher' : profile.accountType === 'other' ? 'Member' : 'Student'}</span>
                   }
                 </div>
                 <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', marginBottom: 10 }}>

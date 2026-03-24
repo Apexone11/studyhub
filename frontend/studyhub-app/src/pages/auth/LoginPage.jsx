@@ -79,7 +79,7 @@ export default function LoginPage() {
       completeAuthentication(data.user)
       navigate(getAuthenticatedHomePath(data.user), { replace: true })
     } catch {
-      setError('Could not connect to the server.')
+      setError('Check your connection and try again.')
     } finally {
       setLoading(false)
     }
@@ -111,7 +111,7 @@ export default function LoginPage() {
       completeAuthentication(data.user)
       navigate(getAuthenticatedHomePath(data.user), { replace: true })
     } catch {
-      setError('Could not connect to the server.')
+      setError('Check your connection and try again.')
     } finally {
       setLoading(false)
     }

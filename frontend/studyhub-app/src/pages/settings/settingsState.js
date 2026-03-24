@@ -80,7 +80,7 @@ export function usePreferences() {
       setMsg({ type: 'success', text: successText })
       return true
     } catch {
-      setMsg({ type: 'error', text: 'Could not connect to the server.' })
+      setMsg({ type: 'error', text: 'Check your connection and try again.' })
       return false
     } finally {
       setSaving(false)

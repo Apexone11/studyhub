@@ -130,7 +130,7 @@ export default function SheetViewerPage() {
                     ) : user && sheet.userId !== user.id ? (
                       <button type="button" onClick={handleFork} disabled={forking} style={actionButton('var(--sh-brand)')}>
                         <IconFork size={13} />
-                        {forking ? 'Forking…' : 'Edit your copy'}
+                        {forking ? 'Forking...' : 'Make your own copy'}
                       </button>
                     ) : null}
                     {user && sheet.forkOf && sheet.userId === user.id ? (
