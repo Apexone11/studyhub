@@ -74,7 +74,7 @@ export default function AppSidebar({ mode = 'fixed' }) {
         <div style={{ minWidth: 0 }}>
           <div style={{ fontWeight: 700, fontSize: 'var(--type-sm)', color: 'var(--sh-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.username}</div>
           <div style={{ fontSize: 'var(--type-xs)', color: 'var(--sh-muted)', marginTop: 1 }}>
-            {user.role === 'admin' ? '👑 Admin' : 'Student'}
+            {user.role === 'admin' ? '👑 Admin' : user.accountType === 'teacher' ? 'Teacher' : user.accountType === 'other' ? 'Member' : 'Student'}
             {joinDate ? ` · Joined ${joinDate}` : ''}
           </div>
         </div>
@@ -83,12 +83,15 @@ export default function AppSidebar({ mode = 'fixed' }) {
       {/* Nav links — clean list, no enclosing card */}
       <nav aria-label="Sidebar navigation" className="sh-sidebar-section">
         {NAV_LINKS.map((link) => {
-          const isActive = pathname === link.to || (link.to === '/sheets' && pathname.startsWith('/sheets'))
+          const to = link.to === '__MY_PROFILE__' ? `/users/${user.username}` : link.to
+          const isActive = to === pathname
+            || (link.to === '/sheets' && pathname.startsWith('/sheets'))
+            || (link.to === '__MY_PROFILE__' && pathname === `/users/${user.username}`)
           const Icon = link.icon
           return (
             <Link
-              key={link.to}
-              to={link.to}
+              key={to}
+              to={to}
               className={`sh-sidebar-nav-link${isActive ? ' sh-sidebar-nav-link--active' : ''}`}
             >
               <Icon size={15} />
@@ -104,7 +107,7 @@ export default function AppSidebar({ mode = 'fixed' }) {
           MY COURSES
         </div>
         {courseCodes.length === 0
-          ? <div style={{ fontSize: 'var(--type-xs)', color: 'var(--sh-muted)', fontStyle: 'italic', padding: '4px 2px' }}>No courses yet</div>
+          ? <Link to="/my-courses" style={{ fontSize: 'var(--type-xs)', color: 'var(--sh-brand)', padding: '4px 2px', textDecoration: 'none' }}>Set up your courses &rarr;</Link>
           : courseCodes.map(code => (
               <div key={code} style={{
                 display: 'flex', alignItems: 'center', gap: 8,
@@ -117,7 +120,7 @@ export default function AppSidebar({ mode = 'fixed' }) {
             ))
         }
         <button
-          onClick={() => navigate('/settings?tab=courses')}
+          onClick={() => navigate('/my-courses')}
           className="sh-btn sh-btn--secondary sh-btn--sm"
           style={{ marginTop: 10, width: '100%', justifyContent: 'center', gap: 5 }}
         >

@@ -30,6 +30,7 @@ import FeedCard from './FeedCard'
 import FeedAside from './FeedAside'
 import { useFeedData } from './useFeedData'
 import { useRecentlyViewed } from '../../lib/useRecentlyViewed'
+import SchoolSuggestionBanner from './SchoolSuggestionBanner'
 
 export default function FeedPage() {
   usePageTitle('Feed')
@@ -96,6 +97,7 @@ export default function FeedPage() {
 
             <main id="main-content" style={{ display: 'grid', gap: 18 }}>
               <GettingStartedCard user={user} />
+              <SchoolSuggestionBanner user={user} />
               {newSinceLastVisit > 0 ? (
                 <div
                   style={{

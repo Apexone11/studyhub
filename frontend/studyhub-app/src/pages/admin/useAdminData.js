@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { API } from '../../config'
 import { getApiErrorMessage, readJsonSafely } from '../../lib/http'
 import { useSession } from '../../lib/session-context'
+import { showToast } from '../../lib/toast'
 import { authHeaders, createPageState, createAuditState } from './adminConstants'
 
 export function useAdminData() {
@@ -152,7 +153,16 @@ export function useAdminData() {
 
   function deleteSheet(sheetId) {
     setConfirmAction({ title: 'Delete this sheet?', message: 'The sheet and all associated data will be permanently removed.', variant: 'danger',
-      onConfirm: async () => { setConfirmAction(null); await apiJson(`/api/admin/sheets/${sheetId}`, { method: 'DELETE' }); await Promise.all([loadPagedData('sheets', sheetsState.page), loadOverview()]) },
+      onConfirm: async () => {
+        setConfirmAction(null)
+        try {
+          await apiJson(`/api/admin/sheets/${sheetId}`, { method: 'DELETE' })
+          showToast('Sheet deleted.', 'success')
+          await Promise.all([loadPagedData('sheets', sheetsState.page), loadOverview()])
+        } catch (err) {
+          showToast(err.message || 'Could not delete sheet.', 'error')
+        }
+      },
     })
   }
 
@@ -165,9 +175,14 @@ export function useAdminData() {
       variant: action === 'approve' ? 'default' : 'danger',
       onConfirm: async () => {
         setConfirmAction(null)
-        const reason = action === 'approve' ? 'Quick-approved via admin panel.' : 'Quick-rejected via admin panel.'
-        await apiJson(`/api/admin/sheets/${sheetId}/review`, { method: 'PATCH', body: JSON.stringify({ action, reason }) })
-        await Promise.all([loadPagedData('sheet-reviews', reviewState.page), loadPagedData('sheets', sheetsState.page), loadOverview()])
+        try {
+          const reason = action === 'approve' ? 'Quick-approved via admin panel.' : 'Quick-rejected via admin panel.'
+          await apiJson(`/api/admin/sheets/${sheetId}/review`, { method: 'PATCH', body: JSON.stringify({ action, reason }) })
+          showToast(action === 'approve' ? 'Sheet approved and published.' : 'Sheet rejected.', 'success')
+          await Promise.all([loadPagedData('sheet-reviews', reviewState.page), loadPagedData('sheets', sheetsState.page), loadOverview()])
+        } catch (err) {
+          showToast(err.message || `Could not ${action} sheet.`, 'error')
+        }
       },
     })
   }

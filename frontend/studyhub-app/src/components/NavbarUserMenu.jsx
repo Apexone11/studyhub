@@ -48,17 +48,11 @@ export default function NavbarUserMenu({ user }) {
 
       {showUserMenu && (
         <div style={S.userMenu}>
-          <button type="button" style={S.userMenuItem} onClick={() => { setShowUserMenu(false); navigate('/dashboard') }}
+          <button type="button" style={S.userMenuItem} onClick={() => { setShowUserMenu(false); navigate(`/users/${user.username}`) }}
             onMouseEnter={e => e.currentTarget.style.background = 'var(--sh-soft)'}
             onMouseLeave={e => e.currentTarget.style.background = 'none'}
           >
-            Dashboard
-          </button>
-          <button type="button" style={S.userMenuItem} onClick={() => { setShowUserMenu(false); navigate(`/profile/${user.username}`) }}
-            onMouseEnter={e => e.currentTarget.style.background = 'var(--sh-soft)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'none'}
-          >
-            Profile
+            My Profile
           </button>
           <button type="button" style={S.userMenuItem} onClick={() => { setShowUserMenu(false); navigate('/settings') }}
             onMouseEnter={e => e.currentTarget.style.background = 'var(--sh-soft)'}

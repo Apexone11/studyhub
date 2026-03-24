@@ -128,7 +128,9 @@ function normalizeEmail(value, allowEmpty = false) {
   return normalizedEmail
 }
 
-function validateRegistrationInput({ username, email, password, confirmPassword, termsAccepted }) {
+const VALID_ACCOUNT_TYPES = ['student', 'teacher', 'other']
+
+function validateRegistrationInput({ username, email, password, confirmPassword, termsAccepted, accountType }) {
   const normalizedUsername = typeof username === 'string' ? username.trim() : ''
   if (!normalizedUsername) throw new AppError(400, 'Username is required.')
   if (!USERNAME_REGEX.test(normalizedUsername)) {
@@ -149,10 +151,15 @@ function validateRegistrationInput({ username, email, password, confirmPassword,
     throw new AppError(400, 'You must accept the Terms of Use and Community Guidelines.')
   }
 
+  const normalizedAccountType = typeof accountType === 'string' && VALID_ACCOUNT_TYPES.includes(accountType.trim().toLowerCase())
+    ? accountType.trim().toLowerCase()
+    : 'student'
+
   return {
     username: normalizedUsername,
     email: normalizedEmail || null,
     password,
+    accountType: normalizedAccountType,
   }
 }
 
@@ -168,6 +175,7 @@ async function getAuthenticatedUser(userId) {
       avatarUrl: true,
       coverImageUrl: true,
       authProvider: true,
+      accountType: true,
       createdAt: true,
       enrollments: {
         include: {
@@ -196,6 +204,7 @@ function buildAuthenticatedUserPayload(user, extraFields = {}) {
     emailVerified: Boolean(user.emailVerified),
     avatarUrl: user.avatarUrl || null,
     authProvider: user.authProvider || 'local',
+    accountType: user.accountType || 'student',
     createdAt: user.createdAt,
     enrollments: user.enrollments || [],
     counts: user._count

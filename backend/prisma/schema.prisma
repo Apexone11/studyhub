@@ -25,6 +25,7 @@ model User {
   twoFaExpiry    DateTime?
   googleId       String?   @unique
   authProvider   String    @default("local")
+  accountType    String    @default("student")
   createdAt      DateTime  @default(now())
 
   studySheets        StudySheet[]
@@ -69,7 +70,9 @@ model School {
   city       String   @default("")
   state      String   @default("MD")
   schoolType String   @default("public")
-  courses    Course[]
+  logoUrl      String?
+  emailDomain  String?
+  courses      Course[]
 }
 
 model Course {

@@ -89,6 +89,27 @@ router.patch('/username', async (req, res) => {
   }
 })
 
+const VALID_ACCOUNT_TYPES = ['student', 'teacher', 'other']
+
+router.patch('/account-type', async (req, res) => {
+  const { accountType } = req.body || {}
+
+  if (!accountType || !VALID_ACCOUNT_TYPES.includes(accountType)) {
+    return res.status(400).json({ error: 'Account type must be student, teacher, or other.' })
+  }
+
+  try {
+    await prisma.user.update({
+      where: { id: req.user.userId },
+      data: { accountType },
+    })
+    const user = await getSettingsUser(req.user.userId)
+    return res.json({ message: 'Account type updated.', user })
+  } catch (error) {
+    return handleSettingsError(req, res, error)
+  }
+})
+
 router.delete('/account', twoFaLimiter, async (req, res) => {
   const { password, reason, details } = req.body || {}
   if (!password) return res.status(400).json({ error: 'Password is required to delete your account.' })

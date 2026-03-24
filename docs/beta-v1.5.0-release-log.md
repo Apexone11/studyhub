@@ -4542,3 +4542,149 @@ npx prisma validate                    ✅ schema valid
 | `frontend/studyhub-app/src/pages/settings/SettingsPage.jsx` | Wired onCoverChange prop |
 | `frontend/studyhub-app/src/pages/profile/UserProfilePage.jsx` | Cover banner, heatmap, badges, pinned sheets |
 | `frontend/studyhub-app/src/pages/profile/ProfileWidgets.jsx` | Added BadgesSection, PinnedSheetsSection |
+
+---
+
+## Cycle 46 — Unified Profile Redesign + Production Bugfixes [2026-03-24]
+
+### Summary
+Merged the separate Dashboard page (`/dashboard`) and User Profile page (`/users/:username`) into a single unified profile at `/users/:username` with URL-driven tabs, a hero header, and conditional layouts. Fixed four production bugs: admin action silent failures, preview CSP blocking CSS/fonts, cover image 404s, and stale deleted-sheet entries in Resume Studying.
+
+### Added
+
+- **Unified profile page** (`UserProfilePage.jsx`): complete rewrite with tab system
+  - Own profile: 4 tabs — Overview (Student Cockpit), Study, Sheets, Achievements
+  - Other profiles: 3 tabs — Overview (Showcase), Sheets, Achievements
+  - URL-driven tabs via `?tab=overview|study|sheets|achievements`
+- **Hero header** (360px desktop / 260px mobile): cover image with gradient overlay, avatar overlap, identity section, follower stats, action CTA row
+- **Student Cockpit layout** (`.profile-cockpit`): two-column grid (1.15fr/0.85fr) for own Overview — dashboard widgets on left, identity/progress on right
+- **Showcase layout**: single-column for other-user Overview — pinned sheets, badges, heatmap, recent sheets
+- **Dashboard redirect**: `/dashboard` now redirects to `/users/:me?tab=overview`
+- **Nav consolidation**: "Dashboard" + broken "Profile" menu items merged into single "My Profile" → `/users/:username`
+- **Profile CSS classes**: `.profile-hero`, `.profile-tabs`, `.profile-tab-btn`, `.profile-cockpit`, `.profile-hero-ctas` in `responsive.css`
+- **Cover image `onError` fallback**: gracefully falls back to gradient when image fails to load
+- **Auto-prune stale entries**: `useRecentlyViewed` now removes entries older than 30 days on read
+- **`removeRecentlyViewedEntry()` export**: standalone function for pruning deleted sheets from localStorage
+- **Sheet viewer auto-prune**: when `loadSheet` gets 403/404, the sheet is removed from recently-viewed localStorage
+
+### Changed
+
+- **`preview.routes.js` CSP**: `BASE_PREVIEW_DIRECTIVES` now allows Google Fonts (`fonts.googleapis.com` for stylesheets, `fonts.gstatic.com` for font files) and `https:` for images while keeping scripts blocked on Tier 1+ previews
+- **`index.js` `previewSurfaceCsp`**: fallback middleware CSP updated to match route-level directives — allows Google Fonts and `https:` images
+- **`profileConstants.js`**: increased `maxWidth` to 1100, added tab definitions (`OWN_TABS`, `OTHER_TABS`, `isValidTab`)
+- **Sidebar**: "Profile" nav label → "My Profile", destination → `/users/:username` (dynamic)
+- **`NavbarUserMenu.jsx`**: fixed broken `/profile/:username` link (was 404) → `/users/:username`
+
+### Fixed
+
+- **46.8 — `/api/courses/popular` 500**: (fixed in prior session)
+- **46.9 — Admin action silent failures**: wrapped 6 confirmation dialog `onConfirm` handlers in try-catch with `showToast()` in `useAdminData.js` and `ModerationTab.jsx` (reviewSheet, deleteSheet, reviewCase, liftRestriction, reviewAppeal)
+- **46.10 — Safe Preview blocking CSS/fonts**: CSP `style-src`, `style-src-elem`, and `font-src` now allow Google Fonts domains so HTML sheets render styled content while scripts remain blocked
+- **46.11 — Cover images 404**: added `express.static` middleware for `/uploads/covers` in `index.js` — cover images are now publicly served alongside avatars
+- **46.12 — Resume Studying stale entries**: deleted/inaccessible sheets are auto-removed from localStorage when the sheet viewer encounters 403/404; entries older than 30 days are pruned on read
+
+### Validation
+
+```
+npm --prefix backend run lint          ✅ clean
+npm --prefix frontend/studyhub-app run lint  ✅ clean
+```
+
+### Known Risks / Deferred
+
+- Profile page is ~500 lines — a future cycle should extract tab components into separate files
+- No E2E test coverage for the unified profile tabs yet
+- Background batch-validation of recently-viewed entries (HEAD requests to verify all entries still exist) deferred — current approach prunes on navigation
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `frontend/studyhub-app/src/App.jsx` | Added `DashboardRedirect`, removed `DashboardPage` import |
+| `frontend/studyhub-app/src/pages/profile/UserProfilePage.jsx` | Complete rewrite: unified profile with tabs, hero, cockpit |
+| `frontend/studyhub-app/src/pages/profile/profileConstants.js` | Tab definitions, maxWidth bump |
+| `frontend/studyhub-app/src/styles/responsive.css` | Profile hero, tabs, cockpit CSS classes |
+| `frontend/studyhub-app/src/components/AppSidebar.jsx` | Dynamic My Profile link |
+| `frontend/studyhub-app/src/components/sidebarConstants.js` | Profile label + placeholder |
+| `frontend/studyhub-app/src/components/NavbarUserMenu.jsx` | Fixed broken Profile link |
+| `frontend/studyhub-app/src/components/navbarConstants.js` | Breadcrumb updates |
+| `frontend/studyhub-app/src/pages/admin/useAdminData.js` | try-catch + showToast in admin actions |
+| `frontend/studyhub-app/src/pages/admin/ModerationTab.jsx` | try-catch + showToast in moderation actions |
+| `frontend/studyhub-app/src/lib/useRecentlyViewed.js` | 30-day prune, `removeRecentlyViewedEntry` export |
+| `frontend/studyhub-app/src/pages/sheets/useSheetViewer.js` | Auto-prune on 403/404 |
+| `backend/src/index.js` | Added `COVERS_DIR` static serving, updated `previewSurfaceCsp` |
+| `backend/src/modules/preview/preview.routes.js` | CSP allows Google Fonts |
+
+---
+
+## Cycle 46 — 46.13–46.17 (2026-03-24)
+
+**Theme**: Registration simplification, My Courses page, school logos pipeline, .edu onboarding, account types.
+
+### Added
+
+- **46.14 — `/my-courses` page** (`MyCoursesPage.jsx`): Interactive school/course personalization hub. Two-column layout with school search/selection, course department filter chips, course search, and a "Feed Preview" sticky side panel. Saves via `PATCH /api/settings/courses`. Sidebar nav link + breadcrumb wired.
+- **46.15 — School logos pipeline**: `logoUrl` field on School model (schema migration). `SCHOOL_LOGOS_DIR` in storage, `express.static` middleware with 1-hour cache. Admin endpoints: `GET /api/admin/schools`, `POST /api/admin/schools/:id/logo` (multer + magic bytes validation), `DELETE /api/admin/schools/:id/logo`. Admin `SchoolsTab.jsx` with upload/replace/remove UI and inline email domain editing.
+- **46.15 — `emailDomain` on School model**: Nullable string field for matching `.edu` emails to schools. Admin can set via inline editor in SchoolsTab. `PATCH /api/admin/schools/:id` endpoint for updating school metadata.
+- **46.16 — .edu school suggestion banner** (`SchoolSuggestionBanner.jsx`): Shown on FeedPage for new users with `.edu` email + 0 enrollments. Calls `GET /api/courses/schools/suggest` to match email domain → school. Dismissable via localStorage. Links to `/my-courses`.
+- **46.17 — `accountType` on User model**: `student`, `teacher`, or `other` (default: `student`). Schema migration added. Registration form includes "I am a..." chip selector. Stored in VerificationChallenge payload for verified flow. `PATCH /api/settings/account-type` endpoint for later changes. Included in auth and settings user payloads.
+
+### Changed
+
+- **46.13 — Registration simplified to 2 steps**: Removed course selection step entirely. `register/start` → `register/verify` → auto-complete. No `CoursesStep` import or rendering. `nextStep` returns `'complete'` instead of `'courses'`.
+- **46.13 — Google OAuth instant creation**: Removed `requiresCourseSelection` gate and `/google/complete` route. New Google users created immediately with zero enrollments.
+- **46.13 — Settings tabs reduced**: Removed `CoursesTab` from `SettingsPage.jsx` (6 tabs instead of 7). Course personalization now lives at `/my-courses`.
+- **`courses.schools.controller.js`**: Added `logoUrl` to public schools endpoint select. Added `GET /api/courses/schools/suggest` authenticated endpoint for domain matching.
+- **`auth.service.js`**: `validateRegistrationInput` now accepts and validates `accountType`. `getAuthenticatedUser` and `buildAuthenticatedUserPayload` include `accountType`.
+- **`settings.service.js`**: `getSettingsUser` includes `accountType` in select.
+- **Admin TABS**: Added `['schools', 'Schools']` to admin tab constants.
+
+### Validation
+
+```
+npm --prefix backend run lint          ✅ clean
+npm --prefix frontend/studyhub-app run lint  ✅ clean
+npm --prefix frontend/studyhub-app run build ✅ clean (255ms)
+```
+
+### Known Risks / Deferred
+
+- `emailDomain` values must be set manually by admin for each school — no auto-seed from existing data
+- Google OAuth users always default to `accountType: 'student'` — can change in settings later
+- No E2E tests for MyCoursesPage, SchoolSuggestionBanner, or account type selector yet
+- SchoolSuggestionBanner only shows on FeedPage — users who navigate directly elsewhere won't see it
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `backend/prisma/schema.prisma` | Added `logoUrl`, `emailDomain` on School; `accountType` on User |
+| `backend/prisma/migrations/20260324120000_add_school_logo_url/` | logoUrl migration |
+| `backend/prisma/migrations/20260324130000_add_school_email_domain/` | emailDomain migration |
+| `backend/prisma/migrations/20260324140000_add_user_account_type/` | accountType migration |
+| `backend/src/lib/storage.js` | Added `SCHOOL_LOGOS_DIR` |
+| `backend/src/lib/verificationValidation.js` | `createSignupChallenge` accepts `accountType`, stores in payload |
+| `backend/src/index.js` | Added `SCHOOL_LOGOS_DIR` static serving middleware |
+| `backend/src/modules/admin/admin.schools.controller.js` | New: GET/POST/DELETE/PATCH school endpoints |
+| `backend/src/modules/admin/admin.routes.js` | Mounted schoolsController |
+| `backend/src/modules/auth/auth.register.controller.js` | Passes `accountType` through all registration paths |
+| `backend/src/modules/auth/auth.google.controller.js` | Simplified: single-step creation, no course gate |
+| `backend/src/modules/auth/auth.service.js` | `accountType` in validation, auth user, payload |
+| `backend/src/modules/courses/courses.schools.controller.js` | Added `logoUrl` to select, `GET /schools/suggest` endpoint |
+| `backend/src/modules/settings/settings.account.controller.js` | Added `PATCH /account-type` endpoint |
+| `backend/src/modules/settings/settings.service.js` | `accountType` in getSettingsUser select |
+| `frontend/studyhub-app/src/App.jsx` | Added MyCoursesPage route |
+| `frontend/studyhub-app/src/pages/courses/MyCoursesPage.jsx` | New: interactive school/course personalization |
+| `frontend/studyhub-app/src/pages/feed/FeedPage.jsx` | Added SchoolSuggestionBanner |
+| `frontend/studyhub-app/src/pages/feed/SchoolSuggestionBanner.jsx` | New: .edu domain suggestion banner |
+| `frontend/studyhub-app/src/pages/auth/RegisterStepFields.jsx` | Added account type chip selector |
+| `frontend/studyhub-app/src/pages/auth/RegisterScreen.jsx` | Removed CoursesStep, 2-step only |
+| `frontend/studyhub-app/src/pages/auth/useRegisterFlow.js` | Removed course state, added accountType |
+| `frontend/studyhub-app/src/pages/auth/registerConstants.js` | Removed course APIs, sends accountType |
+| `frontend/studyhub-app/src/pages/auth/LoginPage.jsx` | Removed requiresCourseSelection handling |
+| `frontend/studyhub-app/src/pages/settings/SettingsPage.jsx` | Removed CoursesTab |
+| `frontend/studyhub-app/src/pages/admin/AdminPage.jsx` | Wired SchoolsTab rendering |
+| `frontend/studyhub-app/src/pages/admin/SchoolsTab.jsx` | New: admin school management with logo + domain editing |
+| `frontend/studyhub-app/src/pages/admin/adminConstants.js` | Added schools tab |
+| `frontend/studyhub-app/src/components/sidebarConstants.js` | Added My Courses nav link |
+| `frontend/studyhub-app/src/components/navbarConstants.js` | Added /my-courses breadcrumb |

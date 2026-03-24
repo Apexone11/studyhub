@@ -2,13 +2,22 @@ import { useCallback, useEffect, useState } from 'react'
 
 const STORAGE_KEY = 'studyhub.continuity.recentlyViewed'
 const MAX_ENTRIES = 10
+const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000 // 30 days
 
 function readEntries() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return []
     const parsed = JSON.parse(raw)
-    return Array.isArray(parsed) ? parsed : []
+    if (!Array.isArray(parsed)) return []
+    // Auto-prune entries older than 30 days
+    const cutoff = Date.now() - MAX_AGE_MS
+    const fresh = parsed.filter((e) => {
+      if (!e.viewedAt) return false
+      return new Date(e.viewedAt).getTime() > cutoff
+    })
+    if (fresh.length !== parsed.length) writeEntries(fresh)
+    return fresh
   } catch {
     return []
   }
@@ -40,11 +49,25 @@ export function recordSheetView(sheet) {
   writeEntries(entries.slice(0, MAX_ENTRIES))
 }
 
+/**
+ * Remove a single entry by sheet ID (e.g. when the sheet has been deleted).
+ * Safe to call from anywhere — no-ops if the entry does not exist.
+ */
+export function removeRecentlyViewedEntry(sheetId) {
+  const entries = readEntries().filter((e) => e.id !== sheetId)
+  writeEntries(entries)
+}
+
 export function useRecentlyViewed() {
   const [entries, setEntries] = useState(readEntries)
 
   const refresh = useCallback(() => {
     setEntries(readEntries())
+  }, [])
+
+  const removeEntry = useCallback((sheetId) => {
+    removeRecentlyViewedEntry(sheetId)
+    setEntries((prev) => prev.filter((e) => e.id !== sheetId))
   }, [])
 
   // Refresh on mount and when tab becomes visible (cross-tab sync)
@@ -56,5 +79,5 @@ export function useRecentlyViewed() {
     return () => document.removeEventListener('visibilitychange', onVisibility)
   }, [refresh])
 
-  return { recentlyViewed: entries, refreshRecentlyViewed: refresh }
+  return { recentlyViewed: entries, refreshRecentlyViewed: refresh, removeEntry }
 }

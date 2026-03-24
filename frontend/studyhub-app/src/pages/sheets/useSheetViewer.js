@@ -8,7 +8,7 @@ import { fadeInUp } from '../../lib/animations'
 import { showToast } from '../../lib/toast'
 import { usePageTitle } from '../../lib/usePageTitle'
 import { trackEvent } from '../../lib/telemetry'
-import { recordSheetView } from '../../lib/useRecentlyViewed'
+import { recordSheetView, removeRecentlyViewedEntry } from '../../lib/useRecentlyViewed'
 import { useStudyStatus } from '../../lib/useStudyStatus'
 import { authHeaders, attachmentPreviewKind } from './sheetViewerConstants'
 
@@ -73,6 +73,7 @@ export default function useSheetViewer() {
       }
 
       if (response.status === 403) {
+        removeRecentlyViewedEntry(sheetId)
         apply(() => setSheetState({
           sheet: null,
           loading: false,
@@ -82,6 +83,7 @@ export default function useSheetViewer() {
       }
 
       if (!response.ok) {
+        if (response.status === 404) removeRecentlyViewedEntry(sheetId)
         throw new Error(getApiErrorMessage(data, 'Could not load this sheet.'))
       }
 

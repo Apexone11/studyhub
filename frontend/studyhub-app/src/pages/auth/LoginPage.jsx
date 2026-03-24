@@ -108,18 +108,6 @@ export default function LoginPage() {
         return
       }
 
-      if (data.requiresCourseSelection) {
-        navigate('/register', {
-          replace: true,
-          state: {
-            googleCourseSelection: true,
-            tempCredential: data.tempCredential,
-            googleName: data.googleName,
-          },
-        })
-        return
-      }
-
       completeAuthentication(data.user)
       navigate(getAuthenticatedHomePath(data.user), { replace: true })
     } catch {

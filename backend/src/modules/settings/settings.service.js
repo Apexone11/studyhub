@@ -159,6 +159,7 @@ async function getSettingsUser(userId) {
         avatarUrl: true,
         coverImageUrl: true,
         authProvider: true,
+        accountType: true,
         googleId: true,
         createdAt: true,
         enrollments: {

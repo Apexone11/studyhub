@@ -35,9 +35,11 @@ export function validateAccountFields(form) {
 
 /* ── Step configuration builder ────────────────────────────────────────── */
 export function getSteps(googleCredential) {
+  // Google users are created immediately — no steps needed.
+  // Local users: Account → Verify → done.
   return googleCredential
-    ? [['courses', 'Courses']]
-    : [['account', 'Account'], ['verify', 'Verify'], ['courses', 'Courses']]
+    ? []
+    : [['account', 'Account'], ['verify', 'Verify']]
 }
 
 /* ── API helpers (return { ok, data } or { ok, error }) ────────────────── */
@@ -52,6 +54,7 @@ export async function apiStartRegistration(form) {
       email: form.email.trim(),
       password: form.password,
       confirmPassword: form.confirmPassword,
+      accountType: form.accountType || 'student',
       termsAccepted: form.termsAccepted,
     }),
   })
@@ -96,35 +99,14 @@ export async function apiGoogleAuth(credential) {
   return { ok: true, data }
 }
 
-export async function apiGoogleComplete(credential, schoolId, courseIds, customCourses) {
-  const response = await fetch(`${API}/api/auth/google/complete`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ credential, schoolId, courseIds, customCourses }),
-  })
-  const data = await response.json()
-  if (!response.ok) return { ok: false, error: data.error || 'Could not finish registration.' }
-  return { ok: true, data }
-}
-
-export async function apiCompleteRegistration(verificationToken, schoolId, courseIds, customCourses) {
+export async function apiCompleteRegistration(verificationToken) {
   const response = await fetch(`${API}/api/auth/register/complete`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify({ verificationToken, schoolId, courseIds, customCourses }),
+    body: JSON.stringify({ verificationToken }),
   })
   const data = await response.json()
   if (!response.ok) return { ok: false, error: data.error || 'Could not finish registration.' }
   return { ok: true, data }
-}
-
-export async function apiLoadSchools() {
-  const response = await fetch(`${API}/api/courses/schools`, {
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-  })
-  if (!response.ok) throw new Error('Could not load the course catalog.')
-  return response.json()
 }

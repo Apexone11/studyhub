@@ -18,7 +18,7 @@ export const pageWrapStyle = {
 }
 
 export const containerStyle = {
-  maxWidth: 900,
+  maxWidth: 1100,
   margin: '0 auto',
   padding: 'clamp(20px, 3vw, 40px) clamp(16px, 2vw, 24px)',
 }
@@ -49,4 +49,25 @@ export const pillStyle = {
   background: 'var(--sh-pill-bg)',
   color: 'var(--sh-pill-text)',
   border: '1px solid var(--sh-brand-soft)',
+}
+
+/* ── Tab definitions ──────────────────────────────────────────────────── */
+export const OWN_TABS = [
+  { key: 'overview',     label: 'Overview' },
+  { key: 'study',        label: 'Study' },
+  { key: 'sheets',       label: 'Sheets' },
+  { key: 'achievements', label: 'Achievements' },
+]
+
+export const OTHER_TABS = [
+  { key: 'overview',     label: 'Overview' },
+  { key: 'sheets',       label: 'Sheets' },
+  { key: 'achievements', label: 'Achievements' },
+]
+
+export const DEFAULT_TAB = 'overview'
+
+export function isValidTab(tab, isOwn) {
+  const tabs = isOwn ? OWN_TABS : OTHER_TABS
+  return tabs.some((t) => t.key === tab)
 }

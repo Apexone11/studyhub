@@ -26,8 +26,10 @@ export const ROUTE_CONFIG = {
   '/notes':         { crumbs: [{ label: 'My Notes',        to: '/notes' }],         backTo: '/feed' },
   '/announcements': { crumbs: [{ label: 'Announcements',   to: '/announcements' }], backTo: '/feed' },
   '/submit':        { crumbs: [{ label: 'Submit Request',  to: '/submit' }],         backTo: '/feed' },
+  '/my-courses':    { crumbs: [{ label: 'My Courses',      to: '/my-courses' }],     backTo: '/feed' },
   '/admin':         { crumbs: [{ label: 'Admin',           to: '/admin' }],          backTo: '/feed' },
-  '/dashboard':     { crumbs: [{ label: 'Profile',         to: '/dashboard' }],      backTo: '/feed' },
+  '/dashboard':     { crumbs: [{ label: 'My Profile',      to: '/dashboard' }],      backTo: '/feed' },
+  '/users':         { crumbs: [{ label: 'Profile',          to: null }],              backTo: '/feed' },
 }
 
 export function formatRelativeTime(iso, nowMs) {
