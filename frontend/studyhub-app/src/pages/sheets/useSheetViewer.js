@@ -272,9 +272,9 @@ export default function useSheetViewer() {
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(getApiErrorMessage(data, 'Could not fork this sheet.'))
-      showToast('Sheet forked! Redirecting to editor…', 'success')
+      showToast('Sheet forked! Opening your copy in SheetLab…', 'success')
       trackEvent('sheet_forked', { sheetId: sheet.id })
-      navigate(`/sheets/${data.id}/edit`)
+      navigate(`/sheets/${data.id}/lab`)
     } catch (error) {
       showToast(error.message || 'Could not fork this sheet.', 'error')
     } finally {

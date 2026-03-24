@@ -46,38 +46,58 @@ export default function useSheetLab() {
   const timelineRef = useRef(null)
   const animatedRef = useRef(false)
 
+  const [activeTab, setActiveTab] = useState('history')
+
   const isOwner = user && sheet && (user.role === 'admin' || user.id === sheet.userId)
+  const isFork = Boolean(sheet?.forkOf)
 
   // Load sheet info
+  const reloadSheet = useCallback(async () => {
+    if (!Number.isInteger(sheetId)) return
+    try {
+      const response = await fetch(`${API}/api/sheets/${sheetId}`, {
+        headers: authHeaders(),
+        credentials: 'include',
+      })
+      const data = await readJsonSafely(response, {})
+      if (isAuthSessionFailure(response, data)) {
+        clearSession()
+        navigate('/login', { replace: true })
+        return
+      }
+      if (!response.ok) throw new Error(getApiErrorMessage(data, 'Could not load sheet.'))
+      setSheet(data)
+    } catch (err) {
+      setError(err.message)
+    }
+  }, [sheetId, clearSession, navigate])
+
   useEffect(() => {
     if (!Number.isInteger(sheetId)) {
       setError('Invalid sheet ID.')
       setLoading(false)
       return
     }
+    reloadSheet()
+  }, [sheetId, reloadSheet])
 
-    let cancelled = false
-    async function fetchSheet() {
-      try {
-        const response = await fetch(`${API}/api/sheets/${sheetId}`, {
-          headers: authHeaders(),
-          credentials: 'include',
-        })
-        const data = await readJsonSafely(response, {})
-        if (isAuthSessionFailure(response, data)) {
-          clearSession()
-          navigate('/login', { replace: true })
-          return
-        }
-        if (!response.ok) throw new Error(getApiErrorMessage(data, 'Could not load sheet.'))
-        if (!cancelled) setSheet(data)
-      } catch (err) {
-        if (!cancelled) setError(err.message)
-      }
+  // Route guard: non-owners of non-published sheets get redirected
+  useEffect(() => {
+    if (!sheet || !user) return
+    const owns = user.role === 'admin' || user.id === sheet.userId
+    if (!owns && sheet.status !== 'published') {
+      showToast("You can't edit this sheet. Click 'Edit your copy' on the viewer.", 'error')
+      navigate(`/sheets/${sheetId}`, { replace: true })
     }
-    fetchSheet()
-    return () => { cancelled = true }
-  }, [sheetId, clearSession, navigate])
+  }, [sheet, user, sheetId, navigate])
+
+  // Default to editor tab for owners, history for everyone else
+  useEffect(() => {
+    if (sheet && user) {
+      const owns = user.role === 'admin' || user.id === sheet.userId
+      setActiveTab(owns ? 'editor' : 'history')
+    }
+  }, [sheet, user])
 
   // Load commits
   const loadCommits = useCallback(async (targetPage = 1) => {
@@ -282,6 +302,51 @@ export default function useSheetLab() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [compareSelection])
 
+  const [deleting, setDeleting] = useState(false)
+
+  const handleDeleteFork = async () => {
+    if (deleting || !sheet?.id || !isFork) return
+    setDeleting(true)
+    try {
+      const response = await fetch(`${API}/api/sheets/${sheet.id}`, {
+        method: 'DELETE',
+        headers: authHeaders(),
+        credentials: 'include',
+      })
+      const data = await readJsonSafely(response, {})
+      if (!response.ok) throw new Error(getApiErrorMessage(data, 'Could not delete fork.'))
+      showToast('Fork deleted.', 'success')
+      navigate('/sheets', { replace: true })
+    } catch (err) {
+      showToast(err.message, 'error')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const [publishing, setPublishing] = useState(false)
+
+  const handlePublish = async () => {
+    if (publishing || !sheet?.id) return
+    setPublishing(true)
+    try {
+      const response = await fetch(`${API}/api/sheets/${sheet.id}`, {
+        method: 'PATCH',
+        headers: authHeaders(),
+        credentials: 'include',
+        body: JSON.stringify({ status: 'published' }),
+      })
+      const data = await readJsonSafely(response, {})
+      if (!response.ok) throw new Error(getApiErrorMessage(data, 'Could not publish sheet.'))
+      showToast(data.message || 'Sheet published!', 'success')
+      reloadSheet()
+    } catch (err) {
+      showToast(err.message, 'error')
+    } finally {
+      setPublishing(false)
+    }
+  }
+
   const handleBack = () => {
     navigate(`/sheets/${sheetId}`)
   }
@@ -317,6 +382,9 @@ export default function useSheetLab() {
     loadingDiff,
     timelineRef,
     isOwner,
+    isFork,
+    activeTab,
+    setActiveTab,
     loadCommits,
     toggleCommitContent,
     handleCreateCommit,
@@ -324,5 +392,10 @@ export default function useSheetLab() {
     handleRestore,
     toggleCompareSelection,
     handleBack,
+    deleting,
+    handleDeleteFork,
+    reloadSheet,
+    publishing,
+    handlePublish,
   }
 }

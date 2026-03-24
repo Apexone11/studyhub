@@ -2,10 +2,10 @@
 
 ## Supported Versions
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 1.5.x   | :white_check_mark: |
-| < 1.5   | :x:                |
+| Version | Supported |
+| ------- | --------- |
+| 1.5.x   | Yes       |
+| < 1.5   | No        |
 
 ## Reporting a Vulnerability
 
@@ -34,11 +34,14 @@ In scope:
 - Authentication and authorization bypasses
 - Cross-site scripting (XSS)
 - Cross-site request forgery (CSRF)
-- SQL injection
+- SQL injection and Prisma query injection
 - Remote code execution
 - Server-side request forgery (SSRF)
-- Information disclosure
+- Information disclosure and privacy leaks
 - Privilege escalation
+- File upload abuse (malicious file execution, path traversal)
+- WebAuthn credential theft or replay
+- OAuth token leakage
 
 Out of scope:
 
@@ -46,18 +49,51 @@ Out of scope:
 - Denial of Service attacks
 - Social engineering
 - Physical security
+- Self-XSS (requires user to paste code in their own console)
 
-## Security Measures
+## Security Architecture
 
-- All passwords hashed with bcrypt (cost factor 12)
-- JWT tokens with short expiry and httpOnly cookies
-- CSRF protection on all state-changing endpoints
+### Authentication
+
+- Passwords hashed with bcrypt (cost factor 12)
+- Session tokens issued as JWT in httpOnly, Secure, SameSite cookies
+- Short token expiry with credential refresh
+- Google OAuth via verified ID tokens
+- WebAuthn passkey support for passwordless login
+- Account lockout after repeated failed login attempts
+- Email verification with time-limited codes and attempt tracking
+
+### Authorization
+
+- Role-based access control (student, admin)
+- Owner-or-admin checks on all mutation endpoints
+- Profile visibility enforcement (public, classmates-only, private)
+- Sheet status gates (draft, published, pending_review, quarantined)
+
+### Input Validation
+
 - Content Security Policy headers via Helmet
-- Input sanitization with sanitize-html
-- File upload validation (MIME + magic byte verification)
-- Rate limiting on authentication endpoints
-- Content moderation via AI scanning
-- WebAuthn passkey support for admin accounts
+- File upload validation with MIME type checking and magic byte verification
+- Separate upload directories for avatars, covers, and attachments with path traversal protection
+- Request body validation on all endpoints
+- Rate limiting on authentication, upload, and write endpoints
+
+### Content Security
+
+- HTML study sheet risk classification (Tier 0-3)
+- AI-powered content moderation with category detection
+- ClamAV integration for malware scanning
+- Admin review pipeline for high-risk content
+- Strike/appeal system for policy violations
+- User restriction engine (temporary and permanent)
+
+### Data Protection
+
+- Prisma ORM with parameterized queries (no raw SQL injection surface)
+- Cascade deletes for user data removal
+- Email suppression handling for bounces and complaints
+- Sentry error monitoring with PII scrubbing
+- No third-party ad networks or data brokers
 
 ## Responsible Disclosure
 

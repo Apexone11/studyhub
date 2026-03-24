@@ -1,4 +1,5 @@
 const express = require('express')
+const crypto = require('node:crypto')
 const prisma = require('../../core/db/prisma')
 const { captureError } = require('../../core/monitoring/sentry')
 const requireAuth = require('../../core/auth/requireAuth')
@@ -10,8 +11,15 @@ const { serializeSheet } = require('./sheets.serializer')
 
 const router = express.Router()
 
+function computeChecksum(content) {
+  return crypto.createHash('sha256').update(content || '', 'utf8').digest('hex')
+}
+
 router.post('/:id/fork', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (req, res) => {
   const originalId = Number.parseInt(req.params.id, 10)
+  if (!Number.isInteger(originalId)) {
+    return res.status(400).json({ error: 'Sheet id must be an integer.' })
+  }
 
   try {
     const original = await prisma.studySheet.findUnique({
@@ -24,6 +32,9 @@ router.post('/:id/fork', requireAuth, requireVerifiedEmail, sheetWriteLimiter, a
         contentFormat: true,
         courseId: true,
         userId: true,
+        status: true,
+        forkOf: true,
+        rootSheetId: true,
         attachmentUrl: true,
         attachmentType: true,
         attachmentName: true,
@@ -32,25 +43,18 @@ router.post('/:id/fork', requireAuth, requireVerifiedEmail, sheetWriteLimiter, a
     })
 
     if (!original) return res.status(404).json({ error: 'Sheet not found.' })
+    if (original.status !== SHEET_STATUS.PUBLISHED) {
+      return res.status(403).json({ error: 'Only published sheets can be forked.' })
+    }
+    if (original.userId === req.user.userId) {
+      return res.status(400).json({ error: 'You cannot fork your own sheet.' })
+    }
 
-    const forkTitle = typeof req.body.title === 'string' && req.body.title.trim()
-      ? req.body.title.trim().slice(0, 160)
-      : `${original.title} (fork)`
-
-    const forked = await prisma.studySheet.create({
-      data: {
-        title: forkTitle,
-        description: original.description || '',
-        content: original.content,
-        contentFormat: original.contentFormat || 'markdown',
-        status: SHEET_STATUS.PUBLISHED,
-        courseId: original.courseId,
-        userId: req.user.userId,
+    // ── Idempotent: return existing fork if user already forked this sheet ──
+    const existingFork = await prisma.studySheet.findFirst({
+      where: {
         forkOf: original.id,
-        attachmentUrl: original.attachmentUrl,
-        attachmentType: original.attachmentType,
-        attachmentName: original.attachmentName,
-        allowDownloads: original.allowDownloads,
+        userId: req.user.userId,
       },
       include: {
         author: { select: { id: true, username: true } },
@@ -66,6 +70,67 @@ router.post('/:id/fork', requireAuth, requireVerifiedEmail, sheetWriteLimiter, a
       },
     })
 
+    if (existingFork) {
+      return res.status(200).json(serializeSheet(existingFork))
+    }
+
+    // ── Resolve root sheet id: trace back to the ultimate original ──
+    const rootSheetId = original.rootSheetId || original.forkOf || original.id
+
+    const forkTitle = typeof req.body.title === 'string' && req.body.title.trim()
+      ? req.body.title.trim().slice(0, 160)
+      : `${original.title} (fork)`
+
+    // ── Create fork as DRAFT + initial fork_base commit in one transaction ──
+    const checksum = computeChecksum(original.content)
+
+    const [forked] = await prisma.$transaction([
+      prisma.studySheet.create({
+        data: {
+          title: forkTitle,
+          description: original.description || '',
+          content: original.content,
+          contentFormat: original.contentFormat || 'markdown',
+          status: SHEET_STATUS.DRAFT,
+          courseId: original.courseId,
+          userId: req.user.userId,
+          forkOf: original.id,
+          rootSheetId,
+          attachmentUrl: original.attachmentUrl,
+          attachmentType: original.attachmentType,
+          attachmentName: original.attachmentName,
+          allowDownloads: original.allowDownloads,
+        },
+        include: {
+          author: { select: { id: true, username: true } },
+          course: { include: { school: true } },
+          forkSource: {
+            select: {
+              id: true,
+              title: true,
+              userId: true,
+              author: { select: { id: true, username: true } },
+            },
+          },
+        },
+      }),
+      // Increment fork count on original is deferred until after we have the fork id
+    ])
+
+    // Create fork_base commit (initial snapshot of forked content)
+    await prisma.sheetCommit.create({
+      data: {
+        sheetId: forked.id,
+        userId: req.user.userId,
+        kind: 'fork_base',
+        message: `Forked from "${original.title}"`,
+        content: original.content,
+        contentFormat: original.contentFormat || 'markdown',
+        checksum,
+      },
+    })
+
+    // Increment fork count on original
     await prisma.studySheet.update({
       where: { id: original.id },
       data: { forks: { increment: 1 } },

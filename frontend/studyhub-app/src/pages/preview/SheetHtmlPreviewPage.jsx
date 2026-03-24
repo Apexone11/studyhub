@@ -90,8 +90,8 @@ export default function SheetHtmlPreviewPage() {
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <Link to={`/sheets/${sheetId}/edit`} style={buttonStyle()}>
-                  Back to editor
+                <Link to={`/sheets/${sheetId}/lab`} style={buttonStyle()}>
+                  Back to SheetLab
                 </Link>
                 <Link to={`/sheets/${sheetId}`} style={buttonStyle()}>
                   Open sheet

@@ -6,6 +6,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { IconSheets, IconStar } from '../../components/Icons'
+import BadgeDisplay from '../../components/BadgeDisplay'
 import { API } from '../../config'
 import { FONT, cardStyle, sectionHeadingStyle, pillStyle } from './profileConstants'
 
@@ -101,6 +102,58 @@ export function ProfileActionButtons({ isOwnProfile, currentUser, following, tog
             </button>
           )
       }
+    </div>
+  )
+}
+
+/* ── Badges section ────────────────────────────────────────────────────── */
+export function BadgesSection({ badges }) {
+  if (!badges || badges.length === 0) return null
+  return (
+    <div style={cardStyle}>
+      <h2 style={sectionHeadingStyle}>
+        <i className="fa-solid fa-trophy" style={{ color: '#f59e0b', fontSize: 14 }} />
+        Achievements
+      </h2>
+      <BadgeDisplay badges={badges} />
+    </div>
+  )
+}
+
+/* ── Pinned Sheets section ─────────────────────────────────────────────── */
+export function PinnedSheetsSection({ sheets }) {
+  if (!sheets || sheets.length === 0) return null
+  return (
+    <div style={cardStyle}>
+      <h2 style={sectionHeadingStyle}>
+        <i className="fa-solid fa-thumbtack" style={{ color: 'var(--sh-brand)', fontSize: 14 }} />
+        Pinned Sheets
+      </h2>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
+        {sheets.map((sheet) => (
+          <Link
+            key={sheet.id}
+            to={`/sheets/${sheet.id}`}
+            style={{
+              display: 'block', padding: '14px 16px', borderRadius: 12,
+              border: '1px solid var(--sh-border)', background: 'var(--sh-soft)',
+              textDecoration: 'none', transition: 'box-shadow 0.15s',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.boxShadow = 'var(--shadow-sm, 0 2px 10px rgba(15,23,42,0.08))' }}
+            onMouseLeave={(e) => { e.currentTarget.style.boxShadow = 'none' }}
+          >
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--sh-heading)', marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {sheet.title}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {sheet.course?.code && <span style={pillStyle}>{sheet.course.code}</span>}
+              <span style={{ fontSize: 12, color: 'var(--sh-muted)', marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <IconStar size={12} /> {sheet.stars || 0}
+              </span>
+            </div>
+          </Link>
+        ))}
+      </div>
     </div>
   )
 }

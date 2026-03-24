@@ -10,6 +10,9 @@ const { cleanupAttachmentIfUnused } = require('../../lib/storage')
 const { computeLineDiff, addWordSegments } = require('../../lib/diff')
 const { SHEET_STATUS, contributionRateLimiter, contributionReviewLimiter } = require('./sheets.constants')
 const { serializeContribution } = require('./sheets.serializer')
+const { computeChecksum } = require('../sheetLab/sheetLab.constants')
+const { trackActivity } = require('../../lib/activityTracker')
+const { checkAndAwardBadges } = require('../../lib/badges')
 
 const router = express.Router()
 
@@ -87,6 +90,26 @@ router.patch('/contributions/:contributionId', contributionReviewLimiter, requir
           targetSheetId: contribution.targetSheetId,
         })
       }
+
+      // Create a merge commit on the target sheet
+      const latestCommit = await prisma.sheetCommit.findFirst({
+        where: { sheetId: contribution.targetSheetId },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true },
+      })
+
+      await prisma.sheetCommit.create({
+        data: {
+          sheetId: contribution.targetSheetId,
+          userId: req.user.userId,
+          kind: 'merge',
+          message: `Merged contribution from ${contribution.proposer.username}`,
+          content: contribution.forkSheet.content,
+          contentFormat: contribution.forkSheet.contentFormat || 'markdown',
+          checksum: computeChecksum(contribution.forkSheet.content),
+          parentId: latestCommit ? latestCommit.id : null,
+        },
+      })
     }
 
     const updatedContribution = await prisma.sheetContribution.update({
@@ -109,6 +132,9 @@ router.patch('/contributions/:contributionId', contributionReviewLimiter, requir
         },
       },
     })
+
+    trackActivity(prisma, req.user.userId, 'reviews')
+    checkAndAwardBadges(prisma, req.user.userId)
 
     await createNotification(prisma, {
       userId: contribution.proposer.id,

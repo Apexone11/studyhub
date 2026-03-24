@@ -6,6 +6,7 @@ const { createNotification } = require('../../lib/notify')
 const { getAuthTokenFromRequest, verifyAuthToken } = require('../../lib/authTokens')
 const { getProfileAccessDecision, PROFILE_VISIBILITY } = require('../../lib/profileVisibility')
 const prisma = require('../../lib/prisma')
+const { checkAndAwardBadges } = require('../../lib/badges')
 
 const router = express.Router()
 
@@ -29,6 +30,195 @@ function optionalAuth(req, res, next) {
   next()
 }
 
+// ── GET /api/users/:username/activity ─────────────────────────
+router.get('/me/activity', requireAuth, async (req, res) => {
+  try {
+    const weeksParam = Math.min(Number(req.query.weeks) || 12, 52)
+    const since = new Date()
+    since.setDate(since.getDate() - weeksParam * 7)
+
+    const rows = await prisma.userDailyActivity.findMany({
+      where: { userId: req.user.userId, date: { gte: since } },
+      orderBy: { date: 'asc' },
+      select: { date: true, commits: true, sheets: true, reviews: true, comments: true },
+    })
+
+    res.json(rows)
+  } catch (err) {
+    captureError(err, { route: req.originalUrl })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── GET /api/users/:username/activity (public) ───────────────
+router.get('/:username/activity', optionalAuth, async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { username: req.params.username },
+      select: { id: true },
+    })
+    if (!user) return res.status(404).json({ error: 'User not found.' })
+
+    const weeksParam = Math.min(Number(req.query.weeks) || 12, 52)
+    const since = new Date()
+    since.setDate(since.getDate() - weeksParam * 7)
+
+    const rows = await prisma.userDailyActivity.findMany({
+      where: { userId: user.id, date: { gte: since } },
+      orderBy: { date: 'asc' },
+      select: { date: true, commits: true, sheets: true, reviews: true, comments: true },
+    })
+
+    res.json(rows)
+  } catch (err) {
+    captureError(err, { route: req.originalUrl })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── GET /api/users/me/badges ─────────────────────────────────
+router.get('/me/badges', requireAuth, async (req, res) => {
+  try {
+    const badges = await prisma.userBadge.findMany({
+      where: { userId: req.user.userId },
+      orderBy: { unlockedAt: 'desc' },
+      select: {
+        unlockedAt: true,
+        badge: { select: { slug: true, name: true, description: true, category: true, tier: true, iconUrl: true } },
+      },
+    })
+    res.json(badges.map((ub) => ({ ...ub.badge, unlockedAt: ub.unlockedAt })))
+  } catch (err) {
+    captureError(err, { route: req.originalUrl })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── GET /api/users/:username/badges (public) ─────────────────
+router.get('/:username/badges', optionalAuth, async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { username: req.params.username },
+      select: { id: true },
+    })
+    if (!user) return res.status(404).json({ error: 'User not found.' })
+
+    const badges = await prisma.userBadge.findMany({
+      where: { userId: user.id },
+      orderBy: { unlockedAt: 'desc' },
+      select: {
+        unlockedAt: true,
+        badge: { select: { slug: true, name: true, description: true, category: true, tier: true, iconUrl: true } },
+      },
+    })
+    res.json(badges.map((ub) => ({ ...ub.badge, unlockedAt: ub.unlockedAt })))
+  } catch (err) {
+    captureError(err, { route: req.originalUrl })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── GET /api/users/me/pinned-sheets ──────────────────────────
+router.get('/me/pinned-sheets', requireAuth, async (req, res) => {
+  try {
+    const pins = await prisma.userPinnedSheet.findMany({
+      where: { userId: req.user.userId },
+      orderBy: { position: 'asc' },
+      select: {
+        id: true,
+        position: true,
+        pinnedAt: true,
+        sheet: {
+          select: {
+            id: true,
+            title: true,
+            stars: true,
+            status: true,
+            updatedAt: true,
+            course: { select: { id: true, code: true, school: { select: { short: true } } } },
+          },
+        },
+      },
+    })
+    res.json(pins)
+  } catch (err) {
+    captureError(err, { route: req.originalUrl })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── POST /api/users/me/pinned-sheets ─────────────────────────
+router.post('/me/pinned-sheets', requireAuth, async (req, res) => {
+  const { sheetId } = req.body || {}
+  if (!sheetId || !Number.isInteger(Number(sheetId))) {
+    return res.status(400).json({ error: 'sheetId is required.' })
+  }
+
+  try {
+    const sheet = await prisma.studySheet.findUnique({
+      where: { id: Number(sheetId) },
+      select: { id: true, userId: true, status: true },
+    })
+    if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
+    if (sheet.userId !== req.user.userId) {
+      return res.status(403).json({ error: 'You can only pin your own sheets.' })
+    }
+
+    const existing = await prisma.userPinnedSheet.count({ where: { userId: req.user.userId } })
+    if (existing >= 6) {
+      return res.status(400).json({ error: 'You can pin up to 6 sheets.' })
+    }
+
+    const pin = await prisma.userPinnedSheet.upsert({
+      where: { userId_sheetId: { userId: req.user.userId, sheetId: sheet.id } },
+      update: {},
+      create: { userId: req.user.userId, sheetId: sheet.id, position: existing },
+    })
+
+    res.status(201).json(pin)
+  } catch (err) {
+    captureError(err, { route: req.originalUrl })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── DELETE /api/users/me/pinned-sheets/:sheetId ──────────────
+router.delete('/me/pinned-sheets/:sheetId', requireAuth, async (req, res) => {
+  const sheetId = Number(req.params.sheetId)
+  try {
+    await prisma.userPinnedSheet.deleteMany({
+      where: { userId: req.user.userId, sheetId },
+    })
+    res.json({ removed: true })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── PATCH /api/users/me/pinned-sheets/reorder ────────────────
+router.patch('/me/pinned-sheets/reorder', requireAuth, async (req, res) => {
+  const { order } = req.body || {}
+  if (!Array.isArray(order)) {
+    return res.status(400).json({ error: 'order must be an array of sheetIds.' })
+  }
+
+  try {
+    await prisma.$transaction(
+      order.map((sheetId, index) =>
+        prisma.userPinnedSheet.updateMany({
+          where: { userId: req.user.userId, sheetId: Number(sheetId) },
+          data: { position: index },
+        })
+      )
+    )
+    res.json({ reordered: true })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
 // ── GET /api/users/:username ───────────────────────────────────
 router.get('/:username', optionalAuth, async (req, res) => {
   try {
@@ -39,6 +229,7 @@ router.get('/:username', optionalAuth, async (req, res) => {
         username: true,
         role: true,
         avatarUrl: true,
+        coverImageUrl: true,
         createdAt: true,
         _count: {
           select: {
@@ -99,6 +290,31 @@ router.get('/:username', optionalAuth, async (req, res) => {
       // Degrade gracefully if notes query fails
     }
 
+    /* Fetch pinned sheets for profile display */
+    let pinnedSheets = []
+    try {
+      const pins = await prisma.userPinnedSheet.findMany({
+        where: { userId: user.id },
+        orderBy: { position: 'asc' },
+        take: 6,
+        select: {
+          sheet: {
+            select: {
+              id: true,
+              title: true,
+              stars: true,
+              updatedAt: true,
+              status: true,
+              course: { select: { id: true, code: true } },
+            },
+          },
+        },
+      })
+      pinnedSheets = pins.map((p) => p.sheet).filter((s) => s && s.status === 'published')
+    } catch {
+      // Degrade gracefully
+    }
+
     /* Fetch starred sheets for profile display */
     let starredSheets = []
     try {
@@ -132,6 +348,7 @@ router.get('/:username', optionalAuth, async (req, res) => {
       username: user.username,
       role: user.role,
       avatarUrl: user.avatarUrl || null,
+      coverImageUrl: user.coverImageUrl || null,
       createdAt: user.createdAt,
       sheetCount: user._count.studySheets,
       followerCount: user._count.followers,
@@ -139,6 +356,7 @@ router.get('/:username', optionalAuth, async (req, res) => {
       isFollowing,
       recentSheets: user.studySheets,
       enrollments: user.enrollments,
+      pinnedSheets,
       sharedNotes,
       starredSheets,
     })
@@ -171,6 +389,7 @@ router.post('/:username/follow', requireAuth, followLimiter, async (req, res) =>
     })
 
     const followerCount = await prisma.userFollow.count({ where: { followingId: target.id } })
+    checkAndAwardBadges(prisma, target.id)
     res.json({ following: true, followerCount })
   } catch (err) {
     if (err.code === 'P2002') return res.status(409).json({ error: 'Already following this user.' })

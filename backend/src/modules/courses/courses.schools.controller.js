@@ -46,7 +46,7 @@ router.get('/popular', schoolsLimiter, async (req, res) => {
   try {
     const grouped = await prisma.studySheet.groupBy({
       by: ['courseId'],
-      where: { status: 'published', courseId: { not: null } },
+      where: { status: 'published' },
       _count: { _all: true },
       orderBy: { _count: { _all: 'desc' } },
       take: POPULAR_COURSES_LIMIT,

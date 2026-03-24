@@ -4381,3 +4381,164 @@ Files changed:
 | `src/pages/feed/FeedPage.jsx` | `useRecentlyViewed`, since-last-visit banner, pass to FeedAside |
 | `src/pages/feed/FeedAside.jsx` | Recently viewed panel, why-revisit signals on starred sheets |
 | `src/pages/feed/useFeedData.js` | Last feed visit tracking, `newSinceLastVisit` |
+
+---
+
+Cycle 44 — GitHub-style SheetLab Rework [2026-03-24]
+
+This cycle consolidates the fork/edit/version-control workflow into a unified SheetLab workspace inspired by GitHub's pull request model.
+
+Added:
+
+- DB migration: `rootSheetId` on StudySheet, `kind` field on SheetCommit (`snapshot`, `fork_base`, `restore`, `merge`).
+  - `backend/prisma/migrations/20260324050000_add_root_sheet_id_and_commit_kind/migration.sql`
+- Idempotent fork endpoint: returns existing fork if user already forked, creates fork as `draft`, sets `rootSheetId`, creates `fork_base` commit.
+  - `backend/src/modules/sheets/sheets.fork.controller.js`
+- Smart viewer buttons: owner sees "Edit in SheetLab", non-owner sees "Edit your copy" (forks then redirects to lab).
+  - `frontend/studyhub-app/src/pages/sheets/SheetViewerPage.jsx`
+- Tabbed SheetLab layout with route guard: Editor | Changes | History | Contribute (forks) | Reviews (originals).
+  - `frontend/studyhub-app/src/pages/sheets/SheetLabPage.jsx`
+  - `frontend/studyhub-app/src/pages/sheets/SheetLabPage.css`
+  - `frontend/studyhub-app/src/pages/sheets/useSheetLab.js`
+- Split-pane editor with dark-themed monospace textarea + live preview (HTML iframe or markdown text), debounced autosave (1500ms).
+  - `frontend/studyhub-app/src/pages/sheets/SheetLabEditor.jsx`
+- Changes + Commit tab: shows uncommitted diff between current content and last snapshot, commit form with auto-summary.
+  - `frontend/studyhub-app/src/pages/sheets/SheetLabChanges.jsx`
+  - `backend/src/modules/sheetLab/sheetLab.operations.controller.js` — new `GET /api/sheets/:id/lab/uncommitted-diff`
+- Contribute tab: fork owners submit PRs to the original, view outgoing contribution history with inline diffs, sync from original (pull upstream).
+  - `frontend/studyhub-app/src/pages/sheets/SheetLabContribute.jsx`
+  - `backend/src/modules/sheetLab/sheetLab.operations.controller.js` — new `POST /api/sheets/:id/lab/sync-upstream`
+- Reviews tab: original owners review incoming contributions with accept/reject actions and inline diffs.
+  - `frontend/studyhub-app/src/pages/sheets/SheetLabReviews.jsx`
+- Contribution merge commit: accepting a contribution now creates a `merge` kind commit on the target sheet.
+  - `backend/src/modules/sheets/sheets.contributions.controller.js`
+- Fork deletion: fork owners can delete their fork from SheetLab with confirmation.
+- Fork publishing: draft sheets get a "Publish" button in the SheetLab header.
+- Color-coded commit kind badges (fork_base, restore, merge) in History tab.
+- `kind` field now included in commits list API response.
+- One-time tutorial banners for SheetLab (separate for owners and fork users), dismissed via localStorage.
+  - `frontend/studyhub-app/src/components/TutorialBanner.jsx`
+- Old `/sheets/:id/edit` route now redirects to `/sheets/:id/lab` for backward compatibility.
+  - `frontend/studyhub-app/src/App.jsx`
+
+Changed:
+
+- Restore commits now tagged with `kind: 'restore'`.
+- Preview page "Back to editor" link updated to point to SheetLab.
+- Fork redirect from sheets list updated from `/edit` to `/lab`.
+
+Fixed:
+
+- CSP `frame-ancestors` issue on preview routes (fixed in earlier session, included in this cycle scope).
+  - `backend/src/modules/preview/preview.routes.js` — uses `res.locals.frameAncestorsDirective` instead of hardcoded `'none'`.
+  - `backend/src/index.js` — passes computed frame-ancestors via `res.locals`.
+
+School/Course diagnosis:
+
+- No code bugs found. Backend endpoints, frontend API calls, and data transformation are all correct.
+- Root cause: empty database. Fix: run `npm --prefix backend run seed` on production.
+
+Cycle 44 Validation Commands (Executed)
+
+- `npm --prefix frontend/studyhub-app run lint` — 0 errors
+- `npm --prefix backend run lint` — 0 errors
+- `npm --prefix frontend/studyhub-app run build` — passes (262ms)
+
+Cycle 44 Validation Result
+
+- Frontend lint: 0 errors, 0 warnings
+- Backend lint: 0 errors
+- Frontend build: passes
+
+Cycle 44 Files Changed
+
+| File | Change |
+| ---- | ------ |
+| `backend/prisma/schema.prisma` | Added `rootSheetId` to StudySheet, `kind` to SheetCommit |
+| `backend/prisma/migrations/20260324050000_*/migration.sql` | Migration SQL |
+| `backend/src/index.js` | Pass `res.locals.frameAncestorsDirective` |
+| `backend/src/modules/preview/preview.routes.js` | Dynamic CSP with `buildPreviewCsp()` |
+| `backend/src/modules/sheets/sheets.fork.controller.js` | Idempotent fork, draft status, fork_base commit |
+| `backend/src/modules/sheets/sheets.contributions.controller.js` | Merge commit on accept |
+| `backend/src/modules/sheetLab/sheetLab.operations.controller.js` | `uncommitted-diff` + `sync-upstream` endpoints, restore kind |
+| `backend/src/modules/sheetLab/sheetLab.commits.controller.js` | Include `kind` in commits list select |
+| `frontend/studyhub-app/src/App.jsx` | EditRedirect, useParams import |
+| `frontend/studyhub-app/src/pages/sheets/SheetLabPage.jsx` | Full tabbed layout with real components |
+| `frontend/studyhub-app/src/pages/sheets/SheetLabPage.css` | Tab nav, status badges, commit kind badge CSS |
+| `frontend/studyhub-app/src/pages/sheets/useSheetLab.js` | reloadSheet, deleteForck, publish, activeTab logic |
+| `frontend/studyhub-app/src/pages/sheets/SheetLabEditor.jsx` | New: split-pane editor |
+| `frontend/studyhub-app/src/pages/sheets/SheetLabChanges.jsx` | New: changes + commit tab |
+| `frontend/studyhub-app/src/pages/sheets/SheetLabContribute.jsx` | New: contribute tab with sync |
+| `frontend/studyhub-app/src/pages/sheets/SheetLabReviews.jsx` | New: reviews tab |
+| `frontend/studyhub-app/src/pages/sheets/SheetViewerPage.jsx` | Smart edit/fork buttons |
+| `frontend/studyhub-app/src/pages/sheets/useSheetViewer.js` | Fork redirects to lab |
+| `frontend/studyhub-app/src/pages/sheets/useSheetsData.js` | Fork redirects to lab |
+| `frontend/studyhub-app/src/pages/preview/SheetHtmlPreviewPage.jsx` | Link to lab instead of edit |
+| `frontend/studyhub-app/src/components/TutorialBanner.jsx` | New: one-time tutorial banner |
+
+---
+
+## Cycle 45 — Profile & Achievements (2026-03-24)
+
+### Added
+
+- **Cover Image System**: Full pipeline — `coverImageUrl` column on User, `COVERS_DIR` storage with separate upload directory (not mixed with avatars), multer disk upload with 8MB limit, JPEG/PNG/WebP validation with magic byte checks, `POST /api/upload/cover` and `DELETE /api/upload/cover` endpoints with old-file cleanup.
+- **Cover Crop Modal** (`CoverCropModal.jsx`): Rectangular 16:5 crop using react-easy-crop, zoom slider, uploads cropped JPEG blob to cover endpoint.
+- **Profile Cover Banner**: Cover image displays on the profile page with gradient overlay for contrast-safe text. Avatar overlaps the cover boundary. Fallback gradient for profiles without covers.
+- **Settings Cover Section**: New "Cover Image" section in ProfileTab with upload/change/remove buttons and live preview.
+- **Pinned Sheets**: `UserPinnedSheet` model with position ordering, max 6 pins per user. Full CRUD: `GET/POST /api/users/me/pinned-sheets`, `DELETE /api/users/me/pinned-sheets/:sheetId`, `PATCH /api/users/me/pinned-sheets/reorder`. Pinned sheets appear in profile response and render as a grid on the profile page.
+- **Activity Tracking**: `UserDailyActivity` model with daily counters for commits, sheets, reviews, comments. `trackActivity()` helper called from SheetLab commits, sheet creation, contribution reviews, and comment creation. `GET /api/users/me/activity` and `GET /api/users/:username/activity` endpoints with configurable week range.
+- **Contribution Graph Heatmap** (`ActivityHeatmap.jsx`): GitHub-style SVG heatmap with 5 intensity levels, Study/Build/All filter toggle, day labels, and color legend. Renders on profile page when activity data exists.
+- **Badge System**: 12 badges across 3 categories (Studying, Building, Collaboration) and 3 tiers (bronze, silver, gold). `Badge` and `UserBadge` models. Badge catalog auto-seeded at server startup via `seedBadgeCatalog()`. `checkAndAwardBadges()` engine checks user stats and awards badges on key actions (commits, sheet creation, contribution reviews, follows).
+- **Badge UI** (`BadgeDisplay.jsx`): Coin-shaped badges with sticker/3D-lite style — gradient backgrounds per tier (bronze/silver/gold), inset shadows, hover lift animation, category icons. Achievements section on profile page.
+- **Badge Endpoints**: `GET /api/users/me/badges` and `GET /api/users/:username/badges`.
+
+### Changed
+
+- `coverImageUrl` added to session user select (auth service), settings user select (settings service), and profile response (users route).
+- `/me/` routes in users module moved before `/:username` to prevent Express param collision.
+- `ProfileTab` now accepts `onCoverChange` prop; `SettingsPage` wires cover state sync.
+
+### Database
+
+- Migration `20260324060000_cycle45_profile_achievements`:
+  - `ALTER TABLE "User" ADD COLUMN "coverImageUrl" TEXT`
+  - `CREATE TABLE "UserPinnedSheet"` with unique constraint on (userId, sheetId)
+  - `CREATE TABLE "UserDailyActivity"` with unique constraint on (userId, date)
+  - `CREATE TABLE "Badge"` with unique slug
+  - `CREATE TABLE "UserBadge"` with unique constraint on (userId, badgeId)
+
+### Validation
+
+```
+npm --prefix backend run lint          ✅ clean
+npm --prefix frontend/studyhub-app run lint   ✅ clean
+npm --prefix frontend/studyhub-app run build  ✅ clean (282ms)
+npx prisma validate                    ✅ schema valid
+```
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `backend/prisma/schema.prisma` | Added coverImageUrl, UserPinnedSheet, UserDailyActivity, Badge, UserBadge models |
+| `backend/prisma/migrations/20260324060000_cycle45_profile_achievements/migration.sql` | New migration |
+| `backend/src/lib/storage.js` | Added COVERS_DIR, buildCoverUrl, resolveCoverPath, cleanupCoverIfUnused |
+| `backend/src/lib/activityTracker.js` | New: daily activity increment helper |
+| `backend/src/lib/badges.js` | New: badge catalog, seedBadgeCatalog, checkAndAwardBadges |
+| `backend/src/lib/bootstrap.js` | Seed badge catalog at startup |
+| `backend/src/modules/upload/upload.routes.js` | Added POST/DELETE /api/upload/cover |
+| `backend/src/modules/users/users.routes.js` | Added /me/badges, /:username/badges, /me/pinned-sheets CRUD, /me/activity, /:username/activity, badge check on follow |
+| `backend/src/modules/settings/settings.service.js` | Added coverImageUrl to settings user select |
+| `backend/src/modules/auth/auth.service.js` | Added coverImageUrl to session user select |
+| `backend/src/modules/sheetLab/sheetLab.commits.controller.js` | Added trackActivity + checkAndAwardBadges |
+| `backend/src/modules/sheets/sheets.create.controller.js` | Added trackActivity + checkAndAwardBadges |
+| `backend/src/modules/sheets/sheets.contributions.controller.js` | Added trackActivity + checkAndAwardBadges |
+| `backend/src/modules/sheets/sheets.social.controller.js` | Added trackActivity on comment create |
+| `frontend/studyhub-app/src/components/CoverCropModal.jsx` | New: rectangular cover crop modal |
+| `frontend/studyhub-app/src/components/ActivityHeatmap.jsx` | New: SVG contribution graph heatmap |
+| `frontend/studyhub-app/src/components/BadgeDisplay.jsx` | New: coin-shaped badge renderer |
+| `frontend/studyhub-app/src/pages/settings/ProfileTab.jsx` | Added cover image section with upload/remove |
+| `frontend/studyhub-app/src/pages/settings/SettingsPage.jsx` | Wired onCoverChange prop |
+| `frontend/studyhub-app/src/pages/profile/UserProfilePage.jsx` | Cover banner, heatmap, badges, pinned sheets |
+| `frontend/studyhub-app/src/pages/profile/ProfileWidgets.jsx` | Added BadgesSection, PinnedSheetsSection |
