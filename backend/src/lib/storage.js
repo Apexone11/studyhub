@@ -34,9 +34,10 @@ const UPLOADS_DIR = resolveUploadsDir(process.env.UPLOADS_DIR || autoDetectedUpl
 const AVATARS_DIR = path.join(UPLOADS_DIR, 'avatars')
 const COVERS_DIR = path.join(UPLOADS_DIR, 'covers')
 const ATTACHMENTS_DIR = path.join(UPLOADS_DIR, 'attachments')
+const SCHOOL_LOGOS_DIR = path.join(UPLOADS_DIR, 'school-logos')
 
 function ensureUploadDirectories() {
-  for (const directory of [UPLOADS_DIR, AVATARS_DIR, COVERS_DIR, ATTACHMENTS_DIR]) {
+  for (const directory of [UPLOADS_DIR, AVATARS_DIR, COVERS_DIR, ATTACHMENTS_DIR, SCHOOL_LOGOS_DIR]) {
     fs.mkdirSync(directory, { recursive: true })
     fs.accessSync(directory, fs.constants.R_OK | fs.constants.W_OK)
   }
@@ -249,6 +250,7 @@ module.exports = {
   ATTACHMENTS_DIR,
   AVATARS_DIR,
   COVERS_DIR,
+  SCHOOL_LOGOS_DIR,
   PRIVATE_ATTACHMENT_PREFIX,
   UPLOADS_DIR,
   buildAttachmentUrl,

@@ -13,11 +13,6 @@ const {
 const { registerLimiter, verificationLimiter } = require('./auth.constants')
 const {
   AppError,
-  parseOptionalInteger,
-  parseCourseIds,
-  parseCustomCourses,
-  resolveCourseIds,
-  validateCourses,
   validateRegistrationInput,
   sendVerificationCodeEmail,
   issueAuthenticatedSession,
@@ -28,20 +23,11 @@ const router = express.Router()
 
 /* ── Direct registration (no email verification) ────────────────────────
  * Creates account in a single step: validate fields -> create user -> issue session.
- * Email is stored but not verified at signup time. Google handles its own
- * verification, and local users can verify later via settings.
- *
- * Flow:
- * 1. POST /api/auth/register { username, email, password, confirmPassword, termsAccepted }
- *    -> 201 { user, message: 'Account created!' }
- *
- * 2. Frontend then shows course selection step, which calls:
- *    PATCH /api/settings/courses { schoolId, courseIds, customCourses }
- *    (using the auth token from step 1)
+ * School/course selection is deferred to /my-courses (post-signup).
  * ─────────────────────────────────────────────────────────────────────── */
 router.post('/register', registerLimiter, async (req, res) => {
   try {
-    const { username, email, password } = validateRegistrationInput(req.body || {})
+    const { username, email, password, accountType } = validateRegistrationInput(req.body || {})
 
     const existingUsername = await prisma.user.findUnique({ where: { username }, select: { id: true } })
     if (existingUsername) {
@@ -62,6 +48,7 @@ router.post('/register', registerLimiter, async (req, res) => {
         username,
         passwordHash,
         email,
+        accountType,
         emailVerified: false,
         emailVerificationCode: null,
         emailVerificationExpiry: null,
@@ -81,7 +68,7 @@ router.post('/register', registerLimiter, async (req, res) => {
 
 router.post('/register/start', registerLimiter, async (req, res) => {
   try {
-    const { username, email, password } = validateRegistrationInput(req.body || {})
+    const { username, email, password, accountType } = validateRegistrationInput(req.body || {})
 
     if (!email) {
       return res.status(400).json({ error: 'Email is required for the verified registration flow.' })
@@ -100,7 +87,7 @@ router.post('/register/start', registerLimiter, async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 12)
-    const { challenge, code } = await createSignupChallenge({ username, email, passwordHash })
+    const { challenge, code } = await createSignupChallenge({ username, email, passwordHash, accountType })
 
     try {
       await sendVerificationCodeEmail(challenge.email, challenge.username, code, {
@@ -131,7 +118,7 @@ router.post('/register/verify', verificationLimiter, async (req, res) => {
     res.json({
       verified: true,
       verificationToken: challenge.token,
-      nextStep: 'courses',
+      nextStep: 'complete',
       expiresAt: challenge.expiresAt,
     })
   } catch (error) {
@@ -164,19 +151,11 @@ router.post('/register/complete', registerLimiter, async (req, res) => {
     )
 
     if (!challenge.verifiedAt) {
-      throw new AppError(400, 'Verify your email before choosing courses and completing registration.')
+      throw new AppError(400, 'Verify your email before completing registration.')
     }
 
-    const parsedSchoolId = parseOptionalInteger(body.schoolId, 'schoolId')
-    const parsedCourseIds = parseCourseIds(body.courseIds)
-    const parsedCustomCourses = parseCustomCourses(body.customCourses)
-
-    if (parsedCustomCourses.length > 0 && parsedSchoolId === null) {
-      throw new AppError(400, 'Please select a school before adding custom courses.')
-    }
-
-    await validateCourses(parsedCourseIds, parsedSchoolId)
-
+    // School/course selection is no longer part of registration.
+    // Users can personalize later via /my-courses.
     const createdUserId = await prisma.$transaction(async (tx) => {
       const [existingUsername, existingEmail] = await Promise.all([
         tx.user.findUnique({
@@ -201,29 +180,13 @@ router.post('/register/complete', registerLimiter, async (req, res) => {
           username: challenge.username,
           passwordHash: challenge.passwordHash,
           email: challenge.email,
+          accountType: challenge.payload?.accountType || 'student',
           emailVerified: true,
           emailVerificationCode: null,
           emailVerificationExpiry: null,
         },
         select: { id: true },
       })
-
-      const resolvedCourseIds = await resolveCourseIds(
-        tx,
-        parsedCourseIds,
-        parsedCustomCourses,
-        parsedSchoolId,
-      )
-
-      if (resolvedCourseIds.length > 0) {
-        await tx.enrollment.createMany({
-          data: resolvedCourseIds.map((courseId) => ({
-            userId: createdUser.id,
-            courseId,
-          })),
-          skipDuplicates: true,
-        })
-      }
 
       await tx.verificationChallenge.deleteMany({
         where: { id: challenge.id },

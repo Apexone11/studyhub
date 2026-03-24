@@ -16,7 +16,7 @@ import { GOOGLE_CLIENT_ID } from './config'
 const HomePage = lazy(() => import('./pages/home/HomePage'))
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'))
 const RegisterScreen = lazy(() => import('./pages/auth/RegisterScreen'))
-const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage'))
+/* DashboardPage removed — /dashboard now redirects to /users/:me via DashboardRedirect */
 const TermsPage = lazy(() => import('./pages/legal/TermsPage'))
 const PrivacyPage = lazy(() => import('./pages/legal/PrivacyPage'))
 const GuidelinesPage = lazy(() => import('./pages/legal/GuidelinesPage'))
@@ -37,6 +37,7 @@ const TestTakerPage = lazy(() => import('./pages/tests/TestTakerPage'))
 const NotesPage = lazy(() => import('./pages/notes/NotesPage'))
 const AnnouncementsPage = lazy(() => import('./pages/announcements/AnnouncementsPage'))
 const SubmitPage = lazy(() => import('./pages/submit/SubmitPage'))
+const MyCoursesPage = lazy(() => import('./pages/courses/MyCoursesPage'))
 const SheetLabPage = lazy(() => import('./pages/sheets/SheetLabPage'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 
@@ -65,6 +66,12 @@ function EditRedirect() {
   return <Navigate to={`/sheets/${id}/lab`} replace />
 }
 
+function DashboardRedirect() {
+  const { user } = useSession()
+  if (!user) return <Navigate to="/login" replace />
+  return <Navigate to={`/users/${user.username}?tab=overview`} replace />
+}
+
 /* Route-change announcer for screen readers */
 const ROUTE_TITLES = {
   '/': 'Home',
@@ -77,8 +84,9 @@ const ROUTE_TITLES = {
   '/notes': 'My Notes',
   '/announcements': 'Announcements',
   '/submit': 'Submit Request',
+  '/my-courses': 'My Courses',
   '/admin': 'Admin',
-  '/dashboard': 'Profile',
+  '/dashboard': 'My Profile',
   '/settings': 'Settings',
   '/terms': 'Terms of Service',
   '/privacy': 'Privacy Policy',
@@ -188,8 +196,9 @@ function AppRoutes() {
             <Route path="/notes"         element={<PrivateRoute><NotesPage /></PrivateRoute>} />
             <Route path="/announcements" element={<PrivateRoute><AnnouncementsPage /></PrivateRoute>} />
             <Route path="/submit"        element={<PrivateRoute><SubmitPage /></PrivateRoute>} />
+            <Route path="/my-courses"   element={<PrivateRoute><MyCoursesPage /></PrivateRoute>} />
             <Route path="/admin"         element={<PrivateRoute><AdminPage /></PrivateRoute>} />
-            <Route path="/dashboard"     element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
+            <Route path="/dashboard"     element={<PrivateRoute><DashboardRedirect /></PrivateRoute>} />
             <Route path="/settings"      element={<PrivateRoute><SettingsPage /></PrivateRoute>} />
 
             {/* ── public user profiles ─────────────────────────────── */}

@@ -130,7 +130,7 @@ const QUICK_ACTIONS = [
     ),
     label: 'Join a course',
     helper: 'Personalise your feed',
-    path: '/settings?tab=courses',
+    path: '/my-courses',
     check: (u) => (u?.counts?.courses || 0) > 0,
   },
   {

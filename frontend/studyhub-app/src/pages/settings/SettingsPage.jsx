@@ -20,7 +20,6 @@ import { showToast } from '../../lib/toast'
 import { usePageTitle } from '../../lib/usePageTitle'
 import ProfileTab from './ProfileTab'
 import SecurityTab from './SecurityTab'
-import CoursesTab from './CoursesTab'
 import AccountTab from './AccountTab'
 import NotificationsTab from './NotificationsTab'
 import PrivacyTab from './PrivacyTab'
@@ -31,7 +30,6 @@ const NAV_TABS = [
   { id: 'security', label: 'Security' },
   { id: 'notifications', label: 'Notifications' },
   { id: 'privacy', label: 'Privacy' },
-  { id: 'courses', label: 'Courses' },
   { id: 'appearance', label: 'Appearance' },
   { id: 'account', label: 'Account' },
 ]
@@ -182,8 +180,6 @@ export default function SettingsPage() {
         return <div data-tutorial="settings-notifications"><NotificationsTab /></div>
       case 'privacy':
         return <PrivacyTab />
-      case 'courses':
-        return <CoursesTab user={user} busyKey={busyKey} setBusyKey={setBusyKey} syncUser={syncUser} />
       case 'appearance':
         return <div data-tutorial="settings-appearance"><AppearanceTab /></div>
       case 'account':

@@ -163,16 +163,100 @@
 }
 
 /* ── Profile page ──────────────────────────────────────────────────────── */
-.profile-columns {
-  display: grid;
-  gap: 16px;
-  grid-template-columns: 1.5fr 1fr;
-  align-items: start;
+
+/* Hero height */
+.profile-hero {
+  position: relative;
+  height: 360px;
+  min-height: 320px;
+  max-height: 420px;
+  overflow: hidden;
 }
 
 @media (max-width: 767px) {
-  .profile-columns {
+  .profile-hero {
+    height: 260px;
+    min-height: 220px;
+    max-height: 300px;
+  }
+}
+
+/* Tab bar */
+.profile-tabs {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 4px;
+}
+
+.profile-tabs::-webkit-scrollbar { display: none; }
+
+.profile-tab-btn {
+  padding: 8px 18px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: var(--sh-muted);
+  font-size: 13px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+  min-height: 44px;
+}
+
+.profile-tab-btn:hover {
+  background: var(--sh-soft);
+  color: var(--sh-heading);
+}
+
+.profile-tab-btn--active {
+  background: var(--sh-brand);
+  color: #fff;
+}
+
+.profile-tab-btn--active:hover {
+  background: var(--sh-brand);
+  color: #fff;
+}
+
+/* Two-column cockpit layout (own profile overview) */
+.profile-cockpit {
+  display: grid;
+  gap: 20px;
+  align-items: start;
+  grid-template-columns: 1.15fr 0.85fr;
+}
+
+@media (max-width: 899px) {
+  .profile-cockpit {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Single-column content area */
+.profile-columns {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1fr;
+  align-items: start;
+}
+
+/* Hero CTA row */
+.profile-hero-ctas {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 767px) {
+  .profile-hero-ctas {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
   }
 }
 

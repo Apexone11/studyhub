@@ -1,9 +1,13 @@
 /* ═══════════════════════════════════════════════════════════════════════════
  * useRegisterFlow.js — Custom hook for multi-step registration state & API
+ *
+ * Two-step flow: Account → Verify Email → auto-complete.
+ * Google OAuth: single-click creation (no extra steps).
+ * School/course selection is deferred to /my-courses (post-signup).
  * ═══════════════════════════════════════════════════════════════════════════ */
 
-import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { getAuthenticatedHomePath } from '../../lib/authNavigation'
 import { trackSignupConversion, trackEvent } from '../../lib/telemetry'
 import { useSession } from '../../lib/session-context'
@@ -12,32 +16,18 @@ import {
   apiVerifyCode,
   apiResendCode,
   apiGoogleAuth,
-  apiGoogleComplete,
   apiCompleteRegistration,
-  apiLoadSchools,
 } from './registerConstants'
 
 export default function useRegisterFlow() {
   const navigate = useNavigate()
-  const location = useLocation()
   const { completeAuthentication } = useSession()
 
-  /* ── Google course selection flow (redirected from login page) ──────── */
-  const googleState = location.state
-  const isGoogleCourseFlow = Boolean(googleState?.googleCourseSelection && googleState?.tempCredential)
-
   /* ── State ─────────────────────────────────────────────────────────── */
-  const [step, setStep] = useState(isGoogleCourseFlow ? 'courses' : 'account')
+  const [step, setStep] = useState('account')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState(isGoogleCourseFlow ? `Signed in as ${googleState.googleName || 'Google user'}. Choose your courses to finish setup.` : '')
-  const [catalogError, setCatalogError] = useState('')
-  const [catalogLoading, setCatalogLoading] = useState(false)
-  const [schools, setSchools] = useState([])
-  const [selectedCourseIds, setSelectedCourseIds] = useState([])
-  const [customCourses, setCustomCourses] = useState([])
-  const [customCourseDraft, setCustomCourseDraft] = useState({ code: '', name: '' })
-  const [googleCredential, setGoogleCredential] = useState(isGoogleCourseFlow ? googleState.tempCredential : null)
+  const [success, setSuccess] = useState('')
   const [verificationToken, setVerificationToken] = useState('')
   const [verificationCode, setVerificationCode] = useState('')
   const [deliveryHint, setDeliveryHint] = useState('')
@@ -50,8 +40,8 @@ export default function useRegisterFlow() {
     email: '',
     password: '',
     confirmPassword: '',
+    accountType: 'student',
     termsAccepted: false,
-    schoolId: '',
   })
 
   /* ── Resend countdown timer ──────────────────────────────────────── */
@@ -65,37 +55,6 @@ export default function useRegisterFlow() {
     const interval = setInterval(tick, 1000)
     return () => clearInterval(interval)
   }, [resendAvailableAt])
-
-  /* ── Load course catalog when entering courses step ────────────────── */
-  useEffect(() => {
-    if (step !== 'courses' || schools.length > 0 || catalogLoading) return
-
-    let active = true
-    setCatalogLoading(true)
-    setCatalogError('')
-
-    apiLoadSchools()
-      .then((data) => {
-        if (!active) return
-        setSchools(Array.isArray(data) ? data : [])
-      })
-      .catch((loadError) => {
-        if (!active) return
-        setCatalogError(loadError.message || 'Could not load the course catalog.')
-      })
-      .finally(() => {
-        if (active) setCatalogLoading(false)
-      })
-
-    return () => { active = false }
-  }, [catalogLoading, schools.length, step])
-
-  /* ── Derived state ─────────────────────────────────────────────────── */
-  const selectedSchool = useMemo(
-    () => schools.find((school) => String(school.id) === String(form.schoolId)) || null,
-    [form.schoolId, schools],
-  )
-  const availableCourses = selectedSchool?.courses || []
 
   /* ── Form helpers ──────────────────────────────────────────────────── */
   function setField(key, value) {
@@ -144,11 +103,17 @@ export default function useRegisterFlow() {
     setSuccess('')
 
     try {
-      const result = await apiVerifyCode(verificationToken, trimmedCode)
+      const verifyResult = await apiVerifyCode(verificationToken, trimmedCode)
+      if (!verifyResult.ok) { setError(verifyResult.error); return }
+
+      // Immediately complete registration (no courses step)
+      const result = await apiCompleteRegistration(verificationToken)
       if (!result.ok) { setError(result.error); return }
 
-      setStep('courses')
-      setSuccess('Email verified! Now choose your courses, or skip for now.')
+      completeAuthentication(result.data.user)
+      trackSignupConversion()
+      trackEvent('signup_completed', { method: 'local' })
+      navigate(getAuthenticatedHomePath(result.data.user), { replace: true })
     } catch {
       setError('Could not connect to the server.')
     } finally {
@@ -189,72 +154,11 @@ export default function useRegisterFlow() {
       const result = await apiGoogleAuth(credentialResponse.credential)
       if (!result.ok) { setError(result.error); return }
 
-      if (result.data.requiresCourseSelection) {
-        setGoogleCredential(result.data.tempCredential)
-        setStep('courses')
-        setSuccess(`Signed in as ${result.data.googleName || 'Google user'}. Choose your courses to finish setup.`)
-        return
-      }
-
+      // Google creates the user immediately — no extra steps
       completeAuthentication(result.data.user)
       trackSignupConversion()
+      trackEvent('signup_completed', { method: 'google' })
       navigate(getAuthenticatedHomePath(result.data.user), { replace: true })
-    } catch {
-      setError('Could not connect to the server.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  /* ── Course selection helpers ───────────────────────────────────────── */
-  function toggleCourse(courseId) {
-    setSelectedCourseIds((current) => (
-      current.includes(courseId)
-        ? current.filter((id) => id !== courseId)
-        : current.length < 10
-          ? [...current, courseId]
-          : current
-    ))
-  }
-
-  function addCustomCourse() {
-    const code = customCourseDraft.code.trim().toUpperCase()
-    const name = customCourseDraft.name.trim()
-
-    if (!form.schoolId) { setError('Choose a school before adding a custom course.'); return }
-    if (!code || !name) { setError('Enter both a course code and a course name.'); return }
-    if (selectedCourseIds.length + customCourses.length >= 10) { setError('You can add up to 10 total courses.'); return }
-    if (customCourses.some((course) => course.code === code)) { setError('That custom course has already been added.'); return }
-
-    setCustomCourses((current) => [...current, { code, name }])
-    setCustomCourseDraft({ code: '', name: '' })
-    setError('')
-  }
-
-  /* ── Complete registration with courses ────────────────────────────── */
-  async function handleCompleteRegistration(skipCourses = false) {
-    setLoading(true)
-    setError('')
-    setSuccess('')
-
-    const schoolId = skipCourses ? null : (form.schoolId ? Number(form.schoolId) : null)
-    const courseIds = skipCourses ? [] : selectedCourseIds
-    const courses = skipCourses ? [] : customCourses
-
-    try {
-      const result = googleCredential
-        ? await apiGoogleComplete(googleCredential, schoolId, courseIds, courses)
-        : await apiCompleteRegistration(verificationToken, schoolId, courseIds, courses)
-
-      if (!result.ok) { setError(result.error); return }
-
-      completeAuthentication(result.data.user)
-      trackSignupConversion()
-      trackEvent('signup_completed', {
-        method: googleCredential ? 'google' : 'local',
-        ...(googleCredential ? {} : { skipped_courses: skipCourses }),
-      })
-      navigate('/dashboard?welcome=1', { replace: true })
     } catch {
       setError('Could not connect to the server.')
     } finally {
@@ -264,14 +168,9 @@ export default function useRegisterFlow() {
 
   return {
     step, loading, error, success, form,
-    catalogError, catalogLoading, schools,
-    selectedCourseIds, customCourses, customCourseDraft,
-    googleCredential, verificationCode, deliveryHint, resendCountdown,
-    selectedSchool, availableCourses,
-    setError, setField, setVerificationCode, setCustomCourseDraft,
-    setSelectedCourseIds, setCustomCourses, setCatalogError, setSchools,
+    verificationCode, deliveryHint, resendCountdown,
+    setError, setField, setVerificationCode,
     handleCreateAccount, handleVerifyCode, handleResendCode,
-    handleGoogleSuccess, handleCompleteRegistration,
-    toggleCourse, addCustomCourse,
+    handleGoogleSuccess,
   }
 }

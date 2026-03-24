@@ -5,7 +5,6 @@
 import { Link } from 'react-router-dom'
 import { GoogleLogin } from '@react-oauth/google'
 import { GOOGLE_CLIENT_ID } from '../../config'
-import CourseListPicker from '../../components/CourseListPicker'
 
 /* ── Password strength indicator ───────────────────────────────────────── */
 export function PasswordHint({ password, confirmPassword }) {
@@ -156,6 +155,24 @@ export function AccountStep({ form, setField, loading, onSubmit, onGoogleSuccess
 
       <PasswordHint password={form.password} confirmPassword={form.confirmPassword} />
 
+      {/* Account type */}
+      <div className="register-field" style={{ marginTop: 14 }}>
+        <label className="register-label">I am a...</label>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {[['student', 'Student'], ['teacher', 'Teacher / TA'], ['other', 'Other']].map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setField('accountType', value)}
+              className={`sh-chip${form.accountType === value ? ' sh-chip--active' : ''}`}
+              style={{ padding: '8px 16px', fontSize: 13, fontWeight: 600 }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Terms checkbox */}
       <label className="register-terms">
         <input
@@ -234,134 +251,3 @@ export function VerifyStep({ verificationCode, setVerificationCode, deliveryHint
   )
 }
 
-/* ══════════════════════════════════════════════════════════════════════════
- * STEP 3: Course Selection
- * ══════════════════════════════════════════════════════════════════════════ */
-export function CoursesStep({
-  form, setField, loading, schools, catalogLoading, catalogError,
-  selectedSchool, availableCourses, selectedCourseIds, toggleCourse,
-  customCourses, customCourseDraft, setCustomCourseDraft, setCustomCourses,
-  addCustomCourse, onComplete, setCatalogError, setSchools,
-  setSelectedCourseIds,
-}) {
-  return (
-    <div>
-      <div className="register-section-header">
-        <div className="register-logo-mark register-logo-mark--courses">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--sh-success)" strokeWidth="2" strokeLinecap="round">
-            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-          </svg>
-        </div>
-        <h1 className="register-h1">Choose your courses</h1>
-        <p className="register-subtitle">Add your school and courses, or skip and set up later.</p>
-      </div>
-
-      {catalogError && (
-        <div className="register-alert--danger-row">
-          <span>{catalogError}</span>
-          <button onClick={() => { setCatalogError(''); setSchools([]) }} className="register-btn-small">
-            Retry
-          </button>
-        </div>
-      )}
-
-      {/* School selector */}
-      <div className="register-field">
-        <label htmlFor="register-school" className="register-label">School</label>
-        <select
-          id="register-school"
-          value={form.schoolId}
-          onChange={(event) => {
-            setField('schoolId', event.target.value)
-            setSelectedCourseIds([])
-            setCustomCourses([])
-          }}
-          className="register-select"
-        >
-          <option value="">Skip school selection for now</option>
-          {schools.map((school) => (
-            <option key={school.id} value={school.id}>
-              {school.short} — {school.name}{school.city ? `, ${school.city}` : ''}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {catalogLoading && (
-        <div className="register-loading">Loading course catalog...</div>
-      )}
-
-      {selectedSchool && availableCourses.length > 0 && (
-        <div style={{ marginBottom: 18 }}>
-          <div className="register-catalog-label">Course Catalog</div>
-          <CourseListPicker
-            courses={availableCourses}
-            selectedIds={selectedCourseIds}
-            onToggle={toggleCourse}
-            maxSelections={10}
-            maxHeight={220}
-          />
-        </div>
-      )}
-
-      {/* Custom course input */}
-      <div className="register-custom-course-box">
-        <div className="register-catalog-label">Add a custom course</div>
-        <div className="register-custom-course-grid">
-          <input
-            value={customCourseDraft.code}
-            onChange={(event) => setCustomCourseDraft((current) => ({ ...current, code: event.target.value.toUpperCase() }))}
-            placeholder="Code"
-            className="register-input"
-          />
-          <input
-            value={customCourseDraft.name}
-            onChange={(event) => setCustomCourseDraft((current) => ({ ...current, name: event.target.value }))}
-            placeholder="Course name"
-            className="register-input"
-          />
-          <button type="button" onClick={addCustomCourse} className="register-btn-add">
-            Add
-          </button>
-        </div>
-        {customCourses.length > 0 && (
-          <div className="register-pills">
-            {customCourses.map((course) => (
-              <span key={course.code} className="register-pill">
-                {course.code}
-                <button
-                  type="button"
-                  onClick={() => setCustomCourses((current) => current.filter((item) => item.code !== course.code))}
-                  className="register-pill-remove"
-                >
-                  x
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Action buttons */}
-      <div className="register-actions">
-        <button
-          type="button"
-          onClick={() => onComplete(false)}
-          disabled={loading}
-          className="register-btn-success"
-        >
-          {loading ? 'Finishing setup...' : 'Finish Setup'}
-        </button>
-        <button
-          type="button"
-          onClick={() => onComplete(true)}
-          disabled={loading}
-          className="register-btn-secondary"
-        >
-          Skip For Now
-        </button>
-      </div>
-    </div>
-  )
-}

@@ -8,7 +8,7 @@ const { initSentry, captureError } = require('./monitoring/sentry')
 const { bootstrapRuntime } = require('./lib/bootstrap')
 const { validateEmailTransport } = require('./lib/email')
 const { startHtmlArchiveScheduler } = require('./lib/htmlArchiveScheduler')
-const { AVATARS_DIR, validateUploadStorage } = require('./lib/storage')
+const { AVATARS_DIR, COVERS_DIR, SCHOOL_LOGOS_DIR, validateUploadStorage } = require('./lib/storage')
 const csrfProtection = require('./middleware/csrf')
 const { guardedMode, isGuardedModeEnabled } = require('./middleware/guardedMode')
 const checkRestrictions = require('./middleware/checkRestrictions')
@@ -117,12 +117,13 @@ const previewSurfaceCsp = [
   `frame-ancestors ${previewFrameAncestors.length > 0 ? previewFrameAncestors.join(' ') : "'none'"}`,
   "form-action 'none'",
   "connect-src 'none'",
-  "img-src data: blob:",
-  "font-src data:",
+  "img-src data: blob: https:",
+  "font-src data: blob: https://fonts.gstatic.com",
   "media-src data: blob:",
   "object-src 'none'",
   "script-src 'none'",
-  "style-src 'unsafe-inline'",
+  "style-src 'unsafe-inline' https://fonts.googleapis.com",
+  "style-src-elem 'unsafe-inline' https://fonts.googleapis.com",
 ].join('; ')
 
 app.disable('x-powered-by')
@@ -230,13 +231,29 @@ app.use(checkRestrictions)
 // Attach feature flag evaluation helper to every request.
 app.use(featureFlagMiddleware)
 
-// Only avatars remain publicly retrievable. Study attachments now stay behind
-// auth-checked preview/download handlers.
+// Avatars and cover images are publicly retrievable. Study attachments stay
+// behind auth-checked preview/download handlers.
 app.use('/uploads/avatars', express.static(AVATARS_DIR, {
   index: false,
   setHeaders: (res) => {
     res.setHeader('X-Content-Type-Options', 'nosniff')
     res.setHeader('Cache-Control', 'public, max-age=300')
+  },
+}))
+
+app.use('/uploads/covers', express.static(COVERS_DIR, {
+  index: false,
+  setHeaders: (res) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff')
+    res.setHeader('Cache-Control', 'public, max-age=300')
+  },
+}))
+
+app.use('/uploads/school-logos', express.static(SCHOOL_LOGOS_DIR, {
+  index: false,
+  setHeaders: (res) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff')
+    res.setHeader('Cache-Control', 'public, max-age=3600')
   },
 }))
 

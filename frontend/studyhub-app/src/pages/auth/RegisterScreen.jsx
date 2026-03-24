@@ -1,8 +1,9 @@
 /* ═══════════════════════════════════════════════════════════════════════════
  * RegisterScreen.jsx — StudyHub account creation page
  *
- * Three-step flow: Account -> Verify Email -> Courses.
- * Google OAuth flow: Google button -> Courses step (skips account form + verification).
+ * Two-step flow: Account -> Verify Email -> auto-complete.
+ * Google OAuth flow: single-click creation (no extra steps).
+ * School/course selection is deferred to /my-courses (post-signup).
  *
  * Design: Direction A — Campus Lab tokens, no inline hex colors.
  * ═══════════════════════════════════════════════════════════════════════════ */
@@ -13,14 +14,14 @@ import Navbar from '../../components/Navbar'
 import { fadeInUp } from '../../lib/animations'
 import { validateAccountFields, getSteps } from './registerConstants'
 import useRegisterFlow from './useRegisterFlow'
-import { StepIndicator, AccountStep, VerifyStep, CoursesStep } from './RegisterStepFields'
+import { StepIndicator, AccountStep, VerifyStep } from './RegisterStepFields'
 import './RegisterScreen.css'
 
 export default function RegisterScreen() {
   const cardRef = useRef(null)
 
   const flow = useRegisterFlow()
-  const steps = getSteps(flow.googleCredential)
+  const steps = getSteps()
 
   /* ── Card entrance animation ───────────────────────────────────────── */
   useEffect(() => {
@@ -79,31 +80,6 @@ export default function RegisterScreen() {
               onSubmit={flow.handleVerifyCode}
               onResend={flow.handleResendCode}
               setError={flow.setError}
-            />
-          )}
-
-          {/* ── Step 3: Course Selection ──────────────────────────── */}
-          {flow.step === 'courses' && (
-            <CoursesStep
-              form={flow.form}
-              setField={flow.setField}
-              loading={flow.loading}
-              schools={flow.schools}
-              catalogLoading={flow.catalogLoading}
-              catalogError={flow.catalogError}
-              selectedSchool={flow.selectedSchool}
-              availableCourses={flow.availableCourses}
-              selectedCourseIds={flow.selectedCourseIds}
-              setSelectedCourseIds={flow.setSelectedCourseIds}
-              toggleCourse={flow.toggleCourse}
-              customCourses={flow.customCourses}
-              customCourseDraft={flow.customCourseDraft}
-              setCustomCourseDraft={flow.setCustomCourseDraft}
-              setCustomCourses={flow.setCustomCourses}
-              addCustomCourse={flow.addCustomCourse}
-              onComplete={flow.handleCompleteRegistration}
-              setCatalogError={flow.setCatalogError}
-              setSchools={flow.setSchools}
             />
           )}
 

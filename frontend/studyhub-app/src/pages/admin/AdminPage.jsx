@@ -18,6 +18,7 @@ import AnnouncementsTab from './AnnouncementsTab'
 import DeletionReasonsTab from './DeletionReasonsTab'
 import EmailSuppressionsTab from './EmailSuppressionsTab'
 import AdminSettingsTab from './AdminSettingsTab'
+import SchoolsTab from './SchoolsTab'
 
 export default function AdminPage() {
   const layout = useResponsiveAppLayout()
@@ -90,7 +91,11 @@ export default function AdminPage() {
                 <ModerationTab apiJson={d.apiJson} setConfirmAction={d.setConfirmAction} formatDateTime={formatDateTime} />
               ) : null}
 
-              {activeTab !== 'overview' && activeTab !== 'settings' && activeTab !== 'moderation' ? (
+              {activeTab === 'schools' ? (
+                <SchoolsTab apiJson={d.apiJson} />
+              ) : null}
+
+              {activeTab !== 'overview' && activeTab !== 'settings' && activeTab !== 'moderation' && activeTab !== 'schools' ? (
                 <section style={{ background: '#fff', borderRadius: 18, border: '1px solid #e2e8f0', padding: '22px' }}>
                   {tabState?.error ? (
                     <div style={{ color: '#b91c1c', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, padding: '12px 14px', fontSize: 13, marginBottom: 14 }}>

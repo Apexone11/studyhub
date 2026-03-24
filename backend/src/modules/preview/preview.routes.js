@@ -21,10 +21,11 @@ function parseInteger(value) {
  */
 const BASE_PREVIEW_DIRECTIVES = [
   "default-src 'none'",
-  "style-src 'unsafe-inline'",
-  "img-src data: blob:",
+  "style-src 'unsafe-inline' https://fonts.googleapis.com",
+  "style-src-elem 'unsafe-inline' https://fonts.googleapis.com",
+  "img-src data: blob: https:",
   "media-src data: blob:",
-  "font-src data: blob:",
+  "font-src data: blob: https://fonts.gstatic.com",
   "connect-src 'none'",
   "form-action 'none'",
   "frame-src 'none'",

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { FONT } from './adminConstants'
 import { SUB_TABS, createState } from './moderationHelpers'
+import { showToast } from '../../lib/toast'
 import CasesSubTab from './CasesSubTab'
 import StrikesSubTab from './StrikesSubTab'
 import AppealsSubTab from './AppealsSubTab'
@@ -94,9 +95,14 @@ export default function ModerationTab({ apiJson, setConfirmAction, formatDateTim
       variant: action === 'dismiss' ? 'default' : 'danger',
       onConfirm: async () => {
         setConfirmAction(null)
-        await apiJson(`/api/admin/moderation/cases/${caseId}/review`, { method: 'PATCH', body: JSON.stringify({ action }) })
-        setExpandedCase(null)
-        await loadCases(casesState.page)
+        try {
+          await apiJson(`/api/admin/moderation/cases/${caseId}/review`, { method: 'PATCH', body: JSON.stringify({ action }) })
+          showToast(`Case ${action === 'dismiss' ? 'dismissed' : 'confirmed'}.`, 'success')
+          setExpandedCase(null)
+          await loadCases(casesState.page)
+        } catch (err) {
+          showToast(err.message || `Could not ${action} case.`, 'error')
+        }
       },
     })
   }
@@ -125,8 +131,13 @@ export default function ModerationTab({ apiJson, setConfirmAction, formatDateTim
       variant: 'default',
       onConfirm: async () => {
         setConfirmAction(null)
-        await apiJson(`/api/admin/moderation/restrictions/${restrictionId}/lift`, { method: 'PATCH' })
-        await loadRestrictions(restrictionsState.page)
+        try {
+          await apiJson(`/api/admin/moderation/restrictions/${restrictionId}/lift`, { method: 'PATCH' })
+          showToast('Restriction lifted.', 'success')
+          await loadRestrictions(restrictionsState.page)
+        } catch (err) {
+          showToast(err.message || 'Could not lift restriction.', 'error')
+        }
       },
     })
   }
@@ -141,8 +152,13 @@ export default function ModerationTab({ apiJson, setConfirmAction, formatDateTim
       variant: action === 'approve' ? 'default' : 'danger',
       onConfirm: async () => {
         setConfirmAction(null)
-        await apiJson(`/api/admin/moderation/appeals/${appealId}/review`, { method: 'PATCH', body: JSON.stringify({ action }) })
-        await loadAppeals(appealsState.page)
+        try {
+          await apiJson(`/api/admin/moderation/appeals/${appealId}/review`, { method: 'PATCH', body: JSON.stringify({ action }) })
+          showToast(`Appeal ${action === 'approve' ? 'approved' : 'rejected'}.`, 'success')
+          await loadAppeals(appealsState.page)
+        } catch (err) {
+          showToast(err.message || `Could not ${action} appeal.`, 'error')
+        }
       },
     })
   }

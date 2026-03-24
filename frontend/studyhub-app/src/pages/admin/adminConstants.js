@@ -10,6 +10,7 @@ export const TABS = [
   ['deletion-reasons', 'Deletion Reasons'],
   ['email-suppressions', 'Email Suppressions'],
   ['moderation', 'Moderation'],
+  ['schools', 'Schools'],
   ['settings', 'Admin Settings'],
 ]
 
