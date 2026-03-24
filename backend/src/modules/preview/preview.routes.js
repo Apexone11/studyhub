@@ -109,7 +109,7 @@ router.get('/html', async (req, res) => {
 
     const isRuntime = tokenType === 'html-runtime'
 
-    // Tier 2 for admin: always use sanitized preview (never interactive)
+    // Tier 2+: always use safe preview (scripts stripped, never interactive)
     if (effectiveTier >= RISK_TIER.HIGH_RISK) {
       const outputHtml = buildPreviewDocument({ title: sheet.title, html: sheet.content })
       res.setHeader('Cache-Control', 'private, no-store, max-age=0')

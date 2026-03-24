@@ -53,12 +53,21 @@ function detectHtmlFeatures(html) {
 }
 
 /**
- * Backward-compatible wrapper: returns { ok, issues } like the old validateHtmlForSubmission.
- * @deprecated Use detectHtmlFeatures() or classifyHtmlRisk() instead.
+ * Structural validation only: rejects empty or oversized HTML.
+ * Feature detection (scripts, iframes, etc.) is handled by classifyHtmlRisk()
+ * and does NOT block submission — those become scanner findings instead.
  */
 function validateHtmlForSubmission(html) {
-  const { features } = detectHtmlFeatures(html)
-  const issues = features.map((f) => f.message)
+  const value = String(html || '')
+  const issues = []
+
+  if (!value.trim()) {
+    issues.push('HTML content cannot be empty.')
+  }
+  if (value.length > MAX_HTML_CHARS) {
+    issues.push(`HTML content must be ${MAX_HTML_CHARS.toLocaleString()} characters or fewer.`)
+  }
+
   return {
     ok: issues.length === 0,
     issues,
@@ -140,6 +149,17 @@ function detectHighRiskBehaviors(html) {
     })
   }
 
+  // Credential capture: external form with password/sensitive inputs (critical)
+  const hasExternalForm = /<form[^>]+action\s*=\s*["']?\s*https?:\/\//gi.test(value)
+  const hasSensitiveInput = /<input[^>]+(?:type\s*=\s*["']?password|name\s*=\s*["']?(?:passw(?:or)?d|credit|card|ssn|cvv|pin|secret|token))\b/gi.test(value)
+  if (hasExternalForm && hasSensitiveInput) {
+    behaviors.push({
+      category: 'credential-capture',
+      severity: 'critical',
+      message: 'External form with password or sensitive input fields detected — possible credential harvesting.',
+    })
+  }
+
   return { behaviors }
 }
 
@@ -149,7 +169,7 @@ function detectHighRiskBehaviors(html) {
  * Tier 0 (Clean): no suspicious patterns
  * Tier 1 (Flagged): suspicious but common features (scripts, iframes, handlers)
  * Tier 2 (High Risk): behavioral patterns (obfuscation, redirects, keylogging, exfiltration)
- * Tier 3 (Quarantined): reserved for AV detection (set by workflow, not this function)
+ * Tier 3 (Quarantined): critical findings, 3+ distinct high-risk categories, or AV detection
  *
  * Returns { tier, findings, summary }
  */
@@ -182,12 +202,24 @@ function classifyHtmlRisk(html) {
 
   // Determine tier: validation issues (empty/too-long) are Tier 1 since they
   // are not behavioral. Behavioral patterns elevate to Tier 2.
+  // Critical findings or 3+ distinct high-risk categories escalate to Tier 3.
   const hasBehaviors = behaviors.length > 0 || jsRisk.highRisk
   const hasFeatures = features.some((f) => f.category !== 'validation')
   const hasValidationOnly = features.length > 0 && !hasFeatures
+  const hasCritical = findings.some((f) => f.severity === 'critical')
+
+  // Count distinct high-severity behavior categories for combination escalation
+  const highCategories = new Set()
+  for (const b of behaviors) {
+    if (b.severity === 'high' || b.severity === 'critical') highCategories.add(b.category)
+  }
+  // crypto-miner + obfuscation = coordinated malicious payload
+  const hasMinerWithObfuscation = highCategories.has('crypto-miner') && highCategories.has('obfuscation')
 
   let tier = RISK_TIER.CLEAN
-  if (hasBehaviors) {
+  if (hasCritical || highCategories.size >= 3 || hasMinerWithObfuscation) {
+    tier = RISK_TIER.QUARANTINED
+  } else if (hasBehaviors) {
     tier = RISK_TIER.HIGH_RISK
   } else if (hasFeatures) {
     tier = RISK_TIER.FLAGGED

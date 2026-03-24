@@ -10,8 +10,8 @@ export function TutorialModal({ show, onDismiss }) {
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'grid', placeItems: 'center', zIndex: 80, padding: 20 }}>
       <div style={{ width: 'min(680px, 100%)', background: 'var(--sh-surface)', borderRadius: 18, border: '1px solid var(--sh-border)', overflow: 'hidden' }}>
         <div style={{ padding: '16px 18px', background: 'linear-gradient(135deg,#0f172a,#1d4ed8)', color: '#fff' }}>
-          <div style={{ fontSize: 18, fontWeight: 800 }}>Welcome to HTML Upload Beta</div>
-          <div style={{ marginTop: 4, fontSize: 12, opacity: 0.9 }}>Secure upload-first workflow with scan + sandbox preview.</div>
+          <div style={{ fontSize: 18, fontWeight: 800 }}>HTML Upload</div>
+          <div style={{ marginTop: 4, fontSize: 12, opacity: 0.9 }}>Upload, scan, and preview your HTML study sheets.</div>
         </div>
         <div style={{ padding: 18, display: 'grid', gap: 10, fontSize: 13, color: 'var(--sh-subtext)', lineHeight: 1.7 }}>
           <div>1. Fill title, course, and description.</div>

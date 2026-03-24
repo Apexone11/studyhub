@@ -10,7 +10,7 @@
 
 import { FONT, formatDateTime, severityColor } from './sheetReviewConstants'
 
-/* ── Sanitized preview (iframe) ──────────────────────────────────────────── */
+/* ── Safe preview (iframe) ───────────────────────────────────────────────── */
 
 export function SanitizedPreview({ iframeRef, sheetId }) {
   return (

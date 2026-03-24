@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════════
  * SheetReviewPanel.jsx — Side-by-side HTML sheet review for admins
  *
- * Left:  Sandboxed iframe preview (sanitized HTML only — never raw)
+ * Left:  Sandboxed iframe preview (safe HTML only — never raw)
  * Right: Raw HTML as plain text + scan findings + approve/reject with reason
  *
  * Security invariants:
@@ -155,7 +155,7 @@ export default function SheetReviewPanel({ sheetId, onClose, onReviewComplete })
         {/* ── Tab bar ─────────────────────────────────────────────── */}
         {isHtml && (
           <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--sh-border)', padding: '0 20px' }}>
-            {[['preview', 'Sanitized Preview'], ['raw', 'Raw HTML (text)'], ['findings', `Findings (${findings.length})`]].map(([key, label]) => (
+            {[['preview', 'Safe Preview'], ['raw', 'Raw HTML (text)'], ['findings', `Findings (${findings.length})`]].map(([key, label]) => (
               <button
                 key={key}
                 type="button"

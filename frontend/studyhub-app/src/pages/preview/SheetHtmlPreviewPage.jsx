@@ -86,7 +86,7 @@ export default function SheetHtmlPreviewPage() {
               <div>
                 <h1 style={{ margin: 0, fontSize: 22, color: '#0f172a' }}>Sandbox HTML Preview</h1>
                 <div style={{ marginTop: 4, fontSize: 12, color: '#64748b' }}>
-                  Full-page draft testing via short-lived preview session on an isolated surface.
+                  Full-page preview in a secure sandboxed session.
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -108,7 +108,7 @@ export default function SheetHtmlPreviewPage() {
           </section>
 
           {state.error ? (
-            <section style={{ ...panelStyle(), background: '#fef2f2', borderColor: '#fecaca', color: '#dc2626' }}>
+            <section style={{ ...panelStyle(), background: 'var(--sh-danger-bg)', borderColor: 'var(--sh-danger-border)', color: 'var(--sh-danger)' }}>
               {state.error}
             </section>
           ) : null}

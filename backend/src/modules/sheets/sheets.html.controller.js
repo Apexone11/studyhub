@@ -8,6 +8,7 @@ const { signHtmlPreviewToken, HTML_PREVIEW_TOKEN_TTL_SECONDS } = require('../../
 const { submitHtmlDraftForReview } = require('../../lib/htmlDraftWorkflow')
 const { SHEET_STATUS, sheetWriteLimiter } = require('./sheets.constants')
 const { canReadSheet, canModerateOrOwnSheet, resolvePreviewOrigin } = require('./sheets.service')
+const { tierToPreviewMode } = require('./sheets.serializer')
 const { serializeSheet } = require('./sheets.serializer')
 
 const router = express.Router()
@@ -78,6 +79,7 @@ router.get('/:id/html-preview', requireAuth, async (req, res) => {
       title: sheet.title,
       status: sheet.status,
       htmlRiskTier: tier,
+      previewMode: tierToPreviewMode(tier),
       updatedAt: sheet.updatedAt,
       previewUrl,
       expiresInSeconds: HTML_PREVIEW_TOKEN_TTL_SECONDS,
@@ -139,6 +141,7 @@ router.get('/:id/html-runtime', requireAuth, async (req, res) => {
       title: sheet.title,
       status: sheet.status,
       htmlRiskTier: tier,
+      previewMode: tierToPreviewMode(tier),
       updatedAt: sheet.updatedAt,
       runtimeUrl,
       expiresInSeconds: HTML_PREVIEW_TOKEN_TTL_SECONDS,

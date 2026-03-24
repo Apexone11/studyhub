@@ -51,6 +51,13 @@ Status: Planned | In Progress | Done | Deferred | Removed
 | Design Token Migration (Slate + Info) | Done | 14 new tokens, 10 files migrated from hardcoded hex to CSS custom properties (2026-03-23) |
 | Media/Storage Ownership Audit | Done | Canonical path rules, cleanup chain, ownership enforcement documented in security-overview.md (2026-03-23) |
 | Decomposed Pages Smoke Tests | Done | 8 Playwright tests for upload, admin, profile across light + dark themes (2026-03-23) |
+| HTML Policy Migration (Accept-All → Scan → Classify) | Done | `validateHtmlForSubmission` structural-only, all HTML accepted and routed by risk tier (2026-03-23) |
+| Frontend HTML Copy + Token Alignment | Done | "HTML Upload Beta" → "HTML Upload", "Sanitized Preview" → "Safe Preview", SheetViewerPage tokenized (2026-03-23) |
+| Tier Behavior Verification (Integration Tests) | Done | 4 controller-level tests: tier 1 flagged→ack→publish, tier 2 eval→pending_review, tier 2 redirect detection, runtime access control (2026-03-23) |
+| Upload HTML Smoke Test Fix | Done | Playwright test rewritten for tier 1 flagged workflow — removed references to deleted UI text (2026-03-23) |
+| Tier 3 Classifier Rules | Done | Credential capture detector, 3+ category escalation, obfuscated miner escalation — Tier 3 reachable without ClamAV (2026-03-23) |
+| Preview Mode Serialization | Done | `tierToPreviewMode()` helper, `previewMode`/`ackRequired` in htmlWorkflow response, SheetViewerPage refactored to use string checks (2026-03-23) |
+| Sample Test Matrix (A–F) | Done | 6 representative HTML samples covering clean → malicious spectrum through full classifier pipeline (2026-03-23) |
 | Feature Flags System | Planned | OpenFeature-compatible |
 | PWA Offline Support | Planned | Downloaded study sheets |
 | WebAuthn Passkeys | Planned | Admin/power users optional |

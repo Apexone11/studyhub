@@ -3759,3 +3759,199 @@ All tests run across light and dark themes using existing `mockAuthenticatedApp`
 - Full 1000+ instance color migration deferred — focused on high-leverage constants/style-helper files that cascade to consumers
 - Home page components (HomeSections.jsx, HomeHero.jsx) not migrated per CLAUDE.md instruction to preserve HomePage visual language
 - Pre-existing test failures (SearchModal, uploadSheetWorkflow) tracked but not in scope for this cycle
+
+---
+
+## Cycle 37 — HTML Policy Migration (2026-03-23)
+
+**Goal**: Migrate from "block HTML features at submission" to "accept all HTML → scan → classify → route by risk tier".
+
+### Track 1: Backend HTML Policy Rewrite
+
+Rewrote `validateHtmlForSubmission()` in `backend/src/lib/htmlSecurityScanner.js` from a feature-blocker to a structural-only validator:
+
+- **Before**: Called `detectHtmlFeatures()` and returned `ok: false` when any features (script, iframe, handlers, etc.) were detected — this 400-rejected HTML with common web features from being stored
+- **After**: Only checks for empty content and size limit (>350K chars) — all HTML features are accepted and routed through the scan pipeline
+
+This single change unblocks the 4 controllers that call it:
+
+- `sheets.create.controller.js` — new sheet creation
+- `sheets.update.controller.js` — sheet editing
+- `sheets.drafts.controller.js` — draft imports
+- `sheets.contributions.controller.js` — fork contributions
+
+The existing classification pipeline (`classifyHtmlRisk()` → tier 0-3 → route by tier) and draft workflow (`importHtmlDraft`, `submitHtmlDraftForReview`) already work correctly and were not modified.
+
+### Track 2+4: Frontend Copy + Token Updates
+
+**Copy changes (6 files):**
+
+| File | Change |
+| ------ | -------- |
+| `HtmlScanModal.jsx` | "Welcome to HTML Upload Beta" → "HTML Upload"; subtitle updated |
+| `SheetReviewPanel.jsx` | "Sanitized Preview" tab → "Safe Preview"; comment updated |
+| `SheetReviewDetails.jsx` | Comment: "Sanitized preview" → "Safe preview" |
+| `SheetHtmlPreviewPage.jsx` | "Full-page draft testing via short-lived preview session on an isolated surface" → "Full-page preview in a secure sandboxed session" |
+| `SheetHtmlPreviewPage.jsx` | Error panel colors tokenized (danger tokens) |
+| `SheetViewerPage.jsx` | 7 hardcoded color blocks tokenized (see below) |
+
+**SheetViewerPage.jsx token migration:**
+
+- Tier 1 badge: `#ca8a04`/`#fefce8`/`#fde68a` → `var(--sh-warning)`/`var(--sh-warning-bg)`/`var(--sh-warning-border)`
+- Tier 2 badge: `#b45309`/`#fef3c7`/`#fde68a` → `var(--sh-warning-text)`/`var(--sh-warning-bg)`/`var(--sh-warning-border)`
+- Quarantined block: `#fecaca`/`#fef2f2`/`#dc2626` → danger tokens
+- Pending review block: `#fed7aa`/`#fff7ed`/`#9a3412` → warning tokens
+- Warning gate: `#fde68a`/`#fffbeb`/`#92400e`/`#e2e8f0`/`#f8fafc`/`#334155`/`#64748b` → warning/border/soft/heading/subtext tokens
+- Loading text: `#e2e8f0`/`#64748b` → border/subtext tokens
+- Iframe wrapper: `#e2e8f0`/`#fff` → border/surface tokens
+- Error fallback: `#fecaca`/`#fef2f2`/`#dc2626` → danger tokens
+
+### Track 3: Workflow/Status/Moderation Alignment
+
+Audited all admin review components — labels and status display were already aligned from Cycle 35:
+
+- `SheetReviewsTab.jsx` — PipelineBadge uses semantic status labels (pending review, published, rejected, draft)
+- `SheetReviewPanel.jsx` — Review panel tab bar, action bar, findings panel all use token-based colors
+- No changes needed beyond the "Sanitized Preview" → "Safe Preview" rename in Track 2
+
+### Track 5: Documentation Rewrite
+
+Updated `docs/security/security-overview.md`:
+
+- **HTML Security section**: Complete rewrite to document accept-all → scan → classify → route model
+- Describes structural validation, feature detection, behavioral analysis, risk classification (Tier 0-3), dual preview model, CSP, sandbox, and admin review
+- **HTML Security Communication section**: Updated to reflect Cycle 37 language changes (safe preview, tier badges, admin tab rename)
+
+Updated `docs/logs/CHANGELOG.md`, `docs/logs/feature-tracker.md`, `docs/plans/v1.5-weekly-roadmap.md`, `docs/v1.5.0-release-notes.md`.
+
+### Track 6: Tests and Validation
+
+Updated `backend/test/htmlSecurity.test.js`:
+
+- Renamed test from "detects script, iframe, inline handlers, and dangerous urls" to "accepts HTML with scripts, iframes, handlers, and dangerous urls (structural-only validation)"
+- Assertions flipped: all feature-bearing HTML now expected to pass (`ok: true`, `issues.length === 0`)
+- Empty/oversized tests unchanged (still expected to fail)
+
+### Validation
+
+- `npm --prefix backend run lint` — **0 errors**
+- `npm --prefix frontend/studyhub-app run lint` — **0 errors**
+- `npm --prefix backend test` — **21 test files, 161/161 tests passed**
+- `npm --prefix frontend/studyhub-app run build` — **Pass** (built in 304ms)
+
+### Files Modified
+
+| File | Change |
+| ---- | ------ |
+| `backend/src/lib/htmlSecurityScanner.js` | `validateHtmlForSubmission` → structural-only (empty + size checks) |
+| `backend/test/htmlSecurity.test.js` | Test updated to expect acceptance of feature-bearing HTML |
+| `frontend/.../sheets/HtmlScanModal.jsx` | "HTML Upload Beta" → "HTML Upload", subtitle updated |
+| `frontend/.../sheets/SheetViewerPage.jsx` | 7 hardcoded color blocks → CSS tokens |
+| `frontend/.../preview/SheetHtmlPreviewPage.jsx` | Preview description + error panel tokenized |
+| `frontend/.../admin/SheetReviewPanel.jsx` | "Sanitized Preview" → "Safe Preview" |
+| `frontend/.../admin/SheetReviewDetails.jsx` | Comment updated |
+| `docs/security/security-overview.md` | HTML Security section rewritten for accept-all model |
+| `docs/beta-v1.5.0-release-log.md` | Cycle 37 entry |
+| `docs/logs/CHANGELOG.md` | 6 new entries |
+| `docs/logs/feature-tracker.md` | 2 new Done features |
+| `docs/plans/v1.5-weekly-roadmap.md` | Cycle 37 item checked |
+| `docs/v1.5.0-release-notes.md` | HTML Policy Migration section added |
+| `CLAUDE.md` | HTML security policy architecture note added |
+
+---
+
+## Cycle 38 — Scanner Enforcement, Preview Mode & UX Consistency (2026-03-23)
+
+### Summary
+
+Full enforcement of the HTML tier pipeline: Tier 3 now reachable from the classifier alone (credential capture, combination escalation, obfuscated crypto-miner), preview mode explicitly serialized from backend to frontend, and SheetViewerPage refactored to consume `previewMode` instead of inline tier math. Includes 4 controller integration tests, 10 new classifier tests (Tier 3 + sample matrix A-F), and broken Playwright smoke test rewrite.
+
+### Added
+
+#### 38.1 — Tier 3 Classifier Rules + Sample Test Matrix
+
+**Credential capture detector** (`htmlSecurityScanner.js`):
+- External form with `<input type="password">` or `name="password|cvv|ssn|pin|secret|token"` → `credential-capture` (critical severity) → Tier 3
+
+**Combination escalation** (`classifyHtmlRisk`):
+- Any finding with `severity === 'critical'` → Tier 3
+- 3+ distinct high-severity behavior categories → Tier 3 (e.g., obfuscation + redirect + keylogging)
+- `crypto-miner` + `obfuscation` → Tier 3 (obfuscated miner = clearly malicious)
+
+**Sample test matrix** (6 fixtures in `htmlSecurity.test.js`):
+- **A — Clean HTML** (headings, tables, CSS) → Tier 0
+- **B — Rich presentation** (SVG, animations, advanced CSS) → Tier 0
+- **C — Scripted HTML** (inline script, event handlers) → Tier 1
+- **D — Embedded HTML** (iframe, form, embed) → Tier 1
+- **E — Suspicious HTML** (eval) → Tier 2
+- **F — Malicious HTML** (credential phishing form) → Tier 3
+
+**4 new Tier 3 unit tests**: credential capture (password input), credential capture (sensitive name field), 3+ category combination, obfuscated crypto-miner.
+
+#### 38.2 — Preview Mode Serialization
+
+**`tierToPreviewMode()` helper** in `sheets.serializer.js`:
+- Tier 0 → `'interactive'` (scripts allowed)
+- Tier 1 → `'safe'` (scripts blocked, sandboxed)
+- Tier 2 → `'restricted'` (owner/admin only)
+- Tier 3 → `'disabled'` (no preview)
+
+**Backend fields added**:
+- `htmlWorkflow.previewMode` in sheet serializer (all sheet responses)
+- `htmlWorkflow.ackRequired` in sheet serializer (true for Tier 1 only)
+- `previewMode` in `/api/sheets/:id/html-preview` and `/api/sheets/:id/html-runtime` responses
+
+#### Controller Integration Tests (4 tests in `sheet.workflow.integration.test.js`)
+
+1. **Tier 1 flagged path** — script HTML imported → 409 → acknowledge → publish
+2. **Tier 2 eval path** — `eval()` HTML → pending_review → admin approve
+3. **Tier 2 redirect path** — `window.location.href` → pending_review
+4. **Runtime access control** — quarantined 403, pending_review owner/admin access
+
+#### Mock Infrastructure
+
+- `prisma.user.findMany` mock (admin notification in Tier 2+)
+- `authTokens.getJwtSecret` mock (JWT signing for preview tokens)
+
+### Changed
+
+#### SheetViewerPage Refactored to `previewMode`
+
+- Derived `previewMode` from `sheet.htmlWorkflow.previewMode` once at component top
+- Replaced all 12 inline `(sheet.htmlRiskTier || 0) >= X` comparisons with `previewMode` string checks
+- Zero `htmlRiskTier` references remain in the viewer
+
+#### Playwright Smoke Test Rewrite
+
+- **Before**: referenced removed UI text ("strict beta workflow", "unsafe HTML is blocked")
+- **After**: tests current tier 1 flagged flow — scan modal, acknowledgement checkbox, "Publish with Warnings"
+
+#### Copy Audit
+
+- `preview.routes.js` comment: "sanitized preview" → "safe preview"
+- No instances of "blocked HTML", "unsafe HTML removed", "strict beta", or "disallowed features" in codebase
+
+### Validation
+
+- `npm --prefix backend run lint` — **0 errors**
+- `npm --prefix frontend/studyhub-app run lint` — **0 errors**
+- `npm --prefix backend test` — **21 test files, 175/175 tests passed** (10 new)
+- `npm --prefix frontend/studyhub-app run build` — **Pass**
+
+### Files Modified
+
+| File | Change |
+| ---- | ------ |
+| `backend/src/lib/htmlSecurityScanner.js` | Credential capture detector, Tier 3 escalation rules |
+| `backend/src/modules/sheets/sheets.serializer.js` | `tierToPreviewMode()`, `previewMode` + `ackRequired` fields |
+| `backend/src/modules/sheets/sheets.html.controller.js` | `previewMode` in preview/runtime responses |
+| `backend/src/modules/preview/preview.routes.js` | Comment: "sanitized preview" → "safe preview" |
+| `backend/test/htmlSecurity.test.js` | 4 Tier 3 tests + 6 sample matrix tests (A-F) |
+| `backend/test/sheet.workflow.integration.test.js` | 4 integration tests + mock infrastructure |
+| `frontend/.../sheets/SheetViewerPage.jsx` | Refactored to consume `previewMode` (12 tier checks removed) |
+| `frontend/.../tests/sheets.upload-html-workflow.smoke.spec.js` | Rewritten for tier 1 flagged flow |
+| `CLAUDE.md` | Tier 3 triggers documented |
+| `docs/beta-v1.5.0-release-log.md` | Cycle 38 entry |
+| `docs/logs/CHANGELOG.md` | Cycle 38 entries |
+| `docs/logs/feature-tracker.md` | 4 new Done features |
+| `docs/plans/v1.5-weekly-roadmap.md` | Cycle 38 item checked |

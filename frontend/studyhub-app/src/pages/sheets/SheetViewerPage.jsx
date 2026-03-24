@@ -60,6 +60,8 @@ export default function SheetViewerPage() {
     deleteComment,
   } = useSheetViewer()
 
+  const previewMode = sheet?.htmlWorkflow?.previewMode || 'interactive'
+
   return (
     <>
       <Navbar />
@@ -158,12 +160,12 @@ export default function SheetViewerPage() {
                           <span style={{ fontSize: 11, fontWeight: 800, color: '#1d4ed8', textTransform: 'uppercase' }}>
                             HTML sheet
                           </span>
-                          {(sheet.htmlRiskTier || 0) === 1 ? (
-                            <span style={{ fontSize: 10, fontWeight: 700, color: '#ca8a04', background: '#fefce8', border: '1px solid #fde68a', borderRadius: 6, padding: '2px 8px', textTransform: 'uppercase' }}>
+                          {previewMode === 'safe' ? (
+                            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--sh-warning)', background: 'var(--sh-warning-bg)', border: '1px solid var(--sh-warning-border)', borderRadius: 6, padding: '2px 8px', textTransform: 'uppercase' }}>
                               Flagged
                             </span>
-                          ) : (sheet.htmlRiskTier || 0) >= 2 || sheet.status === 'pending_review' ? (
-                            <span style={{ fontSize: 10, fontWeight: 700, color: '#b45309', background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 6, padding: '2px 8px', textTransform: 'uppercase' }}>
+                          ) : previewMode === 'restricted' || previewMode === 'disabled' || sheet.status === 'pending_review' ? (
+                            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--sh-warning-text)', background: 'var(--sh-warning-bg)', border: '1px solid var(--sh-warning-border)', borderRadius: 6, padding: '2px 8px', textTransform: 'uppercase' }}>
                               Pending Review
                             </span>
                           ) : null}
@@ -183,17 +185,17 @@ export default function SheetViewerPage() {
                   ) : null}
 
                   {isHtmlSheet ? (
-                    (sheet.htmlRiskTier || 0) >= 3 ? (
-                      <div style={{ borderRadius: 16, border: '1px solid #fecaca', background: '#fef2f2', padding: 24, textAlign: 'center' }}>
-                        <div style={{ fontSize: 15, fontWeight: 800, color: '#dc2626', marginBottom: 8 }}>Quarantined</div>
-                        <div style={{ fontSize: 13, color: '#dc2626', lineHeight: 1.6 }}>
+                    previewMode === 'disabled' ? (
+                      <div style={{ borderRadius: 16, border: '1px solid var(--sh-danger-border)', background: 'var(--sh-danger-bg)', padding: 24, textAlign: 'center' }}>
+                        <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--sh-danger)', marginBottom: 8 }}>Quarantined</div>
+                        <div style={{ fontSize: 13, color: 'var(--sh-danger)', lineHeight: 1.6 }}>
                           This sheet has been quarantined because our scanner detected a security risk. Preview is disabled. If you believe this is an error, contact support.
                         </div>
                       </div>
-                    ) : (sheet.htmlRiskTier || 0) >= 2 && !canEdit ? (
-                      <div style={{ borderRadius: 16, border: '1px solid #fed7aa', background: '#fff7ed', padding: 24, textAlign: 'center' }}>
-                        <div style={{ fontSize: 15, fontWeight: 800, color: '#9a3412', marginBottom: 8 }}>Pending Safety Review</div>
-                        <div style={{ fontSize: 13, color: '#9a3412', lineHeight: 1.6 }}>
+                    ) : previewMode === 'restricted' && !canEdit ? (
+                      <div style={{ borderRadius: 16, border: '1px solid var(--sh-warning-border)', background: 'var(--sh-warning-bg)', padding: 24, textAlign: 'center' }}>
+                        <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--sh-warning-text)', marginBottom: 8 }}>Pending Safety Review</div>
+                        <div style={{ fontSize: 13, color: 'var(--sh-warning-text)', lineHeight: 1.6 }}>
                           This sheet is awaiting admin review. The preview is disabled until it has been approved.
                         </div>
                       </div>
@@ -201,17 +203,17 @@ export default function SheetViewerPage() {
                       <div
                         style={{
                           borderRadius: 16,
-                          border: (sheet.htmlRiskTier || 0) >= 1 ? '1px solid #fde68a' : '1px solid #e2e8f0',
-                          background: (sheet.htmlRiskTier || 0) >= 1 ? '#fffbeb' : '#f8fafc',
+                          border: previewMode !== 'interactive' ? '1px solid var(--sh-warning-border)' : '1px solid var(--sh-border)',
+                          background: previewMode !== 'interactive' ? 'var(--sh-warning-bg)' : 'var(--sh-soft)',
                           padding: 24,
                           textAlign: 'center',
                         }}
                       >
-                        <div style={{ fontSize: 15, fontWeight: 800, color: (sheet.htmlRiskTier || 0) >= 1 ? '#92400e' : '#334155', marginBottom: 8 }}>
-                          {(sheet.htmlRiskTier || 0) >= 1 ? 'Flagged HTML Sheet' : 'Interactive HTML Sheet'}
+                        <div style={{ fontSize: 15, fontWeight: 800, color: previewMode !== 'interactive' ? 'var(--sh-warning-text)' : 'var(--sh-heading)', marginBottom: 8 }}>
+                          {previewMode !== 'interactive' ? 'Flagged HTML Sheet' : 'Interactive HTML Sheet'}
                         </div>
-                        <div style={{ fontSize: 13, color: (sheet.htmlRiskTier || 0) >= 1 ? '#92400e' : '#64748b', lineHeight: 1.6, marginBottom: 16 }}>
-                          {(sheet.htmlRiskTier || 0) >= 1
+                        <div style={{ fontSize: 13, color: previewMode !== 'interactive' ? 'var(--sh-warning-text)' : 'var(--sh-subtext)', lineHeight: 1.6, marginBottom: 16 }}>
+                          {previewMode !== 'interactive'
                             ? 'This sheet contains flagged HTML features. Scripts are disabled in the preview. It runs in a secure sandbox with no network access.'
                             : 'This sheet contains HTML with scripts. It runs in a secure sandbox with no network access, no popups, and no access to your session. Click below to load it.'}
                         </div>
@@ -230,33 +232,33 @@ export default function SheetViewerPage() {
                             fontFamily: FONT,
                           }}
                         >
-                          {(sheet.htmlRiskTier || 0) >= 1 ? 'Load safe preview' : 'Load interactive sheet'}
+                          {previewMode !== 'interactive' ? 'Load safe preview' : 'Load interactive sheet'}
                         </button>
                       </div>
                     ) : runtimeLoading ? (
-                      <div style={{ borderRadius: 16, border: '1px solid #e2e8f0', padding: 24, textAlign: 'center' }}>
-                        <div style={{ fontSize: 13, color: '#64748b' }}>Loading {(sheet.htmlRiskTier || 0) >= 1 ? 'safe preview' : 'interactive sheet'}…</div>
+                      <div style={{ borderRadius: 16, border: '1px solid var(--sh-border)', padding: 24, textAlign: 'center' }}>
+                        <div style={{ fontSize: 13, color: 'var(--sh-subtext)' }}>Loading {previewMode !== 'interactive' ? 'safe preview' : 'interactive sheet'}…</div>
                       </div>
                     ) : runtimeUrl ? (
                       <div
                         style={{
                           borderRadius: 16,
-                          border: '1px solid #e2e8f0',
+                          border: '1px solid var(--sh-border)',
                           overflow: 'hidden',
-                          background: '#fff',
+                          background: 'var(--sh-surface)',
                         }}
                       >
                         <iframe
                           title={`sheet-html-${sheet.id}`}
-                          sandbox={(sheet.htmlRiskTier || 0) >= 1 ? '' : 'allow-scripts'}
+                          sandbox={previewMode !== 'interactive' ? '' : 'allow-scripts'}
                           referrerPolicy="no-referrer"
                           src={runtimeUrl}
                           style={{ width: '100%', minHeight: 560, border: 'none' }}
                         />
                       </div>
                     ) : (
-                      <div style={{ borderRadius: 16, border: '1px solid #fecaca', background: '#fef2f2', padding: 18 }}>
-                        <div style={{ fontSize: 13, color: '#dc2626' }}>Could not load the interactive sheet runtime.</div>
+                      <div style={{ borderRadius: 16, border: '1px solid var(--sh-danger-border)', background: 'var(--sh-danger-bg)', padding: 18 }}>
+                        <div style={{ fontSize: 13, color: 'var(--sh-danger)' }}>Could not load the interactive sheet runtime.</div>
                       </div>
                     )
                   ) : (

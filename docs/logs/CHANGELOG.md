@@ -9,6 +9,18 @@ Version naming: v1.5.x-beta (weekly), v1.5.x.y-beta (hotfixes).
 ## [v1.5.0-beta] - 2026-03-23 (ongoing)
 
 ### Added (2026-03-23)
+
+- Tier 3 classifier rules: credential capture detector (external form + password/sensitive inputs → critical severity), 3+ distinct high-risk category escalation, obfuscated crypto-miner escalation — Tier 3 now reachable from scanner alone without ClamAV
+- Preview mode serialization: `tierToPreviewMode()` in `sheets.serializer.js`, `previewMode` and `ackRequired` fields in `htmlWorkflow` response object, preview/runtime endpoints return `previewMode`
+- SheetViewerPage refactored: all 12 inline `htmlRiskTier >= X` comparisons replaced with `previewMode` string checks (`interactive`, `safe`, `restricted`, `disabled`)
+- Sample test matrix: 6 representative HTML samples (A–F) testing clean → malicious spectrum through full classifier pipeline
+- Tier behavior integration tests: 4 new tests in `sheet.workflow.integration.test.js` covering tier 1 (flagged → acknowledge → publish), tier 2 (eval → pending_review → admin approve), tier 2 (redirect behavioral detection), and runtime access control (quarantine block, pending_review owner/admin access)
+- Playwright smoke test rewritten for current tier 1 flagged workflow (scan modal, acknowledgement checkbox, publish with warnings)
+- HTML policy migration: `validateHtmlForSubmission()` rewritten from feature-blocker to structural-only validator — all HTML accepted, scanned, classified by risk tier
+- Frontend copy alignment: "HTML Upload Beta" → "HTML Upload", "Sanitized Preview" → "Safe Preview", preview description updated
+- SheetViewerPage HTML section: 7 hardcoded color blocks migrated to CSS custom property tokens (tier badges, banners, warning gate, error fallback)
+- SheetHtmlPreviewPage: error panel tokenized, preview description updated
+- Security overview documentation rewritten: accept-all → scan → classify → route model with tier descriptions
 - Page decomposition: FeedPage (-38%), SheetsPage (-44%), UploadSheetPage (-36%) rewritten as thin orchestrators with extracted child components
 - New components: FeedComposer, FeedAside, SheetsEmptyState, SheetsAside, UploadNavActions
 - Design token expansion: 10 slate-scale tokens + 4 info-semantic tokens added to index.css (light + dark themes)
