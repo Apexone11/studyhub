@@ -128,7 +128,7 @@ export default function SchoolsTab({ apiJson }) {
       setSchools((prev) => prev.map((s) => s.id === schoolId ? { ...s, logoUrl: data.logoUrl } : s))
       showToast('Logo uploaded.', 'success')
     } catch {
-      showToast('Could not connect to the server.', 'error')
+      showToast('Check your connection and try again.', 'error')
     } finally {
       setUploadingId(null)
     }

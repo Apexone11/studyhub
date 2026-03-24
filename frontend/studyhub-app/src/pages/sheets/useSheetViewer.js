@@ -77,14 +77,17 @@ export default function useSheetViewer() {
         apply(() => setSheetState({
           sheet: null,
           loading: false,
-          error: getApiErrorMessage(data, 'You do not have access to this sheet.'),
+          error: getApiErrorMessage(data, 'This sheet is private or you don\u2019t have permission to view it.'),
         }))
         return
       }
 
       if (!response.ok) {
-        if (response.status === 404) removeRecentlyViewedEntry(sheetId)
-        throw new Error(getApiErrorMessage(data, 'Could not load this sheet.'))
+        if (response.status === 404) {
+          removeRecentlyViewedEntry(sheetId)
+          throw new Error(getApiErrorMessage(data, 'This sheet was removed or doesn\u2019t exist.'))
+        }
+        throw new Error(getApiErrorMessage(data, 'Could not load this sheet. Please try again.'))
       }
 
       apply(() => setSheetState({ sheet: data, loading: false, error: '' }))

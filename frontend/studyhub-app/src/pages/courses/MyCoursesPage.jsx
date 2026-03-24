@@ -265,7 +265,7 @@ export default function MyCoursesPage() {
       setDirty(false)
       showToast('Courses updated! Your feed will now reflect your selections.', 'success')
     } catch {
-      showToast('Could not connect to the server.', 'error')
+      showToast('Check your connection and try again.', 'error')
     } finally {
       setSaving(false)
     }

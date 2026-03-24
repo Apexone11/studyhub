@@ -83,7 +83,7 @@ export default function useRegisterFlow() {
       trackEvent('signup_started', { method: 'local' })
       setSuccess(`We sent a 6-digit code to ${result.data.deliveryHint || form.email.trim()}.`)
     } catch {
-      setError('Could not connect to the server.')
+      setError('Check your connection and try again.')
     } finally {
       setLoading(false)
     }
@@ -115,7 +115,7 @@ export default function useRegisterFlow() {
       trackEvent('signup_completed', { method: 'local' })
       navigate(getAuthenticatedHomePath(result.data.user), { replace: true })
     } catch {
-      setError('Could not connect to the server.')
+      setError('Check your connection and try again.')
     } finally {
       setLoading(false)
     }
@@ -134,7 +134,7 @@ export default function useRegisterFlow() {
       setVerificationCode('')
       setSuccess(`New code sent to ${deliveryHint}.`)
     } catch {
-      setError('Could not connect to the server.')
+      setError('Check your connection and try again.')
     } finally {
       setLoading(false)
     }
@@ -160,7 +160,7 @@ export default function useRegisterFlow() {
       trackEvent('signup_completed', { method: 'google' })
       navigate(getAuthenticatedHomePath(result.data.user), { replace: true })
     } catch {
-      setError('Could not connect to the server.')
+      setError('Check your connection and try again.')
     } finally {
       setLoading(false)
     }

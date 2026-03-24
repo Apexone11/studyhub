@@ -4688,3 +4688,80 @@ npm --prefix frontend/studyhub-app run build ✅ clean (255ms)
 | `frontend/studyhub-app/src/pages/admin/adminConstants.js` | Added schools tab |
 | `frontend/studyhub-app/src/components/sidebarConstants.js` | Added My Courses nav link |
 | `frontend/studyhub-app/src/components/navbarConstants.js` | Added /my-courses breadcrumb |
+
+---
+
+## Cycle 47 — v1.7 "Ready for Session 2" Polish (2026-03-24)
+
+### 47.1 — Release Readiness Smoke Checklist
+- Created `docs/smoke-checklist.md` — repeatable <10 min checklist covering signup (email + Google), .edu suggestion, /my-courses, cover images, SheetLab fork/contribute, admin approve/reject, OAuth regression, and sanity checks
+
+### 47.2 — Fix `/api/courses/popular` 500 (Prisma null courseId)
+- **Root cause:** `groupBy` on `courseId` included `null` groups from sheets without a course, causing downstream `findMany({ where: { id: { in: [null, ...] } } })` to fail with PrismaClientValidationError
+- **Fix:** Added `courseId: { not: null }` to the `where` clause in `courses.schools.controller.js`
+- **Test:** Added `backend/test/courses.routes.test.js` with 4 tests: happy path, empty result, deleted courses, and Prisma failure
+
+### 47.3 — Admin Page Reliability
+- SchoolsTab wired into AdminPage.jsx (carried over from Cycle 46)
+- Error toasts with server messages already added to all admin handlers in Cycle 46
+
+### 47.4 — Profile/Dashboard Unification
+- `/dashboard` already redirects to `/users/:me?tab=overview` via DashboardRedirect
+- Fixed stale "Set up your profile" link in FeedWidgets GettingStartedCard: `/dashboard` → `/settings?tab=profile`
+- Sidebar "My Profile" already resolves to `/users/:username` (no `/dashboard` link)
+
+### 47.5 — Unified Profile Tab Skeleton (verified complete)
+- Tab system already implemented with URL-driven `?tab=` param
+- Own profile: Overview | Study | Sheets | Achievements
+- Other profile: Overview | Sheets | Achievements
+- `isOwnProfile` gating correct for Study tab
+- Layout slots match spec: cockpit (two-column), columns, cards
+
+### 47.6 — Copy Polish Pass (user-facing language)
+- **"Edit your copy"** → **"Make your own copy"** (SheetViewerPage.jsx button text)
+- **"You can't edit this sheet. Click 'Edit your copy'"** → clearer toast in useSheetLab.js
+- **"You do not have access to this sheet"** → "This sheet is private or you don't have permission to view it." (useSheetViewer.js)
+- **"Could not load this sheet"** on 404 → "This sheet was removed or doesn't exist." (useSheetViewer.js)
+- **"This user does not exist"** → "User not found." (UserProfilePage.jsx)
+- **"Could not connect to the server"** → "Check your connection and try again." (11 files, 19 occurrences)
+- **Hardcoded "Student"** role label → reflects `accountType` (teacher/other/student) in sidebar + profile hero
+
+### 47.7 — Google OAuth Scope Lock (verified safe)
+- `<GoogleLogin>` component uses default scopes (openid, email, profile) — no custom scopes
+- Backend `googleAuth.js` only verifies ID token, does not request additional permissions
+- No code change needed — confirmed safe
+
+### Changed (sidebar/nav polish)
+- Sidebar "Add Course" button: `/settings?tab=courses` → `/my-courses`
+- Sidebar empty courses: plain "No courses yet" → clickable "Set up your courses →" link
+- GettingStartedCard "Join a course": `/settings?tab=courses` → `/my-courses`
+
+### Validation
+- Frontend lint: pass
+- Frontend build: pass
+- Backend lint: pass
+- Backend test (courses.routes): 4/4 pass
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `docs/smoke-checklist.md` | New: release readiness smoke checklist |
+| `backend/src/modules/courses/courses.schools.controller.js` | Added `courseId: { not: null }` to popular query |
+| `backend/test/courses.routes.test.js` | New: 4 tests for /api/courses/popular |
+| `frontend/studyhub-app/src/pages/feed/FeedWidgets.jsx` | Fixed stale links to /dashboard and /settings?tab=courses |
+| `frontend/studyhub-app/src/components/AppSidebar.jsx` | Fixed /settings?tab=courses → /my-courses, empty state link, accountType label |
+| `frontend/studyhub-app/src/pages/sheets/SheetViewerPage.jsx` | "Edit your copy" → "Make your own copy" |
+| `frontend/studyhub-app/src/pages/sheets/useSheetLab.js` | Updated redirect toast copy |
+| `frontend/studyhub-app/src/pages/sheets/useSheetViewer.js` | Improved 403/404 error messages |
+| `frontend/studyhub-app/src/pages/profile/UserProfilePage.jsx` | accountType label, improved error copy |
+| `frontend/studyhub-app/src/pages/auth/useRegisterFlow.js` | Network error copy |
+| `frontend/studyhub-app/src/pages/auth/LoginPage.jsx` | Network error copy |
+| `frontend/studyhub-app/src/pages/admin/SchoolsTab.jsx` | Network error copy |
+| `frontend/studyhub-app/src/pages/courses/MyCoursesPage.jsx` | Network error copy |
+| `frontend/studyhub-app/src/pages/settings/SettingsPage.jsx` | Network error copy |
+| `frontend/studyhub-app/src/pages/settings/SecurityTab.jsx` | Network error copy |
+| `frontend/studyhub-app/src/pages/settings/AccountTab.jsx` | Network error copy |
+| `frontend/studyhub-app/src/pages/settings/CoursesTab.jsx` | Network error copy |
+| `frontend/studyhub-app/src/pages/settings/settingsState.js` | Network error copy |
+| `frontend/studyhub-app/src/pages/feed/CommentSection.jsx` | Network error copy |

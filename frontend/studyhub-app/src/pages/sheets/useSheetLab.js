@@ -86,7 +86,7 @@ export default function useSheetLab() {
     if (!sheet || !user) return
     const owns = user.role === 'admin' || user.id === sheet.userId
     if (!owns && sheet.status !== 'published') {
-      showToast("You can't edit this sheet. Click 'Edit your copy' on the viewer.", 'error')
+      showToast("You can\u2019t edit this sheet directly. Go back and click \u2018Make your own copy\u2019 to get started.", 'error')
       navigate(`/sheets/${sheetId}`, { replace: true })
     }
   }, [sheet, user, sheetId, navigate])

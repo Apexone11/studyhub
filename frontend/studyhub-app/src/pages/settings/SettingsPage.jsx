@@ -108,8 +108,8 @@ export default function SettingsPage() {
       showToast(data.message || 'Settings saved.', 'success')
       successHandler?.(data)
     } catch {
-      setter({ type: 'error', text: 'Could not connect to the server.' })
-      showToast('Could not connect to the server.', 'error')
+      setter({ type: 'error', text: 'Check your connection and try again.' })
+      showToast('Check your connection and try again.', 'error')
     } finally {
       setBusyKey('')
     }
