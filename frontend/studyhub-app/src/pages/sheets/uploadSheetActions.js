@@ -299,10 +299,11 @@ export function useHandleSubmit({
   content, courseId, description, draftId, isEditing,
   legacyMarkdownMode, navigate, removeExistingAttachment, sheetId, title,
   uploadAttachment,
-  setError, setLoading, setHasUnsavedChanges,
+  setError, setLoading, setHasUnsavedChanges, setVerificationRequired,
 }) {
   return useCallback(async () => {
     setError('')
+    setVerificationRequired(false)
 
     if (legacyMarkdownMode) {
       if (!title.trim()) return setError('Please enter a title.')
@@ -332,7 +333,10 @@ export function useHandleSubmit({
           }),
         })
         const data = await response.json().catch(() => ({}))
-        if (!response.ok) throw new Error(data.error || 'Failed to save sheet.')
+        if (!response.ok) {
+          if (data?.code === 'EMAIL_NOT_VERIFIED') { setVerificationRequired(true); return }
+          throw new Error(data.error || 'Failed to save sheet.')
+        }
 
         await uploadAttachment(data.id)
         setHasUnsavedChanges(false)
@@ -364,6 +368,7 @@ export function useHandleSubmit({
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
+        if (data?.code === 'EMAIL_NOT_VERIFIED') { setVerificationRequired(true); return }
         const findings = Array.isArray(data.findings)
           ? data.findings.map((entry) => entry?.message || entry).filter(Boolean).join(' | ')
           : ''
@@ -397,6 +402,7 @@ export function useHandleSubmit({
     setError,
     setHasUnsavedChanges,
     setLoading,
+    setVerificationRequired,
     sheetId,
     title,
     uploadAttachment,

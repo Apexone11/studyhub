@@ -5,6 +5,9 @@ import {
   detectHtmlFeatures,
   classifyHtmlRisk,
   RISK_TIER,
+  groupFindingsByCategory,
+  generateRiskSummary,
+  generateTierExplanation,
 } from '../src/lib/htmlSecurity'
 
 describe('htmlSecurity', () => {
@@ -274,6 +277,91 @@ describe('htmlSecurity', () => {
       const result = classifyHtmlRisk(html)
       expect(result.tier).toBe(RISK_TIER.QUARANTINED)
       expect(result.findings.some((f) => f.category === 'credential-capture')).toBe(true)
+    })
+  })
+
+  describe('groupFindingsByCategory', () => {
+    it('returns empty object for empty or missing findings', () => {
+      expect(groupFindingsByCategory([])).toEqual({})
+      expect(groupFindingsByCategory(null)).toEqual({})
+      expect(groupFindingsByCategory(undefined)).toEqual({})
+    })
+
+    it('groups findings by category with correct labels and max severity', () => {
+      const findings = [
+        { category: 'obfuscation', severity: 'high', message: 'Heavy escaping' },
+        { category: 'obfuscation', severity: 'medium', message: 'Hex chars' },
+        { category: 'redirect', severity: 'high', message: 'window.location' },
+        { category: 'credential-capture', severity: 'critical', message: 'Phishing form' },
+      ]
+      const grouped = groupFindingsByCategory(findings)
+
+      expect(Object.keys(grouped)).toHaveLength(3)
+      expect(grouped['obfuscation'].label).toBe('Code Obfuscation')
+      expect(grouped['obfuscation'].maxSeverity).toBe('high')
+      expect(grouped['obfuscation'].findings).toHaveLength(2)
+      expect(grouped['redirect'].label).toBe('Page Redirects')
+      expect(grouped['credential-capture'].maxSeverity).toBe('critical')
+    })
+
+    it('falls back to source field when category is absent (legacy findings)', () => {
+      const findings = [
+        { source: 'js-risk', severity: 'high', message: 'eval detected' },
+        { source: 'av', severity: 'critical', message: 'Malware found' },
+      ]
+      const grouped = groupFindingsByCategory(findings)
+
+      expect(grouped['js-risk'].label).toBe('Risky JavaScript')
+      expect(grouped['av'].label).toBe('Antivirus Detection')
+    })
+  })
+
+  describe('generateRiskSummary', () => {
+    it('returns clean message for Tier 0', () => {
+      expect(generateRiskSummary(RISK_TIER.CLEAN, [])).toBe('No suspicious patterns detected.')
+    })
+
+    it('generates single-category summary', () => {
+      const findings = [{ category: 'obfuscation', severity: 'high', message: 'test' }]
+      expect(generateRiskSummary(RISK_TIER.HIGH_RISK, findings)).toBe('Contains obfuscated JavaScript.')
+    })
+
+    it('generates two-category summary with "and"', () => {
+      const findings = [
+        { category: 'obfuscation', severity: 'high', message: 'test' },
+        { category: 'redirect', severity: 'high', message: 'test' },
+      ]
+      expect(generateRiskSummary(RISK_TIER.HIGH_RISK, findings)).toBe('Contains obfuscated JavaScript and page redirect behavior.')
+    })
+
+    it('generates multi-category summary with Oxford comma', () => {
+      const findings = [
+        { category: 'obfuscation', severity: 'high', message: 'test' },
+        { category: 'redirect', severity: 'high', message: 'test' },
+        { category: 'credential-capture', severity: 'critical', message: 'test' },
+      ]
+      const summary = generateRiskSummary(RISK_TIER.QUARANTINED, findings)
+      expect(summary).toBe('Contains obfuscated JavaScript, page redirect behavior, and credential capture indicators.')
+    })
+
+    it('skips validation and system categories', () => {
+      const findings = [
+        { category: 'validation', severity: 'high', message: 'Empty' },
+        { category: 'system', severity: 'high', message: 'Scan failed' },
+      ]
+      expect(generateRiskSummary(RISK_TIER.FLAGGED, findings)).toBe('Structural issues detected.')
+    })
+  })
+
+  describe('generateTierExplanation', () => {
+    it('returns explanation for each tier', () => {
+      expect(generateTierExplanation(RISK_TIER.CLEAN)).toContain('No issues detected')
+      expect(generateTierExplanation(RISK_TIER.FLAGGED)).toContain('Flagged')
+      expect(generateTierExplanation(RISK_TIER.FLAGGED)).toContain('scripts are disabled')
+      expect(generateTierExplanation(RISK_TIER.HIGH_RISK)).toContain('Pending review')
+      expect(generateTierExplanation(RISK_TIER.HIGH_RISK)).toContain('admin must approve')
+      expect(generateTierExplanation(RISK_TIER.QUARANTINED)).toContain('Quarantined')
+      expect(generateTierExplanation(RISK_TIER.QUARANTINED)).toContain('security threat')
     })
   })
 })

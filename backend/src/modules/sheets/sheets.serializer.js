@@ -1,6 +1,6 @@
 const prisma = require('../../core/db/prisma')
 const { SCAN_STATUS, HTML_VERSION_KIND } = require('../../lib/htmlDraftWorkflow')
-const { RISK_TIER } = require('../../lib/htmlSecurity')
+const { RISK_TIER, generateRiskSummary, generateTierExplanation, groupFindingsByCategory } = require('../../lib/htmlSecurity')
 
 /**
  * Derive the preview mode string from the risk tier.
@@ -80,6 +80,9 @@ function serializeSheet(sheet, { starred = false, reactions = null, commentCount
       previewMode: tierToPreviewMode(sheet.htmlRiskTier || 0),
       ackRequired: (sheet.htmlRiskTier || 0) === RISK_TIER.FLAGGED,
       scanFindings: Array.isArray(sheet.htmlScanFindings) ? sheet.htmlScanFindings : [],
+      riskSummary: generateRiskSummary(sheet.htmlRiskTier || 0, sheet.htmlScanFindings),
+      tierExplanation: generateTierExplanation(sheet.htmlRiskTier || 0),
+      findingsByCategory: groupFindingsByCategory(Array.isArray(sheet.htmlScanFindings) ? sheet.htmlScanFindings : []),
       scanUpdatedAt: sheet.htmlScanUpdatedAt || null,
       scanAcknowledgedAt: sheet.htmlScanAcknowledgedAt || null,
       hasOriginalVersion: Boolean(originalVersion),

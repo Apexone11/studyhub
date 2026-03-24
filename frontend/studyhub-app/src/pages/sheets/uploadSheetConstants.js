@@ -31,9 +31,9 @@ export function validateAttachment(file) {
 }
 
 export function tierLabel(tier) {
-  if (tier === 0) return 'Clean'
-  if (tier === 1) return 'Flagged'
-  if (tier === 2) return 'High Risk'
+  if (tier === 0) return 'Passed'
+  if (tier === 1) return 'Minor Findings'
+  if (tier === 2) return 'Needs Review'
   if (tier === 3) return 'Quarantined'
   return 'Unknown'
 }

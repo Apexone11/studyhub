@@ -88,6 +88,8 @@ router.get('/summary', async (req, res) => {
     const hasOwnSheet = user._count.studySheets > 0
     const hasForked = forkCount > 0
     const hasPosted = feedPostCount > 0
+    const hasAvatar = Boolean(user.avatarUrl)
+    const hasVerifiedEmail = Boolean(user.emailVerified)
 
     const activationChecklist = [
       {
@@ -97,6 +99,22 @@ router.get('/summary', async (req, res) => {
         done: hasCourse,
         actionLabel: 'Choose courses',
         actionPath: '/settings?tab=courses',
+      },
+      {
+        key: 'verify_email',
+        label: 'Verify your email',
+        helper: 'Required to upload sheets and post comments.',
+        done: hasVerifiedEmail,
+        actionLabel: 'Verify now',
+        actionPath: '/settings?tab=account',
+      },
+      {
+        key: 'add_photo',
+        label: 'Add a profile photo',
+        helper: 'Help classmates recognise you.',
+        done: hasAvatar,
+        actionLabel: 'Add photo',
+        actionPath: '/dashboard',
       },
       {
         key: 'star_or_view_sheet',

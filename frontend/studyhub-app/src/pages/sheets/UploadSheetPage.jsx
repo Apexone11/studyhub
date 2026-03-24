@@ -15,6 +15,7 @@ import { FONT } from './uploadSheetConstants'
 import {
   InfoFields, DescriptionField, HtmlImportSection,
   AttachmentSection, DraftBanner, StatusBanner, ErrorBanner, EditorPanel,
+  UploadHelperCard,
 } from './UploadSheetFormFields'
 import { TutorialModal, HtmlScanModal } from './HtmlScanModal'
 import UploadNavActions from './UploadNavActions'
@@ -52,6 +53,7 @@ export default function UploadSheetPage() {
     <div style={{ minHeight: '100vh', background: '#edf0f5', fontFamily: FONT }}>
       <Navbar crumbs={[{ label: 'Study Sheets', to: '/sheets' }, { label: hook.isEditing ? 'Edit Sheet' : 'New Sheet', to: null }]} hideTabs actions={navActions} hideSearch />
       <div style={pageShell('editor', 20, 60)}>
+        {!hook.isEditing ? <UploadHelperCard /> : null}
         <InfoFields
           title={hook.title} setTitle={hook.setTitle}
           courseId={hook.courseId} setCourseId={hook.setCourseId}
@@ -92,8 +94,8 @@ export default function UploadSheetPage() {
           setShowDiscardDialog={hook.setShowDiscardDialog}
         />
 
-        <StatusBanner status={hook.status} />
-        <ErrorBanner error={hook.error} />
+        <StatusBanner status={hook.status} sheetId={hook.isEditing ? hook.sheetId : hook.draftId} />
+        <ErrorBanner error={hook.error} verificationRequired={hook.verificationRequired} />
 
         <EditorPanel
           content={hook.content} setContent={hook.setContent}

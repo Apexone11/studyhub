@@ -178,6 +178,83 @@
   text-decoration-color: var(--sh-border-strong);
 }
 
+.sheets-repo-row__signal {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 6px;
+  vertical-align: middle;
+  letter-spacing: 0.02em;
+}
+
+.sheets-repo-row__signal--popular {
+  color: var(--sh-brand-hover);
+  background: var(--sh-brand-soft);
+}
+
+.sheets-repo-row__signal--trending {
+  color: var(--sh-success-text);
+  background: var(--sh-success-bg);
+}
+
+.sheets-repo-row__signal--new {
+  color: var(--sh-info-text);
+  background: var(--sh-info-bg);
+}
+
+.sheets-repo-row__signal--well-used {
+  color: var(--sh-subtext);
+  background: var(--sh-soft);
+}
+
+.sheets-repo-row__fork-lineage {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: var(--sh-muted);
+  line-height: 1.4;
+}
+
+.sheets-repo-row__fork-lineage a {
+  color: var(--sh-link);
+  text-decoration: none;
+}
+
+.sheets-repo-row__fork-lineage a:hover {
+  text-decoration: underline;
+}
+
+.sheets-repo-row__status-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+}
+
+.sheets-repo-row__status-badge--draft {
+  color: var(--sh-muted);
+  background: var(--sh-soft);
+  border-color: var(--sh-border);
+}
+
+.sheets-repo-row__status-badge--danger {
+  color: var(--sh-danger-text);
+  background: var(--sh-danger-bg);
+  border-color: var(--sh-danger);
+}
+
+.sheets-repo-row__status-badge--warning {
+  color: var(--sh-warning-text);
+  background: var(--sh-warning-bg);
+  border-color: var(--sh-warning-border);
+}
+
+.sheets-repo-row__status-badge--review {
+  color: var(--sh-warning-text);
+  background: var(--sh-warning-bg);
+  border-color: var(--sh-warning-border);
+}
+
 .sheets-repo-row__description {
   margin: 4px 0 0;
   color: var(--sh-subtext);
@@ -324,6 +401,75 @@
   color: var(--sh-subtext);
   font-size: 13px;
   line-height: 1.65;
+}
+
+.sheets-page__course-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.sheets-page__course-chip {
+  font-size: 12px;
+}
+
+.sheets-page__course-chip-school {
+  margin-left: 4px;
+  opacity: 0.6;
+  font-size: 11px;
+}
+
+.sheets-page__popular-list {
+  display: grid;
+  gap: 0;
+  margin-top: 10px;
+}
+
+.sheets-page__popular-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 7px 8px;
+  border-radius: 6px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--sh-text);
+  text-align: left;
+  transition: background 0.12s ease;
+}
+
+.sheets-page__popular-row:hover {
+  background: var(--sh-soft);
+}
+
+.sheets-page__popular-row.is-active {
+  background: var(--sh-brand-soft);
+  color: var(--sh-brand-hover);
+}
+
+.sheets-page__popular-code {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.sheets-page__popular-school {
+  color: var(--sh-muted);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sheets-page__popular-count {
+  font-weight: 700;
+  color: var(--sh-muted);
+  font-size: 11px;
+  min-width: 20px;
+  text-align: right;
 }
 
 .sheets-page__tutorial-btn {

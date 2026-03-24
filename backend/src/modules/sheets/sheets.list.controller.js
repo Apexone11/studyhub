@@ -111,7 +111,7 @@ router.get('/', optionalAuth, async (req, res) => {
       where.OR = sheetTextSearchClauses
     }
 
-    const allowedSort = ['createdAt', 'stars', 'downloads', 'forks', 'updatedAt']
+    const allowedSort = ['createdAt', 'stars', 'downloads', 'forks', 'updatedAt', 'recommended']
     const sortCandidate = typeof sort === 'string' && sort.trim() ? sort : orderByParam
     const sortField = allowedSort.includes(sortCandidate) ? sortCandidate : 'createdAt'
     const take = parsePositiveInt(limit, 20)
@@ -232,29 +232,61 @@ router.get('/', optionalAuth, async (req, res) => {
       })
     }
 
-    const [sheets, total] = await Promise.all([
-      prisma.studySheet.findMany({
-        where,
-        include: {
+    /* ── Recommended sort: composite score ───────────────────────────── */
+    const useRecommended = sortField === 'recommended'
+
+    const sheetInclude = {
+      author: { select: { id: true, username: true } },
+      course: { include: { school: true } },
+      forkSource: {
+        select: {
+          id: true,
+          title: true,
+          userId: true,
           author: { select: { id: true, username: true } },
-          course: { include: { school: true } },
-          forkSource: {
-            select: {
-              id: true,
-              title: true,
-              userId: true,
-              author: { select: { id: true, username: true } },
-            },
-          },
         },
-        orderBy: { [sortField]: 'desc' },
-        take,
-        skip,
-      }),
+      },
+    }
+
+    const [sheets, total] = await Promise.all([
+      useRecommended
+        ? prisma.studySheet.findMany({
+            where,
+            include: sheetInclude,
+            orderBy: { createdAt: 'desc' },
+            take: Math.min(take + skip + 200, 500),
+          })
+        : prisma.studySheet.findMany({
+            where,
+            include: sheetInclude,
+            orderBy: { [sortField]: 'desc' },
+            take,
+            skip,
+          }),
       prisma.studySheet.count({ where }),
     ])
 
-    const sheetIds = sheets.map((sheet) => sheet.id)
+    /* Score + re-sort + paginate for recommended mode */
+    const rankedSheets = useRecommended
+      ? (() => {
+          const now = Date.now()
+          const DAY_MS = 86400000
+          const scored = sheets.map((sheet) => {
+            const ageDays = Math.max(1, (now - new Date(sheet.createdAt).getTime()) / DAY_MS)
+            const freshness = Math.max(0, 10 - Math.log2(ageDays))
+            const score = (sheet.stars || 0) * 3
+              + (sheet.forks || 0) * 2
+              + (sheet.downloads || 0)
+              + freshness
+            return { sheet, score }
+          })
+          scored.sort((a, b) => b.score - a.score)
+          return scored.slice(skip, skip + take).map((s) => s.sheet)
+        })()
+      : sheets
+
+    const finalSheets = rankedSheets
+    const sheetIds = finalSheets.map((sheet) => sheet.id)
     const [starredRows, commentRows] = await Promise.all([
       req.user
         ? prisma.starredSheet.findMany({
@@ -275,7 +307,7 @@ router.get('/', optionalAuth, async (req, res) => {
     const commentCountBySheetId = new Map(commentRows.map((row) => [row.sheetId, row._count._all]))
 
     res.json({
-      sheets: sheets.map((sheet) => serializeSheet(sheet, {
+      sheets: finalSheets.map((sheet) => serializeSheet(sheet, {
         starred: starredIds.has(sheet.id),
         commentCount: commentCountBySheetId.get(sheet.id) || 0,
       })),

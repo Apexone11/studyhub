@@ -24,7 +24,7 @@ import { useTutorial } from '../../lib/useTutorial'
 import { FEED_STEPS } from '../../lib/tutorialSteps'
 
 import { FONT, FILTERS } from './feedConstants'
-import { Panel, EmptyFeed } from './FeedWidgets'
+import { Panel, EmptyFeed, GettingStartedCard } from './FeedWidgets'
 import FeedComposer from './FeedComposer'
 import FeedCard from './FeedCard'
 import FeedAside from './FeedAside'
@@ -40,7 +40,7 @@ export default function FeedPage() {
   const search = searchParams.get('search') || ''
 
   const {
-    feedState, leaderboards, loadingMore, deletingPostIds,
+    feedState, leaderboards, starredUpdates, loadingMore, deletingPostIds,
     loadMoreFeed, toggleReaction, toggleStar,
     canDeletePost, deletePost, submitPost, retryFeed,
   } = useFeedData({ user, clearSession, search })
@@ -92,6 +92,7 @@ export default function FeedPage() {
             <AppSidebar mode={layout.sidebarMode} />
 
             <main id="main-content" style={{ display: 'grid', gap: 18 }}>
+              <GettingStartedCard user={user} />
               <div data-tutorial="feed-composer">
                 <Panel title="Share with your classmates" helper="Post class notes, course questions, or links to your latest sheet.">
                   <FeedComposer user={user} onSubmitPost={submitPost} />
@@ -110,22 +111,22 @@ export default function FeedPage() {
               </div>
 
               {feedState.partial ? (
-                <div style={{ background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a', borderRadius: 14, padding: '12px 14px', fontSize: 13, lineHeight: 1.6 }}>
+                <div style={{ background: 'var(--sh-warning-bg)', color: 'var(--sh-warning-text)', border: '1px solid var(--sh-warning-border)', borderRadius: 14, padding: '12px 14px', fontSize: 13, lineHeight: 1.6 }}>
                   Feed loaded in reduced mode. {feedState.degradedSections.join(', ')}.
                 </div>
               ) : null}
 
               {feedState.error ? (
-                <div style={{ background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: 14, padding: '12px 14px', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <div style={{ background: 'var(--sh-danger-bg)', color: 'var(--sh-danger-text)', border: '1px solid var(--sh-danger)', borderRadius: 14, padding: '12px 14px', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                   <span>{feedState.error}</span>
-                  <button onClick={retryFeed} style={{ background: '#dc2626', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: FONT }}>Retry</button>
+                  <button onClick={retryFeed} style={{ background: 'var(--sh-danger)', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: FONT }}>Retry</button>
                 </div>
               ) : null}
 
               {feedState.loading ? (
                 <SkeletonFeed count={3} />
               ) : visibleItems.length === 0 ? (
-                <EmptyFeed message="No feed items matched this filter." />
+                <EmptyFeed message={feedState.items.length === 0 && !search ? 'Your feed is empty' : 'No feed items matched this filter.'} isFirstRun={feedState.items.length === 0 && !search} />
               ) : (
                 <div ref={feedListRef} style={{ display: 'grid', gap: 14 }}>
                   {visibleItems.map((item) => (
@@ -151,7 +152,7 @@ export default function FeedPage() {
               )}
             </main>
 
-            <FeedAside leaderboards={leaderboards} />
+            <FeedAside leaderboards={leaderboards} starredUpdates={starredUpdates} />
           </div>
         </div>
       </div>

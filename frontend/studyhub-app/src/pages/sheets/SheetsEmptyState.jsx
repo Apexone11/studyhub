@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom'
 import { IconUpload } from '../../components/Icons'
 
 export default function SheetsEmptyState({
-  search, hasActiveFilters, mine, statusFilter, clearAllFilters,
+  search, hasActiveFilters, mine, statusFilter, clearAllFilters, selectedCourse,
 }) {
   if (search.trim()) {
     return (
@@ -17,6 +17,28 @@ export default function SheetsEmptyState({
         <button type="button" className="sh-btn sh-btn--secondary" onClick={clearAllFilters}>
           Clear filters
         </button>
+      </section>
+    )
+  }
+
+  if (selectedCourse && !mine && !search.trim()) {
+    const courseLabel = selectedCourse.code || selectedCourse.name
+    const schoolLabel = selectedCourse.school?.short || selectedCourse.school?.name || ''
+    return (
+      <section className="sh-card sheets-page__empty-state">
+        <h2 className="sheets-page__empty-title">No sheets for {courseLabel} yet</h2>
+        <p className="sheets-page__empty-copy">
+          Be the first to share notes for {courseLabel}{schoolLabel ? ` at ${schoolLabel}` : ''}. Upload your study materials to help classmates.
+        </p>
+        <div className="sheets-page__empty-actions">
+          <Link to="/sheets/upload" className="sh-btn sh-btn--primary">
+            <IconUpload size={14} />
+            Upload for {courseLabel}
+          </Link>
+          <button type="button" className="sh-btn sh-btn--secondary" onClick={clearAllFilters}>
+            Browse all sheets
+          </button>
+        </div>
       </section>
     )
   }

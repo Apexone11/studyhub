@@ -1,8 +1,58 @@
 /* ═══════════════════════════════════════════════════════════════════════════
  * UploadSheetFormFields.jsx — Form field components for the upload sheet page
  * ═══════════════════════════════════════════════════════════════════════════ */
+import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { IconEye, IconUpload } from '../../components/Icons'
 import { FONT, MiniPreview, tierColor, tierLabel } from './uploadSheetConstants'
+
+/* ── First-upload helper card ──────────────────────────────────────────── */
+const UPLOAD_HELPER_KEY = 'studyhub.upload.helper.dismissed'
+
+export function UploadHelperCard() {
+  const [dismissed, setDismissed] = useState(() => {
+    try { return localStorage.getItem(UPLOAD_HELPER_KEY) === '1' } catch { return false }
+  })
+
+  if (dismissed) return null
+
+  const dismiss = () => {
+    try { localStorage.setItem(UPLOAD_HELPER_KEY, '1') } catch { /* ignore */ }
+    setDismissed(true)
+  }
+
+  return (
+    <section
+      style={{
+        background: 'var(--sh-info-bg)',
+        border: '1px solid var(--sh-info-border)',
+        borderRadius: 14,
+        padding: '14px 20px',
+        marginBottom: 12,
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--sh-heading)' }}>
+          How uploading works
+        </div>
+        <button
+          type="button"
+          onClick={dismiss}
+          aria-label="Dismiss upload helper"
+          style={{ background: 'none', border: 'none', color: 'var(--sh-muted)', fontSize: 16, cursor: 'pointer', padding: '0 2px', lineHeight: 1 }}
+        >
+          &times;
+        </button>
+      </div>
+      <div style={{ display: 'grid', gap: 6, fontSize: 12, color: 'var(--sh-subtext)', lineHeight: 1.7 }}>
+        <div><strong>Formats:</strong> Write Markdown directly, or import an HTML file for rich layouts.</div>
+        <div><strong>Security scan:</strong> HTML sheets are automatically scanned. Most sheets pass instantly.</div>
+        <div><strong>After submit:</strong> Clean sheets publish immediately. Flagged sheets publish with a small warning badge. High-risk content goes to a brief admin review.</div>
+        <div><strong>Your sheet:</strong> You can always find it under <Link to="/sheets?mine=true" style={{ color: 'var(--sh-link, #2563eb)', fontWeight: 600, textDecoration: 'none' }}>My Sheets</Link>.</div>
+      </div>
+    </section>
+  )
+}
 
 /* ── Info fields: title, course, downloads ─────────────────────────────── */
 export function InfoFields({ title, setTitle, courseId, setCourseId, allowDownloads, setAllowDownloads, courses, error, setHasUnsavedChanges }) {
@@ -210,17 +260,77 @@ export function DraftBanner({ isEditing, draftId, status, title, discarding, set
 }
 
 /* ── Status banner ────────────────────────────────────────────────────── */
-export function StatusBanner({ status }) {
+const STATUS_CONFIG = {
+  pending_review: {
+    bg: 'var(--sh-warning-bg)',
+    border: 'var(--sh-warning-border)',
+    color: 'var(--sh-warning-text)',
+    title: 'Pending admin review',
+    body: 'Your sheet has been submitted and is waiting for a brief review. Most reviews complete within a few hours. You can continue editing while you wait.',
+  },
+  rejected: {
+    bg: 'var(--sh-danger-bg)',
+    border: 'var(--sh-danger-border)',
+    color: 'var(--sh-danger-text)',
+    title: 'Changes requested',
+    body: 'An admin reviewed your sheet and requested changes. Check the review reason below, make adjustments, and resubmit when ready.',
+  },
+  published: {
+    bg: 'var(--sh-success-bg)',
+    border: 'var(--sh-success-border)',
+    color: 'var(--sh-success-text)',
+    title: 'Published',
+    body: 'This sheet is live and visible to your classmates.',
+  },
+  quarantined: {
+    bg: 'var(--sh-danger-bg)',
+    border: 'var(--sh-danger-border)',
+    color: 'var(--sh-danger-text)',
+    title: 'Quarantined',
+    body: 'This sheet was quarantined because the security scanner detected a serious risk. If you believe this is a mistake, contact support.',
+  },
+}
+
+export function StatusBanner({ status, sheetId }) {
   if (!status || status === 'draft') return null
+
+  const cfg = STATUS_CONFIG[status] || {
+    bg: 'var(--sh-info-bg)',
+    border: 'var(--sh-info-border)',
+    color: 'var(--sh-info-text)',
+    title: status.replace(/_/g, ' '),
+    body: null,
+  }
+
   return (
-    <div style={{ background: status === 'rejected' ? 'var(--sh-danger-bg)' : 'var(--sh-info-bg)', border: `1px solid ${status === 'rejected' ? 'var(--sh-danger-border)' : 'var(--sh-info-border)'}`, borderRadius: 9, padding: '10px 14px', marginBottom: 10, fontSize: 13, color: status === 'rejected' ? 'var(--sh-danger-text)' : 'var(--sh-info-text)' }}>
-      Status: <strong>{status.replace(/_/g, ' ')}</strong>
+    <div style={{ background: cfg.bg, border: `1px solid ${cfg.border}`, borderRadius: 12, padding: '12px 16px', marginBottom: 10, fontSize: 13, color: cfg.color, lineHeight: 1.6 }}>
+      <div style={{ fontWeight: 800, marginBottom: cfg.body ? 4 : 0 }}>{cfg.title}</div>
+      {cfg.body ? <div>{cfg.body}</div> : null}
+      <div style={{ display: 'flex', gap: 12, marginTop: 8, flexWrap: 'wrap' }}>
+        <Link to="/sheets?mine=true" style={{ fontSize: 12, fontWeight: 700, color: cfg.color, textDecoration: 'underline' }}>
+          My Sheets
+        </Link>
+        {sheetId && status === 'published' ? (
+          <Link to={`/sheets/${sheetId}`} style={{ fontSize: 12, fontWeight: 700, color: cfg.color, textDecoration: 'underline' }}>
+            View sheet
+          </Link>
+        ) : null}
+      </div>
     </div>
   )
 }
 
 /* ── Error banner ─────────────────────────────────────────────────────── */
-export function ErrorBanner({ error }) {
+export function ErrorBanner({ error, verificationRequired }) {
+  if (verificationRequired) {
+    return (
+      <div role="alert" style={{ background: 'var(--sh-warning-bg)', border: '1px solid var(--sh-warning-border)', borderRadius: 9, padding: '12px 14px', marginBottom: 10, fontSize: 13, lineHeight: 1.6, color: 'var(--sh-warning-text)' }}>
+        <strong>Email verification required.</strong>{' '}
+        Verify your email to upload sheets and access all features.{' '}
+        <a href="/settings?tab=account" style={{ color: 'var(--sh-link, #2563eb)', fontWeight: 700, textDecoration: 'underline' }}>Verify now</a>
+      </div>
+    )
+  }
   if (!error) return null
   return (
     <div style={{ background: 'var(--sh-danger-bg)', border: '1px solid var(--sh-danger-border)', borderRadius: 9, padding: '10px 14px', marginBottom: 10, fontSize: 13, color: 'var(--sh-danger)' }}>

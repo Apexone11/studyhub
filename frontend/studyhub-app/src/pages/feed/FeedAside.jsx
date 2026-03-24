@@ -5,10 +5,50 @@ import { Link } from 'react-router-dom'
 import { IconPlus } from '../../components/Icons'
 import { linkButton } from './feedConstants'
 import { Panel, LeaderboardPanel } from './FeedWidgets'
+import { timeAgo } from '../sheets/sheetsPageConstants'
 
-export default function FeedAside({ leaderboards }) {
+export default function FeedAside({ leaderboards, starredUpdates }) {
   return (
     <aside className="feed-aside" data-tutorial="feed-leaderboards" style={{ display: 'grid', gap: 16 }}>
+      {starredUpdates.length > 0 ? (
+        <Panel title="Your starred sheets" helper="Recently updated">
+          <div style={{ display: 'grid', gap: 8 }}>
+            {starredUpdates.map((sheet) => (
+              <Link
+                key={sheet.id}
+                to={`/sheets/${sheet.id}`}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '8px 10px',
+                  borderRadius: 10,
+                  background: 'var(--sh-soft)',
+                  border: '1px solid var(--sh-border)',
+                  textDecoration: 'none',
+                  transition: 'border-color 0.12s',
+                }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--sh-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {sheet.title}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--sh-muted)' }}>
+                    {sheet.course?.code || 'General'} · {sheet.author?.username || 'unknown'}
+                  </div>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--sh-muted)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  {timeAgo(sheet.updatedAt)}
+                </div>
+              </Link>
+            ))}
+          </div>
+          <Link to="/sheets?starred=1" style={{ display: 'block', marginTop: 10, fontSize: 12, fontWeight: 700, color: 'var(--sh-brand)', textDecoration: 'none' }}>
+            View all starred
+          </Link>
+        </Panel>
+      ) : null}
       <LeaderboardPanel title="Top Starred" items={leaderboards.stars} empty="No starred sheets yet." renderLabel={(item) => item.title} />
       <LeaderboardPanel title="Most Downloaded" items={leaderboards.downloads} empty="No downloads yet." renderLabel={(item) => item.title} />
       <LeaderboardPanel title="Top Contributors" items={leaderboards.contributors} empty="No contributor activity yet." renderLabel={(item) => item.username} />

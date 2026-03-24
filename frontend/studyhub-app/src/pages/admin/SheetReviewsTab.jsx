@@ -2,6 +2,36 @@ import { Link } from 'react-router-dom'
 import { Pager, PipelineBadge } from './AdminWidgets'
 import { createPageState, filterSelectStyle, pillButton } from './adminConstants'
 
+const TIER_LABELS = ['Clean', 'Flagged', 'High Risk', 'Quarantined']
+const TIER_BADGE_COLORS = [
+  { bg: 'var(--sh-success-bg)', color: 'var(--sh-success)', border: 'var(--sh-success-border)' },
+  { bg: 'var(--sh-warning-bg)', color: 'var(--sh-warning)', border: 'var(--sh-warning-border)' },
+  { bg: 'var(--sh-warning-bg)', color: 'var(--sh-warning-text)', border: 'var(--sh-warning-border)' },
+  { bg: 'var(--sh-danger-bg)', color: 'var(--sh-danger)', border: 'var(--sh-danger-border)' },
+]
+const PREVIEW_MODE_LABELS = { 0: 'Interactive', 1: 'Safe', 2: 'Restricted', 3: 'Disabled' }
+
+function TierBadge({ tier }) {
+  const t = tier || 0
+  if (t === 0) return null
+  const c = TIER_BADGE_COLORS[t] || TIER_BADGE_COLORS[0]
+  return (
+    <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', padding: '2px 8px', borderRadius: 6, background: c.bg, color: c.color, border: `1px solid ${c.border}` }}>
+      {TIER_LABELS[t] || `Tier ${t}`}
+    </span>
+  )
+}
+
+function PreviewModeBadge({ tier }) {
+  const t = tier || 0
+  if (t === 0) return null
+  return (
+    <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 6, background: 'var(--sh-info-bg)', color: 'var(--sh-info-text)', border: '1px solid var(--sh-info-border)' }}>
+      {PREVIEW_MODE_LABELS[t] || 'Interactive'} preview
+    </span>
+  )
+}
+
 export default function SheetReviewsTab({
   reviewState,
   reviewStatus,
@@ -86,6 +116,13 @@ export default function SheetReviewsTab({
                 {record.contentFormat === 'html' && (
                   <PipelineBadge label={`scan: ${record.htmlScanStatus || 'n/a'}`} type={record.htmlScanStatus === 'passed' ? 'success' : record.htmlScanStatus === 'failed' ? 'danger' : record.htmlScanStatus === 'running' ? 'info' : 'muted'} />
                 )}
+                {record.contentFormat === 'html' && <TierBadge tier={record.htmlRiskTier} />}
+                {record.contentFormat === 'html' && <PreviewModeBadge tier={record.htmlRiskTier} />}
+                {record.contentFormat === 'html' && Array.isArray(record.htmlScanFindings) && record.htmlScanFindings.length > 0 && (
+                  <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: 'var(--sh-soft)', color: 'var(--sh-muted)', border: '1px solid var(--sh-border)' }}>
+                    {record.htmlScanFindings.length} finding{record.htmlScanFindings.length !== 1 ? 's' : ''}
+                  </span>
+                )}
               </div>
             </div>
             {record.description ? (
@@ -101,16 +138,19 @@ export default function SheetReviewsTab({
                 {record.reviewReason ? ` — "${record.reviewReason}"` : ''}
               </div>
             )}
-            {record.htmlScanStatus === 'failed' && Array.isArray(record.htmlScanFindings) && record.htmlScanFindings.length > 0 ? (
+            {Array.isArray(record.htmlScanFindings) && record.htmlScanFindings.length > 0 ? (
               <div style={{ border: '1px solid var(--sh-danger-border)', background: 'var(--sh-danger-bg)', borderRadius: 10, padding: 10, marginBottom: 10 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--sh-danger-text)', marginBottom: 4 }}>
                   Security Scan Findings ({record.htmlScanFindings.length})
                   {record.htmlScanAcknowledgedAt ? ' · user acknowledged' : ''}
                 </div>
                 <ul style={{ margin: 0, paddingLeft: 16, color: 'var(--sh-danger-text)', fontSize: 11, lineHeight: 1.6 }}>
-                  {record.htmlScanFindings.map((finding, index) => (
+                  {record.htmlScanFindings.slice(0, 5).map((finding, index) => (
                     <li key={index}>{finding?.message || String(finding)}</li>
                   ))}
+                  {record.htmlScanFindings.length > 5 && (
+                    <li style={{ fontStyle: 'italic' }}>...and {record.htmlScanFindings.length - 5} more</li>
+                  )}
                 </ul>
               </div>
             ) : null}

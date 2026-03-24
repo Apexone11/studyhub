@@ -10,6 +10,28 @@ Version naming: v1.5.x-beta (weekly), v1.5.x.y-beta (hotfixes).
 
 ### Added (2026-03-23)
 
+- Feed `GettingStartedCard`: dismissible onboarding panel with 4 quick actions, completion tracking, localStorage persistence (Cycle 40.1)
+- Feed `EmptyFeed` enhanced with first-run CTAs ("Browse study sheets", "Upload a sheet") (Cycle 40.1)
+- Dashboard activation checklist expanded to 6 items: "Verify your email" and "Add a profile photo" steps with backend checks (Cycle 40.1)
+- Upload `UploadHelperCard`: dismissible "How uploading works" info panel explaining formats, scan, post-submit flow (Cycle 40.3)
+- Upload `StatusBanner` rewritten: context-aware messages for pending_review, rejected, published, quarantined states with return-path links (Cycle 40.3)
+- Upload `ErrorBanner`: `verificationRequired` prop with `EMAIL_NOT_VERIFIED` detection in both markdown and HTML submit paths (Cycle 40.2)
+- `EmailVerificationBanner`: grace period countdown with days remaining (Cycle 40.2)
+- `SheetsAside`: "Add your courses" CTA for zero-enrollment users, "Upload a sheet" primary CTA (Cycle 40.4)
+- Dark mode token migration: `RecentSheets`, `CourseFocus`, `QuickActions`, `EmptyState`, `DashboardSkeleton`, `ActivationChecklist`, `StatCards` — all hardcoded hex replaced with CSS custom properties (Cycles 40.1, 40.4)
+- Scanner explainability helpers: `generateRiskSummary()`, `generateTierExplanation()`, `groupFindingsByCategory()`, `CATEGORY_LABELS` — all scan results now include plain-English summaries, "why this tier" explanations, and grouped findings
+- `htmlWorkflow` serializer enriched with `riskSummary`, `tierExplanation`, `findingsByCategory` fields across sheet detail, preview, runtime, scan status, and admin review-detail endpoints
+- `category` field added to `normalizeFindings()` output (backward-compatible with existing `source` field)
+- 9 new unit tests for explainability helpers (grouping, summaries, tier explanations)
+- Admin review queue badges: tier badge, preview mode badge, finding count badge on each queue card (Cycle 39.2)
+- Admin review panel: risk summary bar with tier badge, acknowledgement indicator, tier explanation in header (Cycle 39.2)
+- Grouped findings display in `FindingsPanel` — category-grouped, severity-sorted with labels from `CATEGORY_LABELS` (Cycle 39.2)
+- Review reason quick-fill templates (5 templates) in `ReviewActionBar` for faster admin decisions (Cycle 39.2)
+- `HtmlScanModal` rewritten: category-grouped findings with severity badges, risk summary headline, tier explanation (replaces flat list + hardcoded text) (Cycle 39.2)
+- SheetViewerPage risk summary shown next to tier badge for non-interactive preview modes (Cycle 39.2)
+- 5 Playwright E2E smoke tests for HTML security tiers: tier 2 upload, tier 3 quarantine, grouped findings modal, admin review queue with badges/panel/templates, sheet viewer risk summary (Cycle 39.3)
+- HTML moderation playbook: step-by-step admin review guide with decision matrix, preview mode reference, and reason templates (`docs/security/html-moderation-playbook.md`) (Cycle 39.3)
+- HTML finding category glossary: all 13 scanner categories with triggers, severities, tier escalation rules (`docs/security/html-finding-categories.md`) (Cycle 39.3)
 - Tier 3 classifier rules: credential capture detector (external form + password/sensitive inputs → critical severity), 3+ distinct high-risk category escalation, obfuscated crypto-miner escalation — Tier 3 now reachable from scanner alone without ClamAV
 - Preview mode serialization: `tierToPreviewMode()` in `sheets.serializer.js`, `previewMode` and `ackRequired` fields in `htmlWorkflow` response object, preview/runtime endpoints return `previewMode`
 - SheetViewerPage refactored: all 12 inline `htmlRiskTier >= X` comparisons replaced with `previewMode` string checks (`interactive`, `safe`, `restricted`, `disabled`)
@@ -49,10 +71,18 @@ Version naming: v1.5.x-beta (weekly), v1.5.x.y-beta (hotfixes).
 - 14 Prisma validation errors from `parseInt` producing `NaN` on invalid route params (added `Number.isInteger()` guards)
 - Feed post reaction delete race condition — `P2025` not caught on already-deleted row
 - 11 raw `data.error` patterns in `useSheetViewer.js` and `useFeedData.js` replaced with safe `getApiErrorMessage()` helper
+- Service Worker intercepting Playwright API mocks — added `test.use({ serviceWorkers: 'block' })` to HTML upload test files (Cycle 39.3)
+- Existing tier 1 upload smoke test: fixed wrong working-html mock URL, added missing tutorial localStorage key (Cycle 39.3)
 
 ### Security (2026-03-23)
 - Attachment preview iframes now sandboxed (`allow-same-origin` only) across Feed, Sheet Viewer, and Preview pages
 - Error messages sanitized through `getApiErrorMessage()` to prevent API implementation detail leakage
+
+### Changed (2026-03-23)
+- Upload scan language: `TutorialModal` steps rewritten with supportive tone, `HtmlScanModal` intro reframed, tier 1 acknowledgement simplified (Cycle 40.3)
+- `tierLabel()` renamed: "Clean" → "Passed", "Flagged" → "Minor Findings", "High Risk" → "Needs Review" in upload flow (Cycle 40.3)
+- `RecentSheets` helper text changed from developer note to user-facing copy (Cycle 40.4)
+- `SheetsAside` workflow section: better guidance copy + "Upload a sheet" CTA (Cycle 40.4)
 
 ### Added (2026-03-21)
 - Unverified user restriction with 3-day grace period (backend middleware + 9 route guards)

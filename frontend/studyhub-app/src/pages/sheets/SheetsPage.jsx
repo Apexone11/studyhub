@@ -33,8 +33,10 @@ export default function SheetsPage() {
     catalog, catalogError, sheetsState, loadingMore,
     mobileFiltersOpen, setMobileFiltersOpen,
     forkingSheetId, cardsRef,
-    activeSchool, availableCourses, subtitle, hasActiveFilters,
-    setQueryParam, handleSchoolChange, toggleMine, clearAllFilters,
+    activeSchool, availableCourses, selectedCourse,
+    popularCourses, recentCourses,
+    subtitle, hasActiveFilters,
+    setQueryParam, handleSchoolChange, handleCourseFilter, toggleMine, clearAllFilters,
     toggleStar, handleFork, loadMoreSheets,
   } = useSheetsData()
 
@@ -78,6 +80,7 @@ export default function SheetsPage() {
                 <SheetsEmptyState
                   search={search} hasActiveFilters={hasActiveFilters}
                   mine={mine} statusFilter={statusFilter} clearAllFilters={clearAllFilters}
+                  selectedCourse={selectedCourse}
                 />
               ) : (
                 <section className="sh-card sh-card--flat sh-card--flush sheets-page__list-shell">
@@ -127,6 +130,10 @@ export default function SheetsPage() {
               sheetsTotal={sheetsState.total}
               catalogCount={catalog.length}
               enrollmentCount={user?.enrollments?.length || 0}
+              popularCourses={popularCourses}
+              recentCourses={recentCourses}
+              activeCourseId={courseId}
+              onCourseFilter={handleCourseFilter}
             />
           </div>
         </div>

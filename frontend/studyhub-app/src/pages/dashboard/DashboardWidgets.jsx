@@ -38,7 +38,7 @@ export function EmptyState({ title, body, actionLabel, actionTo }) {
             justifyContent: 'center',
             padding: '9px 16px',
             borderRadius: 10,
-            background: '#3b82f6',
+            background: 'var(--sh-brand)',
             color: '#fff',
             fontSize: 13,
             fontWeight: 700,
@@ -56,13 +56,13 @@ export function EmptyState({ title, body, actionLabel, actionTo }) {
 export function DashboardSkeleton() {
   return (
     <div style={{ display: 'grid', gap: 16 }}>
-      <div style={{ height: 132, borderRadius: 18, background: '#dbe4f0', opacity: 0.6 }} />
+      <div style={{ height: 132, borderRadius: 18, background: 'var(--sh-border)', opacity: 0.6 }} />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
         {Array.from({ length: 3 }).map((_, index) => (
-          <div key={index} style={{ height: 112, borderRadius: 16, background: '#dbe4f0', opacity: 0.55 }} />
+          <div key={index} style={{ height: 112, borderRadius: 16, background: 'var(--sh-border)', opacity: 0.55 }} />
         ))}
       </div>
-      <div style={{ height: 260, borderRadius: 18, background: '#dbe4f0', opacity: 0.45 }} />
+      <div style={{ height: 260, borderRadius: 18, background: 'var(--sh-border)', opacity: 0.45 }} />
     </div>
   )
 }
@@ -75,20 +75,20 @@ export function StatCards({ statsRef, cards }) {
         <div
           key={card.label}
           style={{
-            background: '#fff',
+            background: 'var(--sh-surface)',
             borderRadius: 16,
-            border: '1px solid #e2e8f0',
+            border: '1px solid var(--sh-border)',
             padding: '18px 18px 20px',
             boxShadow: '0 4px 20px rgba(15,23,42,0.04)',
           }}
         >
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '.08em', marginBottom: 10 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--sh-muted)', letterSpacing: '.08em', marginBottom: 10 }}>
             {card.label.toUpperCase()}
           </div>
           <div data-stat-value={card.value} style={{ fontSize: 32, fontWeight: 800, color: card.accent, marginBottom: 4 }}>
             {card.value}
           </div>
-          <div style={{ fontSize: 13, color: '#64748b' }}>{card.helper}</div>
+          <div style={{ fontSize: 13, color: 'var(--sh-subtext)' }}>{card.helper}</div>
         </div>
       ))}
     </section>
@@ -101,17 +101,17 @@ export function ActivationChecklist({ activation }) {
   return (
     <section
       style={{
-        background: '#fff',
+        background: 'var(--sh-surface)',
         borderRadius: 18,
-        border: '1px solid #e2e8f0',
+        border: '1px solid var(--sh-border)',
         padding: '20px 22px',
         boxShadow: '0 4px 20px rgba(15,23,42,0.04)',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 18, color: '#0f172a' }}>Getting Started</h2>
-          <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>
+          <h2 style={{ margin: 0, fontSize: 18, color: 'var(--sh-heading)' }}>Getting Started</h2>
+          <div style={{ fontSize: 12, color: 'var(--sh-muted)', marginTop: 4 }}>
             {activation.completedCount} of {activation.totalCount} steps complete
           </div>
         </div>
@@ -120,12 +120,12 @@ export function ActivationChecklist({ activation }) {
             width: 44,
             height: 44,
             borderRadius: '50%',
-            background: `conic-gradient(#3b82f6 ${(activation.completedCount / activation.totalCount) * 360}deg, #e2e8f0 0deg)`,
+            background: `conic-gradient(var(--sh-brand) ${(activation.completedCount / activation.totalCount) * 360}deg, var(--sh-border) 0deg)`,
             display: 'grid',
             placeItems: 'center',
           }}
         >
-          <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#fff', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 800, color: '#3b82f6' }}>
+          <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'var(--sh-surface)', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 800, color: 'var(--sh-brand)' }}>
             {activation.completedCount}/{activation.totalCount}
           </div>
         </div>
@@ -140,8 +140,8 @@ export function ActivationChecklist({ activation }) {
               gap: 12,
               padding: '12px 14px',
               borderRadius: 12,
-              background: item.done ? '#f0fdf4' : '#f8fafc',
-              border: `1px solid ${item.done ? '#bbf7d0' : '#e2e8f0'}`,
+              background: item.done ? 'var(--sh-success-bg)' : 'var(--sh-soft)',
+              border: `1px solid ${item.done ? 'var(--sh-success-border)' : 'var(--sh-border)'}`,
             }}
           >
             <div
@@ -149,7 +149,7 @@ export function ActivationChecklist({ activation }) {
                 width: 24,
                 height: 24,
                 borderRadius: '50%',
-                background: item.done ? '#10b981' : '#e2e8f0',
+                background: item.done ? 'var(--sh-success)' : 'var(--sh-border)',
                 display: 'grid',
                 placeItems: 'center',
                 flexShrink: 0,
@@ -160,8 +160,8 @@ export function ActivationChecklist({ activation }) {
               ) : null}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: item.done ? '#166534' : '#0f172a' }}>{item.label}</div>
-              <div style={{ fontSize: 12, color: item.done ? '#16a34a' : '#64748b' }}>{item.helper}</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: item.done ? 'var(--sh-success-text)' : 'var(--sh-heading)' }}>{item.label}</div>
+              <div style={{ fontSize: 12, color: item.done ? 'var(--sh-success-text)' : 'var(--sh-subtext)' }}>{item.helper}</div>
             </div>
             {!item.done && item.actionPath ? (
               <Link
@@ -169,7 +169,7 @@ export function ActivationChecklist({ activation }) {
                 style={{
                   padding: '6px 12px',
                   borderRadius: 9,
-                  background: '#3b82f6',
+                  background: 'var(--sh-brand)',
                   color: '#fff',
                   fontSize: 12,
                   fontWeight: 700,
@@ -192,20 +192,20 @@ export function RecentSheets({ recentSheets }) {
   return (
     <div
       style={{
-        background: '#fff',
+        background: 'var(--sh-surface)',
         borderRadius: 18,
-        border: '1px solid #e2e8f0',
+        border: '1px solid var(--sh-border)',
         padding: '20px 22px',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: 18, color: '#0f172a' }}>Recent Sheets</h2>
-          <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>
-            Rendered from the new summary endpoint for a faster first load.
+          <h2 style={{ margin: 0, fontSize: 18, color: 'var(--sh-heading)' }}>Recent Sheets</h2>
+          <div style={{ fontSize: 12, color: 'var(--sh-muted)', marginTop: 4 }}>
+            Latest sheets from your enrolled courses.
           </div>
         </div>
-        <Link to="/sheets" style={{ fontSize: 12, fontWeight: 700, color: '#3b82f6', textDecoration: 'none' }}>
+        <Link to="/sheets" style={{ fontSize: 12, fontWeight: 700, color: 'var(--sh-brand)', textDecoration: 'none' }}>
           Browse all
         </Link>
       </div>
@@ -230,9 +230,9 @@ export function RecentSheets({ recentSheets }) {
                 alignItems: 'center',
                 padding: '14px 16px',
                 borderRadius: 14,
-                border: '1px solid #e2e8f0',
+                border: '1px solid var(--sh-border)',
                 textDecoration: 'none',
-                background: '#f8fafc',
+                background: 'var(--sh-soft)',
               }}
             >
               <div
@@ -240,8 +240,8 @@ export function RecentSheets({ recentSheets }) {
                   width: 42,
                   height: 42,
                   borderRadius: 12,
-                  background: '#eff6ff',
-                  color: '#2563eb',
+                  background: 'var(--sh-brand-soft, #eff6ff)',
+                  color: 'var(--sh-brand)',
                   display: 'grid',
                   placeItems: 'center',
                 }}
@@ -249,14 +249,19 @@ export function RecentSheets({ recentSheets }) {
                 <IconSheets size={18} />
               </div>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', marginBottom: 3 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--sh-heading)', marginBottom: 3 }}>
                   {sheet.title}
                 </div>
-                <div style={{ fontSize: 12, color: '#64748b' }}>
+                <div style={{ fontSize: 12, color: 'var(--sh-subtext)' }}>
                   {sheet.course?.code || 'General'} · by {sheet.author?.username || 'unknown'}
                 </div>
+                {sheet.forkSource ? (
+                  <div style={{ fontSize: 11, color: 'var(--sh-muted)', marginTop: 2 }}>
+                    Forked from {sheet.forkSource.title}{sheet.forkSource.author ? ` by ${sheet.forkSource.author.username}` : ''}
+                  </div>
+                ) : null}
               </div>
-              <div style={{ fontSize: 12, color: '#94a3b8', textAlign: 'right' }}>
+              <div style={{ fontSize: 12, color: 'var(--sh-muted)', textAlign: 'right' }}>
                 {sheet.stars || 0} stars
               </div>
             </Link>
@@ -272,13 +277,13 @@ export function CourseFocus({ courses }) {
   return (
     <div
       style={{
-        background: '#fff',
+        background: 'var(--sh-surface)',
         borderRadius: 18,
-        border: '1px solid #e2e8f0',
+        border: '1px solid var(--sh-border)',
         padding: '20px 22px',
       }}
     >
-      <h2 style={{ margin: '0 0 12px', fontSize: 18, color: '#0f172a' }}>Course Focus</h2>
+      <h2 style={{ margin: '0 0 12px', fontSize: 18, color: 'var(--sh-heading)' }}>Course Focus</h2>
       {courses.length === 0 ? (
         <EmptyState
           title="No courses selected"
@@ -298,15 +303,15 @@ export function CourseFocus({ courses }) {
                 gap: 12,
                 padding: '12px 14px',
                 borderRadius: 12,
-                background: '#f8fafc',
-                border: '1px solid #e2e8f0',
+                background: 'var(--sh-soft)',
+                border: '1px solid var(--sh-border)',
               }}
             >
               <div>
-                <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>{course.code}</div>
-                <div style={{ fontSize: 12, color: '#64748b' }}>{course.name}</div>
+                <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--sh-heading)' }}>{course.code}</div>
+                <div style={{ fontSize: 12, color: 'var(--sh-subtext)' }}>{course.name}</div>
               </div>
-              <div style={{ fontSize: 11, color: '#94a3b8' }}>
+              <div style={{ fontSize: 11, color: 'var(--sh-muted)' }}>
                 {course.school?.short || course.school?.name || 'School'}
               </div>
             </div>
@@ -331,13 +336,13 @@ export function QuickActions() {
     <div
       data-tutorial="dashboard-actions"
       style={{
-        background: '#fff',
+        background: 'var(--sh-surface)',
         borderRadius: 18,
-        border: '1px solid #e2e8f0',
+        border: '1px solid var(--sh-border)',
         padding: '20px 22px',
       }}
     >
-      <h2 style={{ margin: '0 0 12px', fontSize: 18, color: '#0f172a' }}>Quick Actions</h2>
+      <h2 style={{ margin: '0 0 12px', fontSize: 18, color: 'var(--sh-heading)' }}>Quick Actions</h2>
       <div style={{ display: 'grid', gap: 10 }}>
         {QUICK_ACTIONS.map((action) => (
           <Link
@@ -349,9 +354,9 @@ export function QuickActions() {
               gap: 10,
               padding: '12px 14px',
               borderRadius: 12,
-              background: '#f8fafc',
-              border: '1px solid #e2e8f0',
-              color: '#0f172a',
+              background: 'var(--sh-soft)',
+              border: '1px solid var(--sh-border)',
+              color: 'var(--sh-heading)',
               textDecoration: 'none',
               fontSize: 13,
               fontWeight: 700,

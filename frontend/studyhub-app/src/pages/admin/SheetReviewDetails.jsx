@@ -59,11 +59,47 @@ export function RawHtmlView({ rawHtml }) {
 
 export function FindingsPanel({ findings, detail }) {
   const d = detail
+  const groupedFindings = d.findingsByCategory || d.liveFindingsByCategory || null
+  const hasGroups = groupedFindings && Object.keys(groupedFindings).length > 0
+
   return (
     <div style={{ padding: 16 }}>
+      {/* Risk summary */}
+      {d.riskSummary && d.htmlRiskTier > 0 && (
+        <div style={{ marginBottom: 12, fontSize: 13, fontWeight: 700, color: d.htmlRiskTier >= 3 ? 'var(--sh-danger)' : 'var(--sh-warning-text)' }}>
+          {d.riskSummary}
+        </div>
+      )}
+
       {findings.length === 0 ? (
         <div style={{ padding: 24, textAlign: 'center', color: 'var(--sh-success)', fontSize: 13, fontWeight: 700 }}>
           No security findings. Content passed all checks.
+        </div>
+      ) : hasGroups ? (
+        <div style={{ display: 'grid', gap: 10 }}>
+          {Object.entries(groupedFindings).sort((a, b) => {
+            const order = { critical: 0, high: 1, medium: 2 }
+            return (order[a[1].maxSeverity] ?? 3) - (order[b[1].maxSeverity] ?? 3)
+          }).map(([category, group]) => (
+            <div key={category} style={{ padding: '10px 14px', borderRadius: 10, border: `1px solid ${severityColor(group.maxSeverity)}20`, background: `${severityColor(group.maxSeverity)}08` }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
+                <span style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', color: severityColor(group.maxSeverity) }}>
+                  {group.maxSeverity}
+                </span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--sh-heading)' }}>
+                  {group.label}
+                </span>
+                <span style={{ fontSize: 10, color: 'var(--sh-muted)' }}>
+                  ({group.findings.length})
+                </span>
+              </div>
+              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: 'var(--sh-text)', lineHeight: 1.7 }}>
+                {group.findings.map((f, i) => (
+                  <li key={i}>{f.message || String(f)}</li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
       ) : (
         <div style={{ display: 'grid', gap: 8 }}>
@@ -115,6 +151,14 @@ export function FindingsPanel({ findings, detail }) {
 
 /* ── Action bar ──────────────────────────────────────────────────────────── */
 
+const REASON_TEMPLATES = [
+  'Allowed advanced HTML; safe preview only.',
+  'Pending due to obfuscated script behavior.',
+  'Quarantined due to phishing/exfiltration indicators.',
+  'Rejected — content violates community guidelines.',
+  'Content is clean, no security issues found.',
+]
+
 export function ReviewActionBar({ reason, setReason, submitting, submitError, setSubmitError, handleReview }) {
   return (
     <div style={{ padding: '16px 20px', borderTop: '1px solid var(--sh-border)', background: 'var(--sh-soft)' }}>
@@ -124,14 +168,31 @@ export function ReviewActionBar({ reason, setReason, submitting, submitError, se
         </div>
       )}
 
-      <label style={{ display: 'block', marginBottom: 8, fontSize: 12, fontWeight: 700, color: 'var(--sh-text)' }}>
+      <label style={{ display: 'block', marginBottom: 6, fontSize: 12, fontWeight: 700, color: 'var(--sh-text)' }}>
         Review reason (optional — defaults applied if empty)
       </label>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+        {REASON_TEMPLATES.map((template) => (
+          <button
+            key={template}
+            type="button"
+            onClick={() => { setReason(template); setSubmitError('') }}
+            style={{
+              padding: '4px 10px', borderRadius: 6, border: '1px solid var(--sh-border)',
+              background: reason === template ? 'var(--sh-brand)' : 'var(--sh-surface)',
+              color: reason === template ? '#fff' : 'var(--sh-muted)',
+              fontSize: 10, fontWeight: 600, cursor: 'pointer', fontFamily: FONT,
+            }}
+          >
+            {template}
+          </button>
+        ))}
+      </div>
       <textarea
         value={reason}
         onChange={(e) => { setReason(e.target.value); setSubmitError('') }}
-        placeholder="Explain your decision (e.g. 'Content is clean, no security issues found' or 'Contains obfuscated script injection in img tags')"
-        rows={3}
+        placeholder="Explain your decision or pick a template above"
+        rows={2}
         style={{
           width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 10,
           border: '1px solid var(--sh-input-border)', fontSize: 13, fontFamily: FONT, resize: 'vertical',

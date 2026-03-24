@@ -3955,3 +3955,179 @@ Full enforcement of the HTML tier pipeline: Tier 3 now reachable from the classi
 | `docs/logs/CHANGELOG.md` | Cycle 38 entries |
 | `docs/logs/feature-tracker.md` | 4 new Done features |
 | `docs/plans/v1.5-weekly-roadmap.md` | Cycle 38 item checked |
+
+---
+
+## Cycle 39 — Admin Review Ergonomics, Scanner Explainability & Production Confidence (2026-03-23)
+
+Theme: Make the HTML security system usable at scale — faster for admins to review, easier for users to understand, safer to operate in production.
+
+### Sub-cycle 39.1 — Scanner Explainability + Backend Enrichment
+
+Added:
+- `generateRiskSummary(tier, findings)` — produces short plain-English summaries from findings (e.g., "Contains obfuscated JavaScript and page redirect behavior.")
+- `generateTierExplanation(tier)` — produces "why this tier" explanation text for each risk tier
+- `groupFindingsByCategory(findings)` — groups findings into `{ [category]: { label, maxSeverity, findings[] } }` buckets
+- `CATEGORY_LABELS` constant mapping all 13 finding categories to human-readable labels (e.g., `'credential-capture'` → `'Credential Capture'`)
+- `category` field added to `normalizeFindings()` output (alongside `source` for backward compatibility)
+- `htmlWorkflow` serializer enriched with `riskSummary`, `tierExplanation`, `findingsByCategory` fields
+- Admin review-detail endpoint enriched with both stored and live explainability fields (`riskSummary`, `tierExplanation`, `findingsByCategory`, `liveRiskSummaryText`, `liveTierExplanation`, `liveFindingsByCategory`)
+- html-preview and html-runtime endpoints enriched with `riskSummary` and `tierExplanation`
+- `getHtmlScanStatus()` response enriched with `riskSummary`, `tierExplanation`, `findingsByCategory`
+- 9 new unit tests covering `groupFindingsByCategory`, `generateRiskSummary`, `generateTierExplanation`
+
+Files changed:
+| File | Change |
+|------|--------|
+| `backend/src/lib/htmlSecurityScanner.js` | Added `groupFindingsByCategory`, `generateRiskSummary`, `generateTierExplanation`, `CATEGORY_LABELS` |
+| `backend/src/lib/htmlSecurity.js` | Re-export 4 new symbols |
+| `backend/src/lib/htmlDraftValidation.js` | Added `category` field to `normalizeFindings()` |
+| `backend/src/lib/htmlDraftWorkflow.js` | Enriched `getHtmlScanStatus()` with explainability fields |
+| `backend/src/modules/sheets/sheets.serializer.js` | Enriched `htmlWorkflow` with `riskSummary`, `tierExplanation`, `findingsByCategory` |
+| `backend/src/modules/sheets/sheets.html.controller.js` | Enriched preview/runtime endpoints with summary/explanation |
+| `backend/src/modules/admin/admin.sheets.controller.js` | Enriched review-detail with stored + live explainability fields |
+| `backend/test/htmlSecurity.test.js` | 9 new tests for explainability helpers |
+
+Validation:
+- Backend tests: 184/184 passed (9 new)
+- Backend lint: 0 errors
+- Frontend lint: 0 errors
+
+### Sub-cycle 39.2 — Admin Ergonomics + Author Experience + UI Polish
+
+Added:
+- Admin queue cards: tier badge (Flagged/High Risk/Quarantined), preview mode badge (Safe/Restricted/Disabled), finding count badge for HTML sheets
+- Admin queue findings: now shown for all sheets with findings (not just failed scan status), capped at 5 with "...and N more" overflow
+- Admin review panel header: risk badge with tier label, risk summary, acknowledgement indicator, tier explanation
+- Admin review panel findings: grouped by category (sorted by severity) with category label, count, and finding list when `findingsByCategory` is available; falls back to flat list for legacy data
+- Admin review reason templates: 5 quick-fill buttons ("Allowed advanced HTML; safe preview only", "Pending due to obfuscated script behavior", etc.) in action bar
+- HtmlScanModal: grouped findings by category (sorted by severity) replacing flat list, risk summary headline, tier explanation replacing hardcoded per-tier text
+- HtmlScanModal: scrollable content area (max-height 60vh) for long finding lists
+- SheetViewerPage: risk summary shown next to tier badge for flagged/pending/quarantined sheets
+- `reduceScanState` now passes through `riskSummary`, `tierExplanation`, `findingsByCategory` from backend responses
+- `hydrateFromSheet` passes `riskSummary`, `tierExplanation`, `findingsByCategory` from `htmlWorkflow`
+
+Files changed:
+| File | Change |
+|------|--------|
+| `frontend/.../sheets/uploadSheetWorkflow.js` | `reduceScanState` passes through 3 new explainability fields |
+| `frontend/.../sheets/useUploadSheet.js` | `hydrateFromSheet` passes tier + explainability fields from htmlWorkflow |
+| `frontend/.../sheets/HtmlScanModal.jsx` | Grouped findings, risk summary, tier explanation, scrollable content |
+| `frontend/.../sheets/SheetViewerPage.jsx` | Risk summary next to tier badge |
+| `frontend/.../admin/SheetReviewsTab.jsx` | Tier badge, preview mode badge, finding count, widened findings display |
+| `frontend/.../admin/SheetReviewPanel.jsx` | Enriched header with risk summary, tier explanation, acknowledgement state |
+| `frontend/.../admin/SheetReviewDetails.jsx` | Grouped findings panel, reason templates in action bar |
+
+Validation:
+- Backend tests: 184/184 passed
+- Backend lint: 0 errors
+- Frontend lint: 0 errors
+- Frontend build: passes
+
+### Sub-cycle 39.3 — E2E Tests + Documentation
+
+Added:
+- 5 Playwright E2E smoke tests for HTML security tiers in `sheets.html-security-tiers.smoke.spec.js`:
+  - Tier 2 high-risk upload: grouped findings, "Understood" dismiss, "Submit for Review" button
+  - Tier 3 quarantined upload: critical findings, "Close" only, disabled "Quarantined" button
+  - Grouped findings: 3 categories (Code Obfuscation, Suspicious Tags, Page Redirects) sorted by severity
+  - Admin review queue: queue badges, review panel, grouped findings tab, reason templates, reject action
+  - Sheet viewer: risk summary for flagged HTML sheet, safe preview badge
+- HTML moderation playbook (`docs/security/html-moderation-playbook.md`): step-by-step admin review guide with decision matrix, preview mode reference, and reason template guidance
+- HTML finding category glossary (`docs/security/html-finding-categories.md`): all 13 scanner categories with triggers, severities, tier escalation rules, compound Tier 3 triggers
+
+Fixed:
+- Service Worker (`public/sw.js`) intercepting Playwright API mocks — added `test.use({ serviceWorkers: 'block' })` to HTML upload test files
+- Existing tier 1 upload smoke test (`sheets.upload-html-workflow.smoke.spec.js`): fixed wrong working-html mock URL (`**/api/sheets/777/working-html` → `**/api/sheets/drafts/777/working-html`), added missing `tutorial_upload_seen` localStorage key
+- Strict mode violations in 4 tests — category label locators changed to `{ exact: true }` to avoid matching substrings in risk summary text; redundant tier-label assertions removed
+- Admin review test: `force: true` on Reject click to bypass overlapping label element; `{ exact: true }` on "Reject" button to avoid matching "Quick Reject"
+- Cleaned up debug test files (`debug-scan-poll.spec.js`, `debug-scan-poll2.spec.js`)
+
+Files changed:
+| File | Change |
+|------|--------|
+| `frontend/.../tests/sheets.html-security-tiers.smoke.spec.js` | New: 5 E2E smoke tests for tier 2/3, grouped findings, admin review, viewer |
+| `frontend/.../tests/sheets.upload-html-workflow.smoke.spec.js` | Fixed: SW blocking, tutorial key, working-html URL |
+| `docs/security/html-moderation-playbook.md` | New: admin review playbook with decision matrix |
+| `docs/security/html-finding-categories.md` | New: 13-category glossary with triggers + severities |
+| `docs/logs/CHANGELOG.md` | Updated with 39.3 entries |
+| `docs/logs/feature-tracker.md` | Updated with 39.3 features |
+| `docs/plans/v1.5-weekly-roadmap.md` | Updated with 39.3 completion |
+
+Validation:
+- 5/5 new E2E tests pass
+- 1/1 existing tier 1 upload test passes
+- Frontend lint: 0 errors
+- Frontend build: passes
+
+---
+
+### Cycle 40 — Launch UX + Onboarding Polish + First-Success Flow
+Date: 2026-03-23
+
+Theme: Turn StudyHub from "technically capable beta" into "a product a student can land on and understand in minutes."
+
+#### Sub-cycle 40.1 — First-run onboarding + dashboard guidance
+
+Added:
+- `GettingStartedCard` on Feed page: dismissible onboarding panel with 4 quick actions (join course, browse sheets, upload, set up profile), completion tracking, auto-hide for non-new users with 3+ actions done
+- `EmptyFeed` enhanced with `isFirstRun` prop: shows "Browse study sheets" and "Upload a sheet" CTAs for first-run users
+- Dashboard activation checklist expanded 4→6 items: added "Verify your email" and "Add a profile photo" steps with `hasVerifiedEmail` and `hasAvatar` backend checks
+- Dark mode token migration for `ActivationChecklist` and `StatCards` components: all hardcoded hex colors replaced with CSS custom property tokens
+
+Changed:
+- `FeedPage.jsx`: wired `GettingStartedCard` above composer, context-aware `EmptyFeed` messages
+- `dashboard.routes.js`: `emailVerified` field added to user select, 2 new checklist items with action paths
+
+#### Sub-cycle 40.2 — Account/verification UX + trust messaging
+
+Added:
+- `EmailVerificationBanner`: grace period countdown ("You have X days left before some features are restricted"), link fixed to `/settings?tab=account`
+- `EmailVerificationInline`: updated copy and link target
+- `ErrorBanner` in upload flow: accepts `verificationRequired` prop, shows warning-styled banner with "Verify now" link instead of generic error when `EMAIL_NOT_VERIFIED` response detected
+- `verificationRequired` state wired through upload hook chain: `uploadSheetActions.js` detects `data?.code === 'EMAIL_NOT_VERIFIED'` in both markdown and HTML submit paths, `useUploadSheet.js` exposes state, `UploadSheetPage.jsx` passes prop to `ErrorBanner`
+
+#### Sub-cycle 40.3 — First upload success flow + scan outcome polish
+
+Added:
+- `UploadHelperCard`: dismissible "How uploading works" info panel explaining formats, security scan, post-submit flow, and "My Sheets" return path. Persisted via `localStorage` key. Shown only for new uploads (not edit mode).
+- `StatusBanner` rewritten with context-aware configurations: `pending_review` (reassuring wait message), `rejected` (actionable "Changes requested" with guidance), `published` (success with "View sheet" link), `quarantined` (explanation + support prompt). All states include "My Sheets" return link.
+
+Changed:
+- `TutorialModal` steps rewritten with friendlier language: "we create a safe working copy automatically", "most sheets publish instantly"
+- `HtmlScanModal` intro rewritten: supportive tone ("Most sheets pass without issues"), removed threatening language
+- Tier 1 acknowledgement checkbox: simplified from compliance-focused to informational
+- `tierLabel()` renamed: "Clean" → "Passed", "Flagged" → "Minor Findings", "High Risk" → "Needs Review" (user-facing upload flow only; admin panel retains separate hardcoded labels)
+
+#### Sub-cycle 40.4 — Browse/discovery polish + launch surface design
+
+Changed:
+- `DashboardWidgets.jsx` full dark mode token migration: `RecentSheets`, `CourseFocus`, `QuickActions`, `EmptyState`, `DashboardSkeleton` — all hardcoded hex colors replaced with CSS custom property tokens (`var(--sh-surface)`, `var(--sh-border)`, `var(--sh-heading)`, `var(--sh-brand)`, `var(--sh-soft)`, `var(--sh-subtext)`, `var(--sh-muted)`)
+- `RecentSheets` helper text changed from dev note ("Rendered from the new summary endpoint…") to user-facing copy ("Latest sheets from your enrolled courses")
+- `SheetsAside` sidebar improved: added "Add your courses" CTA for users with 0 enrollments, "Upload a sheet" primary CTA, better workflow copy ("Filter by school or course…")
+
+#### Sub-cycle 40.5 — Validation + release notes
+
+Files changed:
+| File | Change |
+|------|--------|
+| `frontend/.../pages/feed/FeedWidgets.jsx` | New: GettingStartedCard, enhanced EmptyFeed |
+| `frontend/.../pages/feed/FeedPage.jsx` | Wired GettingStartedCard + context-aware EmptyFeed |
+| `frontend/.../pages/dashboard/DashboardWidgets.jsx` | Full dark mode token migration, better copy |
+| `frontend/.../pages/sheets/UploadSheetFormFields.jsx` | New: UploadHelperCard, enhanced StatusBanner + ErrorBanner |
+| `frontend/.../pages/sheets/UploadSheetPage.jsx` | Wired UploadHelperCard, StatusBanner sheetId, ErrorBanner verificationRequired |
+| `frontend/.../pages/sheets/uploadSheetActions.js` | EMAIL_NOT_VERIFIED detection in both submit paths |
+| `frontend/.../pages/sheets/useUploadSheet.js` | verificationRequired state + pass-through |
+| `frontend/.../pages/sheets/uploadSheetConstants.js` | tierLabel() friendlier names |
+| `frontend/.../pages/sheets/HtmlScanModal.jsx` | Supportive scan language rewrite |
+| `frontend/.../pages/sheets/SheetsAside.jsx` | Better guidance + CTAs |
+| `frontend/.../components/EmailVerificationBanner.jsx` | Grace period countdown + link fix |
+| `backend/src/modules/dashboard/dashboard.routes.js` | Activation checklist: 6 items, emailVerified + avatarUrl |
+| `docs/logs/CHANGELOG.md` | Updated with Cycle 40 entries |
+| `docs/logs/feature-tracker.md` | Updated with Cycle 40 features |
+| `docs/plans/v1.5-weekly-roadmap.md` | Updated with Cycle 40 completion |
+
+Validation:
+- Frontend lint: 0 errors
+- Frontend build: passes
+- Backend tests: 184/184 pass

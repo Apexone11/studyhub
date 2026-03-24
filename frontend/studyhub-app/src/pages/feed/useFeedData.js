@@ -10,6 +10,7 @@ import { authHeaders } from './feedConstants'
 export function useFeedData({ user, clearSession, search }) {
   const [feedState, setFeedState] = useState({ items: [], total: 0, loading: true, error: '', partial: false, degradedSections: [] })
   const [leaderboards, setLeaderboards] = useState({ stars: [], downloads: [], contributors: [], error: '' })
+  const [starredUpdates, setStarredUpdates] = useState([])
   const [loadingMore, setLoadingMore] = useState(false)
   const [deletingPostIds, setDeletingPostIds] = useState({})
 
@@ -128,6 +129,27 @@ export function useFeedData({ user, clearSession, search }) {
   useLivePolling(loadLeaderboards, {
     enabled: Boolean(user),
     intervalMs: 60000,
+  })
+
+  const loadStarredUpdates = useCallback(async ({ signal } = {}) => {
+    try {
+      const response = await fetch(`${API}/api/sheets?starred=1&sort=updatedAt&limit=5`, {
+        headers: authHeaders(),
+        credentials: 'include',
+        signal,
+      })
+      const data = await response.json().catch(() => ({}))
+      if (response.ok && Array.isArray(data.sheets)) {
+        setStarredUpdates(data.sheets)
+      }
+    } catch (error) {
+      if (error?.name === 'AbortError') return
+    }
+  }, [])
+
+  useLivePolling(loadStarredUpdates, {
+    enabled: Boolean(user),
+    intervalMs: 120000,
   })
 
   const toggleReaction = async (item, type) => {
@@ -290,6 +312,7 @@ export function useFeedData({ user, clearSession, search }) {
   return {
     feedState,
     leaderboards,
+    starredUpdates,
     loadingMore,
     deletingPostIds,
     loadMoreFeed,

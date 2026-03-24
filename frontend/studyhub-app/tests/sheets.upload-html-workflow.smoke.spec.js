@@ -1,12 +1,16 @@
 import { expect, test } from '@playwright/test'
 import { mockAuthenticatedApp } from './helpers/mockStudyHubApi'
 
+// Block service workers so Playwright route interception works for API mocks
+test.use({ serviceWorkers: 'block' })
+
 async function disableTutorials(page) {
   await page.addInitScript(() => {
     window.localStorage.setItem('tutorial_feed_seen', '1')
     window.localStorage.setItem('tutorial_sheets_seen', '1')
     window.localStorage.setItem('tutorial_dashboard_seen', '1')
     window.localStorage.setItem('tutorial_notes_seen', '1')
+    window.localStorage.setItem('tutorial_upload_seen', '1')
     window.localStorage.setItem('studyhub.upload.tutorial.v1', '1')
   })
 }
@@ -87,7 +91,7 @@ test('html upload with flagged content requires scan acknowledgement before publ
     await route.fulfill({ status: 200, json: { draft: { id: 777, status: 'draft' } } })
   })
 
-  await page.route('**/api/sheets/777/working-html', async (route) => {
+  await page.route('**/api/sheets/drafts/777/working-html', async (route) => {
     await route.fulfill({ status: 200, json: { draft: { id: 777, status: 'draft' }, scan: { status: 'flagged', tier: 1, findings: [{ source: 'suspicious-tag', severity: 'medium', message: 'HTML contains flagged tags: script.' }], hasOriginalVersion: true, hasWorkingVersion: true, originalSourceName: 'imported.html' } } })
   })
 

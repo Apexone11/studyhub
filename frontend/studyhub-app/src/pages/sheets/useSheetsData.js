@@ -18,6 +18,7 @@ export default function useSheetsData() {
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
   const [forkingSheetId, setForkingSheetId] = useState(null)
   const [sheetsState, setSheetsState] = useState({ sheets: [], total: 0, loading: true, error: '' })
+  const [popularCourses, setPopularCourses] = useState([])
   const cardsRef = useRef(null)
   const animatedRef = useRef(false)
 
@@ -29,7 +30,7 @@ export default function useSheetsData() {
   const statusFilter = searchParams.get('status') || ''
   const sortValue = SORT_OPTIONS.some((option) => option.value === searchParams.get('sort'))
     ? searchParams.get('sort')
-    : 'createdAt'
+    : 'recommended'
   const formatValue = FORMAT_OPTIONS.some((option) => option.value === searchParams.get('format'))
     ? searchParams.get('format')
     : 'all'
@@ -89,6 +90,28 @@ export default function useSheetsData() {
     [allCourses, courseId],
   )
 
+  const [recentCourses, setRecentCourses] = useState(() => {
+    try {
+      const raw = localStorage.getItem('studyhub.sheets.recentCourses')
+      return raw ? JSON.parse(raw) : []
+    } catch {
+      return []
+    }
+  })
+
+  useEffect(() => {
+    if (!courseId || !selectedCourse) return
+    try {
+      const raw = localStorage.getItem('studyhub.sheets.recentCourses')
+      const list = raw ? JSON.parse(raw) : []
+      const filtered = list.filter((entry) => String(entry.id) !== String(courseId))
+      const schoolLabel = selectedCourse.school?.short || selectedCourse.school?.name || ''
+      const updated = [{ id: selectedCourse.id, code: selectedCourse.code, schoolId: selectedCourse.school?.id || '', schoolLabel }, ...filtered].slice(0, 5)
+      localStorage.setItem('studyhub.sheets.recentCourses', JSON.stringify(updated))
+      setRecentCourses(updated)
+    } catch { /* localStorage unavailable */ }
+  }, [courseId, selectedCourse])
+
   const subtitle = useMemo(() => {
     if (selectedCourse) {
       const schoolLabel = selectedCourse.school?.short || selectedCourse.school?.name || 'StudyHub'
@@ -101,7 +124,7 @@ export default function useSheetsData() {
   }, [activeSchool, selectedCourse])
 
   const hasActiveFilters = Boolean(
-    search || schoolId || courseId || mine || starred || statusFilter || formatValue !== 'all' || sortValue !== 'createdAt',
+    search || schoolId || courseId || mine || starred || statusFilter || formatValue !== 'all' || sortValue !== 'recommended',
   )
 
   useEffect(() => {
@@ -251,6 +274,27 @@ export default function useSheetsData() {
     }
   }, [courseId, formatValue, mine, schoolId, search, sheetsState.sheets.length, sortValue, starred, statusFilter])
 
+  const loadPopularCourses = useCallback(async ({ signal } = {}) => {
+    try {
+      const response = await fetch(`${API}/api/courses/popular`, {
+        headers: authHeaders(),
+        credentials: 'include',
+        signal,
+      })
+      const data = await response.json().catch(() => [])
+      if (response.ok && Array.isArray(data)) {
+        setPopularCourses(data)
+      }
+    } catch (error) {
+      if (error?.name === 'AbortError') return
+    }
+  }, [])
+
+  useLivePolling(loadPopularCourses, {
+    enabled: Boolean(user),
+    intervalMs: 300000,
+  })
+
   useLivePolling(loadCatalog, {
     enabled: Boolean(user),
     intervalMs: 120000,
@@ -261,6 +305,15 @@ export default function useSheetsData() {
     intervalMs: 45000,
     refreshKey: `${search}|${schoolId}|${courseId}|${mine}|${starred}|${sortValue}|${formatValue}|${statusFilter}`,
   })
+
+  const handleCourseFilter = useCallback((courseIdValue, schoolIdValue) => {
+    const next = new URLSearchParams(searchParams)
+    if (courseIdValue) next.set('courseId', String(courseIdValue))
+    else next.delete('courseId')
+    if (schoolIdValue) next.set('schoolId', String(schoolIdValue))
+    else next.delete('schoolId')
+    setSearchParams(next, { replace: true })
+  }, [searchParams, setSearchParams])
 
   const toggleMine = useCallback(() => {
     const next = new URLSearchParams(searchParams)
@@ -349,10 +402,14 @@ export default function useSheetsData() {
     cardsRef,
     activeSchool,
     availableCourses,
+    selectedCourse,
+    popularCourses,
+    recentCourses,
     subtitle,
     hasActiveFilters,
     setQueryParam,
     handleSchoolChange,
+    handleCourseFilter,
     toggleMine,
     clearAllFilters,
     toggleStar,

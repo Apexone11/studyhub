@@ -2,6 +2,7 @@ const rateLimit = require('express-rate-limit')
 
 const POPULAR_THRESHOLD = 3
 const RECOMMENDATION_LIMIT = 6
+const POPULAR_COURSES_LIMIT = 8
 
 const schoolsLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -30,6 +31,7 @@ function parseOptionalInteger(value, fieldName) {
 module.exports = {
   POPULAR_THRESHOLD,
   RECOMMENDATION_LIMIT,
+  POPULAR_COURSES_LIMIT,
   schoolsLimiter,
   parseOptionalInteger,
 }

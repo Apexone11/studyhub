@@ -58,6 +58,26 @@ Status: Planned | In Progress | Done | Deferred | Removed
 | Tier 3 Classifier Rules | Done | Credential capture detector, 3+ category escalation, obfuscated miner escalation — Tier 3 reachable without ClamAV (2026-03-23) |
 | Preview Mode Serialization | Done | `tierToPreviewMode()` helper, `previewMode`/`ackRequired` in htmlWorkflow response, SheetViewerPage refactored to use string checks (2026-03-23) |
 | Sample Test Matrix (A–F) | Done | 6 representative HTML samples covering clean → malicious spectrum through full classifier pipeline (2026-03-23) |
+| Scanner Explainability Helpers | Done | `generateRiskSummary`, `generateTierExplanation`, `groupFindingsByCategory`, `CATEGORY_LABELS` — plain-English scan result summaries (2026-03-23) |
+| htmlWorkflow Explainability Fields | Done | `riskSummary`, `tierExplanation`, `findingsByCategory` added to sheet detail, preview, runtime, scan status, and admin review-detail APIs (2026-03-23) |
+| Admin Queue Badges (Tier + Preview + Findings) | Done | TierBadge, PreviewModeBadge, finding count badge on review queue cards (2026-03-23) |
+| Admin Review Panel Risk Summary | Done | Risk summary bar, tier explanation, acknowledgement indicator in SheetReviewPanel header (2026-03-23) |
+| Grouped Findings Display | Done | FindingsPanel + HtmlScanModal show category-grouped, severity-sorted findings with labels (2026-03-23) |
+| Review Reason Quick-Fill Templates | Done | 5 reason templates in ReviewActionBar for faster admin review decisions (2026-03-23) |
+| HtmlScanModal Category Rewrite | Done | Flat findings list replaced with grouped display, risk summary headline, tier explanation (2026-03-23) |
+| SheetViewerPage Risk Summary | Done | Risk summary text shown next to tier badge for non-interactive preview modes (2026-03-23) |
+| HTML Security Tier E2E Tests (5 tests) | Done | Tier 2 upload, tier 3 quarantine, grouped findings modal, admin review panel, viewer risk summary (2026-03-23) |
+| HTML Moderation Playbook | Done | Step-by-step admin review guide with decision matrix, preview modes, reason templates (2026-03-23) |
+| HTML Finding Category Glossary | Done | All 13 scanner categories documented with triggers, severities, tier escalation rules (2026-03-23) |
+| Feed GettingStartedCard (Onboarding) | Done | Dismissible 4-action panel, completion tracking, localStorage persistence (Cycle 40.1, 2026-03-23) |
+| Dashboard Activation Checklist (6 items) | Done | Added verify email + add photo steps with backend checks (Cycle 40.1, 2026-03-23) |
+| Email Verification Grace Period Banner | Done | Countdown days remaining, link to settings (Cycle 40.2, 2026-03-23) |
+| Upload EMAIL_NOT_VERIFIED Detection | Done | verificationRequired state wired through hook chain, warning banner in ErrorBanner (Cycle 40.2, 2026-03-23) |
+| Upload Helper Card | Done | Dismissible "How uploading works" info panel with formats, scan, post-submit flow (Cycle 40.3, 2026-03-23) |
+| Upload StatusBanner Rewrite | Done | Context-aware messages for pending_review, rejected, published, quarantined with return paths (Cycle 40.3, 2026-03-23) |
+| Upload Scan Language Polish | Done | Supportive tierLabel names, HtmlScanModal/TutorialModal language rewrite (Cycle 40.3, 2026-03-23) |
+| Dashboard Full Dark Mode Tokens | Done | RecentSheets, CourseFocus, QuickActions, EmptyState, DashboardSkeleton migrated (Cycle 40.4, 2026-03-23) |
+| SheetsAside Browse Guidance | Done | Zero-enrollment CTA, upload CTA, better workflow copy (Cycle 40.4, 2026-03-23) |
 | Feature Flags System | Planned | OpenFeature-compatible |
 | PWA Offline Support | Planned | Downloaded study sheets |
 | WebAuthn Passkeys | Planned | Admin/power users optional |

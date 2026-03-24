@@ -234,9 +234,120 @@ function classifyHtmlRisk(html) {
   return { tier, findings, summary }
 }
 
+/**
+ * Human-readable labels for finding categories.
+ */
+const CATEGORY_LABELS = {
+  'validation': 'Structural Issues',
+  'suspicious-tag': 'Suspicious Tags',
+  'inline-handler': 'Inline Event Handlers',
+  'dangerous-url': 'Dangerous URLs',
+  'obfuscation': 'Code Obfuscation',
+  'redirect': 'Page Redirects',
+  'exfiltration': 'Data Exfiltration',
+  'keylogging': 'Keylogging',
+  'crypto-miner': 'Crypto Mining',
+  'credential-capture': 'Credential Capture',
+  'js-risk': 'Risky JavaScript',
+  'av': 'Antivirus Detection',
+  'system': 'System',
+}
+
+/**
+ * Group an array of findings by category.
+ * Works with both normalized findings (source field) and raw findings (category field).
+ * Returns { [category]: { label, maxSeverity, findings[] } }
+ */
+function groupFindingsByCategory(findings) {
+  if (!Array.isArray(findings) || findings.length === 0) return {}
+
+  const groups = {}
+  const severityOrder = { critical: 4, high: 3, medium: 2, low: 1 }
+
+  for (const f of findings) {
+    const cat = f.category || f.source || 'unknown'
+    if (!groups[cat]) {
+      groups[cat] = {
+        label: CATEGORY_LABELS[cat] || cat,
+        maxSeverity: f.severity || 'medium',
+        findings: [],
+      }
+    }
+    groups[cat].findings.push(f)
+    const current = severityOrder[groups[cat].maxSeverity] || 0
+    const incoming = severityOrder[f.severity] || 0
+    if (incoming > current) groups[cat].maxSeverity = f.severity
+  }
+
+  return groups
+}
+
+/**
+ * Generate a short, plain-English summary of the risk findings.
+ * Example: "Contains code obfuscation and page redirect behavior."
+ */
+function generateRiskSummary(tier, findings) {
+  if (tier === RISK_TIER.CLEAN || !Array.isArray(findings) || findings.length === 0) {
+    return 'No suspicious patterns detected.'
+  }
+
+  const categories = new Set()
+  for (const f of findings) {
+    const cat = f.category || f.source || 'unknown'
+    if (cat !== 'validation' && cat !== 'system') categories.add(cat)
+  }
+
+  if (categories.size === 0) return 'Structural issues detected.'
+
+  const SUMMARY_PHRASES = {
+    'suspicious-tag': 'advanced HTML tags',
+    'inline-handler': 'inline event handlers',
+    'dangerous-url': 'suspicious URLs',
+    'obfuscation': 'obfuscated JavaScript',
+    'redirect': 'page redirect behavior',
+    'exfiltration': 'data exfiltration indicators',
+    'keylogging': 'keystroke capture patterns',
+    'crypto-miner': 'crypto-mining signatures',
+    'credential-capture': 'credential capture indicators',
+    'js-risk': 'risky JavaScript patterns',
+    'av': 'antivirus-flagged content',
+  }
+
+  const phrases = []
+  for (const cat of categories) {
+    phrases.push(SUMMARY_PHRASES[cat] || cat)
+  }
+
+  if (phrases.length === 0) return `${findings.length} finding(s) detected.`
+  if (phrases.length === 1) return `Contains ${phrases[0]}.`
+  if (phrases.length === 2) return `Contains ${phrases[0]} and ${phrases[1]}.`
+  const last = phrases.pop()
+  return `Contains ${phrases.join(', ')}, and ${last}.`
+}
+
+/**
+ * Generate a plain-English explanation of why a sheet was assigned a given tier.
+ */
+function generateTierExplanation(tier) {
+  switch (tier) {
+    case RISK_TIER.FLAGGED:
+      return 'Flagged because the scanner detected advanced HTML features (scripts, iframes, or inline handlers). The sheet is published with a safe preview — scripts are disabled.'
+    case RISK_TIER.HIGH_RISK:
+      return 'Pending review because the scanner detected higher-risk behavior patterns (obfuscation, redirects, or data exfiltration). An admin must approve before the sheet is publicly visible.'
+    case RISK_TIER.QUARANTINED:
+      return 'Quarantined because the scanner detected a likely security threat (credential capture, coordinated malicious behavior, or antivirus detection). Preview is disabled.'
+    default:
+      return 'No issues detected. The sheet passed all security checks.'
+  }
+}
+
 module.exports = {
   detectHtmlFeatures,
   validateHtmlForSubmission,
   detectHighRiskBehaviors,
   classifyHtmlRisk,
+  groupFindingsByCategory,
+  generateRiskSummary,
+  generateTierExplanation,
+  CATEGORY_LABELS,
 }

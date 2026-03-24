@@ -169,6 +169,11 @@ export default function SheetViewerPage() {
                               Pending Review
                             </span>
                           ) : null}
+                          {previewMode !== 'interactive' && sheet.htmlWorkflow?.riskSummary && (
+                            <span style={{ fontSize: 11, color: 'var(--sh-muted)', fontWeight: 600 }}>
+                              {sheet.htmlWorkflow.riskSummary}
+                            </span>
+                          )}
                         </div>
                       ) : null}
                     </div>
