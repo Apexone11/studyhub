@@ -1,9 +1,10 @@
 /* ═══════════════════════════════════════════════════════════════════════════
- * notesConstants.js — Constants, toolbar actions, and helpers for NotesPage
+ * notesConstants.js — Constants, toolbar actions, and helpers for NotesPage.
+ *
+ * The MarkdownPreview component lives in notesComponents.jsx and is
+ * re-exported here for backward-compatible imports.
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useMemo } from 'react'
 import { marked } from 'marked'
-import DOMPurify from 'dompurify'
 
 /* ── Configure marked for safe rendering ─────────────────────────────── */
 marked.setOptions({
@@ -56,32 +57,11 @@ export function applyToolbarAction(textareaRef, action, content, onChange) {
   })
 }
 
-/* ── Safe markdown renderer ──────────────────────────────────────────── */
-export function MarkdownPreview({ content }) {
-  const html = useMemo(() => {
-    if (!content?.trim()) return ''
-    const raw = marked.parse(content)
-    return DOMPurify.sanitize(raw, { USE_PROFILES: { html: true } })
-  }, [content])
-
-  if (!html) {
-    return (
-      <div style={{ color: '#94a3b8', fontSize: 13, fontStyle: 'italic', padding: '8px 0' }}>
-        Start typing to see preview…
-      </div>
-    )
-  }
-
-  return (
-    <div
-      className="notes-markdown-preview"
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
-  )
-}
-
 /* ── Word count helper ───────────────────────────────────────────────── */
 export function wordCount(text) {
   if (!text?.trim()) return 0
   return text.trim().split(/\s+/).length
 }
+
+/* ── Re-export JSX component from notesComponents.jsx ──────────────── */
+export { MarkdownPreview } from './notesComponents.jsx'

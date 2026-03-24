@@ -46,20 +46,20 @@ router.get('/', async (req, res) => {
     const primarySections = await Promise.all([
       settleSection('announcements', () => prisma.announcement.findMany({
         where: announcementWhere,
-        include: { author: { select: { id: true, username: true } } },
+        include: { author: { select: { id: true, username: true, avatarUrl: true } } },
         orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
         take: announcementTake,
       })),
       settleSection('sheets', () => prisma.studySheet.findMany({
         where: sheetWhere,
         include: {
-          author: { select: { id: true, username: true } },
+          author: { select: { id: true, username: true, avatarUrl: true } },
           course: { select: { id: true, code: true } },
           forkSource: {
             select: {
               id: true,
               title: true,
-              author: { select: { id: true, username: true } },
+              author: { select: { id: true, username: true, avatarUrl: true } },
             },
           },
         },
@@ -69,7 +69,7 @@ router.get('/', async (req, res) => {
       settleSection('posts', () => prisma.feedPost.findMany({
         where: postWhere,
         include: {
-          author: { select: { id: true, username: true } },
+          author: { select: { id: true, username: true, avatarUrl: true } },
           course: { select: { id: true, code: true } },
         },
         orderBy: { createdAt: 'desc' },

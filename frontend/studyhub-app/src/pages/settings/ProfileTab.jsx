@@ -5,6 +5,7 @@ import { SectionCard } from './settingsShared'
 
 export default function ProfileTab({ user, sessionUser, onAvatarChange }) {
   const [showCrop, setShowCrop] = useState(false)
+  const [imgError, setImgError] = useState(false)
   const avatarUrl = user?.avatarUrl || sessionUser?.avatarUrl
   const initials = (user?.username || '??').slice(0, 2).toUpperCase()
 
@@ -22,8 +23,8 @@ export default function ProfileTab({ user, sessionUser, onAvatarChange }) {
               border: '2px solid var(--sh-border)',
             }}
           >
-            {avatarUrl
-              ? <img src={avatarUrl.startsWith('http') ? avatarUrl : `${API}${avatarUrl}`} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+            {avatarUrl && !imgError
+              ? <img src={avatarUrl.startsWith('http') ? avatarUrl : `${API}${avatarUrl}`} alt={user?.username || ''} onError={() => setImgError(true)} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
               : <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--sh-avatar-text)' }}>{initials}</span>
             }
           </div>

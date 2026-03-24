@@ -1,5 +1,5 @@
 import { IconSearch } from '../../components/Icons'
-import { SORT_OPTIONS, FORMAT_OPTIONS } from './sheetsPageConstants'
+import { SORT_OPTIONS, FORMAT_OPTIONS, STATUS_OPTIONS } from './sheetsPageConstants'
 
 export default function SheetsFilters({
   search,
@@ -9,6 +9,7 @@ export default function SheetsFilters({
   formatValue,
   mine,
   starred,
+  statusFilter,
   mobileFiltersOpen,
   setMobileFiltersOpen,
   catalog,
@@ -16,6 +17,7 @@ export default function SheetsFilters({
   availableCourses,
   setQueryParam,
   handleSchoolChange,
+  toggleMine,
 }) {
   return (
     <section className="sh-card sheets-page__filters-card">
@@ -112,7 +114,7 @@ export default function SheetsFilters({
           <button
             type="button"
             className={`sh-chip ${mine ? 'sh-chip--active' : ''}`}
-            onClick={() => setQueryParam('mine', mine ? '' : '1')}
+            onClick={toggleMine}
           >
             Mine
           </button>
@@ -124,6 +126,22 @@ export default function SheetsFilters({
             Starred
           </button>
         </div>
+
+        {mine ? (
+          <div className="sheets-page__status-row">
+            {STATUS_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={`sh-chip sh-chip--status ${statusFilter === option.value ? 'sh-chip--active' : ''}`}
+                onClick={() => setQueryParam('status', statusFilter === option.value ? '' : option.value)}
+              >
+                {option.icon ? <span className="sh-chip__icon">{option.icon}</span> : null}
+                {option.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
       </div>
     </section>
   )

@@ -1,5 +1,22 @@
 const prisma = require('../../core/db/prisma')
 const { SCAN_STATUS, HTML_VERSION_KIND } = require('../../lib/htmlDraftWorkflow')
+const { RISK_TIER, generateRiskSummary, generateTierExplanation, groupFindingsByCategory } = require('../../lib/htmlSecurity')
+
+/**
+ * Derive the preview mode string from the risk tier.
+ *   interactive — Tier 0: scripts allowed, full CSP
+ *   safe        — Tier 1: scripts blocked, sandboxed
+ *   restricted  — Tier 2: owner/admin only preview
+ *   disabled    — Tier 3: no preview at all
+ */
+function tierToPreviewMode(tier) {
+  switch (tier) {
+    case RISK_TIER.FLAGGED: return 'safe'
+    case RISK_TIER.HIGH_RISK: return 'restricted'
+    case RISK_TIER.QUARANTINED: return 'disabled'
+    default: return 'interactive'
+  }
+}
 
 function serializeContribution(contribution) {
   if (!contribution) return null
@@ -60,7 +77,12 @@ function serializeSheet(sheet, { starred = false, reactions = null, commentCount
     htmlWorkflow: {
       scanStatus: sheet.htmlScanStatus || SCAN_STATUS.QUEUED,
       riskTier: sheet.htmlRiskTier || 0,
+      previewMode: tierToPreviewMode(sheet.htmlRiskTier || 0),
+      ackRequired: (sheet.htmlRiskTier || 0) === RISK_TIER.FLAGGED,
       scanFindings: Array.isArray(sheet.htmlScanFindings) ? sheet.htmlScanFindings : [],
+      riskSummary: generateRiskSummary(sheet.htmlRiskTier || 0, sheet.htmlScanFindings),
+      tierExplanation: generateTierExplanation(sheet.htmlRiskTier || 0),
+      findingsByCategory: groupFindingsByCategory(Array.isArray(sheet.htmlScanFindings) ? sheet.htmlScanFindings : []),
       scanUpdatedAt: sheet.htmlScanUpdatedAt || null,
       scanAcknowledgedAt: sheet.htmlScanAcknowledgedAt || null,
       hasOriginalVersion: Boolean(originalVersion),
@@ -132,4 +154,4 @@ async function fetchContributionCollections(sheet, currentUser) {
   }
 }
 
-module.exports = { serializeSheet, serializeContribution, fetchContributionCollections }
+module.exports = { serializeSheet, serializeContribution, fetchContributionCollections, tierToPreviewMode }

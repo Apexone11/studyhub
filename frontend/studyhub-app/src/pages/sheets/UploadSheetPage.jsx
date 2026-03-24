@@ -4,120 +4,41 @@
  * All state, effects, and API logic live in useUploadSheet.
  * Form fields and editor panels live in UploadSheetFormFields.
  * Scan and tutorial modals live in HtmlScanModal.
+ * Navbar actions live in UploadNavActions.
  * Constants and small helpers live in uploadSheetConstants.
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useMemo } from 'react'
-import { Link } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
 import SafeJoyride from '../../components/SafeJoyride'
 import ConfirmDialog from '../../components/ConfirmDialog'
-import { IconCheck, IconEye, IconUpload } from '../../components/Icons'
 import { pageShell } from '../../lib/ui'
 import { FONT } from './uploadSheetConstants'
 import {
-  InfoFields,
-  DescriptionField,
-  HtmlImportSection,
-  AttachmentSection,
-  DraftBanner,
-  StatusBanner,
-  ErrorBanner,
-  EditorPanel,
+  InfoFields, DescriptionField, HtmlImportSection,
+  AttachmentSection, DraftBanner, StatusBanner, ErrorBanner, EditorPanel,
+  UploadHelperCard,
 } from './UploadSheetFormFields'
 import { TutorialModal, HtmlScanModal } from './HtmlScanModal'
+import UploadNavActions from './UploadNavActions'
 import useUploadSheet from './useUploadSheet'
 
 export default function UploadSheetPage() {
   const hook = useUploadSheet()
 
-  const navActions = useMemo(() => (
-    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-      {hook.saved ? (
-        <span style={{ fontSize: 11, color: '#16a34a', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-          <IconCheck size={12} /> Saved
-        </span>
-      ) : (
-        <span style={{ fontSize: 11, color: '#64748b' }}>{hook.legacyMarkdownMode ? 'Draft autosave…' : 'Working draft sync…'}</span>
-      )}
-      <button
-        type="button"
-        onClick={hook.saveDraftNow}
-        style={{
-          fontSize: 12,
-          fontWeight: 700,
-          color: '#059669',
-          padding: '6px 12px',
-          background: '#ecfdf5',
-          border: '1px solid #a7f3d0',
-          borderRadius: 8,
-          cursor: 'pointer',
-          fontFamily: FONT,
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 6,
-        }}
-      >
-        <IconCheck size={13} /> Save Draft
-      </button>
-      {hook.isHtmlMode ? (
-        <button
-          type="button"
-          onClick={hook.openHtmlPreview}
-          style={{
-            fontSize: 12,
-            fontWeight: 700,
-            color: '#b45309',
-            padding: '6px 12px',
-            background: '#fffbeb',
-            border: '1px solid #fcd34d',
-            borderRadius: 8,
-            cursor: 'pointer',
-            fontFamily: FONT,
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-          }}
-        >
-          <IconEye size={13} /> Preview
-        </button>
-      ) : null}
-      <Link
-        to="/sheets"
-        style={{
-          fontSize: 12,
-          color: '#64748b',
-          textDecoration: 'none',
-          padding: '6px 10px',
-          border: '1px solid #cbd5e1',
-          borderRadius: 8,
-        }}
-      >
-        Cancel
-      </Link>
-      <button
-        type="button"
-        onClick={hook.handleSubmit}
-        disabled={hook.loading || hook.attachUploading || (hook.isHtmlMode && !hook.canSubmitHtml)}
-        style={{
-          fontSize: 12,
-          fontWeight: 700,
-          color: '#fff',
-          padding: '6px 14px',
-          background: (hook.loading || hook.attachUploading || (hook.isHtmlMode && !hook.canSubmitHtml)) ? '#93c5fd' : '#2563eb',
-          border: 'none',
-          borderRadius: 8,
-          cursor: (hook.loading || hook.attachUploading || (hook.isHtmlMode && !hook.canSubmitHtml)) ? 'not-allowed' : 'pointer',
-          fontFamily: FONT,
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 6,
-        }}
-      >
-        <IconUpload size={13} />
-        {hook.loading ? 'Saving…' : hook.legacyMarkdownMode ? (hook.isEditing ? 'Save Changes' : 'Publish Sheet') : hook.scanState.tier === 3 ? 'Quarantined' : hook.scanState.tier === 2 ? 'Submit for Review' : hook.scanState.tier === 1 ? 'Publish with Warnings' : 'Publish'}
-      </button>
-    </div>
-  ), [hook.attachUploading, hook.canSubmitHtml, hook.handleSubmit, hook.isEditing, hook.isHtmlMode, hook.legacyMarkdownMode, hook.loading, hook.openHtmlPreview, hook.saved, hook.saveDraftNow, hook.scanState.tier])
+  const navActions = (
+    <UploadNavActions
+      saved={hook.saved}
+      legacyMarkdownMode={hook.legacyMarkdownMode}
+      isHtmlMode={hook.isHtmlMode}
+      isEditing={hook.isEditing}
+      loading={hook.loading}
+      attachUploading={hook.attachUploading}
+      canSubmitHtml={hook.canSubmitHtml}
+      scanTier={hook.scanState.tier}
+      onSaveDraft={hook.saveDraftNow}
+      onOpenPreview={hook.openHtmlPreview}
+      onSubmit={hook.handleSubmit}
+    />
+  )
 
   if (hook.initializing) {
     return (
@@ -132,6 +53,7 @@ export default function UploadSheetPage() {
     <div style={{ minHeight: '100vh', background: '#edf0f5', fontFamily: FONT }}>
       <Navbar crumbs={[{ label: 'Study Sheets', to: '/sheets' }, { label: hook.isEditing ? 'Edit Sheet' : 'New Sheet', to: null }]} hideTabs actions={navActions} hideSearch />
       <div style={pageShell('editor', 20, 60)}>
+        {!hook.isEditing ? <UploadHelperCard /> : null}
         <InfoFields
           title={hook.title} setTitle={hook.setTitle}
           courseId={hook.courseId} setCourseId={hook.setCourseId}
@@ -172,8 +94,8 @@ export default function UploadSheetPage() {
           setShowDiscardDialog={hook.setShowDiscardDialog}
         />
 
-        <StatusBanner status={hook.status} />
-        <ErrorBanner error={hook.error} />
+        <StatusBanner status={hook.status} sheetId={hook.isEditing ? hook.sheetId : hook.draftId} />
+        <ErrorBanner error={hook.error} verificationRequired={hook.verificationRequired} />
 
         <EditorPanel
           content={hook.content} setContent={hook.setContent}

@@ -14,6 +14,7 @@ const router = express.Router()
 
 router.post('/:id/star', requireAuth, reactLimiter, async (req, res) => {
   const sheetId = Number.parseInt(req.params.id, 10)
+  if (!Number.isInteger(sheetId)) return res.status(400).json({ error: 'Invalid sheet id.' })
   const userId = req.user.userId
 
   try {
@@ -86,6 +87,7 @@ router.post('/:id/star', requireAuth, reactLimiter, async (req, res) => {
 
 router.get('/:id/comments', async (req, res) => {
   const sheetId = Number.parseInt(req.params.id, 10)
+  if (!Number.isInteger(sheetId)) return res.status(400).json({ error: 'Invalid sheet id.' })
   const limit = parsePositiveInt(req.query.limit, 20)
   const offset = Math.max(0, Number.parseInt(req.query.offset, 10) || 0)
 
@@ -117,6 +119,7 @@ router.get('/:id/comments', async (req, res) => {
 
 router.post('/:id/comments', requireAuth, requireVerifiedEmail, commentLimiter, async (req, res) => {
   const sheetId = Number.parseInt(req.params.id, 10)
+  if (!Number.isInteger(sheetId)) return res.status(400).json({ error: 'Invalid sheet id.' })
   const content = typeof req.body.content === 'string' ? req.body.content.trim() : ''
 
   if (!content) return res.status(400).json({ error: 'Comment cannot be empty.' })
@@ -164,6 +167,7 @@ router.post('/:id/comments', requireAuth, requireVerifiedEmail, commentLimiter, 
 
 router.post('/:id/react', requireAuth, reactLimiter, async (req, res) => {
   const sheetId = Number.parseInt(req.params.id, 10)
+  if (!Number.isInteger(sheetId)) return res.status(400).json({ error: 'Invalid sheet id.' })
   const userId = req.user.userId
   const { type } = req.body || {}
 

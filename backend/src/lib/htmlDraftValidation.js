@@ -30,6 +30,7 @@ function normalizeFindings(classifierResult, avResult) {
   for (const finding of classifierResult.findings) {
     findings.push({
       source: finding.category || 'policy',
+      category: finding.category || 'policy',
       severity: finding.severity || 'medium',
       message: finding.message,
     })
@@ -39,12 +40,14 @@ function normalizeFindings(classifierResult, avResult) {
     if (avResult.status === 'infected') {
       findings.push({
         source: 'av',
+        category: 'av',
         severity: 'critical',
         message: avResult.threat || 'Malicious payload detected by antivirus.',
       })
     } else if (avResult.status === 'error') {
       findings.push({
         source: 'av',
+        category: 'av',
         severity: 'high',
         message: avResult.message || 'Antivirus scanner unavailable.',
       })

@@ -6,7 +6,7 @@
  *   ./htmlDraftValidation.js — scan logic, tier mapping, findings
  */
 
-const { RISK_TIER } = require('./htmlSecurity')
+const { RISK_TIER, generateRiskSummary, generateTierExplanation, groupFindingsByCategory } = require('./htmlSecurity')
 const { sendHighRiskSheetAlert } = require('./email')
 const { createNotification } = require('./notify')
 
@@ -118,10 +118,16 @@ async function updateWorkingHtmlDraft(prisma, { sheetId, user, title, courseId, 
 async function getHtmlScanStatus(prisma, { sheetId, user }) {
   const sheet = await ensureSheetOwnership(prisma, sheetId, user)
 
+  const tier = sheet.htmlRiskTier || 0
+  const findings = Array.isArray(sheet.htmlScanFindings) ? sheet.htmlScanFindings : []
+
   return {
     status: sheet.htmlScanStatus || SCAN_STATUS.QUEUED,
-    tier: sheet.htmlRiskTier || 0,
-    findings: Array.isArray(sheet.htmlScanFindings) ? sheet.htmlScanFindings : [],
+    tier,
+    findings,
+    riskSummary: generateRiskSummary(tier, findings),
+    tierExplanation: generateTierExplanation(tier),
+    findingsByCategory: groupFindingsByCategory(findings),
     updatedAt: sheet.htmlScanUpdatedAt,
     acknowledgedAt: sheet.htmlScanAcknowledgedAt,
     hasOriginalVersion: Boolean(findVersionByKind(sheet, HTML_VERSION_KIND.ORIGINAL)),

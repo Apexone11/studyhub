@@ -59,10 +59,28 @@ export async function mockAuthenticatedApp(page, overrides = {}) {
     author: { id: user.id, username: user.username },
     incomingContributions: [],
     outgoingContributions: [],
+    contentFormat: 'markdown',
+    status: 'published',
     hasAttachment: false,
     attachmentName: null,
     attachmentType: null,
     allowDownloads: true,
+    htmlRiskTier: 0,
+    htmlWorkflow: {
+      scanStatus: 'completed',
+      riskTier: 0,
+      previewMode: 'interactive',
+      ackRequired: false,
+      scanFindings: [],
+      riskSummary: null,
+      tierExplanation: null,
+      findingsByCategory: {},
+      scanUpdatedAt: null,
+      scanAcknowledgedAt: null,
+      hasOriginalVersion: false,
+      hasWorkingVersion: false,
+      originalSourceName: null,
+    },
     ...overrides.sheet,
   }
   const settingsUser = overrides.settingsUser || {
@@ -114,6 +132,17 @@ export async function mockAuthenticatedApp(page, overrides = {}) {
     },
   ]
 
+  // Catch-all registered FIRST → lowest priority in Playwright's LIFO matching.
+  // Any unmocked API request returns empty success to prevent network hangs.
+  await page.route('**/api/**', async (route) => {
+    const method = route.request().method()
+    if (method === 'GET') {
+      await route.fulfill({ status: 200, json: {} })
+    } else {
+      await route.fulfill({ status: 200, json: { ok: true } })
+    }
+  })
+
   await page.route('**/api/auth/me', async (route) => {
     await route.fulfill({ status: 200, json: user })
   })
@@ -140,6 +169,12 @@ export async function mockAuthenticatedApp(page, overrides = {}) {
           courses: [user.enrollments[0].course],
         },
       ],
+    })
+  })
+  await page.route('**/api/courses/popular', async (route) => {
+    await route.fulfill({
+      status: 200,
+      json: [{ id: user.enrollments[0].course.id, code: user.enrollments[0].course.code, name: user.enrollments[0].course.name, school: user.enrollments[0].course.school, sheetCount: 1 }],
     })
   })
   await page.route('**/api/sheets?*', async (route) => {

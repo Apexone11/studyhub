@@ -8,8 +8,8 @@ export function authHeaders() {
   return { 'Content-Type': 'application/json' }
 }
 
-export function summaryCard(label, value, helper, accent) {
-  return { label, value, helper, accent }
+export function summaryCard(label, value, helper, accent, to) {
+  return { label, value, helper, accent, to }
 }
 
 export function formatJoinedDate(value) {

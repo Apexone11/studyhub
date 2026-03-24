@@ -33,7 +33,7 @@ router.post('/posts', feedWriteLimiter, async (req, res) => {
         allowDownloads,
       },
       include: {
-        author: { select: { id: true, username: true } },
+        author: { select: { id: true, username: true, avatarUrl: true } },
         course: { select: { id: true, code: true } },
       },
     })
@@ -60,12 +60,13 @@ router.post('/posts', feedWriteLimiter, async (req, res) => {
 
 router.get('/posts/:id', async (req, res) => {
   const postId = Number.parseInt(req.params.id, 10)
+  if (!Number.isInteger(postId)) return res.status(400).json({ error: 'Invalid post id.' })
 
   try {
     const post = await prisma.feedPost.findUnique({
       where: { id: postId },
       include: {
-        author: { select: { id: true, username: true } },
+        author: { select: { id: true, username: true, avatarUrl: true } },
         course: { select: { id: true, code: true } },
       },
     })
@@ -93,6 +94,7 @@ router.get('/posts/:id', async (req, res) => {
 
 router.get('/posts/:id/attachment', requireAuth, attachmentDownloadLimiter, async (req, res) => {
   const postId = Number.parseInt(req.params.id, 10)
+  if (!Number.isInteger(postId)) return res.status(400).json({ error: 'Invalid post id.' })
 
   try {
     const post = await prisma.feedPost.findUnique({
@@ -125,6 +127,7 @@ router.get('/posts/:id/attachment', requireAuth, attachmentDownloadLimiter, asyn
 
 router.get('/posts/:id/attachment/preview', requireAuth, attachmentDownloadLimiter, async (req, res) => {
   const postId = Number.parseInt(req.params.id, 10)
+  if (!Number.isInteger(postId)) return res.status(400).json({ error: 'Invalid post id.' })
 
   try {
     const post = await prisma.feedPost.findUnique({
@@ -163,6 +166,7 @@ router.get('/posts/:id/attachment/preview', requireAuth, attachmentDownloadLimit
 
 router.delete('/posts/:id', feedWriteLimiter, async (req, res) => {
   const postId = Number.parseInt(req.params.id, 10)
+  if (!Number.isInteger(postId)) return res.status(400).json({ error: 'Invalid post id.' })
 
   try {
     const post = await prisma.feedPost.findUnique({

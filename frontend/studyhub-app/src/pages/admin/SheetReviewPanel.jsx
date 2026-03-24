@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════════
  * SheetReviewPanel.jsx — Side-by-side HTML sheet review for admins
  *
- * Left:  Sandboxed iframe preview (sanitized HTML only — never raw)
+ * Left:  Sandboxed iframe preview (safe HTML only — never raw)
  * Right: Raw HTML as plain text + scan findings + approve/reject with reason
  *
  * Security invariants:
@@ -140,22 +140,47 @@ export default function SheetReviewPanel({ sheetId, onClose, onReviewComplete })
     <div style={overlayStyle}>
       <div style={panelStyle}>
         {/* ── Header ──────────────────────────────────────────────── */}
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--sh-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--sh-heading)' }}>
-              Review: {d.title}
-            </h2>
-            <div style={{ marginTop: 4, fontSize: 12, color: 'var(--sh-muted)' }}>
-              {d.course?.code || 'No course'} · by {d.author?.username || 'unknown'} · {d.contentFormat} · {d.status}
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--sh-border)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+            <div>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--sh-heading)' }}>
+                Review: {d.title}
+              </h2>
+              <div style={{ marginTop: 4, fontSize: 12, color: 'var(--sh-muted)' }}>
+                {d.course?.code || 'No course'} · by {d.author?.username || 'unknown'} · {d.contentFormat} · {d.status}
+              </div>
             </div>
+            <button type="button" onClick={onClose} style={closeBtnStyle}>Close</button>
           </div>
-          <button type="button" onClick={onClose} style={closeBtnStyle}>Close</button>
+          {/* Risk summary bar */}
+          {isHtml && (d.htmlRiskTier > 0 || d.liveRiskTier > 0) && (
+            <div style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: 11 }}>
+              {d.htmlRiskTier > 0 && (
+                <span style={{ fontWeight: 700, padding: '3px 10px', borderRadius: 6, background: d.htmlRiskTier >= 3 ? 'var(--sh-danger-bg)' : d.htmlRiskTier >= 2 ? 'var(--sh-warning-bg)' : 'var(--sh-warning-bg)', color: d.htmlRiskTier >= 3 ? 'var(--sh-danger)' : 'var(--sh-warning-text)', border: `1px solid ${d.htmlRiskTier >= 3 ? 'var(--sh-danger-border)' : 'var(--sh-warning-border)'}` }}>
+                  Tier {d.htmlRiskTier}: {['Clean', 'Flagged', 'High Risk', 'Quarantined'][d.htmlRiskTier] || 'Unknown'}
+                </span>
+              )}
+              {d.riskSummary && (
+                <span style={{ color: 'var(--sh-subtext)', fontWeight: 600 }}>{d.riskSummary}</span>
+              )}
+              {d.htmlScanAcknowledgedAt && (
+                <span style={{ fontWeight: 600, color: 'var(--sh-info-text)', background: 'var(--sh-info-bg)', border: '1px solid var(--sh-info-border)', padding: '2px 8px', borderRadius: 6 }}>
+                  User acknowledged
+                </span>
+              )}
+            </div>
+          )}
+          {isHtml && d.tierExplanation && d.htmlRiskTier > 0 && (
+            <div style={{ marginTop: 6, fontSize: 11, color: 'var(--sh-muted)', lineHeight: 1.5 }}>
+              {d.tierExplanation}
+            </div>
+          )}
         </div>
 
         {/* ── Tab bar ─────────────────────────────────────────────── */}
         {isHtml && (
           <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--sh-border)', padding: '0 20px' }}>
-            {[['preview', 'Sanitized Preview'], ['raw', 'Raw HTML (text)'], ['findings', `Findings (${findings.length})`]].map(([key, label]) => (
+            {[['preview', 'Safe Preview'], ['raw', 'Raw HTML (text)'], ['findings', `Findings (${findings.length})`]].map(([key, label]) => (
               <button
                 key={key}
                 type="button"

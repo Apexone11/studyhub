@@ -1,4 +1,5 @@
 export const SORT_OPTIONS = [
+  { value: 'recommended', label: 'Best' },
   { value: 'createdAt', label: 'Recent' },
   { value: 'stars', label: 'Stars' },
   { value: 'forks', label: 'Forks' },
@@ -10,6 +11,13 @@ export const FORMAT_OPTIONS = [
   { value: 'markdown', label: 'Markdown' },
   { value: 'html', label: 'HTML' },
   { value: 'pdf', label: 'PDF' },
+]
+
+export const STATUS_OPTIONS = [
+  { value: 'draft', label: 'Drafts' },
+  { value: 'pending_review', label: 'Pending review' },
+  { value: 'published', label: 'Published' },
+  { value: 'rejected', label: 'Rejected' },
 ]
 
 export function authHeaders() {
@@ -39,4 +47,25 @@ export function formatBadgeText(format) {
   if (format === 'html') return 'HTML'
   if (format === 'pdf') return 'PDF'
   return 'MD'
+}
+
+export function computeSignalBadge(sheet) {
+  const stars = sheet.stars || 0
+  const forks = sheet.forks || 0
+  const downloads = sheet.downloads || 0
+  const createdAt = new Date(sheet.createdAt)
+  const ageDays = Math.max(1, (Date.now() - createdAt.getTime()) / 86400000)
+
+  if (stars >= 10 || (forks >= 5 && stars >= 3)) return 'popular'
+  if (ageDays <= 7 && stars >= 3) return 'trending'
+  if (ageDays <= 3) return 'new'
+  if (downloads >= 20) return 'well-used'
+  return null
+}
+
+export const SIGNAL_BADGE_CONFIG = {
+  popular: { label: 'Popular', className: 'sheets-repo-row__signal--popular' },
+  trending: { label: 'Trending', className: 'sheets-repo-row__signal--trending' },
+  new: { label: 'New', className: 'sheets-repo-row__signal--new' },
+  'well-used': { label: 'Well used', className: 'sheets-repo-row__signal--well-used' },
 }

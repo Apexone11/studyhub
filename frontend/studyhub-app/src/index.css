@@ -151,6 +151,24 @@
   --sh-link: #2563eb;
   --sh-focus-ring: 0 0 0 3px rgba(37, 99, 235, 0.12);
 
+  /* ── Legacy Tailwind slate bridging (migrate to semantic tokens) ── */
+  --sh-slate-50: #f8fafc;
+  --sh-slate-100: #f1f5f9;
+  --sh-slate-200: #e2e8f0;
+  --sh-slate-300: #cbd5e1;
+  --sh-slate-400: #94a3b8;
+  --sh-slate-500: #64748b;
+  --sh-slate-600: #475569;
+  --sh-slate-700: #334155;
+  --sh-slate-800: #1e293b;
+  --sh-slate-900: #0f172a;
+
+  /* ── Info semantic (missing family) ─────────────────────────────── */
+  --sh-info: #2563eb;
+  --sh-info-bg: #eff6ff;
+  --sh-info-border: #bfdbfe;
+  --sh-info-text: #1d4ed8;
+
   /* ── Avatar initials fallback ──────────────────────────────────── */
   --sh-avatar-bg: #e2e8f0;
   --sh-avatar-text: #0f172a;
@@ -265,6 +283,24 @@
 
   --sh-link: #60a5fa;
   --sh-focus-ring: 0 0 0 3px rgba(96, 165, 250, 0.25);
+
+  /* ── Legacy Tailwind slate bridging (dark) ───────────────────── */
+  --sh-slate-50: #1c1c1c;
+  --sh-slate-100: #242424;
+  --sh-slate-200: #2a2a2a;
+  --sh-slate-300: #3a3a3a;
+  --sh-slate-400: #6b6b6b;
+  --sh-slate-500: #8a8a8a;
+  --sh-slate-600: #a0a0a0;
+  --sh-slate-700: #c0c0c0;
+  --sh-slate-800: #e0e0e0;
+  --sh-slate-900: #f5f5f5;
+
+  /* ── Info semantic (dark) ───────────────────────────────────────── */
+  --sh-info: #60a5fa;
+  --sh-info-bg: #1e3a5f;
+  --sh-info-border: #1e40af;
+  --sh-info-text: #93bbfd;
 
   /* ── Avatar initials fallback (dark) ──────────────────────────── */
   --sh-avatar-bg: #1f2937;

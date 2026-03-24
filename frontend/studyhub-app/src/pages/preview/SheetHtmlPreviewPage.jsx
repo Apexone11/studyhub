@@ -86,7 +86,7 @@ export default function SheetHtmlPreviewPage() {
               <div>
                 <h1 style={{ margin: 0, fontSize: 22, color: '#0f172a' }}>Sandbox HTML Preview</h1>
                 <div style={{ marginTop: 4, fontSize: 12, color: '#64748b' }}>
-                  Full-page draft testing via short-lived preview session on an isolated surface.
+                  Full-page preview in a secure sandboxed session.
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -108,7 +108,7 @@ export default function SheetHtmlPreviewPage() {
           </section>
 
           {state.error ? (
-            <section style={{ ...panelStyle(), background: '#fef2f2', borderColor: '#fecaca', color: '#dc2626' }}>
+            <section style={{ ...panelStyle(), background: 'var(--sh-danger-bg)', borderColor: 'var(--sh-danger-border)', color: 'var(--sh-danger)' }}>
               {state.error}
             </section>
           ) : null}
@@ -132,10 +132,10 @@ export default function SheetHtmlPreviewPage() {
               {state.preview?.sanitized ? (
                 <section style={{ ...panelStyle(), borderColor: '#fde68a', background: '#fffbeb' }}>
                   <div style={{ fontSize: 13, color: '#92400e', fontWeight: 800 }}>
-                    Sanitized preview
+                    Safe preview mode
                   </div>
                   <div style={{ fontSize: 12, color: '#92400e', marginTop: 6, lineHeight: 1.6 }}>
-                    We removed unsafe HTML (scripts/iframes/etc) to keep preview safe. Fix the findings in the editor for a clean scan.
+                    This preview has scripts and embeds disabled for safety. The full interactive version will be available after publishing. Review the scan findings below if you want a clean report.
                   </div>
                   {Array.isArray(state.preview.issues) && state.preview.issues.length ? (
                     <ul style={{ marginTop: 10, paddingLeft: 18, color: '#92400e', fontSize: 12, lineHeight: 1.6 }}>

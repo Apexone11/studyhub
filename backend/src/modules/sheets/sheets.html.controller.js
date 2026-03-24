@@ -2,12 +2,13 @@ const express = require('express')
 const prisma = require('../../core/db/prisma')
 const { captureError } = require('../../core/monitoring/sentry')
 const requireAuth = require('../../core/auth/requireAuth')
-const { validateHtmlForSubmission, RISK_TIER } = require('../../lib/htmlSecurity')
+const { validateHtmlForSubmission, RISK_TIER, generateRiskSummary, generateTierExplanation } = require('../../lib/htmlSecurity')
 const requireVerifiedEmail = require('../../core/auth/requireVerifiedEmail')
 const { signHtmlPreviewToken, HTML_PREVIEW_TOKEN_TTL_SECONDS } = require('../../lib/previewTokens')
 const { submitHtmlDraftForReview } = require('../../lib/htmlDraftWorkflow')
 const { SHEET_STATUS, sheetWriteLimiter } = require('./sheets.constants')
 const { canReadSheet, canModerateOrOwnSheet, resolvePreviewOrigin } = require('./sheets.service')
+const { tierToPreviewMode } = require('./sheets.serializer')
 const { serializeSheet } = require('./sheets.serializer')
 
 const router = express.Router()
@@ -51,6 +52,7 @@ router.get('/:id/html-preview', requireAuth, async (req, res) => {
         status: true,
         updatedAt: true,
         htmlRiskTier: true,
+        htmlScanFindings: true,
       },
     })
 
@@ -61,6 +63,7 @@ router.get('/:id/html-preview', requireAuth, async (req, res) => {
     }
 
     const tier = sheet.htmlRiskTier || 0
+    const findings = Array.isArray(sheet.htmlScanFindings) ? sheet.htmlScanFindings : []
     const validation = validateHtmlForSubmission(sheet.content)
     const issues = validation.ok ? [] : (validation.issues || [])
 
@@ -78,6 +81,9 @@ router.get('/:id/html-preview', requireAuth, async (req, res) => {
       title: sheet.title,
       status: sheet.status,
       htmlRiskTier: tier,
+      previewMode: tierToPreviewMode(tier),
+      riskSummary: generateRiskSummary(tier, findings),
+      tierExplanation: generateTierExplanation(tier),
       updatedAt: sheet.updatedAt,
       previewUrl,
       expiresInSeconds: HTML_PREVIEW_TOKEN_TTL_SECONDS,
@@ -105,6 +111,7 @@ router.get('/:id/html-runtime', requireAuth, async (req, res) => {
         status: true,
         updatedAt: true,
         htmlRiskTier: true,
+        htmlScanFindings: true,
       },
     })
 
@@ -134,11 +141,16 @@ router.get('/:id/html-runtime', requireAuth, async (req, res) => {
     })
     const runtimeUrl = `${resolvePreviewOrigin(req)}/preview/html?token=${encodeURIComponent(runtimeToken)}`
 
+    const findings = Array.isArray(sheet.htmlScanFindings) ? sheet.htmlScanFindings : []
+
     res.json({
       id: sheet.id,
       title: sheet.title,
       status: sheet.status,
       htmlRiskTier: tier,
+      previewMode: tierToPreviewMode(tier),
+      riskSummary: generateRiskSummary(tier, findings),
+      tierExplanation: generateTierExplanation(tier),
       updatedAt: sheet.updatedAt,
       runtimeUrl,
       expiresInSeconds: HTML_PREVIEW_TOKEN_TTL_SECONDS,

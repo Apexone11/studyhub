@@ -1,5 +1,7 @@
 // src/components/sidebarConstants.js
-// Constants, config, and helper functions for AppSidebar
+// Constants, config, and helper functions for AppSidebar.
+// The Avatar component lives in sidebarComponents.jsx and is
+// re-exported here for backward-compatible imports.
 
 import {
   IconFeed, IconSheets, IconTests, IconNotes,
@@ -35,18 +37,5 @@ export function courseColor(code = '') {
   return COURSE_COLORS[prefix] || 'var(--sh-brand)'
 }
 
-export function Avatar({ name, size = 48, role }) {
-  const initials = (name || '?').slice(0, 2).toUpperCase()
-  return (
-    <div style={{
-      width: size, height: size, borderRadius: '50%',
-      background: role === 'admin' ? 'var(--sh-brand)' : 'var(--sh-avatar-bg)',
-      color: role === 'admin' ? '#fff' : 'var(--sh-avatar-text)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: size * 0.35, fontWeight: 700, flexShrink: 0,
-      border: '2px solid var(--sh-border)',
-    }}>
-      {initials}
-    </div>
-  )
-}
+/* ── Re-export JSX component from sidebarComponents.jsx ────────────── */
+export { Avatar } from './sidebarComponents.jsx'

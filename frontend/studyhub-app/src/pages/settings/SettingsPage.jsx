@@ -53,6 +53,7 @@ export default function SettingsPage() {
   }, [tab])
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [busyKey, setBusyKey] = useState('')
 
   useEffect(() => {
@@ -67,9 +68,11 @@ export default function SettingsPage() {
         return r.json()
       })
       .then((data) => {
-        if (active) setUser(data)
+        if (active) { setUser(data); setLoadError('') }
       })
-      .catch(() => {})
+      .catch(() => {
+        if (active) setLoadError('Could not load your settings. Please refresh the page.')
+      })
       .finally(() => {
         if (active) setLoading(false)
       })
@@ -124,6 +127,30 @@ export default function SettingsPage() {
             <Skeleton width="100%" height={200} borderRadius={16} />
             <Skeleton width="100%" height={120} borderRadius={16} />
           </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: FONT }}>
+        <Navbar crumbs={[{ label: 'Settings', to: '/settings' }]} hideTabs />
+        <div style={{ maxWidth: 600, margin: '0 auto', padding: '60px 24px', textAlign: 'center' }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>&#9888;&#65039;</div>
+          <h2 style={{ margin: '0 0 8px', color: 'var(--sh-heading)', fontSize: 20, fontWeight: 800 }}>Settings unavailable</h2>
+          <p style={{ margin: '0 0 20px', color: 'var(--sh-subtext)', fontSize: 14, lineHeight: 1.6 }}>{loadError}</p>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            style={{
+              padding: '10px 20px', borderRadius: 10, border: 'none',
+              background: 'var(--sh-brand)', color: '#fff',
+              fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+            }}
+          >
+            Refresh page
+          </button>
         </div>
       </div>
     )

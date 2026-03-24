@@ -52,6 +52,7 @@ export default function useUploadSheet() {
   const [initializing, setInitializing] = useState(true)
   const [loading, setLoading] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [verificationRequired, setVerificationRequired] = useState(false)
 
   /* ── Scan state ────────────────────────────────────────────────────── */
   const [scanState, setScanState] = useState({
@@ -115,7 +116,11 @@ export default function useUploadSheet() {
     const incoming = sheet.htmlWorkflow || {}
     setScanState((prev) => reduceScanState(prev, {
       status: incoming.scanStatus || 'queued',
+      tier: incoming.riskTier || 0,
       findings: incoming.scanFindings || [],
+      riskSummary: incoming.riskSummary || '',
+      tierExplanation: incoming.tierExplanation || '',
+      findingsByCategory: incoming.findingsByCategory || {},
       updatedAt: incoming.scanUpdatedAt,
       acknowledgedAt: incoming.scanAcknowledgedAt,
       hasOriginalVersion: Boolean(incoming.hasOriginalVersion),
@@ -353,7 +358,7 @@ export default function useUploadSheet() {
     content, courseId, description, draftId, isEditing,
     legacyMarkdownMode, navigate, removeExistingAttachment, sheetId, title,
     uploadAttachment,
-    setError, setLoading, setHasUnsavedChanges,
+    setError, setLoading, setHasUnsavedChanges, setVerificationRequired,
   })
 
   /* ═══════════════════════════════════════════════════════════════════════
@@ -364,7 +369,7 @@ export default function useUploadSheet() {
     title, setTitle, courseId, setCourseId, description, setDescription,
     allowDownloads, setAllowDownloads, content, setContent, status,
     legacyMarkdownMode, isHtmlMode, canEditHtml, canSubmitHtml,
-    courses, error, initializing, loading, saved, draftId,
+    courses, error, initializing, loading, saved, draftId, verificationRequired,
     scanState, showScanModal, setShowScanModal,
     scanAckChecked, setScanAckChecked, scanModalDismissed, setScanModalDismissed,
     tutorial, showTutorial, dismissTutorial,

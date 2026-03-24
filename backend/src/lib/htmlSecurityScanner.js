@@ -53,12 +53,21 @@ function detectHtmlFeatures(html) {
 }
 
 /**
- * Backward-compatible wrapper: returns { ok, issues } like the old validateHtmlForSubmission.
- * @deprecated Use detectHtmlFeatures() or classifyHtmlRisk() instead.
+ * Structural validation only: rejects empty or oversized HTML.
+ * Feature detection (scripts, iframes, etc.) is handled by classifyHtmlRisk()
+ * and does NOT block submission — those become scanner findings instead.
  */
 function validateHtmlForSubmission(html) {
-  const { features } = detectHtmlFeatures(html)
-  const issues = features.map((f) => f.message)
+  const value = String(html || '')
+  const issues = []
+
+  if (!value.trim()) {
+    issues.push('HTML content cannot be empty.')
+  }
+  if (value.length > MAX_HTML_CHARS) {
+    issues.push(`HTML content must be ${MAX_HTML_CHARS.toLocaleString()} characters or fewer.`)
+  }
+
   return {
     ok: issues.length === 0,
     issues,
@@ -140,6 +149,17 @@ function detectHighRiskBehaviors(html) {
     })
   }
 
+  // Credential capture: external form with password/sensitive inputs (critical)
+  const hasExternalForm = /<form[^>]+action\s*=\s*["']?\s*https?:\/\//gi.test(value)
+  const hasSensitiveInput = /<input[^>]+(?:type\s*=\s*["']?password|name\s*=\s*["']?(?:passw(?:or)?d|credit|card|ssn|cvv|pin|secret|token))\b/gi.test(value)
+  if (hasExternalForm && hasSensitiveInput) {
+    behaviors.push({
+      category: 'credential-capture',
+      severity: 'critical',
+      message: 'External form with password or sensitive input fields detected — possible credential harvesting.',
+    })
+  }
+
   return { behaviors }
 }
 
@@ -149,7 +169,7 @@ function detectHighRiskBehaviors(html) {
  * Tier 0 (Clean): no suspicious patterns
  * Tier 1 (Flagged): suspicious but common features (scripts, iframes, handlers)
  * Tier 2 (High Risk): behavioral patterns (obfuscation, redirects, keylogging, exfiltration)
- * Tier 3 (Quarantined): reserved for AV detection (set by workflow, not this function)
+ * Tier 3 (Quarantined): critical findings, 3+ distinct high-risk categories, or AV detection
  *
  * Returns { tier, findings, summary }
  */
@@ -182,12 +202,24 @@ function classifyHtmlRisk(html) {
 
   // Determine tier: validation issues (empty/too-long) are Tier 1 since they
   // are not behavioral. Behavioral patterns elevate to Tier 2.
+  // Critical findings or 3+ distinct high-risk categories escalate to Tier 3.
   const hasBehaviors = behaviors.length > 0 || jsRisk.highRisk
   const hasFeatures = features.some((f) => f.category !== 'validation')
   const hasValidationOnly = features.length > 0 && !hasFeatures
+  const hasCritical = findings.some((f) => f.severity === 'critical')
+
+  // Count distinct high-severity behavior categories for combination escalation
+  const highCategories = new Set()
+  for (const b of behaviors) {
+    if (b.severity === 'high' || b.severity === 'critical') highCategories.add(b.category)
+  }
+  // crypto-miner + obfuscation = coordinated malicious payload
+  const hasMinerWithObfuscation = highCategories.has('crypto-miner') && highCategories.has('obfuscation')
 
   let tier = RISK_TIER.CLEAN
-  if (hasBehaviors) {
+  if (hasCritical || highCategories.size >= 3 || hasMinerWithObfuscation) {
+    tier = RISK_TIER.QUARANTINED
+  } else if (hasBehaviors) {
     tier = RISK_TIER.HIGH_RISK
   } else if (hasFeatures) {
     tier = RISK_TIER.FLAGGED
@@ -202,9 +234,120 @@ function classifyHtmlRisk(html) {
   return { tier, findings, summary }
 }
 
+/**
+ * Human-readable labels for finding categories.
+ */
+const CATEGORY_LABELS = {
+  'validation': 'Structural Issues',
+  'suspicious-tag': 'Suspicious Tags',
+  'inline-handler': 'Inline Event Handlers',
+  'dangerous-url': 'Dangerous URLs',
+  'obfuscation': 'Code Obfuscation',
+  'redirect': 'Page Redirects',
+  'exfiltration': 'Data Exfiltration',
+  'keylogging': 'Keylogging',
+  'crypto-miner': 'Crypto Mining',
+  'credential-capture': 'Credential Capture',
+  'js-risk': 'Risky JavaScript',
+  'av': 'Antivirus Detection',
+  'system': 'System',
+}
+
+/**
+ * Group an array of findings by category.
+ * Works with both normalized findings (source field) and raw findings (category field).
+ * Returns { [category]: { label, maxSeverity, findings[] } }
+ */
+function groupFindingsByCategory(findings) {
+  if (!Array.isArray(findings) || findings.length === 0) return {}
+
+  const groups = {}
+  const severityOrder = { critical: 4, high: 3, medium: 2, low: 1 }
+
+  for (const f of findings) {
+    const cat = f.category || f.source || 'unknown'
+    if (!groups[cat]) {
+      groups[cat] = {
+        label: CATEGORY_LABELS[cat] || cat,
+        maxSeverity: f.severity || 'medium',
+        findings: [],
+      }
+    }
+    groups[cat].findings.push(f)
+    const current = severityOrder[groups[cat].maxSeverity] || 0
+    const incoming = severityOrder[f.severity] || 0
+    if (incoming > current) groups[cat].maxSeverity = f.severity
+  }
+
+  return groups
+}
+
+/**
+ * Generate a short, plain-English summary of the risk findings.
+ * Example: "Contains code obfuscation and page redirect behavior."
+ */
+function generateRiskSummary(tier, findings) {
+  if (tier === RISK_TIER.CLEAN || !Array.isArray(findings) || findings.length === 0) {
+    return 'No suspicious patterns detected.'
+  }
+
+  const categories = new Set()
+  for (const f of findings) {
+    const cat = f.category || f.source || 'unknown'
+    if (cat !== 'validation' && cat !== 'system') categories.add(cat)
+  }
+
+  if (categories.size === 0) return 'Structural issues detected.'
+
+  const SUMMARY_PHRASES = {
+    'suspicious-tag': 'advanced HTML tags',
+    'inline-handler': 'inline event handlers',
+    'dangerous-url': 'suspicious URLs',
+    'obfuscation': 'obfuscated JavaScript',
+    'redirect': 'page redirect behavior',
+    'exfiltration': 'data exfiltration indicators',
+    'keylogging': 'keystroke capture patterns',
+    'crypto-miner': 'crypto-mining signatures',
+    'credential-capture': 'credential capture indicators',
+    'js-risk': 'risky JavaScript patterns',
+    'av': 'antivirus-flagged content',
+  }
+
+  const phrases = []
+  for (const cat of categories) {
+    phrases.push(SUMMARY_PHRASES[cat] || cat)
+  }
+
+  if (phrases.length === 0) return `${findings.length} finding(s) detected.`
+  if (phrases.length === 1) return `Contains ${phrases[0]}.`
+  if (phrases.length === 2) return `Contains ${phrases[0]} and ${phrases[1]}.`
+  const last = phrases.pop()
+  return `Contains ${phrases.join(', ')}, and ${last}.`
+}
+
+/**
+ * Generate a plain-English explanation of why a sheet was assigned a given tier.
+ */
+function generateTierExplanation(tier) {
+  switch (tier) {
+    case RISK_TIER.FLAGGED:
+      return 'Flagged because the scanner detected advanced HTML features (scripts, iframes, or inline handlers). The sheet is published with a safe preview — scripts are disabled.'
+    case RISK_TIER.HIGH_RISK:
+      return 'Pending review because the scanner detected higher-risk behavior patterns (obfuscation, redirects, or data exfiltration). An admin must approve before the sheet is publicly visible.'
+    case RISK_TIER.QUARANTINED:
+      return 'Quarantined because the scanner detected a likely security threat (credential capture, coordinated malicious behavior, or antivirus detection). Preview is disabled.'
+    default:
+      return 'No issues detected. The sheet passed all security checks.'
+  }
+}
+
 module.exports = {
   detectHtmlFeatures,
   validateHtmlForSubmission,
   detectHighRiskBehaviors,
   classifyHtmlRisk,
+  groupFindingsByCategory,
+  generateRiskSummary,
+  generateTierExplanation,
+  CATEGORY_LABELS,
 }

@@ -3,6 +3,7 @@
  *
  * Extracted to keep UserProfilePage.jsx a thin orchestrator.
  * ═══════════════════════════════════════════════════════════════════════════ */
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { IconSheets, IconStar } from '../../components/Icons'
 import { API } from '../../config'
@@ -10,6 +11,7 @@ import { FONT, cardStyle, sectionHeadingStyle, pillStyle } from './profileConsta
 
 /* ── Avatar ─────────────────────────────────────────────────────────────── */
 export function ProfileAvatar({ profile, initials, isOwnProfile, onAvatarClick }) {
+  const [imgError, setImgError] = useState(false)
   return (
     <div
       data-tutorial="profile-avatar"
@@ -32,8 +34,8 @@ export function ProfileAvatar({ profile, initials, isOwnProfile, onAvatarClick }
       onKeyDown={isOwnProfile ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onAvatarClick() } } : undefined}
       aria-label={isOwnProfile ? 'Upload profile photo' : undefined}
     >
-      {profile.avatarUrl
-        ? <img src={profile.avatarUrl.startsWith('http') ? profile.avatarUrl : `${API}${profile.avatarUrl}`} alt={profile.username} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+      {profile.avatarUrl && !imgError
+        ? <img src={profile.avatarUrl.startsWith('http') ? profile.avatarUrl : `${API}${profile.avatarUrl}`} alt={profile.username} onError={() => setImgError(true)} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
         : <span style={{ fontSize: 'clamp(20px, 3vw, 28px)', fontWeight: 800, color: 'var(--sh-avatar-text)' }}>{initials}</span>
       }
       {isOwnProfile && (
@@ -281,9 +283,10 @@ export function FollowModal({ followModal, followList, followListLoading, onClos
                   flexShrink: 0, overflow: 'hidden',
                 }}>
                   {u.avatarUrl
-                    ? <img src={u.avatarUrl.startsWith('http') ? u.avatarUrl : `${API}${u.avatarUrl}`} alt={u.username} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
-                    : <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--sh-avatar-text)' }}>{u.username.slice(0, 2).toUpperCase()}</span>
+                    ? <img src={u.avatarUrl.startsWith('http') ? u.avatarUrl : `${API}${u.avatarUrl}`} alt={u.username} onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling.style.display = '' }} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                    : null
                   }
+                  <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--sh-avatar-text)', display: u.avatarUrl ? 'none' : '' }}>{u.username.slice(0, 2).toUpperCase()}</span>
                 </div>
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--sh-heading)' }}>{u.username}</div>

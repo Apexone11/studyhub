@@ -42,7 +42,7 @@ export default function FeedCard({
       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
         {item.author?.username ? (
           <Link to={`/users/${item.author.username}`} style={{ textDecoration: 'none', flexShrink: 0 }}>
-            <Avatar username={item.author.username} role="student" />
+            <Avatar username={item.author.username} role="student" avatarUrl={item.author.avatarUrl} />
           </Link>
         ) : (
           <Avatar username={item.type} role="student" />
@@ -190,6 +190,8 @@ export default function FeedCard({
                   <iframe
                     src={urls.previewUrl}
                     title={`Attachment preview ${item.id}`}
+                    sandbox="allow-same-origin"
+                    referrerPolicy="no-referrer"
                     loading="lazy"
                     style={{ width: '100%', height: 300, border: 'none', background: '#fff' }}
                   />

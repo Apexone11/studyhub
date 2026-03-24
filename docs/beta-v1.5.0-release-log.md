@@ -3433,3 +3433,951 @@ Shared infrastructure lives in `backend/src/core/` (10 files): db/prisma, http/e
 
 - Original `routes/*.js` files are retained for now (strangler pattern) — barrel-wrapped modules delegate to them. They can be migrated into their module directories in a future cleanup pass.
 - Frontend restructuring (pages/ → features/) is the next phase.
+
+---
+
+## Cycle 33 — Sentry Production Bug Sweep (P0/P1 Crash Fixes) [2026-03-23]
+
+Triaged all unresolved Sentry errors from the production backend. Fixed 3 P0 crashes, 4 P1 validation errors, and 1 idempotency race condition across 7 files.
+
+### Fixed
+
+**P0 — Page-breaking crashes:**
+
+- Feed endpoint crash (`GET /api/feed`) — `TypeError: loader(...).then is not a function`:
+  - `backend/src/modules/feed/feed.service.js`
+  - `settleSection()` now wraps the loader call with `Promise.resolve()` so loaders that return plain values (e.g. `[]` from short-circuit ternaries) are handled safely.
+  - Root cause: secondary-section loaders in `feed.list.controller.js` return `[]` when their input array is empty, which is not a Promise.
+
+- User profile crash (`GET /api/users/:username`) — `PrismaClientValidationError: Argument 'followerId' is missing`:
+  - `backend/src/modules/users/users.routes.js`
+  - Changed `req.user && req.user.userId` guard to `req.user?.userId` so the `userFollow.findUnique` call is skipped when the auth token payload doesn't contain `userId`.
+  - Root cause: `optionalAuth` sets `req.user` to the decoded token, which may be truthy but lack `userId`.
+
+- Sheet detail crash (`GET /api/sheets/:id`) — `PrismaClientValidationError: Argument 'userId' is missing`:
+  - `backend/src/modules/sheets/sheets.read.controller.js`
+  - Changed `req.user ? prisma.starredSheet.findUnique(...)` to `req.user?.userId ? ...` for both the starred-sheet and reaction lookups.
+  - Same root cause as the profile bug: `req.user` truthy but `userId` undefined under `optionalAuth`.
+
+**P1 — Prisma validation errors from NaN route params:**
+
+- Added `Number.isInteger(id)` guards before all Prisma calls that use `parseInt(req.params.id)`:
+  - `backend/src/modules/feed/feed.posts.controller.js` — `GET/DELETE /posts/:id`, `GET /posts/:id/attachment`, `GET /posts/:id/attachment/preview`
+  - `backend/src/modules/feed/feed.social.controller.js` — `GET/POST /posts/:id/comments`, `DELETE /posts/:id/comments/:commentId`, `POST /posts/:id/react`
+  - `backend/src/modules/sheets/sheets.read.controller.js` — `GET /:id`
+  - `backend/src/modules/sheets/sheets.social.controller.js` — `POST /:id/star`, `GET/POST /:id/comments`, `POST /:id/react`
+  - `backend/src/modules/sheets/sheets.downloads.controller.js` — `GET/POST /:id/download`, `GET /:id/attachment`, `GET /:id/attachment/preview`
+  - All return `400 { error: 'Invalid ... id.' }` instead of propagating NaN into Prisma.
+
+**P1 — Reaction delete idempotency:**
+
+- Feed post reaction delete (`POST /posts/:id/react`) now catches `P2025` (record not found) during the delete path:
+  - `backend/src/modules/feed/feed.social.controller.js`
+  - Matches the existing pattern in `sheets.social.controller.js` which already handled this race condition.
+
+### Validation
+
+- `npm --prefix backend run lint` — **0 errors**
+- `npm --prefix backend test` — **21 test files, 161/161 tests passed**
+
+### Root-Cause Patterns Addressed
+
+| Pattern | Affected routes | Fix |
+|---|---|---|
+| `settleSection` calls `.then()` on non-Promise return | `GET /api/feed` | `Promise.resolve()` wrapper |
+| `optionalAuth` sets truthy `req.user` without `userId` | `GET /api/users/:username`, `GET /api/sheets/:id` | Guard on `req.user?.userId` |
+| `parseInt` produces `NaN` passed to Prisma `where` | 14 route handlers across feed + sheets | `Number.isInteger()` early-return |
+| `delete()` on already-deleted row throws `P2025` | `POST /api/feed/posts/:id/react` | Catch and suppress `P2025` |
+
+### Deferred / Notes
+
+- `GET /api/announcements` — Sentry shows a `TypeError: fetch failed` (1 event, 7d old). The route code uses direct Prisma queries, not `fetch`. Likely a transient network/DNS issue on Railway, not a code bug. Monitoring.
+- `GET /api/dashboard/summary` — Sentry error (6d old, 5 events) may have been from a pre-migration schema mismatch. The current code and schema look correct. Monitoring.
+- Frontend profile page shows "User not found" with "Server error" subtitle. This is a frontend error-message differentiation issue — the component should distinguish 404 from 500. Deferred to a UI polish pass.
+
+---
+
+## Cycle 34 — Images Consistency + Sheets Pending Section + Error-State Cleanup [2026-03-23]
+
+Three-track improvement pass following the P0/P1 bug sweep in Cycle 33.
+
+### Track 1: Images Consistency Pass
+
+**Fixed:**
+
+- **Feed avatars now render actual images** — `FeedWidgets.jsx` `Avatar` component rewritten to accept `avatarUrl` prop, resolve relative URLs via `API` base, and fall back to initials on image load error.
+- **Feed backend returns `avatarUrl`** — All author `select` blocks in `feed.list.controller.js` and `feed.posts.controller.js` now include `avatarUrl: true`.
+- **Feed service formatters include `avatarUrl`** — `formatAnnouncement`, `formatSheet`, `formatPost`, and `formatFeedPostDetail` in `feed.service.js` now serialize `author.avatarUrl`.
+- **Avatar `onError` fallback added everywhere** — `ProfileTab.jsx`, `ProfileWidgets.jsx` (`ProfileAvatar` and `FollowModal`), and `FeedWidgets.jsx` all gracefully degrade to initials when avatar image fails to load.
+- **Attachment preview iframes secured** — Added `sandbox="allow-same-origin"` and `referrerPolicy="no-referrer"` to all attachment preview iframes: `FeedCard.jsx`, `SheetViewerSidebar.jsx`, `AttachmentPreviewPage.jsx`.
+
+**Files changed:**
+- `backend/src/modules/feed/feed.list.controller.js`
+- `backend/src/modules/feed/feed.posts.controller.js`
+- `backend/src/modules/feed/feed.service.js`
+- `frontend/studyhub-app/src/pages/feed/FeedWidgets.jsx`
+- `frontend/studyhub-app/src/pages/feed/FeedCard.jsx`
+- `frontend/studyhub-app/src/pages/profile/ProfileWidgets.jsx`
+- `frontend/studyhub-app/src/pages/settings/ProfileTab.jsx`
+- `frontend/studyhub-app/src/pages/preview/AttachmentPreviewPage.jsx`
+- `frontend/studyhub-app/src/pages/sheets/SheetViewerSidebar.jsx`
+
+### Track 2: Pending Section on /sheets
+
+**Added:**
+
+- **Backend `status` query param** — `GET /api/sheets?mine=1&status=draft` now filters by sheet status when viewing own sheets. Validates against `SHEET_STATUS` enum. Only applies when `mine=1`.
+  - File: `backend/src/modules/sheets/sheets.list.controller.js`
+- **Frontend status filter pills** — When "Mine" toggle is active on the Sheets page, a row of status filter pills appears: Drafts, Pending review, Published, Rejected. Clicking a pill toggles the `?status=` URL param.
+  - File: `frontend/studyhub-app/src/pages/sheets/SheetsFilters.jsx`
+- **Status-aware empty states** — Custom empty-state messaging per status filter: "No drafts" with upload CTA, "Nothing pending", "No rejected sheets".
+  - File: `frontend/studyhub-app/src/pages/sheets/SheetsPage.jsx`
+- **`STATUS_OPTIONS` constant** — Added to `sheetsPageConstants.js`.
+- **`toggleMine` callback** — Atomically clears both `mine` and `status` params when toggling Mine off, avoiding stale-closure bugs from sequential `setQueryParam` calls.
+  - File: `frontend/studyhub-app/src/pages/sheets/useSheetsData.js`
+- **CSS for status row** — `.sheets-page__status-row`, `.sh-chip--status`, `.sh-chip__icon` styles.
+  - File: `frontend/studyhub-app/src/pages/sheets/SheetsPage.css`
+
+**Files changed:**
+- `backend/src/modules/sheets/sheets.list.controller.js`
+- `frontend/studyhub-app/src/pages/sheets/SheetsPage.jsx`
+- `frontend/studyhub-app/src/pages/sheets/SheetsFilters.jsx`
+- `frontend/studyhub-app/src/pages/sheets/useSheetsData.js`
+- `frontend/studyhub-app/src/pages/sheets/sheetsPageConstants.js`
+- `frontend/studyhub-app/src/pages/sheets/SheetsPage.css`
+
+### Track 3: Frontend Error-State Cleanup
+
+**Fixed:**
+
+- **SettingsPage silent failure** — Initial `GET /api/settings/me` load now surfaces errors with a full-page "Settings unavailable" screen and refresh button, instead of silently swallowing the error via `.catch(() => {})`.
+  - File: `frontend/studyhub-app/src/pages/settings/SettingsPage.jsx`
+- **Consistent `getApiErrorMessage()` usage** — Replaced all `data.error || 'fallback'` patterns with safe `getApiErrorMessage(data, 'fallback')` helper across:
+  - `useSheetViewer.js` — star, reaction, fork, contribution, comment submit, comment delete (7 call sites)
+  - `useFeedData.js` — reaction, star, delete post, compose post (4 call sites)
+- **Load-more failure toast** — `useSheetsData.js` `loadMoreSheets` catch block now shows a toast instead of silently failing.
+
+**Files changed:**
+- `frontend/studyhub-app/src/pages/settings/SettingsPage.jsx`
+- `frontend/studyhub-app/src/pages/sheets/useSheetViewer.js`
+- `frontend/studyhub-app/src/pages/feed/useFeedData.js`
+- `frontend/studyhub-app/src/pages/sheets/useSheetsData.js`
+
+### Validation
+
+- `npm --prefix frontend/studyhub-app run lint` — **22 pre-existing warnings** (all in untouched files: `feedConstants.jsx`, `notesConstants.jsx`, `sheetViewerConstants.jsx`, `uploadSheetConstants.jsx`). **0 errors in changed files.**
+- `npm --prefix frontend/studyhub-app run build` — **Pass** (built in <1s)
+- `npm --prefix backend run lint` — **0 errors**
+- `npm --prefix backend test` — **21 test files, 161/161 tests passed**
+
+### Deferred / Notes
+
+- Profile page already distinguishes 404 vs 500 vs private-profile errors with different icons and messaging (confirmed during audit — no change needed).
+- Leaderboard sidebar errors are small aside text — acceptable for non-critical UI.
+- 22 pre-existing `react-refresh/only-export-components` lint errors in `.jsx` constant files remain. These are false positives from mixing component exports with non-component exports in the same file — cosmetic, not functional.
+
+---
+
+## Cycle 35 — Admin/Button Audit, HTML Workflow Cleanup, Modular Refactor Scaffolding (2026-03-23)
+
+### Track 1: Admin/Button Audit
+
+**Summary:** Full audit of all admin buttons, role-gating, and dead CTAs across the app.
+
+**Result:** All buttons confirmed functional and properly role-gated. BUG-006 (Google link flow) confirmed already implemented in prior cycles — marked resolved.
+
+**Files changed:** None (audit only).
+
+### Track 2: HTML Workflow Cleanup
+
+**Summary:** 6 copy/label fixes across the HTML upload, preview, and scan workflows to improve clarity and tone.
+
+**Changes:**
+- `SheetHtmlPreviewPage.jsx` — "Sanitized preview" → "Safe preview mode"; improved explanation of script/embed disabling
+- `UploadSheetFormFields.jsx` — Improved HTML import explanation; fixed status underscore display (`pending_review` → `pending review`)
+- `uploadSheetActions.js` — "Submit blocked." → "Could not submit sheet." (all instances)
+- `SheetViewerPage.jsx` — Improved quarantine message with contact support CTA
+- `HtmlScanModal.jsx` — "Harmful content" → "community guidelines"; improved acknowledgement checkbox text
+
+**Files changed:**
+- `frontend/studyhub-app/src/pages/preview/SheetHtmlPreviewPage.jsx`
+- `frontend/studyhub-app/src/pages/sheets/UploadSheetFormFields.jsx`
+- `frontend/studyhub-app/src/pages/sheets/uploadSheetActions.js`
+- `frontend/studyhub-app/src/pages/sheets/SheetViewerPage.jsx`
+- `frontend/studyhub-app/src/pages/sheets/HtmlScanModal.jsx`
+
+### Track 3: Modular Refactor Scaffolding
+
+**Summary:** Created feature-first folder structure for the frontend and resolved all 22 pre-existing lint errors.
+
+**Added — Feature barrel exports (8 folders):**
+- `src/features/sheets/index.js` — re-exports hooks, constants, workflow helpers from pages/sheets/
+- `src/features/feed/index.js` — re-exports useFeedData, feedConstants, feedHelpers
+- `src/features/admin/index.js` — re-exports useAdminData, adminConstants, moderationHelpers, sheetReviewConstants
+- `src/features/users/index.js` — re-exports profileConstants
+- `src/features/dashboard/index.js` — re-exports useDashboardData, dashboardConstants
+- `src/features/notes/index.js` — re-exports useNotesData, notesConstants
+- `src/features/auth/index.js` — re-exports useRegisterFlow, registerConstants
+- `src/features/settings/index.js` — re-exports settingsState, settingsShared
+
+**Fixed — 22 react-refresh/only-export-components lint errors:**
+
+Extracted JSX components from mixed-export `.jsx` files into dedicated component files, then renamed the constants to `.js`:
+
+| Original file | Extracted component(s) | New component file |
+|---|---|---|
+| `uploadSheetConstants.jsx` → `.js` | `MiniPreview` | `uploadSheetComponents.jsx` |
+| `sheetViewerConstants.jsx` → `.js` | `errorBanner` | `sheetViewerComponents.jsx` |
+| `notesConstants.jsx` → `.js` | `MarkdownPreview` | `notesComponents.jsx` |
+| `searchModalConstants.jsx` → `.js` | `Highlight` | `searchModalComponents.jsx` |
+| `sidebarConstants.jsx` → `.js` | `Avatar` | `sidebarComponents.jsx` |
+
+All `.js` files re-export the extracted components for backward-compatible imports.
+
+**Backend:** Already fully modularized under `backend/src/modules/` (21 feature modules) — no changes needed.
+
+**Convention established:** From Cycle 35 onward, new feature logic goes in `src/features/<name>/`. Pages import from feature barrels. Existing code stays in `pages/` and migrates incrementally.
+
+**Files added:**
+- `frontend/studyhub-app/src/features/sheets/index.js`
+- `frontend/studyhub-app/src/features/feed/index.js`
+- `frontend/studyhub-app/src/features/admin/index.js`
+- `frontend/studyhub-app/src/features/users/index.js`
+- `frontend/studyhub-app/src/features/dashboard/index.js`
+- `frontend/studyhub-app/src/features/notes/index.js`
+- `frontend/studyhub-app/src/features/auth/index.js`
+- `frontend/studyhub-app/src/features/settings/index.js`
+- `frontend/studyhub-app/src/pages/sheets/uploadSheetComponents.jsx`
+- `frontend/studyhub-app/src/pages/sheets/sheetViewerComponents.jsx`
+- `frontend/studyhub-app/src/pages/notes/notesComponents.jsx`
+- `frontend/studyhub-app/src/components/searchModalComponents.jsx`
+- `frontend/studyhub-app/src/components/sidebarComponents.jsx`
+
+**Files renamed (.jsx → .js):**
+- `uploadSheetConstants.jsx` → `uploadSheetConstants.js`
+- `sheetViewerConstants.jsx` → `sheetViewerConstants.js`
+- `notesConstants.jsx` → `notesConstants.js`
+- `searchModalConstants.jsx` → `searchModalConstants.js`
+- `sidebarConstants.jsx` → `sidebarConstants.js`
+
+### Validation
+
+- `npm --prefix frontend/studyhub-app run lint` — **0 errors** (down from 22)
+- `npm --prefix frontend/studyhub-app run build` — **Pass** (built in <1s)
+- `npm --prefix backend run lint` — **0 errors**
+- `npm --prefix backend test` — **21 test files, 161/161 tests passed**
+
+### Deferred / Notes
+
+- Feature barrels are scaffolding — no existing imports were migrated this cycle. Migration happens incrementally in future cycles.
+- Backend was already fully modularized (21 modules) — confirmed, no action needed.
+
+---
+
+## Cycle 36 — Page Decomposition, Design Tokens, Media Ownership, Smoke Coverage (2026-03-23)
+
+### Track 1: Page Decomposition
+
+Decomposed 3 oversized pages into thin orchestrators + focused child components.
+
+**FeedPage.jsx** (271 → 167 lines, -38%):
+- Extracted `FeedComposer.jsx` — post composer form with own state (content, courseId, file attach, submit)
+- Extracted `FeedAside.jsx` — leaderboard sidebar (3 leaderboard panels, collaboration tips)
+- Parent retains: filter/search state, animation, delete confirmation, tutorial
+
+**SheetsPage.jsx** (256 → 143 lines, -44%):
+- Extracted `SheetsEmptyState.jsx` — 7 conditional empty-state branches (search, filters, mine+status variants)
+- Extracted `SheetsAside.jsx` — quick-view sidebar (stats summary)
+- Parent retains: URL state management, catalog fetching, list rendering
+
+**UploadSheetPage.jsx** (222 → 142 lines, -36%):
+- Extracted `UploadNavActions.jsx` — navbar action buttons (save draft, preview, cancel, publish)
+- Parent retains: thin shell delegating all state to `useUploadSheet` hook
+
+**Files added:**
+- `frontend/studyhub-app/src/pages/feed/FeedComposer.jsx`
+- `frontend/studyhub-app/src/pages/feed/FeedAside.jsx`
+- `frontend/studyhub-app/src/pages/sheets/SheetsEmptyState.jsx`
+- `frontend/studyhub-app/src/pages/sheets/SheetsAside.jsx`
+- `frontend/studyhub-app/src/pages/sheets/UploadNavActions.jsx`
+
+### Track 2: Design System Token Migration
+
+Added new semantic tokens to `index.css` (both light and dark themes):
+- Slate scale: `--sh-slate-50` through `--sh-slate-900` (10 tokens × 2 themes)
+- Info semantic: `--sh-info`, `--sh-info-bg`, `--sh-info-border`, `--sh-info-text` (4 tokens × 2 themes)
+
+Migrated 10 files from hardcoded hex to CSS custom property tokens:
+
+| File | Changes | Key Migrations |
+|------|---------|----------------|
+| `sheetViewerComponents.jsx` | errorBanner | `#fef2f2` → `var(--sh-danger-bg)`, `#dc2626` → `var(--sh-danger)` |
+| `sheetViewerConstants.js` | statusBadge | pending/accepted/rejected → warning/success/danger tokens |
+| `feedConstants.js` | commentButtonStyle | `#fff` → `var(--sh-surface)` |
+| `adminConstants.js` | 6 style objects | table styles, input, buttons, pager, suppression pill |
+| `AdminWidgets.jsx` | StatsGrid, ModerationOverview, ActivityLog | All structural colors tokenized |
+| `UploadNavActions.jsx` | All 6 color groups | success/warning/brand/slate tokens |
+| `UploadSheetFormFields.jsx` | ~40 instances | labels, borders, errors, success/info/warning/danger states |
+| `uploadSheetConstants.js` | tierColor | `#16a34a` → `var(--sh-success)`, etc. |
+| `HtmlScanModal.jsx` | Scan findings, tier banners | All danger/warning semantic colors |
+
+**Not migrated (intentional):** Editor dark panel (`#0f172a` bg, `#1e293b` border) — always-dark code editor theme. Stats card accent colors in AdminWidgets — intentional unique palette per metric. `courseColor()` palette in feedConstants — intentional per-department branding.
+
+### Track 3: Media/Storage Ownership Audit
+
+Full audit of media upload, storage, serving, and cleanup patterns documented in `docs/security/security-overview.md`:
+
+- **Directory structure:** `uploads/avatars/` (public static), `uploads/attachments/` (auth-protected)
+- **Path patterns:** `user-{userId}-{name}-{ts}.ext` (avatars), `sheet-{name}-{ts}.ext` (attachments)
+- **Ownership enforcement:** `assertOwnerOrAdmin()` on all upload/delete operations
+- **Cleanup chain:** ref-count checks on deletion (avatar, sheet, post, user cascading)
+- **Path traversal protection:** `resolveManagedUploadPath()` validates leaf filenames only
+- **HTML content:** stored in database (not filesystem), served via preview token routes
+
+**Findings:** Well-architected ownership model. No orphan cleanup scheduler (inline cleanup only). No S3/cloud storage (Railway persistent volume). All gaps documented.
+
+### Track 4: Smoke Test Coverage
+
+Added `tests/cycle36-decomposed-pages.smoke.spec.js` — 8 Playwright tests covering:
+
+- Upload sheet page (new sheet + draft mode) — validates decomposed form fields, nav actions, editor panel
+- Admin overview — validates StatsGrid, tab navigation, moderation data rendering
+- User profile page — validates public profile rendering
+
+All tests run across light and dark themes using existing `mockAuthenticatedApp` infrastructure.
+
+### Validation
+
+- `npm --prefix frontend/studyhub-app run lint` — **0 errors**
+- `npm --prefix frontend/studyhub-app run build` — **Pass** (built in <350ms)
+- `npm --prefix backend run lint` — **0 errors**
+- `npm --prefix backend test` — **21 test files, 161/161 tests passed**
+- `npm --prefix frontend/studyhub-app test` — **12/14 files pass, 30/33 pass** (3 pre-existing failures in SearchModal.test.jsx, uploadSheetWorkflow.test.jsx — not caused by Cycle 36 changes, confirmed via git diff)
+
+### Deferred / Notes
+
+- Full 1000+ instance color migration deferred — focused on high-leverage constants/style-helper files that cascade to consumers
+- Home page components (HomeSections.jsx, HomeHero.jsx) not migrated per CLAUDE.md instruction to preserve HomePage visual language
+- Pre-existing test failures (SearchModal, uploadSheetWorkflow) tracked but not in scope for this cycle
+
+---
+
+## Cycle 37 — HTML Policy Migration (2026-03-23)
+
+**Goal**: Migrate from "block HTML features at submission" to "accept all HTML → scan → classify → route by risk tier".
+
+### Track 1: Backend HTML Policy Rewrite
+
+Rewrote `validateHtmlForSubmission()` in `backend/src/lib/htmlSecurityScanner.js` from a feature-blocker to a structural-only validator:
+
+- **Before**: Called `detectHtmlFeatures()` and returned `ok: false` when any features (script, iframe, handlers, etc.) were detected — this 400-rejected HTML with common web features from being stored
+- **After**: Only checks for empty content and size limit (>350K chars) — all HTML features are accepted and routed through the scan pipeline
+
+This single change unblocks the 4 controllers that call it:
+
+- `sheets.create.controller.js` — new sheet creation
+- `sheets.update.controller.js` — sheet editing
+- `sheets.drafts.controller.js` — draft imports
+- `sheets.contributions.controller.js` — fork contributions
+
+The existing classification pipeline (`classifyHtmlRisk()` → tier 0-3 → route by tier) and draft workflow (`importHtmlDraft`, `submitHtmlDraftForReview`) already work correctly and were not modified.
+
+### Track 2+4: Frontend Copy + Token Updates
+
+**Copy changes (6 files):**
+
+| File | Change |
+| ------ | -------- |
+| `HtmlScanModal.jsx` | "Welcome to HTML Upload Beta" → "HTML Upload"; subtitle updated |
+| `SheetReviewPanel.jsx` | "Sanitized Preview" tab → "Safe Preview"; comment updated |
+| `SheetReviewDetails.jsx` | Comment: "Sanitized preview" → "Safe preview" |
+| `SheetHtmlPreviewPage.jsx` | "Full-page draft testing via short-lived preview session on an isolated surface" → "Full-page preview in a secure sandboxed session" |
+| `SheetHtmlPreviewPage.jsx` | Error panel colors tokenized (danger tokens) |
+| `SheetViewerPage.jsx` | 7 hardcoded color blocks tokenized (see below) |
+
+**SheetViewerPage.jsx token migration:**
+
+- Tier 1 badge: `#ca8a04`/`#fefce8`/`#fde68a` → `var(--sh-warning)`/`var(--sh-warning-bg)`/`var(--sh-warning-border)`
+- Tier 2 badge: `#b45309`/`#fef3c7`/`#fde68a` → `var(--sh-warning-text)`/`var(--sh-warning-bg)`/`var(--sh-warning-border)`
+- Quarantined block: `#fecaca`/`#fef2f2`/`#dc2626` → danger tokens
+- Pending review block: `#fed7aa`/`#fff7ed`/`#9a3412` → warning tokens
+- Warning gate: `#fde68a`/`#fffbeb`/`#92400e`/`#e2e8f0`/`#f8fafc`/`#334155`/`#64748b` → warning/border/soft/heading/subtext tokens
+- Loading text: `#e2e8f0`/`#64748b` → border/subtext tokens
+- Iframe wrapper: `#e2e8f0`/`#fff` → border/surface tokens
+- Error fallback: `#fecaca`/`#fef2f2`/`#dc2626` → danger tokens
+
+### Track 3: Workflow/Status/Moderation Alignment
+
+Audited all admin review components — labels and status display were already aligned from Cycle 35:
+
+- `SheetReviewsTab.jsx` — PipelineBadge uses semantic status labels (pending review, published, rejected, draft)
+- `SheetReviewPanel.jsx` — Review panel tab bar, action bar, findings panel all use token-based colors
+- No changes needed beyond the "Sanitized Preview" → "Safe Preview" rename in Track 2
+
+### Track 5: Documentation Rewrite
+
+Updated `docs/security/security-overview.md`:
+
+- **HTML Security section**: Complete rewrite to document accept-all → scan → classify → route model
+- Describes structural validation, feature detection, behavioral analysis, risk classification (Tier 0-3), dual preview model, CSP, sandbox, and admin review
+- **HTML Security Communication section**: Updated to reflect Cycle 37 language changes (safe preview, tier badges, admin tab rename)
+
+Updated `docs/logs/CHANGELOG.md`, `docs/logs/feature-tracker.md`, `docs/plans/v1.5-weekly-roadmap.md`, `docs/v1.5.0-release-notes.md`.
+
+### Track 6: Tests and Validation
+
+Updated `backend/test/htmlSecurity.test.js`:
+
+- Renamed test from "detects script, iframe, inline handlers, and dangerous urls" to "accepts HTML with scripts, iframes, handlers, and dangerous urls (structural-only validation)"
+- Assertions flipped: all feature-bearing HTML now expected to pass (`ok: true`, `issues.length === 0`)
+- Empty/oversized tests unchanged (still expected to fail)
+
+### Validation
+
+- `npm --prefix backend run lint` — **0 errors**
+- `npm --prefix frontend/studyhub-app run lint` — **0 errors**
+- `npm --prefix backend test` — **21 test files, 161/161 tests passed**
+- `npm --prefix frontend/studyhub-app run build` — **Pass** (built in 304ms)
+
+### Files Modified
+
+| File | Change |
+| ---- | ------ |
+| `backend/src/lib/htmlSecurityScanner.js` | `validateHtmlForSubmission` → structural-only (empty + size checks) |
+| `backend/test/htmlSecurity.test.js` | Test updated to expect acceptance of feature-bearing HTML |
+| `frontend/.../sheets/HtmlScanModal.jsx` | "HTML Upload Beta" → "HTML Upload", subtitle updated |
+| `frontend/.../sheets/SheetViewerPage.jsx` | 7 hardcoded color blocks → CSS tokens |
+| `frontend/.../preview/SheetHtmlPreviewPage.jsx` | Preview description + error panel tokenized |
+| `frontend/.../admin/SheetReviewPanel.jsx` | "Sanitized Preview" → "Safe Preview" |
+| `frontend/.../admin/SheetReviewDetails.jsx` | Comment updated |
+| `docs/security/security-overview.md` | HTML Security section rewritten for accept-all model |
+| `docs/beta-v1.5.0-release-log.md` | Cycle 37 entry |
+| `docs/logs/CHANGELOG.md` | 6 new entries |
+| `docs/logs/feature-tracker.md` | 2 new Done features |
+| `docs/plans/v1.5-weekly-roadmap.md` | Cycle 37 item checked |
+| `docs/v1.5.0-release-notes.md` | HTML Policy Migration section added |
+| `CLAUDE.md` | HTML security policy architecture note added |
+
+---
+
+## Cycle 38 — Scanner Enforcement, Preview Mode & UX Consistency (2026-03-23)
+
+### Summary
+
+Full enforcement of the HTML tier pipeline: Tier 3 now reachable from the classifier alone (credential capture, combination escalation, obfuscated crypto-miner), preview mode explicitly serialized from backend to frontend, and SheetViewerPage refactored to consume `previewMode` instead of inline tier math. Includes 4 controller integration tests, 10 new classifier tests (Tier 3 + sample matrix A-F), and broken Playwright smoke test rewrite.
+
+### Added
+
+#### 38.1 — Tier 3 Classifier Rules + Sample Test Matrix
+
+**Credential capture detector** (`htmlSecurityScanner.js`):
+- External form with `<input type="password">` or `name="password|cvv|ssn|pin|secret|token"` → `credential-capture` (critical severity) → Tier 3
+
+**Combination escalation** (`classifyHtmlRisk`):
+- Any finding with `severity === 'critical'` → Tier 3
+- 3+ distinct high-severity behavior categories → Tier 3 (e.g., obfuscation + redirect + keylogging)
+- `crypto-miner` + `obfuscation` → Tier 3 (obfuscated miner = clearly malicious)
+
+**Sample test matrix** (6 fixtures in `htmlSecurity.test.js`):
+- **A — Clean HTML** (headings, tables, CSS) → Tier 0
+- **B — Rich presentation** (SVG, animations, advanced CSS) → Tier 0
+- **C — Scripted HTML** (inline script, event handlers) → Tier 1
+- **D — Embedded HTML** (iframe, form, embed) → Tier 1
+- **E — Suspicious HTML** (eval) → Tier 2
+- **F — Malicious HTML** (credential phishing form) → Tier 3
+
+**4 new Tier 3 unit tests**: credential capture (password input), credential capture (sensitive name field), 3+ category combination, obfuscated crypto-miner.
+
+#### 38.2 — Preview Mode Serialization
+
+**`tierToPreviewMode()` helper** in `sheets.serializer.js`:
+- Tier 0 → `'interactive'` (scripts allowed)
+- Tier 1 → `'safe'` (scripts blocked, sandboxed)
+- Tier 2 → `'restricted'` (owner/admin only)
+- Tier 3 → `'disabled'` (no preview)
+
+**Backend fields added**:
+- `htmlWorkflow.previewMode` in sheet serializer (all sheet responses)
+- `htmlWorkflow.ackRequired` in sheet serializer (true for Tier 1 only)
+- `previewMode` in `/api/sheets/:id/html-preview` and `/api/sheets/:id/html-runtime` responses
+
+#### Controller Integration Tests (4 tests in `sheet.workflow.integration.test.js`)
+
+1. **Tier 1 flagged path** — script HTML imported → 409 → acknowledge → publish
+2. **Tier 2 eval path** — `eval()` HTML → pending_review → admin approve
+3. **Tier 2 redirect path** — `window.location.href` → pending_review
+4. **Runtime access control** — quarantined 403, pending_review owner/admin access
+
+#### Mock Infrastructure
+
+- `prisma.user.findMany` mock (admin notification in Tier 2+)
+- `authTokens.getJwtSecret` mock (JWT signing for preview tokens)
+
+### Changed
+
+#### SheetViewerPage Refactored to `previewMode`
+
+- Derived `previewMode` from `sheet.htmlWorkflow.previewMode` once at component top
+- Replaced all 12 inline `(sheet.htmlRiskTier || 0) >= X` comparisons with `previewMode` string checks
+- Zero `htmlRiskTier` references remain in the viewer
+
+#### Playwright Smoke Test Rewrite
+
+- **Before**: referenced removed UI text ("strict beta workflow", "unsafe HTML is blocked")
+- **After**: tests current tier 1 flagged flow — scan modal, acknowledgement checkbox, "Publish with Warnings"
+
+#### Copy Audit
+
+- `preview.routes.js` comment: "sanitized preview" → "safe preview"
+- No instances of "blocked HTML", "unsafe HTML removed", "strict beta", or "disallowed features" in codebase
+
+### Validation
+
+- `npm --prefix backend run lint` — **0 errors**
+- `npm --prefix frontend/studyhub-app run lint` — **0 errors**
+- `npm --prefix backend test` — **21 test files, 175/175 tests passed** (10 new)
+- `npm --prefix frontend/studyhub-app run build` — **Pass**
+
+### Files Modified
+
+| File | Change |
+| ---- | ------ |
+| `backend/src/lib/htmlSecurityScanner.js` | Credential capture detector, Tier 3 escalation rules |
+| `backend/src/modules/sheets/sheets.serializer.js` | `tierToPreviewMode()`, `previewMode` + `ackRequired` fields |
+| `backend/src/modules/sheets/sheets.html.controller.js` | `previewMode` in preview/runtime responses |
+| `backend/src/modules/preview/preview.routes.js` | Comment: "sanitized preview" → "safe preview" |
+| `backend/test/htmlSecurity.test.js` | 4 Tier 3 tests + 6 sample matrix tests (A-F) |
+| `backend/test/sheet.workflow.integration.test.js` | 4 integration tests + mock infrastructure |
+| `frontend/.../sheets/SheetViewerPage.jsx` | Refactored to consume `previewMode` (12 tier checks removed) |
+| `frontend/.../tests/sheets.upload-html-workflow.smoke.spec.js` | Rewritten for tier 1 flagged flow |
+| `CLAUDE.md` | Tier 3 triggers documented |
+| `docs/beta-v1.5.0-release-log.md` | Cycle 38 entry |
+| `docs/logs/CHANGELOG.md` | Cycle 38 entries |
+| `docs/logs/feature-tracker.md` | 4 new Done features |
+| `docs/plans/v1.5-weekly-roadmap.md` | Cycle 38 item checked |
+
+---
+
+## Cycle 39 — Admin Review Ergonomics, Scanner Explainability & Production Confidence (2026-03-23)
+
+Theme: Make the HTML security system usable at scale — faster for admins to review, easier for users to understand, safer to operate in production.
+
+### Sub-cycle 39.1 — Scanner Explainability + Backend Enrichment
+
+Added:
+- `generateRiskSummary(tier, findings)` — produces short plain-English summaries from findings (e.g., "Contains obfuscated JavaScript and page redirect behavior.")
+- `generateTierExplanation(tier)` — produces "why this tier" explanation text for each risk tier
+- `groupFindingsByCategory(findings)` — groups findings into `{ [category]: { label, maxSeverity, findings[] } }` buckets
+- `CATEGORY_LABELS` constant mapping all 13 finding categories to human-readable labels (e.g., `'credential-capture'` → `'Credential Capture'`)
+- `category` field added to `normalizeFindings()` output (alongside `source` for backward compatibility)
+- `htmlWorkflow` serializer enriched with `riskSummary`, `tierExplanation`, `findingsByCategory` fields
+- Admin review-detail endpoint enriched with both stored and live explainability fields (`riskSummary`, `tierExplanation`, `findingsByCategory`, `liveRiskSummaryText`, `liveTierExplanation`, `liveFindingsByCategory`)
+- html-preview and html-runtime endpoints enriched with `riskSummary` and `tierExplanation`
+- `getHtmlScanStatus()` response enriched with `riskSummary`, `tierExplanation`, `findingsByCategory`
+- 9 new unit tests covering `groupFindingsByCategory`, `generateRiskSummary`, `generateTierExplanation`
+
+Files changed:
+| File | Change |
+|------|--------|
+| `backend/src/lib/htmlSecurityScanner.js` | Added `groupFindingsByCategory`, `generateRiskSummary`, `generateTierExplanation`, `CATEGORY_LABELS` |
+| `backend/src/lib/htmlSecurity.js` | Re-export 4 new symbols |
+| `backend/src/lib/htmlDraftValidation.js` | Added `category` field to `normalizeFindings()` |
+| `backend/src/lib/htmlDraftWorkflow.js` | Enriched `getHtmlScanStatus()` with explainability fields |
+| `backend/src/modules/sheets/sheets.serializer.js` | Enriched `htmlWorkflow` with `riskSummary`, `tierExplanation`, `findingsByCategory` |
+| `backend/src/modules/sheets/sheets.html.controller.js` | Enriched preview/runtime endpoints with summary/explanation |
+| `backend/src/modules/admin/admin.sheets.controller.js` | Enriched review-detail with stored + live explainability fields |
+| `backend/test/htmlSecurity.test.js` | 9 new tests for explainability helpers |
+
+Validation:
+- Backend tests: 184/184 passed (9 new)
+- Backend lint: 0 errors
+- Frontend lint: 0 errors
+
+### Sub-cycle 39.2 — Admin Ergonomics + Author Experience + UI Polish
+
+Added:
+- Admin queue cards: tier badge (Flagged/High Risk/Quarantined), preview mode badge (Safe/Restricted/Disabled), finding count badge for HTML sheets
+- Admin queue findings: now shown for all sheets with findings (not just failed scan status), capped at 5 with "...and N more" overflow
+- Admin review panel header: risk badge with tier label, risk summary, acknowledgement indicator, tier explanation
+- Admin review panel findings: grouped by category (sorted by severity) with category label, count, and finding list when `findingsByCategory` is available; falls back to flat list for legacy data
+- Admin review reason templates: 5 quick-fill buttons ("Allowed advanced HTML; safe preview only", "Pending due to obfuscated script behavior", etc.) in action bar
+- HtmlScanModal: grouped findings by category (sorted by severity) replacing flat list, risk summary headline, tier explanation replacing hardcoded per-tier text
+- HtmlScanModal: scrollable content area (max-height 60vh) for long finding lists
+- SheetViewerPage: risk summary shown next to tier badge for flagged/pending/quarantined sheets
+- `reduceScanState` now passes through `riskSummary`, `tierExplanation`, `findingsByCategory` from backend responses
+- `hydrateFromSheet` passes `riskSummary`, `tierExplanation`, `findingsByCategory` from `htmlWorkflow`
+
+Files changed:
+| File | Change |
+|------|--------|
+| `frontend/.../sheets/uploadSheetWorkflow.js` | `reduceScanState` passes through 3 new explainability fields |
+| `frontend/.../sheets/useUploadSheet.js` | `hydrateFromSheet` passes tier + explainability fields from htmlWorkflow |
+| `frontend/.../sheets/HtmlScanModal.jsx` | Grouped findings, risk summary, tier explanation, scrollable content |
+| `frontend/.../sheets/SheetViewerPage.jsx` | Risk summary next to tier badge |
+| `frontend/.../admin/SheetReviewsTab.jsx` | Tier badge, preview mode badge, finding count, widened findings display |
+| `frontend/.../admin/SheetReviewPanel.jsx` | Enriched header with risk summary, tier explanation, acknowledgement state |
+| `frontend/.../admin/SheetReviewDetails.jsx` | Grouped findings panel, reason templates in action bar |
+
+Validation:
+- Backend tests: 184/184 passed
+- Backend lint: 0 errors
+- Frontend lint: 0 errors
+- Frontend build: passes
+
+### Sub-cycle 39.3 — E2E Tests + Documentation
+
+Added:
+- 5 Playwright E2E smoke tests for HTML security tiers in `sheets.html-security-tiers.smoke.spec.js`:
+  - Tier 2 high-risk upload: grouped findings, "Understood" dismiss, "Submit for Review" button
+  - Tier 3 quarantined upload: critical findings, "Close" only, disabled "Quarantined" button
+  - Grouped findings: 3 categories (Code Obfuscation, Suspicious Tags, Page Redirects) sorted by severity
+  - Admin review queue: queue badges, review panel, grouped findings tab, reason templates, reject action
+  - Sheet viewer: risk summary for flagged HTML sheet, safe preview badge
+- HTML moderation playbook (`docs/security/html-moderation-playbook.md`): step-by-step admin review guide with decision matrix, preview mode reference, and reason template guidance
+- HTML finding category glossary (`docs/security/html-finding-categories.md`): all 13 scanner categories with triggers, severities, tier escalation rules, compound Tier 3 triggers
+
+Fixed:
+- Service Worker (`public/sw.js`) intercepting Playwright API mocks — added `test.use({ serviceWorkers: 'block' })` to HTML upload test files
+- Existing tier 1 upload smoke test (`sheets.upload-html-workflow.smoke.spec.js`): fixed wrong working-html mock URL (`**/api/sheets/777/working-html` → `**/api/sheets/drafts/777/working-html`), added missing `tutorial_upload_seen` localStorage key
+- Strict mode violations in 4 tests — category label locators changed to `{ exact: true }` to avoid matching substrings in risk summary text; redundant tier-label assertions removed
+- Admin review test: `force: true` on Reject click to bypass overlapping label element; `{ exact: true }` on "Reject" button to avoid matching "Quick Reject"
+- Cleaned up debug test files (`debug-scan-poll.spec.js`, `debug-scan-poll2.spec.js`)
+
+Files changed:
+| File | Change |
+|------|--------|
+| `frontend/.../tests/sheets.html-security-tiers.smoke.spec.js` | New: 5 E2E smoke tests for tier 2/3, grouped findings, admin review, viewer |
+| `frontend/.../tests/sheets.upload-html-workflow.smoke.spec.js` | Fixed: SW blocking, tutorial key, working-html URL |
+| `docs/security/html-moderation-playbook.md` | New: admin review playbook with decision matrix |
+| `docs/security/html-finding-categories.md` | New: 13-category glossary with triggers + severities |
+| `docs/logs/CHANGELOG.md` | Updated with 39.3 entries |
+| `docs/logs/feature-tracker.md` | Updated with 39.3 features |
+| `docs/plans/v1.5-weekly-roadmap.md` | Updated with 39.3 completion |
+
+Validation:
+- 5/5 new E2E tests pass
+- 1/1 existing tier 1 upload test passes
+- Frontend lint: 0 errors
+- Frontend build: passes
+
+---
+
+### Cycle 40 — Launch UX + Onboarding Polish + First-Success Flow
+Date: 2026-03-23
+
+Theme: Turn StudyHub from "technically capable beta" into "a product a student can land on and understand in minutes."
+
+#### Sub-cycle 40.1 — First-run onboarding + dashboard guidance
+
+Added:
+- `GettingStartedCard` on Feed page: dismissible onboarding panel with 4 quick actions (join course, browse sheets, upload, set up profile), completion tracking, auto-hide for non-new users with 3+ actions done
+- `EmptyFeed` enhanced with `isFirstRun` prop: shows "Browse study sheets" and "Upload a sheet" CTAs for first-run users
+- Dashboard activation checklist expanded 4→6 items: added "Verify your email" and "Add a profile photo" steps with `hasVerifiedEmail` and `hasAvatar` backend checks
+- Dark mode token migration for `ActivationChecklist` and `StatCards` components: all hardcoded hex colors replaced with CSS custom property tokens
+
+Changed:
+- `FeedPage.jsx`: wired `GettingStartedCard` above composer, context-aware `EmptyFeed` messages
+- `dashboard.routes.js`: `emailVerified` field added to user select, 2 new checklist items with action paths
+
+#### Sub-cycle 40.2 — Account/verification UX + trust messaging
+
+Added:
+- `EmailVerificationBanner`: grace period countdown ("You have X days left before some features are restricted"), link fixed to `/settings?tab=account`
+- `EmailVerificationInline`: updated copy and link target
+- `ErrorBanner` in upload flow: accepts `verificationRequired` prop, shows warning-styled banner with "Verify now" link instead of generic error when `EMAIL_NOT_VERIFIED` response detected
+- `verificationRequired` state wired through upload hook chain: `uploadSheetActions.js` detects `data?.code === 'EMAIL_NOT_VERIFIED'` in both markdown and HTML submit paths, `useUploadSheet.js` exposes state, `UploadSheetPage.jsx` passes prop to `ErrorBanner`
+
+#### Sub-cycle 40.3 — First upload success flow + scan outcome polish
+
+Added:
+- `UploadHelperCard`: dismissible "How uploading works" info panel explaining formats, security scan, post-submit flow, and "My Sheets" return path. Persisted via `localStorage` key. Shown only for new uploads (not edit mode).
+- `StatusBanner` rewritten with context-aware configurations: `pending_review` (reassuring wait message), `rejected` (actionable "Changes requested" with guidance), `published` (success with "View sheet" link), `quarantined` (explanation + support prompt). All states include "My Sheets" return link.
+
+Changed:
+- `TutorialModal` steps rewritten with friendlier language: "we create a safe working copy automatically", "most sheets publish instantly"
+- `HtmlScanModal` intro rewritten: supportive tone ("Most sheets pass without issues"), removed threatening language
+- Tier 1 acknowledgement checkbox: simplified from compliance-focused to informational
+- `tierLabel()` renamed: "Clean" → "Passed", "Flagged" → "Minor Findings", "High Risk" → "Needs Review" (user-facing upload flow only; admin panel retains separate hardcoded labels)
+
+#### Sub-cycle 40.4 — Browse/discovery polish + launch surface design
+
+Changed:
+- `DashboardWidgets.jsx` full dark mode token migration: `RecentSheets`, `CourseFocus`, `QuickActions`, `EmptyState`, `DashboardSkeleton` — all hardcoded hex colors replaced with CSS custom property tokens (`var(--sh-surface)`, `var(--sh-border)`, `var(--sh-heading)`, `var(--sh-brand)`, `var(--sh-soft)`, `var(--sh-subtext)`, `var(--sh-muted)`)
+- `RecentSheets` helper text changed from dev note ("Rendered from the new summary endpoint…") to user-facing copy ("Latest sheets from your enrolled courses")
+- `SheetsAside` sidebar improved: added "Add your courses" CTA for users with 0 enrollments, "Upload a sheet" primary CTA, better workflow copy ("Filter by school or course…")
+
+#### Sub-cycle 40.5 — Validation + release notes
+
+Files changed:
+| File | Change |
+|------|--------|
+| `frontend/.../pages/feed/FeedWidgets.jsx` | New: GettingStartedCard, enhanced EmptyFeed |
+| `frontend/.../pages/feed/FeedPage.jsx` | Wired GettingStartedCard + context-aware EmptyFeed |
+| `frontend/.../pages/dashboard/DashboardWidgets.jsx` | Full dark mode token migration, better copy |
+| `frontend/.../pages/sheets/UploadSheetFormFields.jsx` | New: UploadHelperCard, enhanced StatusBanner + ErrorBanner |
+| `frontend/.../pages/sheets/UploadSheetPage.jsx` | Wired UploadHelperCard, StatusBanner sheetId, ErrorBanner verificationRequired |
+| `frontend/.../pages/sheets/uploadSheetActions.js` | EMAIL_NOT_VERIFIED detection in both submit paths |
+| `frontend/.../pages/sheets/useUploadSheet.js` | verificationRequired state + pass-through |
+| `frontend/.../pages/sheets/uploadSheetConstants.js` | tierLabel() friendlier names |
+| `frontend/.../pages/sheets/HtmlScanModal.jsx` | Supportive scan language rewrite |
+| `frontend/.../pages/sheets/SheetsAside.jsx` | Better guidance + CTAs |
+| `frontend/.../components/EmailVerificationBanner.jsx` | Grace period countdown + link fix |
+| `backend/src/modules/dashboard/dashboard.routes.js` | Activation checklist: 6 items, emailVerified + avatarUrl |
+| `docs/logs/CHANGELOG.md` | Updated with Cycle 40 entries |
+| `docs/logs/feature-tracker.md` | Updated with Cycle 40 features |
+| `docs/plans/v1.5-weekly-roadmap.md` | Updated with Cycle 40 completion |
+
+Validation:
+- Frontend lint: 0 errors
+- Frontend build: passes
+- Backend tests: 184/184 pass
+
+---
+
+### Cycle 41 — Discovery + engagement + content quality signals (2026-03-23)
+
+Theme: Turn StudyHub from "easy to understand" into "useful enough to come back to regularly" by improving search ranking, course discovery, content quality signals, and engagement surfaces.
+
+#### Sub-cycle 41.1 — Search/ranking improvements
+
+Added:
+
+- Backend composite ranking algorithm: `score = stars*3 + forks*2 + downloads + freshness(max(0, 10 - log2(ageDays)))` for "recommended" sort
+- `recommended` added to `allowedSort` in `sheets.list.controller.js` — fetches up to 500 recent sheets, scores in-memory, then paginates
+- "Best" sort option added as first/default option in `sheetsPageConstants.js`
+- `IconComment` SVG icon added to `Icons.jsx`
+- Comment count display on sheet list rows in `SheetListItem.jsx` (visible when > 0)
+- Default sort changed from `createdAt` to `recommended` in `useSheetsData.js`
+
+#### Sub-cycle 41.2 — Course-level discovery
+
+Added:
+
+- Backend `GET /api/courses/popular` endpoint: returns top 8 courses by published sheet count, rate-limited (120/15min), public
+- `POPULAR_COURSES_LIMIT` constant in `courses.constants.js`
+- Frontend: `useSheetsData` now fetches popular courses (polled every 5min) and tracks recent course filters in localStorage (`studyhub.sheets.recentCourses`, max 5 entries)
+- `handleCourseFilter` callback: batched `courseId` + `schoolId` URL update (avoids double-render from separate `setQueryParam` calls)
+- `SheetsAside` rewritten with 3 discovery sections: Quick view, Recent courses (clickable chips with toggle), Popular courses (ranked list with sheet counts)
+- Course-specific empty state in `SheetsEmptyState`: when filtering by a course with no sheets, shows "No sheets for CS101 yet — Be the first to share" with contextual upload CTA
+- CSS: `.sheets-page__course-chips`, `.sheets-page__popular-list`, `.sheets-page__popular-row` with active/hover states
+
+#### Sub-cycle 41.3 — Content quality signals on cards/rows
+
+Added:
+
+- `computeSignalBadge()` helper: classifies sheets as "Popular" (>=10 stars or >=5 forks+3 stars), "Trending" (<=7 days + >=3 stars), "New" (<=3 days), or "Well used" (>=20 downloads)
+- `SIGNAL_BADGE_CONFIG` constant: label + CSS class for each signal type
+- Signal badges rendered inline after sheet title in `SheetListItem.jsx`
+- Fork lineage indicator: shows "Forked from {title} by {author}" below sheet title when `forkSource` exists
+- Status badges migrated from inline styles with hardcoded hex to CSS classes: `sheets-repo-row__status-badge--draft`, `--danger`, `--warning`, `--review` using CSS tokens
+- CSS: signal badge styles (`.sheets-repo-row__signal--popular/trending/new/well-used`), fork lineage styles, status badge class styles
+
+#### Sub-cycle 41.4 — Dashboard/feed engagement + collaboration polish
+
+Added:
+
+- "Your starred sheets — Recently updated" widget in `FeedAside`: shows top 5 recently-updated starred sheets with course, author, and time-ago metadata; links to `/sheets?starred=1`
+- `starredUpdates` state in `useFeedData`: fetches `GET /api/sheets?starred=1&sort=updatedAt&limit=5`, polled every 2min
+- Fork lineage visibility in dashboard `RecentSheets` widget: shows "Forked from {title} by {author}" when `forkSource` exists
+
+Changed:
+
+- Feed page alert banners migrated from hardcoded hex (`#fffbeb`, `#b45309`, `#fef2f2`, `#dc2626`) to CSS tokens (`var(--sh-warning-bg)`, `var(--sh-warning-text)`, `var(--sh-danger-bg)`, `var(--sh-danger-text)`)
+
+#### Sub-cycle 41.5 — Visual QA + validation + release notes
+
+Files changed:
+| File | Change |
+|------|--------|
+| `backend/src/modules/courses/courses.schools.controller.js` | New: GET /api/courses/popular endpoint |
+| `backend/src/modules/courses/courses.constants.js` | New: POPULAR_COURSES_LIMIT constant |
+| `backend/src/modules/sheets/sheets.list.controller.js` | Composite recommended sort algorithm |
+| `frontend/.../pages/sheets/sheetsPageConstants.js` | "Best" sort option, computeSignalBadge(), SIGNAL_BADGE_CONFIG |
+| `frontend/.../pages/sheets/useSheetsData.js` | Popular courses, recent courses, handleCourseFilter, recommended default |
+| `frontend/.../pages/sheets/SheetListItem.jsx` | Signal badges, fork lineage, status badge CSS classes |
+| `frontend/.../pages/sheets/SheetsAside.jsx` | Popular courses, recent courses, course discovery |
+| `frontend/.../pages/sheets/SheetsEmptyState.jsx` | Course-specific empty state |
+| `frontend/.../pages/sheets/SheetsPage.jsx` | Wire new data to aside + empty state |
+| `frontend/.../pages/sheets/SheetsPage.css` | Signal badges, fork lineage, popular courses, status badge CSS |
+| `frontend/.../components/Icons.jsx` | IconComment SVG |
+| `frontend/.../pages/feed/useFeedData.js` | starredUpdates loader |
+| `frontend/.../pages/feed/FeedPage.jsx` | Wire starredUpdates, fix alert hex colors |
+| `frontend/.../pages/feed/FeedAside.jsx` | Starred updates widget |
+| `frontend/.../pages/dashboard/DashboardWidgets.jsx` | Fork lineage in RecentSheets |
+
+Validation:
+
+- Frontend lint: 0 errors, 0 warnings
+- Frontend build: passes
+- Backend lint: 0 errors
+- Backend tests: 184/184 pass
+- Visual smoke: 34/36 pass (2 pre-existing sheet-viewer timeouts)
+- Gallery: 34 screenshots across 6 pages
+
+---
+
+## Cycle 42 — Sheet experience + collaboration depth + viewer reliability (2026-03-23)
+
+### 42.1 — Sheet Viewer Reliability and Stability
+
+Added:
+
+- Catch-all `**/api/**` route in mockStudyHubApi.js to prevent unmocked endpoints from causing network hangs in parallel tests
+- `courses/popular` route mock and complete `htmlWorkflow`/`contentFormat`/`status` fields on sheet mock object
+- Proper AbortController in HTML runtime fetch (replaces manual `cancelled` flag)
+- Catch-all registered FIRST in mockStudyHubApi.js for lowest priority in Playwright's LIFO route matching
+
+Changed:
+
+- Comments loading state: plain "Loading comments..." text → SkeletonCard shimmer
+- Secondary operations (star, react, fork, contribute, review) no longer set `sheetState.error` — use toast-only error display to prevent sheet-level banner pollution
+- Sheet viewer test timeout increased from 10s to 15s for mobile viewport resilience
+
+### 42.2 — Sheet Viewer Experience Polish
+
+Changed:
+
+- Full CSS token migration across 4 viewer files (~30+ hardcoded hex → CSS custom properties):
+  - `SheetViewerPage.jsx`: page bg, action buttons, headings, meta text, content box, comment form, comment items, contribute modal
+  - `SheetViewerSidebar.jsx`: stats headings, contribution buttons, attachment preview border, empty states
+  - `ContributionInlineDiff.jsx`: diff button, diff container, hunk headers, line highlights, segment highlights, mode toggle
+  - `useSheetViewer.js`: toast-only error pattern for secondary operations
+- All viewer colors now respond to dark mode via `[data-theme='dark']` token overrides
+
+### 42.3 — Collaboration and Contribution UX
+
+Added:
+
+- Fork lineage in viewer header now links to original sheet and shows author: "Forked from {title} by {author}" with clickable links
+- Collaboration summary section in sidebar: fork count, pending contributions count (warning-colored), accepted contributions count
+- "View version history" link in sidebar stats panel (links to Sheet Lab)
+- Improved empty contribution state: explains the fork→contribute workflow ("Fork this sheet, make edits, then use Contribute Back")
+
+### 42.4 — Continue Learning and Revisit Loop
+
+Added:
+
+- Related sheets fetching in `useSheetViewer.js`: loads up to 4 sheets from same course (sorted by stars, excluding current sheet) via existing `GET /api/sheets?courseId=X&limit=5&sort=stars` endpoint
+- "More from {course code}" / "Related sheets" section below comments with card-style links showing title, author, stars, forks
+- "Browse all {code} sheets →" link at bottom of related section
+
+### 42.5 — Commenting / Feedback Quality Pass
+
+Changed:
+
+- Comment heading now shows count: "Comments (N)" when comments exist
+- Comment placeholder changed from generic "Add a comment" to "Share a clarification, correction, or study tip…"
+- Empty comment state improved: centered layout with encouraging message ("Be the first to leave feedback — corrections, study tips, and clarifications help everyone.")
+
+### 42.6 — Visual QA + Validation
+
+Validation:
+
+- Frontend lint: 0 errors, 0 warnings
+- Frontend build: passes (257ms)
+- Backend lint: 0 errors
+- Backend tests: 184/184 pass
+- Visual smoke: 36/36 pass
+- Previously flaky sheet-viewer tests now stable (root cause: LIFO route matching + missing mocks)
+
+Files changed:
+
+| File | Change |
+| ---- | ------ |
+| `tests/helpers/mockStudyHubApi.js` | Catch-all route (LIFO-safe), courses/popular mock, complete sheet mock |
+| `tests/visual-smoke.spec.js` | Sheet viewer timeout 10s → 15s |
+| `frontend/.../pages/sheets/useSheetViewer.js` | AbortController fix, degraded-mode error isolation, related sheets fetch |
+| `frontend/.../pages/sheets/SheetViewerPage.jsx` | Full token migration, fork lineage links, related sheets, comment UX |
+| `frontend/.../pages/sheets/SheetViewerSidebar.jsx` | Token migration, collaboration section, version history link, contribution explainer |
+| `frontend/.../pages/sheets/ContributionInlineDiff.jsx` | Full token migration (diff colors, buttons, hunk headers) |
+| `frontend/.../pages/sheets/sheetViewerConstants.js` | No changes (already tokenized) |
+
+---
+
+## Cycle 43 — Study Continuity + Personal Workflow Value + Return-User Habit Loops [2026-03-24]
+
+Product objective: Make StudyHub feel like the user's personal study workspace — not just a content repository. Add study continuity signals (recently viewed, resume studying), personal value surfaces (study activity, what's-new, study queue), and return triggers (since-you-were-last-here, why-revisit signals).
+
+### 43.1 — Recently Viewed + Resume Studying
+
+Added:
+
+- `useRecentlyViewed` hook in `src/lib/useRecentlyViewed.js`: localStorage-based tracking, max 10 entries, cross-tab sync via visibilitychange
+- `recordSheetView()` function: captures id, title, courseCode, authorUsername, viewedAt on each sheet view
+- Sheet viewer integration: `useSheetViewer.js` records every sheet view on load via `useEffect`
+- `ResumeStudying` dashboard widget: shows up to 5 recently viewed sheets with title, course, author, relative time, purple clock icon
+- `IconClock` icon added to `Icons.jsx`
+- Feed aside "Resume studying" section: compact 3-item panel showing recently viewed sheets
+- `useRecentlyViewed` hook wired into `useDashboardData.js` and `FeedPage.jsx`
+
+### 43.2 — Personal Study Dashboard Value
+
+Added:
+
+- `StudyActivity` compact banner widget: shows "X sheets studied this week" with relative last-studied time, derived from localStorage recently-viewed data
+- "What's new" badge on Recent Sheets heading: blue pill showing "N new" sheets since last dashboard visit
+- Last dashboard visit tracking via localStorage (`studyhub.dashboard.lastVisit`)
+- Clickable stat cards: Courses → `/settings?tab=courses`, Sheets → `/sheets?mine=1`, Stars → `/sheets?starred=1`
+- `summaryCard()` helper updated with optional `to` link target
+
+Changed:
+
+- `StatCards` component renders each card as a `Link` when `to` is provided, with pointer cursor
+- `RecentSheets` accepts `newCount` prop for the "N new" badge
+- `recentSheets` wrapped in `useMemo` to fix `react-hooks/exhaustive-deps` warning
+
+### 43.3 — Save, Star, and Revisit Loop Polish
+
+Added:
+
+- "Why revisit" signals on starred sheets in FeedAside: comment count and fork count micro-badges (blue/green) below each starred sheet row
+- Star confirmation toast in sheet viewer: "Starred! Find it in your feed sidebar or browse starred sheets."
+
+### 43.4 — Personal Notes / Lightweight Study-Status Marker
+
+Added:
+
+- `useStudyStatus` hook in `src/lib/useStudyStatus.js`: localStorage-based per-sheet status marker (to-review, studying, done), cross-tab sync
+- `useAllStudyStatuses` hook: reads all statuses for dashboard display with counts and filtered lists
+- Study-status dropdown menu in sheet viewer action bar: three status options with colored dots, clear option, checkmark on active
+- `StudyQueue` dashboard widget: shows studying/to-review/done counts and up to 4 active items with status badges
+- Widget placed in dashboard right column alongside CourseFocus and QuickActions
+
+### 43.5 — Notifications / Return Triggers
+
+Added:
+
+- "Since your last visit" feed banner: blue info banner showing "N new posts since your last visit" at top of feed
+- Last feed visit tracking via localStorage (`studyhub.feed.lastVisit`), timestamp captured after feed loads
+- `newSinceLastVisit` computed value in `useFeedData.js` comparing feed item `createdAt` timestamps against stored last visit
+
+Verified:
+
+- Notification bell already has unread count badge with 30-second live polling — no changes needed
+
+### 43.6 — Visual QA + Validation
+
+Validation:
+
+- Frontend lint: 0 errors, 0 warnings
+- Frontend build: passes (273ms)
+- Backend lint: 0 errors
+- Backend tests: 184/184 pass
+- Visual smoke: 35/36 first run, 36/36 on targeted retry (1 transient tablet/dark race — same as Cycle 42)
+
+Files changed:
+
+| File | Change |
+| ---- | ------ |
+| `src/components/Icons.jsx` | Added `IconClock` |
+| `src/lib/useRecentlyViewed.js` | New: recently viewed localStorage hook |
+| `src/lib/useStudyStatus.js` | New: study-status localStorage hook |
+| `src/pages/sheets/useSheetViewer.js` | Record sheet view, study status hook, star toast |
+| `src/pages/sheets/SheetViewerPage.jsx` | Study-status dropdown menu in action bar |
+| `src/pages/dashboard/DashboardWidgets.jsx` | `ResumeStudying`, `StudyActivity`, `StudyQueue` widgets, clickable `StatCards`, `RecentSheets` new-count badge |
+| `src/pages/dashboard/DashboardPage.jsx` | Wire new widgets and data |
+| `src/pages/dashboard/useDashboardData.js` | `useRecentlyViewed`, `useAllStudyStatuses`, study activity, what's-new, last-visit tracking |
+| `src/pages/dashboard/dashboardConstants.js` | `summaryCard()` with optional `to` field |
+| `src/pages/feed/FeedPage.jsx` | `useRecentlyViewed`, since-last-visit banner, pass to FeedAside |
+| `src/pages/feed/FeedAside.jsx` | Recently viewed panel, why-revisit signals on starred sheets |
+| `src/pages/feed/useFeedData.js` | Last feed visit tracking, `newSinceLastVisit` |

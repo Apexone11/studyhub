@@ -75,11 +75,14 @@ Chunk information into groups of 5-9 items.
 - Cards: max-width 720px, centered in column
 - Right panels: Top Starred, Most Downloaded, Top Contributors
 
-### 4. Sheets Page (REDESIGNING)
+### 4. Sheets Page (DONE - Updated 2026-03-23)
+
 - **Desktop**: 3-column with filter bar spanning full width
 - **Tablet**: Filters collapse to dropdown, 2-column grid
 - **Mobile**: 1-column, filters in expandable drawer
 - Sheet cards: thumbnail, title, course badge, stats
+- **Status filter pills**: Drafts, Pending review, Published, Rejected (visible when "Mine" active)
+- **Status-aware empty states**: Custom messaging per status filter
 
 ### 5. Dashboard Page (REDESIGNING)
 - **Desktop**: Hero banner + 3 stat cards + 2-column content
@@ -159,3 +162,47 @@ Storage: localStorage key per page (e.g., `tutorial_feed_seen`).
 2. Recent sheets: "Quick access to latest sheets in your courses"
 3. Course focus: "Your enrolled courses and progress"
 4. Quick actions: "Common tasks in one click"
+
+---
+
+## Frontend Architecture Convention (Cycle 35+)
+
+### Feature Folder Structure
+
+New feature logic goes under `src/features/<name>/index.js` barrel exports.
+Pages remain in `src/pages/<name>/` and import from feature barrels.
+Migration is incremental — existing imports continue to work via re-exports.
+
+Current barrels: `sheets`, `feed`, `admin`, `users`, `dashboard`, `notes`, `auth`, `settings`.
+
+### Component Extraction Pattern
+
+Files that mix React components with non-component exports (constants, helpers) must be split:
+- Constants/helpers → `.js` file
+- React components → dedicated `.jsx` file
+- The `.js` file re-exports components from the `.jsx` file for backward compatibility
+
+This satisfies the `react-refresh/only-export-components` lint rule.
+
+### Page Decomposition Pattern (Cycle 36+)
+
+Large pages (>200 lines) should be decomposed into thin orchestrator shells:
+- Page file owns layout, routing state, and hook wiring only
+- Composable child components own their visual rendering and local state
+- Props flow down from the page's main data hook (e.g., `useUploadSheet`, `useFeedData`)
+- Extracted components: composers, sidebars/asides, empty states, nav action bars
+
+Decomposed pages: FeedPage, SheetsPage, UploadSheetPage.
+
+### Design Token Strategy (Cycle 36+)
+
+All inline style colors should use CSS custom properties from `index.css`:
+- Semantic tokens: `--sh-brand`, `--sh-danger`, `--sh-success`, `--sh-warning`, `--sh-info` (with `-bg`, `-border`, `-text` variants)
+- Slate scale: `--sh-slate-50` through `--sh-slate-900` for neutral grays
+- Surface/layout: `--sh-surface`, `--sh-soft`, `--sh-border`, `--sh-text`, `--sh-heading`, `--sh-subtext`, `--sh-muted`
+- Input: `--sh-input-bg`, `--sh-input-text`, `--sh-input-border`, `--sh-input-focus`
+
+Exceptions (intentionally hardcoded):
+- Dark-mode-always code editor panels (`#0f172a`, `#1e293b`)
+- Unique palette colors for per-metric stats cards and per-department branding
+- White text on colored buttons (`#fff`)

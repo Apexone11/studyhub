@@ -1,6 +1,6 @@
 const express = require('express')
 const { captureError } = require('../../monitoring/sentry')
-const { validateHtmlForRuntime, classifyHtmlRisk, RISK_TIER } = require('../../lib/htmlSecurity')
+const { validateHtmlForRuntime, classifyHtmlRisk, RISK_TIER, generateRiskSummary, generateTierExplanation, groupFindingsByCategory } = require('../../lib/htmlSecurity')
 const { sanitizePreviewHtml } = require('../../lib/htmlPreviewDocument')
 const prisma = require('../../lib/prisma')
 const { PAGE_SIZE, parsePage } = require('./admin.constants')
@@ -99,6 +99,9 @@ router.get('/sheets/:id/review-detail', async (req, res) => {
     const sanitizedHtml = rawHtml ? sanitizePreviewHtml(rawHtml) : null
     const liveClassification = rawHtml ? classifyHtmlRisk(rawHtml) : { tier: 0, findings: [], summary: 'N/A' }
 
+    const storedFindings = sheet.htmlScanFindings || []
+    const storedTier = sheet.htmlRiskTier || 0
+
     res.json({
       id: sheet.id,
       title: sheet.title,
@@ -108,11 +111,17 @@ router.get('/sheets/:id/review-detail', async (req, res) => {
       rawHtml,
       sanitizedHtml,
       validationIssues: liveClassification.findings.map((f) => f.message),
-      htmlRiskTier: sheet.htmlRiskTier || 0,
+      htmlRiskTier: storedTier,
       liveRiskTier: liveClassification.tier,
       liveRiskSummary: liveClassification.summary,
+      riskSummary: generateRiskSummary(storedTier, storedFindings),
+      tierExplanation: generateTierExplanation(storedTier),
+      findingsByCategory: groupFindingsByCategory(storedFindings),
+      liveRiskSummaryText: generateRiskSummary(liveClassification.tier, liveClassification.findings),
+      liveTierExplanation: generateTierExplanation(liveClassification.tier),
+      liveFindingsByCategory: groupFindingsByCategory(liveClassification.findings),
       htmlScanStatus: sheet.htmlScanStatus,
-      htmlScanFindings: sheet.htmlScanFindings || [],
+      htmlScanFindings: storedFindings,
       htmlScanAcknowledgedAt: sheet.htmlScanAcknowledgedAt,
       author: sheet.author,
       course: sheet.course,

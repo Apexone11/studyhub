@@ -1,16 +1,19 @@
 import { Link } from 'react-router-dom'
 import {
+  IconComment,
   IconFork,
   IconStar,
   IconStarFilled,
 } from '../../components/Icons'
-import { resolveSheetFormat, formatBadgeText, timeAgo } from './sheetsPageConstants'
+import { resolveSheetFormat, formatBadgeText, timeAgo, computeSignalBadge, SIGNAL_BADGE_CONFIG } from './sheetsPageConstants'
 
 export default function SheetListRow({ sheet, forking, onOpen, onStar, onFork }) {
   const format = resolveSheetFormat(sheet)
   const authorName = sheet.author?.username || 'Unknown author'
   const schoolLabel = sheet.course?.school?.short || sheet.course?.school?.name || 'StudyHub'
   const preview = (sheet.description || sheet.content || 'No summary available yet.').replace(/\s+/g, ' ').trim()
+  const signal = computeSignalBadge(sheet)
+  const signalConfig = signal ? SIGNAL_BADGE_CONFIG[signal] : null
 
   const handleRowKeyDown = (event) => {
     if (event.target !== event.currentTarget) return
@@ -34,7 +37,21 @@ export default function SheetListRow({ sheet, forking, onOpen, onStar, onFork })
           <Link to={`/sheets/${sheet.id}`} onClick={(event) => event.stopPropagation()}>
             {sheet.title}
           </Link>
+          {signalConfig ? (
+            <span className={`sheets-repo-row__signal ${signalConfig.className}`}>{signalConfig.label}</span>
+          ) : null}
         </h2>
+        {sheet.forkSource ? (
+          <p className="sheets-repo-row__fork-lineage">
+            Forked from{' '}
+            <Link to={`/sheets/${sheet.forkSource.id}`} onClick={(event) => event.stopPropagation()}>
+              {sheet.forkSource.title}
+            </Link>
+            {sheet.forkSource.author ? (
+              <> by {sheet.forkSource.author.username}</>
+            ) : null}
+          </p>
+        ) : null}
         <p className="sheets-repo-row__description">{preview}</p>
         <div className="sheets-repo-row__meta">
           <span>{sheet.course?.code || 'General'} · {schoolLabel}</span>
@@ -56,15 +73,15 @@ export default function SheetListRow({ sheet, forking, onOpen, onStar, onFork })
             {formatBadgeText(format)}
           </span>
           {sheet.status === 'draft' ? (
-            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--sh-muted)', background: 'var(--sh-soft)', border: '1px solid var(--sh-border)', borderRadius: 6, padding: '1px 6px' }}>Draft</span>
+            <span className="sh-pill sheets-repo-row__status-badge sheets-repo-row__status-badge--draft">Draft</span>
           ) : sheet.status === 'rejected' ? (
-            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--sh-danger)', background: 'var(--sh-danger-bg)', border: '1px solid var(--sh-danger)', borderRadius: 6, padding: '1px 6px' }}>Rejected</span>
+            <span className="sh-pill sheets-repo-row__status-badge sheets-repo-row__status-badge--danger">Rejected</span>
           ) : sheet.status === 'quarantined' ? (
-            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--sh-danger)', background: 'var(--sh-danger-bg)', border: '1px solid var(--sh-danger)', borderRadius: 6, padding: '1px 6px' }}>Quarantined</span>
+            <span className="sh-pill sheets-repo-row__status-badge sheets-repo-row__status-badge--danger">Quarantined</span>
           ) : (sheet.htmlRiskTier || 0) === 1 ? (
-            <span style={{ fontSize: 10, fontWeight: 700, color: '#ca8a04', background: '#fefce8', border: '1px solid #fde68a', borderRadius: 6, padding: '1px 6px' }}>Flagged</span>
+            <span className="sh-pill sheets-repo-row__status-badge sheets-repo-row__status-badge--warning">Flagged</span>
           ) : (sheet.htmlRiskTier || 0) >= 2 || sheet.status === 'pending_review' ? (
-            <span style={{ fontSize: 10, fontWeight: 700, color: '#b45309', background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 6, padding: '1px 6px' }}>Pending Review</span>
+            <span className="sh-pill sheets-repo-row__status-badge sheets-repo-row__status-badge--review">Pending Review</span>
           ) : null}
         </div>
       </div>
@@ -79,6 +96,12 @@ export default function SheetListRow({ sheet, forking, onOpen, onStar, onFork })
             <IconFork size={13} />
             {sheet.forks || 0}
           </span>
+          {(sheet.commentCount || 0) > 0 ? (
+            <span className="sheets-repo-row__stat">
+              <IconComment size={13} />
+              {sheet.commentCount}
+            </span>
+          ) : null}
         </div>
         <div className="sheets-repo-row__actions">
           <button

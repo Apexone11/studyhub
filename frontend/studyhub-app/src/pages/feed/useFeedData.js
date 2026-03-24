@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { API } from '../../config'
 import { getApiErrorMessage, isAuthSessionFailure, readJsonSafely } from '../../lib/http'
 import { useLivePolling } from '../../lib/useLivePolling'
@@ -7,9 +7,23 @@ import { trackEvent } from '../../lib/telemetry'
 import { canUserDeletePost } from './feedHelpers'
 import { authHeaders } from './feedConstants'
 
+const LAST_FEED_VISIT_KEY = 'studyhub.feed.lastVisit'
+
+function getLastFeedVisit() {
+  try {
+    const raw = localStorage.getItem(LAST_FEED_VISIT_KEY)
+    return raw ? new Date(raw).getTime() : 0
+  } catch { return 0 }
+}
+
+function markFeedVisit() {
+  try { localStorage.setItem(LAST_FEED_VISIT_KEY, new Date().toISOString()) } catch { /* ignore */ }
+}
+
 export function useFeedData({ user, clearSession, search }) {
   const [feedState, setFeedState] = useState({ items: [], total: 0, loading: true, error: '', partial: false, degradedSections: [] })
   const [leaderboards, setLeaderboards] = useState({ stars: [], downloads: [], contributors: [], error: '' })
+  const [starredUpdates, setStarredUpdates] = useState([])
   const [loadingMore, setLoadingMore] = useState(false)
   const [deletingPostIds, setDeletingPostIds] = useState({})
 
@@ -130,6 +144,27 @@ export function useFeedData({ user, clearSession, search }) {
     intervalMs: 60000,
   })
 
+  const loadStarredUpdates = useCallback(async ({ signal } = {}) => {
+    try {
+      const response = await fetch(`${API}/api/sheets?starred=1&sort=updatedAt&limit=5`, {
+        headers: authHeaders(),
+        credentials: 'include',
+        signal,
+      })
+      const data = await response.json().catch(() => ({}))
+      if (response.ok && Array.isArray(data.sheets)) {
+        setStarredUpdates(data.sheets)
+      }
+    } catch (error) {
+      if (error?.name === 'AbortError') return
+    }
+  }, [])
+
+  useLivePolling(loadStarredUpdates, {
+    enabled: Boolean(user),
+    intervalMs: 120000,
+  })
+
   const toggleReaction = async (item, type) => {
     const currentType = item.reactions?.userReaction || null
     const nextType = currentType === type ? null : type
@@ -144,7 +179,7 @@ export function useFeedData({ user, clearSession, search }) {
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
-        throw new Error(data.error || 'Could not update the reaction.')
+        throw new Error(getApiErrorMessage(data, 'Could not update the reaction.'))
       }
 
       setFeedState((current) => ({
@@ -169,7 +204,7 @@ export function useFeedData({ user, clearSession, search }) {
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
-        throw new Error(data.error || 'Could not update the star.')
+        throw new Error(getApiErrorMessage(data, 'Could not update the star.'))
       }
 
       setFeedState((current) => ({
@@ -210,7 +245,7 @@ export function useFeedData({ user, clearSession, search }) {
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
-        throw new Error(data.error || 'Could not delete this post.')
+        throw new Error(getApiErrorMessage(data, 'Could not delete this post.'))
       }
     } catch (error) {
       showToast(error.message || 'Could not delete this post.', 'error')
@@ -252,7 +287,7 @@ export function useFeedData({ user, clearSession, search }) {
 
     const data = await response.json().catch(() => ({}))
     if (!response.ok) {
-      throw new Error(data.error || 'Could not post to the feed.')
+      throw new Error(getApiErrorMessage(data, 'Could not post to the feed.'))
     }
 
     let finalPost = data
@@ -287,11 +322,23 @@ export function useFeedData({ user, clearSession, search }) {
     loadFeed()
   }
 
+  /* "Since your last visit" — count new items */
+  const [lastFeedVisit] = useState(getLastFeedVisit)
+  const newSinceLastVisit = useMemo(() => {
+    if (!lastFeedVisit || feedState.loading || feedState.items.length === 0) return 0
+    return feedState.items.filter((item) => new Date(item.createdAt).getTime() > lastFeedVisit).length
+  }, [feedState.items, feedState.loading, lastFeedVisit])
+
+  // Mark visit once feed loads
+  useEffect(() => { if (!feedState.loading && feedState.items.length > 0) markFeedVisit() }, [feedState.loading, feedState.items.length])
+
   return {
     feedState,
     leaderboards,
+    starredUpdates,
     loadingMore,
     deletingPostIds,
+    newSinceLastVisit,
     loadMoreFeed,
     toggleReaction,
     toggleStar,

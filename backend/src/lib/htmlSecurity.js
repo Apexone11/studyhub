@@ -17,11 +17,16 @@ const {
   detectHighRiskBehaviors,
   classifyHtmlRisk,
   validateHtmlForSubmission,
+  groupFindingsByCategory,
+  generateRiskSummary,
+  generateTierExplanation,
+  CATEGORY_LABELS,
 } = require('./htmlSecurityScanner')
 
 module.exports = {
   RISK_TIER,
   TIER_LABELS,
+  CATEGORY_LABELS,
   normalizeContentFormat,
   detectHtmlFeatures,
   detectHighRiskBehaviors,
@@ -29,4 +34,7 @@ module.exports = {
   validateHtmlForSubmission,
   validateHtmlForRuntime,
   scanInlineJsRisk,
+  groupFindingsByCategory,
+  generateRiskSummary,
+  generateTierExplanation,
 }

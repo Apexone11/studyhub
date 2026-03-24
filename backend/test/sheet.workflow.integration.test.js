@@ -202,6 +202,11 @@ const mocks = vi.hoisted(() => {
       },
       user: {
         count: vi.fn(async () => users.length),
+        findMany: vi.fn(async ({ where } = {}) => {
+          let rows = [...users]
+          if (where?.role) rows = rows.filter((user) => user.role === where.role)
+          return rows.map((user) => ({ id: user.id }))
+        }),
         findUnique: vi.fn(async ({ where, select } = {}) => {
           const id = Number(where?.id)
           const user = users.find((entry) => entry.id === id)
@@ -248,6 +253,7 @@ const mocks = vi.hoisted(() => {
     authTokens: {
       getAuthTokenFromRequest: vi.fn(() => null),
       verifyAuthToken: vi.fn(() => null),
+      getJwtSecret: vi.fn(() => 'test-jwt-secret-for-integration-tests'),
     },
     notify: {
       createNotification: vi.fn(async () => null),
@@ -518,5 +524,196 @@ describe('sheet workflow integration', () => {
 
     expect(rejectResponse.status).toBe(200)
     expect(rejectResponse.body.sheet.status).toBe('rejected')
+  })
+
+  it('accepts script HTML at import and publishes after acknowledgement (tier 1 flagged path)', async () => {
+    // Step 1: import HTML containing <script> — should succeed (structural-only validation)
+    const importResponse = await request(app)
+      .post('/sheets/drafts/import-html')
+      .set('x-test-user-id', '101')
+      .set('x-test-role', 'student')
+      .send({
+        title: 'Script Sheet',
+        courseId: 10,
+        description: 'Sheet with inline script',
+        html: '<main><h1>Study Guide</h1><script>console.log("interactive")</script></main>',
+        sourceName: 'interactive.html',
+      })
+
+    expect(importResponse.status).toBe(201)
+    const draftId = importResponse.body.draft.id
+
+    // Step 2: update working version with script content
+    await request(app)
+      .patch(`/sheets/drafts/${draftId}/working-html`)
+      .set('x-test-user-id', '101')
+      .set('x-test-role', 'student')
+      .send({
+        title: 'Script Sheet',
+        courseId: 10,
+        description: 'Sheet with inline script',
+        html: '<main><h1>Study Guide</h1><script>console.log("interactive")</script></main>',
+      })
+
+    // Step 3: submit for review — should get 409 requiring acknowledgement
+    const submitResponse1 = await request(app)
+      .post(`/sheets/${draftId}/submit-review`)
+      .set('x-test-user-id', '101')
+      .set('x-test-role', 'student')
+
+    expect(submitResponse1.status).toBe(409)
+    expect(submitResponse1.body.error).toMatch(/flagged HTML features/i)
+
+    // Step 4: acknowledge the scan warning
+    const ackResponse = await request(app)
+      .post(`/sheets/drafts/${draftId}/scan-status/acknowledge`)
+      .set('x-test-user-id', '101')
+      .set('x-test-role', 'student')
+
+    expect(ackResponse.status).toBe(200)
+
+    // Step 5: submit again — should publish (tier 1 + acknowledged = published)
+    const submitResponse2 = await request(app)
+      .post(`/sheets/${draftId}/submit-review`)
+      .set('x-test-user-id', '101')
+      .set('x-test-role', 'student')
+
+    expect(submitResponse2.status).toBe(200)
+    expect(submitResponse2.body.status).toBe('published')
+  })
+
+  it('routes high-risk HTML (eval) to pending_review and admin can approve (tier 2 path)', async () => {
+    // eval() triggers js-risk → Tier 2 (HIGH_RISK)
+    const riskyHtml = '<main><h1>Study</h1><script>eval("var x = 1")</script></main>'
+
+    const importResponse = await request(app)
+      .post('/sheets/drafts/import-html')
+      .set('x-test-user-id', '101')
+      .set('x-test-role', 'student')
+      .send({
+        title: 'Eval Sheet',
+        courseId: 10,
+        description: 'Sheet with eval',
+        html: riskyHtml,
+        sourceName: 'eval.html',
+      })
+
+    expect(importResponse.status).toBe(201)
+    const draftId = importResponse.body.draft.id
+
+    // Update working version to ensure it has the risky content
+    await request(app)
+      .patch(`/sheets/drafts/${draftId}/working-html`)
+      .set('x-test-user-id', '101')
+      .set('x-test-role', 'student')
+      .send({
+        title: 'Eval Sheet',
+        courseId: 10,
+        description: 'Sheet with eval',
+        html: riskyHtml,
+      })
+
+    // Submit — Tier 2 content should route to pending_review (not blocked)
+    const submitResponse = await request(app)
+      .post(`/sheets/${draftId}/submit-review`)
+      .set('x-test-user-id', '101')
+      .set('x-test-role', 'student')
+
+    expect(submitResponse.status).toBe(200)
+    expect(submitResponse.body.status).toBe('pending_review')
+
+    // Admin approves the high-risk sheet
+    const approveResponse = await request(app)
+      .patch(`/admin/sheets/${draftId}/review`)
+      .set('x-test-user-id', '1')
+      .set('x-test-role', 'admin')
+      .send({ action: 'approve' })
+
+    expect(approveResponse.status).toBe(200)
+    expect(approveResponse.body.sheet.status).toBe('published')
+  })
+
+  it('routes redirect-pattern HTML to pending_review (tier 2 behavioral detection)', async () => {
+    const redirectHtml = '<main><h1>Notes</h1><script>window.location.href = "https://evil.example";</script></main>'
+
+    const importResponse = await request(app)
+      .post('/sheets/drafts/import-html')
+      .set('x-test-user-id', '101')
+      .set('x-test-role', 'student')
+      .send({
+        title: 'Redirect Sheet',
+        courseId: 10,
+        description: 'Sheet with redirect',
+        html: redirectHtml,
+        sourceName: 'redirect.html',
+      })
+
+    const draftId = importResponse.body.draft.id
+
+    await request(app)
+      .patch(`/sheets/drafts/${draftId}/working-html`)
+      .set('x-test-user-id', '101')
+      .set('x-test-role', 'student')
+      .send({
+        title: 'Redirect Sheet',
+        courseId: 10,
+        description: 'Sheet with redirect',
+        html: redirectHtml,
+      })
+
+    const submitResponse = await request(app)
+      .post(`/sheets/${draftId}/submit-review`)
+      .set('x-test-user-id', '101')
+      .set('x-test-role', 'student')
+
+    expect(submitResponse.status).toBe(200)
+    expect(submitResponse.body.status).toBe('pending_review')
+  })
+
+  it('html-runtime blocks quarantined sheets and restricts pending_review to owner/admin', async () => {
+    // Create a sheet and manually set it to quarantined
+    const draftResponse = await request(app)
+      .post('/sheets/drafts/autosave')
+      .set('x-test-user-id', '101')
+      .set('x-test-role', 'student')
+      .send({
+        title: 'Quarantine Test',
+        courseId: 10,
+        content: '<main><h1>Quarantine</h1></main>',
+        contentFormat: 'html',
+      })
+
+    const sheetId = draftResponse.body.draft.id
+
+    // Manually update to quarantined state (simulates AV detection)
+    mocks.prisma.studySheet.update({ where: { id: sheetId }, data: { status: 'quarantined', htmlRiskTier: 3 } })
+
+    // Owner requests runtime — should be blocked (tier 3 = quarantined)
+    const runtimeResponse = await request(app)
+      .get(`/sheets/${sheetId}/html-runtime`)
+      .set('x-test-user-id', '101')
+      .set('x-test-role', 'student')
+
+    expect(runtimeResponse.status).toBe(403)
+    expect(runtimeResponse.body.error).toMatch(/quarantined/i)
+
+    // Set to pending_review with tier 2 for access control test
+    mocks.prisma.studySheet.update({ where: { id: sheetId }, data: { status: 'pending_review', htmlRiskTier: 2 } })
+
+    // Owner can access pending_review runtime
+    const ownerRuntimeResponse = await request(app)
+      .get(`/sheets/${sheetId}/html-runtime`)
+      .set('x-test-user-id', '101')
+      .set('x-test-role', 'student')
+
+    expect(ownerRuntimeResponse.status).toBe(200)
+
+    // Admin can also access pending_review runtime
+    const adminRuntimeResponse = await request(app)
+      .get(`/sheets/${sheetId}/html-runtime`)
+      .set('x-test-user-id', '1')
+      .set('x-test-role', 'admin')
+
+    expect(adminRuntimeResponse.status).toBe(200)
   })
 })

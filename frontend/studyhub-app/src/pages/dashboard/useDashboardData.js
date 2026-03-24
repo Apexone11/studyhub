@@ -9,7 +9,22 @@ import { useSession } from '../../lib/session-context'
 import { useLivePolling } from '../../lib/useLivePolling'
 import { countUp, fadeInUp, staggerEntrance } from '../../lib/animations'
 import { trackEvent } from '../../lib/telemetry'
+import { useRecentlyViewed } from '../../lib/useRecentlyViewed'
+import { useAllStudyStatuses } from '../../lib/useStudyStatus'
 import { authHeaders, summaryCard } from './dashboardConstants'
+
+const LAST_VISIT_KEY = 'studyhub.dashboard.lastVisit'
+
+function getLastDashboardVisit() {
+  try {
+    const raw = localStorage.getItem(LAST_VISIT_KEY)
+    return raw ? new Date(raw).getTime() : 0
+  } catch { return 0 }
+}
+
+function markDashboardVisit() {
+  try { localStorage.setItem(LAST_VISIT_KEY, new Date().toISOString()) } catch { /* ignore */ }
+}
 
 export function useDashboardData() {
   const navigate = useNavigate()
@@ -78,9 +93,9 @@ export function useDashboardData() {
   const cards = useMemo(() => {
     const stats = summary?.stats || {}
     return [
-      summaryCard('Courses', stats.courseCount || 0, 'Active enrollments', '#3b82f6'),
-      summaryCard('Sheets', stats.sheetCount || 0, 'Sheets you uploaded', '#10b981'),
-      summaryCard('Stars', stats.starCount || 0, 'Saved sheets', '#f59e0b'),
+      summaryCard('Courses', stats.courseCount || 0, 'Active enrollments', '#3b82f6', '/settings?tab=courses'),
+      summaryCard('Sheets', stats.sheetCount || 0, 'Sheets you uploaded', '#10b981', '/sheets?mine=1'),
+      summaryCard('Stars', stats.starCount || 0, 'Saved sheets', '#f59e0b', '/sheets?starred=1'),
     ]
   }, [summary])
 
@@ -106,7 +121,27 @@ export function useDashboardData() {
 
   const hero = summary?.hero || {}
   const courses = summary?.courses || []
-  const recentSheets = summary?.recentSheets || []
+  const recentSheets = useMemo(() => summary?.recentSheets || [], [summary])
+  const { recentlyViewed } = useRecentlyViewed()
+  const { counts: studyQueueCounts, toReview: studyToReview, studying: studyStudying } = useAllStudyStatuses()
+
+  /* Study activity derived from recently-viewed localStorage data */
+  const studyActivity = useMemo(() => {
+    if (!recentlyViewed || recentlyViewed.length === 0) return null
+    const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
+    const thisWeek = recentlyViewed.filter((e) => new Date(e.viewedAt).getTime() > weekAgo)
+    return { weeklyCount: thisWeek.length, lastStudied: recentlyViewed[0]?.viewedAt || null }
+  }, [recentlyViewed])
+
+  /* "What's new" — sheets added since user's last dashboard visit */
+  const [lastVisit] = useState(getLastDashboardVisit)
+  const newSheetCount = useMemo(() => {
+    if (!recentSheets.length || !lastVisit) return recentSheets.length
+    return recentSheets.filter((s) => new Date(s.createdAt).getTime() > lastVisit).length
+  }, [recentSheets, lastVisit])
+
+  // Mark dashboard visit once data loads
+  useEffect(() => { if (summary) markDashboardVisit() }, [summary])
 
   return {
     user,
@@ -128,5 +163,11 @@ export function useDashboardData() {
     hero,
     courses,
     recentSheets,
+    recentlyViewed,
+    studyActivity,
+    newSheetCount,
+    studyQueueCounts,
+    studyToReview,
+    studyStudying,
   }
 }
