@@ -35,6 +35,7 @@ const UserProfilePage = lazy(() => import('./pages/profile/UserProfilePage'))
 const TestsPage = lazy(() => import('./pages/tests/TestsPage'))
 const TestTakerPage = lazy(() => import('./pages/tests/TestTakerPage'))
 const NotesPage = lazy(() => import('./pages/notes/NotesPage'))
+const NoteViewerPage = lazy(() => import('./pages/notes/NoteViewerPage'))
 const AnnouncementsPage = lazy(() => import('./pages/announcements/AnnouncementsPage'))
 const SubmitPage = lazy(() => import('./pages/submit/SubmitPage'))
 const MyCoursesPage = lazy(() => import('./pages/courses/MyCoursesPage'))
@@ -194,6 +195,7 @@ function AppRoutes() {
             <Route path="/tests"         element={<PrivateRoute><TestsPage /></PrivateRoute>} />
             <Route path="/tests/:id"     element={<PrivateRoute><TestTakerPage /></PrivateRoute>} />
             <Route path="/notes"         element={<PrivateRoute><NotesPage /></PrivateRoute>} />
+            <Route path="/notes/:id"    element={<NoteViewerPage />} />
             <Route path="/announcements" element={<PrivateRoute><AnnouncementsPage /></PrivateRoute>} />
             <Route path="/submit"        element={<PrivateRoute><SubmitPage /></PrivateRoute>} />
             <Route path="/my-courses"   element={<PrivateRoute><MyCoursesPage /></PrivateRoute>} />

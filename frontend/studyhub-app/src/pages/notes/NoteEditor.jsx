@@ -10,6 +10,7 @@ export default function NoteEditor({
   editorTitle,
   editorContent,
   editorPrivate,
+  editorAllowDownloads,
   editorCourseId,
   courses,
   saving,
@@ -18,6 +19,7 @@ export default function NoteEditor({
   handleTitleChange,
   handleContentChange,
   handlePrivateChange,
+  handleAllowDownloadsChange,
   handleCourseChange,
   deleteNote,
   setActiveNote,
@@ -90,6 +92,18 @@ export default function NoteEditor({
           <input type="checkbox" checked={editorPrivate} onChange={(e) => handlePrivateChange(e.target.checked)} style={{ accentColor: '#3b82f6' }} />
           {editorPrivate ? 'Private' : 'Shared'}
         </label>
+        {!editorPrivate && (
+          <label style={{
+            display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer',
+            padding: '4px 10px', borderRadius: 8,
+            background: editorAllowDownloads ? '#dbeafe' : 'var(--sh-soft, #f1f5f9)',
+            color: editorAllowDownloads ? '#2563eb' : 'var(--sh-muted, #64748b)',
+            fontWeight: 600, transition: 'all .15s',
+          }}>
+            <input type="checkbox" checked={editorAllowDownloads || false} onChange={(e) => handleAllowDownloadsChange(e.target.checked)} style={{ accentColor: '#3b82f6' }} />
+            Downloads
+          </label>
+        )}
         <div style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 6 }}>
           {saving
             ? <span style={{ color: '#94a3b8' }}>Saving…</span>

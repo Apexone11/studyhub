@@ -5,8 +5,10 @@
  * Pages stay in pages/notes/ and import from this barrel.
  * ═══════════════════════════════════════════════════════════════════════════ */
 
-// Hook
+// Hooks
 export { useNotesData } from '../../pages/notes/useNotesData'
+export { useNoteViewer } from '../../pages/notes/useNoteViewer'
+export { useNoteComments } from '../../pages/notes/useNoteComments'
 
 // Constants & components
 export {

@@ -105,6 +105,18 @@ const SCHEMA_REPAIR_STATEMENTS = [
     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "Note_pkey" PRIMARY KEY ("id")
   )`,
+  `CREATE TABLE IF NOT EXISTS "NoteComment" (
+    "id" SERIAL NOT NULL,
+    "content" TEXT NOT NULL,
+    "noteId" INTEGER NOT NULL,
+    "userId" INTEGER NOT NULL,
+    "anchorText" TEXT,
+    "anchorOffset" INTEGER,
+    "resolved" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "NoteComment_pkey" PRIMARY KEY ("id")
+  )`,
+  'CREATE INDEX IF NOT EXISTS "NoteComment_noteId_createdAt_idx" ON "NoteComment"("noteId", "createdAt" DESC)',
   `CREATE TABLE IF NOT EXISTS "Notification" (
     "id" SERIAL NOT NULL,
     "userId" INTEGER NOT NULL,

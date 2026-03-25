@@ -86,6 +86,7 @@ export default function NotesPage() {
               editorTitle={data.editorTitle}
               editorContent={data.editorContent}
               editorPrivate={data.editorPrivate}
+              editorAllowDownloads={data.editorAllowDownloads}
               editorCourseId={data.editorCourseId}
               courses={data.courses}
               saving={data.saving}
@@ -94,6 +95,7 @@ export default function NotesPage() {
               handleTitleChange={data.handleTitleChange}
               handleContentChange={data.handleContentChange}
               handlePrivateChange={data.handlePrivateChange}
+              handleAllowDownloadsChange={data.handleAllowDownloadsChange}
               handleCourseChange={data.handleCourseChange}
               deleteNote={data.deleteNote}
               setActiveNote={data.setActiveNote}
