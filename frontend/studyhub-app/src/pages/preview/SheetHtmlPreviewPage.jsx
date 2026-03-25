@@ -28,6 +28,9 @@ export default function SheetHtmlPreviewPage() {
   const sheetId = Number.parseInt(id, 10)
   const [state, setState] = useState({ loading: true, error: '', preview: null })
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [interactive, setInteractive] = useState(false)
+  const [runtimeUrl, setRuntimeUrl] = useState('')
+  const [runtimeLoading, setRuntimeLoading] = useState(false)
 
   const loadPreview = useCallback(async () => {
     if (!Number.isInteger(sheetId)) {
@@ -73,8 +76,37 @@ export default function SheetHtmlPreviewPage() {
 
   useEffect(() => {
     setState({ loading: true, error: '', preview: null })
+    setInteractive(false)
+    setRuntimeUrl('')
     void loadPreview()
   }, [loadPreview])
+
+  const loadRuntime = useCallback(async () => {
+    if (!Number.isInteger(sheetId) || runtimeUrl) return
+    setRuntimeLoading(true)
+    try {
+      const response = await fetch(`${API}/api/sheets/${sheetId}/html-runtime`, {
+        headers: authHeaders(),
+        credentials: 'include',
+      })
+      const data = await readJsonSafely(response, {})
+      if (data?.runtimeUrl) setRuntimeUrl(data.runtimeUrl)
+      else throw new Error(getApiErrorMessage(data, 'Could not load interactive preview.'))
+    } catch {
+      setInteractive(false)
+    } finally {
+      setRuntimeLoading(false)
+    }
+  }, [sheetId, runtimeUrl])
+
+  const toggleInteractive = useCallback(() => {
+    if (interactive) {
+      setInteractive(false)
+    } else {
+      setInteractive(true)
+      if (!runtimeUrl) loadRuntime()
+    }
+  }, [interactive, runtimeUrl, loadRuntime])
 
   return (
     <div style={{ minHeight: '100vh', background: '#edf0f5', fontFamily: FONT }}>
@@ -129,13 +161,41 @@ export default function SheetHtmlPreviewPage() {
                 </div>
               </section>
 
+              {state.preview?.canInteract ? (
+                <section style={panelStyle()}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--sh-border)' }}>
+                      <button
+                        type="button"
+                        onClick={() => setInteractive(false)}
+                        style={toggleBtnStyle(!interactive)}
+                      >
+                        Safe Preview
+                      </button>
+                      <button
+                        type="button"
+                        onClick={toggleInteractive}
+                        style={toggleBtnStyle(interactive)}
+                      >
+                        Interactive Preview
+                      </button>
+                    </div>
+                    <span style={{ fontSize: 11, color: '#64748b', lineHeight: 1.4 }}>
+                      {interactive
+                        ? 'Scripts enabled in a locked sandbox — no access to your account or network.'
+                        : 'Scripts disabled for maximum security.'}
+                    </span>
+                  </div>
+                </section>
+              ) : null}
+
               {state.preview?.sanitized ? (
                 <section style={{ ...panelStyle(), borderColor: '#fde68a', background: '#fffbeb' }}>
                   <div style={{ fontSize: 13, color: '#92400e', fontWeight: 800 }}>
                     Safe preview mode
                   </div>
                   <div style={{ fontSize: 12, color: '#92400e', marginTop: 6, lineHeight: 1.6 }}>
-                    This preview has scripts and embeds disabled for safety. The full interactive version will be available after publishing. Review the scan findings below if you want a clean report.
+                    This preview has scripts and embeds disabled for safety. Review the scan findings below if you want a clean report.
                   </div>
                   {Array.isArray(state.preview.issues) && state.preview.issues.length ? (
                     <ul style={{ marginTop: 10, paddingLeft: 18, color: '#92400e', fontSize: 12, lineHeight: 1.6 }}>
@@ -172,20 +232,24 @@ export default function SheetHtmlPreviewPage() {
                   </div>
                 ) : null}
 
-                <iframe
-                  title={`html-sheet-preview-${sheetId}`}
-                  sandbox="allow-scripts"
-                  referrerPolicy="no-referrer"
-                  src={state.preview.previewUrl || ''}
-                  style={{
-                    width: '100%',
-                    height: isFullscreen ? '100%' : 'calc(100vh - 260px)',
-                    minHeight: isFullscreen ? 'unset' : 700,
-                    border: 'none',
-                    background: '#fff',
-                    borderRadius: isFullscreen ? 12 : 0,
-                  }}
-                />
+                {runtimeLoading && interactive ? (
+                  <div style={{ padding: 24, textAlign: 'center', fontSize: 13, color: '#64748b' }}>Loading interactive preview…</div>
+                ) : (
+                  <iframe
+                    title={`html-sheet-preview-${sheetId}`}
+                    sandbox={interactive && runtimeUrl ? 'allow-scripts allow-forms' : ''}
+                    referrerPolicy="no-referrer"
+                    src={interactive && runtimeUrl ? runtimeUrl : (state.preview.previewUrl || '')}
+                    style={{
+                      width: '100%',
+                      height: isFullscreen ? '100%' : 'calc(100vh - 260px)',
+                      minHeight: isFullscreen ? 'unset' : 700,
+                      border: 'none',
+                      background: '#fff',
+                      borderRadius: isFullscreen ? 12 : 0,
+                    }}
+                  />
+                )}
               </section>
             </>
           ) : null}
@@ -208,5 +272,18 @@ function buttonStyle() {
     fontWeight: 700,
     textDecoration: 'none',
     cursor: 'pointer',
+  }
+}
+
+function toggleBtnStyle(active) {
+  return {
+    padding: '6px 14px',
+    border: 'none',
+    background: active ? 'var(--sh-brand)' : 'var(--sh-soft)',
+    color: active ? '#fff' : 'var(--sh-subtext)',
+    fontSize: 12,
+    fontWeight: 700,
+    cursor: 'pointer',
+    fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
   }
 }

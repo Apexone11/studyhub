@@ -119,8 +119,48 @@ function signatureMatchesExpected(filePath, expectedMimes = []) {
   }
 }
 
+/**
+ * Basic SVG content safety check — rejects SVGs containing script execution
+ * vectors (inline scripts, event handlers, javascript: URIs, external data
+ * loading). SVG is XML-based so magic-byte detection doesn't apply; instead
+ * we scan the text content for dangerous patterns.
+ */
+const SVG_DANGEROUS_PATTERNS = [
+  /<script[\s>]/i,
+  /\bon\w+\s*=/i,                     // onclick=, onerror=, onload=, etc.
+  /javascript\s*:/i,                   // javascript: URIs
+  /data\s*:\s*text\/html/i,            // data:text/html embeds
+  /<foreignObject[\s>]/i,              // can embed arbitrary HTML
+  /<iframe[\s>]/i,
+  /<embed[\s>]/i,
+  /<object[\s>]/i,
+]
+
+function validateSvgContent(filePath) {
+  try {
+    const content = fs.readFileSync(path.resolve(String(filePath || '')), 'utf8')
+
+    // Must look like an SVG (starts with XML declaration or <svg)
+    const trimmed = content.trimStart()
+    if (!trimmed.startsWith('<?xml') && !trimmed.startsWith('<svg')) {
+      return { safe: false, reason: 'File does not appear to be a valid SVG.' }
+    }
+
+    for (const pattern of SVG_DANGEROUS_PATTERNS) {
+      if (pattern.test(content)) {
+        return { safe: false, reason: `SVG contains potentially dangerous content: ${pattern.source}` }
+      }
+    }
+
+    return { safe: true, reason: null }
+  } catch {
+    return { safe: false, reason: 'Could not read SVG file.' }
+  }
+}
+
 module.exports = {
   detectFileSignature,
   signatureMatchesExpected,
   validateMagicBytes,
+  validateSvgContent,
 }

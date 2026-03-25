@@ -4765,3 +4765,460 @@ npm --prefix frontend/studyhub-app run build ✅ clean (255ms)
 | `frontend/studyhub-app/src/pages/settings/CoursesTab.jsx` | Network error copy |
 | `frontend/studyhub-app/src/pages/settings/settingsState.js` | Network error copy |
 | `frontend/studyhub-app/src/pages/feed/CommentSection.jsx` | Network error copy |
+
+---
+
+## Cycle 48 — Security Hardening (2026-03-24)
+
+### 48.1 — Permissions / IDOR Audit
+
+**Approach:** Created dedicated IDOR test files that prove non-owners cannot mutate resources they don't own. Each test uses the `Module._load` mock pattern to intercept CJS dependencies, with a mutable `state` object to switch between user identities per test.
+
+**Authorization model verified:**
+- All mutation endpoints use `assertOwnerOrAdmin()` from `lib/accessControl.js` which checks `req.user.userId === resource.userId || req.user.role === 'admin'`
+- Settings endpoints always act on "self" via `req.user.userId` (no userId param)
+- Pins use `/api/users/me/pinned-sheets` pattern (always self)
+- Contributions enforce multi-party rules: fork owner proposes, target owner reviews
+- Admin routes use `requireAdmin` middleware with fresh DB role verification
+
+**Test results:** 25/25 pass
+
+| Test File | Tests | Coverage |
+|-----------|-------|----------|
+| `idor.sheets.test.js` | 7 | PATCH owner/non-owner/admin, DELETE owner/non-owner/admin/404 |
+| `idor.notes.test.js` | 5 | PATCH owner/non-owner/admin, DELETE owner/non-owner |
+| `idor.contributions.test.js` | 9 | POST create (fork owner/stranger), PATCH review (target owner/fork owner/stranger/admin), GET diff (target/proposer/stranger) |
+| `courses.routes.test.js` | 4 | Popular endpoint: happy path, empty, deleted courses, DB failure |
+
+**Key findings:**
+- No IDOR vulnerabilities found — all mutation endpoints have proper ownership checks
+- `assertOwnerOrAdmin` is consistently used across sheets, notes, feed posts, notifications, and comment deletion
+- Admin middleware performs a fresh DB lookup to prevent stale role tokens
+- Security events are logged on all `access.denied` decisions
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `backend/test/idor.sheets.test.js` | New: 7 IDOR tests for sheet PATCH/DELETE |
+| `backend/test/idor.notes.test.js` | New: 5 IDOR tests for note PATCH/DELETE |
+| `backend/test/idor.contributions.test.js` | New: 9 IDOR tests for contribution create/review/diff |
+
+---
+
+## Cycle 48.2 — Auth/Session Cookie Hardening
+
+**Date:** 2026-03-24
+**Scope:** Verify and harden auth cookie flags, add startup secret validation, regression tests.
+
+### Audit Findings
+
+| Check | Status | Detail |
+|-------|--------|--------|
+| `httpOnly: true` | Already in place | Prevents JS access to session cookie |
+| `secure: isProd` | Already in place | HTTPS-only in production |
+| `sameSite` | Correct as-is | `'none'` in prod (required for split-origin cross-domain auth), `'lax'` in dev |
+| `path: '/api'` | Already in place | Cookie scoped away from `/preview` surface |
+| `maxAge: 24h` | Already in place | 86400000ms / 86400s |
+| `trust proxy` | Already in place | `app.set('trust proxy', 1)` in prod — line 132 of index.js |
+| CSRF protection | Already in place | Double-layer: origin check + signed CSRF token for cookie-auth'd sessions |
+
+### Changes Made
+
+1. **Startup secret validation** (`backend/src/lib/authTokens.js`):
+   - Added `validateSecrets()` — crashes the process at startup if `JWT_SECRET` is missing or shorter than 32 characters.
+   - Prevents the server from accepting traffic with a weak or missing signing key.
+
+2. **Wired into startup** (`backend/src/index.js`):
+   - `validateSecrets()` called first in `startServer()`, before `bootstrapRuntime()`.
+
+3. **Regression test** (`backend/test/auth.cookies.test.js` — 7 tests):
+   - `setAuthCookie()` produces `HttpOnly; SameSite=Lax; Path=/api; Max-Age=86400` in dev
+   - Logout clears cookie with matching `HttpOnly` + `Path=/api`
+   - `getAuthCookieOptions()` returns correct shape for dev and production modes
+   - `validateSecrets()`: throws on missing secret, throws on short secret (<32), passes on valid secret
+
+### SameSite Design Decision
+
+`SameSite=Lax` was originally requested but would **break cookie-based auth** on StudyHub's split-origin deployment (frontend and backend on different domains). Cross-origin `fetch()` with `credentials: 'include'` requires `SameSite=None; Secure`. The current config is correct and intentional. CSRF protection is handled separately via origin validation + signed CSRF tokens.
+
+### Validation
+
+| Suite | Result |
+|-------|--------|
+| `auth.cookies.test.js` | 7/7 pass |
+| Full backend suite | 216/216 pass (26 files) |
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `backend/src/lib/authTokens.js` | Added `validateSecrets()` with min-length check, exported |
+| `backend/src/index.js` | Import `validateSecrets`, call at startup before bootstrap |
+| `backend/test/auth.cookies.test.js` | New: 7 regression tests for cookie flags + secret validation |
+
+---
+
+## Cycle 48.3 — Rate Limiting & Abuse Protection
+
+**Date:** 2026-03-24
+**Scope:** Audit all rate limiters, close coverage gaps on diff endpoints, regression test.
+
+### Audit Findings
+
+The codebase already has **29 distinct rate limiters** across all modules. Full inventory:
+
+| Category | Endpoint | Limiter | Limit |
+|----------|----------|---------|-------|
+| Auth | POST /login | loginLimiter | 10/15min |
+| Auth | POST /register | registerLimiter | 8/hour |
+| Auth | POST /forgot-password | forgotLimiter | 5/15min |
+| Auth | POST /google | googleLimiter | 20/15min |
+| Auth | POST /logout | logoutLimiter | 100/15min |
+| Auth | Verification endpoints | verificationLimiter | 25/15min |
+| Upload | POST /avatar | avatarUploadLimiter | 20/15min |
+| Upload | POST /attachment/* | attachmentUploadLimiter | 40/15min |
+| Upload | POST /cover | coverUploadLimiter | 10/15min |
+| Sheets | Create/update | sheetWriteLimiter | 120/15min |
+| Sheets | Star/reactions | reactLimiter | 30/min |
+| Sheets | Comments | commentLimiter | 10/5min |
+| Sheets | Downloads | attachmentDownloadLimiter | 120/15min |
+| Sheets | Leaderboard | leaderboardLimiter | 120/min |
+| Sheets | Contributions | contributionRateLimiter | 60/15min |
+| Sheets | Reviews | contributionReviewLimiter | 60/15min |
+| Search | All /api/search | searchLimiter | 120/min |
+| Feed | GET /feed | feedReadLimiter | 600/min |
+| Feed | POST /feed/posts | feedWriteLimiter | 120/15min |
+| Feed | Comments | commentLimiter | 10/5min |
+| Feed | Auth routes | authLimiter | 240/min |
+| Users | Follow | followLimiter | 30/min |
+| Notes | Mutations | mutateLimiter | 30/min |
+| Settings | Email change | twoFaLimiter | 10/15min |
+| Moderation | Appeals | appealLimiter | 5/15min |
+| WebAuthn | Passkey ops | webauthnLimiter | 20/15min |
+| Global | All routes | globalLimiter | 1000/15min |
+
+All limiters use `standardHeaders: true` (RateLimit-* headers) and `legacyHeaders: false`. Error messages follow `{ error: '...' }` format consistently.
+
+### Gap Found & Fixed
+
+Three diff endpoints lacked dedicated rate limiters (only covered by the global 1000/15min):
+
+| Endpoint | Before | After |
+|----------|--------|-------|
+| `GET /contributions/:id/diff` | No limiter | diffLimiter (60/min) |
+| `GET /:id/lab/uncommitted-diff` | No limiter | diffLimiter (60/min) |
+| `GET /:id/lab/diff/:commitIdA/:commitIdB` | No limiter | diffLimiter (60/min) |
+
+### Design Notes
+
+- **Search at 120/min**: Intentionally generous to support typeahead/autocomplete (2 req/sec). The global limiter provides a ceiling.
+- **In-memory store**: Correct for single-instance Railway deployment. Redis store can be layered in if scaling horizontally.
+- **IP-based keying**: All limiters key by IP (express-rate-limit default). Sufficient for single-instance.
+
+### Validation
+
+| Suite | Result |
+|-------|--------|
+| `ratelimit.test.js` | 3/3 pass |
+| Full backend suite | 219/219 pass (27 files) |
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `backend/src/modules/sheets/sheets.constants.js` | Added `diffLimiter` (60/min), exported |
+| `backend/src/modules/sheets/sheets.contributions.controller.js` | Applied `diffLimiter` to GET /contributions/:id/diff |
+| `backend/src/modules/sheetLab/sheetLab.operations.controller.js` | Applied `diffLimiter` to both Sheet Lab diff endpoints |
+| `backend/test/ratelimit.test.js` | New: 3 regression tests (429 on limit, RateLimit headers, diffLimiter exists) |
+
+---
+
+## Cycle 48.4 — CORS & Security Headers
+
+**Date:** 2026-03-24
+**Scope:** Audit CORS configuration and security headers, prove with regression tests.
+
+### Audit Findings
+
+All CORS and security header requirements from 48.4 were **already implemented**. No code changes needed — only regression tests added.
+
+**A) CORS (all in place):**
+
+| Requirement | Status | Location |
+|-------------|--------|----------|
+| Exact origin allowlist | Done | `index.js:62-81` — env-based + auto www/non-www variants |
+| `credentials: true` | Done | `index.js:171` |
+| No arbitrary origin reflection | Done | `index.js:163-169` — rejects unknown origins with error |
+| Origin validation on mutations | Done | `index.js:175-189` — separate check for POST/PATCH/DELETE |
+| Preflight (OPTIONS) works | Done | cors middleware handles automatically |
+
+**B) Security headers (all in place):**
+
+| Header | Value | Source |
+|--------|-------|--------|
+| `X-Content-Type-Options` | `nosniff` | helmet default (global) |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` | helmet + custom middleware |
+| `Permissions-Policy` | `camera=(), microphone=(), geolocation=(), payment=()` | `index.js:158` |
+| `X-Frame-Options` | `DENY` (API), removed (preview) | `index.js:148/155` |
+| `Content-Security-Policy` | `default-src 'none'; script-src 'none'; frame-ancestors 'none'` (API) | `index.js:99-111` |
+| Preview CSP | fonts/images/inline-styles allowed, scripts blocked, `frame-ancestors` scoped to trusted origins | `index.js:114-127` + per-route `buildPreviewCsp()` |
+| HSTS | Enabled in production | `helmet({ hsts: isProd })` |
+| `x-powered-by` | Disabled | `app.disable('x-powered-by')` |
+
+**C) Preview exceptions preserved:**
+- Preview routes get `Referrer-Policy: no-referrer` (stricter)
+- `X-Frame-Options` removed so trusted origins can embed
+- `frame-ancestors` scoped to trusted origins only
+- Route handlers further customize CSP via `buildPreviewCsp()` per content tier
+
+### Validation
+
+| Suite | Result |
+|-------|--------|
+| `security.headers.test.js` | 14/14 pass |
+| Full backend suite | 233/233 pass (28 files) |
+
+### Tests Added (14, across 5 categories)
+
+**1) CORS allowlist (3 tests)**
+
+| Test | What it proves |
+|------|---------------|
+| Allowed origin gets CORS headers | `Access-Control-Allow-Origin` + `Allow-Credentials: true` on GET |
+| Preflight OPTIONS returns correct CORS headers | 2xx + Allow-Origin + Allow-Credentials + Allow-Methods on OPTIONS |
+| No-origin requests work | Server-to-server calls (no Origin header) not blocked |
+
+**2) CORS deny (3 tests)**
+
+| Test | What it proves |
+|------|---------------|
+| Unknown origin never reflected | `Access-Control-Allow-Origin` absent (not echoed) |
+| Unknown origin preflight rejected | OPTIONS with evil origin gets no CORS headers |
+| POST from untrusted origin blocked | Returns 4xx, no Allow-Origin |
+
+**3) Security headers on API routes (3 tests)**
+
+| Test | What it proves |
+|------|---------------|
+| All required headers on /health | nosniff, referrer-policy, permissions-policy (cam/mic/geo/payment), X-Frame-Options DENY, no x-powered-by |
+| Strict CSP on API | `default-src 'none'`, `script-src 'none'`, `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'none'` |
+| HSTS in production | `Strict-Transport-Security` with `max-age` when NODE_ENV=production |
+
+**4) Preview exceptions preserved (1 test, many assertions)**
+
+| Test | What it proves |
+|------|---------------|
+| Preview vs API CSP differentiation | Preview: font-src/style-src allowed, scripts blocked, frame-ancestors scoped (not 'none', not *), X-Frame-Options removed, referrer-policy=no-referrer. API: frame-ancestors 'none', X-Frame-Options DENY, referrer-policy=strict-origin-when-cross-origin |
+
+**5) Static uploads route headers (3 tests)**
+
+| Test | What it proves |
+|------|---------------|
+| Avatar route | `X-Content-Type-Options: nosniff` + `Cache-Control: public, max-age=300` |
+| Cover route | `X-Content-Type-Options: nosniff` + `Cache-Control: public, max-age=300` |
+| School logos route | `X-Content-Type-Options: nosniff` + `Cache-Control: public, max-age=3600` |
+
+**6) Origin validation on mutations (1 test)**
+
+| Test | What it proves |
+|------|---------------|
+| Trusted origin POST succeeds | POST from allowed origin not blocked by origin check middleware |
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `backend/test/security.headers.test.js` | Expanded: 14 regression tests across CORS, headers, preview CSP, static uploads, HSTS |
+
+---
+
+## Cycle 48.5 — Upload Security Hardening
+
+**Date:** 2026-03-24
+**Scope:** Audit upload validation, close SVG XSS gap, add comprehensive regression tests.
+
+### Pre-Existing Upload Security (already in place)
+
+| Upload Type | Max Size | MIME Allowlist | Magic Bytes | Path Traversal | Rate Limit |
+|-------------|----------|----------------|-------------|----------------|------------|
+| Avatar | 5 MB | JPEG, PNG, WebP, GIF | Dual check | `safeName()` | 20/15m |
+| Cover | 8 MB | JPEG, PNG, WebP | Dual check | `safeName()` | 10/15m |
+| Sheet attachment | 10 MB | PDF, JPEG, PNG, GIF, WebP | Dual check | `safeName()` | 40/15m |
+| Post attachment | 10 MB | PDF, JPEG, PNG, GIF, WebP | Dual check | `safeName()` | 40/15m |
+| School logo | 2 MB | JPEG, PNG, WebP, SVG | Raster only | Timestamp-based | Admin-only |
+
+All non-admin uploads: no SVG, no HTML. Filenames generated server-side (`user-{id}-{safe}-{timestamp}{ext}`). Attachments served behind auth, not publicly. Public uploads served with `X-Content-Type-Options: nosniff`.
+
+### Gap Found & Fixed
+
+**SVG XSS in school logos**: SVGs were accepted but skipped all content validation. SVG is XML-based and can embed `<script>`, event handlers (`onload=`), `javascript:` URIs, `<foreignObject>`, and `data:text/html` payloads.
+
+**Fix**: Added `validateSvgContent()` to `fileSignatures.js` — scans SVG content for 7 dangerous patterns before accepting. Rejects SVGs that don't start with `<?xml` or `<svg`. Integrated into the school logo upload handler.
+
+**Also fixed**: School logo MIME/extension checks converted from `Array.includes()` to `Set.has()` for consistency with all other upload modules.
+
+### Changes Made
+
+1. **`backend/src/lib/fileSignatures.js`** — Added `validateSvgContent()` with pattern checks for: `<script>`, `on*=` event handlers, `javascript:` URIs, `data:text/html`, `<foreignObject>`, `<iframe>`, `<embed>`, `<object>`. Exported.
+
+2. **`backend/src/modules/admin/admin.schools.controller.js`** — SVG uploads now validated via `validateSvgContent()` (rejects with 400 + cleanup). MIME/ext checks converted to Set.
+
+3. **`backend/src/lib/storage.js`** — Exported `isManagedLeafFileName` and `isPathWithinRoot` for testability.
+
+4. **`backend/test/upload.security.test.js`** — 27 regression tests across 4 categories.
+
+### Regression Tests (27)
+
+**Magic byte validation (7 tests)**: Valid JPEG/PNG/PDF detection, reject renamed .jpg with text content, reject .jpg that's actually PDF, reject .png with JPEG bytes, reject file outside expected MIME list.
+
+**SVG content safety (9 tests)**: Accept clean SVG, accept SVG with XML declaration, reject `<script>`, reject `onload=`, reject `onerror=`, reject `javascript:` URI, reject `<foreignObject>`, reject `data:text/html`, reject non-SVG pretending to be SVG.
+
+**Path traversal protection (7 tests)**: `isManagedLeafFileName` rejects `../`, null bytes, path separators, empty strings; accepts simple filenames. `resolveManagedUploadPath` rejects traversal attempts and directory-only paths.
+
+**MIME allowlist assertions (4 tests)**: Avatar/cover/attachment lists exclude SVG and HTML. School logo list includes SVG (admin-only, content-scanned).
+
+### Version Bump
+
+Both `backend/package.json` and `frontend/studyhub-app/package.json` bumped from `1.5.0` → `1.7.0`.
+
+### Validation
+
+| Suite | Result |
+|-------|--------|
+| `upload.security.test.js` | 27/27 pass |
+| Full backend suite | 260/260 pass (29 files) |
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `backend/src/lib/fileSignatures.js` | Added `validateSvgContent()` — SVG XSS content scanner |
+| `backend/src/modules/admin/admin.schools.controller.js` | SVG content validation + Array→Set consistency |
+| `backend/src/lib/storage.js` | Exported `isManagedLeafFileName`, `isPathWithinRoot` for testing |
+| `backend/test/upload.security.test.js` | New: 27 tests (magic bytes, SVG safety, path traversal, MIME lists) |
+| `backend/package.json` | Version bump 1.5.0 → 1.7.0 |
+| `frontend/studyhub-app/package.json` | Version bump 1.5.0 → 1.7.0 |
+
+---
+
+## Cycle 48.6 — HTML Safety / Preview Hardening (2026-03-24)
+
+### Audit Summary
+
+Deep audit of the HTML security pipeline revealed 8 defense layers already in place:
+1. `sanitizePreviewHtml()` — allowlist-based sanitize-html for preview output
+2. `buildPreviewDocument()` — wraps sanitized body in CSP-locked HTML5 document
+3. `buildInteractiveDocument()` — strips `<base>` and `<meta refresh>`, relies on CSP
+4. `detectHtmlFeatures()` — pattern detection for risk-relevant HTML features
+5. `classifyHtmlRisk()` — multi-tier risk classification (CLEAN/FLAGGED/HIGH_RISK/QUARANTINED)
+6. `validateHtmlForRuntime()` — blocks external resource loading (remote src, base, meta refresh)
+7. CSP enforcement: `script-src 'none'` for preview, `script-src 'unsafe-inline'` for interactive
+8. iframe sandbox: `allow-scripts` only (no same-origin, no popups, no forms)
+
+### Security Fix
+
+**Form action `javascript:` bypass** — The `sanitize-html` config applied URL scheme filtering to `href`, `src`, and `srcset` but NOT to `action`. This allowed `<form action="javascript:alert(1)">` to pass through the sanitizer unchanged. Fixed by adding `action` to `allowedSchemesAppliedToAttributes`.
+
+### Changes
+
+| Category | Detail |
+|----------|--------|
+| Fixed | `sanitizePreviewHtml()` now applies scheme filtering to form `action` attribute |
+| Added | XSS corpus regression test suite: 43 tests across 7 groups |
+
+### Test Coverage (43 tests)
+
+1. **sanitizePreviewHtml — XSS stripping** (17 tests): `<script>`, `<img onerror>`, `<svg onload>`, `<a href=javascript:>`, `<body onload>`, `<iframe>`, `<object>/<embed>`, `<math href=javascript:>`, `<details ontoggle>`, cookie exfiltration via onerror, `<input onfocus autofocus>`, `<marquee onstart>`, `<form action=javascript:>`, `data:text/html` in src, `<foreignObject>` nesting, mixed-case handlers, whitespace-encoded `javascript:`
+2. **Safe formatting preservation** (5 tests): basic HTML (p, strong, em, ul, li, a), tables, images with safe src, inline styles, semantic HTML (section, article, details)
+3. **buildPreviewDocument safety** (2 tests): valid HTML5 doc with sanitized body, title injection prevention
+4. **buildInteractiveDocument stripping** (3 tests): `<base>` stripping, `<meta refresh>` stripping, inline script preservation (CSP handles blocking)
+5. **classifyHtmlRisk tier assignment** (5 tests): clean→CLEAN, script→FLAGGED+, event handler→FLAGGED+, credential capture→QUARANTINED, eval+obfuscation→HIGH_RISK+
+6. **detectHtmlFeatures detection** (5 tests): script tags, iframes, inline handlers, javascript: URLs, clean HTML returns empty
+7. **validateHtmlForRuntime blocking** (6 tests): remote script src, base tag, meta refresh, remote image src → rejected; inline script, data: URL → allowed
+
+### Validation
+
+| Suite | Result |
+|-------|--------|
+| `html.security.test.js` | 43/43 pass |
+| Full backend suite | 303/303 pass (30 files) |
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `backend/src/lib/htmlPreviewDocument.js` | Added `action` to `allowedSchemesAppliedToAttributes` — closes form javascript: bypass |
+| `backend/test/html.security.test.js` | New: 43 XSS corpus regression tests across 7 groups |
+
+---
+
+## Cycle 48.7 — Interactive Sandbox Preview (2026-03-24)
+
+### Problem
+
+HTML sheets with JavaScript (tabs, accordions, collapsibles) need scripts to run for interactivity, but enabling scripts in the normal app context would let malicious sheets steal cookies/data. The existing system served interactive mode (`html-runtime`) to ALL authenticated users for Tier 0 sheets — no owner/admin gate.
+
+### Solution: Secure Isolation Model
+
+Interactive preview runs inside an iframe sandbox that enforces hard isolation:
+
+**Iframe sandbox attributes:** `allow-scripts allow-forms` (NO `allow-same-origin`, NO `allow-top-navigation`, NO `allow-popups`)
+- Opaque origin: scripts cannot read domain cookies, localStorage, or sessionStorage
+- No top-navigation: prevents redirect attacks
+- No popups: prevents window.open abuse
+
+**CSP inside sandbox document:**
+- `connect-src 'none'` — blocks all fetch/XHR (prevents data exfiltration)
+- `form-action 'none'` — blocks form submissions to external URLs
+- `script-src 'unsafe-inline'` — allows only inline scripts (no remote script loading)
+- `object-src 'none'`, `worker-src 'none'`, `frame-src 'none'`
+
+**Access control:** Interactive mode restricted to sheet owner + admins only. All other viewers see safe preview (scripts disabled).
+
+### Changes
+
+| Category | Detail |
+|----------|--------|
+| Security | `html-runtime` endpoint gated to owner/admin for ALL tiers (was only gated for Tier 2+) |
+| Added | `canInteract` flag in `html-preview` response — frontend knows whether to show toggle |
+| Changed | SheetViewerPage defaults to safe preview (`html-preview`), lazy-loads `html-runtime` on toggle |
+| Changed | SheetHtmlPreviewPage: added safe↔interactive toggle for owner/admin |
+| Changed | iframe `sandbox` attribute: `allow-scripts allow-forms` for interactive, empty for safe |
+| Added | 21 regression tests for sandbox security properties |
+
+### UX Flow
+
+1. **All users** see safe preview by default (scripts blocked, CSP `script-src 'none'`)
+2. **Owner/admin** sees a Safe/Interactive toggle above the iframe
+3. Toggling to Interactive lazy-fetches `html-runtime` token and switches iframe src
+4. Info text: "Scripts enabled in a locked sandbox — no access to your account or network."
+5. Non-owners never see the toggle, always get safe preview
+
+### Test Coverage (21 tests)
+
+1. **buildInteractiveDocument safety** (4): script preservation, base stripping, meta-refresh stripping, title injection
+2. **buildPreviewDocument guarantees** (3): script stripping, event handler stripping, javascript: URL stripping
+3. **Preview CSP directives** (6): connect-src none, form-action none, script-src none (safe), unsafe-inline (runtime), object-src none, worker-src none
+4. **Owner/admin gate** (2): canModerateOrOwnSheet check before tier checks, 403 message verification
+5. **canInteract flag** (1): html-preview response includes canInteract with canModerateOrOwnSheet
+6. **Sandbox iframe attributes** (5): allow-scripts allow-forms for interactive, empty for safe, no allow-same-origin, no allow-top-navigation, no allow-popups
+
+### Validation
+
+| Suite | Result |
+|-------|--------|
+| `interactive-preview.test.js` | 21/21 pass |
+| Full backend suite | 324/324 pass (31 files) |
+| Frontend lint | Clean |
+| Frontend build | Clean (344ms) |
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `backend/src/modules/sheets/sheets.html.controller.js` | Owner/admin gate on `html-runtime` for all tiers; `canInteract` flag in `html-preview` response |
+| `frontend/studyhub-app/src/pages/preview/SheetHtmlPreviewPage.jsx` | Safe↔interactive toggle, lazy runtime loading, fixed sandbox attrs |
+| `frontend/studyhub-app/src/pages/sheets/useSheetViewer.js` | Safe-first preview loading, lazy interactive toggle, new state/exports |
+| `frontend/studyhub-app/src/pages/sheets/SheetViewerPage.jsx` | Toggle UI for owner/admin, correct sandbox attrs, safe-first default |
+| `backend/test/interactive-preview.test.js` | New: 21 sandbox security regression tests |

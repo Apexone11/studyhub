@@ -64,6 +64,14 @@ const leaderboardLimiter = rateLimit({
   legacyHeaders: false,
 })
 
+const diffLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  message: { error: 'Too many diff requests. Please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
 module.exports = {
   SHEET_STATUS,
   reactLimiter,
@@ -73,4 +81,5 @@ module.exports = {
   contributionReviewLimiter,
   attachmentDownloadLimiter,
   leaderboardLimiter,
+  diffLimiter,
 }

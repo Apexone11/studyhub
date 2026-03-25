@@ -41,9 +41,13 @@ export default function SheetViewerPage() {
     contributeMessage,
     setContributeMessage,
     reviewingId,
+    safePreviewUrl,
     runtimeUrl,
+    previewLoading,
     runtimeLoading,
     htmlWarningAcked,
+    viewerInteractive,
+    toggleViewerInteractive,
     relatedSheets,
     sheetPanelRef,
     canEdit,
@@ -328,14 +332,14 @@ export default function SheetViewerPage() {
                             fontFamily: FONT,
                           }}
                         >
-                          {previewMode !== 'interactive' ? 'Load safe preview' : 'Load interactive sheet'}
+                          {previewMode !== 'interactive' ? 'Load safe preview' : 'Load preview'}
                         </button>
                       </div>
-                    ) : runtimeLoading ? (
+                    ) : previewLoading || (viewerInteractive && runtimeLoading) ? (
                       <div style={{ borderRadius: 16, border: '1px solid var(--sh-border)', padding: 24, textAlign: 'center' }}>
-                        <div style={{ fontSize: 13, color: 'var(--sh-subtext)' }}>Loading {previewMode !== 'interactive' ? 'safe preview' : 'interactive sheet'}…</div>
+                        <div style={{ fontSize: 13, color: 'var(--sh-subtext)' }}>Loading {viewerInteractive ? 'interactive preview' : 'safe preview'}…</div>
                       </div>
-                    ) : runtimeUrl ? (
+                    ) : safePreviewUrl ? (
                       <div
                         style={{
                           borderRadius: 16,
@@ -344,17 +348,50 @@ export default function SheetViewerPage() {
                           background: 'var(--sh-surface)',
                         }}
                       >
+                        {canEdit && previewMode === 'interactive' ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderBottom: '1px solid var(--sh-border)', flexWrap: 'wrap' }}>
+                            <div style={{ display: 'flex', borderRadius: 7, overflow: 'hidden', border: '1px solid var(--sh-border)' }}>
+                              <button
+                                type="button"
+                                onClick={() => viewerInteractive && toggleViewerInteractive()}
+                                style={{
+                                  padding: '4px 12px', border: 'none', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: FONT,
+                                  background: !viewerInteractive ? 'var(--sh-brand)' : 'var(--sh-soft)',
+                                  color: !viewerInteractive ? '#fff' : 'var(--sh-subtext)',
+                                }}
+                              >
+                                Safe
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => !viewerInteractive && toggleViewerInteractive()}
+                                style={{
+                                  padding: '4px 12px', border: 'none', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: FONT,
+                                  background: viewerInteractive ? 'var(--sh-brand)' : 'var(--sh-soft)',
+                                  color: viewerInteractive ? '#fff' : 'var(--sh-subtext)',
+                                }}
+                              >
+                                Interactive
+                              </button>
+                            </div>
+                            <span style={{ fontSize: 10, color: 'var(--sh-muted)', lineHeight: 1.3 }}>
+                              {viewerInteractive
+                                ? 'Scripts enabled in a locked sandbox — no access to your account or network.'
+                                : 'Scripts disabled for maximum security.'}
+                            </span>
+                          </div>
+                        ) : null}
                         <iframe
                           title={`sheet-html-${sheet.id}`}
-                          sandbox={previewMode !== 'interactive' ? '' : 'allow-scripts'}
+                          sandbox={viewerInteractive && runtimeUrl ? 'allow-scripts allow-forms' : ''}
                           referrerPolicy="no-referrer"
-                          src={runtimeUrl}
+                          src={viewerInteractive && runtimeUrl ? runtimeUrl : safePreviewUrl}
                           style={{ width: '100%', minHeight: 560, border: 'none' }}
                         />
                       </div>
                     ) : (
                       <div style={{ borderRadius: 16, border: '1px solid var(--sh-danger-border)', background: 'var(--sh-danger-bg)', padding: 18 }}>
-                        <div style={{ fontSize: 13, color: 'var(--sh-danger)' }}>Could not load the interactive sheet runtime.</div>
+                        <div style={{ fontSize: 13, color: 'var(--sh-danger)' }}>Could not load the sheet preview.</div>
                       </div>
                     )
                   ) : (

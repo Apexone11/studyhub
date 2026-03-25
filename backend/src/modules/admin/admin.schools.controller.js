@@ -5,10 +5,10 @@ const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
 const { SCHOOL_LOGOS_DIR } = require('../../lib/storage')
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
-const { validateMagicBytes } = require('../../lib/fileSignatures')
+const { validateMagicBytes, validateSvgContent } = require('../../lib/fileSignatures')
 
-const ALLOWED_MIME = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml']
-const ALLOWED_EXT = ['.jpg', '.jpeg', '.png', '.webp', '.svg']
+const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'])
+const ALLOWED_EXT = new Set(['.jpg', '.jpeg', '.png', '.webp', '.svg'])
 const MAX_SIZE = 2 * 1024 * 1024 // 2 MB
 
 const logoUpload = multer({
@@ -23,7 +23,7 @@ const logoUpload = multer({
   limits: { fileSize: MAX_SIZE },
   fileFilter: (_req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase()
-    if (!ALLOWED_MIME.includes(file.mimetype) || !ALLOWED_EXT.includes(ext)) {
+    if (!ALLOWED_MIME.has(file.mimetype) || !ALLOWED_EXT.has(ext)) {
       return cb(new Error('Only JPG, PNG, WebP, and SVG images are allowed.'))
     }
     cb(null, true)
@@ -74,12 +74,19 @@ router.post('/schools/:id/logo', logoUpload.single('logo'), async (req, res) => 
       return sendError(res, 400, 'No logo file provided.', ERROR_CODES.UPLOAD_INVALID)
     }
 
-    // Validate magic bytes (skip for SVG which is text-based)
-    if (req.file.mimetype !== 'image/svg+xml') {
+    // Validate file content — magic bytes for raster images, content scan for SVG
+    if (req.file.mimetype === 'image/svg+xml') {
+      const svgCheck = validateSvgContent(req.file.path)
+      if (!svgCheck.safe) {
+        const fs = require('node:fs')
+        try { fs.unlinkSync(req.file.path) } catch { /* ignore */ }
+        return sendError(res, 400, 'SVG file contains unsafe content and was rejected.', ERROR_CODES.UPLOAD_INVALID)
+      }
+    } else {
       const magicCheck = validateMagicBytes(req.file.path, req.file.mimetype)
       if (!magicCheck.valid) {
         const fs = require('node:fs')
-        fs.unlinkSync(req.file.path)
+        try { fs.unlinkSync(req.file.path) } catch { /* ignore */ }
         return sendError(res, 400, 'File content does not match its declared type.', ERROR_CODES.UPLOAD_INVALID)
       }
     }

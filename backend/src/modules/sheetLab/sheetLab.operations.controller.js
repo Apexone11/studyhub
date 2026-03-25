@@ -5,6 +5,7 @@ const { captureError } = require('../../monitoring/sentry')
 const { computeLineDiff, addWordSegments, generateChangeSummary } = require('../../lib/diff')
 const prisma = require('../../lib/prisma')
 const { optionalAuth, canReadSheet, parsePositiveInt, computeChecksum } = require('./sheetLab.constants')
+const { diffLimiter } = require('../sheets/sheets.constants')
 
 const router = express.Router()
 
@@ -95,7 +96,7 @@ router.post('/:id/lab/sync-upstream', requireAuth, async (req, res) => {
 
 // ── GET /api/sheets/:id/lab/uncommitted-diff — diff between last commit and current content ──
 
-router.get('/:id/lab/uncommitted-diff', requireAuth, async (req, res) => {
+router.get('/:id/lab/uncommitted-diff', requireAuth, diffLimiter, async (req, res) => {
   const sheetId = parsePositiveInt(req.params.id, 0)
   if (!sheetId) return res.status(400).json({ error: 'Invalid sheet ID.' })
 
@@ -232,7 +233,7 @@ router.post('/:id/lab/restore/:commitId', requireAuth, async (req, res) => {
 
 // ── GET /api/sheets/:id/lab/diff/:commitIdA/:commitIdB — diff between two commits ──
 
-router.get('/:id/lab/diff/:commitIdA/:commitIdB', optionalAuth, async (req, res) => {
+router.get('/:id/lab/diff/:commitIdA/:commitIdB', optionalAuth, diffLimiter, async (req, res) => {
   const sheetId = parsePositiveInt(req.params.id, 0)
   const commitIdA = parsePositiveInt(req.params.commitIdA, 0)
   const commitIdB = parsePositiveInt(req.params.commitIdB, 0)
