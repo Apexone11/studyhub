@@ -7,6 +7,7 @@ const {
   formatAnnouncement,
   formatSheet,
   formatPost,
+  formatNote,
 } = require('./feed.service')
 
 const router = express.Router()
@@ -41,6 +42,15 @@ router.get('/', async (req, res) => {
         ],
       }
     : undefined
+  const noteWhere = search
+    ? {
+        private: false,
+        OR: [
+          { title: { contains: search, mode: 'insensitive' } },
+          { content: { contains: search, mode: 'insensitive' } },
+        ],
+      }
+    : { private: false }
 
   try {
     const primarySections = await Promise.all([
@@ -75,11 +85,21 @@ router.get('/', async (req, res) => {
         orderBy: { createdAt: 'desc' },
         take,
       })),
+      settleSection('notes', () => prisma.note.findMany({
+        where: noteWhere,
+        include: {
+          author: { select: { id: true, username: true, avatarUrl: true } },
+          course: { select: { id: true, code: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take,
+      })),
     ])
 
     const announcements = primarySections.find((section) => section.label === 'announcements' && section.ok)?.data || []
     const sheets = primarySections.find((section) => section.label === 'sheets' && section.ok)?.data || []
     const posts = primarySections.find((section) => section.label === 'posts' && section.ok)?.data || []
+    const notes = primarySections.find((section) => section.label === 'notes' && section.ok)?.data || []
 
     const degradedSections = primarySections
       .filter((section) => !section.ok)
@@ -95,7 +115,7 @@ router.get('/', async (req, res) => {
         })
       })
 
-    if (!announcements.length && !sheets.length && !posts.length) {
+    if (!announcements.length && !sheets.length && !posts.length && !notes.length) {
       console.error('[feed] all primary sections failed', {
         userId: req.user.userId,
         search,
@@ -110,6 +130,7 @@ router.get('/', async (req, res) => {
 
     const sheetIds = sheets.map((sheet) => sheet.id)
     const postIds = posts.map((post) => post.id)
+    const noteIds = notes.map((note) => note.id)
 
     const secondarySections = await Promise.all([
       settleSection('starredRows', () => (
@@ -172,6 +193,15 @@ router.get('/', async (req, res) => {
             })
           : []
       )),
+      settleSection('noteCommentRows', () => (
+        noteIds.length > 0
+          ? prisma.noteComment.groupBy({
+              by: ['noteId'],
+              where: { noteId: { in: noteIds } },
+              _count: { _all: true },
+            })
+          : []
+      )),
     ])
 
     secondarySections
@@ -192,15 +222,18 @@ router.get('/', async (req, res) => {
     const postReactionRows = secondarySections.find((section) => section.label === 'postReactionRows' && section.ok)?.data || []
     const currentSheetReactions = secondarySections.find((section) => section.label === 'currentSheetReactions' && section.ok)?.data || []
     const currentPostReactions = secondarySections.find((section) => section.label === 'currentPostReactions' && section.ok)?.data || []
+    const noteCommentRows = secondarySections.find((section) => section.label === 'noteCommentRows' && section.ok)?.data || []
 
     const starredIds = new Set(starredRows.map((row) => row.sheetId))
     const sheetCommentCounts = new Map(sheetCommentRows.map((row) => [row.sheetId, row._count._all]))
     const postCommentCounts = new Map(postCommentRows.map((row) => [row.postId, row._count._all]))
+    const noteCommentCounts = new Map(noteCommentRows.map((row) => [row.noteId, row._count._all]))
 
     const items = [
       ...announcements.map(formatAnnouncement),
       ...posts.map((post) => formatPost(post, postCommentCounts, postReactionRows, currentPostReactions)),
       ...sheets.map((sheet) => formatSheet(sheet, starredIds, sheetCommentCounts, sheetReactionRows, currentSheetReactions)),
+      ...notes.map((note) => formatNote(note, noteCommentCounts)),
     ]
       .sort((left, right) => {
         if (left.type === 'announcement' && right.type === 'announcement') {
@@ -232,6 +265,7 @@ router.get('/', async (req, res) => {
         announcements: announcements.length,
         posts: posts.length,
         sheets: sheets.length,
+        notes: notes.length,
         returned: payload.items.length,
       },
       timings: [...primarySections, ...secondarySections].map((section) => ({

@@ -577,3 +577,36 @@ Added inline comment system for notes. Comments optionally anchor to text select
 | Backend tests | 418/418 pass (36 files) |
 | Frontend lint | Clean |
 | Frontend build | Clean |
+
+---
+
+## Cycle 51.5 Phase C — Notes in Feed (2026-03-25)
+
+### Summary
+
+Shared notes now appear in the feed alongside posts, sheets, and announcements. A "notes" filter tab lets users browse only notes. Note cards link to `/notes/:id`.
+
+### Changes
+
+| Category | Detail |
+|----------|--------|
+| Backend | Feed endpoint queries shared notes (`private: false`) with search support |
+| Backend | `formatNote()` in feed service; note comment counts via `noteComment.groupBy` |
+| Frontend | 'notes' filter added to FILTERS; FeedCard renders note cards with purple badge, "Read note" link, comment count |
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `backend/src/modules/feed/feed.service.js` | Added `formatNote()` |
+| `backend/src/modules/feed/feed.list.controller.js` | Notes primary + secondary sections |
+| `frontend/studyhub-app/src/pages/feed/feedConstants.js` | Added 'notes' to FILTERS |
+| `frontend/studyhub-app/src/pages/feed/FeedCard.jsx` | Note-type card rendering |
+
+### Validation
+
+| Suite | Result |
+|-------|--------|
+| Backend tests (all) | 418/418 pass (36 files) |
+| Frontend lint | Clean |
+| Frontend build | Clean |

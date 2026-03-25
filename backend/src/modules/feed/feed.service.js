@@ -102,6 +102,21 @@ function formatPost(item, commentCounts, reactionRows, currentReactions) {
   }
 }
 
+function formatNote(item, commentCounts) {
+  return {
+    id: item.id,
+    feedKey: `note-${item.id}`,
+    type: 'note',
+    createdAt: item.createdAt,
+    title: item.title,
+    preview: summarizeText(item.content, 190),
+    author: item.author ? { id: item.author.id, username: item.author.username, avatarUrl: item.author.avatarUrl || null } : null,
+    course: item.course ? { id: item.course.id, code: item.course.code } : null,
+    commentCount: commentCounts.get(item.id) || 0,
+    linkPath: `/notes/${item.id}`,
+  }
+}
+
 function formatFeedPostDetail(item, commentCount, reactionRows, currentReactions) {
   return {
     id: item.id,
@@ -128,5 +143,6 @@ module.exports = {
   formatAnnouncement,
   formatSheet,
   formatPost,
+  formatNote,
   formatFeedPostDetail,
 }

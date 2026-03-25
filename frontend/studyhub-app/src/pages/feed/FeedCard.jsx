@@ -33,6 +33,7 @@ export default function FeedCard({
 }) {
   const isSheet = item.type === 'sheet'
   const isPost = item.type === 'post'
+  const isNote = item.type === 'note'
   const reaction = item.reactions || { likes: 0, dislikes: 0, userReaction: null }
   const urls = attachmentEndpoints(item)
   const previewKind = attachmentPreviewKind(item)
@@ -64,7 +65,7 @@ export default function FeedCard({
                     fontWeight: 800,
                     textTransform: 'uppercase',
                     letterSpacing: '.08em',
-                    color: item.type === 'announcement' ? '#b45309' : courseColor(item.course?.code),
+                    color: item.type === 'announcement' ? '#b45309' : item.type === 'note' ? '#8b5cf6' : courseColor(item.course?.code),
                   }}
                 >
                   {item.type}
@@ -246,6 +247,15 @@ export default function FeedCard({
               <button type="button" onClick={(e) => { popScale(e.currentTarget); onReact(item, 'dislike') }} style={actionButton(reaction.userReaction === 'dislike' ? '#dc2626' : '#475569')}>
                 Needs work {reaction.dislikes || 0}
               </button>
+            ) : null}
+            {isNote ? (
+              <Link to={item.linkPath} style={linkButton()}>
+                <IconEye size={14} />
+                Read note
+              </Link>
+            ) : null}
+            {isNote && item.commentCount > 0 ? (
+              <span style={pillStyle()}>{item.commentCount} {item.commentCount === 1 ? 'comment' : 'comments'}</span>
             ) : null}
             {item.downloads ? <span style={pillStyle()}>{item.downloads} downloads</span> : null}
             {item.forks ? <span style={pillStyle()}><IconFork size={13} /> {item.forks} forks</span> : null}
