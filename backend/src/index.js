@@ -12,7 +12,7 @@ const { AVATARS_DIR, COVERS_DIR, SCHOOL_LOGOS_DIR, validateUploadStorage } = req
 const csrfProtection = require('./middleware/csrf')
 const { guardedMode, isGuardedModeEnabled } = require('./middleware/guardedMode')
 const checkRestrictions = require('./middleware/checkRestrictions')
-const { getAuthTokenFromRequest, verifyAuthToken } = require('./lib/authTokens')
+const { getAuthTokenFromRequest, validateSecrets, verifyAuthToken } = require('./lib/authTokens')
 const { ERROR_CODES, sendError } = require('./middleware/errorEnvelope')
 
 const sentryEnabled = initSentry()
@@ -330,6 +330,7 @@ app.get('/health', (req, res) => {
 })
 
 async function startServer() {
+  validateSecrets()
   validateUploadStorage()
   await bootstrapRuntime()
   await validateEmailTransport({

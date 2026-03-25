@@ -264,6 +264,8 @@ module.exports = {
   resolveAvatarPath,
   resolveCoverPath,
   resolveManagedUploadPath,
+  isManagedLeafFileName,
+  isPathWithinRoot,
   safeUnlinkFile,
   validateUploadStorage,
 }

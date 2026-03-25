@@ -26,9 +26,12 @@ export default function useSheetViewer() {
   const [showContributeModal, setShowContributeModal] = useState(false)
   const [contributeMessage, setContributeMessage] = useState('')
   const [reviewingId, setReviewingId] = useState(null)
+  const [safePreviewUrl, setSafePreviewUrl] = useState('')
   const [runtimeUrl, setRuntimeUrl] = useState('')
+  const [previewLoading, setPreviewLoading] = useState(false)
   const [runtimeLoading, setRuntimeLoading] = useState(false)
   const [htmlWarningAcked, setHtmlWarningAcked] = useState(false)
+  const [viewerInteractive, setViewerInteractive] = useState(false)
   const [relatedSheets, setRelatedSheets] = useState([])
   const sheetPanelRef = useRef(null)
   const animatedRef = useRef(false)
@@ -186,23 +189,50 @@ export default function useSheetViewer() {
     if (localStorage.getItem(ackKey) === '1') setHtmlWarningAcked(true)
   }, [isHtmlSheet, sheet?.id])
 
+  /* After warning acknowledged, load safe preview (scripts disabled) */
   useEffect(() => {
     if (!isHtmlSheet || !htmlWarningAcked || !sheet?.id) return
     const controller = new AbortController()
-    setRuntimeLoading(true)
-    fetch(`${API}/api/sheets/${sheet.id}/html-runtime`, {
+    setPreviewLoading(true)
+    fetch(`${API}/api/sheets/${sheet.id}/html-preview`, {
       headers: authHeaders(),
       credentials: 'include',
       signal: controller.signal,
     })
       .then((r) => r.json().catch(() => ({})))
       .then((data) => {
-        if (!controller.signal.aborted && data?.runtimeUrl) setRuntimeUrl(data.runtimeUrl)
+        if (!controller.signal.aborted && data?.previewUrl) setSafePreviewUrl(data.previewUrl)
       })
       .catch(() => {})
-      .finally(() => { if (!controller.signal.aborted) setRuntimeLoading(false) })
+      .finally(() => { if (!controller.signal.aborted) setPreviewLoading(false) })
     return () => { controller.abort() }
   }, [isHtmlSheet, htmlWarningAcked, sheet?.id])
+
+  /* Load interactive runtime URL on demand (owner/admin only) */
+  const loadInteractiveRuntime = useCallback(() => {
+    if (!isHtmlSheet || !sheet?.id || runtimeUrl) return
+    setRuntimeLoading(true)
+    fetch(`${API}/api/sheets/${sheet.id}/html-runtime`, {
+      headers: authHeaders(),
+      credentials: 'include',
+    })
+      .then((r) => r.json().catch(() => ({})))
+      .then((data) => {
+        if (data?.runtimeUrl) setRuntimeUrl(data.runtimeUrl)
+        else setViewerInteractive(false)
+      })
+      .catch(() => { setViewerInteractive(false) })
+      .finally(() => { setRuntimeLoading(false) })
+  }, [isHtmlSheet, sheet?.id, runtimeUrl])
+
+  const toggleViewerInteractive = useCallback(() => {
+    if (viewerInteractive) {
+      setViewerInteractive(false)
+    } else {
+      setViewerInteractive(true)
+      if (!runtimeUrl) loadInteractiveRuntime()
+    }
+  }, [viewerInteractive, runtimeUrl, loadInteractiveRuntime])
 
   const acceptHtmlWarning = () => {
     if (sheet?.id) localStorage.setItem(`htmlSheetWarnAck:${sheet.id}`, '1')
@@ -415,9 +445,13 @@ export default function useSheetViewer() {
     contributeMessage,
     setContributeMessage,
     reviewingId,
+    safePreviewUrl,
     runtimeUrl,
+    previewLoading,
     runtimeLoading,
     htmlWarningAcked,
+    viewerInteractive,
+    toggleViewerInteractive,
     relatedSheets,
     sheetPanelRef,
     canEdit,

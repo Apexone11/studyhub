@@ -8,7 +8,7 @@ const { createNotification } = require('../../lib/notify')
 const { validateHtmlForSubmission } = require('../../lib/htmlSecurity')
 const { cleanupAttachmentIfUnused } = require('../../lib/storage')
 const { computeLineDiff, addWordSegments } = require('../../lib/diff')
-const { SHEET_STATUS, contributionRateLimiter, contributionReviewLimiter } = require('./sheets.constants')
+const { SHEET_STATUS, contributionRateLimiter, contributionReviewLimiter, diffLimiter } = require('./sheets.constants')
 const { serializeContribution } = require('./sheets.serializer')
 const { computeChecksum } = require('../sheetLab/sheetLab.constants')
 const { trackActivity } = require('../../lib/activityTracker')
@@ -238,7 +238,7 @@ router.post('/:id/contributions', requireAuth, requireVerifiedEmail, contributio
   }
 })
 
-router.get('/contributions/:contributionId/diff', requireAuth, async (req, res) => {
+router.get('/contributions/:contributionId/diff', requireAuth, diffLimiter, async (req, res) => {
   const contributionId = Number.parseInt(req.params.contributionId, 10)
   if (!Number.isInteger(contributionId)) {
     return res.status(400).json({ error: 'Invalid contribution ID.' })

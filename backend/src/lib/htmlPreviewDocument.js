@@ -56,7 +56,7 @@ function sanitizePreviewHtml(value) {
     allowedTags: DEFAULT_ALLOWED_TAGS,
     allowedAttributes: DEFAULT_ALLOWED_ATTRIBUTES,
     allowedSchemes: ['data', 'blob'],
-    allowedSchemesAppliedToAttributes: ['href', 'src', 'srcset'],
+    allowedSchemesAppliedToAttributes: ['href', 'src', 'srcset', 'action'],
     allowProtocolRelative: false,
     parseStyleAttributes: true,
   })

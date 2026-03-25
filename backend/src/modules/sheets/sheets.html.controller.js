@@ -89,6 +89,7 @@ router.get('/:id/html-preview', requireAuth, async (req, res) => {
       expiresInSeconds: HTML_PREVIEW_TOKEN_TTL_SECONDS,
       sanitized: issues.length > 0,
       issues,
+      canInteract: canModerateOrOwnSheet(sheet, req.user),
     })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
@@ -123,12 +124,12 @@ router.get('/:id/html-runtime', requireAuth, async (req, res) => {
 
     const tier = sheet.htmlRiskTier || 0
 
-    if (tier >= RISK_TIER.QUARANTINED) {
-      return res.status(403).json({ error: 'This sheet has been quarantined. Preview is disabled.' })
+    if (!canModerateOrOwnSheet(sheet, req.user)) {
+      return res.status(403).json({ error: 'Interactive preview is only available to the sheet owner or an admin.' })
     }
 
-    if ((sheet.status === SHEET_STATUS.PENDING_REVIEW || tier >= RISK_TIER.HIGH_RISK) && !canModerateOrOwnSheet(sheet, req.user)) {
-      return res.status(403).json({ error: 'This sheet is under review. Only the author or an admin can preview it interactively.' })
+    if (tier >= RISK_TIER.QUARANTINED) {
+      return res.status(403).json({ error: 'This sheet has been quarantined. Preview is disabled.' })
     }
 
     const runtimeVersion = sheet.updatedAt ? new Date(sheet.updatedAt).toISOString() : '0'

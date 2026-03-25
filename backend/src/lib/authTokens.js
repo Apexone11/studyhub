@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken')
 
 const AUTH_COOKIE_NAME = 'studyhub_session'
 const TOKEN_EXPIRES_IN = '24h'
+const MIN_SECRET_LENGTH = 32
 
 function getJwtSecret() {
   if (!process.env.JWT_SECRET) {
@@ -10,6 +11,25 @@ function getJwtSecret() {
   }
 
   return process.env.JWT_SECRET
+}
+
+/**
+ * Validate JWT_SECRET at startup — crashes early if missing or too short.
+ * Call once from the server bootstrap path so misconfiguration is caught
+ * before the process starts serving traffic.
+ */
+function validateSecrets() {
+  const secret = process.env.JWT_SECRET
+  if (!secret) {
+    throw new Error(
+      'FATAL: JWT_SECRET environment variable is not set. The server cannot start without it.'
+    )
+  }
+  if (secret.length < MIN_SECRET_LENGTH) {
+    throw new Error(
+      `FATAL: JWT_SECRET is too short (${secret.length} chars). Minimum ${MIN_SECRET_LENGTH} characters required for production safety.`
+    )
+  }
 }
 
 function signAuthToken(user) {
@@ -108,6 +128,7 @@ module.exports = {
   signCsrfToken,
   setAuthCookie,
   signAuthToken,
+  validateSecrets,
   verifyCsrfToken,
   verifyAuthToken,
 }
