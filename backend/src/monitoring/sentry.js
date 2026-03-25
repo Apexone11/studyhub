@@ -1,4 +1,5 @@
 const Sentry = require('@sentry/node')
+const { redactObject, redactHeaders, SENSITIVE_KEYS, REDACTED } = require('../lib/redact')
 
 let sentryEnabled = false
 
@@ -23,7 +24,28 @@ function initSentry() {
     Sentry.init({
       dsn,
       tracesSampleRate: parseSampleRate(process.env.SENTRY_TRACES_SAMPLE_RATE, 0.1),
-      environment: process.env.NODE_ENV || 'development'
+      environment: process.env.NODE_ENV || 'development',
+      beforeSend(event) {
+        // Scrub sensitive data from request headers
+        if (event.request?.headers) {
+          event.request.headers = redactHeaders(event.request.headers)
+        }
+        // Scrub sensitive data from request body/data
+        if (event.request?.data) {
+          event.request.data = typeof event.request.data === 'object'
+            ? redactObject(event.request.data)
+            : REDACTED
+        }
+        // Scrub cookies
+        if (event.request?.cookies) {
+          event.request.cookies = REDACTED
+        }
+        // Scrub extras
+        if (event.extra) {
+          event.extra = redactObject(event.extra)
+        }
+        return event
+      },
     })
 
     sentryEnabled = true
@@ -37,8 +59,9 @@ function captureError(error, context = {}) {
     return
   }
 
+  const safeContext = redactObject(context)
   Sentry.withScope((scope) => {
-    Object.entries(context).forEach(([key, value]) => {
+    Object.entries(safeContext).forEach(([key, value]) => {
       scope.setExtra(key, value)
     })
 

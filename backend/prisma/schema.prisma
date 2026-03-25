@@ -61,6 +61,7 @@ model User {
   pinnedSheets               UserPinnedSheet[]
   dailyActivity              UserDailyActivity[]
   badges                     UserBadge[]
+  sensitiveData              UserSensitive?
 }
 
 model School {
@@ -612,6 +613,35 @@ model FeatureFlag {
   conditions        Json?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+}
+
+// ── Audit Log (sensitive operations) ────────────────────────
+model AuditLog {
+  id           Int      @id @default(autoincrement())
+  event        String
+  actorId      Int?
+  actorRole    String?
+  targetUserId Int?
+  route        String?
+  method       String?
+  createdAt    DateTime @default(now())
+
+  @@index([event])
+  @@index([actorId])
+  @@index([targetUserId])
+  @@index([createdAt])
+}
+
+// ── PII Vault (envelope-encrypted sensitive data) ───────────
+model UserSensitive {
+  id               Int      @id @default(autoincrement())
+  userId           Int      @unique
+  ciphertext       String
+  encryptedDataKey String
+  keyArn           String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 // ── WebAuthn passkey credentials ────────────────────────────
