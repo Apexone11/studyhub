@@ -5650,3 +5650,62 @@ Added frontend comment section to the NoteViewerPage. Shared notes now display a
 |-------|--------|
 | Frontend lint | Clean |
 | Frontend build | Clean |
+
+---
+
+## Hotfix — Popular Courses Prisma groupBy crash (2026-03-25)
+
+### Summary
+
+Production P0: `GET /api/courses/schools/popular` crashed with `Argument 'not' must not be null` because Prisma 6.x rejects `courseId: { not: null }` inside `groupBy` where clauses. Replaced with `NOT: { courseId: null }` (top-level NOT operator), which is compatible across all Prisma query types.
+
+### Root Cause
+
+Prisma 6.19 validates `not` filter arguments more strictly in `groupBy` than in `findMany`/`count`. The field-level `{ not: null }` pattern still works in `findMany`, but fails inside `groupBy`.
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `backend/src/modules/courses/courses.schools.controller.js` | `courseId: { not: null }` to `NOT: { courseId: null }` |
+| `backend/test/courses.routes.test.js` | Updated assertion to match new NOT syntax |
+
+### Validation
+
+| Suite | Result |
+|-------|--------|
+| Backend tests | 418/418 pass (36 files) |
+
+---
+
+## Cycle 51.5 Phase C — Notes in Feed (2026-03-25)
+
+### Summary
+
+Added shared notes (private=false) to the feed page. Users can now discover shared notes from all users alongside posts, sheets, and announcements. A "notes" filter tab is available on the feed page. Note cards show title, preview, author, course, comment count, and a "Read note" link to `/notes/:id`.
+
+### Changes
+
+| Category | Detail |
+|----------|--------|
+| Backend | Feed endpoint queries shared notes (private=false) with search support (title + content) |
+| Backend | Added `formatNote()` to feed service with comment count enrichment via `noteComment.groupBy` |
+| Frontend | Added 'notes' filter to feed FILTERS constant |
+| Frontend | FeedCard renders note-type cards with purple type badge, "Read note" link, and comment count pill |
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `backend/src/modules/feed/feed.service.js` | Added `formatNote()` formatter; exported it |
+| `backend/src/modules/feed/feed.list.controller.js` | Added notes primary section query, noteCommentRows secondary section, merged into items array |
+| `frontend/studyhub-app/src/pages/feed/feedConstants.js` | Added 'notes' to FILTERS array |
+| `frontend/studyhub-app/src/pages/feed/FeedCard.jsx` | Added note-type rendering: purple badge, "Read note" link, comment count pill |
+
+### Validation
+
+| Suite | Result |
+|-------|--------|
+| Frontend lint | Clean |
+| Frontend build | Clean |
+| Backend tests (all) | 418/418 pass (36 files) |

@@ -1,6 +1,6 @@
 /* ── Feed shared constants, styles, and helpers ──────────────────────── */
 export const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
-export const FILTERS = ['all', 'posts', 'sheets', 'announcements']
+export const FILTERS = ['all', 'posts', 'sheets', 'notes', 'announcements']
 
 export const COMPOSER_PROMPTS = [
   'Share an update, mention classmates with @username, or point people to a great sheet…',
