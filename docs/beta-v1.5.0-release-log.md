@@ -5222,3 +5222,128 @@ Interactive preview runs inside an iframe sandbox that enforces hard isolation:
 | `frontend/studyhub-app/src/pages/sheets/useSheetViewer.js` | Safe-first preview loading, lazy interactive toggle, new state/exports |
 | `frontend/studyhub-app/src/pages/sheets/SheetViewerPage.jsx` | Toggle UI for owner/admin, correct sandbox attrs, safe-first default |
 | `backend/test/interactive-preview.test.js` | New: 21 sandbox security regression tests |
+
+---
+
+## Cycle 49 — Moderation & Review UX Fixes (2026-03-24)
+
+### Intent
+
+Fix false alarms and improve admin review panel accuracy. ClamAV scanner-unavailable was incorrectly shown as high-severity, runtime validation errors lacked exact locations, and admin reviewers had no way to jump from a finding to its source line.
+
+### Sub-cycles
+
+**49.1 — ClamAV False Alarm Severity**
+
+- Changed: ClamAV scanner-unavailable severity from `high` to `medium`
+- Changed: Message wording to `"Antivirus scanner unavailable — will not block publishing."`
+- Updated test expectation in `htmlDraftWorkflow.test.js`
+
+**49.2 — Enriched Runtime Validation**
+
+- Added `indexToLineCol(value, index)` — maps character offset to `{ line, column }` (1-based)
+- Added `snippetAt(value, index)` — extracts trimmed source line around an offset
+- Added `collectMatches(value, pattern, message, attribute)` — collects all regex matches with location metadata + extracted URLs
+- Rewrote `validateHtmlForRuntime()` to return `{ ok, issues, enrichedIssues }` where each enriched issue has `{ message, line, column, snippet, url?, attribute? }`
+- Admin GET review-detail returns `runtimeValidation: { ok, issues, enrichedIssues }`
+- Admin PATCH review returns `enrichedIssues` array on validation failure
+
+**49.3 — Line-Highlighted Raw HTML View**
+
+- `RawHtmlView` rewritten: line numbers, amber highlighting for flagged lines, `useRef`+`useEffect` scroll-to-line with pulse animation
+- `FindingsPanel` shows enriched issues block with clickable "Line N" buttons that jump to raw HTML source
+- Grouped findings also have `:LN` jump buttons for findings with line info
+
+**49.4 — Approval Error Enrichment**
+
+- `ReviewActionBar` error banner shows enriched issues with clickable line jumps and exact URL display
+- `SheetReviewPanel` wires `submitEnrichedIssues` and `handleJumpToLine` to all sub-components
+- Tab switches to "Raw HTML" and scrolls to target line on click
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `backend/src/lib/htmlSecurityRules.js` | Added `indexToLineCol`, `snippetAt`, `collectMatches`; rewrote `validateHtmlForRuntime` |
+| `backend/src/lib/htmlDraftValidation.js` | ClamAV error severity `high` → `medium`, clearer message |
+| `backend/src/modules/admin/admin.sheets.controller.js` | Review-detail returns `runtimeValidation`; PATCH returns `enrichedIssues` on failure |
+| `backend/test/htmlDraftWorkflow.test.js` | Updated ClamAV error test expectation |
+| `frontend/studyhub-app/src/pages/admin/SheetReviewDetails.jsx` | `RawHtmlView`, `FindingsPanel`, `ReviewActionBar` rewritten with enrichment support |
+| `frontend/studyhub-app/src/pages/admin/SheetReviewPanel.jsx` | New state, `handleJumpToLine`, all props wired |
+
+### Validation
+
+| Suite | Result |
+|-------|--------|
+| Backend tests | 324/324 pass (31 files) |
+| Frontend lint | Clean |
+| Frontend build | Clean |
+
+---
+
+## Cycle 48.8 — Incident Playbook & Runbooks (2026-03-24)
+
+### Intent
+
+Create a complete incident response framework so that when something goes wrong (security issue, outage, bad deploy), there's a step-by-step runbook to follow instead of improvising under pressure.
+
+### Deliverables
+
+6 documents created under `docs/security/`:
+
+| File | Content |
+|------|---------|
+| `INCIDENT_PLAYBOOK.md` | Severity levels (SEV0-3), first-5-minutes checklist, kill switch reference, post-incident template |
+| `RUNBOOK_OUTAGE.md` | Railway triage, common cause/fix table, rollback checklist, "what NOT to do" section |
+| `RUNBOOK_SECURITY.md` | Indicators of compromise, containment actions (per-severity), evidence capture, investigation checklist |
+| `RUNBOOK_SECRETS_ROTATION.md` | Per-secret rotation steps for JWT, Google OAuth, Resend, DB, OpenAI with impact/rollback |
+| `RUNBOOK_DB_RESTORE.md` | Railway backup restore, CLI restore, partial restore, post-restore verification |
+| `CONTACTS.md` | Service dashboards, vendor support links, approval authority, status message templates |
+
+### Live Drill
+
+Simulated "Railway backend 502" scenario and verified every runbook reference against the codebase:
+
+| Check | Result |
+|-------|--------|
+| `/health` endpoint exists and returns `{"status":"ok"}` | PASS |
+| `validateSecrets()` exists and called at startup | PASS |
+| `GUARDED_MODE` middleware wired in `index.js` | PASS |
+| `STUDYHUB_HTML_UPLOADS` kill switch functional | PASS |
+| Railway `railway.toml` healthcheck config matches | PASS |
+| Sentry capture setup matches runbook description | PASS |
+| No missing env vars or kill switches | PASS |
+
+---
+
+## Sub-cycle 50.0 — AWS KMS Ping Endpoint (2026-03-24)
+
+### Summary
+
+Added AWS KMS SDK and a minimal admin-only status endpoint to verify AWS credentials and key policy before building Cycle 50 encryption features.
+
+### Changes
+
+| Category | Detail |
+|----------|--------|
+| Added | `@aws-sdk/client-kms` dependency (578 packages) |
+| Added | `backend/src/lib/kmsClient.js` — minimal KMS client factory (`getKmsClient()`) |
+| Added | `backend/src/modules/admin/admin.kms.controller.js` — `GET /api/admin/kms/status` endpoint |
+| Changed | `backend/src/modules/admin/admin.routes.js` — mounted KMS controller |
+
+### Endpoint Behavior
+
+`GET /api/admin/kms/status` (requires auth + admin):
+- Returns `500` if `KMS_KEY_ARN` env var is missing
+- Calls `DescribeKeyCommand` to read key metadata
+- Calls `GenerateDataKeyCommand` to verify encrypt path works end-to-end
+- Returns `{ ok, region, keyId, keyState, arn }` on success
+- Returns `{ ok: false, name, message }` on AWS error
+
+### Validation
+
+| Suite | Result |
+|-------|--------|
+| Backend tests | 324/324 pass |
+| Frontend build | Clean |
+| Backend lint | 5 pre-existing errors (none from this change) |

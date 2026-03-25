@@ -29,7 +29,7 @@ describe('htmlDraftWorkflow helpers', () => {
     expect(findings[1].severity).toBe('critical')
   })
 
-  it('treats antivirus scanner errors as high-severity findings', () => {
+  it('treats antivirus scanner errors as medium-severity findings', () => {
     const classifierResult = { tier: 0, findings: [] }
     const findings = normalizeFindings(
       classifierResult,
@@ -38,7 +38,7 @@ describe('htmlDraftWorkflow helpers', () => {
 
     expect(findings).toHaveLength(1)
     expect(findings[0].source).toBe('av')
-    expect(findings[0].severity).toBe('high')
+    expect(findings[0].severity).toBe('medium')
   })
 
   it('handles classifier-only findings without AV result', () => {

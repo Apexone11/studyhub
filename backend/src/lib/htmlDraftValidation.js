@@ -48,8 +48,8 @@ function normalizeFindings(classifierResult, avResult) {
       findings.push({
         source: 'av',
         category: 'av',
-        severity: 'high',
-        message: avResult.message || 'Antivirus scanner unavailable.',
+        severity: 'medium',
+        message: `Antivirus scanner unavailable — will not block publishing. Details: ${avResult.message || 'Could not connect to scanner.'}`,
       })
     }
   }

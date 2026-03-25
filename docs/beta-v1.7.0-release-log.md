@@ -197,3 +197,109 @@ Key isolation guarantee: omitting `allow-same-origin` from the iframe sandbox fo
 ### Version
 
 Both `backend/package.json` and `frontend/studyhub-app/package.json` at version `1.7.0`.
+
+---
+
+## Cycle 49 — Moderation & Review UX Fixes (2026-03-24)
+
+### Summary
+
+Improved admin review panel accuracy and usability: downgraded ClamAV-unavailable false alarms, enriched runtime validation errors with exact line/column/URL locations, and added click-to-jump navigation between findings and raw HTML source.
+
+### Changes
+
+| Category | Detail |
+|----------|--------|
+| Fixed | ClamAV scanner-unavailable severity downgraded from `high` to `medium` with clear non-blocking message |
+| Security | `validateHtmlForRuntime()` now returns `enrichedIssues` with `{ message, line, column, snippet, url?, attribute? }` for every violation |
+| Changed | Admin PATCH review endpoint returns `enrichedIssues` on validation failure |
+| Changed | Admin GET review-detail endpoint includes `runtimeValidation: { ok, issues, enrichedIssues }` |
+| Changed | `RawHtmlView` component: line numbers, amber highlighting for flagged lines, `useRef`+`useEffect` scroll-to-line |
+| Changed | `FindingsPanel` component: enriched issues block with clickable "Line N" buttons and exact URLs |
+| Changed | `ReviewActionBar` component: approval error banner shows enriched issues with click-to-jump and URL display |
+| Changed | `SheetReviewPanel`: wires `scrollToLine`, `submitEnrichedIssues`, `handleJumpToLine` across all sub-components |
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `backend/src/lib/htmlSecurityRules.js` | Added `indexToLineCol()`, `snippetAt()`, `collectMatches()` helpers; rewrote `validateHtmlForRuntime()` to return enriched issues |
+| `backend/src/lib/htmlDraftValidation.js` | ClamAV error severity `high` → `medium`, clearer message wording |
+| `backend/src/modules/admin/admin.sheets.controller.js` | Review-detail returns `runtimeValidation`; PATCH review returns `enrichedIssues` on failure |
+| `backend/test/htmlDraftWorkflow.test.js` | Updated test expectation: ClamAV error severity `high` → `medium` |
+| `frontend/studyhub-app/src/pages/admin/SheetReviewDetails.jsx` | `RawHtmlView` rewritten with line numbers + highlighting + scroll; `FindingsPanel` enriched issues block; `ReviewActionBar` error enrichment |
+| `frontend/studyhub-app/src/pages/admin/SheetReviewPanel.jsx` | New state (`scrollToLine`, `submitEnrichedIssues`), `handleJumpToLine`, all props wired to sub-components |
+
+### Validation
+
+| Suite | Result |
+|-------|--------|
+| Backend tests | 324/324 pass (31 files) |
+| Frontend lint | Clean |
+| Frontend build | Clean |
+
+---
+
+## Cycle 48.8 — Incident Playbook & Runbooks (2026-03-24)
+
+### Summary
+
+Created a complete incident response framework: severity classification, first-5-minutes checklist, and step-by-step runbooks for outages, security incidents, secrets rotation, database restore, and contacts/escalation.
+
+### Documents Created
+
+| File | Purpose |
+|------|---------|
+| `docs/security/INCIDENT_PLAYBOOK.md` | Front-door document: severity levels (SEV0-3), first 5 minutes checklist, kill switch reference, post-incident process |
+| `docs/security/RUNBOOK_OUTAGE.md` | Railway/availability: triage, diagnosis table, common causes, rollback checklist, what NOT to do |
+| `docs/security/RUNBOOK_SECURITY.md` | Suspected breach: indicators of compromise, containment actions, evidence capture, investigation steps |
+| `docs/security/RUNBOOK_SECRETS_ROTATION.md` | Rotation procedures for JWT_SECRET, Google OAuth, Resend, DB password, OpenAI key with impact/rollback |
+| `docs/security/RUNBOOK_DB_RESTORE.md` | Railway backup restore, manual CLI restore, partial restore, post-restore verification checklist |
+| `docs/security/CONTACTS.md` | Service dashboards, vendor support links, approval authority, status message templates |
+
+### Key Features
+
+- Kill switch quick reference: `GUARDED_MODE`, `STUDYHUB_HTML_UPLOADS`, `CLAMAV_DISABLED`
+- Secrets rotation order: JWT first (stops attacker sessions), then DB, email, OAuth, moderation
+- Status message templates: investigating, mitigating, resolved, security notice
+- Live drill: simulated Railway outage — all 7 referenced features/endpoints/configs verified present
+
+### Validation (Live Drill)
+
+| Check | Result |
+|-------|--------|
+| `/health` endpoint exists | PASS |
+| `validateSecrets()` called at startup | PASS |
+| `GUARDED_MODE` middleware wired | PASS |
+| `STUDYHUB_HTML_UPLOADS` kill switch exists | PASS |
+| Railway healthcheck config matches | PASS |
+| Sentry capture setup matches | PASS |
+| No missing env vars/kill switches | PASS |
+
+---
+
+## Sub-cycle 50.0 — AWS KMS Ping Endpoint (2026-03-24)
+
+### Summary
+
+Added AWS KMS SDK and a minimal admin-only status endpoint (`GET /api/admin/kms/status`) to verify AWS credentials and key policy before building Cycle 50 encryption features.
+
+### Changes
+
+| Category | Detail |
+|----------|--------|
+| Added | `@aws-sdk/client-kms` dependency |
+| Added | `backend/src/lib/kmsClient.js` — KMS client factory |
+| Added | `backend/src/modules/admin/admin.kms.controller.js` — admin-only KMS status endpoint |
+| Changed | `backend/src/modules/admin/admin.routes.js` — mounted KMS controller |
+
+### Endpoint
+
+`GET /api/admin/kms/status` — requires auth + admin. Calls `DescribeKeyCommand` + `GenerateDataKeyCommand` to verify credentials and encrypt path. Returns key metadata on success, error details on failure.
+
+### Validation
+
+| Suite | Result |
+|-------|--------|
+| Backend tests | 324/324 pass |
+| Frontend build | Clean |
