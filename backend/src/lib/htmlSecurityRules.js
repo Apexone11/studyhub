@@ -167,6 +167,52 @@ function normalizeContentFormat(value) {
 }
 
 /**
+ * Map a character index in a string to { line, column } (1-based).
+ */
+function indexToLineCol(value, index) {
+  let line = 1
+  let col = 1
+  for (let i = 0; i < index && i < value.length; i += 1) {
+    if (value[i] === '\n') { line += 1; col = 1 } else { col += 1 }
+  }
+  return { line, column: col }
+}
+
+/**
+ * Extract a short snippet around an index (the full line, trimmed).
+ */
+function snippetAt(value, index) {
+  let start = index
+  while (start > 0 && value[start - 1] !== '\n') start -= 1
+  let end = index
+  while (end < value.length && value[end] !== '\n') end += 1
+  const line = value.slice(start, end).trim()
+  return line.length > 120 ? `${line.slice(0, 120)}…` : line
+}
+
+/**
+ * Collect all regex matches with location metadata.
+ */
+function collectMatches(value, pattern, message, attribute) {
+  const results = []
+  const regex = new RegExp(pattern.source, pattern.flags)
+  let match
+  while ((match = regex.exec(value)) !== null) {
+    const loc = indexToLineCol(value, match.index)
+    const urlMatch = match[0].match(/https?:\/\/[^\s"'>)]+/)
+    results.push({
+      message,
+      line: loc.line,
+      column: loc.column,
+      snippet: snippetAt(value, match.index),
+      ...(attribute ? { attribute } : {}),
+      ...(urlMatch ? { url: urlMatch[0] } : {}),
+    })
+  }
+  return results
+}
+
+/**
  * Validate HTML for interactive runtime serving.
  * Rejects:
  *   - <script src="..."> (external script loading)
@@ -178,44 +224,56 @@ function normalizeContentFormat(value) {
  *   - inline <script>...</script> (CSP + sandbox protect execution)
  *   - inline styles
  *   - data: and blob: URLs
+ *
+ * Returns { ok, issues: string[], enrichedIssues: object[] }
+ * enrichedIssues contain: { message, line, column, snippet, url?, attribute? }
  */
 function validateHtmlForRuntime(html) {
   const value = String(html || '')
   const lowered = value.toLowerCase()
   const issues = []
+  const enrichedIssues = []
 
   // Reject <script src="...">
-  const scriptSrcPattern = /<\s*script[^>]+\bsrc\s*=/gi
-  if (scriptSrcPattern.test(value)) {
+  const scriptSrcMatches = collectMatches(value, /<\s*script[^>]+\bsrc\s*=/gi, 'External script — use inline scripts only.', 'src')
+  if (scriptSrcMatches.length > 0) {
     issues.push('External scripts (<script src="...">) are not allowed. Use inline scripts only.')
+    enrichedIssues.push(...scriptSrcMatches)
   }
 
   // Reject <base> tags
-  if (/<\s*base[\s>]/i.test(value)) {
+  const baseMatches = collectMatches(value, /<\s*base[\s>]/gi, '<base> tag is not allowed.')
+  if (baseMatches.length > 0) {
     issues.push('<base> tags are not allowed.')
+    enrichedIssues.push(...baseMatches)
   }
 
   // Reject <meta http-equiv="refresh">
-  if (/<\s*meta[^>]+http-equiv\s*=\s*["']?\s*refresh/i.test(value)) {
+  const metaRefreshMatches = collectMatches(value, /<\s*meta[^>]+http-equiv\s*=\s*["']?\s*refresh/gi, '<meta http-equiv="refresh"> is not allowed.')
+  if (metaRefreshMatches.length > 0) {
     issues.push('<meta http-equiv="refresh"> is not allowed.')
+    enrichedIssues.push(...metaRefreshMatches)
   }
 
   // Reject remote URLs (http/https) in src, href, srcset attributes
-  const remoteAttrPattern = /\b(?:src|href|srcset)\s*=\s*["']?\s*https?:\/\//gi
-  if (remoteAttrPattern.test(value)) {
+  const remoteAttrMatches = collectMatches(value, /\b(?:src|href|srcset)\s*=\s*["']?\s*https?:\/\//gi, 'Remote asset — use inline content or data: URLs.', 'src/href/srcset')
+  if (remoteAttrMatches.length > 0) {
     issues.push('Remote assets (http/https URLs in src, href, or srcset) are not allowed. Use inline content or data: URLs.')
+    enrichedIssues.push(...remoteAttrMatches)
   }
 
   // Reject remote URLs in CSS url() or @import
-  const cssUrlPattern = /url\s*\(\s*["']?\s*https?:\/\//gi
-  const cssImportPattern = /@import\s+["']?\s*https?:\/\//gi
-  if (cssUrlPattern.test(lowered) || cssImportPattern.test(lowered)) {
+  const cssUrlMatches = collectMatches(lowered, /url\s*\(\s*["']?\s*https?:\/\//gi, 'Remote CSS url() — use inline styles or data: URLs.', 'css')
+  const cssImportMatches = collectMatches(lowered, /@import\s+["']?\s*https?:\/\//gi, 'Remote @import — use inline styles.', 'css')
+  if (cssUrlMatches.length > 0 || cssImportMatches.length > 0) {
     issues.push('Remote CSS assets (url() or @import with http/https) are not allowed.')
+    enrichedIssues.push(...cssUrlMatches, ...cssImportMatches)
   }
 
   return {
     ok: issues.length === 0,
     issues,
+    enrichedIssues,
   }
 }
 
@@ -277,4 +335,5 @@ module.exports = {
   containsDangerousHrefOrSrc,
   validateHtmlForRuntime,
   scanInlineJsRisk,
+  indexToLineCol,
 }

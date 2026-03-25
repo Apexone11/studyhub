@@ -8,6 +8,7 @@
  *   - ReviewActionBar   (approve / reject controls)
  * ═══════════════════════════════════════════════════════════════════════════ */
 
+import { useEffect, useMemo, useRef } from 'react'
 import { FONT, formatDateTime, severityColor } from './sheetReviewConstants'
 
 /* ── Safe preview (iframe) ───────────────────────────────────────────────── */
@@ -26,38 +27,85 @@ export function SanitizedPreview({ iframeRef, sheetId }) {
   )
 }
 
-/* ── Raw HTML as text (NEVER interpreted) ────────────────────────────────── */
+/* ── Raw HTML as text (NEVER interpreted) with line highlighting ────────── */
 
-export function RawHtmlView({ rawHtml }) {
+export function RawHtmlView({ rawHtml, highlightedLines, scrollToLine }) {
+  const containerRef = useRef(null)
+  const highlightSet = useMemo(() => new Set(Array.isArray(highlightedLines) ? highlightedLines : []), [highlightedLines])
+  const lines = (rawHtml || '(no HTML content)').split('\n')
+
+  /* Scroll to target line after render */
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el || scrollToLine <= 0) return
+    const target = el.querySelector(`[data-line="${scrollToLine}"]`)
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      target.style.transition = 'background 0.3s'
+      target.style.background = '#fef08a'
+      const isHighlighted = highlightSet.has(scrollToLine)
+      setTimeout(() => { target.style.background = isHighlighted ? '#fef3c7' : '' }, 1500)
+    }
+  }, [scrollToLine, highlightSet])
+
   return (
     <div style={{ padding: 16, position: 'relative' }}>
       <button
         type="button"
-        onClick={() => {
-          if (rawHtml) navigator.clipboard.writeText(rawHtml)
-        }}
+        onClick={() => { if (rawHtml) navigator.clipboard.writeText(rawHtml) }}
         style={{
-          position: 'absolute', top: 24, right: 24, padding: '5px 10px',
+          position: 'absolute', top: 24, right: 24, padding: '5px 10px', zIndex: 2,
           borderRadius: 6, border: '1px solid var(--sh-border)', background: 'var(--sh-soft)',
           fontSize: 11, fontWeight: 700, cursor: 'pointer', color: 'var(--sh-subtext)', fontFamily: FONT,
         }}
       >
         Copy raw
       </button>
-      <pre style={{
-        margin: 0, padding: 16, borderRadius: 10, background: 'var(--sh-soft)', color: 'var(--sh-text)',
-        fontSize: 12, lineHeight: 1.6, overflow: 'auto', maxHeight: 500,
-        whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'monospace',
-      }}>
-        {rawHtml || '(no HTML content)'}
-      </pre>
+      <div
+        ref={containerRef}
+        style={{
+          margin: 0, borderRadius: 10, background: 'var(--sh-soft)', overflow: 'auto',
+          maxHeight: 500, fontFamily: 'monospace', fontSize: 12, lineHeight: 1.6,
+        }}
+      >
+        {lines.map((line, idx) => {
+          const lineNum = idx + 1
+          const isHighlighted = highlightSet.has(lineNum)
+          return (
+            <div
+              key={idx}
+              data-line={lineNum}
+              style={{
+                display: 'flex',
+                background: isHighlighted ? '#fef3c7' : 'transparent',
+                borderLeft: isHighlighted ? '3px solid #f59e0b' : '3px solid transparent',
+              }}
+            >
+              <span style={{
+                display: 'inline-block', width: 44, flexShrink: 0, textAlign: 'right',
+                paddingRight: 10, color: isHighlighted ? '#92400e' : 'var(--sh-muted)',
+                userSelect: 'none', fontWeight: isHighlighted ? 700 : 400,
+              }}>
+                {lineNum}
+              </span>
+              <span style={{
+                whiteSpace: 'pre-wrap', wordBreak: 'break-word', flex: 1, padding: '0 8px',
+                color: isHighlighted ? '#78350f' : 'var(--sh-text)',
+                fontWeight: isHighlighted ? 600 : 400,
+              }}>
+                {line}
+              </span>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
 
 /* ── Findings panel ──────────────────────────────────────────────────────── */
 
-export function FindingsPanel({ findings, detail }) {
+export function FindingsPanel({ findings, detail, runtimeValidation, onJumpToLine }) {
   const d = detail
   const groupedFindings = d.findingsByCategory || d.liveFindingsByCategory || null
   const hasGroups = groupedFindings && Object.keys(groupedFindings).length > 0
@@ -68,6 +116,41 @@ export function FindingsPanel({ findings, detail }) {
       {d.riskSummary && d.htmlRiskTier > 0 && (
         <div style={{ marginBottom: 12, fontSize: 13, fontWeight: 700, color: d.htmlRiskTier >= 3 ? 'var(--sh-danger)' : 'var(--sh-warning-text)' }}>
           {d.riskSummary}
+        </div>
+      )}
+
+      {/* Runtime validation — enriched issues with line locations */}
+      {runtimeValidation && !runtimeValidation.ok && Array.isArray(runtimeValidation.enrichedIssues) && runtimeValidation.enrichedIssues.length > 0 && (
+        <div style={{ marginBottom: 14, padding: '12px 14px', borderRadius: 10, background: '#fef2f2', border: '1px solid #fecaca' }}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: '#991b1b', marginBottom: 8 }}>
+            Blocked from publishing — remote assets detected:
+          </div>
+          <div style={{ display: 'grid', gap: 6 }}>
+            {runtimeValidation.enrichedIssues.map((issue, idx) => (
+              <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontSize: 12 }}>
+                {issue.line ? (
+                  <button
+                    type="button"
+                    onClick={() => onJumpToLine && onJumpToLine(issue.line)}
+                    style={{
+                      background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                      color: '#2563eb', fontWeight: 700, fontSize: 11, fontFamily: 'monospace',
+                      textDecoration: 'underline', flexShrink: 0,
+                    }}
+                  >
+                    Line {issue.line}
+                  </button>
+                ) : null}
+                <span style={{ color: '#7f1d1d' }}>
+                  {issue.url ? (
+                    <code style={{ fontSize: 11, background: '#fee2e2', padding: '1px 4px', borderRadius: 3, wordBreak: 'break-all' }}>
+                      {issue.url}
+                    </code>
+                  ) : issue.message}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -95,7 +178,18 @@ export function FindingsPanel({ findings, detail }) {
               </div>
               <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: 'var(--sh-text)', lineHeight: 1.7 }}>
                 {group.findings.map((f, i) => (
-                  <li key={i}>{f.message || String(f)}</li>
+                  <li key={i}>
+                    {f.message || String(f)}
+                    {f.line && onJumpToLine ? (
+                      <button
+                        type="button"
+                        onClick={() => onJumpToLine(f.line)}
+                        style={{ background: 'none', border: 'none', padding: '0 4px', cursor: 'pointer', color: '#2563eb', fontSize: 10, fontWeight: 700, fontFamily: 'monospace', textDecoration: 'underline' }}
+                      >
+                        :L{f.line}
+                      </button>
+                    ) : null}
+                  </li>
                 ))}
               </ul>
             </div>
@@ -159,12 +253,34 @@ const REASON_TEMPLATES = [
   'Content is clean, no security issues found.',
 ]
 
-export function ReviewActionBar({ reason, setReason, submitting, submitError, setSubmitError, handleReview }) {
+export function ReviewActionBar({ reason, setReason, submitting, submitError, submitEnrichedIssues, setSubmitError, handleReview, onJumpToLine }) {
   return (
     <div style={{ padding: '16px 20px', borderTop: '1px solid var(--sh-border)', background: 'var(--sh-soft)' }}>
       {submitError && (
         <div style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 8, background: 'var(--sh-danger-bg)', border: '1px solid var(--sh-danger-border)', color: 'var(--sh-danger)', fontSize: 12 }}>
           {submitError}
+          {Array.isArray(submitEnrichedIssues) && submitEnrichedIssues.length > 0 && (
+            <div style={{ marginTop: 6, display: 'grid', gap: 3 }}>
+              {submitEnrichedIssues.map((issue, idx) => (
+                <div key={idx} style={{ display: 'flex', gap: 6, alignItems: 'baseline', fontSize: 11 }}>
+                  {issue.line && onJumpToLine ? (
+                    <button
+                      type="button"
+                      onClick={() => onJumpToLine(issue.line)}
+                      style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: '#2563eb', fontSize: 10, fontWeight: 700, fontFamily: 'monospace', textDecoration: 'underline', flexShrink: 0 }}
+                    >
+                      Line {issue.line}
+                    </button>
+                  ) : null}
+                  {issue.url ? (
+                    <code style={{ fontSize: 10, wordBreak: 'break-all' }}>{issue.url}</code>
+                  ) : (
+                    <span>{issue.message}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

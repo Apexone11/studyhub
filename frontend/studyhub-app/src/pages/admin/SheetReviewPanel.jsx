@@ -23,7 +23,9 @@ export default function SheetReviewPanel({ sheetId, onClose, onReviewComplete })
   const [reason, setReason] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
+  const [submitEnrichedIssues, setSubmitEnrichedIssues] = useState([])
   const [activeTab, setActiveTab] = useState('preview') // 'preview' | 'raw' | 'findings'
+  const [scrollToLine, setScrollToLine] = useState(0)
   const iframeRef = useRef(null)
 
   const loadDetail = useCallback(async () => {
@@ -58,6 +60,7 @@ export default function SheetReviewPanel({ sheetId, onClose, onReviewComplete })
 
     setSubmitting(true)
     setSubmitError('')
+    setSubmitEnrichedIssues([])
 
     try {
       const response = await fetch(`${API}/api/admin/sheets/${sheetId}/review`, {
@@ -69,6 +72,7 @@ export default function SheetReviewPanel({ sheetId, onClose, onReviewComplete })
       const data = await readJsonSafely(response, {})
 
       if (!response.ok) {
+        if (Array.isArray(data.enrichedIssues)) setSubmitEnrichedIssues(data.enrichedIssues)
         throw new Error(getApiErrorMessage(data, `Could not ${action} sheet.`))
       }
 
@@ -135,6 +139,14 @@ export default function SheetReviewPanel({ sheetId, onClose, onReviewComplete })
     ...(Array.isArray(d.htmlScanFindings) ? d.htmlScanFindings : []),
   ]
   const isHtml = d.contentFormat === 'html'
+  const runtimeValidation = d.runtimeValidation || null
+  const highlightedLines = runtimeValidation?.enrichedIssues?.map((i) => i.line).filter(Boolean) || []
+
+  function handleJumpToLine(line) {
+    setActiveTab('raw')
+    setScrollToLine(0) // reset first to re-trigger even if same line
+    setTimeout(() => setScrollToLine(line), 50)
+  }
 
   return (
     <div style={overlayStyle}>
@@ -205,11 +217,11 @@ export default function SheetReviewPanel({ sheetId, onClose, onReviewComplete })
           )}
 
           {(activeTab === 'raw' && isHtml) && (
-            <RawHtmlView rawHtml={d.rawHtml} />
+            <RawHtmlView rawHtml={d.rawHtml} highlightedLines={highlightedLines} scrollToLine={scrollToLine} />
           )}
 
           {(activeTab === 'findings' || !isHtml) && (
-            <FindingsPanel findings={findings} detail={d} />
+            <FindingsPanel findings={findings} detail={d} runtimeValidation={runtimeValidation} onJumpToLine={handleJumpToLine} />
           )}
         </div>
 
@@ -219,8 +231,10 @@ export default function SheetReviewPanel({ sheetId, onClose, onReviewComplete })
           setReason={setReason}
           submitting={submitting}
           submitError={submitError}
+          submitEnrichedIssues={submitEnrichedIssues}
           setSubmitError={setSubmitError}
           handleReview={handleReview}
+          onJumpToLine={handleJumpToLine}
         />
       </div>
     </div>

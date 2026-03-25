@@ -98,6 +98,7 @@ router.get('/sheets/:id/review-detail', async (req, res) => {
     const rawHtml = sheet.contentFormat === 'html' ? sheet.content : null
     const sanitizedHtml = rawHtml ? sanitizePreviewHtml(rawHtml) : null
     const liveClassification = rawHtml ? classifyHtmlRisk(rawHtml) : { tier: 0, findings: [], summary: 'N/A' }
+    const runtimeValidation = rawHtml ? validateHtmlForRuntime(rawHtml) : { ok: true, issues: [], enrichedIssues: [] }
 
     const storedFindings = sheet.htmlScanFindings || []
     const storedTier = sheet.htmlRiskTier || 0
@@ -129,6 +130,11 @@ router.get('/sheets/:id/review-detail', async (req, res) => {
       reviewedAt: sheet.reviewedAt,
       reviewReason: sheet.reviewReason,
       reviewFindingsSnapshot: sheet.reviewFindingsSnapshot,
+      runtimeValidation: {
+        ok: runtimeValidation.ok,
+        issues: runtimeValidation.issues,
+        enrichedIssues: runtimeValidation.enrichedIssues || [],
+      },
       createdAt: sheet.createdAt,
       updatedAt: sheet.updatedAt,
     })
@@ -172,6 +178,7 @@ router.patch('/sheets/:id/review', async (req, res) => {
         return res.status(400).json({
           error: validation.issues[0],
           issues: validation.issues,
+          enrichedIssues: validation.enrichedIssues || [],
         })
       }
     }
