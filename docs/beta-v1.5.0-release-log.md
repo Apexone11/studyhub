@@ -5505,3 +5505,148 @@ Addressed 7 security findings from static analysis audit of Cycles 50.1–51.2 c
 | Backend tests | 413/413 pass (36 files) |
 | Frontend build | Clean |
 | Total new tests | 89 across 5 test files |
+
+---
+
+## Cycle 51.3 — Rename-safe Sheet Updates (2026-03-25)
+
+### Summary
+
+Title/description-only updates on sheets no longer re-run the HTML security pipeline or flip moderation status. Previously, renaming a published HTML sheet would set its status to `pending_review`, causing 404s for non-owners.
+
+### Root Cause
+
+`sheets.update.controller.js` called `resolveNextSheetStatus()` unconditionally on every update. For HTML sheets, this always returned `PENDING_REVIEW` — even when only the title changed.
+
+### Fix
+
+Added a `contentChanged` gate: the moderation pipeline and status transition only run when the request body contains content-relevant fields (`content`, `contentFormat`, `status`, or `removeAttachment`). Metadata-only updates (`title`, `description`, `courseId`, `allowDownloads`) preserve the existing status.
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `backend/src/modules/sheets/sheets.update.controller.js` | Wrapped status transition + HTML validation in `contentChanged` guard |
+| `backend/test/sheet.workflow.integration.test.js` | Added 5 regression tests (title-only HTML, title-only MD, description-only, content change triggers review, non-owner readability after rename) |
+
+### Validation
+
+| Suite | Result |
+|-------|--------|
+| Backend tests | 418/418 pass (36 files) |
+| New tests added | 5 in sheet.workflow.integration.test.js |
+
+---
+
+## Cycle 51.4 — Notes Sharing + Permissions + Viewer UI (2026-03-25)
+
+### Summary
+
+Added public note sharing with download control. Shared notes are now viewable at `/notes/:id` by anyone (unauthenticated or authenticated). Owners can toggle `allowDownloads` to let visitors download the markdown file. Private notes return 404 to non-owners (no information leakage).
+
+### Changes
+
+| Category | Detail |
+|----------|--------|
+| Schema | Added `allowDownloads Boolean @default(false)` to Note model + migration |
+| Backend | `GET /api/notes/:id` with `optionalAuth` — returns note with `isOwner` flag; private notes 404 for non-owners |
+| Backend | `GET /api/notes?shared=true` — lists all public notes across users |
+| Backend | `PATCH /api/notes/:id` accepts `allowDownloads`; auto-resets to false when making note private |
+| Frontend | `NoteViewerPage.jsx` — read-only viewer with markdown preview, author link, course badge, word count, download button |
+| Frontend | `useNoteViewer.js` — fetch hook for single note with proper id-change reset |
+| Frontend | `NoteEditor.jsx` — added allowDownloads toggle (visible only when note is shared) |
+| Frontend | `useNotesData.js` — added `editorAllowDownloads` state, handler, auto-save integration, `?select=` URL param for "Open in Editor" flow |
+| Frontend | `App.jsx` — added `/notes/:id` route (public, not wrapped in PrivateRoute) |
+| Frontend | `features/notes/index.js` — exported `useNoteViewer` hook |
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `backend/prisma/schema.prisma` | Added `allowDownloads` field to Note model |
+| `backend/prisma/migrations/20260325000002_add_note_allow_downloads/migration.sql` | Migration SQL |
+| `backend/src/modules/notes/notes.routes.js` | Rewrote with per-route auth, `GET /:id` with optionalAuth, `?shared=true` support, allowDownloads in PATCH |
+| `frontend/studyhub-app/src/pages/notes/NoteViewerPage.jsx` | New read-only note viewer page |
+| `frontend/studyhub-app/src/pages/notes/useNoteViewer.js` | New fetch hook for single note |
+| `frontend/studyhub-app/src/pages/notes/NoteEditor.jsx` | Added allowDownloads toggle |
+| `frontend/studyhub-app/src/pages/notes/NotesPage.jsx` | Passed new props to NoteEditor |
+| `frontend/studyhub-app/src/pages/notes/useNotesData.js` | Added allowDownloads state, handler, auto-save, URL auto-select |
+| `frontend/studyhub-app/src/App.jsx` | Added `/notes/:id` route |
+| `frontend/studyhub-app/src/features/notes/index.js` | Exported useNoteViewer |
+
+### Validation
+
+| Suite | Result |
+|-------|--------|
+| Backend tests | 418/418 pass (36 files) |
+| Frontend lint | Clean |
+| Frontend build | Clean |
+
+---
+
+## Cycle 51.5 — Notes Inline Comments: Data Model + Backend API (2026-03-25)
+
+### Summary
+
+Added inline comment system for notes. Comments can optionally anchor to specific text selections via `anchorText` and `anchorOffset` fields. Note owners can resolve/unresolve comments. Comments cascade-delete with notes and users. Notifications and @mention support included.
+
+### Data Model
+
+`NoteComment` with fields: `id`, `content`, `noteId`, `userId`, `anchorText` (optional), `anchorOffset` (optional), `resolved`, `createdAt`. Indexed on `(noteId, createdAt DESC)`. Cascades on note and user deletion.
+
+### API Endpoints
+
+| Endpoint | Auth | Description |
+|----------|------|-------------|
+| `GET /api/notes/:id/comments` | optionalAuth | List comments; respects note privacy |
+| `POST /api/notes/:id/comments` | requireAuth + verified | Create comment with optional anchor; sends notifications + @mentions |
+| `PATCH /api/notes/:id/comments/:commentId` | requireAuth | Resolve/unresolve (note owner or admin only) |
+| `DELETE /api/notes/:id/comments/:commentId` | requireAuth | Delete (comment author, note owner, or admin) |
+
+### Access Control
+
+- Read: follows note visibility (shared = public, private = owner/admin only)
+- Create: any authenticated user who can read the note
+- Resolve: note owner or admin
+- Delete: comment author, note owner, or admin
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `backend/prisma/schema.prisma` | Added `NoteComment` model + relation on Note and User |
+| `backend/prisma/migrations/20260325000003_add_note_comments/migration.sql` | Create table + index + foreign keys |
+| `backend/src/modules/notes/notes.routes.js` | Added 4 comment endpoints with notifications, mentions, activity tracking |
+| `backend/src/lib/bootstrapSchema.js` | Added NoteComment CREATE TABLE + index |
+| `backend/src/lib/deleteUserAccount.js` | Added NoteComment cleanup before user deletion |
+
+### Validation
+
+| Suite | Result |
+|-------|--------|
+| Backend tests | 418/418 pass (36 files) |
+| Frontend lint | Clean |
+
+---
+
+## Cycle 51.5B — Notes Inline Comments: Frontend UI (2026-03-25)
+
+### Summary
+
+Added frontend comment section to the NoteViewerPage. Shared notes now display an expandable comment thread with support for @mentions, resolve/unresolve (note owner), delete (comment author/note owner/admin), and inline anchor text badges for text-selection comments.
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `frontend/studyhub-app/src/pages/notes/useNoteComments.js` | New hook: load, post, resolve, delete note comments via API |
+| `frontend/studyhub-app/src/pages/notes/NoteCommentSection.jsx` | New component: expand/collapse thread, comment input, comment list with anchor badges, resolve/reopen, delete |
+| `frontend/studyhub-app/src/pages/notes/NoteViewerPage.jsx` | Wired NoteCommentSection on shared notes; added useSession for current user |
+| `frontend/studyhub-app/src/features/notes/index.js` | Exported useNoteComments hook |
+
+### Validation
+
+| Suite | Result |
+|-------|--------|
+| Frontend lint | Clean |
+| Frontend build | Clean |

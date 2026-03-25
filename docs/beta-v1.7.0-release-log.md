@@ -484,3 +484,96 @@ Addressed 7 security findings from static analysis audit of Cycles 50.1–51.2 c
 |-------|--------|
 | Backend tests | 413/413 pass (36 files) |
 | Frontend build | Clean |
+
+---
+
+## Cycle 51.3 — Rename-safe Sheet Updates (2026-03-25)
+
+### Summary
+
+Title/description-only updates on sheets no longer re-run the HTML security pipeline or flip moderation status. Previously, renaming a published HTML sheet set its status to `pending_review`, causing 404s for non-owners.
+
+### Root Cause
+
+`resolveNextSheetStatus()` was called unconditionally on every update. For HTML sheets this always returned `PENDING_REVIEW` — even when only the title changed.
+
+### Changes
+
+| Category | Detail |
+|----------|--------|
+| Fixed | `sheets.update.controller.js` — wrapped status transition + HTML validation in `contentChanged` guard; metadata-only updates preserve existing status |
+| Added | 5 regression tests: title-only HTML, title-only MD, description-only, content change triggers review, non-owner readability after rename |
+
+### Validation
+
+| Suite | Result |
+|-------|--------|
+| Backend tests | 418/418 pass (36 files) |
+| New tests added | 5 in sheet.workflow.integration.test.js |
+
+---
+
+## Cycle 51.4 — Notes Sharing + Permissions + Viewer UI (2026-03-25)
+
+### Summary
+
+Added public note sharing with download control. Shared notes are viewable at `/notes/:id` by anyone. Owners can toggle `allowDownloads` to let visitors download the markdown. Private notes return 404 to non-owners.
+
+### Changes
+
+| Category | Detail |
+|----------|--------|
+| Schema | Added `allowDownloads` field to Note model |
+| Backend | `GET /api/notes/:id` with `optionalAuth` — public-readable shared notes, private notes 404 for non-owners |
+| Backend | `GET /api/notes?shared=true` — lists all public notes across users |
+| Backend | `PATCH /api/notes/:id` accepts `allowDownloads`; auto-resets when making note private |
+| Frontend | `NoteViewerPage` — read-only viewer with markdown preview, author link, course badge, download button |
+| Frontend | `NoteEditor` — added allowDownloads toggle (visible only when note is shared) |
+| Frontend | `useNotesData` — allowDownloads state, auto-save integration, `?select=` URL param for "Open in Editor" flow |
+| Frontend | `App.jsx` — `/notes/:id` route (public, not wrapped in PrivateRoute) |
+
+### Validation
+
+| Suite | Result |
+|-------|--------|
+| Backend tests | 418/418 pass (36 files) |
+| Frontend lint | Clean |
+| Frontend build | Clean |
+
+---
+
+## Cycle 51.5 — Notes Inline Comments: Data Model + Backend API (2026-03-25)
+
+### Summary
+
+Added inline comment system for notes. Comments optionally anchor to text selections via `anchorText`/`anchorOffset`. Note owners can resolve comments. Notifications and @mention support included.
+
+### API Endpoints
+
+| Endpoint | Auth | Description |
+|----------|------|-------------|
+| `GET /api/notes/:id/comments` | optionalAuth | List comments; respects note privacy |
+| `POST /api/notes/:id/comments` | requireAuth + verified | Create comment with optional anchor |
+| `PATCH /api/notes/:id/comments/:commentId` | requireAuth | Resolve/unresolve (note owner or admin) |
+| `DELETE /api/notes/:id/comments/:commentId` | requireAuth | Delete (comment author, note owner, or admin) |
+
+### Changes
+
+| Category | Detail |
+|----------|--------|
+| Schema | `NoteComment` model with anchor fields, resolved flag, cascade deletes |
+| Migration | `20260325000003_add_note_comments` — create table, index, foreign keys |
+| Backend | 4 comment endpoints on notes router with rate limiting, notifications, @mentions, activity tracking |
+| Infra | `bootstrapSchema.js` + `deleteUserAccount.js` updated for NoteComment |
+| Frontend | `useNoteComments.js` hook — load, post, resolve, delete comments via API |
+| Frontend | `NoteCommentSection.jsx` — expandable thread with @mentions, anchor badges, resolve/reopen, delete |
+| Frontend | `NoteViewerPage.jsx` — wired comment section on shared notes |
+| Frontend | `features/notes/index.js` — exported useNoteComments |
+
+### Validation
+
+| Suite | Result |
+|-------|--------|
+| Backend tests | 418/418 pass (36 files) |
+| Frontend lint | Clean |
+| Frontend build | Clean |

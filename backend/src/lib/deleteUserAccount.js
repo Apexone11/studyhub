@@ -55,6 +55,14 @@ async function deleteUserAccount(prisma, { userId, username, reason = null, deta
       await tx.feedPostReaction.deleteMany({ where: { postId: { in: postIds } } })
     }
 
+    // Clean up note comments on the user's notes + comments the user authored elsewhere
+    const userNotes = await tx.note.findMany({ where: { userId }, select: { id: true } })
+    const noteIds = userNotes.map((n) => n.id)
+    if (noteIds.length > 0) {
+      await tx.noteComment.deleteMany({ where: { noteId: { in: noteIds } } })
+    }
+    await tx.noteComment.deleteMany({ where: { userId } })
+
     await tx.feedPostComment.deleteMany({ where: { userId } })
     await tx.feedPostReaction.deleteMany({ where: { userId } })
     await tx.sheetContribution.deleteMany({

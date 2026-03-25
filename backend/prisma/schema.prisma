@@ -35,6 +35,7 @@ model User {
   passwordResetToken PasswordResetToken?
   announcements      Announcement[]
   notes              Note[]
+  noteComments       NoteComment[]
   reactions          Reaction[]
   feedPosts          FeedPost[]
   feedPostComments   FeedPostComment[]
@@ -237,11 +238,28 @@ model Note {
   content   String   @default("")
   userId    Int
   courseId  Int?
-  private   Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  private        Boolean  @default(true)
+  allowDownloads Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
   author    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   course    Course?  @relation(fields: [courseId], references: [id])
+  noteComments NoteComment[]
+}
+
+model NoteComment {
+  id           Int      @id @default(autoincrement())
+  content      String
+  noteId       Int
+  userId       Int
+  anchorText   String?
+  anchorOffset Int?
+  resolved     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  note         Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  author       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([noteId, createdAt(sort: Desc)])
 }
 
 model Notification {

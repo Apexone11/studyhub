@@ -81,32 +81,43 @@ router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
 
     const nextContent = typeof data.content === 'string' ? data.content : null
     const nextFormat = data.contentFormat || sheet.contentFormat
-    const wantsDraft = requestedStatus === SHEET_STATUS.DRAFT
-    const nextStatus = wantsDraft
-      ? SHEET_STATUS.DRAFT
-      : resolveNextSheetStatus({
-          requestedStatus,
-          contentFormat: nextFormat,
-        })
 
-    if (nextFormat === 'html') {
-      const killSwitch = await isHtmlUploadsEnabled()
-      if (!killSwitch.enabled) {
-        return res.status(403).json({
-          error: 'HTML uploads are temporarily disabled. Please use Markdown instead.',
-          code: 'HTML_UPLOADS_DISABLED',
-        })
-      }
-      const htmlToValidate = typeof nextContent === 'string' ? nextContent : String(sheet.content || '')
-      if (nextStatus !== SHEET_STATUS.DRAFT || htmlToValidate.trim()) {
-        const validation = validateHtmlForSubmission(htmlToValidate)
-        if (!validation.ok) {
-          return res.status(400).json({ error: validation.issues[0], issues: validation.issues })
+    // Determine if moderation-relevant fields changed (content, format, attachment, status)
+    const contentChanged = typeof content === 'string'
+      || (req.body && Object.hasOwn(req.body, 'contentFormat'))
+      || removeAttachment === true
+      || (req.body && Object.hasOwn(req.body, 'status'))
+
+    if (contentChanged) {
+      const wantsDraft = requestedStatus === SHEET_STATUS.DRAFT
+      const nextStatus = wantsDraft
+        ? SHEET_STATUS.DRAFT
+        : resolveNextSheetStatus({
+            requestedStatus,
+            contentFormat: nextFormat,
+          })
+
+      if (nextFormat === 'html') {
+        const killSwitch = await isHtmlUploadsEnabled()
+        if (!killSwitch.enabled) {
+          return res.status(403).json({
+            error: 'HTML uploads are temporarily disabled. Please use Markdown instead.',
+            code: 'HTML_UPLOADS_DISABLED',
+          })
+        }
+        const htmlToValidate = typeof nextContent === 'string' ? nextContent : String(sheet.content || '')
+        if (nextStatus !== SHEET_STATUS.DRAFT || htmlToValidate.trim()) {
+          const validation = validateHtmlForSubmission(htmlToValidate)
+          if (!validation.ok) {
+            return res.status(400).json({ error: validation.issues[0], issues: validation.issues })
+          }
         }
       }
-    }
 
-    data.status = nextStatus
+      data.status = nextStatus
+    }
+    // When only metadata changed (title, description, courseId, allowDownloads),
+    // preserve the current status — do not re-run moderation pipeline.
 
     const updated = await prisma.studySheet.update({
       where: { id: sheetId },

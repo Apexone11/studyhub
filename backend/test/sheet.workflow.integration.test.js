@@ -716,4 +716,128 @@ describe('sheet workflow integration', () => {
 
     expect(adminRuntimeResponse.status).toBe(200)
   })
+
+  describe('rename-safe updates (Cycle 51.3)', () => {
+    it('title-only update does not change status on an HTML sheet', async () => {
+      // Seed a published HTML sheet directly into mock state
+      const created = await mocks.prisma.studySheet.create({
+        data: {
+          title: 'Original Title',
+          content: '<h1>Hello</h1>',
+          contentFormat: 'html',
+          status: 'published',
+          courseId: 10,
+          userId: 101,
+        },
+      })
+      const sheetId = created.id
+
+      // Rename title only
+      const renameRes = await request(app)
+        .patch(`/sheets/${sheetId}`)
+        .set('x-test-user-id', '101')
+        .set('x-test-role', 'student')
+        .send({ title: 'Renamed Title' })
+
+      expect(renameRes.status).toBe(200)
+      expect(renameRes.body.title).toBe('Renamed Title')
+      expect(renameRes.body.status).toBe('published')
+    })
+
+    it('title-only update does not change status on a markdown sheet', async () => {
+      const created = await mocks.prisma.studySheet.create({
+        data: {
+          title: 'MD Sheet',
+          content: '# Hello',
+          contentFormat: 'markdown',
+          status: 'published',
+          courseId: 10,
+          userId: 101,
+        },
+      })
+
+      const renameRes = await request(app)
+        .patch(`/sheets/${created.id}`)
+        .set('x-test-user-id', '101')
+        .set('x-test-role', 'student')
+        .send({ title: 'Updated MD Title' })
+
+      expect(renameRes.status).toBe(200)
+      expect(renameRes.body.title).toBe('Updated MD Title')
+      expect(renameRes.body.status).toBe('published')
+    })
+
+    it('description-only update does not change status', async () => {
+      const created = await mocks.prisma.studySheet.create({
+        data: {
+          title: 'Desc Test',
+          content: '<p>Content</p>',
+          contentFormat: 'html',
+          status: 'published',
+          courseId: 10,
+          userId: 101,
+        },
+      })
+
+      const updateRes = await request(app)
+        .patch(`/sheets/${created.id}`)
+        .set('x-test-user-id', '101')
+        .set('x-test-role', 'student')
+        .send({ description: 'New description' })
+
+      expect(updateRes.status).toBe(200)
+      expect(updateRes.body.status).toBe('published')
+    })
+
+    it('content change on HTML sheet triggers pending_review', async () => {
+      const created = await mocks.prisma.studySheet.create({
+        data: {
+          title: 'Content Change Test',
+          content: '<h1>Original</h1>',
+          contentFormat: 'html',
+          status: 'published',
+          courseId: 10,
+          userId: 101,
+        },
+      })
+
+      const updateRes = await request(app)
+        .patch(`/sheets/${created.id}`)
+        .set('x-test-user-id', '101')
+        .set('x-test-role', 'student')
+        .send({ content: '<h1>Changed Content</h1>' })
+
+      expect(updateRes.status).toBe(200)
+      expect(updateRes.body.status).toBe('pending_review')
+    })
+
+    it('sheet remains readable by non-owner after title rename', async () => {
+      const created = await mocks.prisma.studySheet.create({
+        data: {
+          title: 'Public Sheet',
+          content: '<p>Visible to all</p>',
+          contentFormat: 'html',
+          status: 'published',
+          courseId: 10,
+          userId: 101,
+        },
+      })
+
+      // Rename as owner
+      const renameRes = await request(app)
+        .patch(`/sheets/${created.id}`)
+        .set('x-test-user-id', '101')
+        .set('x-test-role', 'student')
+        .send({ title: 'Renamed Public Sheet' })
+
+      expect(renameRes.status).toBe(200)
+
+      // Read as unauthenticated visitor (optionalAuth sets req.user = undefined)
+      const readRes = await request(app)
+        .get(`/sheets/${created.id}`)
+
+      expect(readRes.status).toBe(200)
+      expect(readRes.body.title).toBe('Renamed Public Sheet')
+    })
+  })
 })
