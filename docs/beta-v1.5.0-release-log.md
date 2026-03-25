@@ -5347,3 +5347,161 @@ Added AWS KMS SDK and a minimal admin-only status endpoint to verify AWS credent
 | Backend tests | 324/324 pass |
 | Frontend build | Clean |
 | Backend lint | 5 pre-existing errors (none from this change) |
+
+---
+
+## Cycle 50.1 — AWS KMS Envelope Encryption Utilities (2026-03-25)
+
+### Summary
+
+Reusable envelope encryption helpers using AWS KMS + AES-256-GCM. Per-encryption data keys via KMS `GenerateDataKey`, local AES-256-GCM, plaintext keys zeroed from memory.
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `backend/src/lib/kmsEnvelope.js` | New: `encryptField()`, `decryptField()` |
+| `backend/test/kmsEnvelope.test.js` | New: 15 tests (roundtrip, tamper, wrong key, errors) |
+
+---
+
+## Cycle 50.2 — PII Vault Table + Data Access Layer (2026-03-25)
+
+### Summary
+
+Dedicated encrypted storage for sensitive user data. `UserSensitive` table with envelope-encrypted JSON blobs. Address fields explicitly rejected.
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `backend/prisma/schema.prisma` | Added `UserSensitive` model + relation to `User` |
+| `backend/prisma/migrations/20260325000000_add_user_sensitive_pii_vault/` | New migration |
+| `backend/src/lib/piiVault.js` | New: `setUserPII()`, `getUserPII()`, `stripAddressFields()` |
+| `backend/test/piiVault.test.js` | New: 9 tests (address stripping, vault CRUD, roundtrip) |
+
+---
+
+## Cycle 50.3 — Log Redaction + Sentry Scrubbing (2026-03-25)
+
+### Summary
+
+Centralized redaction layer and Sentry `beforeSend` hook to scrub sensitive fields from all error telemetry.
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `backend/src/lib/redact.js` | New: `redactObject()`, `redactHeaders()`, `maskEmail()`, `safeRequestContext()` |
+| `backend/src/monitoring/sentry.js` | Added `beforeSend` scrubbing; `captureError` redacts context |
+| `backend/test/redact.test.js` | New: 23 tests (masking, redaction, headers, safe context) |
+
+---
+
+## Cycle 50.4 — Sensitive Access Audit Logging (2026-03-25)
+
+### Summary
+
+`AuditLog` table wired into PII vault. Every vault read/write creates an audit record with actor metadata, no plaintext PII.
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `backend/prisma/schema.prisma` | Added `AuditLog` model with indexes |
+| `backend/prisma/migrations/20260325000001_add_audit_log/` | New migration |
+| `backend/src/lib/auditLog.js` | New: `recordAudit()` |
+| `backend/src/lib/piiVault.js` | `setUserPII`/`getUserPII` now fire audit records |
+| `backend/test/auditLog.test.js` | New: 7 tests (record creation, vault integration, failure isolation) |
+
+---
+
+## Cycle 50.5 — Gate KMS Status Endpoint (2026-03-25)
+
+### Summary
+
+Gated `/api/admin/kms/status` behind `ENABLE_KMS_STATUS=true` (defaults to 404).
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `backend/src/modules/admin/admin.kms.controller.js` | Added env var gate middleware |
+
+---
+
+## Cycle 51.1 — Remote Asset Allowlist for AI-Generated HTML (2026-03-25)
+
+### Summary
+
+Domain-based allowlist so Google Fonts pass validation while all other remote assets remain blocked. Fixes the most common failure for AI-generated HTML sheets.
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `backend/src/lib/htmlSecurityRules.js` | Added `ALLOWED_STYLESHEET_HOSTS`, `ALLOWED_FONT_HOSTS`, `isAllowedRemoteUrl()`; remote asset regex extended; allowlisted URLs filtered |
+| `backend/test/remoteAllowlist.test.js` | New: 21 tests (allowlist, Google Fonts, scripts blocked, mixed) |
+
+### Validation (Cycles 50.1–51.1)
+
+| Suite | Result |
+|-------|--------|
+| Backend tests | 399/399 pass (36 files) |
+| Frontend build | Clean |
+| New tests added | 75 across 5 test files |
+
+---
+
+## Cycle 51.2 — Expand Remote Stylesheet Allowlist (2026-03-25)
+
+### Summary
+
+Expanded the remote asset allowlist to support Bootstrap, Tailwind, and Font Awesome CSS from `cdnjs.cloudflare.com` and `cdn.jsdelivr.net`. CDN hosts require `.css` file extension — `.js` files from these hosts remain blocked.
+
+### Security Model
+
+| Host | CSS (.css) | JS (.js) | Fonts | Other |
+|------|-----------|---------|-------|-------|
+| `fonts.googleapis.com` | Allowed | Blocked | N/A | Blocked |
+| `fonts.gstatic.com` | N/A | N/A | Allowed | Blocked |
+| `cdnjs.cloudflare.com` | Allowed | Blocked | Blocked | Blocked |
+| `cdn.jsdelivr.net` | Allowed | Blocked | Blocked | Blocked |
+| `unpkg.com` | Blocked | Blocked | Blocked | Blocked |
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `backend/src/lib/htmlSecurityRules.js` | Added `cdnjs.cloudflare.com`, `cdn.jsdelivr.net` to stylesheet hosts; added `CSS_PATH_REQUIRED_HOSTS` enforcing `.css` extension for CDN hosts |
+| `backend/test/remoteAllowlist.test.js` | Expanded from 21 to 34 tests covering CDN CSS pass, CDN JS block, path validation, enriched issues |
+
+---
+
+## Security Hardening Pass — Checkmarx-style Audit Fixes (2026-03-25)
+
+### Summary
+
+Addressed 7 security findings from static analysis audit of Cycles 50.1–51.2 code.
+
+### Fixes Applied
+
+| Finding | Severity | File | Fix |
+|---------|----------|------|-----|
+| Ciphertext split without validation | HIGH | `piiVault.js` | Added segment count check before destructuring |
+| JSON.parse without error handling | MEDIUM-HIGH | `piiVault.js` | Wrapped in try/catch, throws generic error |
+| Shallow address field filtering | MEDIUM | `piiVault.js` | Deep recursive stripping with depth limit |
+| KMS error info disclosure | MEDIUM | `admin.kms.controller.js` | Generic "KMS service error" response, details only in Sentry |
+| Missing ARN format validation | HIGH | `kmsEnvelope.js` | Added `arn:aws:kms:` prefix check |
+| maskEmail edge case | LOW-MEDIUM | `redact.js` | Strict 2-part split validation |
+| Audit log field flooding | LOW-MEDIUM | `auditLog.js` | Added truncation limits (event: 256, route: 2048, role: 64) |
+| Weak .css path validation | MEDIUM | `htmlSecurityRules.js` | Changed to `\.css` boundary regex with query/hash/end anchor |
+| URL extraction regex overly broad | LOW-MEDIUM | `htmlSecurityRules.js` | Tightened character class to exclude angle brackets |
+
+### Validation (Final — Cycles 50.1–51.2 + Security Audit)
+
+| Suite | Result |
+|-------|--------|
+| Backend tests | 413/413 pass (36 files) |
+| Frontend build | Clean |
+| Total new tests | 89 across 5 test files |

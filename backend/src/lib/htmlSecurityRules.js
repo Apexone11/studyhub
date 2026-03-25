@@ -12,6 +12,54 @@ const TIER_LABELS = ['Clean', 'Flagged', 'High Risk', 'Quarantined']
 // Tags that signal Tier 1 (suspicious but common in rich HTML)
 const SUSPICIOUS_TAG_NAMES = ['script', 'iframe', 'object', 'embed', 'meta', 'base', 'form']
 
+// ── Remote Asset Allowlist ──────────────────────────────
+// Only these domains are permitted for external resources, and only for specific purposes.
+// All other remote URLs remain blocked. Scripts are NEVER allowed from external domains.
+const ALLOWED_STYLESHEET_HOSTS = new Set([
+  'fonts.googleapis.com',
+  'cdnjs.cloudflare.com',
+  'cdn.jsdelivr.net',
+])
+const ALLOWED_FONT_HOSTS = new Set([
+  'fonts.gstatic.com',
+])
+
+// CDN hosts that require path to end in .css (blocks .js loaded via <link>)
+const CSS_PATH_REQUIRED_HOSTS = new Set([
+  'cdnjs.cloudflare.com',
+  'cdn.jsdelivr.net',
+])
+
+/**
+ * Check if a URL is from an allowed remote stylesheet/font host.
+ * Only permits https scheme. CDN hosts require .css path extension.
+ */
+function isAllowedRemoteUrl(url) {
+  if (typeof url !== 'string') return false
+  const trimmed = url.trim()
+  if (!trimmed.startsWith('https://')) return false
+  try {
+    const parsed = new URL(trimmed)
+    const { hostname, pathname } = parsed
+
+    // Font file hosts (Google Fonts gstatic)
+    if (ALLOWED_FONT_HOSTS.has(hostname)) return true
+
+    // Stylesheet hosts
+    if (ALLOWED_STYLESHEET_HOSTS.has(hostname)) {
+      // CDN hosts must serve .css files only (reject .js even via <link>)
+      if (CSS_PATH_REQUIRED_HOSTS.has(hostname)) {
+        return /\.css(?:\?|#|$)/.test(pathname)
+      }
+      return true // fonts.googleapis.com doesn't serve static files with extensions
+    }
+
+    return false
+  } catch {
+    return false
+  }
+}
+
 function isAsciiWhitespace(char) {
   return char === ' ' || char === '\n' || char === '\r' || char === '\t' || char === '\f'
 }
@@ -199,7 +247,8 @@ function collectMatches(value, pattern, message, attribute) {
   let match
   while ((match = regex.exec(value)) !== null) {
     const loc = indexToLineCol(value, match.index)
-    const urlMatch = match[0].match(/https?:\/\/[^\s"'>)]+/)
+    const urlMatch = match[0].match(/https?:\/\/[^\s"'<>)]*/)
+
     results.push({
       message,
       line: loc.line,
@@ -256,15 +305,19 @@ function validateHtmlForRuntime(html) {
   }
 
   // Reject remote URLs (http/https) in src, href, srcset attributes
-  const remoteAttrMatches = collectMatches(value, /\b(?:src|href|srcset)\s*=\s*["']?\s*https?:\/\//gi, 'Remote asset — use inline content or data: URLs.', 'src/href/srcset')
+  // EXCEPT: allowlisted stylesheet/font domains (e.g. Google Fonts)
+  const remoteAttrMatchesRaw = collectMatches(value, /\b(?:src|href|srcset)\s*=\s*["']?\s*https?:\/\/[^\s"'>)]+/gi, 'Remote asset — use inline content or data: URLs.', 'src/href/srcset')
+  const remoteAttrMatches = remoteAttrMatchesRaw.filter((m) => !isAllowedRemoteUrl(m.url))
   if (remoteAttrMatches.length > 0) {
     issues.push('Remote assets (http/https URLs in src, href, or srcset) are not allowed. Use inline content or data: URLs.')
     enrichedIssues.push(...remoteAttrMatches)
   }
 
-  // Reject remote URLs in CSS url() or @import
-  const cssUrlMatches = collectMatches(lowered, /url\s*\(\s*["']?\s*https?:\/\//gi, 'Remote CSS url() — use inline styles or data: URLs.', 'css')
-  const cssImportMatches = collectMatches(lowered, /@import\s+["']?\s*https?:\/\//gi, 'Remote @import — use inline styles.', 'css')
+  // Reject remote URLs in CSS url() or @import (allow allowlisted hosts)
+  const cssUrlMatchesRaw = collectMatches(lowered, /url\s*\(\s*["']?\s*https?:\/\/[^\s"'>)]+/gi, 'Remote CSS url() — use inline styles or data: URLs.', 'css')
+  const cssImportMatchesRaw = collectMatches(lowered, /@import\s+["']?\s*https?:\/\/[^\s"'>)]+/gi, 'Remote @import — use inline styles.', 'css')
+  const cssUrlMatches = cssUrlMatchesRaw.filter((m) => !isAllowedRemoteUrl(m.url))
+  const cssImportMatches = cssImportMatchesRaw.filter((m) => !isAllowedRemoteUrl(m.url))
   if (cssUrlMatches.length > 0 || cssImportMatches.length > 0) {
     issues.push('Remote CSS assets (url() or @import with http/https) are not allowed.')
     enrichedIssues.push(...cssUrlMatches, ...cssImportMatches)
@@ -329,6 +382,10 @@ module.exports = {
   RISK_TIER,
   TIER_LABELS,
   SUSPICIOUS_TAG_NAMES,
+  ALLOWED_STYLESHEET_HOSTS,
+  ALLOWED_FONT_HOSTS,
+  CSS_PATH_REQUIRED_HOSTS,
+  isAllowedRemoteUrl,
   normalizeContentFormat,
   containsSuspiciousTag,
   containsInlineEventHandler,

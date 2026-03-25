@@ -6,7 +6,13 @@ const { getKmsClient } = require('../../lib/kmsClient')
 const router = express.Router()
 
 // ── GET /api/admin/kms/status ─────────────────────────────
-router.get('/kms/status', async (req, res) => {
+// Gated behind ENABLE_KMS_STATUS=true (default: disabled in production)
+router.get('/kms/status', (req, res, next) => {
+  if (process.env.ENABLE_KMS_STATUS !== 'true') {
+    return res.status(404).json({ error: 'Not found' })
+  }
+  next()
+}, async (req, res) => {
   try {
     const keyId = process.env.KMS_KEY_ARN
     if (!keyId) {
@@ -31,8 +37,7 @@ router.get('/kms/status', async (req, res) => {
     captureError(err, { route: req.originalUrl, method: req.method })
     res.status(500).json({
       ok: false,
-      name: err.name,
-      message: err.message,
+      error: 'KMS service error',
     })
   }
 })

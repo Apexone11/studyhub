@@ -303,3 +303,184 @@ Added AWS KMS SDK and a minimal admin-only status endpoint (`GET /api/admin/kms/
 |-------|--------|
 | Backend tests | 324/324 pass |
 | Frontend build | Clean |
+
+---
+
+## Cycle 50.1 — AWS KMS Envelope Encryption Utilities (2026-03-25)
+
+### Summary
+
+Added reusable envelope encryption helpers using AWS KMS + AES-256-GCM. Data keys are generated per-encryption via KMS `GenerateDataKey`, used locally for AES-256-GCM, then zeroed from memory. Only the KMS-encrypted data key is persisted.
+
+### Changes
+
+| Category | Detail |
+|----------|--------|
+| Added | `backend/src/lib/kmsEnvelope.js` — `encryptField(plaintext)` and `decryptField(payload)` helpers |
+| Added | `backend/test/kmsEnvelope.test.js` — 15 tests: roundtrip (5), payload structure (3), tamper detection (3), wrong key (1), error handling (3) |
+
+---
+
+## Cycle 50.2 — PII Vault Table + Data Access Layer (2026-03-25)
+
+### Summary
+
+Created a dedicated encrypted storage area for sensitive user data. The `UserSensitive` table stores envelope-encrypted JSON blobs with per-record data keys. Address fields are explicitly rejected.
+
+### Changes
+
+| Category | Detail |
+|----------|--------|
+| Added | `UserSensitive` Prisma model (userId unique FK, ciphertext, encryptedDataKey, keyArn) |
+| Added | `backend/prisma/migrations/20260325000000_add_user_sensitive_pii_vault/` |
+| Added | `backend/src/lib/piiVault.js` — `setUserPII()`, `getUserPII()`, `stripAddressFields()` |
+| Added | `backend/test/piiVault.test.js` — 9 tests: address stripping (3), set (2), get (2), roundtrip (2) |
+| Security | Address fields (`address`, `streetAddress`, `mailingAddress`, etc.) explicitly rejected/stripped |
+
+---
+
+## Cycle 50.3 — Log Redaction + Sentry Scrubbing (2026-03-25)
+
+### Summary
+
+Added centralized redaction for sensitive fields and configured Sentry `beforeSend` hook to scrub headers, cookies, request bodies, and extras before transmission.
+
+### Changes
+
+| Category | Detail |
+|----------|--------|
+| Added | `backend/src/lib/redact.js` — `redactObject()`, `redactHeaders()`, `maskEmail()`, `safeRequestContext()` |
+| Changed | `backend/src/monitoring/sentry.js` — added `beforeSend` hook scrubbing headers/cookies/body/extras; `captureError` now redacts context before attaching |
+| Added | `backend/test/redact.test.js` — 23 tests: email masking (4), object redaction (10), headers (5), safe context (3) |
+| Security | Passwords, tokens, cookies, auth headers, PII vault payloads all redacted from Sentry events |
+
+---
+
+## Cycle 50.4 — Sensitive Access Audit Logging (2026-03-25)
+
+### Summary
+
+Added an `AuditLog` table and wired it into PII vault operations. Every vault read/write produces an audit record with actor metadata but no plaintext PII.
+
+### Changes
+
+| Category | Detail |
+|----------|--------|
+| Added | `AuditLog` Prisma model (event, actorId, actorRole, targetUserId, route, method, indexed) |
+| Added | `backend/prisma/migrations/20260325000001_add_audit_log/` |
+| Added | `backend/src/lib/auditLog.js` — `recordAudit()` helper |
+| Changed | `backend/src/lib/piiVault.js` — `setUserPII` and `getUserPII` now accept actor context and fire audit records |
+| Added | `backend/test/auditLog.test.js` — 7 tests: record creation (3), vault integration (3), failure isolation (1) |
+
+---
+
+## Cycle 50.5 — Gate KMS Status Endpoint (2026-03-25)
+
+### Summary
+
+Gated the debug-style `/api/admin/kms/status` endpoint behind `ENABLE_KMS_STATUS=true` (defaults to disabled/404 in production).
+
+### Changes
+
+| Category | Detail |
+|----------|--------|
+| Changed | `backend/src/modules/admin/admin.kms.controller.js` — added env var gate middleware |
+
+---
+
+## Cycle 51.1 — Remote Asset Allowlist for AI-Generated HTML (2026-03-25)
+
+### Summary
+
+Added a domain-based allowlist so Google Fonts stylesheets and font files pass validation, while all other remote assets (scripts, images, arbitrary CDNs) remain blocked. This fixes the most common failure for ChatGPT/Claude-generated HTML sheets.
+
+### Security Model
+
+| Asset Type | Rule |
+|-----------|------|
+| `<link rel="stylesheet">` from `fonts.googleapis.com` | Allowed (https only) |
+| Font files from `fonts.gstatic.com` | Allowed (https only) |
+| External `<script src="...">` from ANY domain | Blocked |
+| `http://` URLs (even allowed hosts) | Blocked |
+| `javascript:`, `data:text/html` | Blocked |
+| All other remote URLs | Blocked |
+
+### Changes
+
+| Category | Detail |
+|----------|--------|
+| Changed | `backend/src/lib/htmlSecurityRules.js` — added `ALLOWED_STYLESHEET_HOSTS`, `ALLOWED_FONT_HOSTS`, `isAllowedRemoteUrl()`; remote asset regex now captures full URLs; allowlisted URLs filtered before flagging |
+| Added | `backend/test/remoteAllowlist.test.js` — 21 tests: allowlist function (9), Google Fonts pass (3), scripts blocked (2), non-allowlisted blocked (3), mixed (1), config (2), javascript: (1) |
+
+---
+
+## Validation Summary (Cycles 50.1–51.1)
+
+| Suite | Result |
+|-------|--------|
+| Backend tests | 399/399 pass (36 files) |
+| Frontend build | Clean |
+
+### New Test Files
+
+| File | Tests | Coverage |
+|------|-------|----------|
+| `kmsEnvelope.test.js` | 15 | Envelope encryption roundtrip, tamper detection, error handling |
+| `piiVault.test.js` | 9 | Address stripping, vault CRUD, roundtrip |
+| `redact.test.js` | 23 | Email masking, object/header redaction, safe request context |
+| `auditLog.test.js` | 7 | Audit record creation, vault integration, failure isolation |
+| `remoteAllowlist.test.js` | 34 | Allowlist function, Google Fonts, CDN CSS, script blocking, mixed assets |
+
+---
+
+## Cycle 51.2 — Expand Remote Stylesheet Allowlist (2026-03-25)
+
+### Summary
+
+Expanded the remote asset allowlist to support Bootstrap, Tailwind, and Font Awesome CSS from `cdnjs.cloudflare.com` and `cdn.jsdelivr.net`. CDN hosts require `.css` file extension — `.js` files from these hosts remain blocked.
+
+### Security Model
+
+| Host | CSS (.css) | JS (.js) | Fonts | Other |
+|------|-----------|---------|-------|-------|
+| `fonts.googleapis.com` | Allowed | Blocked | N/A | Blocked |
+| `fonts.gstatic.com` | N/A | N/A | Allowed | Blocked |
+| `cdnjs.cloudflare.com` | Allowed | Blocked | Blocked | Blocked |
+| `cdn.jsdelivr.net` | Allowed | Blocked | Blocked | Blocked |
+| `unpkg.com` | Blocked | Blocked | Blocked | Blocked |
+
+### Changes
+
+| Category | Detail |
+|----------|--------|
+| Changed | `backend/src/lib/htmlSecurityRules.js` — added `cdnjs.cloudflare.com`, `cdn.jsdelivr.net` to stylesheet hosts; added `CSS_PATH_REQUIRED_HOSTS` enforcing `.css` extension for CDN hosts |
+| Changed | `backend/test/remoteAllowlist.test.js` — expanded from 21 to 34 tests covering CDN CSS pass, CDN JS block, path validation, enriched issues |
+
+---
+
+## Security Hardening Pass — Checkmarx-style Audit Fixes (2026-03-25)
+
+### Summary
+
+Addressed 7 security findings from static analysis audit of Cycles 50.1–51.2 code.
+
+### Fixes Applied
+
+| Finding | Severity | File | Fix |
+|---------|----------|------|-----|
+| Ciphertext split without validation | HIGH | `piiVault.js` | Added segment count check before destructuring |
+| JSON.parse without error handling | MEDIUM-HIGH | `piiVault.js` | Wrapped in try/catch, throws generic error |
+| Shallow address field filtering | MEDIUM | `piiVault.js` | Deep recursive stripping with depth limit |
+| KMS error info disclosure | MEDIUM | `admin.kms.controller.js` | Generic "KMS service error" response, details only in Sentry |
+| Missing ARN format validation | HIGH | `kmsEnvelope.js` | Added `arn:aws:kms:` prefix check |
+| maskEmail edge case | LOW-MEDIUM | `redact.js` | Strict 2-part split validation |
+| Audit log field flooding | LOW-MEDIUM | `auditLog.js` | Added truncation limits (event: 256, route: 2048, role: 64) |
+| Weak .css path validation | MEDIUM | `htmlSecurityRules.js` | Changed to `/\.css(?:\?|#|$)/` boundary regex |
+| URL extraction regex overly broad | LOW-MEDIUM | `htmlSecurityRules.js` | Tightened character class to `[^\s"'<>)]*` |
+
+### Validation
+
+| Suite | Result |
+|-------|--------|
+| Backend tests | 413/413 pass (36 files) |
+| Frontend build | Clean |
