@@ -3,7 +3,7 @@
  *
  * Layout: Sticky header + 2-column (tabs sidebar | tab content).
  * Responsive: On phone, tabs become a horizontal scrollable row.
- * 7 tabs: Profile, Security, Notifications, Privacy, Courses, Appearance, Account
+ * 8 tabs: Profile, Security, Notifications, Privacy, Appearance, Account, Moderation
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -24,6 +24,7 @@ import AccountTab from './AccountTab'
 import NotificationsTab from './NotificationsTab'
 import PrivacyTab from './PrivacyTab'
 import AppearanceTab from './AppearanceTab'
+import ModerationTab from './ModerationTab'
 
 const NAV_TABS = [
   { id: 'profile', label: 'Profile' },
@@ -32,6 +33,7 @@ const NAV_TABS = [
   { id: 'privacy', label: 'Privacy' },
   { id: 'appearance', label: 'Appearance' },
   { id: 'account', label: 'Account' },
+  { id: 'moderation', label: 'Moderation' },
 ]
 
 export default function SettingsPage() {
@@ -193,6 +195,8 @@ export default function SettingsPage() {
             clearSession={clearSession}
           />
         )
+      case 'moderation':
+        return <ModerationTab />
       default:
         return null
     }

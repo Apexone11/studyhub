@@ -2,20 +2,25 @@ import { useCallback, useEffect, useState } from 'react'
 import { FONT } from './adminConstants'
 import { SUB_TABS, createState } from './moderationHelpers'
 import { showToast } from '../../lib/toast'
+import OverviewSubTab from './OverviewSubTab'
 import CasesSubTab from './CasesSubTab'
 import StrikesSubTab from './StrikesSubTab'
 import AppealsSubTab from './AppealsSubTab'
 import RestrictionsSubTab from './RestrictionsSubTab'
 
 export default function ModerationTab({ apiJson, setConfirmAction, formatDateTime }) {
-  const [subTab, setSubTab] = useState('cases')
+  const [subTab, setSubTab] = useState('overview')
 
   const [casesState, setCasesState] = useState(createState)
   const [strikesState, setStrikesState] = useState(createState)
   const [appealsState, setAppealsState] = useState(createState)
   const [restrictionsState, setRestrictionsState] = useState(createState)
+  const [overviewData, setOverviewData] = useState(null)
+  const [overviewLoading, setOverviewLoading] = useState(false)
 
   const [caseStatus, setCaseStatus] = useState('pending')
+  const [caseSource, setCaseSource] = useState('')
+  const [caseClaimed, setCaseClaimed] = useState('')
   const [caseSort, setCaseSort] = useState('date')
   const [expandedCase, setExpandedCase] = useState(null)
   const [expandedCaseLoading, setExpandedCaseLoading] = useState(false)
@@ -25,15 +30,30 @@ export default function ModerationTab({ apiJson, setConfirmAction, formatDateTim
   const [strikeError, setStrikeError] = useState('')
 
   /* ── Loaders ─────────────────────────────────────────────────── */
+  const loadOverview = useCallback(async () => {
+    setOverviewLoading(true)
+    try {
+      const data = await apiJson('/api/admin/moderation/cases/overview')
+      setOverviewData(data)
+    } catch {
+      setOverviewData(null)
+    } finally {
+      setOverviewLoading(false)
+    }
+  }, [apiJson])
+
   const loadCases = useCallback(async (page = 1) => {
     setCasesState((s) => ({ ...s, loading: true, error: '', page }))
     try {
-      const data = await apiJson(`/api/admin/moderation/cases?page=${page}&status=${encodeURIComponent(caseStatus)}`)
+      const params = new URLSearchParams({ page, status: caseStatus })
+      if (caseSource) params.set('source', caseSource)
+      if (caseClaimed) params.set('claimed', caseClaimed)
+      const data = await apiJson(`/api/admin/moderation/cases?${params}`)
       setCasesState({ loading: false, loaded: true, error: '', page: data.page || page, total: data.total || 0, items: data.cases || [] })
     } catch (err) {
       setCasesState((s) => ({ ...s, loading: false, error: err.message || 'Could not load cases.' }))
     }
-  }, [apiJson, caseStatus])
+  }, [apiJson, caseStatus, caseSource, caseClaimed])
 
   const loadStrikes = useCallback(async (page = 1) => {
     setStrikesState((s) => ({ ...s, loading: true, error: '', page }))
@@ -65,6 +85,7 @@ export default function ModerationTab({ apiJson, setConfirmAction, formatDateTim
     }
   }, [apiJson])
 
+  useEffect(() => { if (subTab === 'overview') void loadOverview() }, [subTab, loadOverview])
   useEffect(() => { if (subTab === 'cases') void loadCases(1) }, [subTab, loadCases])
   useEffect(() => { if (subTab === 'strikes' && !strikesState.loaded && !strikesState.loading) void loadStrikes(1) }, [subTab, strikesState.loaded, strikesState.loading, loadStrikes])
   useEffect(() => { if (subTab === 'appeals') void loadAppeals(1) }, [subTab, loadAppeals])
@@ -163,23 +184,53 @@ export default function ModerationTab({ apiJson, setConfirmAction, formatDateTim
     })
   }
 
+  /* ── Claim / Unclaim ────────────────────────────────────────── */
+  async function claimCase(caseId) {
+    try {
+      await apiJson(`/api/admin/moderation/cases/${caseId}/claim`, { method: 'POST' })
+      showToast('Case claimed.', 'success')
+      await loadCaseDetail(caseId)
+      await loadCases(casesState.page)
+    } catch (err) {
+      showToast(err.message || 'Could not claim case.', 'error')
+    }
+  }
+
+  async function unclaimCase(caseId) {
+    try {
+      await apiJson(`/api/admin/moderation/cases/${caseId}/unclaim`, { method: 'POST' })
+      showToast('Claim released.', 'success')
+      await loadCaseDetail(caseId)
+      await loadCases(casesState.page)
+    } catch (err) {
+      showToast(err.message || 'Could not release claim.', 'error')
+    }
+  }
+
   /* ── Render ─────────────────────────────────────────────────── */
   return (
     <>
-      <div style={{ display: 'flex', gap: 4, marginBottom: 18, borderBottom: '1px solid #e2e8f0', paddingBottom: 8 }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 18, borderBottom: '1px solid var(--sh-border)', paddingBottom: 8, flexWrap: 'wrap' }}>
         {SUB_TABS.map(([key, label]) => (
           <button key={key} type="button" onClick={() => setSubTab(key)}
-            style={{ padding: '7px 16px', borderRadius: '8px 8px 0 0', border: 'none', background: subTab === key ? '#eff6ff' : 'transparent', color: subTab === key ? '#1d4ed8' : '#64748b', fontWeight: subTab === key ? 800 : 600, fontSize: 13, cursor: 'pointer', fontFamily: FONT, borderBottom: subTab === key ? '2px solid #3b82f6' : '2px solid transparent' }}>
+            style={{ padding: '7px 16px', borderRadius: '8px 8px 0 0', border: 'none', background: subTab === key ? 'var(--sh-info-bg)' : 'transparent', color: subTab === key ? 'var(--sh-brand)' : 'var(--sh-muted)', fontWeight: subTab === key ? 800 : 600, fontSize: 13, cursor: 'pointer', fontFamily: FONT, borderBottom: subTab === key ? '2px solid var(--sh-brand)' : '2px solid transparent' }}>
             {label}
           </button>
         ))}
       </div>
 
+      {subTab === 'overview' && (
+        <OverviewSubTab data={overviewData} loading={overviewLoading} formatDateTime={formatDateTime}
+          onNavigateCase={(caseId) => { setSubTab('cases'); setTimeout(() => loadCaseDetail(caseId), 100) }} />
+      )}
       {subTab === 'cases' && (
         <CasesSubTab casesState={casesState} caseStatus={caseStatus} setCaseStatus={setCaseStatus}
+          caseSource={caseSource} setCaseSource={setCaseSource}
+          caseClaimed={caseClaimed} setCaseClaimed={setCaseClaimed}
           caseSort={caseSort} setCaseSort={setCaseSort} expandedCase={expandedCase}
           setExpandedCase={setExpandedCase} expandedCaseLoading={expandedCaseLoading}
           loadCaseDetail={loadCaseDetail} loadCases={loadCases} reviewCase={reviewCase}
+          claimCase={claimCase} unclaimCase={unclaimCase}
           setSubTab={setSubTab} setStrikeForm={setStrikeForm} formatDateTime={formatDateTime} />
       )}
       {subTab === 'strikes' && (

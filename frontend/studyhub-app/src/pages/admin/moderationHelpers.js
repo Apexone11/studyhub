@@ -1,4 +1,5 @@
 export const SUB_TABS = [
+  ['overview', 'Overview'],
   ['cases', 'Cases'],
   ['strikes', 'Strikes'],
   ['appeals', 'Appeals'],
@@ -7,15 +8,15 @@ export const SUB_TABS = [
 
 export function statusPill(status) {
   const map = {
-    pending:   { bg: '#fffbeb', color: '#92400e', border: '#fde68a' },
-    dismissed: { bg: '#f8fafc', color: '#475569', border: '#cbd5e1' },
-    confirmed: { bg: '#fef2f2', color: '#b91c1c', border: '#fecaca' },
-    approved:  { bg: '#ecfdf5', color: '#047857', border: '#a7f3d0' },
-    rejected:  { bg: '#fef2f2', color: '#b91c1c', border: '#fecaca' },
-    active:    { bg: '#fef2f2', color: '#b91c1c', border: '#fecaca' },
-    lifted:    { bg: '#f8fafc', color: '#475569', border: '#cbd5e1' },
-    expired:   { bg: '#f8fafc', color: '#475569', border: '#cbd5e1' },
-    decayed:   { bg: '#f8fafc', color: '#475569', border: '#cbd5e1' },
+    pending:   { bg: 'var(--sh-warning-bg)', color: 'var(--sh-warning-text)', border: 'var(--sh-warning-border)' },
+    dismissed: { bg: 'var(--sh-soft)', color: 'var(--sh-muted)', border: 'var(--sh-border)' },
+    confirmed: { bg: 'var(--sh-danger-bg)', color: 'var(--sh-danger-text)', border: 'var(--sh-danger-border)' },
+    approved:  { bg: 'var(--sh-success-bg)', color: 'var(--sh-success-text)', border: 'var(--sh-success-border)' },
+    rejected:  { bg: 'var(--sh-danger-bg)', color: 'var(--sh-danger-text)', border: 'var(--sh-danger-border)' },
+    active:    { bg: 'var(--sh-danger-bg)', color: 'var(--sh-danger-text)', border: 'var(--sh-danger-border)' },
+    lifted:    { bg: 'var(--sh-soft)', color: 'var(--sh-muted)', border: 'var(--sh-border)' },
+    expired:   { bg: 'var(--sh-soft)', color: 'var(--sh-muted)', border: 'var(--sh-border)' },
+    decayed:   { bg: 'var(--sh-soft)', color: 'var(--sh-muted)', border: 'var(--sh-border)' },
   }
   const s = map[status] || map.pending
   return {

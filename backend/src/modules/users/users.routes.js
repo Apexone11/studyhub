@@ -276,7 +276,7 @@ router.get('/:username', optionalAuth, async (req, res) => {
     let sharedNotes = []
     try {
       sharedNotes = await prisma.note.findMany({
-        where: { userId: user.id, private: false },
+        where: { userId: user.id, private: false, moderationStatus: 'clean' },
         orderBy: { updatedAt: 'desc' },
         take: 10,
         select: {

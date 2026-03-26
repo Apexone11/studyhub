@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
+import ReportModal from '../../components/ReportModal'
 import AppSidebar from '../../components/AppSidebar'
 import SafeJoyride from '../../components/SafeJoyride'
 import { SkeletonCard } from '../../components/Skeleton'
@@ -71,6 +72,7 @@ export default function SheetViewerPage() {
 
   const previewMode = sheet?.htmlWorkflow?.previewMode || 'interactive'
   const [statusMenuOpen, setStatusMenuOpen] = useState(false)
+  const [reportOpen, setReportOpen] = useState(false)
 
   return (
     <>
@@ -222,6 +224,12 @@ export default function SheetViewerPage() {
                           </div>
                         ) : null}
                       </div>
+                    ) : null}
+                    {user && sheet.userId !== user.id ? (
+                      <button type="button" onClick={() => setReportOpen(true)} style={actionButton('var(--sh-warning-text)')}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+                        Report
+                      </button>
                     ) : null}
                   </div>
                 ) : null}
@@ -626,6 +634,7 @@ export default function SheetViewerPage() {
       ) : null}
 
       <SafeJoyride {...tutorial.joyrideProps} />
+      {sheet && <ReportModal open={reportOpen} targetType="sheet" targetId={sheet.id} onClose={() => setReportOpen(false)} />}
     </>
   )
 }

@@ -30,6 +30,7 @@ export default function FeedCard({
   onTogglePostMenu,
   isDeletingPost,
   currentUser,
+  onReport,
 }) {
   const isSheet = item.type === 'sheet'
   const isPost = item.type === 'post'
@@ -82,7 +83,7 @@ export default function FeedCard({
                   Open
                 </Link>
               ) : null}
-              {isPost && canDeletePost ? (
+              {(isPost && currentUser) ? (
                 <div style={{ position: 'relative' }}>
                   <button
                     type="button"
@@ -120,32 +121,61 @@ export default function FeedCard({
                         zIndex: 3,
                       }}
                     >
-                      <button
-                        type="button"
-                        onClick={() => onDeletePost(item)}
-                        disabled={isDeletingPost}
-                        className="feed-post-delete-btn"
-                        style={{
-                          width: '100%',
-                          borderRadius: 8,
-                          border: 'none',
-                          background: 'transparent',
-                          color: '#dc2626',
-                          fontSize: 13,
-                          fontWeight: 600,
-                          textAlign: 'left',
-                          padding: '8px 12px',
-                          cursor: isDeletingPost ? 'wait' : 'pointer',
-                          fontFamily: FONT,
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 8,
-                          transition: 'background .15s',
-                        }}
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                        {isDeletingPost ? 'Deleting…' : 'Delete post'}
-                      </button>
+                      {item.author?.id !== currentUser?.id && (
+                        <button
+                          type="button"
+                          onClick={() => { onTogglePostMenu(null); onReport?.(item.type === 'post' ? 'post' : item.type === 'note' ? 'note' : 'sheet', item.id) }}
+                          className="feed-post-menu-item"
+                          style={{
+                            width: '100%',
+                            borderRadius: 8,
+                            border: 'none',
+                            background: 'transparent',
+                            color: 'var(--sh-warning-text)',
+                            fontSize: 13,
+                            fontWeight: 600,
+                            textAlign: 'left',
+                            padding: '8px 12px',
+                            cursor: 'pointer',
+                            fontFamily: FONT,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            transition: 'background .15s',
+                          }}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+                          Report
+                        </button>
+                      )}
+                      {canDeletePost ? (
+                        <button
+                          type="button"
+                          onClick={() => onDeletePost(item)}
+                          disabled={isDeletingPost}
+                          className="feed-post-delete-btn"
+                          style={{
+                            width: '100%',
+                            borderRadius: 8,
+                            border: 'none',
+                            background: 'transparent',
+                            color: '#dc2626',
+                            fontSize: 13,
+                            fontWeight: 600,
+                            textAlign: 'left',
+                            padding: '8px 12px',
+                            cursor: isDeletingPost ? 'wait' : 'pointer',
+                            fontFamily: FONT,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            transition: 'background .15s',
+                          }}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                          {isDeletingPost ? 'Deleting…' : 'Delete post'}
+                        </button>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>

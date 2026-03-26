@@ -55,6 +55,8 @@ model User {
   restrictions               UserRestriction[]
   moderationCases            ModerationCase[] @relation("ModerationCaseAuthor")
   moderationReviews          ModerationCase[] @relation("ModerationReviewer")
+  moderationReports          ModerationCase[] @relation("ModerationReporter")
+  moderationClaims           ModerationCase[] @relation("ModerationClaimer")
   appealReviews              Appeal[]         @relation("AppealReviewer")
   sheetCommits               SheetCommit[]
   webauthnCredentials        WebAuthnCredential[]
@@ -238,10 +240,11 @@ model Note {
   content   String   @default("")
   userId    Int
   courseId  Int?
-  private        Boolean  @default(true)
-  allowDownloads Boolean  @default(false)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  private          Boolean  @default(true)
+  allowDownloads   Boolean  @default(false)
+  moderationStatus String   @default("clean")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
   author    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   course    Course?  @relation(fields: [courseId], references: [id])
   noteComments NoteComment[]
@@ -252,10 +255,12 @@ model NoteComment {
   content      String
   noteId       Int
   userId       Int
-  anchorText   String?
-  anchorOffset Int?
-  resolved     Boolean  @default(false)
-  createdAt    DateTime @default(now())
+  anchorText    String?
+  anchorOffset  Int?
+  anchorContext    String?
+  resolved         Boolean  @default(false)
+  moderationStatus String   @default("clean")
+  createdAt        DateTime @default(now())
   note         Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
   author       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -464,27 +469,37 @@ model UserPreferences {
 }
 
 model ModerationCase {
-  id          Int       @id @default(autoincrement())
-  contentType String
-  contentId   Int
-  userId      Int?
-  status      String    @default("pending")
-  confidence  Float?
-  category    String?
-  provider    String?
-  evidence    Json?
-  reviewedBy  Int?
-  reviewNote  String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  user        User?     @relation("ModerationCaseAuthor", fields: [userId], references: [id], onDelete: SetNull)
-  reviewer    User?     @relation("ModerationReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
-  strikes     Strike[]
-  appeals     Appeal[]
+  id               Int       @id @default(autoincrement())
+  contentType      String
+  contentId        Int
+  userId           Int?
+  status           String    @default("pending")
+  confidence       Float?
+  category         String?
+  provider         String?
+  evidence         Json?
+  reviewedBy       Int?
+  reviewNote       String?
+  source           String    @default("auto")
+  reporterUserId   Int?
+  reasonCategory   String?
+  excerpt          String?
+  claimedByAdminId Int?
+  claimedAt        DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  user             User?     @relation("ModerationCaseAuthor", fields: [userId], references: [id], onDelete: SetNull)
+  reviewer         User?     @relation("ModerationReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  reporter         User?     @relation("ModerationReporter", fields: [reporterUserId], references: [id], onDelete: SetNull)
+  claimedBy        User?     @relation("ModerationClaimer", fields: [claimedByAdminId], references: [id], onDelete: SetNull)
+  strikes          Strike[]
+  appeals          Appeal[]
 
   @@index([status, createdAt(sort: Desc)])
   @@index([contentType, contentId])
   @@index([userId])
+  @@index([source, status])
+  @@index([claimedByAdminId])
 }
 
 model Strike {

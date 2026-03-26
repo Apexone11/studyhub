@@ -1,4 +1,4 @@
-import { IconSheets, IconUsers, IconSchool } from './Icons'
+import { IconSheets, IconNotes, IconUsers, IconSchool } from './Icons'
 import { Highlight, styles } from './searchModalConstants'
 
 export function SheetResults({ sheets, query, activeIndex, setActiveIndex, navigateToItem }) {
@@ -24,6 +24,36 @@ export function SheetResults({ sheets, query, activeIndex, setActiveIndex, navig
             <div style={styles.resultMeta}>
               {sheet.course?.code} &middot; by {sheet.author?.username}
               {sheet.stars > 0 && <span> &middot; {sheet.stars} stars</span>}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+export function NoteResults({ notes, sheetsCount, query, activeIndex, setActiveIndex, navigateToItem }) {
+  if (notes.length === 0) return null
+  return (
+    <div>
+      <div style={styles.sectionLabel}>
+        <IconNotes size={13} /> Notes
+      </div>
+      {notes.map((note, i) => {
+        const flatIdx = sheetsCount + i
+        return (
+          <div
+            key={`n-${note.id}`}
+            style={{
+              ...styles.resultItem,
+              background: activeIndex === flatIdx ? '#f1f5f9' : 'transparent',
+            }}
+            onClick={() => navigateToItem({ type: 'note', data: note })}
+            onMouseEnter={() => setActiveIndex(flatIdx)}
+          >
+            <div style={styles.resultTitle}><Highlight text={note.title} query={query} /></div>
+            <div style={styles.resultMeta}>
+              {note.course?.code} &middot; by {note.author?.username}
             </div>
           </div>
         )

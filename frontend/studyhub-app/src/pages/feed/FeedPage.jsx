@@ -14,6 +14,7 @@ import { useSearchParams } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
 import AppSidebar from '../../components/AppSidebar'
 import ConfirmDialog from '../../components/ConfirmDialog'
+import ReportModal from '../../components/ReportModal'
 import { useSession } from '../../lib/session-context'
 import { pageShell, useResponsiveAppLayout } from '../../lib/ui'
 import { staggerEntrance } from '../../lib/animations'
@@ -52,6 +53,7 @@ export default function FeedPage() {
   const feedAnimatedRef = useRef(false)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [openPostMenuId, setOpenPostMenuId] = useState(null)
+  const [reportTarget, setReportTarget] = useState(null)
 
   const { recentlyViewed } = useRecentlyViewed()
   const tutorial = useTutorial('feed', FEED_STEPS)
@@ -165,6 +167,7 @@ export default function FeedPage() {
                       onTogglePostMenu={setOpenPostMenuId}
                       isDeletingPost={Boolean(deletingPostIds[item.id])}
                       currentUser={user}
+                      onReport={(type, id) => setReportTarget({ type, id })}
                     />
                   ))}
                   {feedState.items.length < feedState.total && (
@@ -187,6 +190,7 @@ export default function FeedPage() {
         </button>
       )}
       <ConfirmDialog open={deleteTarget !== null} title="Delete this post?" message="This action cannot be undone. The post and any attachments will be permanently removed." confirmLabel="Delete" cancelLabel="Cancel" variant="danger" onConfirm={() => deleteTarget && handleDeletePost(deleteTarget)} onCancel={() => setDeleteTarget(null)} />
+      <ReportModal open={reportTarget !== null} targetType={reportTarget?.type} targetId={reportTarget?.id} onClose={() => setReportTarget(null)} />
     </>
   )
 }

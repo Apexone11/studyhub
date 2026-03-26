@@ -16,6 +16,14 @@ const mocks = vi.hoisted(() => {
       delete: vi.fn(),
       count: vi.fn(),
     },
+    noteComment: {
+      findMany: vi.fn(),
+      findUnique: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      count: vi.fn(),
+    },
     user: {
       findUnique: vi.fn(),
     },
@@ -36,6 +44,27 @@ const mocks = vi.hoisted(() => {
         return user.role === 'admin' || Number(ownerId) === Number(user.userId)
       }),
     },
+    moderationEngine: {
+      isModerationEnabled: vi.fn(() => true),
+      scanContent: vi.fn(),
+    },
+    notify: {
+      createNotification: vi.fn(),
+    },
+    mentions: {
+      notifyMentionedUsers: vi.fn(),
+    },
+    activityTracker: {
+      trackActivity: vi.fn(),
+    },
+    noteAnchor: {
+      buildAnchorContext: vi.fn(() => null),
+      validateAnchorInput: vi.fn(() => null),
+    },
+    optionalAuth: vi.fn((req, _res, next) => {
+      req.user = { userId: 42, username: 'test_user', role: 'student' }
+      next()
+    }),
   }
 })
 
@@ -45,6 +74,12 @@ const mockTargets = new Map([
   [require.resolve('../src/middleware/requireVerifiedEmail'), mocks.requireVerifiedEmail],
   [require.resolve('../src/monitoring/sentry'), mocks.sentry],
   [require.resolve('../src/lib/accessControl'), mocks.accessControl],
+  [require.resolve('../src/lib/moderationEngine'), mocks.moderationEngine],
+  [require.resolve('../src/lib/notify'), mocks.notify],
+  [require.resolve('../src/lib/mentions'), mocks.mentions],
+  [require.resolve('../src/lib/activityTracker'), mocks.activityTracker],
+  [require.resolve('../src/lib/noteAnchor'), mocks.noteAnchor],
+  [require.resolve('../src/core/auth/optionalAuth'), mocks.optionalAuth],
 ])
 
 const originalModuleLoad = Module._load
@@ -83,6 +118,7 @@ beforeEach(() => {
   mocks.accessControl.assertOwnerOrAdmin.mockImplementation(({ user, ownerId }) => {
     return user.role === 'admin' || Number(ownerId) === Number(user.userId)
   })
+  mocks.moderationEngine.isModerationEnabled.mockReturnValue(true)
 })
 
 describe('notes routes', () => {
@@ -282,6 +318,194 @@ describe('notes routes', () => {
       const response = await request(app).delete('/1')
 
       expect(response.status).toBe(403)
+    })
+  })
+
+  describe('content moderation', () => {
+    it('calls scanContent on note creation with title + content', async () => {
+      mocks.prisma.note.create.mockResolvedValue({
+        id: 10,
+        title: 'Biology Notes',
+        content: 'Cell division overview',
+        private: true,
+        userId: 42,
+        courseId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        course: null,
+      })
+
+      await request(app)
+        .post('/')
+        .send({ title: 'Biology Notes', content: 'Cell division overview' })
+
+      expect(mocks.moderationEngine.scanContent).toHaveBeenCalledWith({
+        contentType: 'note',
+        contentId: 10,
+        text: 'Biology Notes Cell division overview',
+        userId: 42,
+      })
+    })
+
+    it('calls scanContent on note update when content changes', async () => {
+      mocks.prisma.note.findUnique.mockResolvedValue({
+        id: 5,
+        userId: 42,
+        title: 'Old Title',
+      })
+      mocks.prisma.note.update.mockResolvedValue({
+        id: 5,
+        title: 'Updated Title',
+        content: 'Updated body text',
+        userId: 42,
+        course: null,
+      })
+
+      await request(app)
+        .patch('/5')
+        .send({ title: 'Updated Title', content: 'Updated body text' })
+
+      expect(mocks.moderationEngine.scanContent).toHaveBeenCalledWith({
+        contentType: 'note',
+        contentId: 5,
+        text: 'Updated Title Updated body text',
+        userId: 42,
+      })
+    })
+
+    it('does not call scanContent on metadata-only update', async () => {
+      mocks.prisma.note.findUnique.mockResolvedValue({
+        id: 5,
+        userId: 42,
+        title: 'Title',
+      })
+      mocks.prisma.note.update.mockResolvedValue({
+        id: 5,
+        title: 'Title',
+        content: 'Existing content',
+        userId: 42,
+        private: false,
+        course: null,
+      })
+
+      await request(app)
+        .patch('/5')
+        .send({ private: false })
+
+      expect(mocks.moderationEngine.scanContent).not.toHaveBeenCalled()
+    })
+
+    it('skips scanContent when moderation is disabled', async () => {
+      mocks.moderationEngine.isModerationEnabled.mockReturnValue(false)
+      mocks.prisma.note.create.mockResolvedValue({
+        id: 11,
+        title: 'Test',
+        content: 'Content',
+        private: true,
+        userId: 42,
+        courseId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        course: null,
+      })
+
+      await request(app)
+        .post('/')
+        .send({ title: 'Test', content: 'Content' })
+
+      expect(mocks.moderationEngine.scanContent).not.toHaveBeenCalled()
+    })
+
+    it('calls scanContent on note comment creation', async () => {
+      mocks.prisma.note.findUnique.mockResolvedValue({
+        id: 3,
+        private: false,
+        userId: 99,
+        title: 'Shared Note',
+        content: 'Some note content',
+      })
+      mocks.prisma.noteComment.create.mockResolvedValue({
+        id: 20,
+        content: 'Great explanation!',
+        noteId: 3,
+        userId: 42,
+        createdAt: new Date(),
+        author: { id: 42, username: 'test_user' },
+      })
+
+      const res = await request(app)
+        .post('/3/comments')
+        .send({ content: 'Great explanation!' })
+
+      expect(res.status).toBe(201)
+      expect(mocks.moderationEngine.scanContent).toHaveBeenCalledWith({
+        contentType: 'note_comment',
+        contentId: 20,
+        text: 'Great explanation!',
+        userId: 42,
+      })
+    })
+  })
+
+  describe('moderation visibility', () => {
+    it('GET /:id returns 404 for pending_review note when not owner', async () => {
+      // optionalAuth gives userId: 42, but note belongs to userId: 99
+      mocks.prisma.note.findUnique.mockResolvedValue({
+        id: 7,
+        title: 'Flagged Note',
+        content: 'Bad content',
+        private: false,
+        moderationStatus: 'pending_review',
+        userId: 99,
+        course: null,
+        author: { id: 99, username: 'other' },
+      })
+
+      const res = await request(app).get('/7')
+      expect(res.status).toBe(404)
+    })
+
+    it('GET /:id returns note for pending_review note when owner', async () => {
+      mocks.prisma.note.findUnique.mockResolvedValue({
+        id: 8,
+        title: 'My Flagged Note',
+        content: 'Under review',
+        private: false,
+        moderationStatus: 'pending_review',
+        userId: 42,
+        course: null,
+        author: { id: 42, username: 'test_user' },
+      })
+
+      const res = await request(app).get('/8')
+      expect(res.status).toBe(200)
+      expect(res.body.title).toBe('My Flagged Note')
+    })
+
+    it('GET /?shared=true includes moderationStatus:clean filter', async () => {
+      mocks.prisma.note.findMany.mockResolvedValue([])
+      mocks.prisma.note.count.mockResolvedValue(0)
+
+      await request(app).get('/?shared=true')
+
+      expect(mocks.prisma.note.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            private: false,
+            moderationStatus: 'clean',
+          }),
+        }),
+      )
+    })
+
+    it('GET /?shared=true does not include own notes filter', async () => {
+      mocks.prisma.note.findMany.mockResolvedValue([])
+      mocks.prisma.note.count.mockResolvedValue(0)
+
+      await request(app).get('/?shared=true')
+
+      const call = mocks.prisma.note.findMany.mock.calls[0][0]
+      expect(call.where.userId).toBeUndefined()
     })
   })
 })

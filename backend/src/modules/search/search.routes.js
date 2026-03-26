@@ -19,7 +19,7 @@ const searchLimiter = rateLimit({
 
 router.use(searchLimiter)
 
-const VALID_TYPES = ['all', 'sheets', 'courses', 'users']
+const VALID_TYPES = ['all', 'sheets', 'courses', 'users', 'notes']
 
 // Optional auth — attach user if token present, but don't require it
 function optionalAuth(req, _res, next) {
@@ -43,7 +43,7 @@ router.get('/', optionalAuth, async (req, res) => {
   const type = rawType || 'all'
 
   if (!query || query.length < 2) {
-    return res.json({ results: { sheets: [], courses: [], users: [] }, query, type })
+    return res.json({ results: { sheets: [], courses: [], users: [], notes: [] }, query, type })
   }
 
   if (query.length > 200) {
@@ -65,6 +65,7 @@ router.get('/', optionalAuth, async (req, res) => {
     const wantSheets = type === 'all' || type === 'sheets'
     const wantCourses = type === 'all' || type === 'courses'
     const wantUsers = type === 'all' || type === 'users'
+    const wantNotes = type === 'all' || type === 'notes'
     const userSearchTake = Math.min(limit * 5, 50)
 
     if (wantSheets) {
@@ -187,7 +188,33 @@ router.get('/', optionalAuth, async (req, res) => {
       promises.push(Promise.resolve([]))
     }
 
-    const [sheets, courses, matchedUsers] = await Promise.all(promises)
+    if (wantNotes) {
+      promises.push(
+        prisma.note.findMany({
+          where: {
+            private: false,
+            moderationStatus: 'clean',
+            OR: [
+              { title: { contains: query, mode: 'insensitive' } },
+              { content: { contains: query, mode: 'insensitive' } },
+            ],
+          },
+          select: {
+            id: true,
+            title: true,
+            createdAt: true,
+            course: { select: { id: true, code: true, name: true } },
+            author: { select: { id: true, username: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: limit,
+        })
+      )
+    } else {
+      promises.push(Promise.resolve([]))
+    }
+
+    const [sheets, courses, matchedUsers, notes] = await Promise.all(promises)
     let users = matchedUsers
 
     if (wantUsers && matchedUsers.length) {
@@ -203,7 +230,7 @@ router.get('/', optionalAuth, async (req, res) => {
     }
 
     return res.json({
-      results: { sheets, courses, users },
+      results: { sheets, courses, users, notes },
       query,
       type,
     })

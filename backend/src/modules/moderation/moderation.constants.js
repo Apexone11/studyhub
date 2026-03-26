@@ -13,4 +13,22 @@ const appealLimiter = rateLimit({
   message: { error: 'Too many appeal submissions. Please try again later.' },
 })
 
-module.exports = { PAGE_SIZE, parsePage, appealLimiter }
+const reportLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  message: { error: 'Too many reports. Please try again later.' },
+})
+
+const REASON_CATEGORIES = [
+  'harassment',
+  'violence',
+  'sexual',
+  'self_harm',
+  'spam',
+  'misinformation',
+  'hate_speech',
+  'plagiarism',
+  'other',
+]
+
+module.exports = { PAGE_SIZE, parsePage, appealLimiter, reportLimiter, REASON_CATEGORIES }

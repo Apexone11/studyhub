@@ -3,11 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import { IconSearch, IconX } from './Icons'
 import { API } from '../config'
 import { DEBOUNCE_MS, styles } from './searchModalConstants'
-import { SheetResults, CourseResults, UserResults } from './SearchResultItems'
+import { SheetResults, NoteResults, CourseResults, UserResults } from './SearchResultItems'
 
 export default function SearchModal({ open, onClose }) {
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState({ sheets: [], courses: [], users: [] })
+  const [results, setResults] = useState({ sheets: [], courses: [], users: [], notes: [] })
   const [loading, setLoading] = useState(false)
   const [activeIndex, setActiveIndex] = useState(-1)
   const inputRef = useRef(null)
@@ -19,7 +19,7 @@ export default function SearchModal({ open, onClose }) {
   useEffect(() => {
     if (open) {
       setQuery('')
-      setResults({ sheets: [], courses: [], users: [] })
+      setResults({ sheets: [], courses: [], users: [], notes: [] })
       setActiveIndex(-1)
       const focusTimer = setTimeout(() => inputRef.current?.focus(), 50)
       return () => clearTimeout(focusTimer)
@@ -60,7 +60,12 @@ export default function SearchModal({ open, onClose }) {
       )
       if (!res.ok) return
       const data = await res.json()
-      setResults(data.results || { sheets: [], courses: [], users: [] })
+      setResults({
+        sheets: data.results?.sheets || [],
+        courses: data.results?.courses || [],
+        users: data.results?.users || [],
+        notes: data.results?.notes || [],
+      })
       setActiveIndex(-1)
     } catch (err) {
       if (err.name !== 'AbortError') console.error('[search]', err)
@@ -75,7 +80,7 @@ export default function SearchModal({ open, onClose }) {
 
     if (value.trim().length < 2) {
       if (abortRef.current) abortRef.current.abort()
-      setResults({ sheets: [], courses: [], users: [] })
+      setResults({ sheets: [], courses: [], users: [], notes: [] })
       setLoading(false)
       return
     }
@@ -87,12 +92,14 @@ export default function SearchModal({ open, onClose }) {
   // Build flat list for keyboard nav
   const flatItems = []
   results.sheets.forEach((s) => flatItems.push({ type: 'sheet', data: s }))
+  results.notes.forEach((n) => flatItems.push({ type: 'note', data: n }))
   results.courses.forEach((c) => flatItems.push({ type: 'course', data: c }))
   results.users.forEach((u) => flatItems.push({ type: 'user', data: u }))
 
   function navigateToItem(item) {
     onClose()
     if (item.type === 'sheet') navigate(`/sheets/${item.data.id}`)
+    else if (item.type === 'note') navigate(`/notes/${item.data.id}`)
     else if (item.type === 'course') navigate(`/sheets?courseId=${item.data.id}`)
     else if (item.type === 'user') navigate(`/users/${item.data.username}`)
   }
@@ -127,15 +134,15 @@ export default function SearchModal({ open, onClose }) {
             value={query}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
-            placeholder="Search sheets, courses, users..."
-            aria-label="Search sheets, courses, and users"
+            placeholder="Search sheets, notes, courses, users..."
+            aria-label="Search sheets, notes, courses, and users"
             style={styles.input}
             autoComplete="off"
             spellCheck={false}
           />
           {query && (
             <button
-              onClick={() => { setQuery(''); setResults({ sheets: [], courses: [], users: [] }); inputRef.current?.focus() }}
+              onClick={() => { setQuery(''); setResults({ sheets: [], courses: [], users: [], notes: [] }); inputRef.current?.focus() }}
               style={styles.clearBtn}
               title="Clear"
               aria-label="Clear search"
@@ -168,9 +175,18 @@ export default function SearchModal({ open, onClose }) {
             navigateToItem={navigateToItem}
           />
 
+          <NoteResults
+            notes={results.notes}
+            sheetsCount={results.sheets.length}
+            query={query}
+            activeIndex={activeIndex}
+            setActiveIndex={setActiveIndex}
+            navigateToItem={navigateToItem}
+          />
+
           <CourseResults
             courses={results.courses}
-            sheetsCount={results.sheets.length}
+            sheetsCount={results.sheets.length + results.notes.length}
             query={query}
             activeIndex={activeIndex}
             setActiveIndex={setActiveIndex}
@@ -179,7 +195,7 @@ export default function SearchModal({ open, onClose }) {
 
           <UserResults
             users={results.users}
-            sheetsCount={results.sheets.length}
+            sheetsCount={results.sheets.length + results.notes.length}
             coursesCount={results.courses.length}
             query={query}
             activeIndex={activeIndex}

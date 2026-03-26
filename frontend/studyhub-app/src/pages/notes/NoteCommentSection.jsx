@@ -10,7 +10,45 @@ import MentionText from '../../components/MentionText'
 import { PAGE_FONT, timeAgo } from '../shared/pageUtils'
 import { useNoteComments } from './useNoteComments'
 
-export default function NoteCommentSection({ noteId, isOwner, user }) {
+/**
+ * Check if an anchor still exists in the note content. Returns:
+ * - 'found' if the anchor text exists at or near its original position
+ * - 'moved' if the anchor text exists elsewhere in the content
+ * - 'orphaned' if the anchor text can no longer be found
+ */
+function resolveAnchorStatus(comment, noteContent) {
+  if (!comment.anchorText || !noteContent) return 'found'
+  const text = comment.anchorText
+  const offset = comment.anchorOffset ?? -1
+
+  // Exact position match (within ±20 chars to handle minor edits)
+  if (offset >= 0) {
+    const searchStart = Math.max(0, offset - 20)
+    const idx = noteContent.indexOf(text, searchStart)
+    if (idx >= 0 && idx <= offset + 20) return 'found'
+  }
+
+  // Context-based re-matching
+  if (comment.anchorContext) {
+    try {
+      const ctx = typeof comment.anchorContext === 'string' ? JSON.parse(comment.anchorContext) : comment.anchorContext
+      if (ctx.prefix || ctx.suffix) {
+        const searchStr = (ctx.prefix || '') + text + (ctx.suffix || '')
+        if (noteContent.includes(searchStr)) return 'found'
+        // Partial context match (prefix only or suffix only)
+        if (ctx.prefix && noteContent.includes(ctx.prefix + text)) return 'found'
+        if (ctx.suffix && noteContent.includes(text + ctx.suffix)) return 'found'
+      }
+    } catch { /* invalid context JSON — fall through */ }
+  }
+
+  // Fallback: text exists somewhere
+  if (noteContent.includes(text)) return 'moved'
+
+  return 'orphaned'
+}
+
+export default function NoteCommentSection({ noteId, isOwner, user, noteContent }) {
   const [expanded, setExpanded] = useState(false)
   const [draft, setDraft] = useState('')
   const {
@@ -115,6 +153,7 @@ export default function NoteCommentSection({ noteId, isOwner, user }) {
                   comment={c}
                   user={user}
                   isNoteOwner={isOwner}
+                  noteContent={noteContent}
                   onResolve={resolveComment}
                   onDelete={deleteComment}
                 />
@@ -127,7 +166,8 @@ export default function NoteCommentSection({ noteId, isOwner, user }) {
   )
 }
 
-function CommentItem({ comment, user, isNoteOwner, onResolve, onDelete }) {
+function CommentItem({ comment, user, isNoteOwner, noteContent, onResolve, onDelete }) {
+  const anchorStatus = resolveAnchorStatus(comment, noteContent)
   const canDelete = user && (
     user.id === comment.author?.id
     || isNoteOwner
@@ -220,13 +260,25 @@ function CommentItem({ comment, user, isNoteOwner, onResolve, onDelete }) {
         {/* Anchor badge (if inline comment) */}
         {comment.anchorText && (
           <div style={{
-            fontSize: 12, fontStyle: 'italic', color: 'var(--sh-slate-500)',
+            fontSize: 12, fontStyle: 'italic',
+            color: anchorStatus === 'orphaned' ? 'var(--sh-danger-text)' : 'var(--sh-slate-500)',
             padding: '4px 8px', marginBottom: 6,
-            background: 'var(--sh-warning-bg)', borderRadius: 4,
-            borderLeft: '3px solid var(--sh-warning-border)',
+            background: anchorStatus === 'orphaned' ? 'var(--sh-danger-bg)' : 'var(--sh-warning-bg)',
+            borderRadius: 4,
+            borderLeft: `3px solid ${anchorStatus === 'orphaned' ? 'var(--sh-danger-border)' : 'var(--sh-warning-border)'}`,
             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
           }}>
             &ldquo;{comment.anchorText}&rdquo;
+            {anchorStatus === 'orphaned' && (
+              <span style={{ fontSize: 10, fontStyle: 'normal', fontWeight: 600, marginLeft: 6 }}>
+                (text changed)
+              </span>
+            )}
+            {anchorStatus === 'moved' && (
+              <span style={{ fontSize: 10, fontStyle: 'normal', fontWeight: 600, marginLeft: 6, color: 'var(--sh-info-text)' }}>
+                (moved)
+              </span>
+            )}
           </div>
         )}
 
