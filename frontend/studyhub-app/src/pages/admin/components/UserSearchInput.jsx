@@ -8,6 +8,7 @@ export default function UserSearchInput({ value, onChange, label = 'User' }) {
   const [results, setResults] = useState([])
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [searchError, setSearchError] = useState(false)
   const timerRef = useRef(null)
   const wrapperRef = useRef(null)
 
@@ -28,15 +29,21 @@ export default function UserSearchInput({ value, onChange, label = 'User' }) {
       return
     }
     setLoading(true)
+    setSearchError(false)
     fetch(`${API}/api/admin/users/search?q=${encodeURIComponent(q)}&limit=10`, {
       credentials: 'include',
     })
       .then((r) => r.json())
       .then((data) => {
         setResults(Array.isArray(data) ? data : [])
+        setSearchError(false)
         setOpen(true)
       })
-      .catch(() => setResults([]))
+      .catch(() => {
+        setResults([])
+        setSearchError(true)
+        setOpen(true)
+      })
       .finally(() => setLoading(false))
   }, [])
 
@@ -170,7 +177,7 @@ export default function UserSearchInput({ value, onChange, label = 'User' }) {
           ))}
         </div>
       )}
-      {open && results.length === 0 && query.length >= 2 && !loading && (
+      {loading && query.length >= 2 && (
         <div style={{
           position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100,
           marginTop: 4, padding: '16px', textAlign: 'center',
@@ -178,7 +185,18 @@ export default function UserSearchInput({ value, onChange, label = 'User' }) {
           borderRadius: 12, color: 'var(--sh-muted)', fontSize: 13,
           fontFamily: "'Plus Jakarta Sans', sans-serif",
         }}>
-          No users found.
+          Searching...
+        </div>
+      )}
+      {open && !loading && results.length === 0 && query.length >= 2 && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100,
+          marginTop: 4, padding: '16px', textAlign: 'center',
+          background: 'var(--sh-surface)', border: '1px solid var(--sh-border)',
+          borderRadius: 12, color: searchError ? 'var(--sh-danger-text)' : 'var(--sh-muted)', fontSize: 13,
+          fontFamily: "'Plus Jakarta Sans', sans-serif",
+        }}>
+          {searchError ? 'Search failed. Check connection and try again.' : 'No users found.'}
         </div>
       )}
     </div>

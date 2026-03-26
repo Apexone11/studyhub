@@ -190,8 +190,13 @@ function AppealModal({ open, caseData, onClose, onSubmit }) {
               marginBottom: 4, boxSizing: 'border-box',
             }}
           />
-          <div style={{ fontSize: 11, color: 'var(--sh-muted)', marginBottom: 12, textAlign: 'right' }}>
-            {reason.trim().length}/2000
+          <div style={{
+            fontSize: 11, marginBottom: 12, textAlign: 'right',
+            color: reason.trim().length > 0 && reason.trim().length < 20 ? 'var(--sh-warning-text)' : 'var(--sh-muted)',
+          }}>
+            {reason.trim().length > 0 && reason.trim().length < 20
+              ? `${reason.trim().length}/20 min`
+              : `${reason.trim().length}/2000`}
           </div>
 
           {/* Acknowledgement */}
@@ -765,6 +770,7 @@ export default function ModerationTab() {
 
       {/* Appeal modal */}
       <AppealModal
+        key={appealTarget?.id ?? 'closed'}
         open={!!appealTarget}
         caseData={appealTarget}
         onClose={() => setAppealTarget(null)}

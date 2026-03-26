@@ -1,5 +1,6 @@
 // HomeSections.jsx — Features, Steps, Testimonials, CTA, and Footer sections for the HomePage.
-import { forwardRef } from 'react'
+// Default export bundles all below-fold content for React.lazy() code-splitting.
+import { forwardRef, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { trackEvent } from '../../lib/telemetry'
 import { IconArrowRight, LogoMark } from '../../components/Icons'
@@ -240,5 +241,26 @@ export function HomeFooter({ currentYear }) {
         </p>
       </div>
     </footer>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  Default export — all below-fold content bundled for React.lazy()   */
+/* ------------------------------------------------------------------ */
+
+export default function HomeSections({ featuresRef, stepsRef, testimonialsRef, currentYear, onReady }) {
+  // Signal the parent that refs are populated so it can wire up animations.
+  useEffect(() => {
+    if (onReady) onReady()
+  }, [onReady])
+
+  return (
+    <>
+      <FeaturesSection ref={featuresRef} />
+      <StepsSection ref={stepsRef} />
+      <TestimonialsSection ref={testimonialsRef} />
+      <CtaSection />
+      <HomeFooter currentYear={currentYear} />
+    </>
   )
 }

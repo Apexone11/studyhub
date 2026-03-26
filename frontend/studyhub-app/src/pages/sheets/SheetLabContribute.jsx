@@ -17,6 +17,9 @@ export default function SheetLabContribute({ sheet, onContributed }) {
   const [syncing, setSyncing] = useState(false)
   const [diffData, setDiffData] = useState({}) // { [contributionId]: diff }
   const [loadingDiff, setLoadingDiff] = useState(null)
+  const [upstreamDiff, setUpstreamDiff] = useState(null)
+  const [loadingUpstreamDiff, setLoadingUpstreamDiff] = useState(false)
+  const [showUpstreamDiff, setShowUpstreamDiff] = useState(false)
 
   const outgoing = sheet?.outgoingContributions || []
   const hasPending = outgoing.some((c) => c.status === 'pending')
@@ -40,6 +43,29 @@ export default function SheetLabContribute({ sheet, onContributed }) {
       showToast(err.message, 'error')
     } finally {
       setSyncing(false)
+    }
+  }
+
+  const handleCompareUpstream = async () => {
+    if (showUpstreamDiff && upstreamDiff) {
+      setShowUpstreamDiff(false)
+      return
+    }
+    if (loadingUpstreamDiff || !sheet?.id) return
+    setLoadingUpstreamDiff(true)
+    try {
+      const response = await fetch(`${API}/api/sheets/${sheet.id}/lab/compare-upstream`, {
+        headers: authHeaders(),
+        credentials: 'include',
+      })
+      const data = await readJsonSafely(response, {})
+      if (!response.ok) throw new Error(getApiErrorMessage(data, 'Could not compare to upstream.'))
+      setUpstreamDiff(data)
+      setShowUpstreamDiff(true)
+    } catch (err) {
+      showToast(err.message, 'error')
+    } finally {
+      setLoadingUpstreamDiff(false)
     }
   }
 
@@ -110,15 +136,51 @@ export default function SheetLabContribute({ sheet, onContributed }) {
             {' '}for the author to review.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={handleSyncUpstream}
-          disabled={syncing}
-          style={syncButtonStyle}
-        >
-          {syncing ? 'Syncing...' : 'Sync from original'}
-        </button>
+        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+          <button
+            type="button"
+            onClick={handleCompareUpstream}
+            disabled={loadingUpstreamDiff}
+            style={compareButtonStyle}
+          >
+            {loadingUpstreamDiff ? 'Comparing...' : showUpstreamDiff ? 'Hide comparison' : 'Compare to original'}
+          </button>
+          <button
+            type="button"
+            onClick={handleSyncUpstream}
+            disabled={syncing}
+            style={syncButtonStyle}
+          >
+            {syncing ? 'Syncing...' : 'Sync from original'}
+          </button>
+        </div>
       </div>
+
+      {/* Upstream comparison diff */}
+      {showUpstreamDiff && upstreamDiff ? (
+        <div style={comparisonBoxStyle}>
+          {upstreamDiff.identical ? (
+            <div style={{ padding: '14px 16px', fontSize: 13, color: 'var(--sh-success-text, #166534)', background: 'var(--sh-success-bg, #f0fdf4)', borderRadius: 12, border: '1px solid var(--sh-success-border, #bbf7d0)' }}>
+              Your fork is identical to the original. No differences found.
+            </div>
+          ) : (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--sh-heading)' }}>
+                  Differences from{' '}
+                  <Link to={`/sheets/${upstreamDiff.upstream?.id}`} style={{ color: 'var(--sh-brand, #6366f1)', textDecoration: 'underline' }}>
+                    {upstreamDiff.upstream?.title || 'original'}
+                  </Link>
+                </span>
+                {upstreamDiff.summary ? (
+                  <span style={{ fontSize: 12, color: 'var(--sh-muted)' }}>{upstreamDiff.summary}</span>
+                ) : null}
+              </div>
+              <DiffViewer diff={upstreamDiff.diff} title="Your changes vs. original" />
+            </>
+          )}
+        </div>
+      ) : null}
 
       {/* Submit form — only if no pending contribution */}
       {!hasPending ? (
@@ -251,6 +313,18 @@ const submitButtonStyle = {
   justifySelf: 'start', padding: '10px 20px', borderRadius: 10,
   border: 'none', background: 'linear-gradient(135deg, #6366f1, #818cf8)',
   color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
+}
+
+const compareButtonStyle = {
+  padding: '8px 16px', borderRadius: 10, whiteSpace: 'nowrap',
+  border: '1px solid #c7d2fe', background: '#eef2ff',
+  color: '#4338ca', fontWeight: 700, fontSize: 12,
+  cursor: 'pointer', fontFamily: 'inherit',
+}
+
+const comparisonBoxStyle = {
+  padding: 16, borderRadius: 14,
+  background: 'var(--sh-surface)', border: '1px solid var(--sh-border)',
 }
 
 const syncButtonStyle = {

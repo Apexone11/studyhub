@@ -79,37 +79,46 @@ function initGoogleAds(adsId) {
 }
 
 export function initTelemetry() {
-  const sentryDsn = import.meta.env.VITE_SENTRY_DSN
-  const sentryTraceRate = parseSampleRate(
-    import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE,
-    0.1
-  )
+  // Telemetry must never crash the app — wrap each provider in try/catch
+  try {
+    const sentryDsn = import.meta.env.VITE_SENTRY_DSN
+    const sentryTraceRate = parseSampleRate(
+      import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE,
+      0.1
+    )
 
-  if (sentryDsn && !sentryInitialized) {
-    Sentry.init({
-      dsn: sentryDsn,
-      tracesSampleRate: sentryTraceRate,
-      environment: import.meta.env.MODE
-    })
+    if (sentryDsn && !sentryInitialized) {
+      Sentry.init({
+        dsn: sentryDsn,
+        tracesSampleRate: sentryTraceRate,
+        environment: import.meta.env.MODE
+      })
 
-    sentryInitialized = true
+      sentryInitialized = true
+    }
+  } catch (err) {
+    console.warn('[telemetry] Sentry init failed:', err.message)
   }
 
-  const posthogKey = import.meta.env.VITE_POSTHOG_KEY
+  try {
+    const posthogKey = import.meta.env.VITE_POSTHOG_KEY
 
-  if (posthogKey && !posthogInitialized) {
-    posthog.init(posthogKey, {
-      api_host: import.meta.env.VITE_POSTHOG_HOST || 'https://us.i.posthog.com',
-      capture_pageview: false,
-      persistence: 'localStorage',
-      person_profiles: 'identified_only'
-    })
+    if (posthogKey && !posthogInitialized) {
+      posthog.init(posthogKey, {
+        api_host: import.meta.env.VITE_POSTHOG_HOST || 'https://us.i.posthog.com',
+        capture_pageview: false,
+        persistence: 'localStorage',
+        person_profiles: 'identified_only'
+      })
 
-    posthogInitialized = true
+      posthogInitialized = true
+    }
+  } catch (err) {
+    console.warn('[telemetry] PostHog init failed:', err.message)
   }
 
-  initClarity(CLARITY_PROJECT_ID)
-  initGoogleAds(GOOGLE_ADS_ID)
+  try { initClarity(CLARITY_PROJECT_ID) } catch { /* best-effort */ }
+  try { initGoogleAds(GOOGLE_ADS_ID) } catch { /* best-effort */ }
 }
 
 export function trackPageView(pathname) {

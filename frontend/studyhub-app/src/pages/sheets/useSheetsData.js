@@ -261,11 +261,15 @@ export default function useSheetsData() {
       })
       const data = await readJsonSafely(response, {})
       if (response.ok && Array.isArray(data.sheets)) {
-        setSheetsState((current) => ({
-          ...current,
-          sheets: [...current.sheets, ...data.sheets],
-          total: data.total || current.total,
-        }))
+        setSheetsState((current) => {
+          const existingIds = new Set(current.sheets.map((s) => s.id))
+          const newSheets = data.sheets.filter((s) => !existingIds.has(s.id))
+          return {
+            ...current,
+            sheets: [...current.sheets, ...newSheets],
+            total: data.total || current.total,
+          }
+        })
       }
     } catch {
       showToast('Could not load more sheets. Try again.', 'error')

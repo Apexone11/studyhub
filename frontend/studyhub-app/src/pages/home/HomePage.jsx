@@ -1,5 +1,5 @@
 // HomePage renders the public landing experience and routes anonymous users into discovery flows.
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { API } from '../../config'
 import { trackEvent } from '../../lib/telemetry'
@@ -7,13 +7,20 @@ import { usePageTitle } from '../../lib/usePageTitle'
 import { fadeInOnScroll } from '../../lib/animations'
 import Navbar from '../../components/Navbar'
 import { HeroSection, ProofBanner } from './HomeHero'
-import {
-  FeaturesSection,
-  StepsSection,
-  TestimonialsSection,
-  CtaSection,
-  HomeFooter,
-} from './HomeSections'
+
+// Below-fold sections are lazy-loaded so the hero paints without waiting for
+// their JS. Vite will code-split HomeSections + homeConstants into a separate chunk.
+const HomeSections = lazy(() => import('./HomeSections'))
+
+// Minimal inline fallback — keeps layout stable while the chunk loads.
+function BelowFoldFallback() {
+  return <div style={{ minHeight: 600 }} aria-hidden="true" />
+}
+
+// Schedule work after first paint when possible.
+const scheduleIdle = typeof requestIdleCallback === 'function'
+  ? requestIdleCallback
+  : (cb) => setTimeout(cb, 1)
 
 export default function HomePage() {
   usePageTitle('The GitHub of Studying')
@@ -25,32 +32,42 @@ export default function HomePage() {
   const stepsRef = useRef(null)
   const testimonialsRef = useRef(null)
 
+  // Defer stats fetch so the hero renders instantly with fallback values.
   useEffect(() => {
-    fetch(`${API}/api/public/platform-stats`)
-      .then((res) => res.ok ? res.json() : null)
-      .then((data) => { if (data) setPlatformStats(data) })
-      .catch(() => {})
+    const id = scheduleIdle(() => {
+      fetch(`${API}/api/public/platform-stats`)
+        .then((res) => res.ok ? res.json() : null)
+        .then((data) => { if (data) setPlatformStats(data) })
+        .catch(() => {})
+    })
+    return () => {
+      if (typeof cancelIdleCallback === 'function') cancelIdleCallback(id)
+    }
   }, [])
 
-  useEffect(() => {
-    if (featuresRef.current) {
-      fadeInOnScroll(featuresRef.current.querySelectorAll('.home-feature-card'), {
-        staggerMs: 60,
-        y: 20,
-      })
-    }
-    if (stepsRef.current) {
-      fadeInOnScroll(stepsRef.current.querySelectorAll('.home-step-card'), {
-        staggerMs: 100,
-        y: 20,
-      })
-    }
-    if (testimonialsRef.current) {
-      fadeInOnScroll(testimonialsRef.current.querySelectorAll('.home-testimonial-card'), {
-        staggerMs: 80,
-        y: 20,
-      })
-    }
+  // Wire up scroll-triggered entrance animations after the lazy chunk has loaded
+  // and the section refs are populated.
+  const setupAnimations = useCallback(() => {
+    scheduleIdle(() => {
+      if (featuresRef.current) {
+        fadeInOnScroll(featuresRef.current.querySelectorAll('.home-feature-card'), {
+          staggerMs: 60,
+          y: 20,
+        })
+      }
+      if (stepsRef.current) {
+        fadeInOnScroll(stepsRef.current.querySelectorAll('.home-step-card'), {
+          staggerMs: 100,
+          y: 20,
+        })
+      }
+      if (testimonialsRef.current) {
+        fadeInOnScroll(testimonialsRef.current.querySelectorAll('.home-testimonial-card'), {
+          staggerMs: 80,
+          y: 20,
+        })
+      }
+    })
   }, [])
 
   function handleHeroSearch(e) {
@@ -73,13 +90,16 @@ export default function HomePage() {
           platformStats={platformStats}
         />
         <ProofBanner />
-        <FeaturesSection ref={featuresRef} />
-        <StepsSection ref={stepsRef} />
-        <TestimonialsSection ref={testimonialsRef} />
-        <CtaSection />
+        <Suspense fallback={<BelowFoldFallback />}>
+          <HomeSections
+            featuresRef={featuresRef}
+            stepsRef={stepsRef}
+            testimonialsRef={testimonialsRef}
+            currentYear={currentYear}
+            onReady={setupAnimations}
+          />
+        </Suspense>
       </main>
-
-      <HomeFooter currentYear={currentYear} />
     </div>
   )
 }

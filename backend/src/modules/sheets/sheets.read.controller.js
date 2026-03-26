@@ -43,10 +43,10 @@ router.get('/:id', optionalAuth, async (req, res) => {
       timedSection('dislikes', () => prisma.reaction.count({ where: { sheetId, type: 'dislike' } })),
       timedSection('commentCount', () => prisma.comment.count({ where: { sheetId } })),
       timedSection('starred', () =>
-        userId ? prisma.starredSheet.findUnique({ where: { userId_sheetId: { userId, sheetId } } }) : null
+        userId ? prisma.starredSheet.findUnique({ where: { userId_sheetId: { userId, sheetId } }, select: { userId: true } }) : null
       ),
       timedSection('userReaction', () =>
-        userId ? prisma.reaction.findUnique({ where: { userId_sheetId: { userId, sheetId } } }) : null
+        userId ? prisma.reaction.findUnique({ where: { userId_sheetId: { userId, sheetId } }, select: { type: true } }) : null
       ),
       timedSection('contributions', () => fetchContributionCollections(sheet, req.user || null)),
     ])

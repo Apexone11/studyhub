@@ -324,6 +324,28 @@ export default function useSheetLab() {
     }
   }
 
+  // Lineage / fork tree
+  const [lineage, setLineage] = useState(null)
+  const [loadingLineage, setLoadingLineage] = useState(false)
+
+  const loadLineage = useCallback(async () => {
+    if (!Number.isInteger(sheetId)) return
+    setLoadingLineage(true)
+    try {
+      const response = await fetch(
+        `${API}/api/sheets/${sheetId}/lab/lineage`,
+        { headers: authHeaders(), credentials: 'include' }
+      )
+      const data = await readJsonSafely(response, {})
+      if (!response.ok) throw new Error(getApiErrorMessage(data, 'Could not load fork tree.'))
+      setLineage(data)
+    } catch (err) {
+      showToast(err.message, 'error')
+    } finally {
+      setLoadingLineage(false)
+    }
+  }, [sheetId])
+
   const [publishing, setPublishing] = useState(false)
 
   const handlePublish = async () => {
@@ -397,5 +419,8 @@ export default function useSheetLab() {
     reloadSheet,
     publishing,
     handlePublish,
+    lineage,
+    loadingLineage,
+    loadLineage,
   }
 }

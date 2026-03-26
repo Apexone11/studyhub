@@ -21,7 +21,20 @@ self.addEventListener('activate', (event) => {
   self.clients.claim()
 })
 
+// Safe cache helper — cache.put() throws for non-http(s) schemes (e.g. chrome-extension://).
+// Always wrap in try/catch so a caching failure never crashes the fetch handler.
+function safeCachePut(cacheName, request, response) {
+  try {
+    const url = new URL(request.url)
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return
+    caches.open(cacheName).then((cache) => cache.put(request, response)).catch(() => {})
+  } catch {
+    // Ignore — caching is best-effort
+  }
+}
+
 // Fetch strategy:
+// - Non-http(s) schemes: pass through (never cache)
 // - API requests: network-only (no caching)
 // - Navigation (HTML): network-first with offline fallback
 // - Hashed assets (/assets/*): cache-first (immutable by content hash)
@@ -31,6 +44,15 @@ self.addEventListener('fetch', (event) => {
 
   // Skip non-GET requests
   if (request.method !== 'GET') return
+
+  // Skip non-http(s) schemes (chrome-extension://, data:, blob:, etc.)
+  // These cannot be cached and calling cache.put() on them throws.
+  try {
+    const url = new URL(request.url)
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return
+  } catch {
+    return
+  }
 
   // API requests: always network, no caching
   if (request.url.includes('/api/')) {
@@ -50,10 +72,7 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          if (response.ok) {
-            const clone = response.clone()
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone))
-          }
+          if (response.ok) safeCachePut(CACHE_NAME, request, response.clone())
           return response
         })
         .catch(() =>
@@ -74,10 +93,7 @@ self.addEventListener('fetch', (event) => {
         (cached) =>
           cached ||
           fetch(request).then((response) => {
-            if (response.ok) {
-              const clone = response.clone()
-              caches.open(CACHE_NAME).then((cache) => cache.put(request, clone))
-            }
+            if (response.ok) safeCachePut(CACHE_NAME, request, response.clone())
             return response
           })
       )
@@ -89,10 +105,7 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     fetch(request)
       .then((response) => {
-        if (response.ok) {
-          const clone = response.clone()
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone))
-        }
+        if (response.ok) safeCachePut(CACHE_NAME, request, response.clone())
         return response
       })
       .catch(() => caches.match(request))

@@ -9,6 +9,7 @@ import SheetLabEditor from './SheetLabEditor'
 import SheetLabChanges from './SheetLabChanges'
 import SheetLabContribute from './SheetLabContribute'
 import SheetLabReviews from './SheetLabReviews'
+import SheetLabLineage from './SheetLabLineage'
 import TutorialBanner from '../../components/TutorialBanner'
 import useSheetLab from './useSheetLab'
 import './SheetLabPage.css'
@@ -22,6 +23,7 @@ function buildTabs(isOwner, isFork) {
     tabs.push({ id: 'changes', label: 'Changes' })
   }
   tabs.push({ id: 'history', label: 'History' })
+  tabs.push({ id: 'lineage', label: 'Lineage' })
   if (isOwner && isFork) {
     tabs.push({ id: 'contribute', label: 'Contribute' })
   }
@@ -425,6 +427,7 @@ export default function SheetLabPage() {
           {validTab === 'editor' ? <SheetLabEditor sheet={sheet} onContentSaved={() => lab.loadCommits(1)} /> : null}
           {validTab === 'changes' ? <SheetLabChanges sheet={sheet} onCommitCreated={() => lab.loadCommits(1)} /> : null}
           {validTab === 'history' ? <HistoryTab lab={lab} /> : null}
+          {validTab === 'lineage' ? <SheetLabLineage lab={lab} /> : null}
           {validTab === 'contribute' ? <SheetLabContribute sheet={sheet} onContributed={() => lab.reloadSheet()} /> : null}
           {validTab === 'reviews' ? <SheetLabReviews sheet={sheet} onReviewed={() => lab.reloadSheet()} /> : null}
         </div>

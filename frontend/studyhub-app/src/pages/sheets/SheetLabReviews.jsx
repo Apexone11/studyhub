@@ -3,7 +3,7 @@
  * Shows pending/accepted/rejected contributions with diff viewer and accept/reject actions.
  * Uses PATCH /api/sheets/contributions/:id and GET /api/sheets/contributions/:id/diff.
  */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { API } from '../../config'
 import { authHeaders } from './sheetLabConstants'
@@ -71,6 +71,15 @@ export default function SheetLabReviews({ sheet, onReviewed }) {
     }
   }
 
+  // Auto-load diff for the first pending contribution so creators see changes immediately
+  const firstPendingId = pending[0]?.id
+  useEffect(() => {
+    if (firstPendingId && !diffData[firstPendingId]) {
+      toggleDiff(firstPendingId)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firstPendingId])
+
   if (incoming.length === 0) {
     return (
       <div style={emptyStyle}>
@@ -87,9 +96,16 @@ export default function SheetLabReviews({ sheet, onReviewed }) {
       {/* Pending contributions */}
       {pending.length > 0 ? (
         <div style={{ display: 'grid', gap: 10 }}>
-          <h4 style={sectionHeadingStyle}>
-            Pending review ({pending.length})
-          </h4>
+          <div style={attentionBannerStyle}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+            {pending.length === 1
+              ? '1 contribution needs your review'
+              : `${pending.length} contributions need your review`}
+          </div>
           {pending.map((c) => (
             <ContributionCard
               key={c.id}
@@ -184,11 +200,15 @@ function ContributionCard({ contribution: c, showActions, reviewing, onReview, d
           <>
             <button
               type="button"
-              onClick={() => onReview(c.id, 'accept')}
+              onClick={() => {
+                if (window.confirm('Accept this contribution? Their changes will be merged into your sheet.')) {
+                  onReview(c.id, 'accept')
+                }
+              }}
               disabled={reviewing === c.id}
               style={acceptButtonStyle}
             >
-              {reviewing === c.id ? '...' : 'Accept'}
+              {reviewing === c.id ? 'Merging...' : 'Accept & Merge'}
             </button>
             <button
               type="button"
@@ -209,6 +229,12 @@ function ContributionCard({ contribution: c, showActions, reviewing, onReview, d
       {/* Diff viewer */}
       {diffData[c.id] ? (
         <div style={{ marginTop: 12 }}>
+          {diffData[c.id].additions != null ? (
+            <div style={{ display: 'flex', gap: 12, marginBottom: 8, fontSize: 12, fontWeight: 700 }}>
+              <span style={{ color: '#16a34a' }}>+{diffData[c.id].additions} additions</span>
+              <span style={{ color: '#dc2626' }}>&minus;{diffData[c.id].deletions} deletions</span>
+            </div>
+          ) : null}
           <DiffViewer diff={diffData[c.id]} title={`Changes from ${c.proposer?.username || 'fork'}`} />
         </div>
       ) : null}
@@ -236,6 +262,14 @@ function StatusBadge({ status }) {
 }
 
 /* ── Styles ────────────────────────────────────────────────── */
+
+const attentionBannerStyle = {
+  display: 'flex', alignItems: 'center', gap: 8,
+  padding: '10px 14px', borderRadius: 12, fontSize: 13, fontWeight: 700,
+  background: 'var(--sh-warning-bg, #fffbeb)',
+  border: '1px solid var(--sh-warning-border, #fde68a)',
+  color: 'var(--sh-warning-text, #92400e)',
+}
 
 const sectionHeadingStyle = {
   margin: 0, fontSize: 13, fontWeight: 700,

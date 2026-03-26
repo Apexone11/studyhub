@@ -1454,3 +1454,260 @@ Memory rule `feedback_fullstack_sync.md` now enforces: every schema change must 
 |-------|--------|
 | Backend tests | 531/531 pass (42 files) |
 | Backend lint | Clean (6 pre-existing only) |
+
+---
+
+## H-1 — Fix Homepage White Screen (P0) (2026-03-26)
+
+### Summary
+
+Fixed production blank-screen crash caused by unhandled exceptions in the service worker and analytics initialization. Three independent failure paths could each produce a white screen for users.
+
+### Root Cause Analysis
+
+| Failure Path | Trigger | Effect |
+|-------------|---------|--------|
+| Service worker `cache.put()` on non-http(s) URLs | Browser extensions inject `chrome-extension://` fetch requests; `cache.put()` throws on non-http(s) schemes | Unhandled promise rejection crashes SW fetch handler, page load hangs |
+| Analytics SDK init failure | Missing env vars, ad blockers, or network issues during `initTelemetry()` / `installApiFetchShim()` | Uncaught exception prevents React mount |
+| Unhandled promise rejections | Any async failure without a `.catch()` | Browser may show blank screen depending on error boundary coverage |
+
+### Changes
+
+| Category | Detail |
+|----------|--------|
+| Fixed | `public/sw.js` — Added `safeCachePut()` helper that validates `http:`/`https:` protocol before calling `cache.put()`; all 4 cache-write sites now use it |
+| Fixed | `public/sw.js` — Added early-return guard in fetch handler for non-http(s) URL schemes (chrome-extension://, data:, blob:) |
+| Fixed | `src/main.jsx` — Wrapped `initTelemetry()` and `installApiFetchShim()` in individual try/catch blocks so failures never block React mount |
+| Fixed | `src/main.jsx` — Added global `unhandledrejection` event listener with `event.preventDefault()` to catch any remaining async failures |
+| Verified | Auth 401 handling already safe — `fetchSessionUser()` returns `{status: 'unauthenticated'}` on 401, HomePage renders without auth data |
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `frontend/studyhub-app/public/sw.js` | Added `safeCachePut()`, protocol guard in fetch handler, replaced all `cache.put()` calls |
+| `frontend/studyhub-app/src/main.jsx` | try/catch around init calls, global `unhandledrejection` handler |
+| `frontend/studyhub-app/src/lib/telemetry.js` | Each analytics provider init wrapped in individual try/catch (was already partially wrapped) |
+
+### Validation
+
+| Suite | Result |
+|-------|--------|
+| Frontend lint | Clean |
+| Frontend build | Clean (805ms) |
+
+---
+
+## H-2 — Homepage "Snappy" Performance (2026-03-26)
+
+### Summary
+
+Optimized HomePage first-paint speed by code-splitting below-fold content and deferring non-critical work. The hero section now renders without waiting for Features, Steps, Testimonials, CTA, or Footer JS to load.
+
+### Changes
+
+| Category | Detail |
+|----------|--------|
+| Performance | Below-fold sections (Features, Steps, Testimonials, CTA, Footer) lazy-loaded via `React.lazy()` + `Suspense` — split into separate chunk |
+| Performance | Platform-stats API fetch deferred via `requestIdleCallback` so hero paints instantly with fallback values |
+| Performance | Scroll animation setup deferred via `requestIdleCallback` so it doesn't compete with first paint |
+| Code-split | `HomeSections` chunk: ~10KB, `homeConstants` chunk: ~2.6KB — neither blocks initial hero render |
+| UX | Minimal 600px-height placeholder maintains layout stability while lazy chunk loads |
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `frontend/studyhub-app/src/pages/home/HomePage.jsx` | Lazy-import HomeSections, wrap in Suspense, defer stats fetch + animation setup with requestIdleCallback |
+| `frontend/studyhub-app/src/pages/home/HomeSections.jsx` | Added default export composing all below-fold sections for React.lazy(); added useEffect to signal parent when refs are ready |
+
+### Validation
+
+| Suite | Result |
+|-------|--------|
+| Frontend lint | Clean |
+| Frontend build | Clean (292ms) |
+| Code-split chunks | HomePage: 9KB, HomeSections: 10KB, homeConstants: 2.6KB (all separate) |
+
+---
+
+## Q-1 — Core Bug Fixes & UX Reliability (2026-03-26)
+
+### Q-1.1 — Star Duplicates Fix
+
+**Problem:** Repeated star/unstar could cause the same sheet to appear twice in the starred list.
+
+**Root Cause:** `loadMoreSheets` in `useSheetsData.js` appended server results without deduplicating against existing items. If the offset drifted (e.g. after a local star toggle), the server could return a sheet already in the list.
+
+**Fix:** Added ID-based deduplication to `loadMoreSheets` and `loadMoreFeed` — new items are filtered against existing IDs before appending.
+
+**Note:** DB constraint `@@unique([userId, sheetId])` and backend `create`/`delete` with P2002/P2025 guards were already correct. The bug was frontend-only.
+
+| File | Change |
+|------|--------|
+| `frontend/studyhub-app/src/pages/sheets/useSheetsData.js` | Deduplicate by sheet ID in loadMoreSheets |
+| `frontend/studyhub-app/src/pages/feed/useFeedData.js` | Deduplicate by item ID in loadMoreFeed (same pattern) |
+
+### Q-1.2 — Admin User Search Reliability
+
+**Problem:** Admin user search could show "No users found" on network errors (indistinguishable from actual empty results), and had no loading indicator.
+
+**Fix:** Added `searchError` state, visible "Searching..." loading indicator, and distinct error message ("Search failed. Check connection and try again.") when fetch fails.
+
+| File | Change |
+|------|--------|
+| `frontend/studyhub-app/src/pages/admin/components/UserSearchInput.jsx` | Added loading indicator, error state tracking, and distinct error/empty messages |
+
+### Q-1.3 — Admin Panel Empty States
+
+**Problem:** Several admin tabs showed blank tables when no data existed — looked broken rather than empty.
+
+**Fix:** Added explicit empty-state messages to all admin tabs that were missing them.
+
+| File | Empty Text |
+|------|-----------|
+| `UsersTab.jsx` | "No users found." |
+| `SheetsTab.jsx` | "No sheets found." |
+| `AnnouncementsTab.jsx` | "No announcements yet." |
+| `DeletionReasonsTab.jsx` | "No deletion records." |
+| `SheetReviewsTab.jsx` | "No sheets match the current filters." |
+
+**Note:** AppealsSubTab, StrikesSubTab, and RestrictionsSubTab already used `AdminTable` with `emptyText` props. EmailSuppressionsTab already had its own empty check.
+
+### Q-1.4 — Appeal Popup Polish
+
+**Problem:** Appeal modal didn't reset form state when reopened for a different case; character counter didn't indicate minimum requirement.
+
+**Fix:**
+- Added `key={appealTarget?.id}` to AppealModal so React remounts it fresh when case changes — all form state resets naturally
+- Character counter now shows "X/20 min" in warning color while below the 20-character minimum, switching to "X/2000" once met
+
+| File | Change |
+|------|--------|
+| `frontend/studyhub-app/src/pages/settings/ModerationTab.jsx` | Key-based remount for form reset; dynamic character counter with minimum hint |
+
+### Q-1 Validation
+
+| Suite | Result |
+|-------|--------|
+| Frontend lint | Clean |
+| Frontend build | Clean (293ms) |
+
+---
+
+## S-10.2 — Backend Query Optimization (2026-03-26)
+
+### Summary
+
+Reduced data overfetch in the three heaviest API endpoints: feed list, sheet list, and sheet detail. Switched from `include` (all columns) to `select` (only needed columns) in feed queries, and reduced the recommended-sort memory pool.
+
+### Changes
+
+| Category | Detail |
+|----------|--------|
+| Performance | **Feed sheets query**: Switched from `include` to `select` — only fetches columns used by `formatSheet()`. Excludes `htmlScanFindings`, `htmlScanStatus`, `htmlRiskTier`, and other scan/audit fields from feed response |
+| Performance | **Feed posts query**: Switched to `select` — only fetches columns used by `formatPost()` |
+| Performance | **Feed notes query**: Switched to `select` — only fetches columns used by `formatNote()` |
+| Performance | **Sheet detail enrichments**: `starredSheet.findUnique` now uses `select: { userId: true }` (was fetching full record for boolean check); `reaction.findUnique` uses `select: { type: true }` (was fetching full record for single field) |
+| Performance | **Sheet list recommended sort**: Reduced memory pool from `take + skip + 200` (max 500) to `take + skip + 50` (max 200) — 75% reduction in overfetch for scoring |
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `backend/src/modules/feed/feed.list.controller.js` | Switched sheets/posts/notes queries from `include` to `select` with explicit column lists |
+| `backend/src/modules/sheets/sheets.read.controller.js` | Added `select` to starred and userReaction enrichment queries |
+| `backend/src/modules/sheets/sheets.list.controller.js` | Reduced recommended sort pool size from 500 to 200 max |
+
+### Impact Estimate
+
+| Endpoint | Before | After | Improvement |
+|----------|--------|-------|-------------|
+| `GET /api/feed` (sheets) | Fetches all ~40 columns per sheet including large JSON fields | Fetches only 12 columns + 3 relations | ~60-70% less data transferred from DB |
+| `GET /api/feed` (posts) | All columns | 8 columns + 2 relations | ~50% less |
+| `GET /api/feed` (notes) | All columns | 4 columns + 2 relations | ~60% less |
+| `GET /api/sheets` (recommended) | Up to 500 rows in memory | Up to 200 rows | 60% less memory |
+| `GET /api/sheets/:id` enrichments | Full record for boolean/single-field checks | Single column per query | Marginal per-query |
+
+### Validation
+
+| Suite | Result |
+|-------|--------|
+| Backend lint | Clean (6 pre-existing only) |
+| Frontend lint | Clean |
+| Frontend build | Clean (298ms) |
+
+---
+
+## Cycle Lab-1 — SheetLab Fork/History UX (2026-03-26)
+
+### Summary
+
+GitHub-style fork tree visualization, upstream comparison, creator decision UX polish, and upstream metadata change notifications for SheetLab.
+
+### Sub-cycles
+
+#### Lab-1.1: Fork Tree + Lineage Tab
+
+New backend endpoint `GET /api/sheets/:id/lab/lineage` returns the full fork tree rooted at the ultimate ancestor. New "Lineage" tab in SheetLab renders the tree with indented nodes showing title, author, status, stars, forks, and timestamps. The current sheet is highlighted.
+
+| Category | Detail |
+|----------|--------|
+| Added | `backend/src/modules/sheetLab/sheetLab.lineage.controller.js` — resolves root via `rootSheetId \|\| forkOf \|\| self`, fetches all forks in one query, builds tree in memory with Map-based parent→children wiring |
+| Added | `frontend/studyhub-app/src/pages/sheets/SheetLabLineage.jsx` — recursive `TreeNode` component with branch connectors, author avatars, status badges, star/fork counts |
+| Changed | `frontend/studyhub-app/src/pages/sheets/SheetLabPage.jsx` — added "Lineage" tab to `buildTabs`, wired `SheetLabLineage` component |
+| Changed | `frontend/studyhub-app/src/pages/sheets/useSheetLab.js` — added `lineage`, `loadingLineage`, `loadLineage` state and API call |
+| Changed | `frontend/studyhub-app/src/pages/sheets/SheetLabPage.css` — lineage panel and tree node styles |
+| Changed | `backend/src/modules/sheetLab/sheetLab.routes.js` — registered lineage controller |
+
+#### Lab-1.2: Compare to Upstream
+
+New backend endpoint `GET /api/sheets/:id/lab/compare-upstream` computes a line-by-line + word-level diff between the fork's current content and the original sheet's content. "Compare to original" button added to the Contribute tab with inline diff viewer.
+
+| Category | Detail |
+|----------|--------|
+| Added | `GET /api/sheets/:id/lab/compare-upstream` in `sheetLab.operations.controller.js` — returns `{ identical, diff, summary, upstream }` |
+| Changed | `frontend/studyhub-app/src/pages/sheets/SheetLabContribute.jsx` — added "Compare to original" toggle button, upstream diff display with DiffViewer, summary stats |
+
+#### Lab-1.3: Creator Decision UX Polish (Reviews Tab)
+
+Improved the Reviews tab for original sheet owners reviewing incoming contributions.
+
+| Category | Detail |
+|----------|--------|
+| Changed | Auto-expand diff for the first pending contribution so creators see changes immediately |
+| Changed | Added attention banner ("N contributions need your review") above pending section |
+| Changed | Accept button now reads "Accept & Merge" with confirmation dialog |
+| Changed | Diff stats (additions/deletions) shown above inline diff viewer |
+
+#### Lab-1.4: Upstream Metadata Change Notifications
+
+Fork owners are now notified when the original sheet's title or status changes. Notifications are fire-and-forget (non-blocking to the update response).
+
+| Category | Detail |
+|----------|--------|
+| Changed | `backend/src/modules/sheets/sheets.update.controller.js` — added `title` to initial select; after update, queries forks and sends `upstream_change` notification to each unique fork owner via `createNotification` |
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `backend/src/modules/sheetLab/sheetLab.lineage.controller.js` | New — fork tree endpoint |
+| `backend/src/modules/sheetLab/sheetLab.operations.controller.js` | Added compare-upstream endpoint |
+| `backend/src/modules/sheetLab/sheetLab.routes.js` | Registered lineage controller |
+| `backend/src/modules/sheets/sheets.update.controller.js` | Added title to select, upstream change notification logic |
+| `frontend/studyhub-app/src/pages/sheets/SheetLabLineage.jsx` | New — fork tree UI component |
+| `frontend/studyhub-app/src/pages/sheets/SheetLabPage.jsx` | Added Lineage tab |
+| `frontend/studyhub-app/src/pages/sheets/SheetLabPage.css` | Lineage panel styles |
+| `frontend/studyhub-app/src/pages/sheets/useSheetLab.js` | Added lineage state and loadLineage |
+| `frontend/studyhub-app/src/pages/sheets/SheetLabContribute.jsx` | Compare-to-upstream button and diff display |
+| `frontend/studyhub-app/src/pages/sheets/SheetLabReviews.jsx` | Auto-expand diff, attention banner, accept UX, diff stats |
+
+### Validation
+
+| Suite | Result |
+|-------|--------|
+| Backend tests | 531/531 pass (42 files) |
+| Backend lint | Clean (6 pre-existing only) |
+| Frontend lint | Clean |
+| Frontend build | Clean (296ms) |

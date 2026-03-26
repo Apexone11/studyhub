@@ -16,6 +16,7 @@ const {
   normalizeContentFormat,
 } = require('./sheets.service')
 const { serializeSheet } = require('./sheets.serializer')
+const { createNotification } = require('../../lib/notify')
 
 const router = express.Router()
 
@@ -29,6 +30,7 @@ router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
       select: {
         id: true,
         userId: true,
+        title: true,
         content: true,
         contentFormat: true,
         status: true,
@@ -153,6 +155,36 @@ router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
           ? 'Draft saved.'
           : 'Sheet updated.',
     })
+
+    /* Notify fork owners when upstream metadata changes (title or status) — fire-and-forget */
+    const titleChanged = typeof data.title === 'string' && data.title !== sheet.title
+    const statusChanged = typeof data.status === 'string' && data.status !== sheet.status
+    if (titleChanged || statusChanged) {
+      Promise.resolve().then(async () => {
+        try {
+          const forks = await prisma.studySheet.findMany({
+            where: { forkOf: sheetId },
+            select: { userId: true },
+          })
+          const uniqueOwnerIds = [...new Set(forks.map((f) => f.userId))]
+          const changeDesc = titleChanged ? `renamed to "${data.title}"` : `status changed to ${data.status}`
+          await Promise.allSettled(
+            uniqueOwnerIds.map((forkOwnerId) =>
+              createNotification(prisma, {
+                userId: forkOwnerId,
+                type: 'upstream_change',
+                message: `The original sheet you forked was ${changeDesc}.`,
+                actorId: req.user.userId,
+                sheetId,
+                linkPath: `/sheets/${sheetId}`,
+              })
+            )
+          )
+        } catch (err) {
+          captureError(err, { context: 'notify.upstreamChange', sheetId })
+        }
+      })
+    }
 
     /* Async content moderation — scan updated title + description + markdown */
     if (isModerationEnabled()) {
