@@ -280,6 +280,7 @@ model Notification {
   type      String
   message   String
   read      Boolean  @default(false)
+  priority  String   @default("medium")
   actorId   Int?
   sheetId   Int?
   linkPath  String?

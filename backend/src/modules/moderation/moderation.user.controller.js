@@ -224,6 +224,7 @@ router.post('/reports', reportLimiter, async (req, res) => {
           message: `New user report: ${reasonCategory.replace(/_/g, ' ')} on ${targetType.replace(/_/g, ' ')}`,
           actorId: null,
           linkPath: '/admin?tab=moderation',
+          priority: 'high',
         })
       }
     } catch { /* notification failures are non-fatal */ }
@@ -300,6 +301,24 @@ router.post('/appeals', appealLimiter, async (req, res) => {
     })
 
     res.status(201).json({ message: 'Appeal submitted.', appeal })
+
+    /* Notify admins about the new appeal */
+    try {
+      const admins = await prisma.user.findMany({
+        where: { role: 'admin' },
+        select: { id: true },
+      })
+      for (const admin of admins) {
+        void createNotification(prisma, {
+          userId: admin.id,
+          type: 'moderation',
+          message: `New appeal submitted for case #${caseId}${reasonCategory ? ` (${reasonCategory.replace(/_/g, ' ')})` : ''}.`,
+          actorId: req.user.userId,
+          linkPath: '/admin?tab=moderation',
+          priority: 'high',
+        })
+      }
+    } catch { /* notification failures are non-fatal */ }
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })

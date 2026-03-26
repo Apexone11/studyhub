@@ -1098,3 +1098,148 @@ Similarity = `1 - (hammingDistance / 64)` where hamming distance counts differin
 | Backend lint | Clean (6 pre-existing warnings in unrelated files) |
 | Frontend lint | Clean |
 | Frontend build | Clean (562 modules, 279ms) |
+
+---
+
+## S-7: Attachment Moderation Gating — Policy A (2026-03-25)
+
+### Problem
+
+Attachment download and preview endpoints did not respect parent content moderation state. A sheet or post could be hidden by moderation (pending_review, confirmed_violation, quarantined, rejected) but its attached files remained accessible to anyone with the URL.
+
+### Policy
+
+**Policy A (owner/admin bypass):**
+- **Owner and admin** can always access attachments — needed for appeals ("show me what I uploaded") and admin review.
+- **Everyone else** gets a 404 (no leakage) when the parent content is moderation-hidden.
+- `allowDownloads` enforcement is owner/admin-bypassed too, so owners can always retrieve their own files.
+
+### Changes
+
+#### `sheets.downloads.controller.js`
+
+All four endpoints (`GET /:id/download`, `GET /:id/attachment`, `GET /:id/attachment/preview`, `POST /:id/download`) now:
+1. Select `userId` alongside existing fields
+2. Use `canReadSheet(sheet, req.user)` — returns true for published sheets or owner/admin
+3. Return 404 (not 403) for non-visible sheets to avoid leaking moderation state
+4. Owner/admin bypass `allowDownloads` restriction
+
+Removed direct `SHEET_STATUS` import — no longer needed since `canReadSheet` encapsulates the logic.
+
+#### `feed.posts.controller.js`
+
+Both endpoints (`GET /posts/:id/attachment`, `GET /posts/:id/attachment/preview`) now:
+1. Select `userId` and `moderationStatus`
+2. Check `isOwnerOrAdmin` — if not, require `moderationStatus === 'clean'`
+3. Return 404 for non-clean posts when requester is not owner/admin
+4. Owner/admin bypass `allowDownloads` restriction
+5. Preview endpoint no longer checks `allowDownloads` at all (previewing is not downloading)
+
+### Access Matrix
+
+| Parent state | Owner | Admin | Stranger | Anonymous |
+|---|---|---|---|---|
+| published / clean | download + preview | download + preview | download (if allowed) + preview | download (if allowed) + preview |
+| pending_review | download + preview | download + preview | 404 | 404 |
+| confirmed_violation | download + preview | download + preview | 404 | 404 |
+| quarantined | download + preview | download + preview | 404 | 404 |
+| rejected | download + preview | download + preview | 404 | 404 |
+| draft | download + preview | download + preview | 404 | 404 |
+
+### Tests
+
+New file: `backend/test/attachmentAccessControl.test.js` (26 tests)
+- Sheet access: `canReadSheet` tested against all 5 statuses × 4 user types (owner, admin, stranger, anonymous)
+- Post access: `postAttachmentAccessible` tested against 3 moderation states × 4 user types
+
+### S-7 Validation
+
+| Suite | Result |
+|-------|--------|
+| Backend tests | 489/489 pass (40 files) |
+| Backend lint | Clean (6 pre-existing warnings in unrelated files) |
+| Frontend lint | Clean |
+
+---
+
+## S-8: Notification Priority Routing + Inbox Controls (2026-03-25)
+
+### Overview
+
+Added priority-based notification routing (high/medium/low) with automatic email delivery for high-priority events, plus inbox management controls (clear read, per-notification delete).
+
+### Changes
+
+#### Database
+
+- **`schema.prisma`** — Added `priority String @default("medium")` to Notification model.
+- **Migration `20260325000010`** — `ALTER TABLE "Notification" ADD COLUMN "priority"`.
+- **`bootstrapSchema.js`** — Added `priority` column fallback.
+
+#### Backend — Priority-aware notification creation
+
+- **`lib/notify.js`** — Complete rewrite:
+  - `createNotification()` now accepts `priority` parameter (`'high'`, `'medium'`, `'low'`; defaults to `'medium'`)
+  - Invalid priority values silently default to `'medium'`
+  - High-priority notifications trigger fire-and-forget email to the recipient (if they have a verified email)
+  - `sendHighPriorityEmail()` renders a branded HTML email with StudyHub styling
+  - Exports `VALID_PRIORITIES` for validation
+  - Self-notification guard preserved
+
+#### Backend — New endpoint
+
+- **`notifications.routes.js`** — Added `DELETE /api/notifications/read`:
+  - Deletes all notifications where `userId = currentUser AND read = true`
+  - Returns `{ deleted: count }`
+  - Route defined before `/:id` to prevent route collision
+
+#### Backend — High-priority event wiring
+
+| Call site | Event | Priority |
+|---|---|---|
+| `moderationEngine.js` | User receives a strike | high |
+| `htmlDraftWorkflow.js` | High-risk HTML sheet flagged (admin alert) | high |
+| `moderation.user.controller.js` | New user report (admin alert) | high |
+| `moderation.user.controller.js` | Appeal submitted (admin alert) — **NEW** | high |
+| `moderation.admin.enforcement.js` | Restriction lifted | medium (default) |
+| `moderation.admin.enforcement.js` | Appeal approved/rejected | medium (default) |
+| All other call sites | Stars, comments, follows, forks, etc. | medium (default) |
+
+#### Frontend — Inbox controls
+
+- **`NavbarNotifications.jsx`** — Enhanced dropdown:
+  - **X button** per notification (absolute-positioned, hover reveals danger color)
+  - **"Clear read"** button in header (only shows when read notifications exist)
+  - **"Mark all read"** + **"Clear read"** shown side-by-side
+  - **Priority indicator**: high-priority notifications get `!` prefix + red left border (vs blue for normal)
+  - `deleteOne()`: optimistic removal + fires `DELETE /api/notifications/:id`
+  - `clearRead()`: optimistic filter + fires `DELETE /api/notifications/read`
+
+### Email Routing Policy
+
+| Priority | In-app | Email |
+|---|---|---|
+| high | Yes | Yes (if user has verified email) |
+| medium | Yes | No |
+| low | Yes | No |
+
+### Tests
+
+- **`notifications.routes.test.js`** — Added 2 tests for `DELETE /read` endpoint (success + zero-count)
+- **`notifyPriority.test.js`** (NEW) — 7 tests:
+  - Priority field stored correctly
+  - Invalid priority defaults to medium
+  - Missing priority defaults to medium
+  - Self-notification skipped
+  - High priority triggers email delivery
+  - Medium priority does not trigger email
+  - Unverified email does not trigger email
+
+### S-8 Validation
+
+| Suite | Result |
+|-------|--------|
+| Backend tests | 499/499 pass (42 files) |
+| Backend lint | Clean (6 pre-existing warnings in unrelated files) |
+| Frontend lint | Clean |
+| Frontend build | Clean (562 modules, 307ms) |

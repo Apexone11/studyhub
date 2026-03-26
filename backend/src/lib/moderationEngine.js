@@ -227,6 +227,7 @@ async function issueStrike({ userId, reason, caseId }) {
       message: `You received a strike: ${reason}`,
       actorId: null,
       linkPath: '/settings?tab=account',
+      priority: 'high',
     })
   } catch { /* notification failures are non-fatal */ }
 

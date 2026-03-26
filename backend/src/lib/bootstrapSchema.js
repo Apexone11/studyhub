@@ -274,6 +274,8 @@ const SCHEMA_REPAIR_STATEMENTS = [
   'ALTER TABLE "Note" DROP CONSTRAINT IF EXISTS "Note_courseId_fkey"',
   'ALTER TABLE "Note" ADD CONSTRAINT "Note_courseId_fkey" FOREIGN KEY ("courseId") REFERENCES "Course"("id") ON DELETE SET NULL ON UPDATE CASCADE',
 
+  'ALTER TABLE "Notification" ADD COLUMN IF NOT EXISTS "priority" TEXT NOT NULL DEFAULT \'medium\'',
+
   'ALTER TABLE "Notification" DROP CONSTRAINT IF EXISTS "Notification_userId_fkey"',
   'ALTER TABLE "Notification" ADD CONSTRAINT "Notification_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE',
   'ALTER TABLE "Notification" DROP CONSTRAINT IF EXISTS "Notification_actorId_fkey"',

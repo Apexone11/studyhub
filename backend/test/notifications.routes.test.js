@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => {
       update: vi.fn(),
       updateMany: vi.fn(),
       delete: vi.fn(),
+      deleteMany: vi.fn(),
     },
   }
 
@@ -198,6 +199,29 @@ describe('notifications routes', () => {
 
       expect(response.status).toBe(200)
       expect(response.body).toMatchObject({ updated: 0 })
+    })
+  })
+
+  describe('DELETE /read (clear read notifications)', () => {
+    it('deletes all read notifications for the user', async () => {
+      mocks.prisma.notification.deleteMany.mockResolvedValue({ count: 7 })
+
+      const response = await request(app).delete('/read')
+
+      expect(response.status).toBe(200)
+      expect(response.body).toMatchObject({ deleted: 7 })
+      expect(mocks.prisma.notification.deleteMany).toHaveBeenCalledWith({
+        where: { userId: 42, read: true },
+      })
+    })
+
+    it('returns zero when no read notifications exist', async () => {
+      mocks.prisma.notification.deleteMany.mockResolvedValue({ count: 0 })
+
+      const response = await request(app).delete('/read')
+
+      expect(response.status).toBe(200)
+      expect(response.body).toMatchObject({ deleted: 0 })
     })
   })
 

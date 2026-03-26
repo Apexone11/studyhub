@@ -7,8 +7,8 @@ const requireAuth = require('../../core/auth/requireAuth')
 const { sendForbidden } = require('../../lib/accessControl')
 const { resolveAttachmentPath } = require('../../lib/storage')
 const { sendAttachmentPreview } = require('../../lib/attachmentPreview')
-const { SHEET_STATUS, attachmentDownloadLimiter } = require('./sheets.constants')
-const { safeDownloadName } = require('./sheets.service')
+const { attachmentDownloadLimiter } = require('./sheets.constants')
+const { canReadSheet, safeDownloadName } = require('./sheets.service')
 
 const router = express.Router()
 
@@ -21,6 +21,7 @@ router.get('/:id/download', attachmentDownloadLimiter, async (req, res) => {
       where: { id: sheetId },
       select: {
         id: true,
+        userId: true,
         title: true,
         content: true,
         contentFormat: true,
@@ -30,10 +31,11 @@ router.get('/:id/download', attachmentDownloadLimiter, async (req, res) => {
     })
 
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
-    if (sheet.status !== SHEET_STATUS.PUBLISHED) {
-      return sendForbidden(res, 'Downloads are unavailable for this sheet.')
+    const isOwnerOrAdmin = req.user && (req.user.userId === sheet.userId || req.user.role === 'admin')
+    if (!canReadSheet(sheet, req.user)) {
+      return res.status(404).json({ error: 'Sheet not found.' })
     }
-    if (!sheet.allowDownloads) {
+    if (!isOwnerOrAdmin && !sheet.allowDownloads) {
       return sendForbidden(res, 'Downloads are disabled for this sheet.')
     }
 
@@ -67,6 +69,7 @@ router.get('/:id/attachment', requireAuth, attachmentDownloadLimiter, async (req
       where: { id: sheetId },
       select: {
         id: true,
+        userId: true,
         status: true,
         attachmentUrl: true,
         attachmentName: true,
@@ -75,11 +78,12 @@ router.get('/:id/attachment', requireAuth, attachmentDownloadLimiter, async (req
     })
 
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
-    if (sheet.status !== SHEET_STATUS.PUBLISHED) {
-      return sendForbidden(res, 'Downloads are unavailable for this sheet.')
+    const isOwnerOrAdmin = req.user && (req.user.userId === sheet.userId || req.user.role === 'admin')
+    if (!canReadSheet(sheet, req.user)) {
+      return res.status(404).json({ error: 'Sheet not found.' })
     }
     if (!sheet.attachmentUrl) return res.status(404).json({ error: 'Attachment not found.' })
-    if (!sheet.allowDownloads) {
+    if (!isOwnerOrAdmin && !sheet.allowDownloads) {
       return sendForbidden(res, 'Downloads are disabled for this sheet.')
     }
 
@@ -109,6 +113,7 @@ router.get('/:id/attachment/preview', requireAuth, attachmentDownloadLimiter, as
       where: { id: sheetId },
       select: {
         id: true,
+        userId: true,
         status: true,
         attachmentUrl: true,
         attachmentName: true,
@@ -117,8 +122,8 @@ router.get('/:id/attachment/preview', requireAuth, attachmentDownloadLimiter, as
     })
 
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
-    if (sheet.status !== SHEET_STATUS.PUBLISHED) {
-      return sendForbidden(res, 'Preview unavailable for this sheet.')
+    if (!canReadSheet(sheet, req.user)) {
+      return res.status(404).json({ error: 'Sheet not found.' })
     }
     if (!sheet.attachmentUrl) return res.status(404).json({ error: 'Attachment not found.' })
 
@@ -146,13 +151,14 @@ router.post('/:id/download', attachmentDownloadLimiter, async (req, res) => {
   try {
     const sheet = await prisma.studySheet.findUnique({
       where: { id: sheetId },
-      select: { id: true, status: true, allowDownloads: true },
+      select: { id: true, userId: true, status: true, allowDownloads: true },
     })
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
-    if (sheet.status !== SHEET_STATUS.PUBLISHED) {
-      return sendForbidden(res, 'Downloads are unavailable for this sheet.')
+    const isOwnerOrAdmin = req.user && (req.user.userId === sheet.userId || req.user.role === 'admin')
+    if (!canReadSheet(sheet, req.user)) {
+      return res.status(404).json({ error: 'Sheet not found.' })
     }
-    if (!sheet.allowDownloads) {
+    if (!isOwnerOrAdmin && !sheet.allowDownloads) {
       return sendForbidden(res, 'Downloads are disabled for this sheet.')
     }
 

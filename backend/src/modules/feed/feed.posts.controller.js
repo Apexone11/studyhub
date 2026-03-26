@@ -108,6 +108,8 @@ router.get('/posts/:id/attachment', requireAuth, attachmentDownloadLimiter, asyn
       where: { id: postId },
       select: {
         id: true,
+        userId: true,
+        moderationStatus: true,
         attachmentUrl: true,
         attachmentName: true,
         allowDownloads: true,
@@ -115,8 +117,12 @@ router.get('/posts/:id/attachment', requireAuth, attachmentDownloadLimiter, asyn
     })
 
     if (!post) return res.status(404).json({ error: 'Post not found.' })
+    const isOwnerOrAdmin = req.user && (req.user.userId === post.userId || req.user.role === 'admin')
+    if (!isOwnerOrAdmin && post.moderationStatus !== 'clean') {
+      return res.status(404).json({ error: 'Post not found.' })
+    }
     if (!post.attachmentUrl) return res.status(404).json({ error: 'Attachment not found.' })
-    if (!post.allowDownloads) {
+    if (!isOwnerOrAdmin && !post.allowDownloads) {
       return sendForbidden(res, 'Downloads are disabled for this post.')
     }
 
@@ -141,18 +147,20 @@ router.get('/posts/:id/attachment/preview', requireAuth, attachmentDownloadLimit
       where: { id: postId },
       select: {
         id: true,
+        userId: true,
+        moderationStatus: true,
         attachmentUrl: true,
         attachmentName: true,
         attachmentType: true,
-        allowDownloads: true,
       },
     })
 
     if (!post) return res.status(404).json({ error: 'Post not found.' })
-    if (!post.attachmentUrl) return res.status(404).json({ error: 'Attachment not found.' })
-    if (!post.allowDownloads) {
-      return sendForbidden(res, 'Downloads are disabled for this post.')
+    const isOwnerOrAdmin = req.user && (req.user.userId === post.userId || req.user.role === 'admin')
+    if (!isOwnerOrAdmin && post.moderationStatus !== 'clean') {
+      return res.status(404).json({ error: 'Post not found.' })
     }
+    if (!post.attachmentUrl) return res.status(404).json({ error: 'Attachment not found.' })
 
     const localPath = resolveAttachmentPath(post.attachmentUrl)
     if (!localPath || !fs.existsSync(localPath)) {
