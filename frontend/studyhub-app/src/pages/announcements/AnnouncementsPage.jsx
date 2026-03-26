@@ -18,7 +18,7 @@ import { API } from '../../config'
 import { useSession } from '../../lib/session-context'
 import { useLivePolling } from '../../lib/useLivePolling'
 import { useTutorial } from '../../lib/useTutorial'
-import { ANNOUNCEMENTS_STEPS } from '../../lib/tutorialSteps'
+import { ANNOUNCEMENTS_STEPS, TUTORIAL_VERSIONS } from '../../lib/tutorialSteps'
 import { staggerEntrance } from '../../lib/animations'
 import { usePageTitle } from '../../lib/usePageTitle'
 import { SkeletonFeed } from '../../components/Skeleton'
@@ -44,7 +44,7 @@ export default function AnnouncementsPage() {
   const animatedRef = useRef(false)
 
   /* Tutorial */
-  const tutorial = useTutorial('announcements', ANNOUNCEMENTS_STEPS)
+  const tutorial = useTutorial('announcements', ANNOUNCEMENTS_STEPS, { version: TUTORIAL_VERSIONS.announcements })
 
   /* Animate cards on first load */
   useEffect(() => {

@@ -22,7 +22,7 @@ import { PageShell } from '../shared/pageScaffold'
 import { PAGE_FONT } from '../shared/pageUtils'
 import SafeJoyride from '../../components/SafeJoyride'
 import { useTutorial } from '../../lib/useTutorial'
-import { NOTES_STEPS } from '../../lib/tutorialSteps'
+import { NOTES_STEPS, TUTORIAL_VERSIONS } from '../../lib/tutorialSteps'
 import { usePageTitle } from '../../lib/usePageTitle'
 import { useNotesData } from './useNotesData'
 import NotesList from './NotesList'
@@ -34,7 +34,7 @@ export default function NotesPage() {
   const layout = useResponsiveAppLayout()
 
   /* Tutorial popup */
-  const tutorial = useTutorial('notes', NOTES_STEPS)
+  const tutorial = useTutorial('notes', NOTES_STEPS, { version: TUTORIAL_VERSIONS.notes })
 
   /* All notes state and actions */
   const data = useNotesData()

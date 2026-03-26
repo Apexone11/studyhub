@@ -19,14 +19,14 @@ import {
 import { API } from '../../config'
 import { useResponsiveAppLayout, pageShell } from '../../lib/ui'
 import { useTutorial } from '../../lib/useTutorial'
-import { VIEWER_STEPS } from '../../lib/tutorialSteps'
+import { VIEWER_STEPS, TUTORIAL_VERSIONS } from '../../lib/tutorialSteps'
 import useSheetViewer from './useSheetViewer'
 import SheetViewerSidebar from './SheetViewerSidebar'
 import { FONT, panelStyle, actionButton, linkButton, errorBanner, timeAgo } from './sheetViewerConstants'
 
 export default function SheetViewerPage() {
   const layout = useResponsiveAppLayout()
-  const tutorial = useTutorial('viewer', VIEWER_STEPS)
+  const tutorial = useTutorial('viewer', VIEWER_STEPS, { version: TUTORIAL_VERSIONS.viewer })
 
   const {
     user,

@@ -12,7 +12,7 @@ import SafeJoyride from '../../components/SafeJoyride'
 import { API } from '../../config'
 import { useSession } from '../../lib/session-context'
 import { useTutorial } from '../../lib/useTutorial'
-import { SETTINGS_STEPS } from '../../lib/tutorialSteps'
+import { SETTINGS_STEPS, TUTORIAL_VERSIONS } from '../../lib/tutorialSteps'
 import { fadeInUp } from '../../lib/animations'
 import { Skeleton } from '../../components/Skeleton'
 import { FONT } from './settingsState'
@@ -44,7 +44,7 @@ export default function SettingsPage() {
 
   const initialTab = NAV_TABS.find((t) => t.id === searchParams.get('tab'))?.id || 'profile'
   const [tab, setTab] = useState(initialTab)
-  const tutorial = useTutorial('settings', SETTINGS_STEPS)
+  const tutorial = useTutorial('settings', SETTINGS_STEPS, { version: TUTORIAL_VERSIONS.settings })
   const tabContentRef = useRef(null)
 
   /* Animate tab content on switch */

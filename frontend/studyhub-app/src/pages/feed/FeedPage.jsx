@@ -22,7 +22,7 @@ import { usePageTitle } from '../../lib/usePageTitle'
 import { SkeletonFeed } from '../../components/Skeleton'
 import SafeJoyride from '../../components/SafeJoyride'
 import { useTutorial } from '../../lib/useTutorial'
-import { FEED_STEPS } from '../../lib/tutorialSteps'
+import { FEED_STEPS, TUTORIAL_VERSIONS } from '../../lib/tutorialSteps'
 
 import { FONT, FILTERS } from './feedConstants'
 import { Panel, EmptyFeed, GettingStartedCard } from './FeedWidgets'
@@ -56,7 +56,7 @@ export default function FeedPage() {
   const [reportTarget, setReportTarget] = useState(null)
 
   const { recentlyViewed } = useRecentlyViewed()
-  const tutorial = useTutorial('feed', FEED_STEPS)
+  const tutorial = useTutorial('feed', FEED_STEPS, { version: TUTORIAL_VERSIONS.feed })
 
   const setQueryParam = useCallback((key, value) => {
     const next = new URLSearchParams(searchParams)
