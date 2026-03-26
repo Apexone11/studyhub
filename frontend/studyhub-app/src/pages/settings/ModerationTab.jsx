@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { API } from '../../config'
 import { FONT } from './settingsState'
+import { HistoryIcon } from '../admin/components/icons'
 
 const SECTION_TABS = ['status', 'cases', 'appeals']
 const SECTION_LABELS = { status: 'My Status', cases: 'My Cases', appeals: 'My Appeals' }
@@ -60,12 +61,25 @@ function Card({ children, style }) {
 }
 
 /* ── Appeal Modal ──────────────────────────────────────────────── */
-function AppealModal({ caseData, onClose, onSubmit }) {
+function AppealModal({ open, caseData, onClose, onSubmit }) {
   const [category, setCategory] = useState('')
   const [reason, setReason] = useState('')
   const [acknowledged, setAcknowledged] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler)
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', handler)
+      document.body.style.overflow = ''
+    }
+  }, [open, onClose])
+
+  if (!open) return null
 
   const selectedCategory = APPEAL_CATEGORIES.find((c) => c.value === category)
   const canSubmit = category && reason.trim().length >= 20 && acknowledged && !submitting
@@ -86,16 +100,17 @@ function AppealModal({ caseData, onClose, onSubmit }) {
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, zIndex: 1000,
+      position: 'fixed', inset: 0, zIndex: 9000,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'rgba(15,23,42,0.5)', padding: 16,
+      background: 'rgba(15, 23, 42, 0.55)', backdropFilter: 'blur(4px)',
+      padding: 24,
     }} onClick={onClose}>
       <div
         style={{
           background: 'var(--sh-surface)', borderRadius: 16,
-          border: '1px solid var(--sh-border)', padding: '24px 28px',
-          maxWidth: 520, width: '100%', maxHeight: '90vh', overflowY: 'auto',
-          boxShadow: '0 20px 60px rgba(15,23,42,0.2)',
+          maxWidth: 520, width: '92vw', maxHeight: 'calc(100vh - 48px)',
+          overflowY: 'auto', boxShadow: '0 20px 60px rgba(15, 23, 42, 0.25)',
+          padding: '24px 28px',
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -270,7 +285,7 @@ function StatusSection({ data }) {
       )}
 
       <Card>
-        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
           <div>
             <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--sh-heading)' }}>{data.activeStrikes}</div>
             <div style={{ fontSize: 12, color: 'var(--sh-muted)', fontWeight: 600 }}>Active Strikes</div>
@@ -435,10 +450,13 @@ function AppealsSection({ data }) {
   if (appeals.length === 0) {
     return (
       <Card>
-        <p style={{ margin: '0 0 8px', fontSize: 13, color: 'var(--sh-muted)' }}>No appeals submitted yet.</p>
-        <p style={{ margin: 0, fontSize: 12, color: 'var(--sh-muted)', lineHeight: 1.6 }}>
-          If a case was confirmed against your content, you can submit an appeal from the &ldquo;My Cases&rdquo; tab.
-        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '12px 0', textAlign: 'center' }}>
+          <HistoryIcon size={28} style={{ color: 'var(--sh-muted)', opacity: 0.5 }} />
+          <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: 'var(--sh-muted)' }}>No appeals submitted yet</p>
+          <p style={{ margin: 0, fontSize: 12, color: 'var(--sh-muted)', lineHeight: 1.6, maxWidth: 340 }}>
+            If a case was confirmed against your content, you can submit an appeal from the &ldquo;My Cases&rdquo; tab.
+          </p>
+        </div>
       </Card>
     )
   }
@@ -638,13 +656,12 @@ export default function ModerationTab() {
       {section === 'appeals' && <AppealsSection data={data} />}
 
       {/* Appeal modal */}
-      {appealTarget && (
-        <AppealModal
-          caseData={appealTarget}
-          onClose={() => setAppealTarget(null)}
-          onSubmit={handleSubmitAppeal}
-        />
-      )}
+      <AppealModal
+        open={!!appealTarget}
+        caseData={appealTarget}
+        onClose={() => setAppealTarget(null)}
+        onSubmit={handleSubmitAppeal}
+      />
     </div>
   )
 }
