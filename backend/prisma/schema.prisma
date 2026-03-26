@@ -132,6 +132,8 @@ model StudySheet {
   attachmentType String?
   attachmentName String?
   allowDownloads Boolean  @default(true)
+  contentHash    String?
+  contentSimhash String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   course    Course   @relation(fields: [courseId], references: [id])
@@ -156,6 +158,8 @@ model StudySheet {
   @@index([status, createdAt(sort: Desc)])
   @@index([htmlScanStatus, updatedAt(sort: Desc)])
   @@index([htmlRiskTier, status, createdAt(sort: Desc)])
+  @@index([contentHash])
+  @@index([contentSimhash])
 }
 
 model SheetHtmlVersion {
@@ -193,13 +197,14 @@ model RequestedCourse {
 }
 
 model Comment {
-  id        Int        @id @default(autoincrement())
-  content   String
-  sheetId   Int
-  userId    Int
-  createdAt DateTime   @default(now())
-  sheet     StudySheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
-  author    User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id               Int        @id @default(autoincrement())
+  content          String
+  sheetId          Int
+  userId           Int
+  moderationStatus String     @default("clean")
+  createdAt        DateTime   @default(now())
+  sheet            StudySheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  author           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([sheetId, createdAt(sort: Desc)])
 }
@@ -243,6 +248,8 @@ model Note {
   private          Boolean  @default(true)
   allowDownloads   Boolean  @default(false)
   moderationStatus String   @default("clean")
+  contentHash      String?
+  contentSimhash   String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   author    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -312,20 +319,21 @@ model DeletionReason {
 }
 
 model FeedPost {
-  id             Int                @id @default(autoincrement())
-  content        String
-  userId         Int
-  courseId       Int?
-  attachmentUrl  String?
-  attachmentType String?
-  attachmentName String?
-  allowDownloads Boolean            @default(true)
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
-  author         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  course         Course?            @relation(fields: [courseId], references: [id], onDelete: SetNull)
-  comments       FeedPostComment[]
-  reactions      FeedPostReaction[]
+  id               Int                @id @default(autoincrement())
+  content          String
+  userId           Int
+  courseId         Int?
+  attachmentUrl    String?
+  attachmentType   String?
+  attachmentName   String?
+  allowDownloads   Boolean            @default(true)
+  moderationStatus String             @default("clean")
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  author           User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course           Course?            @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  comments         FeedPostComment[]
+  reactions        FeedPostReaction[]
 
   @@index([createdAt(sort: Desc)])
   @@index([userId, createdAt(sort: Desc)])
@@ -333,13 +341,14 @@ model FeedPost {
 }
 
 model FeedPostComment {
-  id        Int      @id @default(autoincrement())
-  content   String
-  postId    Int
-  userId    Int
-  createdAt DateTime @default(now())
-  post      FeedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
-  author    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id               Int      @id @default(autoincrement())
+  content          String
+  postId           Int
+  userId           Int
+  moderationStatus String   @default("clean")
+  createdAt        DateTime @default(now())
+  post             FeedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([postId, createdAt(sort: Desc)])
 }
@@ -494,6 +503,7 @@ model ModerationCase {
   claimedBy        User?     @relation("ModerationClaimer", fields: [claimedByAdminId], references: [id], onDelete: SetNull)
   strikes          Strike[]
   appeals          Appeal[]
+  snapshots        ModerationSnapshot[]
 
   @@index([status, createdAt(sort: Desc)])
   @@index([contentType, contentId])
@@ -517,21 +527,38 @@ model Strike {
 }
 
 model Appeal {
-  id         Int       @id @default(autoincrement())
-  caseId     Int
-  userId     Int
-  reason     String
-  status     String    @default("pending")
-  reviewedBy Int?
-  reviewNote String?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  case       ModerationCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  reviewer   User?     @relation("AppealReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  id             Int       @id @default(autoincrement())
+  caseId         Int
+  userId         Int
+  reasonCategory String?
+  reason         String
+  status         String    @default("pending")
+  reviewedBy     Int?
+  reviewNote     String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  case           ModerationCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewer       User?     @relation("AppealReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
 
   @@index([caseId])
   @@index([userId, status])
+}
+
+model ModerationSnapshot {
+  id            Int            @id @default(autoincrement())
+  caseId        Int
+  targetType    String
+  targetId      Int
+  ownerId       Int?
+  contentJson   Json
+  attachmentUrl String?
+  createdAt     DateTime       @default(now())
+  restoredAt    DateTime?
+  case          ModerationCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+  @@index([targetType, targetId])
 }
 
 model UserRestriction {

@@ -6,6 +6,7 @@ const { assertOwnerOrAdmin } = require('../../lib/accessControl')
 const { cleanupAttachmentIfUnused } = require('../../lib/storage')
 const { validateHtmlForSubmission } = require('../../lib/htmlSecurity')
 const { isModerationEnabled, scanContent } = require('../../lib/moderationEngine')
+const { updateFingerprint } = require('../../lib/plagiarismService')
 const { createProvenanceToken } = require('../../lib/provenance')
 const { isHtmlUploadsEnabled } = require('../../lib/htmlKillSwitch')
 const { SHEET_STATUS, sheetWriteLimiter } = require('./sheets.constants')
@@ -164,6 +165,9 @@ router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
         void scanContent({ contentType: 'sheet', contentId: sheetId, text: textToScan, userId: req.user.userId })
       }
     }
+
+    /* Content fingerprinting for plagiarism detection (fire-and-forget) */
+    if (typeof content === 'string') void updateFingerprint('sheet', sheetId, content)
 
     /* Auto-generate provenance manifest if one does not exist yet (fire-and-forget) */
     Promise.resolve().then(async () => {

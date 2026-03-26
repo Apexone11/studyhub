@@ -2,6 +2,7 @@ const express = require('express')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
 const { issueStrike, reviewCase } = require('../../lib/moderationEngine')
+const { findSimilarContent } = require('../../lib/plagiarismService')
 const { isSuperAdmin } = require('../../lib/superAdmin')
 const { PAGE_SIZE, parsePage } = require('./moderation.constants')
 
@@ -262,6 +263,165 @@ router.patch('/cases/:id/review', async (req, res) => {
   }
 })
 
+/* GET /cases/:id/preview — Admin-only preview of reported content */
+router.get('/cases/:id/preview', async (req, res) => {
+  const caseId = Number.parseInt(req.params.id, 10)
+  if (!Number.isFinite(caseId)) return res.status(400).json({ error: 'Invalid case ID.' })
+
+  try {
+    const modCase = await prisma.moderationCase.findUnique({
+      where: { id: caseId },
+      select: {
+        id: true,
+        contentType: true,
+        contentId: true,
+        userId: true,
+        excerpt: true,
+        evidence: true,
+      },
+    })
+    if (!modCase) return res.status(404).json({ error: 'Case not found.' })
+
+    const { contentType, contentId } = modCase
+    const preview = { contentType, contentId, linkPath: null, title: null, text: null, attachments: [], owner: null, createdAt: null }
+
+    /* Resolve preview based on content type */
+    if (contentType === 'post' || contentType === 'feed_post') {
+      const post = await prisma.feedPost.findUnique({
+        where: { id: contentId },
+        select: {
+          id: true, content: true, attachmentUrl: true, attachmentType: true, attachmentName: true,
+          createdAt: true, moderationStatus: true,
+          author: { select: { id: true, username: true } },
+        },
+      })
+      if (post) {
+        preview.text = post.content
+        preview.linkPath = `/feed?post=${post.id}`
+        preview.owner = post.author
+        preview.createdAt = post.createdAt
+        preview.moderationStatus = post.moderationStatus
+        if (post.attachmentUrl) {
+          preview.attachments.push({
+            url: `/api/posts/${post.id}/attachment/preview`,
+            downloadUrl: `/api/posts/${post.id}/attachment`,
+            name: post.attachmentName || 'Attachment',
+            type: post.attachmentType || 'unknown',
+          })
+        }
+      }
+    } else if (contentType === 'sheet') {
+      const sheet = await prisma.studySheet.findUnique({
+        where: { id: contentId },
+        select: {
+          id: true, title: true, content: true, description: true,
+          attachmentUrl: true, attachmentType: true, attachmentName: true,
+          status: true, createdAt: true,
+          author: { select: { id: true, username: true } },
+        },
+      })
+      if (sheet) {
+        preview.title = sheet.title
+        preview.text = sheet.description ? `${sheet.description}\n\n${sheet.content?.slice(0, 2000) || ''}` : sheet.content?.slice(0, 2000)
+        preview.linkPath = `/sheets/${sheet.id}`
+        preview.owner = sheet.author
+        preview.createdAt = sheet.createdAt
+        preview.moderationStatus = sheet.status
+        if (sheet.attachmentUrl) {
+          preview.attachments.push({
+            url: `/api/sheets/${sheet.id}/attachment/preview`,
+            downloadUrl: `/api/sheets/${sheet.id}/attachment`,
+            name: sheet.attachmentName || 'Attachment',
+            type: sheet.attachmentType || 'unknown',
+          })
+        }
+      }
+    } else if (contentType === 'note') {
+      const note = await prisma.note.findUnique({
+        where: { id: contentId },
+        select: {
+          id: true, title: true, content: true, moderationStatus: true, createdAt: true,
+          author: { select: { id: true, username: true } },
+        },
+      })
+      if (note) {
+        preview.title = note.title
+        preview.text = note.content?.slice(0, 5000)
+        preview.linkPath = `/notes/${note.id}`
+        preview.owner = note.author
+        preview.createdAt = note.createdAt
+        preview.moderationStatus = note.moderationStatus
+      }
+    } else if (contentType === 'post_comment') {
+      const comment = await prisma.feedPostComment.findUnique({
+        where: { id: contentId },
+        select: {
+          id: true, content: true, postId: true, moderationStatus: true, createdAt: true,
+          author: { select: { id: true, username: true } },
+        },
+      })
+      if (comment) {
+        preview.text = comment.content
+        preview.linkPath = `/feed?post=${comment.postId}`
+        preview.owner = comment.author
+        preview.createdAt = comment.createdAt
+        preview.moderationStatus = comment.moderationStatus
+      }
+    } else if (contentType === 'sheet_comment') {
+      const comment = await prisma.comment.findUnique({
+        where: { id: contentId },
+        select: {
+          id: true, content: true, sheetId: true, moderationStatus: true, createdAt: true,
+          author: { select: { id: true, username: true } },
+        },
+      })
+      if (comment) {
+        preview.text = comment.content
+        preview.linkPath = `/sheets/${comment.sheetId}`
+        preview.owner = comment.author
+        preview.createdAt = comment.createdAt
+        preview.moderationStatus = comment.moderationStatus
+      }
+    } else if (contentType === 'note_comment') {
+      const comment = await prisma.noteComment.findUnique({
+        where: { id: contentId },
+        select: {
+          id: true, content: true, noteId: true, moderationStatus: true, createdAt: true,
+          author: { select: { id: true, username: true } },
+        },
+      })
+      if (comment) {
+        preview.text = comment.content
+        preview.linkPath = `/notes/${comment.noteId}`
+        preview.owner = comment.author
+        preview.createdAt = comment.createdAt
+        preview.moderationStatus = comment.moderationStatus
+      }
+    } else if (contentType === 'user') {
+      const user = await prisma.user.findUnique({
+        where: { id: contentId },
+        select: { id: true, username: true, bio: true, createdAt: true },
+      })
+      if (user) {
+        preview.text = user.bio || '(no bio)'
+        preview.linkPath = `/users/${user.username}`
+        preview.owner = { id: user.id, username: user.username }
+        preview.createdAt = user.createdAt
+      }
+    }
+
+    /* Fallback: use case excerpt if live content was deleted */
+    if (!preview.text && modCase.excerpt) {
+      preview.text = modCase.excerpt
+    }
+
+    res.json(preview)
+  } catch (error) {
+    captureError(error, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
 /* POST /strikes — Issue a strike to a user */
 router.post('/strikes', async (req, res) => {
   const userId = Number.parseInt(req.body?.userId, 10)
@@ -331,6 +491,79 @@ router.get('/strikes', async (req, res) => {
       total,
       page,
       pages: Math.ceil(total / PAGE_SIZE) || 1,
+    })
+  } catch (error) {
+    captureError(error, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+/* GET /cases/:id/plagiarism — Find similar content for plagiarism review */
+router.get('/cases/:id/plagiarism', async (req, res) => {
+  const caseId = Number.parseInt(req.params.id, 10)
+  if (!Number.isFinite(caseId)) return res.status(400).json({ error: 'Invalid case ID.' })
+
+  try {
+    const modCase = await prisma.moderationCase.findUnique({
+      where: { id: caseId },
+      select: { id: true, contentType: true, contentId: true, reasonCategory: true },
+    })
+    if (!modCase) return res.status(404).json({ error: 'Case not found.' })
+
+    const { contentType, contentId } = modCase
+
+    /* Only sheets and notes have enough text to compare */
+    if (contentType !== 'sheet' && contentType !== 'note') {
+      return res.json({ matches: [], message: 'Plagiarism check is only available for sheets and notes.' })
+    }
+
+    /* Fetch the reported content for side-by-side comparison */
+    let reportedContent = null
+    if (contentType === 'sheet') {
+      reportedContent = await prisma.studySheet.findUnique({
+        where: { id: contentId },
+        select: { id: true, title: true, content: true, userId: true, createdAt: true, author: { select: { id: true, username: true } } },
+      })
+    } else {
+      reportedContent = await prisma.note.findUnique({
+        where: { id: contentId },
+        select: { id: true, title: true, content: true, userId: true, createdAt: true, author: { select: { id: true, username: true } } },
+      })
+    }
+
+    if (!reportedContent) return res.json({ matches: [], message: 'Reported content not found.' })
+
+    const matches = await findSimilarContent({ contentType, contentId, limit: 10 })
+
+    /* For each match, fetch a text preview for side-by-side */
+    const enrichedMatches = await Promise.all(matches.map(async (m) => {
+      let preview = null
+      if (m.type === 'sheet') {
+        const s = await prisma.studySheet.findUnique({
+          where: { id: m.id },
+          select: { content: true },
+        })
+        preview = s?.content?.slice(0, 2000) || null
+      } else if (m.type === 'note') {
+        const n = await prisma.note.findUnique({
+          where: { id: m.id },
+          select: { content: true },
+        })
+        preview = n?.content?.slice(0, 2000) || null
+      }
+      return { ...m, textPreview: preview }
+    }))
+
+    res.json({
+      reported: {
+        type: contentType,
+        id: reportedContent.id,
+        title: reportedContent.title,
+        textPreview: reportedContent.content?.slice(0, 2000) || null,
+        author: reportedContent.author,
+        createdAt: reportedContent.createdAt,
+      },
+      matches: enrichedMatches,
     })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })

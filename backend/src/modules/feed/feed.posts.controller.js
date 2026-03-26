@@ -72,6 +72,13 @@ router.get('/posts/:id', async (req, res) => {
     })
     if (!post) return res.status(404).json({ error: 'Post not found.' })
 
+    /* Hide moderated content from non-owner/non-admin */
+    if (post.moderationStatus !== 'clean') {
+      const isOwner = req.user?.userId === post.userId
+      const isAdmin = req.user?.role === 'admin'
+      if (!isOwner && !isAdmin) return res.status(404).json({ error: 'Post not found.' })
+    }
+
     const [commentCount, reactionRows, currentReactions] = await Promise.all([
       prisma.feedPostComment.count({ where: { postId } }),
       prisma.feedPostReaction.groupBy({

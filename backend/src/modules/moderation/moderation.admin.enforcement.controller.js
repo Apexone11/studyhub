@@ -1,7 +1,7 @@
 const express = require('express')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
-const { countActiveStrikes } = require('../../lib/moderationEngine')
+const { countActiveStrikes, restoreContent } = require('../../lib/moderationEngine')
 const { PAGE_SIZE, parsePage } = require('./moderation.constants')
 
 const router = express.Router()
@@ -137,8 +137,12 @@ router.patch('/appeals/:id/review', async (req, res) => {
       if (appeal.caseId) {
         await prisma.moderationCase.update({
           where: { id: appeal.caseId },
-          data: { status: 'dismissed', reviewedBy: req.user.userId, reviewNote: 'Dismissed via approved appeal.' },
+          data: { status: 'reversed', reviewedBy: req.user.userId, reviewNote: 'Reversed via approved appeal.' },
         }).catch((err) => captureError(err, { context: 'appeal-case-dismiss', appealId }))
+
+        /* Restore taken-down content */
+        await restoreContent(appeal.caseId)
+          .catch((err) => captureError(err, { context: 'appeal-restore', appealId }))
       }
 
       await prisma.strike.updateMany({

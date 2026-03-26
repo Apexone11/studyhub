@@ -3,7 +3,7 @@ const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
 const { countActiveStrikes, hasActiveRestriction } = require('../../lib/moderationEngine')
 const { createNotification } = require('../../lib/notify')
-const { appealLimiter, reportLimiter, REASON_CATEGORIES } = require('./moderation.constants')
+const { appealLimiter, reportLimiter, REASON_CATEGORIES, APPEAL_REASON_CATEGORIES } = require('./moderation.constants')
 
 const router = express.Router()
 
@@ -41,6 +41,7 @@ router.get('/my-status', async (req, res) => {
         select: {
           id: true,
           contentType: true,
+          contentId: true,
           status: true,
           reasonCategory: true,
           excerpt: true,
@@ -68,6 +69,7 @@ router.get('/my-status', async (req, res) => {
         select: {
           id: true,
           caseId: true,
+          reasonCategory: true,
           status: true,
           reason: true,
           reviewNote: true,
@@ -233,10 +235,21 @@ router.post('/reports', reportLimiter, async (req, res) => {
   }
 })
 
-/* POST /appeals — Submit an appeal */
+/* POST /appeals — Submit an appeal
+ *
+ * Eligibility (any of):
+ *   - Case status is 'confirmed' AND user is the content owner (userId on case)
+ *   - User has an active (non-decayed) strike linked to this case
+ * Guards:
+ *   - One pending appeal per case per user
+ *   - Rate limited (appealLimiter)
+ *   - Reason: 20–2000 chars
+ *   - Optional reasonCategory from APPEAL_REASON_CATEGORIES
+ */
 router.post('/appeals', appealLimiter, async (req, res) => {
   const caseId = Number.parseInt(req.body?.caseId, 10)
   const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : ''
+  const reasonCategory = typeof req.body?.reasonCategory === 'string' ? req.body.reasonCategory.trim() : null
 
   if (!Number.isFinite(caseId)) return res.status(400).json({ error: 'Valid caseId is required.' })
   if (reason.length < 20) {
@@ -245,22 +258,30 @@ router.post('/appeals', appealLimiter, async (req, res) => {
   if (reason.length > 2000) {
     return res.status(400).json({ error: 'Appeal reason must be 2000 characters or fewer.' })
   }
+  if (reasonCategory && !APPEAL_REASON_CATEGORIES.includes(reasonCategory)) {
+    return res.status(400).json({ error: 'Invalid appeal reason category.' })
+  }
 
   try {
     const modCase = await prisma.moderationCase.findUnique({
       where: { id: caseId },
-      select: { id: true, status: true },
+      select: { id: true, status: true, userId: true },
     })
     if (!modCase) return res.status(404).json({ error: 'Moderation case not found.' })
 
+    /* Eligibility: content owner on confirmed case OR has active strike */
+    const isContentOwner = modCase.userId === req.user.userId
+    const isConfirmedCase = modCase.status === 'confirmed'
     const linkedStrike = await prisma.strike.findFirst({
       where: { caseId, userId: req.user.userId, decayedAt: null },
       select: { id: true },
     })
-    if (!linkedStrike) {
-      return res.status(403).json({ error: 'You can only appeal cases linked to your own active strikes.' })
+
+    if (!(isContentOwner && isConfirmedCase) && !linkedStrike) {
+      return res.status(403).json({ error: 'You can only appeal confirmed cases on your content or cases linked to your active strikes.' })
     }
 
+    /* Prevent duplicate pending appeals */
     const existingAppeal = await prisma.appeal.findFirst({
       where: { caseId, userId: req.user.userId, status: 'pending' },
       select: { id: true },
@@ -273,6 +294,7 @@ router.post('/appeals', appealLimiter, async (req, res) => {
       data: {
         caseId,
         userId: req.user.userId,
+        reasonCategory: reasonCategory || null,
         reason,
       },
     })

@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useSession } from '../../lib/session-context'
 import ReportModal from '../../components/ReportModal'
+import ModerationBanner from '../../components/ModerationBanner'
 import { PAGE_FONT } from '../shared/pageUtils'
 import { MarkdownPreview, wordCount } from './notesConstants'
 import NoteCommentSection from './NoteCommentSection'
@@ -109,6 +110,9 @@ export default function NoteViewerPage() {
           )}
         </div>
       </div>
+
+      {/* Moderation banner (owner only) */}
+      {note.isOwner && <ModerationBanner status={note.moderationStatus} />}
 
       {/* Actions bar */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>

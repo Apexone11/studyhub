@@ -6,6 +6,7 @@ const { notifyMentionedUsers } = require('../../lib/mentions')
 const { trackActivity } = require('../../lib/activityTracker')
 const { buildAnchorContext, validateAnchorInput } = require('../../lib/noteAnchor')
 const { isModerationEnabled, scanContent } = require('../../lib/moderationEngine')
+const { updateFingerprint } = require('../../lib/plagiarismService')
 const requireAuth = require('../../middleware/auth')
 const requireVerifiedEmail = require('../../middleware/requireVerifiedEmail')
 const optionalAuth = require('../../core/auth/optionalAuth')
@@ -155,6 +156,9 @@ router.post('/', requireAuth, mutateLimiter, requireVerifiedEmail, async (req, r
       void scanContent({ contentType: 'note', contentId: note.id, text: textToScan, userId: req.user.userId })
     }
 
+    /* Content fingerprinting for plagiarism detection (fire-and-forget) */
+    void updateFingerprint('note', note.id, contentStr)
+
     res.status(201).json(note)
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
@@ -162,7 +166,7 @@ router.post('/', requireAuth, mutateLimiter, requireVerifiedEmail, async (req, r
   }
 })
 
-// ── PATCH /api/notes/:id ────────────────────────────────────────
+// ── PATCH /api/notes/:id ────────────────────────────────────────────��──────────────────────────────��
 router.patch('/:id', requireAuth, mutateLimiter, requireVerifiedEmail, async (req, res) => {
   const noteId = parseInt(req.params.id)
   try {
@@ -210,6 +214,9 @@ router.patch('/:id', requireAuth, mutateLimiter, requireVerifiedEmail, async (re
         void scanContent({ contentType: 'note', contentId: noteId, text: textToScan, userId: req.user.userId })
       }
     }
+
+    /* Content fingerprinting on content changes (fire-and-forget) */
+    if (data.content !== undefined) void updateFingerprint('note', noteId, updated.content)
 
     res.json(updated)
   } catch (err) {

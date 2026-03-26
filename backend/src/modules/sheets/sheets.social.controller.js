@@ -102,13 +102,13 @@ router.get('/:id/comments', async (req, res) => {
 
     const [comments, total] = await Promise.all([
       prisma.comment.findMany({
-        where: { sheetId },
+        where: { sheetId, moderationStatus: 'clean' },
         include: { author: { select: { id: true, username: true } } },
         orderBy: { createdAt: 'desc' },
         take: limit,
         skip: offset,
       }),
-      prisma.comment.count({ where: { sheetId } }),
+      prisma.comment.count({ where: { sheetId, moderationStatus: 'clean' } }),
     ])
 
     res.json({ comments, total, limit, offset })
