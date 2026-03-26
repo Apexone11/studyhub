@@ -6,6 +6,7 @@ const { buildSheetTextSearchClauses } = require('../../lib/sheetSearch')
 const { searchSheetsFTS, searchCoursesFTS, searchUsersFTS } = require('../../lib/fullTextSearch')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
+const { timedSection, logTiming } = require('../../lib/requestTiming')
 
 const router = express.Router()
 
@@ -35,6 +36,7 @@ function optionalAuth(req, _res, next) {
 }
 
 router.get('/', optionalAuth, async (req, res) => {
+  req._timingStart = Date.now()
   const rawQ = Array.isArray(req.query.q) ? req.query.q[0] : req.query.q
   const rawType = Array.isArray(req.query.type) ? req.query.type[0] : req.query.type
   const rawLimit = Array.isArray(req.query.limit) ? req.query.limit[0] : req.query.limit
@@ -59,7 +61,7 @@ router.get('/', optionalAuth, async (req, res) => {
   const useFTS = req.query.fts === 'true'
 
   try {
-    const promises = []
+    const sections = []
     const sheetTextSearchClauses = buildSheetTextSearchClauses(query)
 
     const wantSheets = type === 'all' || type === 'sheets'
@@ -70,7 +72,7 @@ router.get('/', optionalAuth, async (req, res) => {
 
     if (wantSheets) {
       if (useFTS) {
-        promises.push(
+        sections.push(timedSection('sheets-fts', () =>
           searchSheetsFTS(query, { status: 'published', limit }).then(async (result) => {
             if (!result.sheets.length) return []
             const ids = result.sheets.map((s) => Number(s.id))
@@ -84,9 +86,9 @@ router.get('/', optionalAuth, async (req, res) => {
               },
             })
           })
-        )
+        ))
       } else {
-        promises.push(
+        sections.push(timedSection('sheets', () =>
           prisma.studySheet.findMany({
             where: {
               status: 'published',
@@ -106,15 +108,15 @@ router.get('/', optionalAuth, async (req, res) => {
             orderBy: { stars: 'desc' },
             take: limit,
           })
-        )
+        ))
       }
     } else {
-      promises.push(Promise.resolve([]))
+      sections.push(timedSection('sheets-skip', () => []))
     }
 
     if (wantCourses) {
       if (useFTS) {
-        promises.push(
+        sections.push(timedSection('courses-fts', () =>
           searchCoursesFTS(query, { limit }).then(async (rows) => {
             if (!rows.length) return []
             const ids = rows.map((c) => Number(c.id))
@@ -126,9 +128,9 @@ router.get('/', optionalAuth, async (req, res) => {
               },
             })
           })
-        )
+        ))
       } else {
-        promises.push(
+        sections.push(timedSection('courses', () =>
           prisma.course.findMany({
             where: {
               OR: [
@@ -145,15 +147,15 @@ router.get('/', optionalAuth, async (req, res) => {
             orderBy: { code: 'asc' },
             take: limit,
           })
-        )
+        ))
       }
     } else {
-      promises.push(Promise.resolve([]))
+      sections.push(timedSection('courses-skip', () => []))
     }
 
     if (wantUsers) {
       if (useFTS) {
-        promises.push(
+        sections.push(timedSection('users-fts', () =>
           searchUsersFTS(query, { limit: userSearchTake }).then(async (rows) => {
             if (!rows.length) return []
             const ids = rows.map((u) => Number(u.id))
@@ -165,9 +167,9 @@ router.get('/', optionalAuth, async (req, res) => {
               },
             })
           })
-        )
+        ))
       } else {
-        promises.push(
+        sections.push(timedSection('users', () =>
           prisma.user.findMany({
             where: {
               username: { contains: query, mode: 'insensitive' },
@@ -182,14 +184,14 @@ router.get('/', optionalAuth, async (req, res) => {
             orderBy: { username: 'asc' },
             take: userSearchTake,
           })
-        )
+        ))
       }
     } else {
-      promises.push(Promise.resolve([]))
+      sections.push(timedSection('users-skip', () => []))
     }
 
     if (wantNotes) {
-      promises.push(
+      sections.push(timedSection('notes', () =>
         prisma.note.findMany({
           where: {
             private: false,
@@ -209,25 +211,39 @@ router.get('/', optionalAuth, async (req, res) => {
           orderBy: { createdAt: 'desc' },
           take: limit,
         })
-      )
+      ))
     } else {
-      promises.push(Promise.resolve([]))
+      sections.push(timedSection('notes-skip', () => []))
     }
 
-    const [sheets, courses, matchedUsers, notes] = await Promise.all(promises)
+    const resolved = await Promise.all(sections)
+    const sheets = resolved[0].data || []
+    const courses = resolved[1].data || []
+    const matchedUsers = resolved[2].data || []
+    const notes = resolved[3].data || []
     let users = matchedUsers
 
     if (wantUsers && matchedUsers.length) {
-      const visibleUserIds = await getVisibleProfileIds(
-        prisma,
-        req.user,
-        matchedUsers.map((user) => user.id),
+      const visibilitySection = await timedSection('visibility', () =>
+        getVisibleProfileIds(prisma, req.user, matchedUsers.map((user) => user.id))
       )
+      resolved.push(visibilitySection)
 
+      const visibleUserIds = visibilitySection.data
       users = matchedUsers
         .filter((user) => visibleUserIds.has(user.id))
         .slice(0, limit)
     }
+
+    logTiming(req, {
+      sections: resolved,
+      extra: {
+        query: query.slice(0, 50),
+        type,
+        useFTS,
+        counts: { sheets: sheets.length, courses: courses.length, users: users.length, notes: notes.length },
+      },
+    })
 
     return res.json({
       results: { sheets, courses, users, notes },

@@ -231,6 +231,20 @@ async function issueStrike({ userId, reason, caseId }) {
     })
   } catch { /* notification failures are non-fatal */ }
 
+  /* If auto-restriction was triggered, send a separate high-priority notification */
+  if (restricted) {
+    try {
+      await createNotification(prisma, {
+        userId,
+        type: 'moderation',
+        message: `Your account has been restricted due to ${activeStrikes} active strikes. Posting, sharing, and publishing are temporarily blocked.`,
+        actorId: null,
+        linkPath: '/settings?tab=account',
+        priority: 'high',
+      })
+    } catch { /* notification failures are non-fatal */ }
+  }
+
   return { strike, activeStrikes, restricted }
 }
 

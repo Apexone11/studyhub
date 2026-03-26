@@ -4,6 +4,7 @@ import { getApiErrorMessage, isAuthSessionFailure, readJsonSafely } from '../../
 import { useLivePolling } from '../../lib/useLivePolling'
 import { showToast } from '../../lib/toast'
 import { trackEvent } from '../../lib/telemetry'
+import { usePageTiming } from '../../lib/usePageTiming'
 import { canUserDeletePost } from './feedHelpers'
 import { authHeaders } from './feedConstants'
 
@@ -26,12 +27,14 @@ export function useFeedData({ user, clearSession, search }) {
   const [starredUpdates, setStarredUpdates] = useState([])
   const [loadingMore, setLoadingMore] = useState(false)
   const [deletingPostIds, setDeletingPostIds] = useState({})
+  const timing = usePageTiming('feed')
 
   const loadFeed = useCallback(async ({ signal, startTransition } = {}) => {
     const apply = startTransition || ((fn) => fn())
     const params = new URLSearchParams({ limit: '24' })
     if (search) params.set('search', search)
 
+    timing.markFetchStart()
     try {
       const response = await fetch(`${API}/api/feed?${params.toString()}`, {
         headers: authHeaders(),
@@ -40,6 +43,7 @@ export function useFeedData({ user, clearSession, search }) {
       })
 
       const data = await readJsonSafely(response, {})
+      timing.markFetchEnd()
 
       if (isAuthSessionFailure(response, data)) {
         clearSession()
@@ -81,7 +85,12 @@ export function useFeedData({ user, clearSession, search }) {
         }))
       })
     }
-  }, [clearSession, search])
+  }, [clearSession, search, timing])
+
+  // Report timing when feed items first arrive
+  useEffect(() => {
+    if (!feedState.loading && feedState.items.length > 0) timing.markContentVisible()
+  }, [feedState.loading, feedState.items.length, timing])
 
   const loadMoreFeed = async () => {
     setLoadingMore(true)

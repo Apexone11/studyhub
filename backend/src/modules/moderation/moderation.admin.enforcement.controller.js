@@ -2,6 +2,7 @@ const express = require('express')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
 const { countActiveStrikes, restoreContent } = require('../../lib/moderationEngine')
+const { createNotification } = require('../../lib/notify')
 const { PAGE_SIZE, parsePage } = require('./moderation.constants')
 
 const router = express.Router()
@@ -57,11 +58,12 @@ router.patch('/restrictions/:id/lift', async (req, res) => {
     })
 
     try {
-      await require('../../lib/notify').createNotification(prisma, {
+      await createNotification(prisma, {
         userId: existing.userId,
         type: 'moderation',
         message: 'Your account restriction has been lifted.',
         actorId: null,
+        performerUserId: req.user.userId,
       })
     } catch { /* non-fatal */ }
 
@@ -163,11 +165,13 @@ router.patch('/appeals/:id/review', async (req, res) => {
       }
 
       try {
-        await require('../../lib/notify').createNotification(prisma, {
+        await createNotification(prisma, {
           userId: appeal.userId,
           type: 'moderation',
           message: 'Your appeal has been approved. The strike has been removed.',
           actorId: null,
+          linkPath: '/settings?tab=account',
+          performerUserId: req.user.userId,
         })
       } catch { /* non-fatal */ }
 
@@ -180,11 +184,13 @@ router.patch('/appeals/:id/review', async (req, res) => {
     })
 
     try {
-      await require('../../lib/notify').createNotification(prisma, {
+      await createNotification(prisma, {
         userId: appeal.userId,
         type: 'moderation',
         message: 'Your appeal has been reviewed and was not approved.',
         actorId: null,
+        linkPath: '/settings?tab=account',
+        performerUserId: req.user.userId,
       })
     } catch { /* non-fatal */ }
 

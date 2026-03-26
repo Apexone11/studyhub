@@ -10,6 +10,7 @@ const { notifyMentionedUsers } = require('../../lib/mentions')
 const { SHEET_STATUS, reactLimiter, commentLimiter } = require('./sheets.constants')
 const { canReadSheet } = require('./sheets.service')
 const { trackActivity } = require('../../lib/activityTracker')
+const { timedSection, logTiming } = require('../../lib/requestTiming')
 
 const router = express.Router()
 
@@ -87,31 +88,39 @@ router.post('/:id/star', requireAuth, reactLimiter, async (req, res) => {
 })
 
 router.get('/:id/comments', async (req, res) => {
+  req._timingStart = Date.now()
   const sheetId = Number.parseInt(req.params.id, 10)
   if (!Number.isInteger(sheetId)) return res.status(400).json({ error: 'Invalid sheet id.' })
   const limit = parsePositiveInt(req.query.limit, 20)
   const offset = Math.max(0, Number.parseInt(req.query.offset, 10) || 0)
 
   try {
-    const sheet = await prisma.studySheet.findUnique({
-      where: { id: sheetId },
-      select: { id: true, status: true, userId: true },
-    })
+    const sheetSection = await timedSection('sheet-lookup', () =>
+      prisma.studySheet.findUnique({ where: { id: sheetId }, select: { id: true, status: true, userId: true } })
+    )
+    const sheet = sheetSection.data
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
     if (!canReadSheet(sheet, req.user || null)) return res.status(404).json({ error: 'Sheet not found.' })
 
-    const [comments, total] = await Promise.all([
-      prisma.comment.findMany({
-        where: { sheetId, moderationStatus: 'clean' },
-        include: { author: { select: { id: true, username: true } } },
-        orderBy: { createdAt: 'desc' },
-        take: limit,
-        skip: offset,
-      }),
-      prisma.comment.count({ where: { sheetId, moderationStatus: 'clean' } }),
+    const [commentsSection, countSection] = await Promise.all([
+      timedSection('comments', () =>
+        prisma.comment.findMany({
+          where: { sheetId, moderationStatus: 'clean' },
+          include: { author: { select: { id: true, username: true } } },
+          orderBy: { createdAt: 'desc' },
+          take: limit,
+          skip: offset,
+        })
+      ),
+      timedSection('count', () => prisma.comment.count({ where: { sheetId, moderationStatus: 'clean' } })),
     ])
 
-    res.json({ comments, total, limit, offset })
+    logTiming(req, {
+      sections: [sheetSection, commentsSection, countSection],
+      extra: { sheetId, commentCount: countSection.data },
+    })
+
+    res.json({ comments: commentsSection.data, total: countSection.data, limit, offset })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })

@@ -1,5 +1,5 @@
 import Module, { createRequire } from 'node:module'
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /**
  * S-8: Tests for priority-aware notification creation.
@@ -8,6 +8,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
  *   - invalid priority defaults to 'medium'
  *   - high priority triggers email delivery
  *   - self-notification is skipped
+ *   - performerUserId self-notify guard (anti-spam rule 1)
+ *   - dedup guard (anti-spam rule 2)
  */
 
 const require = createRequire(import.meta.url)
@@ -36,7 +38,7 @@ const mockTargets = new Map([
 ])
 
 const originalModuleLoad = Module._load
-let createNotification, VALID_PRIORITIES
+let createNotification, VALID_PRIORITIES, _emailDedup, _burstQueues
 
 beforeAll(() => {
   Module._load = function patchedModuleLoad(requestId, parent, isMain) {
@@ -50,6 +52,8 @@ beforeAll(() => {
   const mod = require(notifyPath)
   createNotification = mod.createNotification
   VALID_PRIORITIES = mod.VALID_PRIORITIES
+  _emailDedup = mod._emailDedup
+  _burstQueues = mod._burstQueues
 })
 
 afterAll(() => {
@@ -60,6 +64,21 @@ afterAll(() => {
 beforeEach(() => {
   vi.clearAllMocks()
   mockPrisma.notification.create.mockResolvedValue({ id: 1, priority: 'medium' })
+  mockPrisma.user.findUnique.mockResolvedValue(null)
+  /* Reset anti-spam state */
+  _emailDedup.clear()
+  for (const [key, queue] of _burstQueues) {
+    if (queue.timer) clearTimeout(queue.timer)
+    _burstQueues.delete(key)
+  }
+})
+
+afterEach(() => {
+  /* Clean up any pending burst timers */
+  for (const [key, queue] of _burstQueues) {
+    if (queue.timer) clearTimeout(queue.timer)
+    _burstQueues.delete(key)
+  }
 })
 
 describe('createNotification priority', () => {
@@ -128,7 +147,6 @@ describe('createNotification priority', () => {
       linkPath: '/settings?tab=account',
     })
 
-    // Email is fire-and-forget, give it a tick to resolve
     await new Promise((r) => setTimeout(r, 50))
 
     expect(mockDeliverMail).toHaveBeenCalledTimes(1)
@@ -173,5 +191,93 @@ describe('createNotification priority', () => {
 
   it('exports VALID_PRIORITIES', () => {
     expect(VALID_PRIORITIES).toEqual(['high', 'medium', 'low'])
+  })
+})
+
+describe('anti-spam: self-notify guard', () => {
+  it('skips email when performerUserId === userId', async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({
+      email: 'admin@test.com',
+      emailVerified: true,
+      username: 'admin',
+    })
+
+    await createNotification(mockPrisma, {
+      userId: 5,
+      type: 'moderation',
+      message: 'test',
+      priority: 'high',
+      performerUserId: 5,
+    })
+
+    await new Promise((r) => setTimeout(r, 50))
+    /* In-app notification is still created */
+    expect(mockPrisma.notification.create).toHaveBeenCalledTimes(1)
+    /* But email is skipped */
+    expect(mockDeliverMail).not.toHaveBeenCalled()
+  })
+})
+
+describe('anti-spam: dedup guard', () => {
+  it('sends email once per dedupKey per hour', async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({
+      email: 'admin@test.com',
+      emailVerified: true,
+      username: 'admin',
+    })
+
+    /* First call — should send */
+    await createNotification(mockPrisma, {
+      userId: 10,
+      type: 'moderation',
+      message: 'report on sheet 1',
+      priority: 'high',
+      dedupKey: 'report-sheet-1',
+    })
+    await new Promise((r) => setTimeout(r, 50))
+    expect(mockDeliverMail).toHaveBeenCalledTimes(1)
+
+    mockDeliverMail.mockClear()
+
+    /* Second call same key — should NOT send email */
+    await createNotification(mockPrisma, {
+      userId: 10,
+      type: 'moderation',
+      message: 'report on sheet 1 again',
+      priority: 'high',
+      dedupKey: 'report-sheet-1',
+    })
+    await new Promise((r) => setTimeout(r, 50))
+    expect(mockDeliverMail).not.toHaveBeenCalled()
+    /* But in-app notification IS still created */
+    expect(mockPrisma.notification.create).toHaveBeenCalledTimes(2)
+  })
+
+  it('different dedupKey allows separate emails', async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({
+      email: 'admin@test.com',
+      emailVerified: true,
+      username: 'admin',
+    })
+
+    await createNotification(mockPrisma, {
+      userId: 10,
+      type: 'moderation',
+      message: 'report on sheet 1',
+      priority: 'high',
+      dedupKey: 'report-sheet-1',
+    })
+    await new Promise((r) => setTimeout(r, 50))
+
+    await createNotification(mockPrisma, {
+      userId: 10,
+      type: 'moderation',
+      message: 'report on sheet 2',
+      priority: 'high',
+      dedupKey: 'report-sheet-2',
+    })
+    await new Promise((r) => setTimeout(r, 50))
+
+    expect(mockDeliverMail).toHaveBeenCalledTimes(2)
   })
 })

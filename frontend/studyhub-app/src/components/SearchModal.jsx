@@ -4,6 +4,7 @@ import { IconSearch, IconX } from './Icons'
 import { API } from '../config'
 import { DEBOUNCE_MS, styles } from './searchModalConstants'
 import { SheetResults, NoteResults, CourseResults, UserResults } from './SearchResultItems'
+import { trackEvent } from '../lib/telemetry'
 
 export default function SearchModal({ open, onClose }) {
   const [query, setQuery] = useState('')
@@ -53,6 +54,7 @@ export default function SearchModal({ open, onClose }) {
     abortRef.current = controller
 
     setLoading(true)
+    const fetchStart = performance.now()
     try {
       const res = await fetch(
         `${API}/api/search?q=${encodeURIComponent(searchQuery)}&type=all&limit=6`,
@@ -60,6 +62,10 @@ export default function SearchModal({ open, onClose }) {
       )
       if (!res.ok) return
       const data = await res.json()
+      const apiLatencyMs = Math.round(performance.now() - fetchStart)
+      const totalResults = (data.results?.sheets?.length || 0) + (data.results?.courses?.length || 0) +
+        (data.results?.users?.length || 0) + (data.results?.notes?.length || 0)
+      trackEvent('page_timing', { page: 'search', apiLatencyMs, totalResults })
       setResults({
         sheets: data.results?.sheets || [],
         courses: data.results?.courses || [],

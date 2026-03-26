@@ -12,6 +12,7 @@ const requireVerifiedEmail = require('../../middleware/requireVerifiedEmail')
 const optionalAuth = require('../../core/auth/optionalAuth')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
+const { timedSection, logTiming } = require('../../lib/requestTiming')
 
 const router = express.Router()
 
@@ -59,14 +60,15 @@ const NOTE_INCLUDE = {
 
 // ── GET /api/notes/:id ── Single note (shared or owner) ─────────
 router.get('/:id', optionalAuth, readLimiter, async (req, res) => {
+  req._timingStart = Date.now()
   const noteId = parseInt(req.params.id, 10)
   if (!Number.isInteger(noteId) || noteId < 1) return res.status(400).json({ error: 'Invalid note id.' })
 
   try {
-    const note = await prisma.note.findUnique({
-      where: { id: noteId },
-      include: NOTE_INCLUDE,
-    })
+    const mainSection = await timedSection('note-main', () =>
+      prisma.note.findUnique({ where: { id: noteId }, include: NOTE_INCLUDE })
+    )
+    const note = mainSection.data
 
     if (!note) return res.status(404).json({ error: 'Note not found.' })
 
@@ -76,6 +78,8 @@ router.get('/:id', optionalAuth, readLimiter, async (req, res) => {
     if ((note.private || note.moderationStatus !== 'clean') && !isOwner) {
       return res.status(404).json({ error: 'Note not found.' })
     }
+
+    logTiming(req, { sections: [mainSection], extra: { noteId, isOwner: Boolean(isOwner) } })
 
     res.json({ ...note, isOwner: Boolean(isOwner) })
   } catch (err) {
@@ -253,6 +257,7 @@ router.delete('/:id', requireAuth, mutateLimiter, async (req, res) => {
 
 // ── GET /api/notes/:id/comments ─────────────────────────────────
 router.get('/:id/comments', optionalAuth, async (req, res) => {
+  req._timingStart = Date.now()
   const noteId = parseInt(req.params.id, 10)
   if (!Number.isInteger(noteId) || noteId < 1) return res.status(400).json({ error: 'Invalid note id.' })
 
@@ -260,10 +265,10 @@ router.get('/:id/comments', optionalAuth, async (req, res) => {
   const offset = Math.max(0, parseInt(req.query.offset, 10) || 0)
 
   try {
-    const note = await prisma.note.findUnique({
-      where: { id: noteId },
-      select: { id: true, private: true, userId: true },
-    })
+    const noteSection = await timedSection('note-lookup', () =>
+      prisma.note.findUnique({ where: { id: noteId }, select: { id: true, private: true, userId: true } })
+    )
+    const note = noteSection.data
     if (!note) return res.status(404).json({ error: 'Note not found.' })
     if (!canReadNote(note, req.user || null)) return res.status(404).json({ error: 'Note not found.' })
 
@@ -273,18 +278,25 @@ router.get('/:id/comments', optionalAuth, async (req, res) => {
       ? { noteId }
       : { noteId, moderationStatus: 'clean' }
 
-    const [comments, total] = await Promise.all([
-      prisma.noteComment.findMany({
-        where: commentWhere,
-        include: COMMENT_INCLUDE,
-        orderBy: { createdAt: 'desc' },
-        take: limit,
-        skip: offset,
-      }),
-      prisma.noteComment.count({ where: commentWhere }),
+    const [commentsSection, countSection] = await Promise.all([
+      timedSection('comments', () =>
+        prisma.noteComment.findMany({
+          where: commentWhere,
+          include: COMMENT_INCLUDE,
+          orderBy: { createdAt: 'desc' },
+          take: limit,
+          skip: offset,
+        })
+      ),
+      timedSection('count', () => prisma.noteComment.count({ where: commentWhere })),
     ])
 
-    res.json({ comments, total, limit, offset })
+    logTiming(req, {
+      sections: [noteSection, commentsSection, countSection],
+      extra: { noteId, commentCount: countSection.data },
+    })
+
+    res.json({ comments: commentsSection.data, total: countSection.data, limit, offset })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })

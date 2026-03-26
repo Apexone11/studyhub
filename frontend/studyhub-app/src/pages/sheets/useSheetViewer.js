@@ -10,6 +10,7 @@ import { usePageTitle } from '../../lib/usePageTitle'
 import { trackEvent } from '../../lib/telemetry'
 import { recordSheetView, removeRecentlyViewedEntry } from '../../lib/useRecentlyViewed'
 import { useStudyStatus } from '../../lib/useStudyStatus'
+import { usePageTiming } from '../../lib/usePageTiming'
 import { authHeaders, attachmentPreviewKind } from './sheetViewerConstants'
 
 export default function useSheetViewer() {
@@ -35,6 +36,7 @@ export default function useSheetViewer() {
   const [relatedSheets, setRelatedSheets] = useState([])
   const sheetPanelRef = useRef(null)
   const animatedRef = useRef(false)
+  const timing = usePageTiming('sheet')
 
   /* Animate sheet content on first load */
   useEffect(() => {
@@ -60,6 +62,7 @@ export default function useSheetViewer() {
   const loadSheet = useCallback(async ({ signal, startTransition } = {}) => {
     const apply = startTransition || ((fn) => fn())
 
+    timing.markFetchStart()
     try {
       const response = await fetch(`${API}/api/sheets/${sheetId}`, {
         headers: authHeaders(),
@@ -68,6 +71,7 @@ export default function useSheetViewer() {
       })
 
       const data = await readJsonSafely(response, {})
+      timing.markFetchEnd()
 
       if (isAuthSessionFailure(response, data)) {
         clearSession()
@@ -98,7 +102,12 @@ export default function useSheetViewer() {
       if (error?.name === 'AbortError') return
       apply(() => setSheetState({ sheet: null, loading: false, error: error.message || 'Could not load this sheet.' }))
     }
-  }, [clearSession, navigate, sheetId])
+  }, [clearSession, navigate, sheetId, timing])
+
+  // Report timing when sheet content arrives
+  useEffect(() => {
+    if (!sheetState.loading && sheetState.sheet) timing.markContentVisible()
+  }, [sheetState.loading, sheetState.sheet, timing])
 
   const loadComments = useCallback(async ({ signal, startTransition } = {}) => {
     const apply = startTransition || ((fn) => fn())

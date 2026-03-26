@@ -1226,20 +1226,154 @@ Added priority-based notification routing (high/medium/low) with automatic email
 ### Tests
 
 - **`notifications.routes.test.js`** — Added 2 tests for `DELETE /read` endpoint (success + zero-count)
-- **`notifyPriority.test.js`** (NEW) — 7 tests:
-  - Priority field stored correctly
-  - Invalid priority defaults to medium
-  - Missing priority defaults to medium
-  - Self-notification skipped
-  - High priority triggers email delivery
-  - Medium priority does not trigger email
-  - Unverified email does not trigger email
+- **`notifyPriority.test.js`** (NEW) — 13 tests: priority field storage, defaults, self-notify skip, email delivery, self-notify guard, dedup guard
+- **`notificationPolicy.test.js`** (NEW) — 29 tests: full coverage of `classifyReportPriority`, `classifyAppealPriority`, `classifyEnforcementPriority`
 
-### S-8 Validation
+---
+
+## S-8+ : Smart Priority Classification + Anti-Spam (2026-03-25)
+
+### Overview
+
+Enhanced S-8's basic priority routing with context-aware priority classification and email anti-spam rules. Call sites no longer hardcode priority — they pass context (reason category, target type, offender signals) and the policy module decides.
+
+### Priority Policy Module
+
+New file: **`lib/notificationPolicy.js`** — centralises all escalation rules.
+
+#### `classifyReportPriority(ctx)` → `'high'` | `'medium'`
+
+Escalation triggers (any one → high):
+
+| Signal | Condition |
+|---|---|
+| Severity category | `sexual`, `self_harm`, `violence`, `hate_speech` |
+| High-impact surface | Feed post, feed comment |
+| Public target | Published sheet or shared note |
+| Repeat offender (strikes) | Content owner has ≥ 2 active strikes |
+| Repeat offender (cases) | Content owner has ≥ 3 cases in 24 hours |
+| System confidence | Auto-detected + HTML risk tier ≥ 2 |
+| Plagiarism (public) | Similarity ≥ 95% AND public target |
+
+Everything else → `'medium'` (in-app only).
+
+#### `classifyAppealPriority()` → `'high'`
+
+All appeals are high priority (admin must act).
+
+#### `classifyEnforcementPriority(ctx)` → `'high'` | `'medium'`
+
+Only escalates when a case confirmation triggers a user restriction.
+
+### Anti-Spam Rules (Email Layer)
+
+Built into `lib/notify.js`:
+
+| Rule | Behavior |
+|---|---|
+| **No self-notify** | If `performerUserId === userId`, email is skipped (in-app still created) |
+| **Dedup** | Same `(userId, type, dedupKey)` within 1 hour → email skipped |
+| **Burst bundling** | ≥ 3 high events for same user within 2 min → queued, sent as 1 digest email after 10s |
+
+`dedupKey` is set per call site (e.g., `report-sheet-42`, `appeal-17`) to prevent repeat emails for the same target.
+
+### Wiring Changes
+
+#### `moderation.user.controller.js` (reports)
+
+- Now looks up `actorActiveStrikes` and `actorRecentCases` (24h window) via parallel queries
+- Checks `isPublicTarget` (sheet status = published, note isShared)
+- Calls `classifyReportPriority()` instead of hardcoding `'high'`
+- Passes `dedupKey: 'report-{targetType}-{targetId}'`
+
+#### `moderation.user.controller.js` (appeals)
+
+- Calls `classifyAppealPriority()` (always high)
+- Passes `dedupKey: 'appeal-{caseId}'`
+
+#### `moderation.admin.enforcement.controller.js`
+
+- Switched from inline `require('../../lib/notify')` to top-level import
+- All admin-initiated notifications now pass `performerUserId: req.user.userId` for self-notify guard
+- Appeal approve/reject notifications include `linkPath` for user navigation
+
+#### `moderationEngine.js` (strikes)
+
+- Strike notification: remains `priority: 'high'` (user receives email)
+- **NEW**: When auto-restriction triggers (≥ 4 active strikes), a second `priority: 'high'` notification is sent: "Your account has been restricted..."
+
+### New Notifications Added
+
+| Event | Recipient | Priority |
+|---|---|---|
+| Appeal submitted | Admins | high (was missing entirely) |
+| Auto-restriction triggered | User | high (new) |
+
+### S-8 + S-8+ Combined Validation
 
 | Suite | Result |
 |-------|--------|
-| Backend tests | 499/499 pass (42 files) |
+| Backend tests | 531/531 pass (42 files) |
 | Backend lint | Clean (6 pre-existing warnings in unrelated files) |
 | Frontend lint | Clean |
-| Frontend build | Clean (562 modules, 307ms) |
+| Frontend build | Clean (562 modules, 292ms) |
+
+---
+
+## S-10.1 — Performance Measurement Instrumentation (2026-03-26)
+
+### Summary
+
+Added standardised request-timing instrumentation to all critical backend endpoints and frontend page-load timing marks. This provides baseline latency data (per-query section timings, slow-query warnings, and frontend time-to-content) to identify and prioritise performance fixes in S-10.2.
+
+### Backend Changes
+
+#### New: `requestTiming.js` utility (`backend/src/lib/requestTiming.js`)
+- `timedSection(label, fn)` — wraps any async operation, returns `{ ok, label, data, durationMs }`
+- `logTiming(req, { sections, extra })` — standardised `[perf]` log entry with route, userId, total durationMs, per-section timings, and slow-query warnings (≥500ms)
+- `startTimer` middleware for stamping `req._timingStart`
+
+#### Instrumented Endpoints
+
+| Endpoint | File | Sections Timed |
+|----------|------|----------------|
+| `GET /api/search` | `search.routes.js` | sheets, courses, users, notes, visibility (4–5 parallel) |
+| `GET /api/sheets/:id` | `sheets.read.controller.js` | sheet-main, likes, dislikes, commentCount, starred, userReaction, contributions (7 sections) |
+| `GET /api/notes/:id` | `notes.routes.js` | note-main (1 section) |
+| `GET /api/notes/:id/comments` | `notes.routes.js` | note-lookup, comments, count (3 sections) |
+| `GET /api/sheets/:id/comments` | `sheets.social.controller.js` | sheet-lookup, comments, count (3 sections) |
+| `GET /api/feed/posts/:id/comments` | `feed.social.controller.js` | comments, count (2 sections) |
+
+`GET /api/feed` already had comprehensive timing via `settleSection` (12 sections).
+
+#### Log Format
+
+```
+[perf] { route, method, userId, durationMs, queryCount, ...extra, timings: [...], slowSections?: [...] }
+```
+
+### Frontend Changes
+
+#### New: `usePageTiming` hook (`frontend/studyhub-app/src/lib/usePageTiming.js`)
+- Measures two phases: API latency (fetch start → fetch end) and time-to-content (mount → first render with data)
+- Uses `performance.mark/measure` for browser DevTools visibility
+- Reports to PostHog via `trackEvent('page_timing', { page, apiLatencyMs, timeToContentMs })`
+- Fires once per page load (deduped via ref)
+
+#### Instrumented Pages
+
+| Page | Hook | Marks |
+|------|------|-------|
+| Feed | `useFeedData.js` | fetchStart → fetchEnd → contentVisible (items arrive) |
+| Sheet Detail | `useSheetViewer.js` | fetchStart → fetchEnd → contentVisible (sheet data arrives) |
+| Note Detail | `useNoteViewer.js` | fetchStart → fetchEnd → contentVisible (note data arrives) |
+| Search Modal | `SearchModal.jsx` | Inline apiLatencyMs + totalResults per query |
+
+### S-10.1 Validation
+
+| Suite | Result |
+|-------|--------|
+| Backend tests | 531/531 pass (42 files) |
+| Backend lint | Clean (6 pre-existing only) |
+| Frontend lint | Clean |
+| Frontend build | Clean (310ms) |

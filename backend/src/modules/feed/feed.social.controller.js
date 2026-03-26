@@ -8,28 +8,39 @@ const { isModerationEnabled, scanContent } = require('../../lib/moderationEngine
 const { parsePositiveInt } = require('../../core/http/validate')
 const { reactLimiter, commentLimiter, feedWriteLimiter } = require('./feed.constants')
 const { reactionSummary } = require('./feed.service')
+const { timedSection, logTiming } = require('../../lib/requestTiming')
 
 const router = express.Router()
 
 router.get('/posts/:id/comments', async (req, res) => {
+  req._timingStart = Date.now()
   const postId = Number.parseInt(req.params.id, 10)
   if (!Number.isInteger(postId)) return res.status(400).json({ error: 'Invalid post id.' })
   const limit = parsePositiveInt(req.query.limit, 20)
   const offset = Math.max(0, Number.parseInt(req.query.offset, 10) || 0)
 
   try {
-    const [comments, total] = await Promise.all([
-      prisma.feedPostComment.findMany({
-        where: { postId, moderationStatus: 'clean' },
-        include: { author: { select: { id: true, username: true } } },
-        orderBy: { createdAt: 'desc' },
-        take: limit,
-        skip: offset,
-      }),
-      prisma.feedPostComment.count({ where: { postId, moderationStatus: 'clean' } }),
+    const [commentsSection, countSection] = await Promise.all([
+      timedSection('comments', () =>
+        prisma.feedPostComment.findMany({
+          where: { postId, moderationStatus: 'clean' },
+          include: { author: { select: { id: true, username: true } } },
+          orderBy: { createdAt: 'desc' },
+          take: limit,
+          skip: offset,
+        })
+      ),
+      timedSection('count', () =>
+        prisma.feedPostComment.count({ where: { postId, moderationStatus: 'clean' } })
+      ),
     ])
 
-    res.json({ comments, total, limit, offset })
+    logTiming(req, {
+      sections: [commentsSection, countSection],
+      extra: { postId, commentCount: countSection.data },
+    })
+
+    res.json({ comments: commentsSection.data, total: countSection.data, limit, offset })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
