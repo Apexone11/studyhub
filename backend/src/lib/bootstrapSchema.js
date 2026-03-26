@@ -344,6 +344,34 @@ const SCHEMA_REPAIR_STATEMENTS = [
 
   // v1.7.0 — ModerationSnapshot cleanup tracking
   'ALTER TABLE "ModerationSnapshot" ADD COLUMN IF NOT EXISTS "permanentlyDeletedAt" TIMESTAMP(3)',
+
+  // v1.7.0 — ModerationCase contentPurged flag
+  'ALTER TABLE "ModerationCase" ADD COLUMN IF NOT EXISTS "contentPurged" BOOLEAN NOT NULL DEFAULT false',
+
+  // v1.7.0 — ModerationLog table (audit trail for moderation actions)
+  `CREATE TABLE IF NOT EXISTS "ModerationLog" (
+    "id" SERIAL NOT NULL,
+    "userId" INTEGER NOT NULL,
+    "action" TEXT NOT NULL,
+    "caseId" INTEGER,
+    "strikeId" INTEGER,
+    "appealId" INTEGER,
+    "contentType" TEXT,
+    "contentId" INTEGER,
+    "reason" TEXT,
+    "performedBy" INTEGER,
+    "metadata" JSONB,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "ModerationLog_pkey" PRIMARY KEY ("id")
+  )`,
+  'CREATE INDEX IF NOT EXISTS "ModerationLog_userId_createdAt_idx" ON "ModerationLog"("userId", "createdAt" DESC)',
+  'CREATE INDEX IF NOT EXISTS "ModerationLog_caseId_idx" ON "ModerationLog"("caseId")',
+  'ALTER TABLE "ModerationLog" DROP CONSTRAINT IF EXISTS "ModerationLog_userId_fkey"',
+  'ALTER TABLE "ModerationLog" ADD CONSTRAINT "ModerationLog_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE',
+
+  // v1.7.0 — Sheet Lab columns (safety net for migration 20260324050000)
+  'ALTER TABLE "StudySheet" ADD COLUMN IF NOT EXISTS "rootSheetId" INTEGER',
+  `ALTER TABLE "SheetCommit" ADD COLUMN IF NOT EXISTS "kind" TEXT NOT NULL DEFAULT 'snapshot'`,
 ]
 
 async function repairRuntimeSchema(prisma) {
