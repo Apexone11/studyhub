@@ -154,4 +154,34 @@ describe('release A middleware response envelope', () => {
     expect(response.status).toBe(200)
     expect(response.body).toEqual({ ok: true })
   })
+
+  it('allows POST /api/auth/logout without CSRF token (exempt)', async () => {
+    const app = express()
+    app.use(buildTestRateLimiter())
+    app.use(csrfProtection)
+    app.post('/api/auth/logout', (req, res) => res.status(200).json({ message: 'Logged out.' }))
+
+    const response = await request(app)
+      .post('/api/auth/logout')
+      .set('Cookie', [`${AUTH_COOKIE_NAME}=${authToken()}`])
+
+    expect(response.status).toBe(200)
+    expect(response.body).toMatchObject({ message: 'Logged out.' })
+  })
+
+  it('logout is idempotent — calling twice returns 200 both times', async () => {
+    const app = express()
+    app.use(buildTestRateLimiter())
+    app.use(csrfProtection)
+    app.post('/api/auth/logout', (req, res) => res.status(200).json({ message: 'Logged out.' }))
+
+    const first = await request(app)
+      .post('/api/auth/logout')
+      .set('Cookie', [`${AUTH_COOKIE_NAME}=${authToken()}`])
+    const second = await request(app)
+      .post('/api/auth/logout')
+
+    expect(first.status).toBe(200)
+    expect(second.status).toBe(200)
+  })
 })
