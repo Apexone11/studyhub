@@ -355,4 +355,33 @@ router.post('/appeals', appealLimiter, async (req, res) => {
   }
 })
 
+/* GET /my-log — user's own moderation history */
+router.get('/my-log', async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1)
+    const limit = 20
+    const [items, total] = await Promise.all([
+      prisma.moderationLog.findMany({
+        where: { userId: req.user.userId },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        select: {
+          id: true,
+          action: true,
+          contentType: true,
+          reason: true,
+          createdAt: true,
+          // Do NOT expose performedBy, metadata, or admin details
+        },
+      }),
+      prisma.moderationLog.count({ where: { userId: req.user.userId } }),
+    ])
+    res.json({ items, page, totalPages: Math.ceil(total / limit) || 1 })
+  } catch (err) {
+    console.error('[moderation] Failed to load user log:', err.message)
+    res.status(500).json({ error: 'Failed to load history.' })
+  }
+})
+
 module.exports = router
