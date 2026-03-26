@@ -341,6 +341,9 @@ const SCHEMA_REPAIR_STATEMENTS = [
   'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "googleId" TEXT',
   `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "authProvider" TEXT NOT NULL DEFAULT 'local'`,
   'CREATE UNIQUE INDEX IF NOT EXISTS "User_googleId_key" ON "User"("googleId")',
+
+  // v1.7.0 — ModerationSnapshot cleanup tracking
+  'ALTER TABLE "ModerationSnapshot" ADD COLUMN IF NOT EXISTS "permanentlyDeletedAt" TIMESTAMP(3)',
 ]
 
 async function repairRuntimeSchema(prisma) {
