@@ -95,6 +95,33 @@ router.get('/users', async (req, res) => {
   }
 })
 
+// ── GET /api/admin/users/search — search by username, email, or displayName ──
+router.get('/users/search', async (req, res) => {
+  try {
+    const q = (req.query.q || '').trim()
+    if (q.length < 2) {
+      return res.status(400).json({ error: 'Query must be at least 2 characters.' })
+    }
+    const limit = Math.min(Number.parseInt(req.query.limit, 10) || 10, 10)
+    const users = await prisma.user.findMany({
+      where: {
+        OR: [
+          { username: { contains: q, mode: 'insensitive' } },
+          { email: { contains: q, mode: 'insensitive' } },
+          { displayName: { contains: q, mode: 'insensitive' } },
+        ],
+      },
+      select: { id: true, username: true, displayName: true, email: true, avatarUrl: true },
+      take: limit,
+      orderBy: { username: 'asc' },
+    })
+    res.json(users)
+  } catch (err) {
+    captureError(err)
+    res.status(500).json({ error: 'Search failed.' })
+  }
+})
+
 // ── PATCH /api/admin/users/:id/role ──────────────────────────
 router.patch('/users/:id/role', async (req, res) => {
   const { role } = req.body || {}
