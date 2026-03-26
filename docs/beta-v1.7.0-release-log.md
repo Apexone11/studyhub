@@ -1377,3 +1377,33 @@ Added standardised request-timing instrumentation to all critical backend endpoi
 | Backend lint | Clean (6 pre-existing only) |
 | Frontend lint | Clean |
 | Frontend build | Clean (310ms) |
+
+---
+
+## Hotfix — Missing `ModerationSnapshot.permanentlyDeletedAt` Migration (2026-03-26)
+
+### Problem
+
+The moderation cleanup scheduler (`moderationCleanupScheduler.js`) was crashing on startup:
+
+```
+[moderation-cleanup] Scheduler error:
+Invalid `prisma.moderationSnapshot.findMany()` invocation:
+The column `ModerationSnapshot.permanentlyDeletedAt` does not exist in the current database.
+```
+
+The column was added to the Prisma schema during the S-6 moderation cleanup cycle but no migration was created, so the production database never received the column.
+
+### Fix
+
+| File | Change |
+|------|--------|
+| `prisma/migrations/20260326000001_add_snapshot_permanently_deleted_at/migration.sql` | `ALTER TABLE "ModerationSnapshot" ADD COLUMN "permanentlyDeletedAt" TIMESTAMP(3)` |
+| `src/lib/bootstrapSchema.js` | Added `ADD COLUMN IF NOT EXISTS "permanentlyDeletedAt"` safety-net statement |
+
+### Validation
+
+| Suite | Result |
+|-------|--------|
+| Backend tests | 531/531 pass (42 files) |
+| Backend lint | Clean (6 pre-existing only) |
