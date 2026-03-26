@@ -16,6 +16,7 @@ const OpenAI = require('openai')
 const { captureError } = require('../monitoring/sentry')
 const prisma = require('./prisma')
 const { createNotification } = require('./notify')
+const { logModerationEvent } = require('./moderationLogger')
 
 /* ── Lazy-initialised OpenAI client ──────────────────────────────────────── */
 let _openai = null
@@ -114,7 +115,7 @@ async function scanContent({ contentType, contentId, text, userId }) {
       .map(([cat, score]) => ({ category: cat, score: Math.round(score * 1000) / 1000 }))
 
     /* Create moderation case */
-    await prisma.moderationCase.create({
+    const modCase = await prisma.moderationCase.create({
       data: {
         contentType,
         contentId,
@@ -134,6 +135,8 @@ async function scanContent({ contentType, contentId, text, userId }) {
         },
       },
     })
+
+    logModerationEvent({ userId: modCase.userId, action: 'case_opened', caseId: modCase.id, contentType, contentId, reason: `Auto-detected: ${topCategory}` })
 
     /* Hide flagged content from public until admin review */
     try {
@@ -193,6 +196,8 @@ async function issueStrike({ userId, reason, caseId }) {
     },
   })
 
+  logModerationEvent({ userId, action: 'strike_issued', caseId, strikeId: strike.id, reason, performedBy: null })
+
   const activeStrikes = await countActiveStrikes(userId)
   let restricted = false
 
@@ -217,6 +222,9 @@ async function issueStrike({ userId, reason, caseId }) {
       })
     })
     restricted = !!created
+    if (restricted) {
+      logModerationEvent({ userId, action: 'restriction_applied', reason: `Auto-restricted: ${activeStrikes} active strikes`, performedBy: null })
+    }
   }
 
   /* Notify the user about the strike */
@@ -226,7 +234,7 @@ async function issueStrike({ userId, reason, caseId }) {
       type: 'moderation',
       message: `You received a strike: ${reason}`,
       actorId: null,
-      linkPath: '/settings?tab=account',
+      linkPath: '/settings?tab=moderation',
       priority: 'high',
     })
   } catch { /* notification failures are non-fatal */ }
@@ -239,7 +247,7 @@ async function issueStrike({ userId, reason, caseId }) {
         type: 'moderation',
         message: `Your account has been restricted due to ${activeStrikes} active strikes. Posting, sharing, and publishing are temporarily blocked.`,
         actorId: null,
-        linkPath: '/settings?tab=account',
+        linkPath: '/settings?tab=moderation',
         priority: 'high',
       })
     } catch { /* notification failures are non-fatal */ }
@@ -300,6 +308,12 @@ async function reviewCase({ caseId, reviewedBy, action, reviewNote }) {
       reviewNote: reviewNote || null,
     },
   })
+
+  if (action === 'confirm') {
+    logModerationEvent({ userId: modCase.userId, action: 'case_confirmed', caseId, contentType: modCase.contentType, contentId: modCase.contentId, performedBy: reviewedBy })
+  } else {
+    logModerationEvent({ userId: modCase.userId, action: 'case_dismissed', caseId, performedBy: reviewedBy })
+  }
 
   const { contentType, contentId } = modCase
 
@@ -408,6 +422,8 @@ async function restoreContent(caseId) {
       where: { id: caseId },
       data: { status: 'reversed' },
     })
+
+    logModerationEvent({ userId: modCase.userId, action: 'appeal_approved', caseId })
   } catch (err) {
     captureError(err, { context: 'moderation-restore', caseId })
   }

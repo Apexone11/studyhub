@@ -5,6 +5,7 @@ const { countActiveStrikes, hasActiveRestriction } = require('../../lib/moderati
 const { createNotification } = require('../../lib/notify')
 const { classifyReportPriority, classifyAppealPriority, REPEAT_OFFENDER_CASE_WINDOW_MS } = require('../../lib/notificationPolicy')
 const { appealLimiter, reportLimiter, REASON_CATEGORIES, APPEAL_REASON_CATEGORIES } = require('./moderation.constants')
+const { logModerationEvent } = require('../../lib/moderationLogger')
 
 const router = express.Router()
 
@@ -212,6 +213,8 @@ router.post('/reports', reportLimiter, async (req, res) => {
       },
     })
 
+    logModerationEvent({ userId: contentOwnerId, action: 'case_opened', caseId: modCase.id, contentType: targetType, contentId: targetId, reason: reasonCategory, performedBy: req.user.userId })
+
     /* Notify admins with smart priority classification */
     try {
       const [admins, actorStrikes, actorRecentCases] = await Promise.all([
@@ -322,6 +325,8 @@ router.post('/appeals', appealLimiter, async (req, res) => {
         reason,
       },
     })
+
+    logModerationEvent({ userId: req.user.userId, action: 'appeal_submitted', caseId, appealId: appeal.id })
 
     res.status(201).json({ message: 'Appeal submitted.', appeal })
 
