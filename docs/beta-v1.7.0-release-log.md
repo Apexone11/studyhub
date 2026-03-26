@@ -1401,6 +1401,53 @@ The column was added to the Prisma schema during the S-6 moderation cleanup cycl
 | `prisma/migrations/20260326000001_add_snapshot_permanently_deleted_at/migration.sql` | `ALTER TABLE "ModerationSnapshot" ADD COLUMN "permanentlyDeletedAt" TIMESTAMP(3)` |
 | `src/lib/bootstrapSchema.js` | Added `ADD COLUMN IF NOT EXISTS "permanentlyDeletedAt"` safety-net statement |
 
+### Validation (first pass)
+
+| Suite | Result |
+|-------|--------|
+| Backend tests | 531/531 pass (42 files) |
+| Backend lint | Clean (6 pre-existing only) |
+
+---
+
+## Hotfix 2 — Full Schema-vs-Migration Audit (2026-03-26)
+
+### Problem
+
+After the first hotfix deployed, the cleanup scheduler still crashed:
+
+```
+The column `ModerationCase.contentPurged` does not exist in the current database.
+[moderation-cleanup] Scheduler error:
+Invalid `prisma.moderationSnapshot.findMany()` invocation:
+```
+
+A full audit of every Prisma schema column against all migration files revealed **4 gaps** — not just the one column:
+
+### Audit Findings
+
+| Priority | Missing Item | Impact |
+|----------|-------------|--------|
+| CRITICAL | `ModerationLog` table — entire table never created | All moderation audit logging silently failed; admin log/CSV endpoints returned 500 |
+| CRITICAL | `ModerationCase.contentPurged` column | Cleanup scheduler query crashed — expired content never purged |
+| MODERATE | `StudySheet.rootSheetId` — no bootstrapSchema safety net | Migration exists but has no IF NOT EXISTS guard |
+| MODERATE | `SheetCommit.kind` — no bootstrapSchema safety net | Same — migration exists but no safety net |
+
+### Fix
+
+| File | Change |
+|------|--------|
+| `prisma/migrations/20260326000002_.../migration.sql` | `ALTER TABLE "ModerationCase" ADD COLUMN "contentPurged"` + `CREATE TABLE "ModerationLog"` with all columns, indexes, and FK |
+| `src/lib/bootstrapSchema.js` | Added 7 safety-net statements: `contentPurged` column, full `ModerationLog` CREATE TABLE + indexes + FK, `rootSheetId` column, `SheetCommit.kind` column |
+
+### Root Cause
+
+Schema columns and tables were added to `prisma/schema.prisma` during earlier cycles but the corresponding `CREATE TABLE` / `ALTER TABLE` migration SQL was never created. The bootstrapSchema safety net was also not updated to cover these additions.
+
+### Prevention
+
+Memory rule `feedback_fullstack_sync.md` now enforces: every schema change must have all three layers — schema.prisma → migration SQL → bootstrapSchema.js entry.
+
 ### Validation
 
 | Suite | Result |
