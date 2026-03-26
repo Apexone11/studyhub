@@ -31,6 +31,7 @@ export default function FeedCard({
   isDeletingPost,
   currentUser,
   onReport,
+  targetCommentId,
 }) {
   const isSheet = item.type === 'sheet'
   const isPost = item.type === 'post'
@@ -40,7 +41,7 @@ export default function FeedCard({
   const previewKind = attachmentPreviewKind(item)
 
   return (
-    <article className="sh-card">
+    <article className="sh-card" data-post-id={item.id}>
       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
         {item.author?.username ? (
           <Link to={`/users/${item.author.username}`} style={{ textDecoration: 'none', flexShrink: 0 }}>
@@ -293,7 +294,7 @@ export default function FeedCard({
 
           {/* Comment section for posts */}
           {isPost && (
-            <CommentSection postId={item.id} commentCount={item.commentCount || 0} user={currentUser} />
+            <CommentSection postId={item.id} commentCount={item.commentCount || 0} user={currentUser} targetCommentId={targetCommentId} />
           )}
         </div>
       </div>

@@ -41,6 +41,8 @@ export default function FeedPage() {
 
   const activeFilter = FILTERS.includes(searchParams.get('filter')) ? searchParams.get('filter') : 'all'
   const search = searchParams.get('search') || ''
+  const targetPostId = searchParams.get('post')
+  const targetCommentId = searchParams.get('comment')
 
   const {
     feedState, leaderboards, starredUpdates, loadingMore, deletingPostIds,
@@ -77,6 +79,28 @@ export default function FeedPage() {
       staggerEntrance(feedListRef.current.children, { staggerMs: 50, duration: 450, y: 16 })
     }
   }, [feedState.loading, visibleItems.length])
+
+  useEffect(() => {
+    if (!targetPostId || feedState.loading) return
+    const el = document.querySelector(`[data-post-id="${targetPostId}"]`)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      el.style.transition = 'box-shadow 0.3s'
+      el.style.boxShadow = '0 0 0 3px var(--sh-info-border)'
+      setTimeout(() => { el.style.boxShadow = '' }, 2000)
+    }
+  }, [targetPostId, feedState.loading])
+
+  useEffect(() => {
+    if (!targetCommentId || feedState.loading) return
+    const el = document.querySelector(`[data-comment-id="${targetCommentId}"]`)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      el.style.transition = 'box-shadow 0.3s'
+      el.style.boxShadow = '0 0 0 3px var(--sh-info-border)'
+      setTimeout(() => { el.style.boxShadow = '' }, 2000)
+    }
+  }, [targetCommentId, feedState.loading])
 
   const confirmDeletePost = (item) => {
     if (!canDeletePost(item)) return
@@ -168,6 +192,7 @@ export default function FeedPage() {
                       isDeletingPost={Boolean(deletingPostIds[item.id])}
                       currentUser={user}
                       onReport={(type, id) => setReportTarget({ type, id })}
+                      targetCommentId={targetCommentId}
                     />
                   ))}
                   {feedState.items.length < feedState.total && (
