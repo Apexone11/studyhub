@@ -345,7 +345,7 @@ function CaseDetail({
           <button type="button" onClick={() => reviewCase(c.id, 'dismiss')} style={pillButton('var(--sh-surface)', 'var(--sh-muted)', 'var(--sh-border)')}>Dismiss Case</button>
           <button type="button" onClick={() => {
             setSubTab('strikes')
-            setStrikeForm({ userId: String(c.userId || ''), reason: `Case #${c.id}: `, caseId: String(c.id) })
+            setStrikeForm({ userId: String(c.userId || ''), reason: `Case #${c.id}: `, _selectedUser: null })
           }} style={pillButton('var(--sh-info-bg)', 'var(--sh-info-text)', 'var(--sh-info-border)')}>Issue Strike</button>
         </div>
       ) : null}
