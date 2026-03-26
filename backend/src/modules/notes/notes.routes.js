@@ -5,6 +5,7 @@ const { createNotification } = require('../../lib/notify')
 const { notifyMentionedUsers } = require('../../lib/mentions')
 const { trackActivity } = require('../../lib/activityTracker')
 const { buildAnchorContext, validateAnchorInput } = require('../../lib/noteAnchor')
+const { isModerationEnabled, scanContent } = require('../../lib/moderationEngine')
 const requireAuth = require('../../middleware/auth')
 const requireVerifiedEmail = require('../../middleware/requireVerifiedEmail')
 const optionalAuth = require('../../core/auth/optionalAuth')
@@ -70,8 +71,8 @@ router.get('/:id', optionalAuth, readLimiter, async (req, res) => {
 
     const isOwner = req.user && (req.user.userId === note.userId || req.user.role === 'admin')
 
-    // Private notes: only owner/admin can see
-    if (note.private && !isOwner) {
+    // Private notes or flagged notes: only owner/admin can see
+    if ((note.private || note.moderationStatus !== 'clean') && !isOwner) {
       return res.status(404).json({ error: 'Note not found.' })
     }
 
@@ -89,8 +90,9 @@ router.get('/', requireAuth, readLimiter, async (req, res) => {
     const where = {}
 
     if (shared === 'true') {
-      // Shared notes from all users
+      // Shared notes from all users — exclude flagged content
       where.private = false
+      where.moderationStatus = 'clean'
     } else {
       // Own notes only
       where.userId = req.user.userId
@@ -146,6 +148,13 @@ router.post('/', requireAuth, mutateLimiter, requireVerifiedEmail, async (req, r
       },
       include: NOTE_INCLUDE,
     })
+
+    // Async content moderation — fire-and-forget after response is sent
+    if (isModerationEnabled()) {
+      const textToScan = `${trimmedTitle} ${contentStr}`.trim()
+      void scanContent({ contentType: 'note', contentId: note.id, text: textToScan, userId: req.user.userId })
+    }
+
     res.status(201).json(note)
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
@@ -193,6 +202,15 @@ router.patch('/:id', requireAuth, mutateLimiter, requireVerifiedEmail, async (re
       data,
       include: NOTE_INCLUDE,
     })
+
+    // Async content moderation on title/content changes — fire-and-forget
+    if (isModerationEnabled() && (data.title || data.content !== undefined)) {
+      const textToScan = `${updated.title} ${updated.content || ''}`.trim()
+      if (textToScan) {
+        void scanContent({ contentType: 'note', contentId: noteId, text: textToScan, userId: req.user.userId })
+      }
+    }
+
     res.json(updated)
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
@@ -242,15 +260,21 @@ router.get('/:id/comments', optionalAuth, async (req, res) => {
     if (!note) return res.status(404).json({ error: 'Note not found.' })
     if (!canReadNote(note, req.user || null)) return res.status(404).json({ error: 'Note not found.' })
 
+    // Note owners and admins see all comments; others only see clean ones
+    const isNoteOwnerOrAdmin = req.user && (req.user.userId === note.userId || req.user.role === 'admin')
+    const commentWhere = isNoteOwnerOrAdmin
+      ? { noteId }
+      : { noteId, moderationStatus: 'clean' }
+
     const [comments, total] = await Promise.all([
       prisma.noteComment.findMany({
-        where: { noteId },
+        where: commentWhere,
         include: COMMENT_INCLUDE,
         orderBy: { createdAt: 'desc' },
         take: limit,
         skip: offset,
       }),
-      prisma.noteComment.count({ where: { noteId } }),
+      prisma.noteComment.count({ where: commentWhere }),
     ])
 
     res.json({ comments, total, limit, offset })
@@ -296,6 +320,11 @@ router.post('/:id/comments', requireAuth, requireVerifiedEmail, commentLimiter, 
       },
       include: COMMENT_INCLUDE,
     })
+
+    // Async content moderation on comment — fire-and-forget
+    if (isModerationEnabled()) {
+      void scanContent({ contentType: 'note_comment', contentId: comment.id, text: content, userId: req.user.userId })
+    }
 
     trackActivity(prisma, req.user.userId, 'comments')
 

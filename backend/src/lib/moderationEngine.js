@@ -41,13 +41,20 @@ function isModerationEnabled() {
  * Returns null on any error (network, rate limit, invalid key, etc.)
  * so callers can safely skip case creation.
  */
+const MODERATION_TIMEOUT_MS = 10_000
+
 async function callOpenAiModeration(text) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), MODERATION_TIMEOUT_MS)
   try {
     const client = getOpenAiClient()
-    const response = await client.moderations.create({
-      model: process.env.OPENAI_MODERATION_MODEL || 'omni-moderation-latest',
-      input: text,
-    })
+    const response = await client.moderations.create(
+      {
+        model: process.env.OPENAI_MODERATION_MODEL || 'omni-moderation-latest',
+        input: text,
+      },
+      { signal: controller.signal },
+    )
     const result = response.results?.[0]
     if (!result) return null
     return {
@@ -56,8 +63,10 @@ async function callOpenAiModeration(text) {
       categoryScores: result.category_scores,
     }
   } catch (error) {
-    captureError(error, { context: 'openai-moderation' })
+    captureError(error, { context: 'openai-moderation', timedOut: error.name === 'AbortError' })
     return null
+  } finally {
+    clearTimeout(timer)
   }
 }
 
@@ -71,7 +80,7 @@ async function callOpenAiModeration(text) {
  * — it NEVER throws and NEVER blocks the caller's response.
  *
  * @param {object} params
- * @param {'feed_post'|'feed_comment'|'sheet'} params.contentType
+ * @param {'feed_post'|'feed_comment'|'sheet'|'note'|'note_comment'} params.contentType
  * @param {number} params.contentId — DB record ID of the content
  * @param {string} params.text — text to scan
  * @param {number} params.userId — author's user ID
@@ -122,6 +131,23 @@ async function scanContent({ contentType, contentId, text, userId }) {
         },
       },
     })
+
+    /* Hide flagged notes/comments from public until admin review */
+    try {
+      if (contentType === 'note') {
+        await prisma.note.update({
+          where: { id: contentId },
+          data: { moderationStatus: 'pending_review' },
+        })
+      } else if (contentType === 'note_comment') {
+        await prisma.noteComment.update({
+          where: { id: contentId },
+          data: { moderationStatus: 'pending_review' },
+        })
+      }
+    } catch (hideErr) {
+      captureError(hideErr, { context: 'moderation-hide', contentType, contentId })
+    }
   } catch (error) {
     /* Never let scanning errors propagate — content is already published */
     captureError(error, { context: 'moderation-scan', contentType, contentId })
@@ -232,7 +258,7 @@ async function hasActiveRestriction(userId) {
 async function reviewCase({ caseId, reviewedBy, action, reviewNote }) {
   const nextStatus = action === 'dismiss' ? 'dismissed' : 'confirmed'
 
-  return prisma.moderationCase.update({
+  const modCase = await prisma.moderationCase.update({
     where: { id: caseId },
     data: {
       status: nextStatus,
@@ -240,6 +266,28 @@ async function reviewCase({ caseId, reviewedBy, action, reviewNote }) {
       reviewNote: reviewNote || null,
     },
   })
+
+  /* Sync moderationStatus on notes/comments when case is reviewed.
+   * Dismiss → restore to 'clean' (false positive).
+   * Confirm → mark 'confirmed_violation' (stays hidden permanently). */
+  try {
+    const { contentType, contentId } = modCase
+    if (contentType === 'note') {
+      await prisma.note.update({
+        where: { id: contentId },
+        data: { moderationStatus: action === 'dismiss' ? 'clean' : 'confirmed_violation' },
+      })
+    } else if (contentType === 'note_comment') {
+      await prisma.noteComment.update({
+        where: { id: contentId },
+        data: { moderationStatus: action === 'dismiss' ? 'clean' : 'confirmed_violation' },
+      })
+    }
+  } catch (err) {
+    captureError(err, { context: 'moderation-review-sync', contentType: modCase.contentType, contentId: modCase.contentId })
+  }
+
+  return modCase
 }
 
 /* ── Exports ─────────────────────────────────────────────────────────────── */

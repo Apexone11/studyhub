@@ -51,11 +51,30 @@ function resolveRequestPath(urlPath) {
   return path.join(distDir, 'index.html')
 }
 
-function sendFile(filePath, res) {
+function getCacheHeaders(filePath, urlPath) {
+  const relative = path.relative(distDir, filePath).replace(/\\/g, '/')
+
+  // index.html and runtime-config.js must never be cached — they reference
+  // hashed chunk filenames that change on every deploy.
+  if (relative === 'index.html' || relative === 'runtime-config.js') {
+    return { 'Cache-Control': 'no-cache, no-store, must-revalidate', Pragma: 'no-cache', Expires: '0' }
+  }
+
+  // Vite hashed assets under /assets/ are immutable — cache for 1 year.
+  if (urlPath.startsWith('/assets/') || relative.startsWith('assets/')) {
+    return { 'Cache-Control': 'public, max-age=31536000, immutable' }
+  }
+
+  // Other static files: short cache with revalidation.
+  return { 'Cache-Control': 'public, max-age=3600, must-revalidate' }
+}
+
+function sendFile(filePath, res, urlPath) {
   const extension = path.extname(filePath).toLowerCase()
   const contentType = mimeTypes[extension] || 'application/octet-stream'
+  const cacheHeaders = getCacheHeaders(filePath, urlPath || '/')
 
-  res.writeHead(200, { 'Content-Type': contentType })
+  res.writeHead(200, { 'Content-Type': contentType, ...cacheHeaders })
   createReadStream(filePath).pipe(res)
 }
 
@@ -93,7 +112,8 @@ const server = createServer((req, res) => {
     return
   }
 
-  sendFile(filePath, res)
+  const cleanUrl = decodeURIComponent(req.url.split('?')[0] || '/')
+  sendFile(filePath, res, cleanUrl)
 })
 
 server.listen(port, host, () => {

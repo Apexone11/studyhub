@@ -645,3 +645,172 @@ Added shared notes to global search modal. Built anchor context system for inlin
 | Backend tests | 439/439 pass (37 files) |
 | Frontend lint | Clean |
 | Frontend build | Clean |
+
+---
+
+## Cycle S-1 — Frontend Stability Hotfix (2026-03-25)
+
+### Summary
+
+Fixed Railway chunk load failures caused by stale service worker caching and missing cache headers. After each deploy, old cached `index.html` referenced deleted JS chunks, causing `ChunkLoadError` for active users.
+
+### Root Cause
+
+Three compounding issues:
+1. **Service worker used cache-first for all static assets** — including `index.html`, so browsers served stale HTML even after deploys
+2. **No cache headers** on the custom Node.js static server — browsers and CDN made their own caching decisions
+3. **No client-side recovery** — chunk load failures crashed the page with no way to recover
+
+### Changes
+
+| Category | Detail |
+|----------|--------|
+| Infra | `scripts/start.js` — added `getCacheHeaders()`: `no-cache` for `index.html`/`runtime-config.js`, `immutable` (1yr) for hashed `/assets/`, 1hr for other static files |
+| Infra | `public/sw.js` — redesigned from v1 to v2: network-first for HTML navigation, cache-first only for hashed `/assets/`, network-first for everything else; removed pre-caching of `index.html` |
+| Frontend | `RouteErrorBoundary.jsx` — added `isChunkLoadError()` detection; auto-refreshes once on chunk failure (sessionStorage flag prevents loops); user-friendly "Update available" UI with "Refresh Page" button if auto-refresh already attempted |
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `frontend/studyhub-app/scripts/start.js` | Cache header logic: immutable for hashed assets, no-cache for HTML |
+| `frontend/studyhub-app/public/sw.js` | Network-first for navigation/non-asset; cache-first only for `/assets/` |
+| `frontend/studyhub-app/src/components/RouteErrorBoundary.jsx` | Chunk load error detection, auto-refresh, friendly recovery UI |
+
+### Validation
+
+| Suite | Result |
+|-------|--------|
+| Frontend lint | Clean |
+| Frontend build | Clean |
+
+---
+
+## Cycle S-2 — Notes & Comments Content Moderation (2026-03-25)
+
+### Summary
+
+Closed the moderation gap: notes and note comments now go through the same OpenAI text moderation pipeline as feed posts, feed comments, and sheets. Previously, notes and note comments bypassed all content scanning entirely.
+
+### Gap Closed
+
+| Content Type | Before | After |
+|-------------|--------|-------|
+| Feed posts | Scanned | Scanned |
+| Feed comments | Scanned | Scanned |
+| Sheets (title/desc/markdown) | Scanned | Scanned |
+| **Notes** | **Not scanned** | **Scanned** |
+| **Note comments** | **Not scanned** | **Scanned** |
+
+### Scan Points
+
+| Endpoint | Content Type | Text Scanned |
+|----------|-------------|-------------|
+| `POST /api/notes` | `note` | title + content |
+| `PATCH /api/notes/:id` | `note` | title + content (only when title/content changes) |
+| `POST /api/notes/:id/comments` | `note_comment` | comment text |
+
+All scans are fire-and-forget (`void scanContent()`) — never block the user's response. Cases appear in the existing admin Moderation > Cases panel with content types `note` and `note_comment`.
+
+### Changes
+
+| Category | Detail |
+|----------|--------|
+| Backend | `notes.routes.js` — added `scanContent` calls on note create, update (content-change guard), and comment create |
+| Backend | `moderationEngine.js` — updated JSDoc to include `note` and `note_comment` content types |
+| Tests | 5 new tests in `notes.routes.test.js`: note create scan, update scan, metadata-only skip, moderation-disabled skip, comment scan |
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `backend/src/modules/notes/notes.routes.js` | Import + wire `isModerationEnabled`/`scanContent` at 3 points |
+| `backend/src/lib/moderationEngine.js` | JSDoc type union updated |
+| `backend/test/notes.routes.test.js` | Added moderation engine mock + 5 content moderation tests |
+
+### S-2 Validation
+
+| Suite | Result |
+|-------|--------|
+| Backend tests | 444/444 pass (37 files) |
+| Frontend build | Clean |
+
+---
+
+## Cycle S-3a — Notes & Comments Pending Review Visibility (2026-03-25)
+
+### Summary
+
+Flagged notes and note comments are now hidden from public surfaces until an admin reviews them. The `moderationStatus` field on notes/comments controls visibility: `clean` (default, visible), `pending_review` (hidden from public, visible to owner/admin), `confirmed_violation` (hidden permanently). Admin case review syncs the status back to the source record.
+
+### Publish-but-hide Flow
+
+1. User creates/edits a note or comment → content is published immediately
+2. `scanContent()` runs fire-and-forget → if flagged (score ≥ 0.5), sets `moderationStatus: 'pending_review'`
+3. Flagged content is hidden from all public queries (feed, search, profile, shared notes, viewer)
+4. Owner can still see their own flagged content
+5. Admin reviews case → dismiss restores `clean`, confirm sets `confirmed_violation`
+
+### Schema Changes
+
+| Model | Field Added | Default |
+|-------|------------|---------|
+| `Note` | `moderationStatus` (TEXT) | `'clean'` |
+| `NoteComment` | `moderationStatus` (TEXT) | `'clean'` |
+
+### Visibility Filtering (6 surfaces)
+
+| Surface | File | Filter Applied |
+|---------|------|---------------|
+| Shared notes list | `notes.routes.js` (GET `/?shared=true`) | `moderationStatus: 'clean'` |
+| Single note viewer | `notes.routes.js` (GET `/:id`) | Non-owner blocked if status ≠ `clean` |
+| Note comments list | `notes.routes.js` (GET `/:id/comments`) | Non-owner filtered by `moderationStatus: 'clean'` |
+| Feed | `feed.list.controller.js` | `moderationStatus: 'clean'` on noteWhere |
+| Global search | `search.routes.js` | `moderationStatus: 'clean'` on notes query |
+| User profile | `users.routes.js` | `moderationStatus: 'clean'` on shared notes |
+
+### Admin Review Hooks
+
+| Action | `moderationStatus` Sync |
+|--------|------------------------|
+| Dismiss (false positive) | → `clean` (content restored to public) |
+| Confirm (violation) | → `confirmed_violation` (hidden permanently) |
+
+### OpenAI Timeout
+
+Added 10-second `AbortController` timeout to `callOpenAiModeration()`. Prevents fire-and-forget calls from accumulating in memory if the OpenAI API is slow or unresponsive.
+
+### Changes
+
+| Category | Detail |
+|----------|--------|
+| Schema | `moderationStatus` field added to `Note` and `NoteComment` models |
+| Migration | `20260325000005_add_note_moderation_status` |
+| Infra | `bootstrapSchema.js` updated for both tables |
+| Backend | `moderationEngine.js` — auto-hide on flag (`pending_review`), review sync (dismiss→clean, confirm→confirmed_violation), 10s AbortController timeout |
+| Backend | 6 query surfaces updated with `moderationStatus: 'clean'` filtering |
+| Tests | `moderationVisibility.test.js` — 8 new tests (scan→pending_review, review→sync) |
+| Tests | `notes.routes.test.js` — 4 new visibility tests (pending_review viewer, owner bypass, shared filter, no-own-notes filter) |
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `backend/prisma/schema.prisma` | `moderationStatus` field on Note + NoteComment |
+| `backend/prisma/migrations/20260325000005_add_note_moderation_status/migration.sql` | ALTER TABLE for both models |
+| `backend/src/lib/bootstrapSchema.js` | `moderationStatus` column in Note + NoteComment CREATE TABLE |
+| `backend/src/lib/moderationEngine.js` | Auto-hide on flag, review sync, 10s AbortController timeout |
+| `backend/src/modules/notes/notes.routes.js` | Visibility filtering on shared list, viewer, comments |
+| `backend/src/modules/feed/feed.list.controller.js` | `moderationStatus: 'clean'` in noteWhere |
+| `backend/src/modules/search/search.routes.js` | `moderationStatus: 'clean'` in notes search |
+| `backend/src/modules/users/users.routes.js` | `moderationStatus: 'clean'` in profile notes |
+| `backend/test/moderationVisibility.test.js` | New: 8 tests for scan + review visibility |
+| `backend/test/notes.routes.test.js` | 4 new moderation visibility tests |
+
+### S-3a Validation
+
+| Suite | Result |
+|-------|--------|
+| Backend tests | 456/456 pass (38 files) |
+| Frontend lint | Clean |
+| Frontend build | Clean |

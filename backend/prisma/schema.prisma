@@ -238,10 +238,11 @@ model Note {
   content   String   @default("")
   userId    Int
   courseId  Int?
-  private        Boolean  @default(true)
-  allowDownloads Boolean  @default(false)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  private          Boolean  @default(true)
+  allowDownloads   Boolean  @default(false)
+  moderationStatus String   @default("clean")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
   author    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   course    Course?  @relation(fields: [courseId], references: [id])
   noteComments NoteComment[]
@@ -254,9 +255,10 @@ model NoteComment {
   userId       Int
   anchorText    String?
   anchorOffset  Int?
-  anchorContext String?
-  resolved      Boolean  @default(false)
-  createdAt    DateTime @default(now())
+  anchorContext    String?
+  resolved         Boolean  @default(false)
+  moderationStatus String   @default("clean")
+  createdAt        DateTime @default(now())
   note         Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
   author       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 

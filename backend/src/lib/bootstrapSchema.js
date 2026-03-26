@@ -101,6 +101,8 @@ const SCHEMA_REPAIR_STATEMENTS = [
     "userId" INTEGER NOT NULL,
     "courseId" INTEGER,
     "private" BOOLEAN NOT NULL DEFAULT true,
+    "allowDownloads" BOOLEAN NOT NULL DEFAULT false,
+    "moderationStatus" TEXT NOT NULL DEFAULT 'clean',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "Note_pkey" PRIMARY KEY ("id")
@@ -114,6 +116,7 @@ const SCHEMA_REPAIR_STATEMENTS = [
     "anchorOffset" INTEGER,
     "anchorContext" TEXT,
     "resolved" BOOLEAN NOT NULL DEFAULT false,
+    "moderationStatus" TEXT NOT NULL DEFAULT 'clean',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "NoteComment_pkey" PRIMARY KEY ("id")
   )`,

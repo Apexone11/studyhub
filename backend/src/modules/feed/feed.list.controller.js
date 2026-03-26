@@ -45,12 +45,13 @@ router.get('/', async (req, res) => {
   const noteWhere = search
     ? {
         private: false,
+        moderationStatus: 'clean',
         OR: [
           { title: { contains: search, mode: 'insensitive' } },
           { content: { contains: search, mode: 'insensitive' } },
         ],
       }
-    : { private: false }
+    : { private: false, moderationStatus: 'clean' }
 
   try {
     const primarySections = await Promise.all([
