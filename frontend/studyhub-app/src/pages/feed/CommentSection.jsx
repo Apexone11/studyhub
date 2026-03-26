@@ -181,7 +181,7 @@ function CommentList({ comments, loading, user, onDelete }) {
   return (
     <div style={commentListStyle}>
       {comments.map((comment) => (
-        <div key={comment.id} style={commentItemStyle}>
+        <div key={comment.id} data-comment-id={comment.id} style={commentItemStyle}>
           {comment.author?.username ? (
             <Link to={`/users/${comment.author.username}`} style={{ textDecoration: 'none', flexShrink: 0 }}>
               <Avatar username={comment.author.username} role="student" size={28} />
@@ -219,8 +219,8 @@ function CommentList({ comments, loading, user, onDelete }) {
   )
 }
 
-export default function CommentSection({ postId, commentCount, user }) {
-  const [expanded, setExpanded] = useState(false)
+export default function CommentSection({ postId, commentCount, user, targetCommentId }) {
+  const [expanded, setExpanded] = useState(() => Boolean(targetCommentId))
   const [newComment, setNewComment] = useState('')
   const {
     comments,
@@ -233,6 +233,23 @@ export default function CommentSection({ postId, commentCount, user }) {
     postComment,
     deleteComment,
   } = useComments(postId, commentCount || 0)
+
+  useEffect(() => {
+    if (targetCommentId) {
+      loadComments()
+    }
+  }, [targetCommentId, loadComments])
+
+  useEffect(() => {
+    if (!targetCommentId || loading) return
+    const el = document.querySelector(`[data-comment-id="${targetCommentId}"]`)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      el.style.transition = 'box-shadow 0.3s'
+      el.style.boxShadow = '0 0 0 3px var(--sh-info-border)'
+      setTimeout(() => { el.style.boxShadow = '' }, 2000)
+    }
+  }, [targetCommentId, loading])
 
   const handleToggle = () => {
     const next = !expanded

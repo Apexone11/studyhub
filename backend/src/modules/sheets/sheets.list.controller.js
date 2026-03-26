@@ -147,7 +147,7 @@ router.get('/', optionalAuth, async (req, res) => {
 
       const comments = await prisma.comment.groupBy({
         by: ['sheetId'],
-        where: { sheetId: { in: starredSheetIds } },
+        where: { sheetId: { in: starredSheetIds }, moderationStatus: 'clean' },
         _count: { _all: true },
       })
       const commentCountBySheetId = new Map(comments.map((row) => [row.sheetId, row._count._all]))
@@ -211,7 +211,7 @@ router.get('/', optionalAuth, async (req, res) => {
         ftsSheetIds.length > 0
           ? prisma.comment.groupBy({
               by: ['sheetId'],
-              where: { sheetId: { in: ftsSheetIds } },
+              where: { sheetId: { in: ftsSheetIds }, moderationStatus: 'clean' },
               _count: { _all: true },
             })
           : [],
@@ -297,7 +297,7 @@ router.get('/', optionalAuth, async (req, res) => {
       sheetIds.length > 0
         ? prisma.comment.groupBy({
             by: ['sheetId'],
-            where: { sheetId: { in: sheetIds } },
+            where: { sheetId: { in: sheetIds }, moderationStatus: 'clean' },
             _count: { _all: true },
           })
         : [],

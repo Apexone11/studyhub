@@ -19,7 +19,7 @@ import { pageShell, useResponsiveAppLayout } from '../../lib/ui'
 import { usePageTitle } from '../../lib/usePageTitle'
 import SafeJoyride from '../../components/SafeJoyride'
 import { useTutorial } from '../../lib/useTutorial'
-import { DASHBOARD_STEPS } from '../../lib/tutorialSteps'
+import { DASHBOARD_STEPS, TUTORIAL_VERSIONS } from '../../lib/tutorialSteps'
 import { FONT, formatJoinedDate } from './dashboardConstants'
 import { useDashboardData } from './useDashboardData'
 import {
@@ -67,7 +67,7 @@ export default function DashboardPage() {
   } = useDashboardData()
 
   /* Tutorial popup — first-visit or re-trigger via floating "?" button */
-  const tutorial = useTutorial('dashboard', DASHBOARD_STEPS)
+  const tutorial = useTutorial('dashboard', DASHBOARD_STEPS, { version: TUTORIAL_VERSIONS.dashboard })
 
   const navActions = (
     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>

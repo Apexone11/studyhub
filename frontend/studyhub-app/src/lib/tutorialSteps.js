@@ -6,6 +6,18 @@
  * Keep content short and actionable.
  * ═══════════════════════════════════════════════════════════════════════════ */
 
+export const TUTORIAL_VERSIONS = {
+  feed: 1,
+  sheets: 1,
+  dashboard: 1,
+  notes: 1,
+  settings: 1,
+  profile: 1,
+  viewer: 1,
+  announcements: 1,
+  upload: 1,
+}
+
 export const FEED_STEPS = [
   {
     target: '[data-tutorial="feed-composer"]',

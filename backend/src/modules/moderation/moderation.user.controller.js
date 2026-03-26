@@ -5,6 +5,7 @@ const { countActiveStrikes, hasActiveRestriction } = require('../../lib/moderati
 const { createNotification } = require('../../lib/notify')
 const { classifyReportPriority, classifyAppealPriority, REPEAT_OFFENDER_CASE_WINDOW_MS } = require('../../lib/notificationPolicy')
 const { appealLimiter, reportLimiter, REASON_CATEGORIES, APPEAL_REASON_CATEGORIES } = require('./moderation.constants')
+const { logModerationEvent } = require('../../lib/moderationLogger')
 
 const router = express.Router()
 
@@ -212,6 +213,8 @@ router.post('/reports', reportLimiter, async (req, res) => {
       },
     })
 
+    logModerationEvent({ userId: contentOwnerId, action: 'case_opened', caseId: modCase.id, contentType: targetType, contentId: targetId, reason: reasonCategory, performedBy: req.user.userId })
+
     /* Notify admins with smart priority classification */
     try {
       const [admins, actorStrikes, actorRecentCases] = await Promise.all([
@@ -323,6 +326,8 @@ router.post('/appeals', appealLimiter, async (req, res) => {
       },
     })
 
+    logModerationEvent({ userId: req.user.userId, action: 'appeal_submitted', caseId, appealId: appeal.id })
+
     res.status(201).json({ message: 'Appeal submitted.', appeal })
 
     /* Notify admins about the new appeal */
@@ -347,6 +352,35 @@ router.post('/appeals', appealLimiter, async (req, res) => {
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+/* GET /my-log — user's own moderation history */
+router.get('/my-log', async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1)
+    const limit = 20
+    const [items, total] = await Promise.all([
+      prisma.moderationLog.findMany({
+        where: { userId: req.user.userId },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        select: {
+          id: true,
+          action: true,
+          contentType: true,
+          reason: true,
+          createdAt: true,
+          // Do NOT expose performedBy, metadata, or admin details
+        },
+      }),
+      prisma.moderationLog.count({ where: { userId: req.user.userId } }),
+    ])
+    res.json({ items, page, totalPages: Math.ceil(total / limit) || 1 })
+  } catch (err) {
+    console.error('[moderation] Failed to load user log:', err.message)
+    res.status(500).json({ error: 'Failed to load history.' })
   }
 })
 

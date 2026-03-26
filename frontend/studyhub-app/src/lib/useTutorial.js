@@ -3,122 +3,130 @@
  *
  * Each page gets a tutorial with 3-5 steps max.
  * Triggered: First visit to the page OR click the tutorial re-trigger button.
- * Storage: localStorage key per page (e.g., `tutorial_feed_seen`).
+ * Storage: Versioned localStorage key per page (e.g., `tutorial_feed_v1_seen`).
  *
  * Usage:
- *   const tutorial = useTutorial('feed', FEED_STEPS)
+ *   import { useTutorial } from '../../lib/useTutorial'
+ *   import { TUTORIAL_VERSIONS, FEED_STEPS } from '../../lib/tutorialSteps'
+ *   const tutorial = useTutorial('feed', FEED_STEPS, { version: TUTORIAL_VERSIONS.feed })
  *   // In render:
  *   <Joyride {...tutorial.joyrideProps} />
  *   <button onClick={tutorial.restart}>Show Tutorial</button>
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useCallback, useEffect, useState } from 'react'
-
-const STORAGE_PREFIX = 'tutorial_'
+import { useState, useCallback, useMemo } from 'react'
 
 /**
  * @param {string} pageKey — unique key for localStorage (e.g., 'feed', 'sheets')
  * @param {Array} steps — react-joyride step definitions
  * @param {object} [options]
  * @param {number} [options.delayMs=800] — delay before showing tutorial on first visit
+ * @param {number} [options.version=1] — increment to reset seen state for all users
  * @returns {{ joyrideProps: object, restart: () => void, seen: boolean }}
  */
 export function useTutorial(pageKey, steps, options = {}) {
-  const { delayMs = 800 } = options
-  const storageKey = `${STORAGE_PREFIX}${pageKey}_seen`
+  const { delayMs = 800, version = 1 } = options
+  const storageKey = `tutorial_${pageKey}_v${version}_seen`
 
-  const [run, setRun] = useState(false)
-  const [seen, setSeen] = useState(() => {
-    try { return localStorage.getItem(storageKey) === '1' }
-    catch { return false }
-  })
-
-  /* Auto-start on first visit after a short delay */
-  useEffect(() => {
-    if (seen || steps.length === 0) return undefined
-
-    const timer = setTimeout(() => setRun(true), delayMs)
-    return () => clearTimeout(timer)
-  }, [seen, steps.length, delayMs])
-
-  /* Mark as seen when tutorial completes or is skipped */
-  const handleCallback = useCallback((data) => {
-    const { status } = data
-    const finishedStatuses = ['finished', 'skipped']
-    if (finishedStatuses.includes(status)) {
-      setRun(false)
-      setSeen(true)
-      try { localStorage.setItem(storageKey, '1') } catch { /* ignore */ }
+  const alreadySeen = useMemo(() => {
+    try {
+      return localStorage.getItem(storageKey) === '1'
+    } catch {
+      return true
     }
   }, [storageKey])
 
-  /* Re-trigger button handler */
+  const [run, setRun] = useState(false)
+  const [hasTriggered, setHasTriggered] = useState(false)
+
+  // Auto-trigger once after delay, only if not seen
+  useState(() => {
+    if (alreadySeen || hasTriggered) return
+    const timer = setTimeout(() => {
+      setRun(true)
+      setHasTriggered(true)
+    }, delayMs)
+    return () => clearTimeout(timer)
+  })
+
+  const markSeen = useCallback(() => {
+    try {
+      localStorage.setItem(storageKey, '1')
+    } catch {
+      // localStorage unavailable
+    }
+  }, [storageKey])
+
+  const handleCallback = useCallback(
+    (data) => {
+      const { status } = data
+      if (status === 'finished' || status === 'skipped') {
+        setRun(false)
+        markSeen()
+      }
+    },
+    [markSeen]
+  )
+
   const restart = useCallback(() => {
     setRun(true)
   }, [])
 
-  /* Shared joyride props — spread onto <Joyride /> */
-  const joyrideProps = {
-    steps,
-    run,
-    continuous: true,
-    showSkipButton: true,
-    showProgress: true,
-    disableOverlayClose: false,
-    callback: handleCallback,
-    locale: {
-      back: 'Back',
-      close: 'Got it',
-      last: 'Done',
-      next: 'Next',
-      skip: 'Skip tour',
-    },
-    styles: {
-      options: {
-        zIndex: 10000,
-        primaryColor: '#3b82f6',
-        textColor: '#0f172a',
-        backgroundColor: '#fff',
-        arrowColor: '#fff',
-        overlayColor: 'rgba(15, 23, 42, 0.4)',
+  const joyrideProps = useMemo(
+    () => ({
+      steps,
+      run,
+      continuous: true,
+      showSkipButton: true,
+      showProgress: true,
+      disableOverlayClose: false,
+      callback: handleCallback,
+      locale: {
+        back: 'Back',
+        close: 'Close',
+        last: 'Done',
+        next: 'Next',
+        skip: 'Skip',
       },
-      tooltip: {
-        borderRadius: 14,
-        padding: '20px 22px',
-        fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
-        boxShadow: '0 12px 40px rgba(15, 23, 42, 0.15)',
+      styles: {
+        options: {
+          zIndex: 10000,
+          primaryColor: 'var(--sh-brand, #3b82f6)',
+          textColor: 'var(--sh-text, #0f172a)',
+          backgroundColor: 'var(--sh-surface, #fff)',
+          arrowColor: 'var(--sh-surface, #fff)',
+          overlayColor: 'rgba(15, 23, 42, 0.4)',
+        },
+        tooltip: {
+          borderRadius: 14,
+          padding: '20px 22px',
+          boxShadow: '0 12px 40px rgba(15, 23, 42, 0.15)',
+          fontFamily: "'Plus Jakarta Sans', sans-serif",
+        },
+        spotlight: { borderRadius: 12 },
+        buttonNext: {
+          fontFamily: "'Plus Jakarta Sans', sans-serif",
+          fontWeight: 600,
+          borderRadius: 8,
+          fontSize: 14,
+        },
+        buttonBack: {
+          fontFamily: "'Plus Jakarta Sans', sans-serif",
+          fontWeight: 500,
+          fontSize: 14,
+          color: 'var(--sh-subtext, #475569)',
+        },
+        buttonSkip: {
+          fontFamily: "'Plus Jakarta Sans', sans-serif",
+          fontWeight: 500,
+          fontSize: 13,
+          color: 'var(--sh-muted, #94a3b8)',
+        },
       },
-      tooltipTitle: {
-        fontSize: 16,
-        fontWeight: 800,
-        marginBottom: 8,
-      },
-      tooltipContent: {
-        fontSize: 13,
-        lineHeight: 1.7,
-        color: '#475569',
-      },
-      buttonNext: {
-        borderRadius: 8,
-        fontSize: 13,
-        fontWeight: 700,
-        padding: '8px 16px',
-      },
-      buttonBack: {
-        borderRadius: 8,
-        fontSize: 13,
-        fontWeight: 600,
-        color: '#64748b',
-      },
-      buttonSkip: {
-        borderRadius: 8,
-        fontSize: 12,
-        color: '#94a3b8',
-      },
-      spotlight: {
-        borderRadius: 12,
-      },
-    },
-  }
+    }),
+    [steps, run, handleCallback]
+  )
 
-  return { joyrideProps, restart, seen }
+  return { joyrideProps, restart, seen: alreadySeen }
 }
+
+export default useTutorial

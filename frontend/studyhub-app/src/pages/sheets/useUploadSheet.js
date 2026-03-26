@@ -8,7 +8,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { API } from '../../config'
 import { useTutorial } from '../../lib/useTutorial'
-import { UPLOAD_STEPS } from '../../lib/tutorialSteps'
+import { UPLOAD_STEPS, TUTORIAL_VERSIONS } from '../../lib/tutorialSteps'
 import { usePageTitle } from '../../lib/usePageTitle'
 import {
   UPLOAD_TUTORIAL_KEY,
@@ -44,7 +44,7 @@ export default function useUploadSheet() {
   const [status, setStatus] = useState(isEditing ? 'published' : 'draft')
   const [draftId, setDraftId] = useState(null)
   const [legacyMarkdownMode, setLegacyMarkdownMode] = useState(false)
-  const tutorial = useTutorial('upload', UPLOAD_STEPS)
+  const tutorial = useTutorial('upload', UPLOAD_STEPS, { version: TUTORIAL_VERSIONS.upload })
 
   /* ── UI state ──────────────────────────────────────────────────────── */
   const [courses, setCourses] = useState([])

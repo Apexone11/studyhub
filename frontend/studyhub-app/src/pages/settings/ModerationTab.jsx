@@ -9,9 +9,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { API } from '../../config'
 import { FONT } from './settingsState'
+import { HistoryIcon } from '../admin/components/icons'
 
-const SECTION_TABS = ['status', 'cases', 'appeals']
-const SECTION_LABELS = { status: 'My Status', cases: 'My Cases', appeals: 'My Appeals' }
+const SECTION_TABS = ['status', 'cases', 'appeals', 'history']
+const SECTION_LABELS = { status: 'My Status', cases: 'My Cases', appeals: 'My Appeals', history: 'My History' }
 
 const APPEAL_CATEGORIES = [
   { value: 'educational_context', label: 'Educational context', hint: 'What course/topic was this for? Why is it relevant to your studies?' },
@@ -60,12 +61,25 @@ function Card({ children, style }) {
 }
 
 /* ── Appeal Modal ──────────────────────────────────────────────── */
-function AppealModal({ caseData, onClose, onSubmit }) {
+function AppealModal({ open, caseData, onClose, onSubmit }) {
   const [category, setCategory] = useState('')
   const [reason, setReason] = useState('')
   const [acknowledged, setAcknowledged] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler)
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', handler)
+      document.body.style.overflow = ''
+    }
+  }, [open, onClose])
+
+  if (!open) return null
 
   const selectedCategory = APPEAL_CATEGORIES.find((c) => c.value === category)
   const canSubmit = category && reason.trim().length >= 20 && acknowledged && !submitting
@@ -86,16 +100,17 @@ function AppealModal({ caseData, onClose, onSubmit }) {
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, zIndex: 1000,
+      position: 'fixed', inset: 0, zIndex: 9000,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'rgba(15,23,42,0.5)', padding: 16,
+      background: 'rgba(15, 23, 42, 0.55)', backdropFilter: 'blur(4px)',
+      padding: 24,
     }} onClick={onClose}>
       <div
         style={{
           background: 'var(--sh-surface)', borderRadius: 16,
-          border: '1px solid var(--sh-border)', padding: '24px 28px',
-          maxWidth: 520, width: '100%', maxHeight: '90vh', overflowY: 'auto',
-          boxShadow: '0 20px 60px rgba(15,23,42,0.2)',
+          maxWidth: 520, width: '92vw', maxHeight: 'calc(100vh - 48px)',
+          overflowY: 'auto', boxShadow: '0 20px 60px rgba(15, 23, 42, 0.25)',
+          padding: '24px 28px',
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -270,7 +285,7 @@ function StatusSection({ data }) {
       )}
 
       <Card>
-        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
           <div>
             <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--sh-heading)' }}>{data.activeStrikes}</div>
             <div style={{ fontSize: 12, color: 'var(--sh-muted)', fontWeight: 600 }}>Active Strikes</div>
@@ -435,10 +450,13 @@ function AppealsSection({ data }) {
   if (appeals.length === 0) {
     return (
       <Card>
-        <p style={{ margin: '0 0 8px', fontSize: 13, color: 'var(--sh-muted)' }}>No appeals submitted yet.</p>
-        <p style={{ margin: 0, fontSize: 12, color: 'var(--sh-muted)', lineHeight: 1.6 }}>
-          If a case was confirmed against your content, you can submit an appeal from the &ldquo;My Cases&rdquo; tab.
-        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '12px 0', textAlign: 'center' }}>
+          <HistoryIcon size={28} style={{ color: 'var(--sh-muted)', opacity: 0.5 }} />
+          <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: 'var(--sh-muted)' }}>No appeals submitted yet</p>
+          <p style={{ margin: 0, fontSize: 12, color: 'var(--sh-muted)', lineHeight: 1.6, maxWidth: 340 }}>
+            If a case was confirmed against your content, you can submit an appeal from the &ldquo;My Cases&rdquo; tab.
+          </p>
+        </div>
       </Card>
     )
   }
@@ -513,6 +531,113 @@ function AppealsSection({ data }) {
           )}
         </Card>
       ))}
+    </div>
+  )
+}
+
+/* ── My History section ────────────────────────────────────────── */
+const ACTION_LABELS = {
+  case_opened: 'Content flagged for review',
+  case_confirmed: 'Violation confirmed',
+  case_dismissed: 'Case dismissed',
+  strike_issued: 'Strike issued',
+  strike_decayed: 'Strike removed',
+  strike_expired: 'Strike expired',
+  appeal_submitted: 'Appeal submitted',
+  appeal_approved: 'Appeal approved',
+  appeal_rejected: 'Appeal rejected',
+  restriction_applied: 'Account restricted',
+  restriction_lifted: 'Restriction lifted',
+  content_purged: 'Content permanently removed',
+}
+
+function HistorySection() {
+  const [page, setPage] = useState(1)
+  const [log, setLog] = useState({ items: [], totalPages: 1 })
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      setLoading(true)
+      try {
+        const r = await fetch(`${API}/api/moderation/my-log?page=${page}`, { credentials: 'include' })
+        const data = await r.json()
+        if (!cancelled) setLog(data)
+      } catch {
+        // fetch errors are non-fatal
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [page])
+
+  if (loading) return <div style={{ padding: 24, textAlign: 'center', color: 'var(--sh-muted)' }}>Loading history...</div>
+
+  if (!log.items || log.items.length === 0) {
+    return (
+      <Card>
+        <div style={{ textAlign: 'center', padding: 32, color: 'var(--sh-muted)' }}>
+          No moderation history.
+        </div>
+      </Card>
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {log.items.map((entry) => (
+        <Card key={entry.id}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--sh-heading)' }}>
+                {ACTION_LABELS[entry.action] || entry.action}
+              </div>
+              {entry.reason && (
+                <div style={{ fontSize: 13, color: 'var(--sh-subtext)', marginTop: 4 }}>
+                  {entry.reason}
+                </div>
+              )}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--sh-muted)', whiteSpace: 'nowrap' }}>
+              {new Date(entry.createdAt).toLocaleDateString()}
+            </div>
+          </div>
+        </Card>
+      ))}
+      {log.totalPages > 1 && (
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 8 }}>
+          <button
+            type="button"
+            disabled={page <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            style={{
+              padding: '6px 14px', borderRadius: 8, border: '1px solid var(--sh-border)',
+              background: 'var(--sh-surface)', color: 'var(--sh-subtext)',
+              fontSize: 13, fontWeight: 700, cursor: page <= 1 ? 'not-allowed' : 'pointer', fontFamily: FONT,
+            }}
+          >
+            Previous
+          </button>
+          <span style={{ fontSize: 13, color: 'var(--sh-muted)', lineHeight: '32px' }}>
+            Page {page} of {log.totalPages}
+          </span>
+          <button
+            type="button"
+            disabled={page >= log.totalPages}
+            onClick={() => setPage((p) => Math.min(log.totalPages, p + 1))}
+            style={{
+              padding: '6px 14px', borderRadius: 8, border: '1px solid var(--sh-border)',
+              background: 'var(--sh-surface)', color: 'var(--sh-subtext)',
+              fontSize: 13, fontWeight: 700, cursor: page >= log.totalPages ? 'not-allowed' : 'pointer', fontFamily: FONT,
+            }}
+          >
+            Next
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -636,15 +761,15 @@ export default function ModerationTab() {
       {section === 'status' && <StatusSection data={data} />}
       {section === 'cases' && <CasesSection data={data} onAppeal={setAppealTarget} />}
       {section === 'appeals' && <AppealsSection data={data} />}
+      {section === 'history' && <HistorySection />}
 
       {/* Appeal modal */}
-      {appealTarget && (
-        <AppealModal
-          caseData={appealTarget}
-          onClose={() => setAppealTarget(null)}
-          onSubmit={handleSubmitAppeal}
-        />
-      )}
+      <AppealModal
+        open={!!appealTarget}
+        caseData={appealTarget}
+        onClose={() => setAppealTarget(null)}
+        onSubmit={handleSubmitAppeal}
+      />
     </div>
   )
 }

@@ -1,78 +1,85 @@
-import { FONT, tableHeadStyle, tableCell, tableCellStrong, inputStyle, pillButton } from './adminConstants'
-import { Pager } from './AdminWidgets'
-import { statusPill } from './moderationHelpers'
+import { AdminCard, AdminTable, AdminPill } from './components'
+import UserSearchInput from './components/UserSearchInput'
+import AdminInput from './components/AdminInput'
+import { formatDateTime } from './adminConstants'
 
 export default function StrikesSubTab({
-  strikesState, strikeForm, setStrikeForm, strikeSaving, strikeError,
-  submitStrike, loadStrikes, formatDateTime,
+  state, strikeForm, strikeSaving, strikeError,
+  onStrikeFormChange, onSubmitStrike, onPageChange,
 }) {
+  const columns = [
+    { key: 'id', label: 'ID', cellClass: 'strong' },
+    { key: 'user', label: 'User', render: (r) => r.user?.username || `#${r.userId}` },
+    { key: 'reason', label: 'Reason', render: (r) => (
+      <span style={{ maxWidth: 300, display: 'inline-block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {r.reason}
+      </span>
+    )},
+    { key: 'status', label: 'Status', render: (r) => (
+      <AdminPill status={r.decayedAt ? 'decayed' : 'active'}>
+        {r.decayedAt ? 'Decayed' : 'Active'}
+      </AdminPill>
+    )},
+    { key: 'caseId', label: 'Case', render: (r) => r.caseId ? `#${r.caseId}` : '\u2014' },
+    { key: 'issuedAt', label: 'Issued', render: (r) => formatDateTime(r.issuedAt) },
+    { key: 'expiresAt', label: 'Expires', render: (r) => formatDateTime(r.expiresAt) },
+  ]
+
   return (
-    <>
-      {/* New Strike Form */}
-      <div style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: '14px 16px', marginBottom: 18, background: '#f8fafc' }}>
-        <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', marginBottom: 10, fontFamily: FONT }}>Issue New Strike</div>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-          <div>
-            <label style={{ fontSize: 11, color: '#64748b', fontWeight: 700 }}>User ID</label>
-            <input value={strikeForm.userId} onChange={(e) => setStrikeForm((f) => ({ ...f, userId: e.target.value }))}
-              placeholder="User ID" style={{ ...inputStyle, width: 100 }} />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <AdminCard title="Issue New Strike">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <UserSearchInput
+            value={strikeForm._selectedUser || null}
+            onChange={(user) => onStrikeFormChange({
+              ...strikeForm,
+              userId: user ? user.id : '',
+              _selectedUser: user,
+            })}
+          />
+          <AdminInput
+            label="Reason"
+            placeholder="Describe the violation (10-1000 characters)"
+            value={strikeForm.reason}
+            onChange={(e) => onStrikeFormChange({ ...strikeForm, reason: e.target.value })}
+          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <span style={{
+              fontSize: 12, color: 'var(--sh-muted)',
+              fontFamily: "'Plus Jakarta Sans', sans-serif",
+            }}>
+              Case ID will be auto-assigned
+            </span>
+            <button
+              className="admin-btn admin-btn--primary"
+              disabled={strikeSaving || !strikeForm.userId || strikeForm.reason.length < 10}
+              onClick={onSubmitStrike}
+            >
+              {strikeSaving ? 'Issuing...' : 'Issue Strike'}
+            </button>
           </div>
-          <div style={{ flex: 1 }}>
-            <label style={{ fontSize: 11, color: '#64748b', fontWeight: 700 }}>Reason</label>
-            <input value={strikeForm.reason} onChange={(e) => setStrikeForm((f) => ({ ...f, reason: e.target.value }))}
-              placeholder="Reason for strike" style={{ ...inputStyle, width: '100%' }} />
-          </div>
-          <div>
-            <label style={{ fontSize: 11, color: '#64748b', fontWeight: 700 }}>Case ID (optional)</label>
-            <input value={strikeForm.caseId} onChange={(e) => setStrikeForm((f) => ({ ...f, caseId: e.target.value }))}
-              placeholder="Case ID" style={{ ...inputStyle, width: 100 }} />
-          </div>
-          <button type="button" onClick={submitStrike} disabled={strikeSaving}
-            style={{ ...pillButton('#eff6ff', '#1d4ed8', '#bfdbfe'), opacity: strikeSaving ? 0.5 : 1 }}>
-            {strikeSaving ? 'Saving...' : 'Issue Strike'}
-          </button>
+          {strikeError && <div className="admin-error">{strikeError}</div>}
         </div>
-        {strikeError ? <div style={{ color: '#b91c1c', fontSize: 12, marginTop: 6 }}>{strikeError}</div> : null}
-      </div>
+      </AdminCard>
 
-      {/* Strikes Table */}
-      {strikesState.error ? (
-        <div style={{ color: '#b91c1c', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, padding: '12px 14px', fontSize: 13, marginBottom: 14 }}>{strikesState.error}</div>
-      ) : null}
-
-      {strikesState.loading && strikesState.items.length === 0 ? (
-        <div style={{ color: '#94a3b8', fontSize: 13 }}>Loading...</div>
-      ) : strikesState.items.length > 0 ? (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead>
-              <tr style={{ background: '#f8fafc' }}>
-                {['ID', 'User', 'Reason', 'Status', 'Issued', 'Decayed'].map((h) => (
-                  <th key={h} style={tableHeadStyle}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {strikesState.items.map((s) => (
-                <tr key={s.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                  <td style={tableCellStrong}>{s.id}</td>
-                  <td style={tableCell}>{s.user?.username || s.userId || '—'}</td>
-                  <td style={tableCell}>{s.reason || '—'}</td>
-                  <td style={tableCell}>
-                    <span style={statusPill(s.decayedAt ? 'decayed' : 'active')}>{s.decayedAt ? 'Decayed' : 'Active'}</span>
-                  </td>
-                  <td style={tableCell}>{formatDateTime(s.createdAt)}</td>
-                  <td style={tableCell}>{s.decayedAt ? formatDateTime(s.decayedAt) : '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (!strikesState.loading && strikesState.loaded) ? (
-        <div style={{ fontSize: 13, color: '#94a3b8' }}>No strikes found.</div>
-      ) : null}
-
-      <Pager page={strikesState.page} total={strikesState.total} onChange={(p) => void loadStrikes(p)} />
-    </>
+      <AdminCard title="Strike History" flush>
+        {state.loading ? (
+          <div className="admin-loading">Loading strikes...</div>
+        ) : state.error ? (
+          <div className="admin-error" style={{ margin: 16 }}>{state.error}</div>
+        ) : (
+          <>
+            <AdminTable columns={columns} rows={state.items} emptyText="No strikes issued yet." />
+            {state.total > 1 && (
+              <div className="admin-pager">
+                <button className="admin-btn admin-btn--ghost admin-btn--sm" disabled={state.page <= 1} onClick={() => onPageChange(state.page - 1)}>Prev</button>
+                <span>Page {state.page} of {state.total}</span>
+                <button className="admin-btn admin-btn--ghost admin-btn--sm" disabled={state.page >= state.total} onClick={() => onPageChange(state.page + 1)}>Next</button>
+              </div>
+            )}
+          </>
+        )}
+      </AdminCard>
+    </div>
   )
 }

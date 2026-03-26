@@ -5675,3 +5675,75 @@ Prisma 6.19 validates `not` filter arguments more strictly in `groupBy` than in 
 | Suite | Result |
 |-------|--------|
 | Backend tests | 418/418 pass (36 files) |
+
+---
+
+## Moderation System Overhaul (2026-03-26)
+
+### Summary
+
+Comprehensive moderation system overhaul covering tutorial persistence fix, admin UI redesign with shared primitives, content preview modal, deep linking, user-facing moderation tab improvements, deletion lifecycle management, audit logging, and security bug fixes.
+
+### Group 1: Tutorial Fix
+
+- Fixed `useTutorial` hook persistence bug — tutorial no longer re-shows on every login
+- Added versioned localStorage keys (`tutorial_${pageKey}_v${version}_seen`) for controlled re-display on major updates
+- Synchronous `useMemo` read replaces async effect that was setting `run: true` before checking localStorage
+
+### Group 2: Admin Moderation UI Overhaul
+
+- **Shared primitives**: Created AdminCard, AdminTable, AdminModal, AdminInput, AdminSelect, AdminPill, AdminSplitPanel components with `admin-primitives.css` using only `--sh-*` tokens
+- **SVG icons**: Created 10 inline SVG icon components (SearchIcon, WarningTriangleIcon, ShieldXIcon, etc.) replacing all emoji usage
+- **User search**: Added `GET /api/admin/users/search` endpoint with typeahead `UserSearchInput` component — admins no longer type raw userId
+- **Strike form**: Vertical layout with user search, auto-generated case IDs, AdminCard/AdminInput primitives
+- **Appeals/Restrictions**: Full rewrite using admin primitives, all hardcoded colors removed
+- **Content preview**: `ContentPreviewModal` with split-panel layout (content left, case context right), responsive breakpoints at 960px/768px
+- **Cases table**: Replaced inline case expansion with ContentPreviewModal overlay, added "View" buttons with ExternalLinkIcon
+- **Deep linking**: Feed deep link scroll-to-post with 2s highlight animation via `?post=N` and `?comment=N` params, comment sections auto-expand for targeted comments
+
+### Group 3: User-Facing Moderation Tab Redesign
+
+- **AppealModal**: Fixed centering — now proper fixed-position overlay with backdrop blur, Escape key, body scroll lock
+- **ModerationBanner**: Replaced emoji icons with WarningTriangleIcon/ShieldXIcon SVGs
+- **Layout improvements**: Stats cards gap 16px, consistent Card borderRadius/padding, SVG icon empty states
+- **My History tab**: New section showing user's own moderation history via `GET /api/moderation/my-log` with pagination
+
+### Group 4: Deletion Lifecycle
+
+- **Prisma schema**: Added `ModerationLog` model, `permanentlyDeletedAt` on ModerationSnapshot, `contentPurged` on ModerationCase
+- **Audit logger**: Fire-and-forget `logModerationEvent()` helper — never throws, never blocks callers
+- **Audit integration**: 12 event types logged across moderationEngine, admin enforcement controller, and user controller
+- **Cleanup scheduler**: `moderationCleanupScheduler.js` runs every 6 hours, permanently deletes content after 30-day grace period for confirmed cases with no pending appeal
+- **Admin log endpoints**: `GET /api/admin/moderation/users/:userId/log` (paginated) and `GET /api/admin/moderation/users/:userId/log/export` (streaming CSV)
+
+### Group 5: Security & Bug Fixes
+
+- **Comment filtering**: Added `moderationStatus: 'clean'` to 6 comment count groupBy queries across feed and sheet listing controllers
+- **Attachment preview**: Returns structured JSON errors with `kind` field instead of generic 404 HTML
+- **restoreContent**: Wrapped in `prisma.$transaction` to prevent partial restoration; returns `{ success, error }` instead of silently swallowing errors
+- **Notification links**: Fixed `/settings?tab=account` to `/settings?tab=moderation` in moderation notification emails
+
+### Files Changed
+
+| Area | Files |
+| ------ | ------- |
+| Frontend — Admin primitives | `admin-primitives.css`, `AdminCard.jsx`, `AdminTable.jsx`, `AdminModal.jsx`, `AdminInput.jsx`, `AdminSelect.jsx`, `AdminPill.jsx`, `AdminSplitPanel.jsx`, `index.js`, `icons.jsx` |
+| Frontend — Admin tabs | `StrikesSubTab.jsx`, `AppealsSubTab.jsx`, `RestrictionsSubTab.jsx`, `CasesSubTab.jsx`, `ModerationTab.jsx` (admin) |
+| Frontend — User search | `UserSearchInput.jsx`, `ContentPreviewModal.jsx` |
+| Frontend — Deep linking | `FeedPage.jsx`, `FeedCard.jsx`, `CommentSection.jsx` |
+| Frontend — User moderation | `ModerationTab.jsx` (settings), `ModerationBanner.jsx` |
+| Frontend — Tutorial | `useTutorial.js`, `tutorialSteps.js`, 9 page call sites |
+| Backend — Schema | `schema.prisma` |
+| Backend — Moderation | `moderationEngine.js`, `moderationLogger.js`, `moderationCleanupScheduler.js` |
+| Backend — Controllers | `moderation.admin.cases.controller.js`, `moderation.admin.enforcement.controller.js`, `moderation.user.controller.js`, `admin.users.controller.js` |
+| Backend — Feed/Sheets | `feed.list.controller.js`, `feed.posts.controller.js`, `sheets.list.controller.js` |
+| Backend — Server | `index.js` (scheduler registration) |
+
+### Validation
+
+| Suite | Result |
+| ------- | -------- |
+| Frontend lint | Clean |
+| Frontend build | Clean (575 modules, 482ms) |
+| Backend tests | 531/531 pass (42 files) |
+| Backend lint | 6 pre-existing errors (unrelated files) |

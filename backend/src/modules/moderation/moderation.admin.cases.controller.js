@@ -362,7 +362,7 @@ router.get('/cases/:id/preview', async (req, res) => {
       })
       if (comment) {
         preview.text = comment.content
-        preview.linkPath = `/feed?post=${comment.postId}`
+        preview.linkPath = `/feed?post=${comment.postId}&comment=${contentId}`
         preview.owner = comment.author
         preview.createdAt = comment.createdAt
         preview.moderationStatus = comment.moderationStatus
@@ -377,7 +377,7 @@ router.get('/cases/:id/preview', async (req, res) => {
       })
       if (comment) {
         preview.text = comment.content
-        preview.linkPath = `/sheets/${comment.sheetId}`
+        preview.linkPath = `/sheets/${comment.sheetId}?comment=${contentId}`
         preview.owner = comment.author
         preview.createdAt = comment.createdAt
         preview.moderationStatus = comment.moderationStatus
@@ -392,7 +392,7 @@ router.get('/cases/:id/preview', async (req, res) => {
       })
       if (comment) {
         preview.text = comment.content
-        preview.linkPath = `/notes/${comment.noteId}`
+        preview.linkPath = `/notes/${comment.noteId}?comment=${contentId}`
         preview.owner = comment.author
         preview.createdAt = comment.createdAt
         preview.moderationStatus = comment.moderationStatus
@@ -426,7 +426,7 @@ router.get('/cases/:id/preview', async (req, res) => {
 router.post('/strikes', async (req, res) => {
   const userId = Number.parseInt(req.body?.userId, 10)
   const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : ''
-  const caseId = req.body?.caseId ? Number.parseInt(req.body.caseId, 10) : null
+  let caseId = req.body?.caseId ? Number.parseInt(req.body.caseId, 10) : null
 
   if (!Number.isFinite(userId)) return res.status(400).json({ error: 'Valid userId is required.' })
   if (reason.length < 10) return res.status(400).json({ error: 'Reason must be at least 10 characters.' })
@@ -444,6 +444,23 @@ router.post('/strikes', async (req, res) => {
     if (caseId) {
       const modCase = await prisma.moderationCase.findUnique({ where: { id: caseId }, select: { id: true } })
       if (!modCase) return res.status(404).json({ error: 'Moderation case not found.' })
+    }
+
+    /* Auto-create a lightweight case if none linked */
+    if (!caseId) {
+      const autoCase = await prisma.moderationCase.create({
+        data: {
+          contentType: 'user',
+          contentId: userId,
+          userId,
+          status: 'confirmed',
+          source: 'admin_manual',
+          reasonCategory: 'other',
+          reviewedBy: req.user.userId,
+          reviewNote: reason,
+        },
+      })
+      caseId = autoCase.id
     }
 
     const result = await issueStrike({ userId, reason, caseId })

@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { FONT, tableHeadStyle, tableCell, tableCellStrong, pillButton } from './adminConstants'
 import { Pager } from './AdminWidgets'
 import { statusPill } from './moderationHelpers'
+import ContentPreviewModal from './components/ContentPreviewModal'
+import { ExternalLinkIcon } from './components/icons'
 
 function renderError(state) {
   if (!state.error) return null
@@ -345,7 +347,7 @@ function CaseDetail({
           <button type="button" onClick={() => reviewCase(c.id, 'dismiss')} style={pillButton('var(--sh-surface)', 'var(--sh-muted)', 'var(--sh-border)')}>Dismiss Case</button>
           <button type="button" onClick={() => {
             setSubTab('strikes')
-            setStrikeForm({ userId: String(c.userId || ''), reason: `Case #${c.id}: `, caseId: String(c.id) })
+            setStrikeForm({ userId: String(c.userId || ''), reason: `Case #${c.id}: `, _selectedUser: null })
           }} style={pillButton('var(--sh-info-bg)', 'var(--sh-info-text)', 'var(--sh-info-border)')}>Issue Strike</button>
         </div>
       ) : null}
@@ -374,12 +376,11 @@ export default function CasesSubTab({
   casesState, caseStatus, setCaseStatus,
   caseSource, setCaseSource, caseClaimed, setCaseClaimed,
   caseSort, setCaseSort,
-  expandedCase, setExpandedCase, expandedCaseLoading,
-  casePreview, casePreviewLoading,
-  loadCaseDetail, loadCases, reviewCase,
-  claimCase, unclaimCase, apiJson,
+  loadCases, reviewCase,
   setSubTab, setStrikeForm, formatDateTime,
 }) {
+  const [modalCaseId, setModalCaseId] = useState(null)
+
   const sortedItems = [...casesState.items].sort((a, b) => {
     if (caseSort === 'confidence') return (b.confidence ?? 0) - (a.confidence ?? 0)
     return new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
@@ -438,8 +439,8 @@ export default function CasesSubTab({
             </thead>
             <tbody>
               {sortedItems.map((c) => (
-                <tr key={c.id} style={{ borderBottom: '1px solid var(--sh-soft)', background: expandedCase?.id === c.id ? 'var(--sh-info-bg)' : 'transparent', cursor: 'pointer' }}
-                  onClick={() => void loadCaseDetail(c.id)}>
+                <tr key={c.id} style={{ borderBottom: '1px solid var(--sh-soft)', background: modalCaseId === c.id ? 'var(--sh-info-bg)' : 'transparent', cursor: 'pointer' }}
+                  onClick={() => setModalCaseId(c.id)}>
                   <td style={tableCellStrong}>{c.id}</td>
                   <td style={tableCell}><span style={sourceBadge(c.source)}>{SOURCE_BADGE[c.source]?.label || c.source || '—'}</span></td>
                   <td style={tableCell}>{c.contentType || '—'}</td>
@@ -448,7 +449,15 @@ export default function CasesSubTab({
                   <td style={tableCell}><span style={statusPill(c.status)}>{c.status}</span></td>
                   <td style={tableCell}>{c.claimedBy?.username || '—'}</td>
                   <td style={tableCell}>{formatDateTime(c.createdAt)}</td>
-                  <td style={{ ...tableCell, display: 'flex', gap: 6, flexWrap: 'wrap' }} onClick={(e) => e.stopPropagation()}>
+                  <td style={{ ...tableCell, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }} onClick={(e) => e.stopPropagation()}>
+                    <button
+                      type="button"
+                      onClick={() => setModalCaseId(c.id)}
+                      style={{ ...pillButton('var(--sh-soft)', 'var(--sh-muted)', 'var(--sh-border)'), display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                      title="View case"
+                    >
+                      <ExternalLinkIcon size={12} /> View
+                    </button>
                     {c.status === 'pending' ? (
                       <>
                         <button type="button" onClick={() => reviewCase(c.id, 'confirm')} style={pillButton('var(--sh-danger-bg)', 'var(--sh-danger-text)', 'var(--sh-danger-border)')}>Confirm</button>
@@ -467,13 +476,17 @@ export default function CasesSubTab({
         <div style={{ fontSize: 13, color: 'var(--sh-muted)' }}>No {caseStatus} cases found.</div>
       ) : null}
 
-      <CaseDetail
-        expandedCase={expandedCase} expandedCaseLoading={expandedCaseLoading}
-        casePreview={casePreview} casePreviewLoading={casePreviewLoading}
-        apiJson={apiJson}
-        reviewCase={reviewCase} setExpandedCase={setExpandedCase}
-        claimCase={claimCase} unclaimCase={unclaimCase}
-        setSubTab={setSubTab} setStrikeForm={setStrikeForm} formatDateTime={formatDateTime}
+      <ContentPreviewModal
+        open={!!modalCaseId}
+        onClose={() => setModalCaseId(null)}
+        caseId={modalCaseId}
+        onConfirm={() => { reviewCase(modalCaseId, 'confirm'); setModalCaseId(null) }}
+        onDismiss={() => { reviewCase(modalCaseId, 'dismiss'); setModalCaseId(null) }}
+        onIssueStrike={() => {
+          setSubTab('strikes')
+          setStrikeForm({ userId: '', reason: `Case #${modalCaseId}: `, _selectedUser: null })
+          setModalCaseId(null)
+        }}
       />
 
       <Pager page={casesState.page} total={casesState.total} onChange={(p) => void loadCases(p)} />

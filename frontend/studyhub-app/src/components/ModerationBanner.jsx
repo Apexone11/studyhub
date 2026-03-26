@@ -2,6 +2,8 @@
  * ModerationBanner — shown to content owners when their content is under review
  * or has been removed by moderation. Read-only informational banner.
  */
+import { WarningTriangleIcon, ShieldXIcon } from '../pages/admin/components/icons'
+
 export default function ModerationBanner({ status }) {
   if (!status) return null
 
@@ -38,7 +40,7 @@ export default function ModerationBanner({ status }) {
       alignItems: 'center',
       gap: 8,
     }}>
-      <span style={{ fontSize: 16, lineHeight: 1 }}>{status === 'pending_review' ? '\u26A0' : '\u26D4'}</span>
+      {status === 'pending_review' ? <WarningTriangleIcon size={16} /> : <ShieldXIcon size={16} />}
       <span>{message}</span>
     </div>
   )

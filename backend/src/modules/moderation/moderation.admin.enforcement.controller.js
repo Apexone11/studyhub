@@ -4,6 +4,7 @@ const prisma = require('../../lib/prisma')
 const { countActiveStrikes, restoreContent } = require('../../lib/moderationEngine')
 const { createNotification } = require('../../lib/notify')
 const { PAGE_SIZE, parsePage } = require('./moderation.constants')
+const { logModerationEvent } = require('../../lib/moderationLogger')
 
 const router = express.Router()
 
@@ -56,6 +57,8 @@ router.patch('/restrictions/:id/lift', async (req, res) => {
       data: { endsAt: new Date() },
       include: { user: { select: { id: true, username: true } } },
     })
+
+    logModerationEvent({ userId: existing.userId, action: 'restriction_lifted', performedBy: req.user.userId })
 
     try {
       await createNotification(prisma, {
@@ -143,8 +146,10 @@ router.patch('/appeals/:id/review', async (req, res) => {
         }).catch((err) => captureError(err, { context: 'appeal-case-dismiss', appealId }))
 
         /* Restore taken-down content */
-        await restoreContent(appeal.caseId)
-          .catch((err) => captureError(err, { context: 'appeal-restore', appealId }))
+        const restoreResult = await restoreContent(appeal.caseId)
+        if (!restoreResult.success) {
+          captureError(new Error(restoreResult.error || 'restoreContent failed'), { context: 'appeal-restore', appealId, caseId: appeal.caseId })
+        }
       }
 
       await prisma.strike.updateMany({
@@ -164,13 +169,16 @@ router.patch('/appeals/:id/review', async (req, res) => {
         }).catch((err) => captureError(err, { context: 'appeal-restriction-lift', appealId }))
       }
 
+      logModerationEvent({ userId: appeal.userId, action: 'appeal_approved', caseId: appeal.caseId, appealId: appeal.id, performedBy: req.user.userId })
+      logModerationEvent({ userId: appeal.userId, action: 'strike_decayed', caseId: appeal.caseId, appealId: appeal.id, performedBy: req.user.userId })
+
       try {
         await createNotification(prisma, {
           userId: appeal.userId,
           type: 'moderation',
           message: 'Your appeal has been approved. The strike has been removed.',
           actorId: null,
-          linkPath: '/settings?tab=account',
+          linkPath: '/settings?tab=moderation',
           performerUserId: req.user.userId,
         })
       } catch { /* non-fatal */ }
@@ -182,6 +190,8 @@ router.patch('/appeals/:id/review', async (req, res) => {
       where: { id: appealId },
       data: { status: 'rejected', reviewedBy: req.user.userId, reviewNote },
     })
+
+    logModerationEvent({ userId: appeal.userId, action: 'appeal_rejected', caseId: appeal.caseId, appealId: appeal.id, performedBy: req.user.userId })
 
     try {
       await createNotification(prisma, {

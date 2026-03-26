@@ -1,58 +1,45 @@
-import { tableHeadStyle, tableCell, tableCellStrong, pillButton } from './adminConstants'
-import { Pager } from './AdminWidgets'
-import { statusPill } from './moderationHelpers'
+import { AdminCard, AdminTable, AdminPill } from './components'
+import { formatDateTime } from './adminConstants'
 
-export default function RestrictionsSubTab({
-  restrictionsState, loadRestrictions, liftRestriction, formatDateTime,
-}) {
+export default function RestrictionsSubTab({ state, onLift, onPageChange }) {
+  const columns = [
+    { key: 'id', label: 'ID', cellClass: 'strong' },
+    { key: 'user', label: 'User', render: (r) => r.user?.username || `#${r.userId}` },
+    { key: 'type', label: 'Type', render: (r) => r.type },
+    { key: 'reason', label: 'Reason', render: (r) => r.reason || '\u2014' },
+    { key: 'status', label: 'Status', render: (r) => {
+      const isActive = !r.endsAt || new Date(r.endsAt) > new Date()
+      if (!isActive) return <AdminPill status="lifted">Lifted</AdminPill>
+      return <AdminPill status="active">Active</AdminPill>
+    }},
+    { key: 'endsAt', label: 'Until', render: (r) => r.endsAt ? formatDateTime(r.endsAt) : 'Permanent' },
+    { key: 'actions', label: 'Actions', render: (r) => {
+      const isActive = !r.endsAt || new Date(r.endsAt) > new Date()
+      if (!isActive) return <span style={{ color: 'var(--sh-muted)', fontSize: 12 }}>Lifted</span>
+      return (
+        <button className="admin-btn admin-btn--success admin-btn--sm" onClick={() => onLift(r.id)}>Lift</button>
+      )
+    }},
+  ]
+
   return (
-    <>
-      {restrictionsState.error ? (
-        <div style={{ color: '#b91c1c', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, padding: '12px 14px', fontSize: 13, marginBottom: 14 }}>{restrictionsState.error}</div>
-      ) : null}
-
-      {restrictionsState.loading && restrictionsState.items.length === 0 ? (
-        <div style={{ color: '#94a3b8', fontSize: 13 }}>Loading...</div>
-      ) : restrictionsState.items.length > 0 ? (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead>
-              <tr style={{ background: '#f8fafc' }}>
-                {['ID', 'User', 'Type', 'Reason', 'Status', 'Until', 'Actions'].map((h) => (
-                  <th key={h} style={tableHeadStyle}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {restrictionsState.items.map((r) => (
-                <tr key={r.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                  <td style={tableCellStrong}>{r.id}</td>
-                  <td style={tableCell}>{r.user?.username || r.userId || '—'}</td>
-                  <td style={tableCell}>{r.type || '—'}</td>
-                  <td style={{ ...tableCell, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.reason || '—'}</td>
-                  <td style={tableCell}>
-                    <span style={statusPill(r.liftedAt ? 'lifted' : r.expiresAt && new Date(r.expiresAt) < new Date() ? 'expired' : 'active')}>
-                      {r.liftedAt ? 'Lifted' : r.expiresAt && new Date(r.expiresAt) < new Date() ? 'Expired' : 'Active'}
-                    </span>
-                  </td>
-                  <td style={tableCell}>{r.expiresAt ? formatDateTime(r.expiresAt) : 'Permanent'}</td>
-                  <td style={tableCell}>
-                    {!r.liftedAt ? (
-                      <button type="button" onClick={() => liftRestriction(r.id)} style={pillButton('#f0fdf4', '#16a34a', '#bbf7d0')}>Lift</button>
-                    ) : (
-                      <span style={{ fontSize: 12, color: '#94a3b8' }}>Lifted</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (!restrictionsState.loading && restrictionsState.loaded) ? (
-        <div style={{ fontSize: 13, color: '#94a3b8' }}>No restrictions found.</div>
-      ) : null}
-
-      <Pager page={restrictionsState.page} total={restrictionsState.total} onChange={(p) => void loadRestrictions(p)} />
-    </>
+    <AdminCard flush>
+      {state.loading ? (
+        <div className="admin-loading">Loading restrictions...</div>
+      ) : state.error ? (
+        <div className="admin-error" style={{ margin: 16 }}>{state.error}</div>
+      ) : (
+        <>
+          <AdminTable columns={columns} rows={state.items} emptyText="No restrictions found." />
+          {state.total > 1 && (
+            <div className="admin-pager">
+              <button className="admin-btn admin-btn--ghost admin-btn--sm" disabled={state.page <= 1} onClick={() => onPageChange(state.page - 1)}>Prev</button>
+              <span>Page {state.page} of {state.total}</span>
+              <button className="admin-btn admin-btn--ghost admin-btn--sm" disabled={state.page >= state.total} onClick={() => onPageChange(state.page + 1)}>Next</button>
+            </div>
+          )}
+        </>
+      )}
+    </AdminCard>
   )
 }

@@ -16,6 +16,7 @@ const OpenAI = require('openai')
 const { captureError } = require('../monitoring/sentry')
 const prisma = require('./prisma')
 const { createNotification } = require('./notify')
+const { logModerationEvent } = require('./moderationLogger')
 
 /* ── Lazy-initialised OpenAI client ──────────────────────────────────────── */
 let _openai = null
@@ -114,7 +115,7 @@ async function scanContent({ contentType, contentId, text, userId }) {
       .map(([cat, score]) => ({ category: cat, score: Math.round(score * 1000) / 1000 }))
 
     /* Create moderation case */
-    await prisma.moderationCase.create({
+    const modCase = await prisma.moderationCase.create({
       data: {
         contentType,
         contentId,
@@ -134,6 +135,8 @@ async function scanContent({ contentType, contentId, text, userId }) {
         },
       },
     })
+
+    logModerationEvent({ userId: modCase.userId, action: 'case_opened', caseId: modCase.id, contentType, contentId, reason: `Auto-detected: ${topCategory}` })
 
     /* Hide flagged content from public until admin review */
     try {
@@ -193,6 +196,8 @@ async function issueStrike({ userId, reason, caseId }) {
     },
   })
 
+  logModerationEvent({ userId, action: 'strike_issued', caseId, strikeId: strike.id, reason, performedBy: null })
+
   const activeStrikes = await countActiveStrikes(userId)
   let restricted = false
 
@@ -217,6 +222,9 @@ async function issueStrike({ userId, reason, caseId }) {
       })
     })
     restricted = !!created
+    if (restricted) {
+      logModerationEvent({ userId, action: 'restriction_applied', reason: `Auto-restricted: ${activeStrikes} active strikes`, performedBy: null })
+    }
   }
 
   /* Notify the user about the strike */
@@ -226,7 +234,7 @@ async function issueStrike({ userId, reason, caseId }) {
       type: 'moderation',
       message: `You received a strike: ${reason}`,
       actorId: null,
-      linkPath: '/settings?tab=account',
+      linkPath: '/settings?tab=moderation',
       priority: 'high',
     })
   } catch { /* notification failures are non-fatal */ }
@@ -239,7 +247,7 @@ async function issueStrike({ userId, reason, caseId }) {
         type: 'moderation',
         message: `Your account has been restricted due to ${activeStrikes} active strikes. Posting, sharing, and publishing are temporarily blocked.`,
         actorId: null,
-        linkPath: '/settings?tab=account',
+        linkPath: '/settings?tab=moderation',
         priority: 'high',
       })
     } catch { /* notification failures are non-fatal */ }
@@ -300,6 +308,12 @@ async function reviewCase({ caseId, reviewedBy, action, reviewNote }) {
       reviewNote: reviewNote || null,
     },
   })
+
+  if (action === 'confirm') {
+    logModerationEvent({ userId: modCase.userId, action: 'case_confirmed', caseId, contentType: modCase.contentType, contentId: modCase.contentId, performedBy: reviewedBy })
+  } else {
+    logModerationEvent({ userId: modCase.userId, action: 'case_dismissed', caseId, performedBy: reviewedBy })
+  }
 
   const { contentType, contentId } = modCase
 
@@ -369,47 +383,64 @@ async function createSnapshot(modCase) {
  * Called when an appeal is approved.
  *
  * @param {number} caseId — the ModerationCase to reverse
+ * @returns {{ success: boolean, error?: string }}
  */
 async function restoreContent(caseId) {
   try {
     const modCase = await prisma.moderationCase.findUnique({
       where: { id: caseId },
-      select: { id: true, contentType: true, contentId: true, status: true },
+      select: { id: true, contentType: true, contentId: true, status: true, userId: true },
     })
-    if (!modCase) return
+    if (!modCase) {
+      console.error(`[restoreContent] Case not found: caseId=${caseId}`)
+      return { success: false, error: 'Case not found' }
+    }
 
     const { contentType, contentId } = modCase
     const modelName = CONTENT_MODEL_MAP[contentType]
 
-    /* Restore moderationStatus to clean */
-    if (HAS_MODERATION_STATUS.has(contentType) && modelName && prisma[modelName]) {
-      await prisma[modelName].update({
-        where: { id: contentId },
-        data: { moderationStatus: 'clean' },
-      }).catch(() => {})
+    if (!modelName) {
+      console.error(`[restoreContent] Unknown content type: caseId=${caseId}, contentType=${contentType}`)
+      return { success: false, error: 'Unknown content type' }
     }
 
-    /* For sheets: restore to published */
-    if (contentType === 'sheet') {
-      await prisma.studySheet.update({
-        where: { id: contentId },
-        data: { status: 'published' },
-      }).catch(() => {})
-    }
+    /* Wrap all restoration updates in a transaction so partial failures roll back */
+    await prisma.$transaction(async (tx) => {
+      /* Restore moderationStatus to clean */
+      if (HAS_MODERATION_STATUS.has(contentType) && modelName && tx[modelName]) {
+        await tx[modelName].update({
+          where: { id: contentId },
+          data: { moderationStatus: 'clean' },
+        })
+      }
 
-    /* Mark snapshot as restored */
-    await prisma.moderationSnapshot.updateMany({
-      where: { caseId, restoredAt: null },
-      data: { restoredAt: new Date() },
+      /* For sheets: restore to published */
+      if (contentType === 'sheet') {
+        await tx.studySheet.update({
+          where: { id: contentId },
+          data: { status: 'published' },
+        })
+      }
+
+      /* Mark snapshot as restored */
+      await tx.moderationSnapshot.updateMany({
+        where: { caseId, restoredAt: null },
+        data: { restoredAt: new Date() },
+      })
+
+      /* Update case status to reflect reversal */
+      await tx.moderationCase.update({
+        where: { id: caseId },
+        data: { status: 'reversed' },
+      })
     })
 
-    /* Update case status to reflect reversal */
-    await prisma.moderationCase.update({
-      where: { id: caseId },
-      data: { status: 'reversed' },
-    })
+    logModerationEvent({ userId: modCase.userId, action: 'appeal_approved', caseId })
+    return { success: true }
   } catch (err) {
+    console.error(`[restoreContent] Restore failed: caseId=${caseId}`, err)
     captureError(err, { context: 'moderation-restore', caseId })
+    return { success: false, error: err.message }
   }
 }
 

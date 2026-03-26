@@ -18,7 +18,7 @@ import { SkeletonProfile } from '../../components/Skeleton'
 import { API } from '../../config'
 import { useSession } from '../../lib/session-context'
 import { useTutorial } from '../../lib/useTutorial'
-import { PROFILE_STEPS } from '../../lib/tutorialSteps'
+import { PROFILE_STEPS, TUTORIAL_VERSIONS } from '../../lib/tutorialSteps'
 import { fadeInUp, staggerEntrance } from '../../lib/animations'
 import { useRecentlyViewed } from '../../lib/useRecentlyViewed'
 import { useAllStudyStatuses } from '../../lib/useStudyStatus'
@@ -117,7 +117,7 @@ export default function UserProfilePage() {
   const dashboardRecentSheets = useMemo(() => dashboardSummary?.recentSheets || [], [dashboardSummary])
 
   /* ── Refs & animation ──────────────────────────────────────────────── */
-  const tutorial = useTutorial('profile', PROFILE_STEPS)
+  const tutorial = useTutorial('profile', PROFILE_STEPS, { version: TUTORIAL_VERSIONS.profile })
   const heroRef = useRef(null)
   const contentRef = useRef(null)
   const animatedRef = useRef(false)

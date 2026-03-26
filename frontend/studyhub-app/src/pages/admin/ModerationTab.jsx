@@ -27,7 +27,7 @@ export default function ModerationTab({ apiJson, setConfirmAction, formatDateTim
   const [casePreview, setCasePreview] = useState(null)
   const [casePreviewLoading, setCasePreviewLoading] = useState(false)
   const [appealStatus, setAppealStatus] = useState('pending')
-  const [strikeForm, setStrikeForm] = useState({ userId: '', reason: '', caseId: '' })
+  const [strikeForm, setStrikeForm] = useState({ userId: '', reason: '', _selectedUser: null })
   const [strikeSaving, setStrikeSaving] = useState(false)
   const [strikeError, setStrikeError] = useState('')
 
@@ -142,10 +142,8 @@ export default function ModerationTab({ apiJson, setConfirmAction, formatDateTim
     if (!userId || !strikeForm.reason.trim()) { setStrikeError('User ID and reason are required.'); return }
     setStrikeSaving(true); setStrikeError('')
     try {
-      const body = { userId, reason: strikeForm.reason.trim() }
-      if (strikeForm.caseId) body.caseId = Number.parseInt(strikeForm.caseId, 10)
-      await apiJson('/api/admin/moderation/strikes', { method: 'POST', body: JSON.stringify(body) })
-      setStrikeForm({ userId: '', reason: '', caseId: '' })
+      await apiJson('/api/admin/moderation/strikes', { method: 'POST', body: JSON.stringify({ userId: Number(strikeForm.userId), reason: strikeForm.reason }) })
+      setStrikeForm({ userId: '', reason: '', _selectedUser: null })
       await loadStrikes(1)
     } catch (err) {
       setStrikeError(err.message || 'Could not issue strike.')
@@ -245,17 +243,17 @@ export default function ModerationTab({ apiJson, setConfirmAction, formatDateTim
           setSubTab={setSubTab} setStrikeForm={setStrikeForm} formatDateTime={formatDateTime} />
       )}
       {subTab === 'strikes' && (
-        <StrikesSubTab strikesState={strikesState} strikeForm={strikeForm} setStrikeForm={setStrikeForm}
-          strikeSaving={strikeSaving} strikeError={strikeError} submitStrike={submitStrike}
-          loadStrikes={loadStrikes} formatDateTime={formatDateTime} />
+        <StrikesSubTab state={strikesState} strikeForm={strikeForm} strikeSaving={strikeSaving}
+          strikeError={strikeError} onStrikeFormChange={setStrikeForm} onSubmitStrike={submitStrike}
+          onPageChange={(p) => void loadStrikes(p)} />
       )}
       {subTab === 'appeals' && (
-        <AppealsSubTab appealsState={appealsState} appealStatus={appealStatus} setAppealStatus={setAppealStatus}
-          loadAppeals={loadAppeals} reviewAppeal={reviewAppeal} formatDateTime={formatDateTime} />
+        <AppealsSubTab state={appealsState} appealStatus={appealStatus} onAppealStatusChange={setAppealStatus}
+          onReviewAppeal={reviewAppeal} onPageChange={(p) => void loadAppeals(p)} />
       )}
       {subTab === 'restrictions' && (
-        <RestrictionsSubTab restrictionsState={restrictionsState} loadRestrictions={loadRestrictions}
-          liftRestriction={liftRestriction} formatDateTime={formatDateTime} />
+        <RestrictionsSubTab state={restrictionsState} onLift={liftRestriction}
+          onPageChange={(p) => void loadRestrictions(p)} />
       )}
     </>
   )

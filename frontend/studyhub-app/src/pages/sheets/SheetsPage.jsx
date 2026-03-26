@@ -13,7 +13,7 @@ import { usePageTitle } from '../../lib/usePageTitle'
 import { SkeletonSheetGrid } from '../../components/Skeleton'
 import SafeJoyride from '../../components/SafeJoyride'
 import { useTutorial } from '../../lib/useTutorial'
-import { SHEETS_STEPS } from '../../lib/tutorialSteps'
+import { SHEETS_STEPS, TUTORIAL_VERSIONS } from '../../lib/tutorialSteps'
 import SheetListRow from './SheetListItem'
 import SheetsFilters from './SheetsFilters'
 import SheetsEmptyState from './SheetsEmptyState'
@@ -24,7 +24,7 @@ import './SheetsPage.css'
 export default function SheetsPage() {
   usePageTitle('Study Sheets')
   const layout = useResponsiveAppLayout()
-  const tutorial = useTutorial('sheets', SHEETS_STEPS)
+  const tutorial = useTutorial('sheets', SHEETS_STEPS, { version: TUTORIAL_VERSIONS.sheets })
 
   const {
     user, navigate,
