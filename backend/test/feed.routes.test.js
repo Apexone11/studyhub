@@ -36,6 +36,12 @@ const mocks = vi.hoisted(() => {
       delete: vi.fn(),
       groupBy: vi.fn(),
     },
+    note: {
+      findMany: vi.fn(),
+    },
+    noteComment: {
+      groupBy: vi.fn(),
+    },
     starredSheet: {
       findMany: vi.fn(),
     },
@@ -129,6 +135,8 @@ beforeEach(() => {
   mocks.prisma.announcement.findMany.mockResolvedValue([])
   mocks.prisma.studySheet.findMany.mockResolvedValue([])
   mocks.prisma.feedPost.findMany.mockResolvedValue([])
+  mocks.prisma.note.findMany.mockResolvedValue([])
+  mocks.prisma.noteComment.groupBy.mockResolvedValue([])
   mocks.prisma.starredSheet.findMany.mockResolvedValue([])
   mocks.prisma.comment.groupBy.mockResolvedValue([])
   mocks.prisma.feedPostComment.groupBy.mockResolvedValue([])
@@ -184,10 +192,49 @@ describe('feed routes', () => {
       expect(announcementItem.title).toBe('Welcome')
     })
 
+    it('returns shared notes in feed items', async () => {
+      mocks.prisma.note.findMany.mockResolvedValue([
+        {
+          id: 77,
+          title: 'My Shared Study Notes',
+          content: 'Some detailed study content here.',
+          private: false,
+          createdAt: new Date('2026-03-21'),
+          author: { id: 99, username: 'note_maker', avatarUrl: null },
+          course: { id: 10, code: 'CMSC132' },
+        },
+      ])
+
+      const response = await request(app).get('/')
+
+      expect(response.status).toBe(200)
+      const noteItem = response.body.items.find((i) => i.type === 'note')
+      expect(noteItem).toBeDefined()
+      expect(noteItem.title).toBe('My Shared Study Notes')
+      expect(noteItem.linkPath).toBe('/notes/77')
+      expect(noteItem.feedKey).toBe('note-77')
+      expect(noteItem.author.username).toBe('note_maker')
+      // Content should not be fully exposed — only preview
+      expect(noteItem.content).toBeUndefined()
+      expect(noteItem.preview).toBeDefined()
+    })
+
+    it('does not include private notes in feed (query-level filter)', async () => {
+      // The note.findMany where clause filters private:false at query level.
+      // Verify the call includes the private:false constraint.
+      mocks.prisma.note.findMany.mockResolvedValue([])
+
+      await request(app).get('/')
+
+      const noteCall = mocks.prisma.note.findMany.mock.calls[0]?.[0]
+      expect(noteCall?.where?.private).toBe(false)
+    })
+
     it('returns 500 when all primary sections fail', async () => {
       mocks.prisma.announcement.findMany.mockRejectedValue(new Error('db down'))
       mocks.prisma.studySheet.findMany.mockRejectedValue(new Error('db down'))
       mocks.prisma.feedPost.findMany.mockRejectedValue(new Error('db down'))
+      mocks.prisma.note.findMany.mockRejectedValue(new Error('db down'))
 
       const response = await request(app).get('/')
 

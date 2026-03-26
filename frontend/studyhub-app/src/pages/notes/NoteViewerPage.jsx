@@ -168,7 +168,7 @@ export default function NoteViewerPage() {
 
       {/* Comments (visible on shared notes) */}
       {!note.private && (
-        <NoteCommentSection noteId={note.id} isOwner={note.isOwner} user={user} />
+        <NoteCommentSection noteId={note.id} isOwner={note.isOwner} user={user} noteContent={note.content} />
       )}
     </div>
   )

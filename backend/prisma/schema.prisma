@@ -252,9 +252,10 @@ model NoteComment {
   content      String
   noteId       Int
   userId       Int
-  anchorText   String?
-  anchorOffset Int?
-  resolved     Boolean  @default(false)
+  anchorText    String?
+  anchorOffset  Int?
+  anchorContext String?
+  resolved      Boolean  @default(false)
   createdAt    DateTime @default(now())
   note         Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
   author       User     @relation(fields: [userId], references: [id], onDelete: Cascade)

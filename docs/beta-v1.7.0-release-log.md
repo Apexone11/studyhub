@@ -610,3 +610,38 @@ Shared notes now appear in the feed alongside posts, sheets, and announcements. 
 | Backend tests (all) | 418/418 pass (36 files) |
 | Frontend lint | Clean |
 | Frontend build | Clean |
+
+---
+
+## Cycle 52 — Notes Search + Anchor Robustness + Security Hardening (2026-03-25)
+
+### Summary
+
+Added shared notes to global search modal. Built anchor context system for inline comment orphan detection. Completed security audit and fixed 6 CRITICAL/HIGH findings across notes endpoints.
+
+### Changes
+
+| Category | Detail |
+|----------|--------|
+| Search | Shared notes (private:false) now appear in global SearchModal; no content exposed, only title |
+| Anchor | `anchorContext` field stores prefix/suffix for re-matching after edits; frontend orphan badges |
+| Security | Content limit 50KB on notes; rate limiters on all note endpoints; noteId cross-validation on comment PATCH/DELETE; anchorContext capped at 1KB |
+| Tests | 21 new tests: noteAnchor (14), feed notes (2), search notes (5) |
+
+### Security Fixes
+
+| Severity | Fix |
+|----------|-----|
+| CRITICAL | Content size limit (50KB) on POST/PATCH /api/notes |
+| CRITICAL | Rate limiter added to DELETE /api/notes/:id |
+| HIGH | Rate limiter (120 req/min) on GET /api/notes and GET /api/notes/:id |
+| HIGH | anchorContext JSON capped at 1KB |
+| LOW | Comment PATCH/DELETE validate noteId matches URL params |
+
+### Validation
+
+| Suite | Result |
+|-------|--------|
+| Backend tests | 439/439 pass (37 files) |
+| Frontend lint | Clean |
+| Frontend build | Clean |

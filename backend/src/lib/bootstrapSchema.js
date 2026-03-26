@@ -112,6 +112,7 @@ const SCHEMA_REPAIR_STATEMENTS = [
     "userId" INTEGER NOT NULL,
     "anchorText" TEXT,
     "anchorOffset" INTEGER,
+    "anchorContext" TEXT,
     "resolved" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "NoteComment_pkey" PRIMARY KEY ("id")

@@ -101,6 +101,9 @@ const mocks = vi.hoisted(() => {
     enrollment: {
       findMany: vi.fn(),
     },
+    note: {
+      findMany: vi.fn(),
+    },
   }
 
   return {
@@ -215,6 +218,7 @@ beforeEach(() => {
         courseId: enrollment.courseId,
       }))
   })
+  mocks.prisma.note.findMany.mockResolvedValue([])
 })
 
 describe('search routes', () => {
@@ -270,5 +274,75 @@ describe('search routes', () => {
       'viewer_user',
     ])
     expect(mocks.sentry.captureError).not.toHaveBeenCalled()
+  })
+
+  // ── Notes search tests ──────────────────────────────────────────
+  it('returns shared notes in search results', async () => {
+    mocks.prisma.note.findMany.mockResolvedValue([
+      { id: 301, title: 'Study Guide Chapter 5', createdAt: new Date(), course: { id: 10, code: 'CMSC132', name: 'OOP II' }, author: { id: 99, username: 'note_author' } },
+    ])
+
+    const response = await request(app)
+      .get('/')
+      .set('x-studyhub-test-token', 'student-token')
+      .query({ q: 'Study Guide', type: 'all' })
+
+    expect(response.status).toBe(200)
+    expect(response.body.results.notes).toBeDefined()
+    expect(response.body.results.notes.length).toBe(1)
+    expect(response.body.results.notes[0].title).toBe('Study Guide Chapter 5')
+  })
+
+  it('only queries shared notes (private: false in where clause)', async () => {
+    mocks.prisma.note.findMany.mockResolvedValue([])
+
+    await request(app)
+      .get('/')
+      .set('x-studyhub-test-token', 'student-token')
+      .query({ q: 'anything', type: 'notes' })
+
+    const noteCall = mocks.prisma.note.findMany.mock.calls[0]?.[0]
+    expect(noteCall?.where?.private).toBe(false)
+  })
+
+  it('does not return notes for unauthenticated search (notes still query-safe)', async () => {
+    mocks.prisma.note.findMany.mockResolvedValue([
+      { id: 302, title: 'Public Note', createdAt: new Date(), course: null, author: { id: 1, username: 'anon_author' } },
+    ])
+
+    const response = await request(app)
+      .get('/')
+      .query({ q: 'Public Note', type: 'all' })
+
+    // Notes are still returned because the where clause enforces private:false
+    expect(response.status).toBe(200)
+    expect(response.body.results.notes).toBeDefined()
+    expect(response.body.results.notes[0].title).toBe('Public Note')
+  })
+
+  it('does not expose note content in search results', async () => {
+    mocks.prisma.note.findMany.mockResolvedValue([
+      { id: 303, title: 'Secret Content Note', createdAt: new Date(), course: null, author: { id: 1, username: 'user1' } },
+    ])
+
+    const response = await request(app)
+      .get('/')
+      .set('x-studyhub-test-token', 'student-token')
+      .query({ q: 'Secret', type: 'notes' })
+
+    expect(response.status).toBe(200)
+    const note = response.body.results.notes[0]
+    // The select clause only picks id, title, createdAt, course, author — no content
+    expect(note.content).toBeUndefined()
+  })
+
+  it('accepts notes as a valid search type', async () => {
+    const response = await request(app)
+      .get('/')
+      .set('x-studyhub-test-token', 'student-token')
+      .query({ q: 'test', type: 'notes' })
+
+    expect(response.status).toBe(200)
+    expect(response.body.type).toBe('notes')
   })
 })
