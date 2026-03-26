@@ -31,4 +31,12 @@ const REASON_CATEGORIES = [
   'other',
 ]
 
-module.exports = { PAGE_SIZE, parsePage, appealLimiter, reportLimiter, REASON_CATEGORIES }
+const APPEAL_REASON_CATEGORIES = [
+  'educational_context',
+  'false_positive',
+  'not_me',
+  'content_edited',
+  'other',
+]
+
+module.exports = { PAGE_SIZE, parsePage, appealLimiter, reportLimiter, REASON_CATEGORIES, APPEAL_REASON_CATEGORIES }

@@ -135,18 +135,16 @@ async function scanContent({ contentType, contentId, text, userId }) {
       },
     })
 
-    /* Hide flagged notes/comments from public until admin review */
+    /* Hide flagged content from public until admin review */
     try {
-      if (contentType === 'note') {
-        await prisma.note.update({
-          where: { id: contentId },
-          data: { moderationStatus: 'pending_review' },
-        })
-      } else if (contentType === 'note_comment') {
-        await prisma.noteComment.update({
-          where: { id: contentId },
-          data: { moderationStatus: 'pending_review' },
-        })
+      if (HAS_MODERATION_STATUS.has(contentType)) {
+        const modelName = CONTENT_MODEL_MAP[contentType]
+        if (modelName && prisma[modelName]) {
+          await prisma[modelName].update({
+            where: { id: contentId },
+            data: { moderationStatus: 'pending_review' },
+          })
+        }
       }
     } catch (hideErr) {
       captureError(hideErr, { context: 'moderation-hide', contentType, contentId })
@@ -229,8 +227,23 @@ async function issueStrike({ userId, reason, caseId }) {
       message: `You received a strike: ${reason}`,
       actorId: null,
       linkPath: '/settings?tab=account',
+      priority: 'high',
     })
   } catch { /* notification failures are non-fatal */ }
+
+  /* If auto-restriction was triggered, send a separate high-priority notification */
+  if (restricted) {
+    try {
+      await createNotification(prisma, {
+        userId,
+        type: 'moderation',
+        message: `Your account has been restricted due to ${activeStrikes} active strikes. Posting, sharing, and publishing are temporarily blocked.`,
+        actorId: null,
+        linkPath: '/settings?tab=account',
+        priority: 'high',
+      })
+    } catch { /* notification failures are non-fatal */ }
+  }
 
   return { strike, activeStrikes, restricted }
 }
@@ -246,10 +259,28 @@ async function hasActiveRestriction(userId) {
   return count > 0
 }
 
+/* ── Prisma model mapping for moderation targets ─────────────────────────── */
+const CONTENT_MODEL_MAP = {
+  post: 'feedPost',
+  feed_post: 'feedPost',
+  sheet: 'studySheet',
+  note: 'note',
+  post_comment: 'feedPostComment',
+  sheet_comment: 'comment',
+  note_comment: 'noteComment',
+}
+
+/* Content types that support moderationStatus field */
+const HAS_MODERATION_STATUS = new Set([
+  'note', 'note_comment', 'post', 'feed_post', 'post_comment', 'sheet_comment',
+])
+
 /* ── Case review ─────────────────────────────────────────────────────────── */
 
 /**
  * Admin action: dismiss or confirm a moderation case.
+ * Confirm = takedown: snapshot content, mark as confirmed_violation.
+ * Dismiss = restore: set moderationStatus back to 'clean'.
  *
  * @param {object} params
  * @param {number} params.caseId
@@ -270,27 +301,116 @@ async function reviewCase({ caseId, reviewedBy, action, reviewNote }) {
     },
   })
 
-  /* Sync moderationStatus on notes/comments when case is reviewed.
-   * Dismiss → restore to 'clean' (false positive).
-   * Confirm → mark 'confirmed_violation' (stays hidden permanently). */
+  const { contentType, contentId } = modCase
+
+  /* Sync moderationStatus on target content */
   try {
-    const { contentType, contentId } = modCase
-    if (contentType === 'note') {
-      await prisma.note.update({
+    const nextModStatus = action === 'dismiss' ? 'clean' : 'confirmed_violation'
+
+    if (HAS_MODERATION_STATUS.has(contentType)) {
+      const modelName = CONTENT_MODEL_MAP[contentType]
+      if (modelName && prisma[modelName]) {
+        await prisma[modelName].update({
+          where: { id: contentId },
+          data: { moderationStatus: nextModStatus },
+        })
+      }
+    }
+
+    /* For sheets: confirmed → mark status as 'removed_by_moderation' */
+    if (contentType === 'sheet') {
+      await prisma.studySheet.update({
         where: { id: contentId },
-        data: { moderationStatus: action === 'dismiss' ? 'clean' : 'confirmed_violation' },
-      })
-    } else if (contentType === 'note_comment') {
-      await prisma.noteComment.update({
-        where: { id: contentId },
-        data: { moderationStatus: action === 'dismiss' ? 'clean' : 'confirmed_violation' },
-      })
+        data: { status: action === 'dismiss' ? 'published' : 'removed_by_moderation' },
+      }).catch(() => { /* sheet may not exist */ })
+    }
+
+    /* On confirm: create a snapshot for potential restore on appeal */
+    if (action === 'confirm') {
+      await createSnapshot(modCase)
     }
   } catch (err) {
-    captureError(err, { context: 'moderation-review-sync', contentType: modCase.contentType, contentId: modCase.contentId })
+    captureError(err, { context: 'moderation-review-sync', contentType, contentId })
   }
 
   return modCase
+}
+
+/**
+ * Create a snapshot of the target content before takedown.
+ * This enables restore on appeal approval.
+ */
+async function createSnapshot(modCase) {
+  const { id: caseId, contentType, contentId, userId } = modCase
+  const modelName = CONTENT_MODEL_MAP[contentType]
+  if (!modelName || !prisma[modelName]) return
+
+  try {
+    const record = await prisma[modelName].findUnique({ where: { id: contentId } })
+    if (!record) return
+
+    await prisma.moderationSnapshot.create({
+      data: {
+        caseId,
+        targetType: contentType,
+        targetId: contentId,
+        ownerId: userId || record.userId || null,
+        contentJson: record,
+        attachmentUrl: record.attachmentUrl || null,
+      },
+    })
+  } catch (err) {
+    captureError(err, { context: 'moderation-snapshot-create', contentType, contentId })
+  }
+}
+
+/**
+ * Restore content that was taken down by moderation.
+ * Called when an appeal is approved.
+ *
+ * @param {number} caseId — the ModerationCase to reverse
+ */
+async function restoreContent(caseId) {
+  try {
+    const modCase = await prisma.moderationCase.findUnique({
+      where: { id: caseId },
+      select: { id: true, contentType: true, contentId: true, status: true },
+    })
+    if (!modCase) return
+
+    const { contentType, contentId } = modCase
+    const modelName = CONTENT_MODEL_MAP[contentType]
+
+    /* Restore moderationStatus to clean */
+    if (HAS_MODERATION_STATUS.has(contentType) && modelName && prisma[modelName]) {
+      await prisma[modelName].update({
+        where: { id: contentId },
+        data: { moderationStatus: 'clean' },
+      }).catch(() => {})
+    }
+
+    /* For sheets: restore to published */
+    if (contentType === 'sheet') {
+      await prisma.studySheet.update({
+        where: { id: contentId },
+        data: { status: 'published' },
+      }).catch(() => {})
+    }
+
+    /* Mark snapshot as restored */
+    await prisma.moderationSnapshot.updateMany({
+      where: { caseId, restoredAt: null },
+      data: { restoredAt: new Date() },
+    })
+
+    /* Update case status to reflect reversal */
+    await prisma.moderationCase.update({
+      where: { id: caseId },
+      data: { status: 'reversed' },
+    })
+  } catch (err) {
+    captureError(err, { context: 'moderation-restore', caseId })
+  }
 }
 
 /* ── Exports ─────────────────────────────────────────────────────────────── */
@@ -302,4 +422,5 @@ module.exports = {
   issueStrike,
   hasActiveRestriction,
   reviewCase,
+  restoreContent,
 }

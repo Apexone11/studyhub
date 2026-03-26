@@ -24,6 +24,8 @@ export default function ModerationTab({ apiJson, setConfirmAction, formatDateTim
   const [caseSort, setCaseSort] = useState('date')
   const [expandedCase, setExpandedCase] = useState(null)
   const [expandedCaseLoading, setExpandedCaseLoading] = useState(false)
+  const [casePreview, setCasePreview] = useState(null)
+  const [casePreviewLoading, setCasePreviewLoading] = useState(false)
   const [appealStatus, setAppealStatus] = useState('pending')
   const [strikeForm, setStrikeForm] = useState({ userId: '', reason: '', caseId: '' })
   const [strikeSaving, setStrikeSaving] = useState(false)
@@ -93,15 +95,22 @@ export default function ModerationTab({ apiJson, setConfirmAction, formatDateTim
 
   /* ── Case detail ─────────────────────────────────────────────── */
   async function loadCaseDetail(caseId) {
-    if (expandedCase?.id === caseId) { setExpandedCase(null); return }
+    if (expandedCase?.id === caseId) { setExpandedCase(null); setCasePreview(null); return }
     setExpandedCaseLoading(true)
+    setCasePreview(null)
+    setCasePreviewLoading(true)
     try {
-      const data = await apiJson(`/api/admin/moderation/cases/${caseId}`)
+      const [data, preview] = await Promise.all([
+        apiJson(`/api/admin/moderation/cases/${caseId}`),
+        apiJson(`/api/admin/moderation/cases/${caseId}/preview`).catch(() => null),
+      ])
       setExpandedCase(data)
+      setCasePreview(preview)
     } catch (err) {
       setExpandedCase({ id: caseId, _error: err.message || 'Could not load case details.' })
     } finally {
       setExpandedCaseLoading(false)
+      setCasePreviewLoading(false)
     }
   }
 
@@ -229,8 +238,10 @@ export default function ModerationTab({ apiJson, setConfirmAction, formatDateTim
           caseClaimed={caseClaimed} setCaseClaimed={setCaseClaimed}
           caseSort={caseSort} setCaseSort={setCaseSort} expandedCase={expandedCase}
           setExpandedCase={setExpandedCase} expandedCaseLoading={expandedCaseLoading}
+          casePreview={casePreview} casePreviewLoading={casePreviewLoading}
           loadCaseDetail={loadCaseDetail} loadCases={loadCases} reviewCase={reviewCase}
           claimCase={claimCase} unclaimCase={unclaimCase}
+          apiJson={apiJson}
           setSubTab={setSubTab} setStrikeForm={setStrikeForm} formatDateTime={formatDateTime} />
       )}
       {subTab === 'strikes' && (

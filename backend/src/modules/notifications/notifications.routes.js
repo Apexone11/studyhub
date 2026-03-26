@@ -72,6 +72,20 @@ router.patch('/:id/read', async (req, res) => {
   }
 })
 
+// ── DELETE /api/notifications/read ────────────────────────────
+// Deletes all read notifications for the current user (clear inbox).
+router.delete('/read', async (req, res) => {
+  try {
+    const result = await prisma.notification.deleteMany({
+      where: { userId: req.user.userId, read: true },
+    })
+    res.json({ deleted: result.count })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
 // ── DELETE /api/notifications/:id ─────────────────────────────
 router.delete('/:id', async (req, res) => {
   const notifId = parseInt(req.params.id, 10)

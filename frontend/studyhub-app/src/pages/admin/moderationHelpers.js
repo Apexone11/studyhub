@@ -17,6 +17,8 @@ export function statusPill(status) {
     lifted:    { bg: 'var(--sh-soft)', color: 'var(--sh-muted)', border: 'var(--sh-border)' },
     expired:   { bg: 'var(--sh-soft)', color: 'var(--sh-muted)', border: 'var(--sh-border)' },
     decayed:   { bg: 'var(--sh-soft)', color: 'var(--sh-muted)', border: 'var(--sh-border)' },
+    reversed:  { bg: 'var(--sh-info-bg)', color: 'var(--sh-info-text)', border: 'var(--sh-info-border)' },
+    removed_by_moderation: { bg: 'var(--sh-danger-bg)', color: 'var(--sh-danger-text)', border: 'var(--sh-danger-border)' },
   }
   const s = map[status] || map.pending
   return {

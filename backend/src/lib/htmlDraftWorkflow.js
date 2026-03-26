@@ -228,6 +228,7 @@ async function submitHtmlDraftForReview(prisma, { sheetId, user }) {
             actorId: user.userId,
             sheetId,
             linkPath: '/admin?tab=sheets',
+            priority: 'high',
           }).catch(() => {})
         }
       })

@@ -132,6 +132,7 @@ function formatFeedPostDetail(item, commentCount, reactionRows, currentReactions
     attachmentName: item.attachmentName || null,
     attachmentType: item.attachmentType || null,
     allowDownloads: item.allowDownloads !== false,
+    moderationStatus: item.moderationStatus || 'clean',
   }
 }
 

@@ -187,7 +187,9 @@ function createFallbackEventId(surface = 'client') {
     return crypto.randomUUID()
   }
 
-  return `${surface}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+  const bytes = new Uint8Array(5)
+  crypto.getRandomValues(bytes)
+  return `${surface}-${Date.now().toString(36)}-${Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')}`
 }
 
 export function captureWebVital(metric) {

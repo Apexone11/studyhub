@@ -5,6 +5,7 @@ const requireAuth = require('../../core/auth/requireAuth')
 const requireVerifiedEmail = require('../../core/auth/requireVerifiedEmail')
 const { validateHtmlForSubmission } = require('../../lib/htmlSecurity')
 const { isModerationEnabled, scanContent } = require('../../lib/moderationEngine')
+const { updateFingerprint } = require('../../lib/plagiarismService')
 const { createProvenanceToken } = require('../../lib/provenance')
 const { isHtmlUploadsEnabled } = require('../../lib/htmlKillSwitch')
 const { SHEET_STATUS, sheetWriteLimiter } = require('./sheets.constants')
@@ -85,6 +86,9 @@ router.post('/', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (re
       const textToScan = `${title} ${description || ''} ${contentFormat === 'markdown' ? content : ''}`.trim()
       void scanContent({ contentType: 'sheet', contentId: sheet.id, text: textToScan, userId: req.user.userId })
     }
+
+    /* Content fingerprinting for plagiarism detection (fire-and-forget) */
+    void updateFingerprint('sheet', sheet.id, content)
 
     /* Auto-generate provenance manifest (fire-and-forget) */
     Promise.resolve().then(async () => {

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { FONT, tableHeadStyle, tableCell, tableCellStrong, pillButton } from './adminConstants'
 import { Pager } from './AdminWidgets'
 import { statusPill } from './moderationHelpers'
@@ -35,8 +36,189 @@ function sourceBadge(source) {
   }
 }
 
+const MODERATION_STATUS_PILL = {
+  clean: { bg: 'var(--sh-success-bg)', color: 'var(--sh-success-text)', label: 'Clean' },
+  pending_review: { bg: 'var(--sh-warning-bg)', color: 'var(--sh-warning-text)', label: 'Pending review' },
+  confirmed_violation: { bg: 'var(--sh-danger-bg)', color: 'var(--sh-danger-text)', label: 'Confirmed violation' },
+  removed_by_moderation: { bg: 'var(--sh-danger-bg)', color: 'var(--sh-danger-text)', label: 'Removed' },
+  published: { bg: 'var(--sh-success-bg)', color: 'var(--sh-success-text)', label: 'Published' },
+}
+
+function modStatusPill(status) {
+  const s = MODERATION_STATUS_PILL[status] || { bg: 'var(--sh-soft)', color: 'var(--sh-muted)', label: status || '—' }
+  return (
+    <span style={{ display: 'inline-flex', padding: '3px 8px', borderRadius: 6, background: s.bg, color: s.color, fontSize: 10, fontWeight: 700, textTransform: 'uppercase' }}>
+      {s.label}
+    </span>
+  )
+}
+
+function ContentPreview({ preview, loading, formatDateTime }) {
+  if (loading) return <div style={{ fontSize: 12, color: 'var(--sh-muted)', padding: '8px 0' }}>Loading content preview...</div>
+  if (!preview) return null
+
+  return (
+    <div style={{ marginBottom: 12, border: '1px solid var(--sh-warning-border)', borderRadius: 10, background: 'var(--sh-surface)', overflow: 'hidden' }}>
+      <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--sh-border)', background: 'var(--sh-warning-bg)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--sh-warning-text)' }}>REPORTED CONTENT</span>
+          {preview.moderationStatus && modStatusPill(preview.moderationStatus)}
+        </div>
+        {preview.linkPath && (
+          <a href={preview.linkPath} target="_blank" rel="noopener noreferrer"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 6, background: 'var(--sh-info-bg)', color: 'var(--sh-info-text)', fontSize: 11, fontWeight: 700, textDecoration: 'none', border: '1px solid var(--sh-info-border)' }}>
+            View content ↗
+          </a>
+        )}
+      </div>
+      <div style={{ padding: '10px 12px' }}>
+        {/* Owner + timestamp */}
+        {(preview.owner || preview.createdAt) && (
+          <div style={{ display: 'flex', gap: 12, marginBottom: 8, fontSize: 12, color: 'var(--sh-muted)' }}>
+            {preview.owner && <span>By <strong style={{ color: 'var(--sh-heading)' }}>{preview.owner.username}</strong></span>}
+            {preview.createdAt && <span>{formatDateTime(preview.createdAt)}</span>}
+          </div>
+        )}
+        {/* Title */}
+        {preview.title && (
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--sh-heading)', marginBottom: 6 }}>{preview.title}</div>
+        )}
+        {/* Text content */}
+        {preview.text && (
+          <div style={{ fontSize: 13, color: 'var(--sh-subtext)', whiteSpace: 'pre-wrap', maxHeight: 300, overflow: 'auto', padding: '8px 10px', background: 'var(--sh-soft)', borderRadius: 8, border: '1px solid var(--sh-border)' }}>
+            {preview.text}
+          </div>
+        )}
+        {/* Attachments */}
+        {preview.attachments && preview.attachments.length > 0 && (
+          <div style={{ marginTop: 8 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--sh-muted)', marginBottom: 4 }}>ATTACHMENTS</div>
+            {preview.attachments.map((att, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', background: 'var(--sh-soft)', borderRadius: 6, border: '1px solid var(--sh-border)', marginBottom: 4 }}>
+                <span style={{ fontSize: 12, color: 'var(--sh-subtext)', flex: 1 }}>{att.name} <span style={{ color: 'var(--sh-muted)' }}>({att.type})</span></span>
+                <a href={att.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: 'var(--sh-info-text)', fontWeight: 700, textDecoration: 'none' }}>Preview</a>
+                <a href={att.downloadUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: 'var(--sh-info-text)', fontWeight: 700, textDecoration: 'none' }}>Download</a>
+              </div>
+            ))}
+          </div>
+        )}
+        {!preview.text && !preview.title && (
+          <div style={{ fontSize: 12, color: 'var(--sh-muted)', fontStyle: 'italic' }}>Content may have been deleted.</div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function similarityColor(score) {
+  if (score >= 0.85) return 'var(--sh-danger-text)'
+  if (score >= 0.70) return 'var(--sh-warning-text)'
+  return 'var(--sh-muted)'
+}
+
+function PlagiarismPanel({ caseId, contentType, apiJson, formatDateTime }) {
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [expanded, setExpanded] = useState(null) // match id for side-by-side
+
+  const canCheck = contentType === 'sheet' || contentType === 'note'
+
+  async function loadMatches() {
+    setLoading(true)
+    setError('')
+    try {
+      const result = await apiJson(`/api/admin/moderation/cases/${caseId}/plagiarism`)
+      setData(result)
+    } catch (err) {
+      setError(err.message || 'Could not load plagiarism data.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (!canCheck) return null
+
+  if (!data && !loading) {
+    return (
+      <div style={{ marginBottom: 12 }}>
+        <button type="button" onClick={loadMatches} style={pillButton('var(--sh-warning-bg)', 'var(--sh-warning-text)', 'var(--sh-warning-border)')}>
+          Check for plagiarism
+        </button>
+      </div>
+    )
+  }
+
+  if (loading) return <div style={{ fontSize: 12, color: 'var(--sh-muted)', marginBottom: 12 }}>Scanning for similar content...</div>
+  if (error) return <div style={{ fontSize: 12, color: 'var(--sh-danger-text)', marginBottom: 12 }}>{error}</div>
+  if (!data) return null
+
+  const { reported, matches } = data
+
+  return (
+    <div style={{ marginBottom: 12, border: '1px solid var(--sh-warning-border)', borderRadius: 10, background: 'var(--sh-surface)', overflow: 'hidden' }}>
+      <div style={{ padding: '10px 12px', background: 'var(--sh-warning-bg)', borderBottom: '1px solid var(--sh-warning-border)' }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--sh-warning-text)' }}>
+          PLAGIARISM CHECK — {matches.length} {matches.length === 1 ? 'match' : 'matches'} found
+        </span>
+      </div>
+      <div style={{ padding: '10px 12px' }}>
+        {matches.length === 0 && (
+          <div style={{ fontSize: 12, color: 'var(--sh-muted)' }}>No similar content found in the database.</div>
+        )}
+        {matches.map((m) => {
+          const isExpanded = expanded === `${m.type}-${m.id}`
+          return (
+            <div key={`${m.type}-${m.id}`} style={{ marginBottom: 8, border: '1px solid var(--sh-border)', borderRadius: 8, overflow: 'hidden' }}>
+              <div
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '8px 10px', background: 'var(--sh-soft)', cursor: 'pointer', flexWrap: 'wrap' }}
+                onClick={() => setExpanded(isExpanded ? null : `${m.type}-${m.id}`)}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--sh-heading)' }}>
+                    {m.type === 'sheet' ? 'Sheet' : 'Note'} #{m.id}
+                  </span>
+                  {m.title && <span style={{ fontSize: 12, color: 'var(--sh-subtext)' }}>{m.title.length > 50 ? m.title.slice(0, 50) + '...' : m.title}</span>}
+                  <span style={{ fontSize: 11, color: 'var(--sh-muted)' }}>by {m.authorUsername}</span>
+                  {m.isExactMatch && (
+                    <span style={{ padding: '2px 6px', borderRadius: 4, background: 'var(--sh-danger-bg)', color: 'var(--sh-danger-text)', fontSize: 10, fontWeight: 700 }}>EXACT COPY</span>
+                  )}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: similarityColor(m.similarity) }}>
+                    {Math.round(m.similarity * 100)}%
+                  </span>
+                  <span style={{ fontSize: 11, color: 'var(--sh-muted)' }}>{formatDateTime(m.createdAt)}</span>
+                  <span style={{ fontSize: 12, color: 'var(--sh-muted)' }}>{isExpanded ? '▲' : '▼'}</span>
+                </div>
+              </div>
+              {isExpanded && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1, background: 'var(--sh-border)' }}>
+                  <div style={{ padding: '8px 10px', background: 'var(--sh-surface)' }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--sh-danger-text)', marginBottom: 4 }}>REPORTED (by {reported?.author?.username || '?'})</div>
+                    <div style={{ fontSize: 11, color: 'var(--sh-subtext)', whiteSpace: 'pre-wrap', maxHeight: 300, overflow: 'auto', lineHeight: 1.5 }}>
+                      {reported?.textPreview || '(no text)'}
+                    </div>
+                  </div>
+                  <div style={{ padding: '8px 10px', background: 'var(--sh-surface)' }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--sh-info-text)', marginBottom: 4 }}>MATCH (by {m.authorUsername})</div>
+                    <div style={{ fontSize: 11, color: 'var(--sh-subtext)', whiteSpace: 'pre-wrap', maxHeight: 300, overflow: 'auto', lineHeight: 1.5 }}>
+                      {m.textPreview || '(no text)'}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function CaseDetail({
   expandedCase, expandedCaseLoading, reviewCase, setExpandedCase,
+  casePreview, casePreviewLoading, apiJson,
   setSubTab, setStrikeForm, formatDateTime, claimCase, unclaimCase,
 }) {
   if (expandedCaseLoading) return <div style={{ color: 'var(--sh-muted)', fontSize: 13, marginTop: 12 }}>Loading case details...</div>
@@ -52,7 +234,7 @@ function CaseDetail({
         <div>
           <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--sh-heading)', marginBottom: 4 }}>Case #{c.id}</div>
           <div style={{ fontSize: 12, color: 'var(--sh-muted)' }}>
-            Type: {c.contentType || 'Unknown'} | Content ID: {c.contentId ?? '—'} | Category: {c.category || c.reasonCategory || '—'}
+            {(c.contentType || 'Unknown').replace(/_/g, ' ')} #{c.contentId ?? '—'} | Category: {(c.category || c.reasonCategory || '—').replace(/_/g, ' ')}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -109,12 +291,19 @@ function CaseDetail({
         </div>
       ) : null}
 
-      {c.excerpt || c.flaggedText || c.snippet ? (
+      {/* Inline content preview — fetched from /cases/:id/preview */}
+      <ContentPreview preview={casePreview} loading={casePreviewLoading} formatDateTime={formatDateTime} />
+
+      {/* Fallback excerpt if preview didn't load or content was deleted */}
+      {!casePreview && !casePreviewLoading && (c.excerpt || c.flaggedText || c.snippet) ? (
         <div style={{ marginBottom: 12, padding: '10px 12px', border: '1px solid var(--sh-border)', borderRadius: 10, background: 'var(--sh-surface)' }}>
-          <div style={metaLabel}>FLAGGED CONTENT</div>
+          <div style={metaLabel}>FLAGGED CONTENT (excerpt)</div>
           <div style={{ fontSize: 13, color: 'var(--sh-subtext)', whiteSpace: 'pre-wrap', maxHeight: 200, overflow: 'auto' }}>{c.excerpt || c.flaggedText || c.snippet || '—'}</div>
         </div>
       ) : null}
+
+      {/* Plagiarism check panel (sheets + notes only) */}
+      <PlagiarismPanel caseId={c.id} contentType={c.contentType} apiJson={apiJson} formatDateTime={formatDateTime} />
 
       {/* Evidence (report note) */}
       {c.evidence?.reportNote && (
@@ -186,8 +375,9 @@ export default function CasesSubTab({
   caseSource, setCaseSource, caseClaimed, setCaseClaimed,
   caseSort, setCaseSort,
   expandedCase, setExpandedCase, expandedCaseLoading,
+  casePreview, casePreviewLoading,
   loadCaseDetail, loadCases, reviewCase,
-  claimCase, unclaimCase,
+  claimCase, unclaimCase, apiJson,
   setSubTab, setStrikeForm, formatDateTime,
 }) {
   const sortedItems = [...casesState.items].sort((a, b) => {
@@ -279,6 +469,8 @@ export default function CasesSubTab({
 
       <CaseDetail
         expandedCase={expandedCase} expandedCaseLoading={expandedCaseLoading}
+        casePreview={casePreview} casePreviewLoading={casePreviewLoading}
+        apiJson={apiJson}
         reviewCase={reviewCase} setExpandedCase={setExpandedCase}
         claimCase={claimCase} unclaimCase={unclaimCase}
         setSubTab={setSubTab} setStrikeForm={setStrikeForm} formatDateTime={formatDateTime}

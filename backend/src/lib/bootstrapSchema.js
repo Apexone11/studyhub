@@ -75,6 +75,8 @@ const SCHEMA_REPAIR_STATEMENTS = [
   'ALTER TABLE "StudySheet" ADD COLUMN IF NOT EXISTS "htmlScanUpdatedAt" TIMESTAMP(3)',
   'ALTER TABLE "StudySheet" ADD COLUMN IF NOT EXISTS "htmlScanAcknowledgedAt" TIMESTAMP(3)',
   'ALTER TABLE "StudySheet" ADD COLUMN IF NOT EXISTS "htmlOriginalArchivedAt" TIMESTAMP(3)',
+  'ALTER TABLE "StudySheet" ADD COLUMN IF NOT EXISTS "contentHash" TEXT',
+  'ALTER TABLE "StudySheet" ADD COLUMN IF NOT EXISTS "contentSimhash" TEXT',
   `CREATE TABLE IF NOT EXISTS "SheetHtmlVersion" (
     "id" SERIAL NOT NULL,
     "sheetId" INTEGER NOT NULL,
@@ -158,6 +160,7 @@ const SCHEMA_REPAIR_STATEMENTS = [
     "content" TEXT NOT NULL,
     "sheetId" INTEGER NOT NULL,
     "userId" INTEGER NOT NULL,
+    "moderationStatus" TEXT NOT NULL DEFAULT 'clean',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "Comment_pkey" PRIMARY KEY ("id")
   )`,
@@ -191,6 +194,7 @@ const SCHEMA_REPAIR_STATEMENTS = [
     "attachmentType" TEXT,
     "attachmentName" TEXT,
     "allowDownloads" BOOLEAN NOT NULL DEFAULT true,
+    "moderationStatus" TEXT NOT NULL DEFAULT 'clean',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "FeedPost_pkey" PRIMARY KEY ("id")
@@ -200,6 +204,7 @@ const SCHEMA_REPAIR_STATEMENTS = [
     "content" TEXT NOT NULL,
     "postId" INTEGER NOT NULL,
     "userId" INTEGER NOT NULL,
+    "moderationStatus" TEXT NOT NULL DEFAULT 'clean',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "FeedPostComment_pkey" PRIMARY KEY ("id")
   )`,
@@ -268,6 +273,8 @@ const SCHEMA_REPAIR_STATEMENTS = [
   'ALTER TABLE "Note" ADD CONSTRAINT "Note_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE',
   'ALTER TABLE "Note" DROP CONSTRAINT IF EXISTS "Note_courseId_fkey"',
   'ALTER TABLE "Note" ADD CONSTRAINT "Note_courseId_fkey" FOREIGN KEY ("courseId") REFERENCES "Course"("id") ON DELETE SET NULL ON UPDATE CASCADE',
+
+  'ALTER TABLE "Notification" ADD COLUMN IF NOT EXISTS "priority" TEXT NOT NULL DEFAULT \'medium\'',
 
   'ALTER TABLE "Notification" DROP CONSTRAINT IF EXISTS "Notification_userId_fkey"',
   'ALTER TABLE "Notification" ADD CONSTRAINT "Notification_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE',

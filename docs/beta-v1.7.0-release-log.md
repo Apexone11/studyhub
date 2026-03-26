@@ -908,3 +908,472 @@ Admins get claim/assign workflow with source filtering and super admin dashboard
 | Backend lint | Clean (6 pre-existing warnings in unrelated files) |
 | Frontend lint | Clean |
 | Frontend build | Clean |
+
+---
+
+## Cycle S-5 — Moderation Takedown, Preview & Restore (2026-03-25)
+
+### Summary
+
+Admin case detail now shows the actual reported content inline with deep links. Confirmed-violation content is soft-deleted via ModerationSnapshot (reversible). Owners see a moderation banner on their taken-down content. Visibility filtering hides moderated posts/comments from the feed.
+
+### Schema Changes
+
+| Model | Change |
+|-------|--------|
+| `FeedPost` | Added `moderationStatus String @default("clean")` |
+| `FeedPostComment` | Added `moderationStatus String @default("clean")` |
+| `Comment` (sheet comments) | Added `moderationStatus String @default("clean")` |
+| `ModerationSnapshot` | New model: `caseId`, `targetType`, `targetId`, `ownerId`, `contentJson` (Json), `attachmentUrl`, `createdAt`, `restoredAt` |
+| `ModerationCase` | Added `snapshots ModerationSnapshot[]` relation |
+
+### Backend Changes
+
+| File | Change |
+|------|--------|
+| `prisma/schema.prisma` | Added `moderationStatus` to FeedPost, FeedPostComment, Comment; added ModerationSnapshot model |
+| `prisma/migrations/20260325000007_add_moderation_takedown/migration.sql` | New migration for above schema |
+| `src/lib/bootstrapSchema.js` | Added `moderationStatus` default columns to FeedPost, FeedPostComment, Comment CREATE TABLE stubs |
+| `src/lib/moderationEngine.js` | Added `CONTENT_MODEL_MAP`, `HAS_MODERATION_STATUS`; rewrote `reviewCase()` for generic content types; added `createSnapshot()`, `restoreContent()`; `scanContent()` now hides all flagged content types via CONTENT_MODEL_MAP |
+| `src/modules/moderation/moderation.admin.cases.controller.js` | Added `GET /cases/:id/preview` — resolves live content by type (post, sheet, note, comments, user) with text, attachments, owner, deep link |
+| `src/modules/moderation/moderation.admin.enforcement.controller.js` | Appeal approval now calls `restoreContent(caseId)` to reverse takedowns |
+| `src/modules/feed/feed.list.controller.js` | Added `moderationStatus: 'clean'` filter to post feed listing |
+| `src/modules/feed/feed.posts.controller.js` | Added owner/admin bypass for moderated posts on `GET /posts/:id` |
+| `src/modules/feed/feed.social.controller.js` | Added `moderationStatus: 'clean'` filter to post comments listing |
+| `src/modules/feed/feed.service.js` | Added `moderationStatus` field to `formatFeedPostDetail()` |
+| `src/modules/sheets/sheets.social.controller.js` | Added `moderationStatus: 'clean'` filter to sheet comments listing |
+
+### Frontend Changes
+
+| File | Change |
+|------|--------|
+| `src/components/ModerationBanner.jsx` | New: reusable banner for `pending_review` / `confirmed_violation` / `removed_by_moderation` status |
+| `src/pages/admin/CasesSubTab.jsx` | Added `ContentPreview` component: inline content preview with title, text, attachments, deep link, moderation status pill; replaced generic "FLAGGED CONTENT" section; added `modStatusPill()` helper |
+| `src/pages/admin/ModerationTab.jsx` | Added `casePreview`/`casePreviewLoading` state; `loadCaseDetail()` now fetches preview in parallel; passes preview props to CasesSubTab |
+| `src/pages/sheets/SheetViewerPage.jsx` | Added ModerationBanner for owner when sheet status is `removed_by_moderation` |
+| `src/pages/notes/NoteViewerPage.jsx` | Added ModerationBanner for owner when note `moderationStatus` is non-clean |
+
+### Moderation Lifecycle
+
+1. **Auto-scan or user report** → ModerationCase created (status: `pending`), content `moderationStatus` set to `pending_review`
+2. **Admin reviews case** → `confirm`: snapshot content JSON, set `moderationStatus` to `confirmed_violation` (sheets: `status` to `removed_by_moderation`); `dismiss`: restore `moderationStatus` to `clean`
+3. **Owner sees banner** on their content explaining the status and how to appeal
+4. **Appeal approved** → `restoreContent()`: restore `moderationStatus` to `clean`, sheet `status` to `published`, mark snapshot as restored, case status to `reversed`
+5. **Non-owner/non-admin** sees 404 for any non-clean content
+
+### Content Type Coverage
+
+| Content Type | moderationStatus field | Visibility filter | Owner banner | Admin preview |
+|-------------|----------------------|-------------------|--------------|---------------|
+| Feed post | Yes | Feed listing + detail | Via moderationStatus | Yes (text + attachments) |
+| Feed comment | Yes | Comment listing | N/A (inline) | Yes (text) |
+| Sheet | Via `status` field | canReadSheet | Via sheet status | Yes (title + description + attachments) |
+| Sheet comment | Yes | Comment listing | N/A (inline) | Yes (text) |
+| Note | Yes (pre-existing) | Note listing + detail | Yes | Yes (title + content) |
+| Note comment | Yes (pre-existing) | Comment listing | N/A (inline) | Yes (text) |
+
+### S-5 Validation
+
+| Suite | Result |
+|-------|--------|
+| Backend tests | 463/463 pass (39 files) |
+| Backend lint | Clean (6 pre-existing warnings in unrelated files) |
+| Frontend lint | Clean |
+| Frontend build | Clean |
+
+---
+
+## S5-fix: Appeal UX Overhaul (2026-03-25)
+
+### Problem
+
+The appeal flow was broken from the user's perspective:
+- My Cases showed confirmed cases but had **no appeal button**
+- My Appeals was empty with **no way to create appeals from cases**
+- Users had to guess that appeals lived elsewhere
+
+### Changes
+
+#### Backend
+
+- **`moderation.user.controller.js`** — Expanded appeal eligibility: content owner on a confirmed case OR user with an active strike can now appeal. Previously required a linked strike only.
+- **`moderation.user.controller.js`** — `POST /appeals` now accepts `reasonCategory` field, validated against `APPEAL_REASON_CATEGORIES`.
+- **`moderation.user.controller.js`** — `GET /my-status` now includes `contentId` in cases and `reasonCategory` in appeals.
+- **`moderation.constants.js`** — Added `APPEAL_REASON_CATEGORIES`: `educational_context`, `false_positive`, `not_me`, `content_edited`, `other`.
+- **`schema.prisma`** — Added `reasonCategory String?` to Appeal model.
+- **Migration `20260325000008`** — `ALTER TABLE Appeal ADD COLUMN reasonCategory`.
+
+#### Frontend
+
+- **`settings/ModerationTab.jsx`** — Complete rewrite of appeal flow:
+  - **AppealModal**: Reason category chips with guided hints per category, explanation textarea (20–2000 chars), acknowledgement checkbox.
+  - **CasesSection**: Per-case appeal button states — canAppeal → "Appeal Decision", pendingAppeal → status chip, approvedAppeal → success chip, rejected → "Appeal again".
+  - **AppealsSection**: Full history with outcome cards showing admin notes and decision dates.
+- **`admin/AppealsSubTab.jsx`** — Fixed hardcoded hex colors → CSS tokens. Added `Category` column showing `reasonCategory`. Fixed `strikeId` → `caseId` column reference.
+
+### Appeal Reason Categories
+
+| Category | Guided Hint |
+|----------|-------------|
+| Educational context | Explain how the content serves a legitimate educational purpose |
+| False positive | Describe why the system or reporter flagged this incorrectly |
+| Not me / Compromised | If someone else posted using your account, explain the situation |
+| Content edited | If you've already fixed the issue, describe what you changed |
+| Other | Provide any other context the review team should consider |
+
+---
+
+## S-6: Plagiarism / Content Similarity Detection (2026-03-25)
+
+### Overview
+
+Implemented content fingerprinting and similarity detection so admins can identify potential plagiarism when reviewing moderation cases. The system computes fingerprints on content creation/update and provides on-demand similarity matching in the admin panel.
+
+### Changes
+
+#### Backend — Fingerprinting Engine
+
+- **`lib/contentFingerprint.js`** (NEW) — Pure-JS content fingerprinting with no external deps:
+  - `normalizeText()`: Strip HTML tags, punctuation, collapse whitespace, lowercase
+  - `exactHash()`: SHA-256 of normalized text
+  - `simhash()`: 64-bit SimHash via FNV-1a on 3-word shingles with BigInt arithmetic
+  - `hammingDistance()`: Bit-level distance between two hex fingerprints
+  - `similarity()`: `1 - (hamming / 64)`, returns 0–1 float
+
+- **`lib/plagiarismService.js`** (NEW) — Content similarity matching service:
+  - `updateFingerprint(type, id, text)`: Fire-and-forget compute + store fingerprints
+  - `findSimilarContent(type, id)`: Two-phase search — exact hash match, then SimHash brute-force scan (up to 500 items each for sheets and notes)
+  - Thresholds: `LIKELY_COPY_THRESHOLD = 0.85`, `SIMILARITY_THRESHOLD = 0.70`
+
+#### Backend — Integration Points
+
+- **`sheets.create.controller.js`** — `void updateFingerprint('sheet', sheet.id, content)` after creation
+- **`sheets.update.controller.js`** — `void updateFingerprint('sheet', sheetId, content)` after content update
+- **`notes.routes.js`** — `void updateFingerprint('note', note.id, content)` after note create/update
+- **`moderation.admin.cases.controller.js`** — `GET /cases/:id/plagiarism` endpoint: fetches reported content fingerprint, runs `findSimilarContent()`, enriches matches with text previews (up to 2000 chars)
+- **`lib/bootstrapSchema.js`** — Added `contentHash` and `contentSimhash` ALTER TABLE fallbacks for StudySheet
+
+#### Database
+
+- **`schema.prisma`** — Added `contentHash String?` and `contentSimhash String?` to both `StudySheet` and `Note` models, with indexes on `contentHash` and `contentSimhash` for StudySheet.
+- **Migration `20260325000009`** — `ALTER TABLE` statements for both tables.
+
+#### Frontend — Admin Plagiarism Panel
+
+- **`admin/CasesSubTab.jsx`** — Added `PlagiarismPanel` component:
+  - "Check for plagiarism" button appears on sheet/note cases
+  - Fetches matches from `GET /cases/:id/plagiarism`
+  - Expandable match cards showing similarity %, EXACT COPY badge, author, creation date
+  - Side-by-side text comparison grid (reported content vs match)
+  - `similarityColor()` helper: ≥0.85 → danger, ≥0.70 → warning, else muted
+- **`admin/ModerationTab.jsx`** — Threads `apiJson` prop through to CasesSubTab
+
+#### Frontend — Owner Visibility
+
+- **`components/ModerationBanner.jsx`** (NEW) — Reusable banner for content owners:
+  - `pending_review` → warning style
+  - `confirmed_violation` / `removed_by_moderation` → danger style
+  - Renders nothing for `clean` or null
+- **`sheets/SheetViewerPage.jsx`** — Shows ModerationBanner for owner when `sheet.status === 'removed_by_moderation'`
+- **`notes/NoteViewerPage.jsx`** — Shows ModerationBanner for owner when `note.moderationStatus` is non-clean
+- **`feed/feed.service.js`** — Added `moderationStatus` to `formatFeedPostDetail()`
+
+### SimHash Algorithm Details
+
+```
+Input text → normalize → extract 3-word shingles
+Each shingle → FNV-1a 64-bit hash
+Accumulate weighted bit vector (64 positions)
+Collapse: bit[i] = weightedSum[i] > 0 ? 1 : 0
+Result: 64-bit hex string
+```
+
+Similarity = `1 - (hammingDistance / 64)` where hamming distance counts differing bits.
+
+### S5-fix + S-6 Validation
+
+| Suite | Result |
+|-------|--------|
+| Backend tests | 463/463 pass (39 files) |
+| Backend lint | Clean (6 pre-existing warnings in unrelated files) |
+| Frontend lint | Clean |
+| Frontend build | Clean (562 modules, 279ms) |
+
+---
+
+## S-7: Attachment Moderation Gating — Policy A (2026-03-25)
+
+### Problem
+
+Attachment download and preview endpoints did not respect parent content moderation state. A sheet or post could be hidden by moderation (pending_review, confirmed_violation, quarantined, rejected) but its attached files remained accessible to anyone with the URL.
+
+### Policy
+
+**Policy A (owner/admin bypass):**
+- **Owner and admin** can always access attachments — needed for appeals ("show me what I uploaded") and admin review.
+- **Everyone else** gets a 404 (no leakage) when the parent content is moderation-hidden.
+- `allowDownloads` enforcement is owner/admin-bypassed too, so owners can always retrieve their own files.
+
+### Changes
+
+#### `sheets.downloads.controller.js`
+
+All four endpoints (`GET /:id/download`, `GET /:id/attachment`, `GET /:id/attachment/preview`, `POST /:id/download`) now:
+1. Select `userId` alongside existing fields
+2. Use `canReadSheet(sheet, req.user)` — returns true for published sheets or owner/admin
+3. Return 404 (not 403) for non-visible sheets to avoid leaking moderation state
+4. Owner/admin bypass `allowDownloads` restriction
+
+Removed direct `SHEET_STATUS` import — no longer needed since `canReadSheet` encapsulates the logic.
+
+#### `feed.posts.controller.js`
+
+Both endpoints (`GET /posts/:id/attachment`, `GET /posts/:id/attachment/preview`) now:
+1. Select `userId` and `moderationStatus`
+2. Check `isOwnerOrAdmin` — if not, require `moderationStatus === 'clean'`
+3. Return 404 for non-clean posts when requester is not owner/admin
+4. Owner/admin bypass `allowDownloads` restriction
+5. Preview endpoint no longer checks `allowDownloads` at all (previewing is not downloading)
+
+### Access Matrix
+
+| Parent state | Owner | Admin | Stranger | Anonymous |
+|---|---|---|---|---|
+| published / clean | download + preview | download + preview | download (if allowed) + preview | download (if allowed) + preview |
+| pending_review | download + preview | download + preview | 404 | 404 |
+| confirmed_violation | download + preview | download + preview | 404 | 404 |
+| quarantined | download + preview | download + preview | 404 | 404 |
+| rejected | download + preview | download + preview | 404 | 404 |
+| draft | download + preview | download + preview | 404 | 404 |
+
+### Tests
+
+New file: `backend/test/attachmentAccessControl.test.js` (26 tests)
+- Sheet access: `canReadSheet` tested against all 5 statuses × 4 user types (owner, admin, stranger, anonymous)
+- Post access: `postAttachmentAccessible` tested against 3 moderation states × 4 user types
+
+### S-7 Validation
+
+| Suite | Result |
+|-------|--------|
+| Backend tests | 489/489 pass (40 files) |
+| Backend lint | Clean (6 pre-existing warnings in unrelated files) |
+| Frontend lint | Clean |
+
+---
+
+## S-8: Notification Priority Routing + Inbox Controls (2026-03-25)
+
+### Overview
+
+Added priority-based notification routing (high/medium/low) with automatic email delivery for high-priority events, plus inbox management controls (clear read, per-notification delete).
+
+### Changes
+
+#### Database
+
+- **`schema.prisma`** — Added `priority String @default("medium")` to Notification model.
+- **Migration `20260325000010`** — `ALTER TABLE "Notification" ADD COLUMN "priority"`.
+- **`bootstrapSchema.js`** — Added `priority` column fallback.
+
+#### Backend — Priority-aware notification creation
+
+- **`lib/notify.js`** — Complete rewrite:
+  - `createNotification()` now accepts `priority` parameter (`'high'`, `'medium'`, `'low'`; defaults to `'medium'`)
+  - Invalid priority values silently default to `'medium'`
+  - High-priority notifications trigger fire-and-forget email to the recipient (if they have a verified email)
+  - `sendHighPriorityEmail()` renders a branded HTML email with StudyHub styling
+  - Exports `VALID_PRIORITIES` for validation
+  - Self-notification guard preserved
+
+#### Backend — New endpoint
+
+- **`notifications.routes.js`** — Added `DELETE /api/notifications/read`:
+  - Deletes all notifications where `userId = currentUser AND read = true`
+  - Returns `{ deleted: count }`
+  - Route defined before `/:id` to prevent route collision
+
+#### Backend — High-priority event wiring
+
+| Call site | Event | Priority |
+|---|---|---|
+| `moderationEngine.js` | User receives a strike | high |
+| `htmlDraftWorkflow.js` | High-risk HTML sheet flagged (admin alert) | high |
+| `moderation.user.controller.js` | New user report (admin alert) | high |
+| `moderation.user.controller.js` | Appeal submitted (admin alert) — **NEW** | high |
+| `moderation.admin.enforcement.js` | Restriction lifted | medium (default) |
+| `moderation.admin.enforcement.js` | Appeal approved/rejected | medium (default) |
+| All other call sites | Stars, comments, follows, forks, etc. | medium (default) |
+
+#### Frontend — Inbox controls
+
+- **`NavbarNotifications.jsx`** — Enhanced dropdown:
+  - **X button** per notification (absolute-positioned, hover reveals danger color)
+  - **"Clear read"** button in header (only shows when read notifications exist)
+  - **"Mark all read"** + **"Clear read"** shown side-by-side
+  - **Priority indicator**: high-priority notifications get `!` prefix + red left border (vs blue for normal)
+  - `deleteOne()`: optimistic removal + fires `DELETE /api/notifications/:id`
+  - `clearRead()`: optimistic filter + fires `DELETE /api/notifications/read`
+
+### Email Routing Policy
+
+| Priority | In-app | Email |
+|---|---|---|
+| high | Yes | Yes (if user has verified email) |
+| medium | Yes | No |
+| low | Yes | No |
+
+### Tests
+
+- **`notifications.routes.test.js`** — Added 2 tests for `DELETE /read` endpoint (success + zero-count)
+- **`notifyPriority.test.js`** (NEW) — 13 tests: priority field storage, defaults, self-notify skip, email delivery, self-notify guard, dedup guard
+- **`notificationPolicy.test.js`** (NEW) — 29 tests: full coverage of `classifyReportPriority`, `classifyAppealPriority`, `classifyEnforcementPriority`
+
+---
+
+## S-8+ : Smart Priority Classification + Anti-Spam (2026-03-25)
+
+### Overview
+
+Enhanced S-8's basic priority routing with context-aware priority classification and email anti-spam rules. Call sites no longer hardcode priority — they pass context (reason category, target type, offender signals) and the policy module decides.
+
+### Priority Policy Module
+
+New file: **`lib/notificationPolicy.js`** — centralises all escalation rules.
+
+#### `classifyReportPriority(ctx)` → `'high'` | `'medium'`
+
+Escalation triggers (any one → high):
+
+| Signal | Condition |
+|---|---|
+| Severity category | `sexual`, `self_harm`, `violence`, `hate_speech` |
+| High-impact surface | Feed post, feed comment |
+| Public target | Published sheet or shared note |
+| Repeat offender (strikes) | Content owner has ≥ 2 active strikes |
+| Repeat offender (cases) | Content owner has ≥ 3 cases in 24 hours |
+| System confidence | Auto-detected + HTML risk tier ≥ 2 |
+| Plagiarism (public) | Similarity ≥ 95% AND public target |
+
+Everything else → `'medium'` (in-app only).
+
+#### `classifyAppealPriority()` → `'high'`
+
+All appeals are high priority (admin must act).
+
+#### `classifyEnforcementPriority(ctx)` → `'high'` | `'medium'`
+
+Only escalates when a case confirmation triggers a user restriction.
+
+### Anti-Spam Rules (Email Layer)
+
+Built into `lib/notify.js`:
+
+| Rule | Behavior |
+|---|---|
+| **No self-notify** | If `performerUserId === userId`, email is skipped (in-app still created) |
+| **Dedup** | Same `(userId, type, dedupKey)` within 1 hour → email skipped |
+| **Burst bundling** | ≥ 3 high events for same user within 2 min → queued, sent as 1 digest email after 10s |
+
+`dedupKey` is set per call site (e.g., `report-sheet-42`, `appeal-17`) to prevent repeat emails for the same target.
+
+### Wiring Changes
+
+#### `moderation.user.controller.js` (reports)
+
+- Now looks up `actorActiveStrikes` and `actorRecentCases` (24h window) via parallel queries
+- Checks `isPublicTarget` (sheet status = published, note isShared)
+- Calls `classifyReportPriority()` instead of hardcoding `'high'`
+- Passes `dedupKey: 'report-{targetType}-{targetId}'`
+
+#### `moderation.user.controller.js` (appeals)
+
+- Calls `classifyAppealPriority()` (always high)
+- Passes `dedupKey: 'appeal-{caseId}'`
+
+#### `moderation.admin.enforcement.controller.js`
+
+- Switched from inline `require('../../lib/notify')` to top-level import
+- All admin-initiated notifications now pass `performerUserId: req.user.userId` for self-notify guard
+- Appeal approve/reject notifications include `linkPath` for user navigation
+
+#### `moderationEngine.js` (strikes)
+
+- Strike notification: remains `priority: 'high'` (user receives email)
+- **NEW**: When auto-restriction triggers (≥ 4 active strikes), a second `priority: 'high'` notification is sent: "Your account has been restricted..."
+
+### New Notifications Added
+
+| Event | Recipient | Priority |
+|---|---|---|
+| Appeal submitted | Admins | high (was missing entirely) |
+| Auto-restriction triggered | User | high (new) |
+
+### S-8 + S-8+ Combined Validation
+
+| Suite | Result |
+|-------|--------|
+| Backend tests | 531/531 pass (42 files) |
+| Backend lint | Clean (6 pre-existing warnings in unrelated files) |
+| Frontend lint | Clean |
+| Frontend build | Clean (562 modules, 292ms) |
+
+---
+
+## S-10.1 — Performance Measurement Instrumentation (2026-03-26)
+
+### Summary
+
+Added standardised request-timing instrumentation to all critical backend endpoints and frontend page-load timing marks. This provides baseline latency data (per-query section timings, slow-query warnings, and frontend time-to-content) to identify and prioritise performance fixes in S-10.2.
+
+### Backend Changes
+
+#### New: `requestTiming.js` utility (`backend/src/lib/requestTiming.js`)
+- `timedSection(label, fn)` — wraps any async operation, returns `{ ok, label, data, durationMs }`
+- `logTiming(req, { sections, extra })` — standardised `[perf]` log entry with route, userId, total durationMs, per-section timings, and slow-query warnings (≥500ms)
+- `startTimer` middleware for stamping `req._timingStart`
+
+#### Instrumented Endpoints
+
+| Endpoint | File | Sections Timed |
+|----------|------|----------------|
+| `GET /api/search` | `search.routes.js` | sheets, courses, users, notes, visibility (4–5 parallel) |
+| `GET /api/sheets/:id` | `sheets.read.controller.js` | sheet-main, likes, dislikes, commentCount, starred, userReaction, contributions (7 sections) |
+| `GET /api/notes/:id` | `notes.routes.js` | note-main (1 section) |
+| `GET /api/notes/:id/comments` | `notes.routes.js` | note-lookup, comments, count (3 sections) |
+| `GET /api/sheets/:id/comments` | `sheets.social.controller.js` | sheet-lookup, comments, count (3 sections) |
+| `GET /api/feed/posts/:id/comments` | `feed.social.controller.js` | comments, count (2 sections) |
+
+`GET /api/feed` already had comprehensive timing via `settleSection` (12 sections).
+
+#### Log Format
+
+```
+[perf] { route, method, userId, durationMs, queryCount, ...extra, timings: [...], slowSections?: [...] }
+```
+
+### Frontend Changes
+
+#### New: `usePageTiming` hook (`frontend/studyhub-app/src/lib/usePageTiming.js`)
+- Measures two phases: API latency (fetch start → fetch end) and time-to-content (mount → first render with data)
+- Uses `performance.mark/measure` for browser DevTools visibility
+- Reports to PostHog via `trackEvent('page_timing', { page, apiLatencyMs, timeToContentMs })`
+- Fires once per page load (deduped via ref)
+
+#### Instrumented Pages
+
+| Page | Hook | Marks |
+|------|------|-------|
+| Feed | `useFeedData.js` | fetchStart → fetchEnd → contentVisible (items arrive) |
+| Sheet Detail | `useSheetViewer.js` | fetchStart → fetchEnd → contentVisible (sheet data arrives) |
+| Note Detail | `useNoteViewer.js` | fetchStart → fetchEnd → contentVisible (note data arrives) |
+| Search Modal | `SearchModal.jsx` | Inline apiLatencyMs + totalResults per query |
+
+### S-10.1 Validation
+
+| Suite | Result |
+|-------|--------|
+| Backend tests | 531/531 pass (42 files) |
+| Backend lint | Clean (6 pre-existing only) |
+| Frontend lint | Clean |
+| Frontend build | Clean (310ms) |

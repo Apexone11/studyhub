@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
 import ReportModal from '../../components/ReportModal'
+import ModerationBanner from '../../components/ModerationBanner'
 import AppSidebar from '../../components/AppSidebar'
 import SafeJoyride from '../../components/SafeJoyride'
 import { SkeletonCard } from '../../components/Skeleton'
@@ -236,6 +237,10 @@ export default function SheetViewerPage() {
               </div>
 
               {errorBanner(sheetState.error)}
+
+              {sheet && user && sheet.userId === user.id && (
+                <ModerationBanner status={sheet.status === 'removed_by_moderation' ? 'confirmed_violation' : sheet.moderationStatus} />
+              )}
 
               {sheetState.loading ? (
                 <SkeletonCard style={{ padding: '28px 24px' }} />

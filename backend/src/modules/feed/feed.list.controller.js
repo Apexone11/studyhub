@@ -32,8 +32,8 @@ router.get('/', async (req, res) => {
       }
     : { status: 'published', htmlRiskTier: { lt: 3 } }
   const postWhere = search
-    ? { content: { contains: search, mode: 'insensitive' } }
-    : undefined
+    ? { moderationStatus: 'clean', content: { contains: search, mode: 'insensitive' } }
+    : { moderationStatus: 'clean' }
   const announcementWhere = search
     ? {
         OR: [
