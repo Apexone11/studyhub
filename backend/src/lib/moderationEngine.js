@@ -383,49 +383,64 @@ async function createSnapshot(modCase) {
  * Called when an appeal is approved.
  *
  * @param {number} caseId — the ModerationCase to reverse
+ * @returns {{ success: boolean, error?: string }}
  */
 async function restoreContent(caseId) {
   try {
     const modCase = await prisma.moderationCase.findUnique({
       where: { id: caseId },
-      select: { id: true, contentType: true, contentId: true, status: true },
+      select: { id: true, contentType: true, contentId: true, status: true, userId: true },
     })
-    if (!modCase) return
+    if (!modCase) {
+      console.error(`[restoreContent] Case not found: caseId=${caseId}`)
+      return { success: false, error: 'Case not found' }
+    }
 
     const { contentType, contentId } = modCase
     const modelName = CONTENT_MODEL_MAP[contentType]
 
-    /* Restore moderationStatus to clean */
-    if (HAS_MODERATION_STATUS.has(contentType) && modelName && prisma[modelName]) {
-      await prisma[modelName].update({
-        where: { id: contentId },
-        data: { moderationStatus: 'clean' },
-      }).catch(() => {})
+    if (!modelName) {
+      console.error(`[restoreContent] Unknown content type: caseId=${caseId}, contentType=${contentType}`)
+      return { success: false, error: 'Unknown content type' }
     }
 
-    /* For sheets: restore to published */
-    if (contentType === 'sheet') {
-      await prisma.studySheet.update({
-        where: { id: contentId },
-        data: { status: 'published' },
-      }).catch(() => {})
-    }
+    /* Wrap all restoration updates in a transaction so partial failures roll back */
+    await prisma.$transaction(async (tx) => {
+      /* Restore moderationStatus to clean */
+      if (HAS_MODERATION_STATUS.has(contentType) && modelName && tx[modelName]) {
+        await tx[modelName].update({
+          where: { id: contentId },
+          data: { moderationStatus: 'clean' },
+        })
+      }
 
-    /* Mark snapshot as restored */
-    await prisma.moderationSnapshot.updateMany({
-      where: { caseId, restoredAt: null },
-      data: { restoredAt: new Date() },
-    })
+      /* For sheets: restore to published */
+      if (contentType === 'sheet') {
+        await tx.studySheet.update({
+          where: { id: contentId },
+          data: { status: 'published' },
+        })
+      }
 
-    /* Update case status to reflect reversal */
-    await prisma.moderationCase.update({
-      where: { id: caseId },
-      data: { status: 'reversed' },
+      /* Mark snapshot as restored */
+      await tx.moderationSnapshot.updateMany({
+        where: { caseId, restoredAt: null },
+        data: { restoredAt: new Date() },
+      })
+
+      /* Update case status to reflect reversal */
+      await tx.moderationCase.update({
+        where: { id: caseId },
+        data: { status: 'reversed' },
+      })
     })
 
     logModerationEvent({ userId: modCase.userId, action: 'appeal_approved', caseId })
+    return { success: true }
   } catch (err) {
+    console.error(`[restoreContent] Restore failed: caseId=${caseId}`, err)
     captureError(err, { context: 'moderation-restore', caseId })
+    return { success: false, error: err.message }
   }
 }
 

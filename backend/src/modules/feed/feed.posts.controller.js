@@ -160,11 +160,11 @@ router.get('/posts/:id/attachment/preview', requireAuth, attachmentDownloadLimit
     if (!isOwnerOrAdmin && post.moderationStatus !== 'clean') {
       return res.status(404).json({ error: 'Post not found.' })
     }
-    if (!post.attachmentUrl) return res.status(404).json({ error: 'Attachment not found.' })
+    if (!post.attachmentUrl) return res.status(404).json({ error: 'No attachment found.', kind: 'none' })
 
     const localPath = resolveAttachmentPath(post.attachmentUrl)
     if (!localPath || !fs.existsSync(localPath)) {
-      return res.status(404).json({ error: 'Attachment file is missing.' })
+      return res.status(404).json({ error: 'Attachment file not found.', kind: 'missing' })
     }
 
     await sendAttachmentPreview({

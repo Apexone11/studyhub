@@ -146,8 +146,10 @@ router.patch('/appeals/:id/review', async (req, res) => {
         }).catch((err) => captureError(err, { context: 'appeal-case-dismiss', appealId }))
 
         /* Restore taken-down content */
-        await restoreContent(appeal.caseId)
-          .catch((err) => captureError(err, { context: 'appeal-restore', appealId }))
+        const restoreResult = await restoreContent(appeal.caseId)
+        if (!restoreResult.success) {
+          captureError(new Error(restoreResult.error || 'restoreContent failed'), { context: 'appeal-restore', appealId, caseId: appeal.caseId })
+        }
       }
 
       await prisma.strike.updateMany({
