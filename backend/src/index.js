@@ -8,6 +8,7 @@ const { initSentry, captureError } = require('./monitoring/sentry')
 const { bootstrapRuntime } = require('./lib/bootstrap')
 const { validateEmailTransport } = require('./lib/email')
 const { startHtmlArchiveScheduler } = require('./lib/htmlArchiveScheduler')
+const { startModerationCleanupScheduler } = require('./lib/moderationCleanupScheduler')
 const { AVATARS_DIR, COVERS_DIR, SCHOOL_LOGOS_DIR, validateUploadStorage } = require('./lib/storage')
 const csrfProtection = require('./middleware/csrf')
 const { guardedMode, isGuardedModeEnabled } = require('./middleware/guardedMode')
@@ -348,6 +349,7 @@ async function startServer() {
 
   return app.listen(PORT, () => {
     startHtmlArchiveScheduler()
+    startModerationCleanupScheduler()
     console.log(`Server running on http://localhost:${PORT}`)
   })
 }
