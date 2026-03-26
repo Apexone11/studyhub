@@ -814,3 +814,97 @@ Added 10-second `AbortController` timeout to `callOpenAiModeration()`. Prevents 
 | Backend tests | 456/456 pass (38 files) |
 | Frontend lint | Clean |
 | Frontend build | Clean |
+
+---
+
+## Cycle S-4 — Reporting + Appeals + Admin Triage (2026-03-25)
+
+### Summary
+
+Full user-facing reporting and appeals system with admin triage queue.
+Users can report content/users, view their moderation status, and submit appeals.
+Admins get claim/assign workflow with source filtering and super admin dashboard.
+
+### Product Decisions
+
+- **Unified ModerationCase model**: auto-detected, user reports, and admin-created cases all share one model (`source` field distinguishes)
+- **Super admin protection**: site owner (resolved via `ADMIN_USERNAME`) cannot be struck, demoted, or deleted
+- **Claim workflow**: admins claim cases to avoid duplicate work; super admin can override/view all claims
+- **User visibility**: users see their status, strikes, and cases but NOT confidence scores or internal evidence
+- **404 for hidden content**: moderation-hidden content returns 404 (no info leakage), lists silently exclude
+
+### Schema Changes
+
+| Change | Detail |
+|--------|--------|
+| ModerationCase | Added `source`, `reporterUserId`, `reasonCategory`, `excerpt`, `claimedByAdminId`, `claimedAt` |
+| ModerationCase relations | Added `reporter` (ModerationReporter), `claimedBy` (ModerationClaimer) |
+| ModerationCase indexes | Added `[source, status]`, `[claimedByAdminId]` |
+| User model | Added `moderationReports`, `moderationClaims` relations |
+
+### Backend Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/moderation/my-status` | Combined moderation summary for current user |
+| GET | `/api/moderation/my-strikes` | User's own strikes |
+| GET | `/api/moderation/my-appeals` | User's own appeals |
+| POST | `/api/moderation/reports` | Submit user report (rate limited: 10/hr) |
+| POST | `/api/moderation/appeals` | Submit appeal (rate limited: 5/15min) |
+| GET | `/api/admin/moderation/cases` | List cases with source/claimed filters |
+| GET | `/api/admin/moderation/cases/overview` | Super admin dashboard stats |
+| GET | `/api/admin/moderation/cases/:id` | Single case with strikes/appeals |
+| POST | `/api/admin/moderation/cases/:id/claim` | Claim case (idempotent, 409 if claimed) |
+| POST | `/api/admin/moderation/cases/:id/unclaim` | Release claim (claimer or super admin) |
+| PATCH | `/api/admin/moderation/cases/:id/review` | Dismiss or confirm case |
+| POST | `/api/admin/moderation/strikes` | Issue strike (super admin protected) |
+
+### Frontend Components
+
+| Component | Location | Description |
+|-----------|----------|-------------|
+| Settings ModerationTab | `pages/settings/ModerationTab.jsx` | My Status, My Cases, My Appeals sections |
+| ReportModal | `components/ReportModal.jsx` | Content/user reporting dialog with category selection |
+| ActionBlockedModal | `components/ActionBlockedModal.jsx` | Restriction notification with link to settings |
+| Admin OverviewSubTab | `pages/admin/OverviewSubTab.jsx` | Super admin dashboard (pending, source breakdown, claims, recent resolved) |
+| Admin CasesSubTab | `pages/admin/CasesSubTab.jsx` | Enhanced with source/claimed filters, claim/unclaim, reporter display |
+
+### Report Button Wiring
+
+| Page | Target Type | Integration |
+|------|-------------|-------------|
+| FeedPage → FeedCard | `post` | Three-dot menu (all users, not just owner) |
+| SheetViewerPage | `sheet` | Action bar button |
+| NoteViewerPage | `note` | Action bar button |
+| UserProfilePage | `user` | Profile header button |
+
+### Backend Support Files
+
+| File | Change |
+|------|--------|
+| `backend/src/lib/superAdmin.js` | New: resolves super admin ID via `ADMIN_USERNAME`, caches, exports `isSuperAdmin()` |
+| `backend/src/lib/moderationEngine.js` | Added `source: 'auto'`, `reasonCategory`, `excerpt` to auto-scan case creation |
+| `backend/src/middleware/errorEnvelope.js` | Added `ACCOUNT_RESTRICTED`, `SUPER_ADMIN_PROTECTED` error codes |
+| `backend/src/middleware/checkRestrictions.js` | Uses `ACCOUNT_RESTRICTED` code, includes restriction reason |
+| `backend/src/modules/admin/admin.users.controller.js` | Super admin protection on role change + delete |
+| `backend/src/modules/moderation/moderation.constants.js` | Added `reportLimiter`, `REASON_CATEGORIES` |
+| `backend/src/modules/moderation/moderation.user.controller.js` | Rewritten: my-status, reports with validation, self-report prevention |
+| `backend/src/modules/moderation/moderation.admin.cases.controller.js` | Rewritten: source/claimed filters, claim/unclaim, overview |
+| `backend/prisma/schema.prisma` | Extended ModerationCase with 6 fields, 2 relations, 2 indexes |
+| `backend/prisma/migrations/20260325000006_extend_moderation_case_reporting/migration.sql` | New migration |
+
+### UI Conventions
+
+- All inline style colors use CSS custom property tokens (`--sh-*`)
+- Status pills updated to use semantic tokens (works in light + dark mode)
+- Admin sub-tab bar uses `var(--sh-brand)` / `var(--sh-info-bg)` tokens
+- Report modal uses `var(--sh-surface)`, `var(--sh-border)`, `var(--sh-brand)` etc.
+
+### S-4 Validation
+
+| Suite | Result |
+|-------|--------|
+| Backend tests | 463/463 pass (39 files) |
+| Backend lint | Clean (6 pre-existing warnings in unrelated files) |
+| Frontend lint | Clean |
+| Frontend build | Clean |

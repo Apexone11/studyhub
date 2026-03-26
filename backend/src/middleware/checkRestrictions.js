@@ -46,8 +46,8 @@ async function checkRestrictions(req, res, next) {
       res,
       403,
       'Your account is currently restricted. You may not create or modify content.',
-      ERROR_CODES.FORBIDDEN,
-      { restricted: true, restrictionType: restriction.type },
+      ERROR_CODES.ACCOUNT_RESTRICTED,
+      { restricted: true, restrictionType: restriction.type, reason: restriction.reason || null },
     )
   } catch (error) {
     /* Fail-open: DB errors should not block all user writes */

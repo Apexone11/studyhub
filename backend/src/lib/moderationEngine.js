@@ -123,6 +123,9 @@ async function scanContent({ contentType, contentId, text, userId }) {
         confidence: Math.round(topScore * 1000) / 1000,
         category: topCategory,
         provider: 'openai',
+        source: 'auto',
+        reasonCategory: topCategory,
+        excerpt: text.slice(0, 400),
         evidence: {
           flagged: modResult.flagged,
           topScore: Math.round(topScore * 1000) / 1000,

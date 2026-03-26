@@ -12,6 +12,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
+import ReportModal from '../../components/ReportModal'
 import SafeJoyride from '../../components/SafeJoyride'
 import { SkeletonProfile } from '../../components/Skeleton'
 import { API } from '../../config'
@@ -92,6 +93,7 @@ export default function UserProfilePage() {
   const [following, setFollowing] = useState(false)
   const [followers, setFollowers] = useState(0)
   const [toggling, setToggling] = useState(false)
+  const [reportOpen, setReportOpen] = useState(false)
   const [followModal, setFollowModal] = useState(null)
   const [followList, setFollowList] = useState([])
   const [followListLoading, setFollowListLoading] = useState(false)
@@ -351,6 +353,23 @@ export default function UserProfilePage() {
                     {toggling ? '...' : following ? 'Following' : 'Follow'}
                   </button>
                 ) : null}
+                {currentUser && !isOwnProfile && (
+                  <button
+                    onClick={() => setReportOpen(true)}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10,
+                      fontWeight: 600, fontSize: 12, fontFamily: 'inherit',
+                      border: '1px solid rgba(255,255,255,0.15)',
+                      background: 'rgba(255,255,255,0.08)',
+                      color: 'rgba(255,255,255,0.7)',
+                      cursor: 'pointer',
+                      backdropFilter: 'blur(6px)',
+                    }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+                    Report
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -466,6 +485,8 @@ export default function UserProfilePage() {
           }}
         />
       )}
+
+      {profile && <ReportModal open={reportOpen} targetType="user" targetId={profile.id} onClose={() => setReportOpen(false)} />}
     </div>
   )
 }

@@ -2,8 +2,10 @@
  * NoteViewerPage.jsx — Read-only view for shared notes at /notes/:id
  * Owners see an "Open in Editor" link back to /notes?select=:id
  * ═══════════════════════════════════════════════════════════════════════════ */
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useSession } from '../../lib/session-context'
+import ReportModal from '../../components/ReportModal'
 import { PAGE_FONT } from '../shared/pageUtils'
 import { MarkdownPreview, wordCount } from './notesConstants'
 import NoteCommentSection from './NoteCommentSection'
@@ -29,6 +31,7 @@ function downloadMarkdown(title, content) {
 export default function NoteViewerPage() {
   const { user } = useSession()
   const { note, loading, error } = useNoteViewer()
+  const [reportOpen, setReportOpen] = useState(false)
 
   if (loading) {
     return (
@@ -149,6 +152,28 @@ export default function NoteViewerPage() {
             Download .md
           </button>
         )}
+        {user && !note.isOwner && (
+          <button
+            type="button"
+            onClick={() => setReportOpen(true)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '6px 14px',
+              borderRadius: 6,
+              background: 'var(--sh-soft)',
+              color: 'var(--sh-warning-text)',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: 13,
+              fontWeight: 600,
+            }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+            Report
+          </button>
+        )}
       </div>
 
       {/* Content */}
@@ -170,6 +195,8 @@ export default function NoteViewerPage() {
       {!note.private && (
         <NoteCommentSection noteId={note.id} isOwner={note.isOwner} user={user} noteContent={note.content} />
       )}
+
+      <ReportModal open={reportOpen} targetType="note" targetId={note.id} onClose={() => setReportOpen(false)} />
     </div>
   )
 }

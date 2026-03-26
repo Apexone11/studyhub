@@ -2,18 +2,26 @@ const express = require('express')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
 const { issueStrike, reviewCase } = require('../../lib/moderationEngine')
+const { isSuperAdmin } = require('../../lib/superAdmin')
 const { PAGE_SIZE, parsePage } = require('./moderation.constants')
 
 const router = express.Router()
 
-/* GET /cases — List moderation cases */
+/* GET /cases — List moderation cases with source/claim filters */
 router.get('/cases', async (req, res) => {
   const status = req.query.status || 'pending'
+  const source = req.query.source || ''
+  const claimed = req.query.claimed || ''
   const page = parsePage(req.query.page)
   const skip = (page - 1) * PAGE_SIZE
 
   try {
     const where = status === 'all' ? {} : { status }
+    if (source && source !== 'all') where.source = source
+    if (claimed === 'mine') where.claimedByAdminId = req.user.userId
+    else if (claimed === 'unclaimed') where.claimedByAdminId = null
+    else if (claimed === 'any') where.claimedByAdminId = { not: null }
+
     const [cases, total] = await Promise.all([
       prisma.moderationCase.findMany({
         where,
@@ -23,6 +31,8 @@ router.get('/cases', async (req, res) => {
         include: {
           user: { select: { id: true, username: true } },
           reviewer: { select: { id: true, username: true } },
+          reporter: { select: { id: true, username: true } },
+          claimedBy: { select: { id: true, username: true } },
         },
       }),
       prisma.moderationCase.count({ where }),
@@ -33,6 +43,78 @@ router.get('/cases', async (req, res) => {
       total,
       page,
       pages: Math.ceil(total / PAGE_SIZE) || 1,
+    })
+  } catch (error) {
+    captureError(error, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+/* GET /cases/overview — Super admin dashboard stats */
+router.get('/cases/overview', async (req, res) => {
+  try {
+    const [
+      totalPending,
+      totalBySource,
+      claimedByAdmin,
+      recentResolved,
+    ] = await Promise.all([
+      prisma.moderationCase.count({ where: { status: 'pending' } }),
+      prisma.moderationCase.groupBy({
+        by: ['source'],
+        where: { status: 'pending' },
+        _count: true,
+      }),
+      prisma.moderationCase.groupBy({
+        by: ['claimedByAdminId'],
+        where: {
+          claimedByAdminId: { not: null },
+          status: 'pending',
+        },
+        _count: true,
+      }),
+      prisma.moderationCase.findMany({
+        where: { status: { in: ['confirmed', 'dismissed'] } },
+        orderBy: { updatedAt: 'desc' },
+        take: 20,
+        select: {
+          id: true,
+          contentType: true,
+          status: true,
+          source: true,
+          updatedAt: true,
+          reviewer: { select: { id: true, username: true } },
+        },
+      }),
+    ])
+
+    /* Resolve admin usernames for the groupBy results */
+    const adminIds = claimedByAdmin
+      .map((g) => g.claimedByAdminId)
+      .filter(Boolean)
+    const adminUsers = adminIds.length > 0
+      ? await prisma.user.findMany({
+          where: { id: { in: adminIds } },
+          select: { id: true, username: true },
+        })
+      : []
+    const adminMap = Object.fromEntries(adminUsers.map((u) => [u.id, u.username]))
+
+    const claimedBreakdown = claimedByAdmin.map((g) => ({
+      adminId: g.claimedByAdminId,
+      adminUsername: adminMap[g.claimedByAdminId] || 'Unknown',
+      pendingClaimed: g._count,
+    }))
+
+    const sourceBreakdown = Object.fromEntries(
+      totalBySource.map((g) => [g.source, g._count]),
+    )
+
+    res.json({
+      totalPending,
+      sourceBreakdown,
+      claimedBreakdown,
+      recentResolved,
     })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
@@ -51,6 +133,8 @@ router.get('/cases/:id', async (req, res) => {
       include: {
         user: { select: { id: true, username: true } },
         reviewer: { select: { id: true, username: true } },
+        reporter: { select: { id: true, username: true } },
+        claimedBy: { select: { id: true, username: true } },
         strikes: {
           include: { user: { select: { id: true, username: true } } },
         },
@@ -65,6 +149,78 @@ router.get('/cases/:id', async (req, res) => {
 
     if (!modCase) return res.status(404).json({ error: 'Case not found.' })
     res.json(modCase)
+  } catch (error) {
+    captureError(error, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+/* POST /cases/:id/claim — Claim a case for triage */
+router.post('/cases/:id/claim', async (req, res) => {
+  const caseId = Number.parseInt(req.params.id, 10)
+  if (!Number.isFinite(caseId)) return res.status(400).json({ error: 'Invalid case ID.' })
+
+  try {
+    const modCase = await prisma.moderationCase.findUnique({
+      where: { id: caseId },
+      select: { id: true, status: true, claimedByAdminId: true },
+    })
+    if (!modCase) return res.status(404).json({ error: 'Case not found.' })
+
+    /* Already claimed by this admin — idempotent */
+    if (modCase.claimedByAdminId === req.user.userId) {
+      return res.json({ message: 'Already claimed by you.', caseId })
+    }
+
+    /* Claimed by another admin — super admin can override */
+    if (modCase.claimedByAdminId !== null) {
+      const isSuper = await isSuperAdmin(req.user.userId)
+      if (!isSuper) {
+        return res.status(409).json({
+          error: 'This case is already claimed by another admin.',
+          claimedByAdminId: modCase.claimedByAdminId,
+        })
+      }
+    }
+
+    await prisma.moderationCase.update({
+      where: { id: caseId },
+      data: { claimedByAdminId: req.user.userId, claimedAt: new Date() },
+    })
+
+    res.json({ message: 'Case claimed.', caseId })
+  } catch (error) {
+    captureError(error, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+/* POST /cases/:id/unclaim — Release a claim */
+router.post('/cases/:id/unclaim', async (req, res) => {
+  const caseId = Number.parseInt(req.params.id, 10)
+  if (!Number.isFinite(caseId)) return res.status(400).json({ error: 'Invalid case ID.' })
+
+  try {
+    const modCase = await prisma.moderationCase.findUnique({
+      where: { id: caseId },
+      select: { id: true, claimedByAdminId: true },
+    })
+    if (!modCase) return res.status(404).json({ error: 'Case not found.' })
+
+    /* Only the claimer or super admin can unclaim */
+    if (modCase.claimedByAdminId !== req.user.userId) {
+      const isSuper = await isSuperAdmin(req.user.userId)
+      if (!isSuper) {
+        return res.status(403).json({ error: 'Only the claiming admin or super admin can release this claim.' })
+      }
+    }
+
+    await prisma.moderationCase.update({
+      where: { id: caseId },
+      data: { claimedByAdminId: null, claimedAt: null },
+    })
+
+    res.json({ message: 'Claim released.', caseId })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
@@ -119,6 +275,11 @@ router.post('/strikes', async (req, res) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } })
     if (!user) return res.status(404).json({ error: 'User not found.' })
+
+    /* Protect super admin from receiving strikes */
+    if (await isSuperAdmin(userId)) {
+      return res.status(403).json({ error: 'Cannot issue strikes to the super admin.', code: 'SUPER_ADMIN_PROTECTED' })
+    }
 
     if (caseId) {
       const modCase = await prisma.moderationCase.findUnique({ where: { id: caseId }, select: { id: true } })
