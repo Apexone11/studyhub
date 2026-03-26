@@ -205,4 +205,84 @@ router.get('/deletion-reasons', async (req, res) => {
   }
 })
 
+// GET /moderation/users/:userId/log — admin view of user's moderation history
+router.get('/moderation/users/:userId/log', async (req, res) => {
+  try {
+    const userId = Number.parseInt(req.params.userId, 10)
+    if (!Number.isFinite(userId)) return res.status(400).json({ error: 'Invalid userId.' })
+    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1)
+    const limit = 50
+
+    const [items, total] = await Promise.all([
+      prisma.moderationLog.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.moderationLog.count({ where: { userId } }),
+    ])
+    res.json({ items, page, totalPages: Math.ceil(total / limit) || 1 })
+  } catch (err) {
+    console.error('[admin] Failed to load moderation log:', err.message)
+    res.status(500).json({ error: 'Failed to load log.' })
+  }
+})
+
+// GET /moderation/users/:userId/log/export — CSV export of moderation history
+router.get('/moderation/users/:userId/log/export', async (req, res) => {
+  try {
+    const userId = Number.parseInt(req.params.userId, 10)
+    if (!Number.isFinite(userId)) return res.status(400).json({ error: 'Invalid userId.' })
+
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { username: true } })
+    if (!user) return res.status(404).json({ error: 'User not found.' })
+
+    const dateStr = new Date().toISOString().slice(0, 10)
+    const filename = `moderation-log-${user.username}-${dateStr}.csv`
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+
+    // Write CSV header
+    res.write('Date,Action,Case ID,Content Type,Content ID,Reason,Performed By,Metadata\n')
+
+    // Stream in batches
+    const batchSize = 100
+    let skip = 0
+    let hasMore = true
+
+    while (hasMore) {
+      const batch = await prisma.moderationLog.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: batchSize,
+      })
+
+      for (const row of batch) {
+        const fields = [
+          row.createdAt.toISOString(),
+          row.action,
+          row.caseId ?? '',
+          row.contentType ?? '',
+          row.contentId ?? '',
+          `"${(row.reason || '').replace(/"/g, '""')}"`,
+          row.performedBy ?? 'system',
+          row.metadata ? `"${JSON.stringify(row.metadata).replace(/"/g, '""')}"` : '',
+        ]
+        res.write(fields.join(',') + '\n')
+      }
+
+      skip += batchSize
+      hasMore = batch.length === batchSize
+    }
+
+    res.end()
+  } catch (err) {
+    console.error('[admin] CSV export failed:', err.message)
+    res.status(500).json({ error: 'Export failed.' })
+  }
+})
+
 module.exports = router
