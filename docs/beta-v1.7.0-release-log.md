@@ -1862,5 +1862,31 @@ Extended `usePageTiming` with a module-level `getLastPageTiming()` export. Added
 ### Validation
 
 - **Lint:** 0 errors, 1 pre-existing warning (`react-hooks/incompatible-library` on `useVirtualizer` — expected with TanStack Virtual + React Compiler)
-- **Tests:** 31 passed, 7 pre-existing failures (SearchModal, RegisterScreen, AnnouncementsPage, uploadSheetWorkflow — unrelated to this cycle)
+- **Tests:** 31 passed, 7 pre-existing failures (SearchModal, RegisterScreen, AnnouncementsPage, uploadSheetWorkflow — unrelated to this cycle, fixed in Q-Fix below)
 - **Build:** Clean production build in 283ms, PerfOverlay tree-shaken out
+
+---
+
+## Q-Fix: Test Suite Cleanup
+
+**Date:** 2026-03-26
+**Commit:** `fix(tests): repair 7 stale test assertions across 4 test files`
+
+### Problem
+
+7 test assertions across 4 test files had drifted from source code changes over prior cycles. The failures were not bugs — they were stale test expectations that no longer matched current behavior.
+
+### Root Causes & Fixes
+
+| Test File | Root Cause | Fix |
+| --------- | ---------- | --- |
+| `uploadSheetWorkflow.test.jsx` | `canEditHtmlWorkingCopy` no longer checks `hasOriginalVersion`; `canSubmitHtmlReview` uses tier-based logic (tier 0 auto-publishes, tier 3 quarantined) | Rewrote assertions to test tier-based scan rules and always-true edit permission |
+| `AnnouncementsPage.test.jsx` | `TUTORIAL_VERSIONS` export was added to `tutorialSteps.js` but mock was not updated | Added `TUTORIAL_VERSIONS: { announcements: 1 }` to the mock |
+| `SearchModal.test.jsx` | Search placeholder updated to include "notes" but test not updated; highlight `<mark>` tags split text across elements | Updated placeholder text; switched to function matcher for highlighted text |
+| `RegisterScreen.test.jsx` | Registration flow simplified from 3-step (Account → Verify → Courses) to 2-step (Account → Verify → auto-complete). Course selection deferred to `/my-courses` post-signup | Rewrote both tests: removed course selection step, updated complete payload to `{ verificationToken }` only, changed expected navigation from `/dashboard` to `/feed` |
+
+### Validation
+
+- **Lint:** 0 errors, 1 pre-existing warning (`react-hooks/incompatible-library`)
+- **Tests:** 38 passed, 0 failures — full green CI
+- **Build:** Not re-run (no production code changed)
