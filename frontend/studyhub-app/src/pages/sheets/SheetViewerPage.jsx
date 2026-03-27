@@ -74,6 +74,7 @@ export default function SheetViewerPage() {
   const previewMode = sheet?.htmlWorkflow?.previewMode || 'interactive'
   const [statusMenuOpen, setStatusMenuOpen] = useState(false)
   const [reportOpen, setReportOpen] = useState(false)
+  const [commentsExpanded, setCommentsExpanded] = useState(false)
 
   return (
     <>
@@ -430,87 +431,101 @@ export default function SheetViewerPage() {
               {errorBanner(commentsState.error)}
 
               <section data-tutorial="viewer-comments" style={panelStyle()}>
-                <h2 style={{ margin: '0 0 12px', fontSize: 18, color: 'var(--sh-heading)' }}>
+                <button
+                  type="button"
+                  onClick={() => setCommentsExpanded((v) => !v)}
+                  style={{
+                    background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                    margin: '0 0 12px', fontSize: 18, fontWeight: 800,
+                    color: 'var(--sh-heading)', fontFamily: FONT,
+                    display: 'flex', alignItems: 'center', gap: 8,
+                  }}
+                >
+                  <span style={{ fontSize: 12 }}>{commentsExpanded ? '\u25BE' : '\u25B8'}</span>
                   Comments{commentsState.total > 0 ? ` (${commentsState.total})` : ''}
-                </h2>
-                <form onSubmit={submitComment} style={{ display: 'grid', gap: 12, marginBottom: 16 }}>
-                  <textarea
-                    value={commentDraft}
-                    onChange={(event) => setCommentDraft(event.target.value)}
-                    placeholder="Share a clarification, correction, or study tip…"
-                    rows={3}
-                    style={{
-                      width: '100%',
-                      resize: 'vertical',
-                      borderRadius: 12,
-                      border: '1px solid var(--sh-input-border)',
-                      padding: 12,
-                      font: 'inherit',
-                      background: 'var(--sh-input-bg)',
-                      color: 'var(--sh-input-text)',
-                    }}
-                  />
-                  <div>
-                    <button
-                      type="submit"
-                      disabled={commentSaving}
-                      style={{
-                        borderRadius: 10,
-                        border: 'none',
-                        background: 'var(--sh-btn-primary-bg)',
-                        color: 'var(--sh-btn-primary-text)',
-                        fontWeight: 800,
-                        fontSize: 13,
-                        padding: '10px 14px',
-                        cursor: commentSaving ? 'wait' : 'pointer',
-                        fontFamily: FONT,
-                      }}
-                    >
-                      {commentSaving ? 'Posting...' : 'Post comment'}
-                    </button>
-                  </div>
-                </form>
+                </button>
+                {commentsExpanded && (
+                  <>
+                    <form onSubmit={submitComment} style={{ display: 'grid', gap: 12, marginBottom: 16 }}>
+                      <textarea
+                        value={commentDraft}
+                        onChange={(event) => setCommentDraft(event.target.value)}
+                        placeholder="Share a clarification, correction, or study tip…"
+                        rows={3}
+                        style={{
+                          width: '100%',
+                          resize: 'vertical',
+                          borderRadius: 12,
+                          border: '1px solid var(--sh-input-border)',
+                          padding: 12,
+                          font: 'inherit',
+                          background: 'var(--sh-input-bg)',
+                          color: 'var(--sh-input-text)',
+                        }}
+                      />
+                      <div>
+                        <button
+                          type="submit"
+                          disabled={commentSaving}
+                          style={{
+                            borderRadius: 10,
+                            border: 'none',
+                            background: 'var(--sh-btn-primary-bg)',
+                            color: 'var(--sh-btn-primary-text)',
+                            fontWeight: 800,
+                            fontSize: 13,
+                            padding: '10px 14px',
+                            cursor: commentSaving ? 'wait' : 'pointer',
+                            fontFamily: FONT,
+                          }}
+                        >
+                          {commentSaving ? 'Posting...' : 'Post comment'}
+                        </button>
+                      </div>
+                    </form>
 
-                {commentsState.loading ? (
-                  <SkeletonCard style={{ padding: 16, minHeight: 60 }} />
-                ) : commentsState.comments.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '16px 12px' }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--sh-heading)', marginBottom: 4 }}>No comments yet</div>
-                    <div style={{ fontSize: 12, color: 'var(--sh-muted)', lineHeight: 1.5 }}>
-                      Be the first to leave feedback — corrections, study tips, and clarifications help everyone.
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ display: 'grid', gap: 12 }}>
-                    {commentsState.comments.map((comment) => (
-                      <div key={comment.id} style={{ borderTop: '1px solid var(--sh-soft)', paddingTop: 12 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 4, alignItems: 'center' }}>
-                          <Link to={`/users/${comment.author?.username}`} style={{ fontSize: 13, fontWeight: 700, color: 'var(--sh-heading)', textDecoration: 'none' }}>
-                            {comment.author?.username || 'Unknown'}
-                          </Link>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span style={{ fontSize: 11, color: 'var(--sh-muted)' }}>{timeAgo(comment.createdAt)}</span>
-                            {user && (user.id === comment.author?.id || user.role === 'admin') ? (
-                              <button
-                                type="button"
-                                onClick={() => deleteComment(comment.id)}
-                                style={{
-                                  padding: '2px 8px', borderRadius: 6, border: '1px solid var(--sh-danger-border)',
-                                  background: 'var(--sh-surface)', color: 'var(--sh-danger)', fontSize: 11, fontWeight: 600,
-                                  cursor: 'pointer', fontFamily: FONT,
-                                }}
-                              >
-                                Delete
-                              </button>
-                            ) : null}
-                          </div>
-                        </div>
-                        <div style={{ fontSize: 13, color: 'var(--sh-subtext)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
-                          <MentionText text={comment.content} />
+                    {commentsState.loading ? (
+                      <SkeletonCard style={{ padding: 16, minHeight: 60 }} />
+                    ) : commentsState.comments.length === 0 ? (
+                      <div style={{ textAlign: 'center', padding: '16px 12px' }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--sh-heading)', marginBottom: 4 }}>No comments yet</div>
+                        <div style={{ fontSize: 12, color: 'var(--sh-muted)', lineHeight: 1.5 }}>
+                          Be the first to leave feedback — corrections, study tips, and clarifications help everyone.
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    ) : (
+                      <div style={{ display: 'grid', gap: 12 }}>
+                        {commentsState.comments.map((comment) => (
+                          <div key={comment.id} style={{ borderTop: '1px solid var(--sh-soft)', paddingTop: 12 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 4, alignItems: 'center' }}>
+                              <Link to={`/users/${comment.author?.username}`} style={{ fontSize: 13, fontWeight: 700, color: 'var(--sh-heading)', textDecoration: 'none' }}>
+                                {comment.author?.username || 'Unknown'}
+                              </Link>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{ fontSize: 11, color: 'var(--sh-muted)' }}>{timeAgo(comment.createdAt)}</span>
+                                {user && (user.id === comment.author?.id || user.role === 'admin') ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => deleteComment(comment.id)}
+                                    style={{
+                                      padding: '2px 8px', borderRadius: 6, border: '1px solid var(--sh-danger-border)',
+                                      background: 'var(--sh-surface)', color: 'var(--sh-danger)', fontSize: 11, fontWeight: 600,
+                                      cursor: 'pointer', fontFamily: FONT,
+                                    }}
+                                  >
+                                    Delete
+                                  </button>
+                                ) : null}
+                              </div>
+                            </div>
+                            <div style={{ fontSize: 13, color: 'var(--sh-subtext)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+                              <MentionText text={comment.content} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
                 )}
               </section>
 
