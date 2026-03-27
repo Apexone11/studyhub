@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN "trustLevel" TEXT NOT NULL DEFAULT 'new';
+ALTER TABLE "User" ADD COLUMN "trustedAt" TIMESTAMP(3);
