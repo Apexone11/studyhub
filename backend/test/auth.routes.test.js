@@ -111,7 +111,7 @@ beforeAll(() => {
   }
 
   delete require.cache[authRoutePath]
-  const authRouterModule = require(authRoutePath)
+  const authRouterModule = require('../src/modules/auth')
   const authRouter = authRouterModule.default || authRouterModule
 
   app = express()

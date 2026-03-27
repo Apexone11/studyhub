@@ -35,7 +35,7 @@ export const styles = {
     alignItems: 'center',
     gap: 10,
     padding: '14px 18px',
-    borderBottom: '1px solid #e2e8f0',
+    borderBottom: '1px solid var(--sh-slate-200, #e2e8f0)',
   },
   input: {
     flex: 1,
@@ -50,7 +50,7 @@ export const styles = {
     background: 'none',
     border: 'none',
     cursor: 'pointer',
-    color: '#94a3b8',
+    color: 'var(--sh-slate-400, #94a3b8)',
     display: 'flex',
     alignItems: 'center',
     padding: 2,
@@ -58,8 +58,8 @@ export const styles = {
   kbd: {
     fontSize: 10,
     fontWeight: 600,
-    color: '#94a3b8',
-    border: '1px solid #e2e8f0',
+    color: 'var(--sh-slate-400, #94a3b8)',
+    border: '1px solid var(--sh-slate-200, #e2e8f0)',
     borderRadius: 4,
     padding: '2px 6px',
     lineHeight: 1.2,
@@ -73,13 +73,13 @@ export const styles = {
   statusMsg: {
     padding: '24px 18px',
     textAlign: 'center',
-    color: '#94a3b8',
+    color: 'var(--sh-slate-400, #94a3b8)',
     fontSize: 13,
   },
   sectionLabel: {
     fontSize: 11,
     fontWeight: 700,
-    color: '#64748b',
+    color: 'var(--sh-slate-500, #64748b)',
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
     padding: '10px 18px 4px',
@@ -100,7 +100,7 @@ export const styles = {
   },
   resultMeta: {
     fontSize: 12,
-    color: '#64748b',
+    color: 'var(--sh-slate-500, #64748b)',
     marginTop: 2,
   },
   userAvatar: {

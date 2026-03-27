@@ -182,7 +182,7 @@ router.post('/request', requireAuth, async (req, res) => {
         method: req.method,
         source: 'sendCourseRequestNotice',
       })
-      console.error('Course request notification failed:', emailError)
+      console.error('Course request notification failed:', emailError.message || 'unknown error')
     }
 
     return res.status(201).json({
@@ -196,7 +196,7 @@ router.post('/request', requireAuth, async (req, res) => {
       method: req.method
     })
 
-    console.error(error)
+    console.error('Course request failed:', error.message || 'unknown error')
     return res.status(500).json({ error: 'Server error.' })
   }
 })

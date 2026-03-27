@@ -32,7 +32,7 @@ export function EmailVerificationInline({ visible }) {
       }}
     >
       <strong>Email verification required.</strong>{' '}
-      Your grace period has ended. Verify your email to upload sheets, post comments, and access all features.{' '}
+      Verify your email to upload sheets, post comments, and access all features.{' '}
       <Link to="/settings?tab=account" style={{ color: 'var(--sh-link, #2563eb)', fontWeight: 700, textDecoration: 'underline' }}>
         Verify now
       </Link>
@@ -43,19 +43,8 @@ export function EmailVerificationInline({ visible }) {
 export default function EmailVerificationBanner() {
   const { user } = useSession()
   const [dismissed, setDismissed] = useState(false)
-  const [graceDaysLeft] = useState(() => {
-    if (!user?.createdAt) return null
-    const graceMs = 3 * 24 * 60 * 60 * 1000
-    const elapsed = Date.now() - new Date(user.createdAt).getTime()
-    if (elapsed >= graceMs) return 0
-    return Math.ceil((graceMs - elapsed) / (24 * 60 * 60 * 1000))
-  })
 
   if (!user || user.emailVerified || dismissed) return null
-
-  const graceText = graceDaysLeft > 0
-    ? ` You have ${graceDaysLeft} day${graceDaysLeft !== 1 ? 's' : ''} left before some features are restricted.`
-    : ''
 
   return (
     <div
@@ -75,7 +64,7 @@ export default function EmailVerificationBanner() {
       }}
     >
       <span>
-        Please verify your email to upload sheets, post comments, and access all features.{graceText}
+        Please verify your email to upload sheets, post comments, and access all features.
       </span>
       <Link
         to="/settings?tab=account"

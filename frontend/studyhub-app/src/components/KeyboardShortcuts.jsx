@@ -81,8 +81,8 @@ export default function KeyboardShortcuts() {
             ))}
           </div>
         ))}
-        <div style={{ fontSize: 11, color: '#94a3b8', textAlign: 'center', marginTop: 8 }}>
-          Press <kbd style={{ fontSize: 10, background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 4, padding: '1px 5px' }}>?</kbd> or <kbd style={{ fontSize: 10, background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 4, padding: '1px 5px' }}>Esc</kbd> to close
+        <div style={{ fontSize: 11, color: 'var(--sh-slate-400, #94a3b8)', textAlign: 'center', marginTop: 8 }}>
+          Press <kbd style={{ fontSize: 10, background: 'var(--sh-slate-100, #f1f5f9)', border: '1px solid var(--sh-slate-200, #e2e8f0)', borderRadius: 4, padding: '1px 5px' }}>?</kbd> or <kbd style={{ fontSize: 10, background: 'var(--sh-slate-100, #f1f5f9)', border: '1px solid var(--sh-slate-200, #e2e8f0)', borderRadius: 4, padding: '1px 5px' }}>Esc</kbd> to close
         </div>
       </div>
     </div>

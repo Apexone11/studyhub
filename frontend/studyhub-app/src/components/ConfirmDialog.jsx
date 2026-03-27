@@ -55,7 +55,7 @@ export default function ConfirmDialog({
             onClick={onConfirm}
             style={{
               ...styles.confirmBtn,
-              background: isDanger ? '#ef4444' : '#3b82f6',
+              background: isDanger ? 'var(--sh-danger)' : 'var(--sh-info)',
             }}
           >
             {confirmLabel}
@@ -70,7 +70,7 @@ const styles = {
   overlay: {
     position: 'fixed',
     inset: 0,
-    background: 'rgba(15, 23, 42, 0.5)',
+    background: 'var(--sh-overlay, rgba(15, 23, 42, 0.5))',
     backdropFilter: 'blur(3px)',
     zIndex: 600,
     display: 'flex',
@@ -79,7 +79,7 @@ const styles = {
     fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
   },
   modal: {
-    background: '#fff',
+    background: 'var(--sh-surface, #fff)',
     borderRadius: 18,
     padding: 'clamp(20px, 3vw, 28px)',
     width: 'min(420px, 90vw)',
@@ -89,13 +89,13 @@ const styles = {
     margin: 0,
     fontSize: 17,
     fontWeight: 700,
-    color: '#0f172a',
+    color: 'var(--sh-slate-900, #0f172a)',
     lineHeight: 1.3,
   },
   message: {
     margin: '10px 0 0',
     fontSize: 14,
-    color: '#475569',
+    color: 'var(--sh-slate-600, #475569)',
     lineHeight: 1.5,
   },
   actions: {
@@ -107,9 +107,9 @@ const styles = {
   cancelBtn: {
     padding: '9px 18px',
     borderRadius: 10,
-    border: '1px solid #e2e8f0',
-    background: '#fff',
-    color: '#475569',
+    border: '1px solid var(--sh-slate-200, #e2e8f0)',
+    background: 'var(--sh-surface, #fff)',
+    color: 'var(--sh-slate-600, #475569)',
     fontSize: 13,
     fontWeight: 600,
     cursor: 'pointer',
@@ -120,7 +120,7 @@ const styles = {
     padding: '9px 18px',
     borderRadius: 10,
     border: 'none',
-    color: '#fff',
+    color: 'var(--sh-surface, #fff)',
     fontSize: 13,
     fontWeight: 600,
     cursor: 'pointer',

@@ -116,7 +116,7 @@ beforeAll(() => {
   }
 
   delete require.cache[feedRoutePath]
-  const feedRouterModule = require(feedRoutePath)
+  const feedRouterModule = require('../src/modules/feed')
   const feedRouter = feedRouterModule.default || feedRouterModule
 
   app = express()

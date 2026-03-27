@@ -6,29 +6,29 @@ export default function AdminSettingsTab({ user, htmlKillSwitch, htmlToggleSavin
   return (
     <section
       style={{
-        background: '#fff',
+        background: 'var(--sh-surface, #fff)',
         borderRadius: 18,
-        border: '1px solid #e2e8f0',
+        border: '1px solid var(--sh-border, #e2e8f0)',
         padding: '22px',
       }}
     >
-      <h1 style={{ margin: '0 0 10px', fontSize: 22, color: '#0f172a' }}>Admin Settings</h1>
-      <p style={{ margin: '0 0 14px', fontSize: 13, color: '#64748b', lineHeight: 1.7 }}>
+      <h1 style={{ margin: '0 0 10px', fontSize: 22, color: 'var(--sh-slate-900, #0f172a)' }}>Admin Settings</h1>
+      <p style={{ margin: '0 0 14px', fontSize: 13, color: 'var(--sh-slate-500, #64748b)', lineHeight: 1.7 }}>
         Core account changes now live under the shared settings flow so admin and student verification behavior stay consistent.
       </p>
       <div style={{ display: 'grid', gap: 12 }}>
         <div style={settingsCardStyle}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', marginBottom: 6 }}>ADMIN EMAIL</div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', marginBottom: 4 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--sh-slate-400, #94a3b8)', marginBottom: 6 }}>ADMIN EMAIL</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--sh-slate-900, #0f172a)', marginBottom: 4 }}>
             {user.email || SUPPORT_EMAIL}
           </div>
-          <div style={{ fontSize: 12, color: '#64748b' }}>
+          <div style={{ fontSize: 12, color: 'var(--sh-slate-500, #64748b)' }}>
             Verification status: {user.emailVerified ? 'verified' : 'verification required'}
           </div>
         </div>
         <div style={settingsCardStyle}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', marginBottom: 6 }}>SECURITY</div>
-          <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.7 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--sh-slate-400, #94a3b8)', marginBottom: 6 }}>SECURITY</div>
+          <div style={{ fontSize: 12, color: 'var(--sh-slate-500, #64748b)', lineHeight: 1.7 }}>
             Use the main settings page to change email, password, username, 2-step verification, and enrolled courses.
           </div>
         </div>
@@ -37,7 +37,7 @@ export default function AdminSettingsTab({ user, htmlKillSwitch, htmlToggleSavin
           border: htmlKillSwitch.enabled ? '1px solid var(--sh-success-border, #bbf7d0)' : '1px solid var(--sh-danger-border, #fecaca)',
           background: htmlKillSwitch.enabled ? 'var(--sh-success-bg, #f0fdf4)' : 'var(--sh-danger-bg, #fef2f2)',
         }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#94a3b8', marginBottom: 6 }}>HTML UPLOADS KILL-SWITCH</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--sh-slate-400, #94a3b8)', marginBottom: 6 }}>HTML UPLOADS KILL-SWITCH</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
             <div style={{
               fontSize: 14, fontWeight: 700,

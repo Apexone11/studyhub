@@ -133,7 +133,7 @@ export default function SearchModal({ open, onClose }) {
       <div style={styles.modal} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Search sheets, courses, and users">
         {/* Search input */}
         <div style={styles.inputRow}>
-          <IconSearch size={16} style={{ color: '#64748b', flexShrink: 0 }} />
+          <IconSearch size={16} style={{ color: 'var(--sh-slate-500, #64748b)', flexShrink: 0 }} />
           <input
             ref={inputRef}
             type="text"

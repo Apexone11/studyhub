@@ -173,8 +173,9 @@ export default function SettingsPage() {
               }}>
                 <strong>Account Status: New</strong>
                 <p style={{ margin: '6px 0 0', lineHeight: 1.5 }}>
-                  Your account is new. To keep StudyHub safe, public posts and shared content may require review for a short time.
-                  After a few days of activity with no issues, your account will be automatically trusted.
+                  {sessionUser?.emailVerified
+                    ? 'Your email is verified. After a few days with no issues, your account will be automatically promoted to trusted status and your content will publish immediately.'
+                    : 'Verify your email to unlock all features. Once verified and after a few days with no issues, your content will publish immediately.'}
                 </p>
               </div>
             )}

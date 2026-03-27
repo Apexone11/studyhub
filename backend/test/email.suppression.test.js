@@ -49,7 +49,7 @@ beforeAll(() => {
   }
 
   delete require.cache[emailLibPath]
-  emailLib = require(emailLibPath)
+  emailLib = require('../src/lib/email/email')
 })
 
 afterAll(() => {

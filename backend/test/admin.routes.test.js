@@ -106,7 +106,7 @@ beforeAll(() => {
   }
 
   delete require.cache[adminRoutePath]
-  const adminRouterModule = require(adminRoutePath)
+  const adminRouterModule = require('../src/modules/admin')
   const adminRouter = adminRouterModule.default || adminRouterModule
 
   app = express()

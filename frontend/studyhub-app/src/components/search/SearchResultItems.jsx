@@ -15,7 +15,7 @@ export function SheetResults({ sheets, query, activeIndex, setActiveIndex, navig
             key={`s-${sheet.id}`}
             style={{
               ...styles.resultItem,
-              background: activeIndex === flatIdx ? '#f1f5f9' : 'transparent',
+              background: activeIndex === flatIdx ? 'var(--sh-slate-100, #f1f5f9)' : 'transparent',
             }}
             onClick={() => navigateToItem({ type: 'sheet', data: sheet })}
             onMouseEnter={() => setActiveIndex(flatIdx)}
@@ -46,7 +46,7 @@ export function NoteResults({ notes, sheetsCount, query, activeIndex, setActiveI
             key={`n-${note.id}`}
             style={{
               ...styles.resultItem,
-              background: activeIndex === flatIdx ? '#f1f5f9' : 'transparent',
+              background: activeIndex === flatIdx ? 'var(--sh-slate-100, #f1f5f9)' : 'transparent',
             }}
             onClick={() => navigateToItem({ type: 'note', data: note })}
             onMouseEnter={() => setActiveIndex(flatIdx)}
@@ -76,7 +76,7 @@ export function CourseResults({ courses, sheetsCount, query, activeIndex, setAct
             key={`c-${course.id}`}
             style={{
               ...styles.resultItem,
-              background: activeIndex === flatIdx ? '#f1f5f9' : 'transparent',
+              background: activeIndex === flatIdx ? 'var(--sh-slate-100, #f1f5f9)' : 'transparent',
             }}
             onClick={() => navigateToItem({ type: 'course', data: course })}
             onMouseEnter={() => setActiveIndex(flatIdx)}
@@ -104,7 +104,7 @@ export function UserResults({ users, sheetsCount, coursesCount, query, activeInd
             key={`u-${user.id}`}
             style={{
               ...styles.resultItem,
-              background: activeIndex === flatIdx ? '#f1f5f9' : 'transparent',
+              background: activeIndex === flatIdx ? 'var(--sh-slate-100, #f1f5f9)' : 'transparent',
             }}
             onClick={() => navigateToItem({ type: 'user', data: user })}
             onMouseEnter={() => setActiveIndex(flatIdx)}

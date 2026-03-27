@@ -48,7 +48,7 @@ router.post('/forgot-password', forgotLimiter, async (req, res) => {
     return res.json({ message: GENERIC_MESSAGE })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
-    console.error(error)
+    console.error('Password reset request failed:', error.message || 'unknown error')
     return res.json({ message: GENERIC_MESSAGE })
   }
 })

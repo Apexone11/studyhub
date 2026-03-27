@@ -51,7 +51,7 @@ beforeAll(() => {
   }
 
   delete require.cache[modEnginePath]
-  const mod = require(modEnginePath)
+  const mod = require('../src/lib/moderation/moderationEngine')
   scanContent = mod.scanContent
   reviewCase = mod.reviewCase
 })
