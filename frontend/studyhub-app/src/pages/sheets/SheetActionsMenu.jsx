@@ -44,11 +44,28 @@ export default function SheetActionsMenu({
 
   return (
     <div data-tutorial="viewer-actions" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+      {!user && (
+        <Link
+          to="/login"
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '6px 14px', borderRadius: 8,
+            background: 'var(--sh-brand)', color: 'var(--sh-btn-primary-text)',
+            fontSize: 12, fontWeight: 700, textDecoration: 'none',
+            fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+          }}
+        >
+          Sign in to star, fork, and contribute
+        </Link>
+      )}
+
       {/* Primary actions */}
-      <button type="button" onClick={updateStar} style={actionButton(sheet.starred ? 'var(--sh-warning)' : 'var(--sh-slate-600)')}>
-        {sheet.starred ? <IconStarFilled size={14} /> : <IconStar size={14} />}
-        {sheet.stars || 0}
-      </button>
+      {user && (
+        <button type="button" onClick={updateStar} style={actionButton(sheet.starred ? 'var(--sh-warning)' : 'var(--sh-slate-600)')}>
+          {sheet.starred ? <IconStarFilled size={14} /> : <IconStar size={14} />}
+          {sheet.stars || 0}
+        </button>
+      )}
 
       {canEdit ? (
         <Link to={`/sheets/${sheet.id}/lab`} style={linkButton()}>

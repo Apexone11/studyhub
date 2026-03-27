@@ -36,43 +36,65 @@ export default function SheetCommentsPanel({
 
       {commentsExpanded && (
         <>
-          <form onSubmit={submitComment} style={{ display: 'grid', gap: 12, marginBottom: 16 }}>
-            <textarea
-              value={commentDraft}
-              onChange={(event) => setCommentDraft(event.target.value)}
-              placeholder="Share a clarification, correction, or study tip…"
-              rows={3}
-              style={{
-                width: '100%',
-                resize: 'vertical',
-                borderRadius: 12,
-                border: '1px solid var(--sh-input-border)',
-                padding: 12,
-                font: 'inherit',
-                background: 'var(--sh-input-bg)',
-                color: 'var(--sh-input-text)',
-              }}
-            />
-            <div>
-              <button
-                type="submit"
-                disabled={commentSaving}
-                style={{
-                  borderRadius: 10,
-                  border: 'none',
-                  background: 'var(--sh-btn-primary-bg)',
-                  color: 'var(--sh-btn-primary-text)',
-                  fontWeight: 800,
-                  fontSize: 13,
-                  padding: '10px 14px',
-                  cursor: commentSaving ? 'wait' : 'pointer',
-                  fontFamily: FONT,
-                }}
-              >
-                {commentSaving ? 'Posting...' : 'Post comment'}
-              </button>
+          {!user ? (
+            <div style={{
+              textAlign: 'center', padding: '16px 12px',
+              borderRadius: 12, border: '1px solid var(--sh-border)',
+              background: 'var(--sh-soft)', marginBottom: 16,
+            }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--sh-heading)', marginBottom: 4 }}>
+                Join the conversation
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--sh-muted)', lineHeight: 1.5, marginBottom: 10 }}>
+                Sign in to leave comments, corrections, and study tips.
+              </div>
+              <Link to="/login" style={{
+                display: 'inline-block', padding: '7px 16px', borderRadius: 8,
+                background: 'var(--sh-brand)', color: 'var(--sh-btn-primary-text)',
+                fontSize: 12, fontWeight: 700, textDecoration: 'none',
+              }}>
+                Sign in
+              </Link>
             </div>
-          </form>
+          ) : (
+            <form onSubmit={submitComment} style={{ display: 'grid', gap: 12, marginBottom: 16 }}>
+              <textarea
+                value={commentDraft}
+                onChange={(event) => setCommentDraft(event.target.value)}
+                placeholder="Share a clarification, correction, or study tip…"
+                rows={3}
+                style={{
+                  width: '100%',
+                  resize: 'vertical',
+                  borderRadius: 12,
+                  border: '1px solid var(--sh-input-border)',
+                  padding: 12,
+                  font: 'inherit',
+                  background: 'var(--sh-input-bg)',
+                  color: 'var(--sh-input-text)',
+                }}
+              />
+              <div>
+                <button
+                  type="submit"
+                  disabled={commentSaving}
+                  style={{
+                    borderRadius: 10,
+                    border: 'none',
+                    background: 'var(--sh-btn-primary-bg)',
+                    color: 'var(--sh-btn-primary-text)',
+                    fontWeight: 800,
+                    fontSize: 13,
+                    padding: '10px 14px',
+                    cursor: commentSaving ? 'wait' : 'pointer',
+                    fontFamily: FONT,
+                  }}
+                >
+                  {commentSaving ? 'Posting...' : 'Post comment'}
+                </button>
+              </div>
+            </form>
+          )}
 
           {commentsState.loading ? (
             <SkeletonCard style={{ padding: 16, minHeight: 60 }} />
