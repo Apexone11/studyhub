@@ -14,7 +14,7 @@ const {
   upsertHtmlVersion,
 } = require('../../lib/htmlDraftWorkflow')
 const { isHtmlUploadsEnabled } = require('../../lib/htmlKillSwitch')
-const { SHEET_STATUS, sheetWriteLimiter } = require('./sheets.constants')
+const { SHEET_STATUS, AUTHOR_SELECT, sheetWriteLimiter } = require('./sheets.constants')
 const { normalizeContentFormat } = require('./sheets.service')
 const { serializeSheet } = require('./sheets.serializer')
 
@@ -28,7 +28,7 @@ router.get('/drafts/latest', requireAuth, async (req, res) => {
         status: SHEET_STATUS.DRAFT,
       },
       include: {
-        author: { select: { id: true, username: true } },
+        author: { select: AUTHOR_SELECT },
         course: { include: { school: true } },
         htmlVersions: true,
       },
@@ -95,7 +95,7 @@ router.post('/drafts/autosave', requireAuth, requireVerifiedEmail, sheetWriteLim
           allowDownloads,
         },
         include: {
-          author: { select: { id: true, username: true } },
+          author: { select: AUTHOR_SELECT },
           course: { include: { school: true } },
           htmlVersions: true,
         },
@@ -113,7 +113,7 @@ router.post('/drafts/autosave', requireAuth, requireVerifiedEmail, sheetWriteLim
           allowDownloads,
         },
         include: {
-          author: { select: { id: true, username: true } },
+          author: { select: AUTHOR_SELECT },
           course: { include: { school: true } },
           htmlVersions: true,
         },
@@ -131,7 +131,7 @@ router.post('/drafts/autosave', requireAuth, requireVerifiedEmail, sheetWriteLim
       draft = await prisma.studySheet.findUnique({
         where: { id: draft.id },
         include: {
-          author: { select: { id: true, username: true } },
+          author: { select: AUTHOR_SELECT },
           course: { include: { school: true } },
           htmlVersions: true,
         },
@@ -167,7 +167,7 @@ router.post('/drafts/import-html', requireAuth, requireVerifiedEmail, sheetWrite
     const draft = await prisma.studySheet.findUnique({
       where: { id: nextDraftId },
       include: {
-        author: { select: { id: true, username: true } },
+        author: { select: AUTHOR_SELECT },
         course: { include: { school: true } },
         htmlVersions: true,
       },
@@ -210,7 +210,7 @@ router.patch('/drafts/:id/working-html', requireAuth, requireVerifiedEmail, shee
     const draft = await prisma.studySheet.findUnique({
       where: { id: sheetId },
       include: {
-        author: { select: { id: true, username: true } },
+        author: { select: AUTHOR_SELECT },
         course: { include: { school: true } },
         htmlVersions: true,
       },

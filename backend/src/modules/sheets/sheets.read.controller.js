@@ -2,6 +2,7 @@ const express = require('express')
 const prisma = require('../../core/db/prisma')
 const { captureError } = require('../../core/monitoring/sentry')
 const optionalAuth = require('../../core/auth/optionalAuth')
+const { AUTHOR_SELECT } = require('./sheets.constants')
 const { canReadSheet } = require('./sheets.service')
 const { serializeSheet, fetchContributionCollections } = require('./sheets.serializer')
 const { timedSection, logTiming } = require('../../lib/requestTiming')
@@ -18,7 +19,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
       prisma.studySheet.findUnique({
         where: { id: sheetId },
         include: {
-          author: { select: { id: true, username: true } },
+          author: { select: AUTHOR_SELECT },
           course: { include: { school: true } },
           htmlVersions: true,
           forkSource: {
@@ -26,7 +27,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
               id: true,
               title: true,
               userId: true,
-              author: { select: { id: true, username: true } },
+              author: { select: AUTHOR_SELECT },
             },
           },
         },

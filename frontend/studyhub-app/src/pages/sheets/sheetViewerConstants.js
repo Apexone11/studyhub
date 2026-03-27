@@ -93,6 +93,66 @@ function statusBadge(status) {
   }
 }
 
+function statusPill(status) {
+  const colorMap = {
+    published: { bg: 'var(--sh-success-bg)', color: 'var(--sh-success)', border: 'var(--sh-success-border)' },
+    pending_review: { bg: 'var(--sh-warning-bg)', color: 'var(--sh-warning-text)', border: 'var(--sh-warning-border)' },
+    rejected: { bg: 'var(--sh-danger-bg)', color: 'var(--sh-danger)', border: 'var(--sh-danger-border)' },
+    quarantined: { bg: 'var(--sh-danger-bg)', color: 'var(--sh-danger)', border: 'var(--sh-danger-border)' },
+    draft: { bg: 'var(--sh-soft)', color: 'var(--sh-muted)', border: 'var(--sh-border)' },
+  }
+  const c = colorMap[status] || colorMap.draft
+  return {
+    display: 'inline-flex',
+    alignItems: 'center',
+    padding: '2px 10px',
+    borderRadius: 20,
+    fontSize: 11,
+    fontWeight: 700,
+    textTransform: 'capitalize',
+    background: c.bg,
+    color: c.color,
+    border: `1px solid ${c.border}`,
+    letterSpacing: '0.02em',
+  }
+}
+
+function secondaryDropdown() {
+  return {
+    position: 'absolute',
+    top: '100%',
+    right: 0,
+    marginTop: 6,
+    background: 'var(--sh-surface)',
+    border: '1px solid var(--sh-border)',
+    borderRadius: 12,
+    boxShadow: '0 8px 24px rgba(15,23,42,0.12)',
+    padding: 4,
+    zIndex: 30,
+    minWidth: 200,
+  }
+}
+
+function dropdownItem() {
+  return {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    width: '100%',
+    padding: '9px 12px',
+    border: 'none',
+    borderRadius: 8,
+    background: 'transparent',
+    color: 'var(--sh-text)',
+    fontSize: 13,
+    fontWeight: 600,
+    cursor: 'pointer',
+    fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+    textAlign: 'left',
+    textDecoration: 'none',
+  }
+}
+
 export {
   FONT,
   IMAGE_EXTENSIONS,
@@ -104,6 +164,9 @@ export {
   actionButton,
   linkButton,
   statusBadge,
+  statusPill,
+  secondaryDropdown,
+  dropdownItem,
 }
 
 /* ── Re-export JSX helpers from sheetViewerComponents.jsx ──────────────── */

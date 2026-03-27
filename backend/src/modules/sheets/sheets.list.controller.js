@@ -3,7 +3,7 @@ const prisma = require('../../core/db/prisma')
 const { captureError } = require('../../core/monitoring/sentry')
 const optionalAuth = require('../../core/auth/optionalAuth')
 const { parsePositiveInt } = require('../../core/http/validate')
-const { SHEET_STATUS, leaderboardLimiter } = require('./sheets.constants')
+const { SHEET_STATUS, AUTHOR_SELECT, leaderboardLimiter } = require('./sheets.constants')
 const { serializeSheet } = require('./sheets.serializer')
 const { buildSheetTextSearchClauses } = require('../../lib/sheetSearch')
 const { searchSheetsFTS } = require('../../lib/fullTextSearch')
@@ -46,7 +46,7 @@ router.get('/leaderboard', leaderboardLimiter, async (req, res) => {
         stars: true,
         downloads: true,
         allowDownloads: true,
-        author: { select: { id: true, username: true } },
+        author: { select: AUTHOR_SELECT },
         course: { select: { code: true } },
       },
       where: { status: SHEET_STATUS.PUBLISHED },
@@ -134,14 +134,14 @@ router.get('/', optionalAuth, async (req, res) => {
       const sheets = await prisma.studySheet.findMany({
         where: { id: { in: starredSheetIds } },
         include: {
-          author: { select: { id: true, username: true } },
+          author: { select: AUTHOR_SELECT },
           course: { include: { school: true } },
           forkSource: {
             select: {
               id: true,
               title: true,
               userId: true,
-              author: { select: { id: true, username: true } },
+              author: { select: AUTHOR_SELECT },
             },
           },
         },
@@ -182,14 +182,14 @@ router.get('/', optionalAuth, async (req, res) => {
         ? await prisma.studySheet.findMany({
             where: { id: { in: ftsSheetIds } },
             include: {
-              author: { select: { id: true, username: true } },
+              author: { select: AUTHOR_SELECT },
               course: { include: { school: true } },
               forkSource: {
                 select: {
                   id: true,
                   title: true,
                   userId: true,
-                  author: { select: { id: true, username: true } },
+                  author: { select: AUTHOR_SELECT },
                 },
               },
             },
@@ -235,14 +235,14 @@ router.get('/', optionalAuth, async (req, res) => {
     const useRecommended = sortField === 'recommended'
 
     const sheetInclude = {
-      author: { select: { id: true, username: true } },
+      author: { select: AUTHOR_SELECT },
       course: { include: { school: true } },
       forkSource: {
         select: {
           id: true,
           title: true,
           userId: true,
-          author: { select: { id: true, username: true } },
+          author: { select: AUTHOR_SELECT },
         },
       },
     }

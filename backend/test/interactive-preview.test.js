@@ -230,11 +230,11 @@ describe('html-preview endpoint — canInteract flag', () => {
  * 6) Sandbox iframe attributes — frontend verification
  * ═══════════════════════════════════════════════════════════════════════════ */
 describe('Frontend sandbox iframe attributes', () => {
-  it('SheetViewerPage uses allow-scripts allow-forms for interactive mode', () => {
+  it('SheetContentPanel uses allow-scripts allow-forms for interactive mode', () => {
     const fs = require('node:fs')
     const path = require('node:path')
     const source = fs.readFileSync(
-      path.join(__dirname, '../../frontend/studyhub-app/src/pages/sheets/SheetViewerPage.jsx'),
+      path.join(__dirname, '../../frontend/studyhub-app/src/pages/sheets/SheetContentPanel.jsx'),
       'utf8'
     )
     expect(source).toContain("'allow-scripts allow-forms'")
@@ -242,11 +242,11 @@ describe('Frontend sandbox iframe attributes', () => {
     expect(source).not.toContain('allow-same-origin')
   })
 
-  it('SheetViewerPage uses empty sandbox for safe mode', () => {
+  it('SheetContentPanel uses empty sandbox for safe mode', () => {
     const fs = require('node:fs')
     const path = require('node:path')
     const source = fs.readFileSync(
-      path.join(__dirname, '../../frontend/studyhub-app/src/pages/sheets/SheetViewerPage.jsx'),
+      path.join(__dirname, '../../frontend/studyhub-app/src/pages/sheets/SheetContentPanel.jsx'),
       'utf8'
     )
     // The ternary should fall back to empty string for safe mode
@@ -264,21 +264,21 @@ describe('Frontend sandbox iframe attributes', () => {
     expect(source).not.toContain('allow-same-origin')
   })
 
-  it('SheetViewerPage does not include allow-top-navigation', () => {
+  it('SheetContentPanel does not include allow-top-navigation', () => {
     const fs = require('node:fs')
     const path = require('node:path')
     const source = fs.readFileSync(
-      path.join(__dirname, '../../frontend/studyhub-app/src/pages/sheets/SheetViewerPage.jsx'),
+      path.join(__dirname, '../../frontend/studyhub-app/src/pages/sheets/SheetContentPanel.jsx'),
       'utf8'
     )
     expect(source).not.toContain('allow-top-navigation')
   })
 
-  it('SheetViewerPage does not include allow-popups', () => {
+  it('SheetContentPanel does not include allow-popups', () => {
     const fs = require('node:fs')
     const path = require('node:path')
     const source = fs.readFileSync(
-      path.join(__dirname, '../../frontend/studyhub-app/src/pages/sheets/SheetViewerPage.jsx'),
+      path.join(__dirname, '../../frontend/studyhub-app/src/pages/sheets/SheetContentPanel.jsx'),
       'utf8'
     )
     expect(source).not.toContain('allow-popups')

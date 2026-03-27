@@ -531,3 +531,36 @@ export function LogoWordmark({ height = 32 }) {
     </div>
   )
 }
+
+// ─── BADGE / UTILITY ICONS ──────────────────────────────────────
+
+// More (horizontal dots) — secondary actions menu trigger
+export function IconMoreHorizontal({ size, ...p }) {
+  return (
+    <Svg size={size} {...p}>
+      <circle cx="5" cy="12" r="1.5" fill="currentColor" />
+      <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+      <circle cx="19" cy="12" r="1.5" fill="currentColor" />
+    </Svg>
+  )
+}
+
+// Shield check — staff verified badge
+export function IconShieldCheck({ size, ...p }) {
+  return (
+    <Svg size={size} {...p}>
+      <path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.25C17.25 22.15 21 17.25 21 12V7l-9-5z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M8.5 12.5l2.5 2.5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  )
+}
+
+// Mail check — email verified badge
+export function IconMailCheck({ size, ...p }) {
+  return (
+    <Svg size={size} {...p}>
+      <path d="M3 7a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M3 7l9 6 9-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  )
+}

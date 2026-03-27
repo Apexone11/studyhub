@@ -8,7 +8,7 @@ const { createNotification } = require('../../lib/notify')
 const { validateHtmlForSubmission } = require('../../lib/htmlSecurity')
 const { cleanupAttachmentIfUnused } = require('../../lib/storage')
 const { computeLineDiff, addWordSegments } = require('../../lib/diff')
-const { SHEET_STATUS, contributionRateLimiter, contributionReviewLimiter, diffLimiter } = require('./sheets.constants')
+const { SHEET_STATUS, AUTHOR_SELECT, contributionRateLimiter, contributionReviewLimiter, diffLimiter } = require('./sheets.constants')
 const { serializeContribution } = require('./sheets.serializer')
 const { computeChecksum } = require('../sheetLab/sheetLab.constants')
 const { trackActivity } = require('../../lib/activityTracker')
@@ -47,7 +47,7 @@ router.patch('/contributions/:contributionId', contributionReviewLimiter, requir
             allowDownloads: true,
           },
         },
-        proposer: { select: { id: true, username: true } },
+        proposer: { select: AUTHOR_SELECT },
       },
     })
 
@@ -120,14 +120,14 @@ router.patch('/contributions/:contributionId', contributionReviewLimiter, requir
         reviewedAt: new Date(),
       },
       include: {
-        proposer: { select: { id: true, username: true } },
-        reviewer: { select: { id: true, username: true } },
+        proposer: { select: AUTHOR_SELECT },
+        reviewer: { select: AUTHOR_SELECT },
         forkSheet: {
           select: {
             id: true,
             title: true,
             updatedAt: true,
-            author: { select: { id: true, username: true } },
+            author: { select: AUTHOR_SELECT },
           },
         },
       },
@@ -209,14 +209,14 @@ router.post('/:id/contributions', requireAuth, requireVerifiedEmail, contributio
         message,
       },
       include: {
-        proposer: { select: { id: true, username: true } },
-        reviewer: { select: { id: true, username: true } },
+        proposer: { select: AUTHOR_SELECT },
+        reviewer: { select: AUTHOR_SELECT },
         forkSheet: {
           select: {
             id: true,
             title: true,
             updatedAt: true,
-            author: { select: { id: true, username: true } },
+            author: { select: AUTHOR_SELECT },
           },
         },
       },

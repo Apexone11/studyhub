@@ -1,5 +1,6 @@
 import { Pager } from './AdminWidgets'
 import { tableHeadStyle, tableCell, tableCellStrong, pillButton } from './adminConstants'
+import { API } from '../../config'
 
 export default function UsersTab({ usersState, currentUserId, patchRole, deleteUser, loadPagedData }) {
   return (
@@ -11,14 +12,14 @@ export default function UsersTab({ usersState, currentUserId, patchRole, deleteU
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ background: '#f8fafc' }}>
-              {['Username', 'Email', 'Role', 'Sheets', 'Joined', 'Actions'].map((header) => (
+              {['Username', 'Email', 'Role', 'Sheets', 'Joined', 'Staff Verified', 'Actions'].map((header) => (
                 <th key={header} style={tableHeadStyle}>{header}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {usersState.items.length === 0 && (
-              <tr><td colSpan={6} className="admin-empty">No users found.</td></tr>
+              <tr><td colSpan={7} className="admin-empty">No users found.</td></tr>
             )}
             {usersState.items.map((record) => (
               <tr key={record.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
@@ -27,6 +28,24 @@ export default function UsersTab({ usersState, currentUserId, patchRole, deleteU
                 <td style={tableCell}>{record.role}</td>
                 <td style={tableCell}>{record._count?.studySheets ?? 0}</td>
                 <td style={tableCell}>{new Date(record.createdAt).toLocaleDateString()}</td>
+                <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(record.isStaffVerified)}
+                    onChange={async () => {
+                      try {
+                        await fetch(`${API}/api/admin/users/${record.id}/staff-verified`, {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          credentials: 'include',
+                          body: JSON.stringify({ isStaffVerified: !record.isStaffVerified }),
+                        })
+                        loadPagedData('users', usersState.page)
+                      } catch { /* swallow */ }
+                    }}
+                    style={{ cursor: 'pointer', width: 16, height: 16, accentColor: 'var(--sh-brand)' }}
+                  />
+                </td>
                 <td style={{ ...tableCell, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   {record.role === 'student' ? (
                     <button type="button" onClick={() => void patchRole(record.id, 'admin')} style={pillButton('#eff6ff', '#1d4ed8', '#bfdbfe')}>
