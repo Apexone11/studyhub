@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
 import { API } from '../../config'
-import { getApiErrorMessage, isAuthSessionFailure, readJsonSafely } from '../../lib/http'
-import { useSession } from '../../lib/session-context'
+import { getApiErrorMessage, readJsonSafely } from '../../lib/http'
 import { pageShell } from '../../lib/ui'
 
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
@@ -22,8 +21,6 @@ function panelStyle() {
 }
 
 export default function SheetHtmlPreviewPage() {
-  const navigate = useNavigate()
-  const { clearSession } = useSession()
   const { id } = useParams()
   const sheetId = Number.parseInt(id, 10)
   const [state, setState] = useState({ loading: true, error: '', preview: null })
@@ -44,12 +41,6 @@ export default function SheetHtmlPreviewPage() {
         credentials: 'include',
       })
       const data = await readJsonSafely(response, {})
-
-      if (isAuthSessionFailure(response, data)) {
-        clearSession()
-        navigate('/login', { replace: true })
-        return
-      }
 
       if (response.status === 403) {
         setState({
@@ -72,7 +63,7 @@ export default function SheetHtmlPreviewPage() {
     } catch (error) {
       setState({ loading: false, error: error.message || 'Could not load HTML preview.', preview: null })
     }
-  }, [clearSession, navigate, sheetId])
+  }, [sheetId])
 
   useEffect(() => {
     setState({ loading: true, error: '', preview: null })

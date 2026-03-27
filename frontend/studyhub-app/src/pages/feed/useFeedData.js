@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { API } from '../../config'
-import { getApiErrorMessage, isAuthSessionFailure, readJsonSafely } from '../../lib/http'
+import { getApiErrorMessage, readJsonSafely } from '../../lib/http'
 import { useLivePolling } from '../../lib/useLivePolling'
 import { showToast } from '../../lib/toast'
 import { trackEvent } from '../../lib/telemetry'
@@ -21,7 +21,7 @@ function markFeedVisit() {
   try { localStorage.setItem(LAST_FEED_VISIT_KEY, new Date().toISOString()) } catch { /* ignore */ }
 }
 
-export function useFeedData({ user, clearSession, search }) {
+export function useFeedData({ user, search }) {
   const [feedState, setFeedState] = useState({ items: [], total: 0, loading: true, error: '', partial: false, degradedSections: [] })
   const [leaderboards, setLeaderboards] = useState({ stars: [], downloads: [], contributors: [], error: '' })
   const [starredUpdates, setStarredUpdates] = useState([])
@@ -44,11 +44,6 @@ export function useFeedData({ user, clearSession, search }) {
 
       const data = await readJsonSafely(response, {})
       timing.markFetchEnd()
-
-      if (isAuthSessionFailure(response, data)) {
-        clearSession()
-        return
-      }
 
       if (response.status === 403) {
         apply(() => {
@@ -85,7 +80,7 @@ export function useFeedData({ user, clearSession, search }) {
         }))
       })
     }
-  }, [clearSession, search, timing])
+  }, [search, timing])
 
   // Report timing when feed items first arrive
   useEffect(() => {

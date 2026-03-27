@@ -35,7 +35,7 @@ import SchoolSuggestionBanner from './SchoolSuggestionBanner'
 
 export default function FeedPage() {
   usePageTitle('Feed')
-  const { user, clearSession } = useSession()
+  const { user } = useSession()
   const layout = useResponsiveAppLayout()
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -49,7 +49,7 @@ export default function FeedPage() {
     newSinceLastVisit,
     loadMoreFeed, toggleReaction, toggleStar,
     canDeletePost, deletePost, submitPost, retryFeed,
-  } = useFeedData({ user, clearSession, search })
+  } = useFeedData({ user, search })
 
   const feedListRef = useRef(null)
   const feedAnimatedRef = useRef(false)

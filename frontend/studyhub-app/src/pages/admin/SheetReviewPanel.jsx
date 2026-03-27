@@ -13,12 +13,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { API } from '../../config'
 import { getApiErrorMessage, readJsonSafely } from '../../lib/http'
-import { useSession } from '../../lib/session-context'
 import { FONT, overlayStyle, panelStyle, closeBtnStyle } from './sheetReviewConstants'
 import { SanitizedPreview, RawHtmlView, FindingsPanel, ReviewActionBar } from './SheetReviewDetails'
 
 export default function SheetReviewPanel({ sheetId, onClose, onReviewComplete }) {
-  const { clearSession } = useSession()
   const [state, setState] = useState({ loading: true, error: '', detail: null })
   const [reason, setReason] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -36,10 +34,6 @@ export default function SheetReviewPanel({ sheetId, onClose, onReviewComplete })
       })
       const data = await readJsonSafely(response, {})
 
-      if (response.status === 401) {
-        clearSession()
-        return
-      }
       if (!response.ok) {
         throw new Error(getApiErrorMessage(data, 'Could not load review detail.'))
       }
@@ -48,7 +42,7 @@ export default function SheetReviewPanel({ sheetId, onClose, onReviewComplete })
     } catch (err) {
       setState({ loading: false, error: err.message || 'Could not load review detail.', detail: null })
     }
-  }, [clearSession, sheetId])
+  }, [sheetId])
 
   useEffect(() => {
     setState({ loading: true, error: '', detail: null })
