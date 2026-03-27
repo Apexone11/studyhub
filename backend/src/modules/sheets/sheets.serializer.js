@@ -1,4 +1,5 @@
 const prisma = require('../../core/db/prisma')
+const { AUTHOR_SELECT } = require('./sheets.constants')
 const { SCAN_STATUS, HTML_VERSION_KIND } = require('../../lib/htmlDraftWorkflow')
 const { RISK_TIER, generateRiskSummary, generateTierExplanation, groupFindingsByCategory } = require('../../lib/htmlSecurity')
 
@@ -32,12 +33,16 @@ function serializeContribution(contribution) {
       ? {
           id: contribution.proposer.id,
           username: contribution.proposer.username,
+          emailVerified: contribution.proposer.emailVerified || false,
+          isStaffVerified: contribution.proposer.isStaffVerified || false,
         }
       : null,
     reviewer: contribution.reviewer
       ? {
           id: contribution.reviewer.id,
           username: contribution.reviewer.username,
+          emailVerified: contribution.reviewer.emailVerified || false,
+          isStaffVerified: contribution.reviewer.isStaffVerified || false,
         }
       : null,
     forkSheet: contribution.forkSheet
@@ -49,6 +54,8 @@ function serializeContribution(contribution) {
             ? {
                 id: contribution.forkSheet.author.id,
                 username: contribution.forkSheet.author.username,
+                emailVerified: contribution.forkSheet.author.emailVerified || false,
+                isStaffVerified: contribution.forkSheet.author.isStaffVerified || false,
               }
             : null,
         }
@@ -104,6 +111,8 @@ function serializeSheet(sheet, { starred = false, reactions = null, commentCount
         ? {
             id: sheet.forkSource.author.id,
             username: sheet.forkSource.author.username,
+            emailVerified: sheet.forkSource.author.emailVerified || false,
+            isStaffVerified: sheet.forkSource.author.isStaffVerified || false,
           }
         : null,
     }
@@ -117,14 +126,14 @@ async function fetchContributionCollections(sheet, currentUser) {
   const canSeeOutgoing = currentUser && (currentUser.role === 'admin' || currentUser.userId === sheet.userId)
 
   const contributionInclude = {
-    proposer: { select: { id: true, username: true } },
-    reviewer: { select: { id: true, username: true } },
+    proposer: { select: AUTHOR_SELECT },
+    reviewer: { select: AUTHOR_SELECT },
     forkSheet: {
       select: {
         id: true,
         title: true,
         updatedAt: true,
-        author: { select: { id: true, username: true } },
+        author: { select: AUTHOR_SELECT },
       },
     },
   }

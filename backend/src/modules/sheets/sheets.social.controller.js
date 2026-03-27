@@ -7,7 +7,7 @@ const { parsePositiveInt } = require('../../core/http/validate')
 const { assertOwnerOrAdmin, sendForbidden } = require('../../lib/accessControl')
 const { createNotification } = require('../../lib/notify')
 const { notifyMentionedUsers } = require('../../lib/mentions')
-const { SHEET_STATUS, reactLimiter, commentLimiter } = require('./sheets.constants')
+const { SHEET_STATUS, AUTHOR_SELECT, reactLimiter, commentLimiter } = require('./sheets.constants')
 const { canReadSheet } = require('./sheets.service')
 const { trackActivity } = require('../../lib/activityTracker')
 const { timedSection, logTiming } = require('../../lib/requestTiming')
@@ -106,7 +106,7 @@ router.get('/:id/comments', async (req, res) => {
       timedSection('comments', () =>
         prisma.comment.findMany({
           where: { sheetId, moderationStatus: 'clean' },
-          include: { author: { select: { id: true, username: true } } },
+          include: { author: { select: AUTHOR_SELECT } },
           orderBy: { createdAt: 'desc' },
           take: limit,
           skip: offset,
@@ -147,7 +147,7 @@ router.post('/:id/comments', requireAuth, requireVerifiedEmail, commentLimiter, 
 
     const comment = await prisma.comment.create({
       data: { content, sheetId, userId: req.user.userId },
-      include: { author: { select: { id: true, username: true } } },
+      include: { author: { select: AUTHOR_SELECT } },
     })
 
     trackActivity(prisma, req.user.userId, 'comments')
