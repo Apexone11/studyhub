@@ -99,6 +99,7 @@ router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
             requestedStatus,
             contentFormat: nextFormat,
             user: req.user,
+            currentStatus: sheet.status,
           })
 
       if (nextFormat === 'html') {

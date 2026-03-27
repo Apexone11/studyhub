@@ -23,12 +23,16 @@ function canReadSheet(sheet, user) {
   return canModerateOrOwnSheet(sheet, user)
 }
 
-function resolveNextSheetStatus({ requestedStatus, contentFormat, isDraftAutosave = false, user = null }) {
+function resolveNextSheetStatus({ requestedStatus, contentFormat, isDraftAutosave = false, user = null, currentStatus = null }) {
   const normalizedRequested = normalizeSheetStatus(requestedStatus, '')
   if (normalizedRequested === SHEET_STATUS.DRAFT || isDraftAutosave) {
     return SHEET_STATUS.DRAFT
   }
   if (contentFormat === 'html') {
+    return SHEET_STATUS.PENDING_REVIEW
+  }
+  // Preserve pending_review on edits — only an admin review should clear it
+  if (currentStatus === SHEET_STATUS.PENDING_REVIEW) {
     return SHEET_STATUS.PENDING_REVIEW
   }
   if (user && !shouldAutoPublish(user)) {
