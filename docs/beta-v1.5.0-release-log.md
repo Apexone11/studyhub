@@ -5747,33 +5747,3 @@ Comprehensive moderation system overhaul covering tutorial persistence fix, admi
 | Frontend build | Clean (575 modules, 482ms) |
 | Backend tests | 531/531 pass (42 files) |
 | Backend lint | 6 pre-existing errors (unrelated files) |
-
-## S-9 Trust Levels — Frontend UX (Tasks 13-18) (2026-03-26)
-
-### What Changed
-
-- **PendingReviewBanner component** (`src/components/PendingReviewBanner.jsx`): New reusable warning banner shown to content owners when their content is pending moderation review due to new-account trust gating.
-
-- **FeedCard** (`src/pages/feed/FeedCard.jsx`): Shows `PendingReviewBanner` when `item.moderationStatus === 'pending_review'` and the current user is the post author.
-
-- **SheetViewerPage** (`src/pages/sheets/SheetViewerPage.jsx`): Shows `PendingReviewBanner` when `sheet.status === 'pending_review'` and the viewer is the sheet owner.
-
-- **NoteViewerPage** (`src/pages/notes/NoteViewerPage.jsx`): Shows `PendingReviewBanner` when `note.moderationStatus === 'pending_review'` and `note.isOwner` is true.
-
-- **Admin UsersTab** (`src/pages/admin/UsersTab.jsx`): Added "Trust" column with an inline `<select>` dropdown (New / Trusted / Restricted) per user row. `PATCH /api/admin/users/:id/trust-level` is called on change; the user list refreshes after success.
-
-- **Admin backend** (`backend/src/modules/admin/admin.users.controller.js`): Added `trustLevel: true` to the `GET /api/admin/users` Prisma select so the frontend dropdown has the correct initial value.
-
-- **Admin CasesSubTab** (`src/pages/admin/CasesSubTab.jsx`): Added trust-level filter select (All / New Users / Trusted / Restricted) in the filter row. Added "new" badge next to usernames in the cases table when `c.user?.trustLevel === 'new'`.
-
-- **ModerationTab** (`src/pages/admin/ModerationTab.jsx`): Added `caseTrustFilter` / `setCaseTrustFilter` state; passes `trustLevel` param to `GET /api/admin/moderation/cases` when set; forwards props to `CasesSubTab`.
-
-- **SettingsPage** (`src/pages/settings/SettingsPage.jsx`): Shows an info banner ("Account Status: New") for `trustLevel === 'new'` users and a success banner ("Account Status: Trusted") for `trustLevel === 'trusted'` users at the top of the Profile tab.
-
-### Validation
-
-| Suite | Result |
-| ------- | -------- |
-| Frontend lint | Clean (1 pre-existing warning, 0 errors) |
-| Frontend tests | 38/38 pass |
-| Frontend build | Clean (581 modules) |
