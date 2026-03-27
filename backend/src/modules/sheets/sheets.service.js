@@ -2,6 +2,7 @@ const path = require('node:path')
 const prisma = require('../../core/db/prisma')
 const { SHEET_STATUS } = require('./sheets.constants')
 const { normalizeContentFormat } = require('../../lib/htmlSecurity')
+const { shouldAutoPublish } = require('../../lib/trustGate')
 
 function normalizeSheetStatus(value, fallback = SHEET_STATUS.PUBLISHED) {
   const normalized = String(value || '').trim().toLowerCase()
@@ -22,12 +23,15 @@ function canReadSheet(sheet, user) {
   return canModerateOrOwnSheet(sheet, user)
 }
 
-function resolveNextSheetStatus({ requestedStatus, contentFormat, isDraftAutosave = false }) {
+function resolveNextSheetStatus({ requestedStatus, contentFormat, isDraftAutosave = false, user = null }) {
   const normalizedRequested = normalizeSheetStatus(requestedStatus, '')
   if (normalizedRequested === SHEET_STATUS.DRAFT || isDraftAutosave) {
     return SHEET_STATUS.DRAFT
   }
   if (contentFormat === 'html') {
+    return SHEET_STATUS.PENDING_REVIEW
+  }
+  if (user && !shouldAutoPublish(user)) {
     return SHEET_STATUS.PENDING_REVIEW
   }
   return SHEET_STATUS.PUBLISHED

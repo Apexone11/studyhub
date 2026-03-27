@@ -11,6 +11,7 @@ const { isModerationEnabled, scanContent } = require('../../lib/moderationEngine
 const requireAuth = require('../../middleware/auth')
 const { feedWriteLimiter, attachmentDownloadLimiter } = require('./feed.constants')
 const { formatFeedPostDetail, safeDownloadName } = require('./feed.service')
+const { getInitialModerationStatus } = require('../../lib/trustGate')
 
 const router = express.Router()
 
@@ -25,12 +26,14 @@ router.post('/posts', feedWriteLimiter, async (req, res) => {
   }
 
   try {
+    const moderationStatus = getInitialModerationStatus(req.user)
     const post = await prisma.feedPost.create({
       data: {
         content,
         userId: req.user.userId,
         courseId: courseId || null,
         allowDownloads,
+        moderationStatus,
       },
       include: {
         author: { select: { id: true, username: true, avatarUrl: true } },

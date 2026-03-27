@@ -8,6 +8,7 @@ const { isModerationEnabled, scanContent } = require('../../lib/moderationEngine
 const { parsePositiveInt } = require('../../core/http/validate')
 const { reactLimiter, commentLimiter, feedWriteLimiter } = require('./feed.constants')
 const { reactionSummary } = require('./feed.service')
+const { getInitialModerationStatus } = require('../../lib/trustGate')
 const { timedSection, logTiming } = require('../../lib/requestTiming')
 
 const router = express.Router()
@@ -64,8 +65,9 @@ router.post('/posts/:id/comments', commentLimiter, async (req, res) => {
     })
     if (!post) return res.status(404).json({ error: 'Post not found.' })
 
+    const moderationStatus = getInitialModerationStatus(req.user)
     const comment = await prisma.feedPostComment.create({
-      data: { content, postId, userId: req.user.userId },
+      data: { content, postId, userId: req.user.userId, moderationStatus },
       include: { author: { select: { id: true, username: true } } },
     })
 

@@ -26,6 +26,7 @@ router.post('/', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (re
   const nextStatus = resolveNextSheetStatus({
     requestedStatus: req.body?.status,
     contentFormat,
+    user: req.user,
   })
 
   if (!title?.trim()) return res.status(400).json({ error: 'Title is required.' })
