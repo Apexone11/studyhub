@@ -1808,3 +1808,11 @@ The starred sheets query in `sheets.list.controller.js` had no `orderBy` on `sta
 The Appeal Decision modal in `ModerationTab.jsx` renders inside the Settings tab `<main>` element, which has a `transform` applied by anime.js `fadeInUp` animation. CSS `position: fixed` inside a transformed parent is relative to the parent, not the viewport — causing the modal to float off-center. Fixed by wrapping the modal JSX in `createPortal(…, document.body)`.
 
 **File:** `frontend/studyhub-app/src/pages/settings/ModerationTab.jsx`
+
+**Verification:**
+
+- Open Settings → Moderation → click "Appeal Decision" on any case
+- Confirm modal is centered on: desktop + mobile widths, light + dark mode
+- Confirm centering holds while the page is animating (tab switch triggers anime.js transform)
+
+**General rule:** Any modal rendered inside a transformed or animated container must be portaled to `document.body` to guarantee viewport centering. This applies to all Settings tabs (animated via `fadeInUp`) and any future page that uses anime.js entrance animations.
