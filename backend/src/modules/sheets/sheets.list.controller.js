@@ -254,7 +254,7 @@ router.get('/', optionalAuth, async (req, res) => {
             where,
             include: sheetInclude,
             orderBy: { createdAt: 'desc' },
-            take: Math.min(take + skip + 200, 500),
+            take: Math.min(take + skip + 50, 200),
           })
         : prisma.studySheet.findMany({
             where,

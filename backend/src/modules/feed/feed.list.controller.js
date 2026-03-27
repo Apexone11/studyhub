@@ -63,7 +63,10 @@ router.get('/', async (req, res) => {
       })),
       settleSection('sheets', () => prisma.studySheet.findMany({
         where: sheetWhere,
-        include: {
+        select: {
+          id: true, title: true, description: true, content: true,
+          createdAt: true, stars: true, forks: true, downloads: true,
+          attachmentUrl: true, attachmentName: true, attachmentType: true, allowDownloads: true,
           author: { select: { id: true, username: true, avatarUrl: true } },
           course: { select: { id: true, code: true } },
           forkSource: {
@@ -79,7 +82,9 @@ router.get('/', async (req, res) => {
       })),
       settleSection('posts', () => prisma.feedPost.findMany({
         where: postWhere,
-        include: {
+        select: {
+          id: true, content: true, createdAt: true, updatedAt: true,
+          attachmentUrl: true, attachmentName: true, attachmentType: true, allowDownloads: true,
           author: { select: { id: true, username: true, avatarUrl: true } },
           course: { select: { id: true, code: true } },
         },
@@ -88,7 +93,8 @@ router.get('/', async (req, res) => {
       })),
       settleSection('notes', () => prisma.note.findMany({
         where: noteWhere,
-        include: {
+        select: {
+          id: true, title: true, content: true, createdAt: true,
           author: { select: { id: true, username: true, avatarUrl: true } },
           course: { select: { id: true, code: true } },
         },

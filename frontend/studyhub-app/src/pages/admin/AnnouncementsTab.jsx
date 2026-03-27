@@ -43,6 +43,9 @@ export default function AnnouncementsTab({
       </form>
 
       <div style={{ display: 'grid', gap: 10 }}>
+        {announcementsState.items.length === 0 && (
+          <div className="admin-empty">No announcements yet.</div>
+        )}
         {announcementsState.items.map((record) => (
           <div key={record.id} style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: '14px 16px', background: record.pinned ? '#fffbeb' : '#fff' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>

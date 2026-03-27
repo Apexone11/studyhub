@@ -94,6 +94,59 @@ router.post('/:id/lab/sync-upstream', requireAuth, async (req, res) => {
   }
 })
 
+// ── GET /api/sheets/:id/lab/compare-upstream — diff between fork's content and the original's content ──
+
+router.get('/:id/lab/compare-upstream', optionalAuth, diffLimiter, async (req, res) => {
+  const sheetId = parsePositiveInt(req.params.id, 0)
+  if (!sheetId) return res.status(400).json({ error: 'Invalid sheet ID.' })
+
+  try {
+    const fork = await prisma.studySheet.findUnique({
+      where: { id: sheetId },
+      select: { id: true, userId: true, status: true, forkOf: true, content: true },
+    })
+
+    if (!fork) return res.status(404).json({ error: 'Sheet not found.' })
+    if (!canReadSheet(fork, req.user || null)) {
+      return res.status(404).json({ error: 'Sheet not found.' })
+    }
+    if (!fork.forkOf) return res.status(400).json({ error: 'This sheet is not a fork.' })
+
+    const original = await prisma.studySheet.findUnique({
+      where: { id: fork.forkOf },
+      select: { id: true, title: true, content: true },
+    })
+
+    if (!original) return res.status(404).json({ error: 'Original sheet not found or was deleted.' })
+
+    const upstreamContent = original.content || ''
+    const forkContent = fork.content || ''
+
+    if (upstreamContent === forkContent) {
+      return res.json({
+        identical: true,
+        diff: null,
+        summary: 'Your fork is identical to the original.',
+        upstream: { id: original.id, title: original.title },
+      })
+    }
+
+    const diff = computeLineDiff(upstreamContent, forkContent)
+    addWordSegments(diff.hunks)
+    const summary = generateChangeSummary(upstreamContent, forkContent)
+
+    res.json({
+      identical: false,
+      diff,
+      summary,
+      upstream: { id: original.id, title: original.title },
+    })
+  } catch (error) {
+    captureError(error, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
 // ── GET /api/sheets/:id/lab/uncommitted-diff — diff between last commit and current content ──
 
 router.get('/:id/lab/uncommitted-diff', requireAuth, diffLimiter, async (req, res) => {

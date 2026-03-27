@@ -17,6 +17,7 @@ import { API, GOOGLE_CLIENT_ID } from '../../config'
 import { fadeInUp } from '../../lib/animations'
 import { getAuthenticatedHomePath } from '../../lib/authNavigation'
 import { useSession, SESSION_EXPIRED_FLAG } from '../../lib/session-context'
+import { LOGGED_OUT_FLAG } from '../../lib/session'
 import './LoginPage.css'
 
 export default function LoginPage() {
@@ -31,6 +32,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [showForgot, setShowForgot] = useState(false)
   const [sessionExpired, setSessionExpired] = useState(false)
+  const [loggedOut, setLoggedOut] = useState(false)
 
   /* ── Detect session-expired redirect ─────────────────────────────── */
   useEffect(() => {
@@ -38,6 +40,10 @@ export default function LoginPage() {
       if (sessionStorage.getItem(SESSION_EXPIRED_FLAG)) {
         setSessionExpired(true)
         sessionStorage.removeItem(SESSION_EXPIRED_FLAG)
+      }
+      if (sessionStorage.getItem(LOGGED_OUT_FLAG)) {
+        setLoggedOut(true)
+        sessionStorage.removeItem(LOGGED_OUT_FLAG)
       }
     } catch { /* private mode */ }
   }, [])
@@ -146,6 +152,13 @@ export default function LoginPage() {
             <div role="status" className="login-alert login-alert--warning">
               <span className="login-alert-icon" aria-hidden="true">&#x1f512;</span>
               <span>Your session expired. Sign in again to pick up where you left off.</span>
+            </div>
+          )}
+
+          {/* ── Logged-out banner ─────────────────────────────────── */}
+          {loggedOut && !sessionExpired && (
+            <div role="status" className="login-alert login-alert--info">
+              You've been signed out.
             </div>
           )}
 

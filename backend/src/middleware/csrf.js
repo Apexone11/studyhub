@@ -9,6 +9,7 @@ const AUTH_BOOTSTRAP_PREFIXES = [
   '/api/auth/login',
   '/api/auth/google',
   '/api/auth/register',
+  '/api/auth/logout',
 ]
 
 function csrfProtection(req, res, next) {

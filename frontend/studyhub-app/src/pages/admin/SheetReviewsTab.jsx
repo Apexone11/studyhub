@@ -99,6 +99,9 @@ export default function SheetReviewsTab({
         </div>
       </div>
       <div style={{ display: 'grid', gap: 10 }}>
+        {reviewState.items.length === 0 && (
+          <div className="admin-empty">No sheets match the current filters.</div>
+        )}
         {reviewState.items.map((record) => (
           <div key={record.id} style={{ border: '1px solid var(--sh-border)', borderRadius: 14, padding: '14px 16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 10 }}>

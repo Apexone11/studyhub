@@ -17,6 +17,9 @@ export default function UsersTab({ usersState, currentUserId, patchRole, deleteU
             </tr>
           </thead>
           <tbody>
+            {usersState.items.length === 0 && (
+              <tr><td colSpan={6} className="admin-empty">No users found.</td></tr>
+            )}
             {usersState.items.map((record) => (
               <tr key={record.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                 <td style={tableCellStrong}>{record.username}</td>

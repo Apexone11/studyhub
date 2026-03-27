@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
+import { Link, Navigate, useParams } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
 import { IconDownload, IconEye } from '../../components/Icons'
 import { API } from '../../config'
-import { getApiErrorMessage, isAuthSessionFailure, readJsonSafely } from '../../lib/http'
-import { useSession } from '../../lib/session-context'
+import { getApiErrorMessage, readJsonSafely } from '../../lib/http'
 import { pageShell } from '../../lib/ui'
 
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
@@ -102,8 +101,6 @@ function linkButton() {
 }
 
 export default function AttachmentPreviewPage() {
-  const navigate = useNavigate()
-  const { clearSession } = useSession()
   const { scope, id } = useParams()
   const [state, setState] = useState({ loading: true, error: '', detail: null })
   const numericId = Number.parseInt(id, 10)
@@ -119,12 +116,6 @@ export default function AttachmentPreviewPage() {
     try {
       const response = await fetch(config.detailUrl, { headers: authHeaders(), credentials: 'include' })
       const data = await readJsonSafely(response, {})
-
-      if (isAuthSessionFailure(response, data)) {
-        clearSession()
-        navigate('/login', { replace: true })
-        return
-      }
 
       if (response.status === 403) {
         setState({
@@ -147,7 +138,7 @@ export default function AttachmentPreviewPage() {
     } catch (error) {
       setState({ loading: false, error: error.message || 'Could not load this attachment preview.', detail: null })
     }
-  }, [clearSession, config, navigate])
+  }, [config])
 
   useEffect(() => {
     if (!config) return

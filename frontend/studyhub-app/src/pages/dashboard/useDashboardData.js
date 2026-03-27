@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { API } from '../../config'
-import { getApiErrorMessage, isAuthSessionFailure, readJsonSafely } from '../../lib/http'
+import { getApiErrorMessage, readJsonSafely } from '../../lib/http'
 import { useSession } from '../../lib/session-context'
 import { useLivePolling } from '../../lib/useLivePolling'
 import { countUp, fadeInUp, staggerEntrance } from '../../lib/animations'
@@ -29,7 +29,7 @@ function markDashboardVisit() {
 export function useDashboardData() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const { user, clearSession, signOut } = useSession()
+  const { user, signOut } = useSession()
   const [summary, setSummary] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -51,12 +51,6 @@ export function useDashboardData() {
       })
 
       const data = await readJsonSafely(response, {})
-
-      if (isAuthSessionFailure(response, data)) {
-        clearSession()
-        navigate('/login', { replace: true })
-        return
-      }
 
       if (response.status === 403) {
         apply(() => {
