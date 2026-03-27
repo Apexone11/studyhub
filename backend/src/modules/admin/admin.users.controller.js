@@ -78,6 +78,7 @@ router.get('/users', async (req, res) => {
           id: true,
           username: true,
           role: true,
+          isStaffVerified: true,
           email: true,
           createdAt: true,
           _count: { select: { studySheets: true } }
@@ -183,6 +184,31 @@ router.delete('/users/:id', async (req, res) => {
     if (err.code === 'P2003') return res.status(409).json({ error: 'Cannot delete user: dependent records still exist. Contact support.' })
     captureError(err, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Deletion failed. Please try again or contact support.' })
+  }
+})
+
+// ── PATCH /api/admin/users/:id/staff-verified ────────────────
+router.patch('/users/:id/staff-verified', async (req, res) => {
+  const targetId = Number.parseInt(req.params.id, 10)
+  const { isStaffVerified } = req.body || {}
+
+  if (typeof isStaffVerified !== 'boolean') {
+    return res.status(400).json({ error: 'isStaffVerified must be a boolean.' })
+  }
+
+  try {
+    const target = await prisma.user.findUnique({ where: { id: targetId }, select: { id: true, role: true } })
+    if (!target) return res.status(404).json({ error: 'User not found.' })
+
+    await prisma.user.update({
+      where: { id: targetId },
+      data: { isStaffVerified },
+    })
+
+    res.json({ message: `Staff verification ${isStaffVerified ? 'granted' : 'revoked'}.` })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
   }
 })
 
