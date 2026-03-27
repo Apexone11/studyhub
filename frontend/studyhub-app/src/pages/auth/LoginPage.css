@@ -127,6 +127,12 @@
   color: var(--sh-danger-text);
 }
 
+.login-alert--info {
+  border: 1px solid var(--sh-info-border);
+  background: var(--sh-info-bg);
+  color: var(--sh-info-text);
+}
+
 .login-alert-icon {
   font-size: 18px;
   flex-shrink: 0;
