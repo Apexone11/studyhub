@@ -228,22 +228,6 @@ export function SessionProvider({ children }) {
     }
   }, [clearSession])
 
-  // Best-effort logout on tab close / page exit
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined
-    if (status !== 'authenticated') return undefined
-
-    const handlePageHide = () => {
-      navigator.sendBeacon(`${API}/api/auth/logout`)
-      clearStoredSession()
-    }
-
-    window.addEventListener('pagehide', handlePageHide)
-    return () => {
-      window.removeEventListener('pagehide', handlePageHide)
-    }
-  }, [status])
-
   const completeAuthentication = useCallback((nextUser) => {
     /* Use flushSync so state is committed synchronously before the caller
        navigates — prevents a race where the target page renders before
