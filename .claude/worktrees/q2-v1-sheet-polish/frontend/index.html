@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StudyHub</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f4f8;
+      color: #111827;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* NAVBAR */
+    nav {
+      background: #1e3a5f;
+      padding: 16px 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    nav .logo {
+      color: #ffffff;
+      font-size: 24px;
+      font-weight: bold;
+      letter-spacing: 1px;
+    }
+
+    nav .logo span { color: #60a5fa; }
+
+    nav ul {
+      list-style: none;
+      display: flex;
+      gap: 24px;
+    }
+
+    nav ul li a {
+      color: #ffffff;
+      text-decoration: none;
+      font-size: 15px;
+    }
+
+    nav ul li a:hover { color: #93c5fd; }
+
+    .nav-btn {
+      background: #2563eb;
+      color: white !important;
+      padding: 8px 20px;
+      border-radius: 6px;
+    }
+
+    /* ANNOUNCEMENT BANNER */
+    .announcement-banner {
+      background: #e0ecff;
+      color: #1e3a5f;
+      text-align: center;
+      padding: 12px 20px;
+      font-size: 14px;
+    }
+
+    .announcement-banner strong { margin-right: 8px; }
+
+    /* HERO */
+    .hero {
+      background: linear-gradient(135deg, #1e3a5f, #2563eb);
+      color: white;
+      text-align: center;
+      padding: 80px 20px;
+    }
+
+    .hero h1 {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+
+    .hero p {
+      max-width: 760px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+
+    .hero-buttons {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      margin-top: 32px;
+    }
+
+    .btn {
+      padding: 12px 28px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      border: none;
+      text-decoration: none;
+    }
+
+    .btn-primary { background: #2563eb; color: white; }
+
+    .btn-outline {
+      background: transparent;
+      color: white;
+      border: 2px solid white;
+    }
+
+    /* FEATURES */
+    .section { padding: 60px 40px; flex: 1;}
+
+    .section h2 {
+      text-align: center;
+      font-size: 28px;
+      margin-bottom: 40px;
+      color: #1e3a5f;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 24px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 28px 24px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+      text-align: center;
+      transition: transform 0.2s ease;
+    }
+
+    .card:hover { transform: translateY(-4px); }
+
+    .card .icon {
+      font-size: 36px;
+      margin-bottom: 14px;
+      color: #2563eb;
+    }
+
+    .card h3 {
+      font-size: 17px;
+      margin-bottom: 8px;
+      color: #1e3a5f;
+    }
+
+    .card p {
+      font-size: 14px;
+      color: #6b7280;
+      line-height: 1.5;
+    }
+
+    /* FOOTER */
+    footer {
+      background: #1e3a5f;
+      color: #94a3b8;
+      text-align: center;
+      padding: 24px;
+      font-size: 14px;
+      
+    }
+
+    footer span { color: #60a5fa; }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="logo">Study<span>Hub</span></div>
+    <ul>
+      <li><a href="index.html">Home</a></li>
+      <li><a href="#">Study Sheets</a></li>
+      <li><a href="#">Practice Test</a></li>
+      <li><a href="#">Syllabus</a></li>
+      <li><a href="login.html" class="nav-btn">Login</a></li>
+    </ul>
+  </nav>
+
+  <div class="announcement-banner">
+    <strong>Announcement:</strong> Thank you for supporting my website
+  </div>
+
+  <div class="hero">
+    <h1>Your Study Hub</h1>
+    <p>Study sheets, practice tests, announcements, and AI help, all in one place. No downloads required.</p>
+    <div class="hero-buttons">
+      <a href="#" class="btn btn-primary">Get Started</a>
+      <a href="#" class="btn btn-outline">Browse Study Sheets</a>
+    </div>
+  </div>
+
+  <section class="section">
+    <h2>Everything You Need to Succeed</h2>
+    <div class="cards">
+      <div class="card">
+        <div class="icon"><i class="fas fa-book-open"></i></div>
+        <h3>Study Sheets</h3>
+        <p>View community study guides directly in your browser. No downloads, no hassle.</p>
+      </div>
+      <div class="card">
+        <div class="icon"><i class="fas fa-clipboard-check"></i></div>
+        <h3>Practice Tests</h3>
+        <p>Take quizzes on any topic and get your score instantly with feedback.</p>
+      </div>
+      <div class="card">
+        <div class="icon"><i class="fas fa-bullhorn"></i></div>
+        <h3>Announcements</h3>
+        <p>Real-time course announcements from your instructor, always up to date.</p>
+      </div>
+      <div class="card">
+        <div class="icon"><i class="fas fa-robot"></i></div>
+        <h3>AI Assistant</h3>
+        <p>Stuck on a concept? Ask the AI tutor and get a clear, instant explanation.</p>
+      </div>
+      <div class="card">
+        <div class="icon"><i class="fas fa-pen-to-square"></i></div>
+        <h3>Personal Notes</h3>
+        <p>Add your own notes to any topic. Saved securely to your account.</p>
+      </div>
+      <div class="card">
+        <div class="icon"><i class="fas fa-people-group"></i></div>
+        <h3>Contribute</h3>
+        <p>Submit your own study guides and help your classmates succeed.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    Built by Students, For Students - <span>StudyHub</span> - Open Source on GitHub
+  </footer>
+</body>
+</html>

@@ -1,0 +1,205 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+ * tutorialSteps.js — Per-page tutorial step definitions for react-joyride
+ *
+ * Each page gets 3-5 steps max (Hick's Law — don't overwhelm users).
+ * Steps target CSS selectors that exist on the page.
+ * Keep content short and actionable.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+export const TUTORIAL_VERSIONS = {
+  feed: 1,
+  sheets: 1,
+  dashboard: 1,
+  notes: 1,
+  settings: 1,
+  profile: 1,
+  viewer: 1,
+  announcements: 1,
+  upload: 1,
+}
+
+export const FEED_STEPS = [
+  {
+    target: '[data-tutorial="feed-composer"]',
+    title: 'Share with classmates',
+    content: 'Post updates, questions, or links to your latest study sheets here. Mention classmates with @username.',
+    disableBeacon: true,
+  },
+  {
+    target: '[data-tutorial="feed-filters"]',
+    title: 'Filter the feed',
+    content: 'Filter by posts, sheets, or announcements to find exactly what you need.',
+  },
+  {
+    target: '[data-tutorial="feed-search"]',
+    title: 'Search the feed',
+    content: 'Search for specific topics, users, or course content across all feed items.',
+  },
+  {
+    target: '[data-tutorial="feed-leaderboards"]',
+    title: 'Leaderboards',
+    content: 'See top starred sheets, most downloaded content, and top contributors in your courses.',
+  },
+]
+
+export const SHEETS_STEPS = [
+  {
+    target: '[data-tutorial="sheets-search"]',
+    title: 'Search sheets',
+    content: 'Search sheets by title, description, or content keywords.',
+    disableBeacon: true,
+  },
+  {
+    target: '[data-tutorial="sheets-filters"]',
+    title: 'Filter and sort',
+    content: 'Filter by school, course, or sort by stars, downloads, and more.',
+  },
+  {
+    target: '[data-tutorial="sheets-upload"]',
+    title: 'Upload a sheet',
+    content: 'Share your own study sheets with classmates. You can upload PDFs and images.',
+  },
+  {
+    target: '[data-tutorial="sheets-toggles"]',
+    title: 'Your sheets and favorites',
+    content: 'Toggle "Mine" to see sheets you uploaded, or "Starred" to find your saved favorites.',
+  },
+]
+
+export const DASHBOARD_STEPS = [
+  {
+    target: '[data-tutorial="dashboard-hero"]',
+    title: 'Welcome to your dashboard',
+    content: 'This is your personal study hub. See your stats, recent activity, and quick actions at a glance.',
+    disableBeacon: true,
+  },
+  {
+    target: '[data-tutorial="dashboard-stats"]',
+    title: 'Your stats',
+    content: 'Track your enrolled courses, uploaded sheets, and starred content.',
+  },
+  {
+    target: '[data-tutorial="dashboard-sheets"]',
+    title: 'Recent sheets',
+    content: 'Quick access to the latest sheets in your enrolled courses.',
+  },
+  {
+    target: '[data-tutorial="dashboard-actions"]',
+    title: 'Quick actions',
+    content: 'Jump to common tasks like uploading sheets, taking practice tests, or reviewing notes.',
+  },
+]
+
+export const NOTES_STEPS = [
+  {
+    target: '[data-tutorial="notes-filters"]',
+    title: 'Filter your notes',
+    content: 'View all notes, or filter by private and shared notes.',
+    disableBeacon: true,
+  },
+  {
+    target: '[data-tutorial="notes-create"]',
+    title: 'Create a note',
+    content: 'Start a new markdown note. Notes are private by default and auto-save as you type.',
+  },
+]
+
+export const SETTINGS_STEPS = [
+  {
+    target: '[data-tutorial="settings-avatar"]',
+    title: 'Upload a profile photo',
+    content: 'Add a photo so other students can recognize you. Drag and zoom to crop it just right.',
+    disableBeacon: true,
+  },
+  {
+    target: '[data-tutorial="settings-tabs"]',
+    title: 'Settings categories',
+    content: 'Navigate between profile, security, notifications, privacy, courses, appearance, and account settings.',
+  },
+  {
+    target: '[data-tutorial="settings-appearance"]',
+    title: 'Customize appearance',
+    content: 'Switch between light and dark themes, and adjust your preferred font size.',
+  },
+  {
+    target: '[data-tutorial="settings-notifications"]',
+    title: 'Notification preferences',
+    content: 'Control which notifications you receive — stars, comments, follows, and more.',
+  },
+]
+
+export const PROFILE_STEPS = [
+  {
+    target: '[data-tutorial="profile-avatar"]',
+    title: 'Upload a photo',
+    content: 'Click your avatar to upload and crop a profile photo. Drag and zoom to get the perfect crop.',
+    disableBeacon: true,
+  },
+  {
+    target: '[data-tutorial="profile-stats"]',
+    title: 'Profile stats',
+    content: 'See sheet count, followers, and following. Click followers or following to view the full list.',
+  },
+  {
+    target: '[data-tutorial="profile-sheets"]',
+    title: 'Recent sheets',
+    content: 'Browse the latest public study sheets this user has shared.',
+  },
+  {
+    target: '[data-tutorial="profile-courses"]',
+    title: 'Enrolled courses',
+    content: 'See which courses this student is enrolled in.',
+  },
+]
+
+export const VIEWER_STEPS = [
+  {
+    target: '[data-tutorial="viewer-actions"]',
+    title: 'Sheet actions',
+    content: 'Star, react, fork, or download this sheet. Contribute improvements back to the author.',
+    disableBeacon: true,
+  },
+  {
+    target: '[data-tutorial="viewer-content"]',
+    title: 'Sheet content',
+    content: 'Read the study material here. HTML sheets render in a secure preview.',
+  },
+  {
+    target: '[data-tutorial="viewer-comments"]',
+    title: 'Discussion',
+    content: 'Ask questions and discuss with classmates. Use @mentions to notify someone.',
+  },
+]
+
+export const ANNOUNCEMENTS_STEPS = [
+  {
+    target: '[data-tutorial="announcements-header"]',
+    title: 'Announcements',
+    content: 'Official updates from the StudyHub team appear here. Pinned announcements stay at the top.',
+    disableBeacon: true,
+  },
+  {
+    target: '[data-tutorial="announcements-list"]',
+    title: 'Stay up to date',
+    content: 'New announcements appear automatically. Pinned posts are highlighted in yellow.',
+  },
+]
+
+export const UPLOAD_STEPS = [
+  {
+    target: '[data-tutorial="upload-info"]',
+    title: 'Sheet details',
+    content: 'Give your sheet a clear title and select the relevant course.',
+    disableBeacon: true,
+  },
+  {
+    target: '[data-tutorial="upload-content"]',
+    title: 'Add content',
+    content: 'Write or paste your study material. Choose between Markdown and HTML formats.',
+  },
+  {
+    target: '[data-tutorial="upload-attachment"]',
+    title: 'Attach files',
+    content: 'Optionally attach a PDF or image (10MB max) for classmates to preview and download.',
+  },
+]

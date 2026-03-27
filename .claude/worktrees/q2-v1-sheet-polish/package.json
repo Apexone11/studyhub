@@ -1,0 +1,38 @@
+{
+  "name": "studyhub",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend/studyhub-app"
+  ],
+  "scripts": {
+    "lint": "npm --prefix backend run lint && npm --prefix frontend/studyhub-app run lint",
+    "build": "npm --prefix backend run build && npm --prefix frontend/studyhub-app run build",
+    "test": "npm --prefix backend run test && npm --prefix frontend/studyhub-app run test",
+    "test:e2e:smoke": "npm --prefix frontend/studyhub-app run test:e2e:smoke",
+    "test:e2e": "npm --prefix frontend/studyhub-app run test:e2e",
+    "test:perf": "npm --prefix backend run load:test",
+    "verify": "npm run lint && npm run build && npm run test && npm run test:e2e:smoke",
+    "verify:nightly": "npm run lint && npm run build && npm run test && npm run test:e2e && npm run test:perf",
+    "beta:up": "docker compose up -d --build db backend frontend pgadmin",
+    "beta:down": "docker compose down",
+    "beta:seed": "docker compose exec -T backend npx prisma generate && docker compose exec -T backend npm run migrate:readiness:deploy && docker compose exec -T backend npm run seed && docker compose exec -T backend npm run seed:beta && docker compose exec -T backend npm run preview:fixture",
+    "beta:validate": "docker compose exec -T backend npm run test && npm --prefix frontend/studyhub-app run test && npm --prefix frontend/studyhub-app run test:e2e:smoke && npm --prefix frontend/studyhub-app run test:e2e:beta && docker compose exec -T backend npm run smoke:routes",
+    "beta:capture:feed": "node scripts/betaCaptureFeedDiagnostics.js",
+    "beta:check": "npm run beta:capture:feed && npm run beta:validate",
+    "beta:bootstrap": "npm run beta:up && npm run beta:seed",
+    "beta:snapshots": "docker compose exec -T backend npm run preview:fixture && npm --prefix frontend/studyhub-app run beta:snapshots",
+    "beta:load:synthetic": "docker compose restart backend && docker compose exec -T backend env LOAD_TEST_BASE_URL=http://backend:4000 LOAD_TEST_USERNAME=beta_student1 LOAD_TEST_PASSWORD=BetaStudent123! LOAD_TEST_SEED=20260317 LOAD_TEST_DURATION=20 LOAD_TEST_SCALE=1.5 npm run load:test",
+    "beta:cycle4": "npm run beta:check && npm run beta:snapshots && npm run beta:load:synthetic",
+    "beta:cycle5": "npm run beta:check && npm --prefix frontend/studyhub-app run test:e2e:smoke -- tests/sheets.upload-html-workflow.smoke.spec.js tests/sheets.html-preview.sandbox.smoke.spec.js && docker compose exec -T backend npm run archive:html-originals",
+    "beta:cycle6": "docker compose exec -T backend npm run migrate:readiness:smoke && npm run beta:check && npm run beta:snapshots && npm run beta:load:synthetic",
+    "beta:start:oneclick": "npm run beta:bootstrap",
+    "beta:validate:oneclick": "npm run beta:cycle6",
+    "ci:lighthouse": "npm --prefix frontend/studyhub-app run build && npx --yes @lhci/cli@latest autorun --config frontend/studyhub-app/lighthouse.config.js",
+    "ci:a11y": "echo 'Run a11y audit with: npx axe-cli http://localhost:4173'",
+    "ci:quality": "npm run lint && npm run build && npm run test"
+  },
+  "overrides": {
+    "effect": "~3.21.0"
+  }
+}

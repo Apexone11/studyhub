@@ -1,0 +1,1768 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StudyHub — Create Account</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f4f8;
+      color: #111827;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    nav {
+      background: #1e3a5f;
+      padding: 16px 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    nav .logo {
+      color: #ffffff;
+      font-size: 24px;
+      font-weight: bold;
+      letter-spacing: 1px;
+      text-decoration: none;
+    }
+
+    nav .logo span { color: #60a5fa; }
+
+    nav ul {
+      list-style: none;
+      display: flex;
+      gap: 24px;
+    }
+
+    nav ul li a {
+      color: #ffffff;
+      text-decoration: none;
+      font-size: 15px;
+    }
+
+    nav ul li a:hover { color: #93c5fd; }
+
+    .nav-btn {
+      background: #2563eb;
+      color: white !important;
+      padding: 8px 20px;
+      border-radius: 6px;
+    }
+
+    .page {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+    }
+
+    .register-card {
+      background: white;
+      border-radius: 16px;
+      padding: 48px 40px;
+      width: 100%;
+      max-width: 500px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
+    }
+
+    /* PROGRESS BAR */
+    .progress-wrap { margin-bottom: 32px; }
+
+    .progress-steps {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      margin-bottom: 10px;
+    }
+
+    .step-circle {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      border: 2px solid #e5e7eb;
+      background: white;
+      color: #9ca3af;
+      font-size: 13px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s;
+      position: relative;
+      z-index: 1;
+    }
+
+    .step-circle.active {
+      border-color: #2563eb;
+      background: #2563eb;
+      color: white;
+    }
+
+    .step-circle.done {
+      border-color: #16a34a;
+      background: #16a34a;
+      color: white;
+    }
+
+    .step-line {
+      flex: 1;
+      height: 2px;
+      background: #e5e7eb;
+      max-width: 80px;
+      transition: background 0.3s;
+    }
+
+    .step-line.done { background: #16a34a; }
+
+    .progress-labels {
+      display: flex;
+      justify-content: space-between;
+      padding: 0 4px;
+    }
+
+    .step-label {
+      font-size: 11px;
+      color: #9ca3af;
+      text-align: center;
+      width: 80px;
+    }
+
+    .step-label.active { color: #2563eb; font-weight: bold; }
+    .step-label.done   { color: #16a34a; }
+
+    /* STEP PANELS */
+    .step-panel { display: none; }
+    .step-panel.active { display: block; }
+
+    .panel-top {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .panel-top .icon {
+      font-size: 36px;
+      color: #2563eb;
+      margin-bottom: 10px;
+    }
+
+    .panel-top h1 {
+      font-size: 24px;
+      color: #1e3a5f;
+      margin-bottom: 4px;
+    }
+
+    .panel-top p {
+      font-size: 13px;
+      color: #6b7280;
+    }
+
+    /* FORM ELEMENTS */
+    .form-group { margin-bottom: 16px; }
+
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: bold;
+      color: #374151;
+      margin-bottom: 6px;
+    }
+
+    .input-wrapper { position: relative; }
+
+    .input-wrapper i.input-icon {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #9ca3af;
+      font-size: 14px;
+    }
+
+    .input-wrapper input {
+      width: 100%;
+      padding: 11px 14px 11px 38px;
+      border: 2px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 14px;
+      color: #111827;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .input-wrapper input:focus { border-color: #2563eb; }
+    .input-wrapper input.valid { border-color: #16a34a; }
+    .input-wrapper input.invalid { border-color: #dc2626; }
+
+    .check-icon {
+      position: absolute;
+      right: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 14px;
+      display: none;
+    }
+
+    .check-icon.show-valid  { display: block; color: #16a34a; }
+    .check-icon.show-invalid { display: block; color: #dc2626; }
+
+    .toggle-password {
+      position: absolute;
+      right: 36px;
+      top: 50%;
+      transform: translateY(-50%);
+      cursor: pointer;
+      color: #9ca3af;
+      font-size: 14px;
+      background: none;
+      border: none;
+    }
+
+    .toggle-password:hover { color: #2563eb; }
+
+    .hint {
+      font-size: 11px;
+      color: #9ca3af;
+      margin-top: 4px;
+      display: block;
+    }
+
+    /* PASSWORD STRENGTH */
+    .strength-bar-wrap { margin-top: 6px; display: none; }
+    .strength-bar-wrap.show { display: block; }
+
+    .strength-bar-track {
+      height: 4px;
+      background: #e5e7eb;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .strength-bar-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: 999px;
+      transition: width 0.3s, background 0.3s;
+    }
+
+    .strength-label {
+      font-size: 11px;
+      margin-top: 3px;
+      color: #9ca3af;
+    }
+
+    /* ALERTS */
+    .alert {
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13px;
+      margin-bottom: 16px;
+      display: none;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .alert.show { display: flex; }
+    .alert-error   { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; }
+    .alert-success { background: #f0fdf4; border: 1px solid #bbf7d0; color: #16a34a; }
+
+    /* TERMS */
+    .terms {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 18px;
+      font-size: 12px;
+      color: #6b7280;
+    }
+
+    .terms input[type="checkbox"] {
+      margin-top: 2px;
+      accent-color: #2563eb;
+      width: 14px;
+      height: 14px;
+      flex-shrink: 0;
+    }
+
+    .terms a { color: #2563eb; text-decoration: none; }
+    .terms a:hover { text-decoration: underline; }
+
+    /* BUTTONS */
+    .btn {
+      width: 100%;
+      border: none;
+      border-radius: 8px;
+      padding: 13px;
+      font-size: 15px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s, color 0.2s;
+    }
+
+    .btn-primary { background: #2563eb; color: white; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
+
+    .btn-secondary {
+      background: white;
+      color: #374151;
+      border: 2px solid #e5e7eb;
+      margin-bottom: 10px;
+    }
+
+    .btn-secondary:hover { border-color: #2563eb; color: #2563eb; }
+
+    /* DIVIDER */
+    .divider {
+      text-align: center;
+      margin: 20px 0;
+      font-size: 12px;
+      color: #9ca3af;
+      position: relative;
+    }
+
+    .divider::before, .divider::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      width: 42%;
+      height: 1px;
+      background: #e5e7eb;
+    }
+
+    .divider::before { left: 0; }
+    .divider::after  { right: 0; }
+
+    .login-link {
+      text-align: center;
+      font-size: 13px;
+      color: #6b7280;
+    }
+
+    .login-link a {
+      color: #2563eb;
+      font-weight: bold;
+      text-decoration: none;
+    }
+
+    .login-link a:hover { text-decoration: underline; }
+
+    /* ---- STEP 2 STYLES ---- */
+
+    /* SCHOOL SEARCH */
+    .search-box {
+      position: relative;
+      margin-bottom: 8px;
+    }
+
+    .search-box i {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #9ca3af;
+      font-size: 14px;
+    }
+
+    .search-box input {
+      width: 100%;
+      padding: 11px 14px 11px 38px;
+      border: 2px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .search-box input:focus { border-color: #2563eb; }
+
+    /* DROPDOWN */
+    .dropdown {
+      border: 2px solid #e5e7eb;
+      border-radius: 8px;
+      max-height: 180px;
+      overflow-y: auto;
+      display: none;
+      margin-bottom: 12px;
+    }
+
+    .dropdown.show { display: block; }
+
+    .dropdown-item {
+      padding: 10px 14px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .dropdown-item:hover { background: #eff6ff; color: #2563eb; }
+    .dropdown-item i { color: #9ca3af; font-size: 12px; }
+
+    .dropdown-empty {
+      padding: 12px 14px;
+      font-size: 13px;
+      color: #9ca3af;
+      text-align: center;
+    }
+
+    /* SELECTED SCHOOL BADGE */
+    .selected-school {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      background: #eff6ff;
+      border: 2px solid #2563eb;
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      color: #1e3a5f;
+      font-weight: bold;
+    }
+
+    .selected-school.show { display: flex; }
+    .selected-school i { color: #2563eb; }
+
+    .selected-school .clear-school {
+      margin-left: auto;
+      cursor: pointer;
+      color: #9ca3af;
+      background: none;
+      border: none;
+      font-size: 14px;
+    }
+
+    .selected-school .clear-school:hover { color: #dc2626; }
+
+    /* COURSES */
+    .courses-section { margin-top: 4px; }
+
+    .courses-label {
+      font-size: 13px;
+      font-weight: bold;
+      color: #374151;
+      margin-bottom: 8px;
+      display: block;
+    }
+
+    .course-search-box {
+      position: relative;
+      margin-bottom: 8px;
+    }
+
+    .course-search-box i {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #9ca3af;
+      font-size: 14px;
+    }
+
+    .course-search-box input {
+      width: 100%;
+      padding: 11px 14px 11px 38px;
+      border: 2px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .course-search-box input:focus { border-color: #2563eb; }
+
+    .course-dropdown {
+      border: 2px solid #e5e7eb;
+      border-radius: 8px;
+      max-height: 150px;
+      overflow-y: auto;
+      display: none;
+      margin-bottom: 10px;
+    }
+
+    .course-dropdown.show { display: block; }
+
+    .course-item {
+      padding: 9px 14px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .course-item:hover { background: #eff6ff; color: #2563eb; }
+
+    .course-item .course-code {
+      font-weight: bold;
+      margin-right: 6px;
+      color: #2563eb;
+    }
+
+    /* SELECTED COURSES TAGS */
+    .selected-courses {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      min-height: 20px;
+      margin-bottom: 8px;
+    }
+
+    .course-tag {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1e3a5f;
+      border-radius: 999px;
+      padding: 4px 12px;
+      font-size: 12px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .course-tag button {
+      background: none;
+      border: none;
+      color: #9ca3af;
+      cursor: pointer;
+      font-size: 11px;
+      padding: 0;
+      line-height: 1;
+    }
+
+    .course-tag button:hover { color: #dc2626; }
+
+    .courses-hint {
+      font-size: 11px;
+      color: #9ca3af;
+      margin-top: 4px;
+    }
+
+    /* SKIP LINK */
+    .skip-link {
+      text-align: center;
+      margin-top: 12px;
+      font-size: 12px;
+      color: #9ca3af;
+    }
+
+    .skip-link a {
+      color: #6b7280;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
+    #finishBtn { margin-top: 20px; }
+
+    footer {
+      background: #1e3a5f;
+      color: #94a3b8;
+      text-align: center;
+      padding: 20px;
+      font-size: 13px;
+    }
+
+    footer span { color: #60a5fa; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f4f8;
+      color: #111827;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* NAVBAR */
+    nav {
+      background: #1e3a5f;
+      padding: 16px 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    nav .logo {
+      color: #ffffff;
+      font-size: 24px;
+      font-weight: bold;
+      letter-spacing: 1px;
+      text-decoration: none;
+    }
+
+    nav .logo span { color: #60a5fa; }
+
+    nav ul {
+      list-style: none;
+      display: flex;
+      gap: 24px;
+    }
+
+    nav ul li a {
+      color: #ffffff;
+      text-decoration: none;
+      font-size: 15px;
+    }
+
+    nav ul li a:hover { color: #93c5fd; }
+
+    .nav-btn {
+      background: #2563eb;
+      color: white !important;
+      padding: 8px 20px;
+      border-radius: 6px;
+    }
+
+    /* PAGE LAYOUT */
+    .page {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+    }
+
+    /* REGISTER CARD */
+    .register-card {
+      background: white;
+      border-radius: 16px;
+      padding: 48px 40px;
+      width: 100%;
+      max-width: 460px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
+    }
+
+    .register-card .top {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+
+    .register-card .top .icon {
+      font-size: 40px;
+      color: #2563eb;
+      margin-bottom: 12px;
+    }
+
+    .register-card .top h1 {
+      font-size: 26px;
+      color: #1e3a5f;
+      margin-bottom: 6px;
+    }
+
+    .register-card .top p {
+      font-size: 14px;
+      color: #6b7280;
+    }
+
+    /* FORM */
+    .form-group { margin-bottom: 18px; }
+
+    .form-group label {
+      display: block;
+      font-size: 14px;
+      font-weight: bold;
+      color: #374151;
+      margin-bottom: 8px;
+    }
+
+    .input-wrapper { position: relative; }
+
+    .input-wrapper i.input-icon {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #9ca3af;
+      font-size: 15px;
+    }
+
+    .input-wrapper input {
+      width: 100%;
+      padding: 12px 14px 12px 40px;
+      border: 2px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 15px;
+      color: #111827;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .input-wrapper input:focus { border-color: #2563eb; }
+    .input-wrapper input.valid { border-color: #16a34a; }
+    .input-wrapper input.invalid { border-color: #dc2626; }
+
+    /* VALIDATION ICON inside input */
+    .input-wrapper .check-icon {
+      position: absolute;
+      right: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 14px;
+      display: none;
+    }
+
+    .check-icon.show-valid { display: block; color: #16a34a; }
+    .check-icon.show-invalid { display: block; color: #dc2626; }
+
+    /* SHOW/HIDE PASSWORD */
+    .toggle-password {
+      position: absolute;
+      right: 36px;
+      top: 50%;
+      transform: translateY(-50%);
+      cursor: pointer;
+      color: #9ca3af;
+      font-size: 15px;
+      background: none;
+      border: none;
+    }
+
+    .toggle-password:hover { color: #2563eb; }
+
+    /* HINT TEXT below inputs */
+    .hint {
+      font-size: 12px;
+      color: #9ca3af;
+      margin-top: 5px;
+      display: block;
+    }
+
+    /* PASSWORD STRENGTH BAR */
+    .strength-bar-wrap {
+      margin-top: 8px;
+      display: none;
+    }
+
+    .strength-bar-wrap.show { display: block; }
+
+    .strength-bar-track {
+      height: 5px;
+      background: #e5e7eb;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .strength-bar-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: 999px;
+      transition: width 0.3s, background 0.3s;
+    }
+
+    .strength-label {
+      font-size: 12px;
+      margin-top: 4px;
+      color: #9ca3af;
+    }
+
+    /* ERROR / SUCCESS MESSAGES */
+    .alert {
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 14px;
+      margin-bottom: 18px;
+      display: none;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .alert.show { display: flex; }
+
+    .alert-error {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #dc2626;
+    }
+
+    .alert-success {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      color: #16a34a;
+    }
+
+    /* TERMS */
+    .terms {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 20px;
+      font-size: 13px;
+      color: #6b7280;
+    }
+
+    .terms input[type="checkbox"] {
+      margin-top: 2px;
+      accent-color: #2563eb;
+      width: 15px;
+      height: 15px;
+      flex-shrink: 0;
+    }
+
+    .terms a {
+      color: #2563eb;
+      text-decoration: none;
+    }
+
+    .terms a:hover { text-decoration: underline; }
+
+    /* SUBMIT BUTTON */
+    .btn-register {
+      width: 100%;
+      background: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 14px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-register:hover { background: #1d4ed8; }
+    .btn-register:disabled {
+      background: #93c5fd;
+      cursor: not-allowed;
+    }
+
+    /* DIVIDER */
+    .divider {
+      text-align: center;
+      margin: 22px 0;
+      font-size: 13px;
+      color: #9ca3af;
+      position: relative;
+    }
+
+    .divider::before, .divider::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      width: 42%;
+      height: 1px;
+      background: #e5e7eb;
+    }
+
+    .divider::before { left: 0; }
+    .divider::after { right: 0; }
+
+    /* LOGIN LINK */
+    .login-link {
+      text-align: center;
+      font-size: 14px;
+      color: #6b7280;
+    }
+
+    .login-link a {
+      color: #2563eb;
+      font-weight: bold;
+      text-decoration: none;
+    }
+
+    .login-link a:hover { text-decoration: underline; }
+
+    /* FOOTER */
+    footer {
+      background: #1e3a5f;
+      color: #94a3b8;
+      text-align: center;
+      padding: 20px;
+      font-size: 13px;
+    }
+
+    footer span { color: #60a5fa; }
+  </style>
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <nav>
+    <a class="logo" href="index.html">Study<span>Hub</span></a>
+    <ul>
+      <li><a href="index.html">Home</a></li>
+      <li><a href="#">Study Sheets</a></li>
+      <li><a href="#">Practice Tests</a></li>
+      <li><a href="#">Syllabus</a></li>
+      <li><a href="login.html" class="nav-btn">Login</a></li>
+    </ul>
+  </nav>
+
+  <!-- REGISTER FORM -->
+  <div class="page">
+    <div class="register-card">
+
+      <!-- PROGRESS INDICATOR -->
+      <div class="progress-wrap">
+        <div class="progress-steps">
+          <div class="step-circle active" id="circle1">1</div>
+          <div class="step-line" id="line1"></div>
+          <div class="step-circle" id="circle2">2</div>
+        </div>
+        <div class="progress-labels">
+          <div class="step-label active" id="label1">Account</div>
+          <div class="step-label" id="label2">Your Courses</div>
+        </div>
+      </div>
+
+      <!-- SHARED ALERTS -->
+      <div class="alert alert-error" id="errorAlert">
+        <i class="fas fa-circle-exclamation"></i>
+        <span id="errorText">Something went wrong.</span>
+      </div>
+
+      <div class="alert alert-success" id="successAlert">
+        <i class="fas fa-circle-check"></i>
+        <span>Account created! Redirecting to login...</span>
+      </div>
+
+      <!-- ══ STEP 1: ACCOUNT ══ -->
+      <div class="step-panel active" id="step1">
+
+        <div class="panel-top">
+          <div class="icon"><i class="fas fa-user-plus"></i></div>
+          <h1>Create Account</h1>
+          <p>Join StudyHub — no email required</p>
+        </div>
+
+        <form id="registerForm" novalidate>
+
+          <!-- USERNAME -->
+          <div class="form-group">
+            <label for="username">Username</label>
+            <div class="input-wrapper">
+              <i class="fas fa-user input-icon"></i>
+              <input
+                type="text"
+                id="username"
+                placeholder="Choose a username"
+                autocomplete="username"
+                maxlength="20"
+              />
+              <i class="fas fa-circle-check check-icon" id="usernameCheck"></i>
+            </div>
+            <span class="hint">3–20 characters. Letters, numbers, underscores only.</span>
+          </div>
+
+          <!-- PASSWORD -->
+          <div class="form-group">
+            <label for="password">Password</label>
+            <div class="input-wrapper">
+              <i class="fas fa-lock input-icon"></i>
+              <input
+                type="password"
+                id="password"
+                placeholder="Create a password"
+                autocomplete="new-password"
+                maxlength="72"
+              />
+              <button type="button" class="toggle-password" onclick="togglePass('password', 'eyeIcon1')" aria-label="Toggle password">
+                <i class="fas fa-eye" id="eyeIcon1"></i>
+              </button>
+              <i class="fas fa-circle-check check-icon" id="passwordCheck"></i>
+            </div>
+            <div class="strength-bar-wrap" id="strengthWrap">
+              <div class="strength-bar-track">
+                <div class="strength-bar-fill" id="strengthFill"></div>
+              </div>
+              <div class="strength-label" id="strengthLabel"></div>
+            </div>
+            <span class="hint">Min 8 characters. Include a number and a capital letter.</span>
+          </div>
+
+          <!-- CONFIRM PASSWORD -->
+          <div class="form-group">
+            <label for="confirmPassword">Confirm Password</label>
+            <div class="input-wrapper">
+              <i class="fas fa-lock input-icon"></i>
+              <input
+                type="password"
+                id="confirmPassword"
+                placeholder="Re-enter your password"
+                autocomplete="new-password"
+                maxlength="72"
+              />
+              <button type="button" class="toggle-password" onclick="togglePass('confirmPassword', 'eyeIcon2')" aria-label="Toggle confirm password">
+                <i class="fas fa-eye" id="eyeIcon2"></i>
+              </button>
+              <i class="fas fa-circle-check check-icon" id="confirmCheck"></i>
+            </div>
+            <span class="hint" id="matchHint"></span>
+          </div>
+
+          <!-- TERMS -->
+          <div class="terms">
+            <input type="checkbox" id="terms" />
+            <label for="terms">
+              I agree to the <a href="#">Terms of Use</a> and
+              <a href="#">Community Guidelines</a>. I understand my content
+              may be visible to other students.
+            </label>
+          </div>
+
+          <button type="submit" class="btn btn-primary" id="nextBtn">
+            Next: Your Courses &nbsp;<i class="fas fa-arrow-right"></i>
+          </button>
+
+        </form>
+
+      </div>
+      <!-- ══ END STEP 1 ══ -->
+
+      <!-- ══ STEP 2: COURSES ══ -->
+      <div class="step-panel" id="step2">
+
+        <div class="panel-top">
+          <div class="icon"><i class="fas fa-book-open"></i></div>
+          <h1>Your Courses</h1>
+          <p>Find your school and pick the courses you're studying</p>
+        </div>
+
+        <!-- SCHOOL SEARCH -->
+        <label class="courses-label">School</label>
+        <div class="search-box" id="schoolSearchBox">
+          <i class="fas fa-school"></i>
+          <input
+            type="text"
+            id="schoolInput"
+            placeholder="Search for your school…"
+            autocomplete="off"
+          />
+        </div>
+        <div class="dropdown" id="schoolDropdown"></div>
+        <div class="selected-school" id="selectedSchool">
+          <i class="fas fa-check-circle"></i>
+          <span id="selectedSchoolName"></span>
+          <button class="clear-school" onclick="clearSchool()" aria-label="Remove school">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+
+        <!-- COURSE SEARCH -->
+        <div class="courses-section">
+          <label class="courses-label">Courses</label>
+          <div class="course-search-box">
+            <i class="fas fa-search"></i>
+            <input
+              type="text"
+              id="courseInput"
+              placeholder="Search or type a course name…"
+              autocomplete="off"
+            />
+          </div>
+          <div class="course-dropdown" id="courseDropdown"></div>
+          <div class="selected-courses" id="selectedCourses"></div>
+          <span class="courses-hint">Add up to 10 courses. You can change these later.</span>
+        </div>
+
+        <button type="button" class="btn btn-primary" id="finishBtn">
+          <i class="fas fa-user-plus"></i>&nbsp; Create Account
+        </button>
+
+        <div class="skip-link">
+          <a onclick="finishRegistration()">Skip for now</a>
+        </div>
+
+      </div>
+      <!-- ══ END STEP 2 ══ -->
+
+      <div class="divider">or</div>
+
+      <div class="login-link">
+        Already have an account? <a href="login.html">Sign in here</a>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer>
+    Built by Students, For Students · <span>StudyHub</span> · Open Source on GitHub
+  </footer>
+
+  <script>
+    // ================================================================
+    // DATA
+    // ================================================================
+    const SCHOOLS = [
+      { id: 1,  name: 'University of Maryland, Baltimore County (UMBC)', short: 'UMBC'     },
+      { id: 2,  name: 'University of Maryland, College Park (UMD)',      short: 'UMD'      },
+      { id: 3,  name: 'Towson University',                               short: 'TU'       },
+      { id: 4,  name: 'Morgan State University',                         short: 'Morgan'   },
+      { id: 5,  name: 'Bowie State University',                          short: 'BSU'      },
+      { id: 6,  name: 'Frostburg State University',                      short: 'FSU'      },
+      { id: 7,  name: 'Salisbury University',                            short: 'SU'       },
+      { id: 8,  name: 'Coppin State University',                         short: 'Coppin'   },
+      { id: 9,  name: 'University of Baltimore',                         short: 'UB'       },
+      { id: 10, name: 'Maryland Institute College of Art (MICA)',        short: 'MICA'     },
+      { id: 11, name: 'Johns Hopkins University',                        short: 'JHU'      },
+      { id: 12, name: 'Loyola University Maryland',                      short: 'Loyola'   },
+      { id: 13, name: 'Stevenson University',                            short: 'SU'       },
+      { id: 14, name: 'Hood College',                                    short: 'Hood'     },
+      { id: 15, name: 'McDaniel College',                                short: 'McDaniel' },
+      { id: 16, name: 'Washington College',                              short: 'WAC'      },
+      { id: 17, name: "St. Mary's College of Maryland",                  short: 'SMCM'     },
+      { id: 18, name: 'Notre Dame of Maryland University',               short: 'NDMU'     },
+      { id: 19, name: 'Goucher College',                                 short: 'Goucher'  },
+      { id: 20, name: "Prince George's Community College",               short: 'PGCC'     },
+      { id: 21, name: 'Montgomery College',                              short: 'MC'       },
+      { id: 22, name: 'Howard Community College',                        short: 'HCC'      },
+      { id: 23, name: 'Anne Arundel Community College',                  short: 'AACC'     },
+      { id: 24, name: 'Community College of Baltimore County (CCBC)',    short: 'CCBC'     },
+      { id: 25, name: 'Frederick Community College',                     short: 'FCC'      },
+      { id: 26, name: 'Carroll Community College',                       short: 'CCC'      },
+      { id: 27, name: 'Harford Community College',                       short: 'HCC'      },
+      { id: 28, name: 'Chesapeake College',                              short: 'CC'       },
+      { id: 29, name: 'College of Southern Maryland',                    short: 'CSM'      },
+      { id: 30, name: 'Wor-Wic Community College',                       short: 'Wor-Wic'  }
+    ];
+
+    // ================================================================
+    // COURSES — keyed by school id (~200 total)
+    // ================================================================
+    const COURSES_BY_SCHOOL = {
+      1: [ // UMBC
+        { code: 'CMSC101', name: 'Introduction to Computer Science' },
+        { code: 'CMSC201', name: 'Computer Science I' },
+        { code: 'CMSC202', name: 'Computer Science II' },
+        { code: 'CMSC203', name: 'Discrete Structures' },
+        { code: 'CMSC331', name: 'Principles of Programming Languages' },
+        { code: 'CMSC341', name: 'Data Structures' },
+        { code: 'CMSC411', name: 'Computer Architecture' },
+        { code: 'MATH151', name: 'Calculus and Analytic Geometry I' },
+        { code: 'MATH152', name: 'Calculus and Analytic Geometry II' },
+        { code: 'ENGL100', name: 'Composition' },
+        { code: 'ECON121', name: 'Principles of Microeconomics' },
+        { code: 'BIOL141', name: 'Foundations of Biology I' },
+        { code: 'PHYS121', name: 'Introductory Physics I' },
+        { code: 'STAT355', name: 'Introduction to Probability and Statistics' }
+      ],
+      2: [ // UMD
+        { code: 'CMSC131', name: 'Object-Oriented Programming I' },
+        { code: 'CMSC132', name: 'Object-Oriented Programming II' },
+        { code: 'CMSC216', name: 'Introduction to Computer Systems' },
+        { code: 'CMSC250', name: 'Discrete Structures' },
+        { code: 'CMSC330', name: 'Organization of Programming Languages' },
+        { code: 'CMSC351', name: 'Algorithms' },
+        { code: 'MATH140', name: 'Calculus I' },
+        { code: 'MATH141', name: 'Calculus II' },
+        { code: 'ENGL101', name: 'Academic Writing' },
+        { code: 'PHYS161', name: 'General Physics I' }
+      ],
+      3: [ // Towson University
+        { code: 'COSC236', name: 'Introduction to Computer Science' },
+        { code: 'COSC237', name: 'Introduction to Data Structures' },
+        { code: 'MATH211', name: 'Calculus I' },
+        { code: 'MATH212', name: 'Calculus II' },
+        { code: 'ENGL102', name: 'Academic Writing' },
+        { code: 'PHYS211', name: 'General Physics I' },
+        { code: 'BIOL206', name: 'General Biology I' },
+        { code: 'ACCT201', name: 'Principles of Accounting I' }
+      ],
+      4: [ // Morgan State University
+        { code: 'CS101',   name: 'Introduction to Programming' },
+        { code: 'MATH201', name: 'Calculus for Engineers I' },
+        { code: 'ENGL101', name: 'English Composition' },
+        { code: 'BIOL201', name: 'General Biology' },
+        { code: 'PHYS201', name: 'General Physics' },
+        { code: 'ECON201', name: 'Principles of Economics' },
+        { code: 'SOCI201', name: 'Introduction to Sociology' }
+      ],
+      5: [ // Bowie State University
+        { code: 'CS101',   name: 'Introduction to Computer Science' },
+        { code: 'MATH161', name: 'Pre-Calculus' },
+        { code: 'ENGL101', name: 'English Composition I' },
+        { code: 'PSYC101', name: 'General Psychology' },
+        { code: 'BIOL110', name: 'Principles of Biology' },
+        { code: 'BUS101',  name: 'Introduction to Business' }
+      ],
+      6: [ // Frostburg State University
+        { code: 'CS100',   name: 'Introduction to Computing' },
+        { code: 'MATH211', name: 'Calculus I' },
+        { code: 'ENGL101', name: 'English Composition' },
+        { code: 'GEOG110', name: 'Physical Geography' },
+        { code: 'BIO110',  name: 'Principles of Biology' },
+        { code: 'PSYC200', name: 'Introduction to Psychology' }
+      ],
+      7: [ // Salisbury University
+        { code: 'CS132',   name: 'Introduction to Computer Science for Majors' },
+        { code: 'MATH201', name: 'Calculus I' },
+        { code: 'ENGL103', name: 'Composition and Critical Thinking' },
+        { code: 'BIOL150', name: 'Principles of Biology I' },
+        { code: 'CHEM121', name: 'General Chemistry I' },
+        { code: 'ECON201', name: 'Principles of Microeconomics' },
+        { code: 'PSYC100', name: 'Introduction to Psychology' }
+      ],
+      8: [ // Coppin State University
+        { code: 'CIS101',  name: 'Introduction to Computers' },
+        { code: 'MATH130', name: 'College Algebra' },
+        { code: 'ENGL101', name: 'English Composition I' },
+        { code: 'PSYC101', name: 'Introduction to Psychology' },
+        { code: 'SOC101',  name: 'Introduction to Sociology' }
+      ],
+      9: [ // University of Baltimore
+        { code: 'LAW101',  name: 'Introduction to Law' },
+        { code: 'BUS201',  name: 'Principles of Management' },
+        { code: 'ACCT201', name: 'Financial Accounting' },
+        { code: 'ENGL101', name: 'English Composition' },
+        { code: 'ECON201', name: 'Macroeconomics' },
+        { code: 'MIS201',  name: 'Management Information Systems' },
+        { code: 'CPA301',  name: 'Criminal Procedure' }
+      ],
+      10: [ // MICA
+        { code: 'FA101',   name: 'Foundation Drawing' },
+        { code: 'FA102',   name: 'Foundation 2D Design' },
+        { code: 'FA103',   name: 'Foundation 3D Design' },
+        { code: 'HA101',   name: 'Art History Survey I' },
+        { code: 'FA201',   name: 'Printmaking I' }
+      ],
+      11: [ // Johns Hopkins University
+        { code: 'AS110',   name: 'Calculus I' },
+        { code: 'AS113',   name: 'Calculus II' },
+        { code: 'AS171',   name: 'Linear Algebra' },
+        { code: 'AS172',   name: 'Differential Equations' },
+        { code: 'AS301',   name: 'Introduction to Proofs' },
+        { code: 'EN601',   name: 'Algorithms' },
+        { code: 'EN601K',  name: 'Introduction to Programming with Java' },
+        { code: 'AS080',   name: 'Organic Chemistry I' },
+        { code: 'AS020',   name: 'General Physics I' },
+        { code: 'EN520',   name: 'Introduction to Electrical and Computer Engineering' }
+      ],
+      12: [ // Loyola University Maryland
+        { code: 'CS111',   name: 'Introduction to Computing' },
+        { code: 'CS112',   name: 'Object-Oriented Programming' },
+        { code: 'CS271',   name: 'Discrete Structures' },
+        { code: 'MATH201', name: 'Calculus I' },
+        { code: 'MATH202', name: 'Calculus II' },
+        { code: 'ENGL101', name: 'Academic Writing' },
+        { code: 'PHIL200', name: 'Ethics' },
+        { code: 'THEO200', name: 'Introduction to Theology' }
+      ],
+      13: [ // Stevenson University
+        { code: 'CISS101', name: 'Introduction to Computer Science' },
+        { code: 'MATH115', name: 'College Algebra' },
+        { code: 'ENGL101', name: 'English Composition I' },
+        { code: 'BUSN101', name: 'Introduction to Business' },
+        { code: 'NURS101', name: 'Fundamentals of Nursing' },
+        { code: 'ADIT101', name: 'Court Reporting I' }
+      ],
+      14: [ // Hood College
+        { code: 'CS111',   name: 'Introduction to Computer Science' },
+        { code: 'MATH151', name: 'Calculus I' },
+        { code: 'ENGL101', name: 'Writing and Rhetoric' },
+        { code: 'CHEM110', name: 'General Chemistry I' },
+        { code: 'BIO110',  name: 'Principles of Biology' },
+        { code: 'PSYC101', name: 'Introduction to Psychology' }
+      ],
+      15: [ // McDaniel College
+        { code: 'CS110',   name: 'Introduction to Computing' },
+        { code: 'MATH102', name: 'Calculus I' },
+        { code: 'ENGL101', name: 'Writing and Rhetoric' },
+        { code: 'PHIL110', name: 'Ethics' },
+        { code: 'SOC101',  name: 'Introduction to Sociology' },
+        { code: 'BIO110',  name: 'Principles of Biology' }
+      ],
+      16: [ // Washington College
+        { code: 'CS110',   name: 'Introduction to Computer Science' },
+        { code: 'MATH111', name: 'Calculus I' },
+        { code: 'ENGL110', name: 'Writing and Inquiry' },
+        { code: 'ENV111',  name: 'Environmental Studies' },
+        { code: 'ECON101', name: 'Introduction to Economics' }
+      ],
+      17: [ // St. Mary's College of Maryland
+        { code: 'CS101',   name: 'Introduction to Computer Science' },
+        { code: 'MATH151', name: 'Calculus I' },
+        { code: 'ENGL101', name: 'Academic Writing' },
+        { code: 'BIOL111', name: 'Principles of Biology' },
+        { code: 'CHEM111', name: 'General Chemistry I' },
+        { code: 'PSYC100', name: 'Introduction to Psychology' }
+      ],
+      18: [ // Notre Dame of Maryland University
+        { code: 'NURS101', name: 'Fundamentals of Nursing I' },
+        { code: 'CS101',   name: 'Introduction to Computing' },
+        { code: 'ENGL101', name: 'English Composition' },
+        { code: 'PSYC101', name: 'General Psychology' },
+        { code: 'BIO101',  name: 'General Biology' },
+        { code: 'MATH101', name: 'College Algebra' }
+      ],
+      19: [ // Goucher College
+        { code: 'CS101',   name: 'Introduction to Computer Science' },
+        { code: 'MATH120', name: 'Pre-Calculus' },
+        { code: 'ENGL101', name: 'Academic Writing' },
+        { code: 'PSYC101', name: 'Introduction to Psychology' },
+        { code: 'BIO101',  name: 'Principles of Biology' }
+      ],
+      20: [ // Prince George's Community College
+        { code: 'CIS101',  name: 'Computer Applications' },
+        { code: 'MATH111', name: 'Pre-Calculus' },
+        { code: 'ENGL101', name: 'English Composition I' },
+        { code: 'BIOL101', name: 'Principles of Biology' },
+        { code: 'PSYC101', name: 'General Psychology' },
+        { code: 'BUS101',  name: 'Introduction to Business' }
+      ],
+      21: [ // Montgomery College
+        { code: 'CIS101',  name: 'Introduction to Computer Science' },
+        { code: 'MATH181', name: 'Calculus I' },
+        { code: 'ENGL101', name: 'English Composition' },
+        { code: 'BIOL101', name: 'General Biology' },
+        { code: 'CHEM131', name: 'General Chemistry I' },
+        { code: 'PSYC101', name: 'Introduction to Psychology' }
+      ],
+      22: [ // Howard Community College
+        { code: 'CIS101',  name: 'Introduction to Information Technology' },
+        { code: 'MATH181', name: 'Calculus I' },
+        { code: 'ENGL101', name: 'English Composition I' },
+        { code: 'BIOL101', name: 'General Biology' },
+        { code: 'BUS101',  name: 'Introduction to Business' }
+      ],
+      23: [ // Anne Arundel Community College
+        { code: 'CIS101',  name: 'Introduction to Computing' },
+        { code: 'MATH191', name: 'Calculus I' },
+        { code: 'ENGL111', name: 'Academic Writing' },
+        { code: 'BIO101',  name: 'Principles of Biology' },
+        { code: 'PSYC100', name: 'General Psychology' }
+      ],
+      24: [ // CCBC
+        { code: 'CIS101',  name: 'Computer Applications and Concepts' },
+        { code: 'MATH181', name: 'Calculus I' },
+        { code: 'ENGL101', name: 'Composition and Research' },
+        { code: 'BIOL101', name: 'General Biology I' },
+        { code: 'CHEM111', name: 'General Chemistry I' },
+        { code: 'PSYC101', name: 'General Psychology' }
+      ],
+      25: [ // Frederick Community College
+        { code: 'CIS101',  name: 'Introduction to Computing' },
+        { code: 'MATH181', name: 'Pre-Calculus' },
+        { code: 'ENGL101', name: 'English Composition I' },
+        { code: 'BIOL101', name: 'General Biology' },
+        { code: 'HIST101', name: 'Western Civilization' }
+      ],
+      26: [ // Carroll Community College
+        { code: 'CIS101',  name: 'Computer Applications' },
+        { code: 'MATH115', name: 'Pre-Calculus' },
+        { code: 'ENGL101', name: 'English Composition' },
+        { code: 'BIOL101', name: 'General Biology' },
+        { code: 'PSYC101', name: 'Introduction to Psychology' }
+      ],
+      27: [ // Harford Community College
+        { code: 'CIS105',  name: 'Introduction to Computers' },
+        { code: 'MATH115', name: 'Pre-Calculus' },
+        { code: 'ENGL101', name: 'English Composition' },
+        { code: 'BIOL101', name: 'General Biology' },
+        { code: 'BUS101',  name: 'Introduction to Business' }
+      ],
+      28: [ // Chesapeake College
+        { code: 'CIS110',  name: 'Introduction to Computers' },
+        { code: 'MATH115', name: 'College Pre-Calculus' },
+        { code: 'ENGL101', name: 'English Composition I' },
+        { code: 'BIO101',  name: 'General Biology' },
+        { code: 'HIST101', name: 'American History I' }
+      ],
+      29: [ // College of Southern Maryland
+        { code: 'CIS101',  name: 'Computer Concepts and Applications' },
+        { code: 'MATH115', name: 'Pre-Calculus' },
+        { code: 'ENGL101', name: 'English Composition I' },
+        { code: 'BIO101',  name: 'Introduction to Biology' },
+        { code: 'PSYC101', name: 'Introduction to Psychology' }
+      ],
+      30: [ // Wor-Wic Community College
+        { code: 'CIS101',  name: 'Introduction to Computing' },
+        { code: 'MATH125', name: 'Pre-Calculus' },
+        { code: 'ENGL101', name: 'English Composition I' },
+        { code: 'BIO101',  name: 'Principles of Biology' },
+        { code: 'BUSN101', name: 'Introduction to Business' }
+      ]
+    };
+
+    // ================================================================
+    // VALIDATION RULES
+    // ================================================================
+    const rules = {
+      username: /^[a-zA-Z0-9_]{3,20}$/,
+      password: /^(?=.*[A-Z])(?=.*\d).{8,}$/
+    };
+
+    // ================================================================
+    // UTILITY
+    // ================================================================
+    function togglePass(inputId, iconId) {
+      const input = document.getElementById(inputId);
+      const icon  = document.getElementById(iconId);
+      if (input.type === 'password') {
+        input.type = 'text';
+        icon.className = 'fas fa-eye-slash';
+      } else {
+        input.type = 'password';
+        icon.className = 'fas fa-eye';
+      }
+    }
+
+    function showError(msg) {
+      document.getElementById('errorText').textContent = msg;
+      document.getElementById('errorAlert').classList.add('show');
+      document.getElementById('successAlert').classList.remove('show');
+    }
+
+    function hideError() {
+      document.getElementById('errorAlert').classList.remove('show');
+    }
+
+    function setInputState(inputEl, checkIconEl, state) {
+      inputEl.classList.remove('valid', 'invalid');
+      checkIconEl.classList.remove('show-valid', 'show-invalid');
+      if (state === 'valid') {
+        inputEl.classList.add('valid');
+        checkIconEl.className = 'fas fa-circle-check check-icon show-valid';
+      } else if (state === 'invalid') {
+        inputEl.classList.add('invalid');
+        checkIconEl.className = 'fas fa-circle-xmark check-icon show-invalid';
+      }
+    }
+
+    // ================================================================
+    // STEP 1 — ACCOUNT VALIDATION
+    // ================================================================
+    const usernameInput = document.getElementById('username');
+    const usernameCheck = document.getElementById('usernameCheck');
+    const passwordInput = document.getElementById('password');
+    const passwordCheck = document.getElementById('passwordCheck');
+    const confirmInput  = document.getElementById('confirmPassword');
+    const confirmCheck  = document.getElementById('confirmCheck');
+    const matchHint     = document.getElementById('matchHint');
+    const strengthWrap  = document.getElementById('strengthWrap');
+    const strengthFill  = document.getElementById('strengthFill');
+    const strengthLabel = document.getElementById('strengthLabel');
+
+    usernameInput.addEventListener('input', () => {
+      hideError();
+      const val = usernameInput.value.trim();
+      if (!val) { setInputState(usernameInput, usernameCheck, 'neutral'); return; }
+      setInputState(usernameInput, usernameCheck,
+        rules.username.test(val) ? 'valid' : 'invalid');
+    });
+
+    function getStrength(pw) {
+      let score = 0;
+      if (pw.length >= 8)  score++;
+      if (pw.length >= 12) score++;
+      if (/[A-Z]/.test(pw))        score++;
+      if (/\d/.test(pw))           score++;
+      if (/[^a-zA-Z0-9]/.test(pw)) score++;
+      return score;
+    }
+
+    passwordInput.addEventListener('input', () => {
+      hideError();
+      const val = passwordInput.value;
+      if (!val) {
+        strengthWrap.classList.remove('show');
+        setInputState(passwordInput, passwordCheck, 'neutral');
+        return;
+      }
+      strengthWrap.classList.add('show');
+      const levels = [
+        { label: 'Very Weak',   color: '#ef4444', width: '20%'  },
+        { label: 'Weak',        color: '#f97316', width: '40%'  },
+        { label: 'Fair',        color: '#eab308', width: '60%'  },
+        { label: 'Strong',      color: '#22c55e', width: '80%'  },
+        { label: 'Very Strong', color: '#16a34a', width: '100%' }
+      ];
+      const level = levels[Math.min(getStrength(val) - 1, 4)] || levels[0];
+      strengthFill.style.width      = level.width;
+      strengthFill.style.background = level.color;
+      strengthLabel.textContent     = level.label;
+      strengthLabel.style.color     = level.color;
+      setInputState(passwordInput, passwordCheck,
+        rules.password.test(val) ? 'valid' : 'invalid');
+      if (confirmInput.value.length > 0) checkConfirm();
+    });
+
+    function checkConfirm() {
+      const val = confirmInput.value;
+      if (!val) {
+        setInputState(confirmInput, confirmCheck, 'neutral');
+        matchHint.textContent = '';
+        return;
+      }
+      if (val === passwordInput.value) {
+        setInputState(confirmInput, confirmCheck, 'valid');
+        matchHint.textContent  = '✓ Passwords match';
+        matchHint.style.color  = '#16a34a';
+      } else {
+        setInputState(confirmInput, confirmCheck, 'invalid');
+        matchHint.textContent  = '✗ Passwords do not match';
+        matchHint.style.color  = '#dc2626';
+      }
+    }
+
+    confirmInput.addEventListener('input', () => { hideError(); checkConfirm(); });
+
+    // ---- Step 1 form submit → go to Step 2 ----
+    document.getElementById('registerForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const username     = usernameInput.value.trim();
+      const password     = passwordInput.value;
+      const confirm      = confirmInput.value;
+      const termsChecked = document.getElementById('terms').checked;
+
+      if (!username || !password || !confirm) {
+        showError('Please fill in all fields.'); return;
+      }
+      if (!rules.username.test(username)) {
+        showError('Username must be 3–20 characters. Letters, numbers, and underscores only.'); return;
+      }
+      if (!rules.password.test(password)) {
+        showError('Password must be at least 8 characters and include a capital letter and number.'); return;
+      }
+      if (password !== confirm) {
+        showError('Passwords do not match.'); return;
+      }
+      if (!termsChecked) {
+        showError('Please agree to the Terms of Use to continue.'); return;
+      }
+
+      hideError();
+      goToStep(2);
+    });
+
+    // ================================================================
+    // STEP NAVIGATION
+    // ================================================================
+    function goToStep(n) {
+      document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('active'));
+      document.getElementById('step' + n).classList.add('active');
+
+      // Update circles
+      for (let i = 1; i <= 2; i++) {
+        const circle = document.getElementById('circle' + i);
+        const label  = document.getElementById('label'  + i);
+        circle.classList.remove('active', 'done');
+        label.classList.remove('active', 'done');
+        if (i < n)  { circle.classList.add('done');   label.classList.add('done');   circle.innerHTML = '<i class="fas fa-check"></i>'; }
+        if (i === n){ circle.classList.add('active'); label.classList.add('active'); }
+        if (i > n)  { circle.textContent = i; }
+      }
+
+      // Update lines
+      const line1 = document.getElementById('line1');
+      if (n > 1) line1.classList.add('done'); else line1.classList.remove('done');
+    }
+
+    // ================================================================
+    // STEP 2 — SCHOOL SEARCH
+    // ================================================================
+    const schoolInput    = document.getElementById('schoolInput');
+    const schoolDropdown = document.getElementById('schoolDropdown');
+    const selectedSchool = document.getElementById('selectedSchool');
+    const selectedSchoolName = document.getElementById('selectedSchoolName');
+
+    schoolInput.addEventListener('input', () => {
+      const q = schoolInput.value.trim().toLowerCase();
+      if (!q) {
+        schoolDropdown.classList.remove('show');
+        schoolDropdown.innerHTML = '';
+        return;
+      }
+
+      const matches = SCHOOLS.filter(s =>
+        s.name.toLowerCase().includes(q) || s.short.toLowerCase().includes(q)
+      );
+
+      // Clear previous dropdown content
+      schoolDropdown.innerHTML = '';
+
+      if (matches.length === 0) {
+        const emptyDiv = document.createElement('div');
+        emptyDiv.classList.add('dropdown-empty');
+        emptyDiv.textContent = 'No schools found. You can still continue.';
+        schoolDropdown.appendChild(emptyDiv);
+      } else {
+        matches.forEach(s => {
+          const item = document.createElement('div');
+          item.classList.add('dropdown-item');
+          item.dataset.schoolId = String(s.id);
+
+          const icon = document.createElement('i');
+          icon.classList.add('fas', 'fa-school');
+
+          item.appendChild(icon);
+          item.appendChild(document.createTextNode(s.name));
+
+          schoolDropdown.appendChild(item);
+        });
+      }
+      schoolDropdown.classList.add('show');
+    });
+
+    schoolDropdown.addEventListener('click', (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const item = target.closest('.dropdown-item');
+      if (!item) return;
+      const id = Number(item.dataset.schoolId);
+      if (!Number.isNaN(id)) {
+        selectSchool(id);
+      }
+    });
+
+    let currentSchoolId = null;
+
+    function selectSchool(id) {
+      const school = SCHOOLS.find(s => s.id === id);
+      if (!school) {
+        // Treat missing school as invalid selection
+        clearSchool();
+        return;
+      }
+
+      currentSchoolId = school.id;
+      selectedSchoolName.textContent = school.name;
+      selectedSchool.classList.add('show');
+      schoolDropdown.classList.remove('show');
+      schoolInput.value = '';
+      // Reset courses when school changes
+      selectedCourses = [];
+      renderCourseTags();
+      courseInput.value = '';
+      courseDropdown.classList.remove('show');
+    }
+
+    function clearSchool() {
+      currentSchoolId = null;
+      selectedSchool.classList.remove('show');
+      selectedSchoolName.textContent = '';
+      selectedCourses = [];
+      renderCourseTags();
+    }
+
+    // Close school dropdown when clicking outside
+    document.addEventListener('click', e => {
+      if (!document.getElementById('schoolSearchBox').contains(e.target)) {
+        schoolDropdown.classList.remove('show');
+      }
+    });
+
+    // ================================================================
+    // STEP 2 — COURSE SEARCH
+    // ================================================================
+    const courseInput    = document.getElementById('courseInput');
+    const courseDropdown = document.getElementById('courseDropdown');
+    const selectedCoursesEl = document.getElementById('selectedCourses');
+    let selectedCourses  = [];
+
+    courseInput.addEventListener('input', () => {
+      const q = courseInput.value.trim().toLowerCase();
+      if (!q) { courseDropdown.classList.remove('show'); return; }
+
+      if (!currentSchoolId) {
+        courseDropdown.innerHTML = '<div class="dropdown-empty">Select a school first to see its courses.</div>';
+        courseDropdown.classList.add('show');
+        return;
+      }
+
+      const pool = COURSES_BY_SCHOOL[currentSchoolId] || [];
+      const matches = pool.filter(c =>
+        !selectedCourses.find(s => s.code === c.code) &&
+        (c.code.toLowerCase().includes(q) || c.name.toLowerCase().includes(q))
+      );
+
+      if (matches.length === 0) {
+        courseDropdown.innerHTML = '<div class="dropdown-empty">No courses found.</div>';
+      } else {
+        // Build list items without inline onclick handlers
+        courseDropdown.innerHTML = matches.map(c =>
+          `<div class="course-item"><span class="course-code"></span><span class="course-name"></span></div>`
+        ).join('');
+
+        // Attach data and event listeners safely
+        const items = courseDropdown.querySelectorAll('.course-item');
+        items.forEach((item, index) => {
+          const course = matches[index];
+          const codeEl = item.querySelector('.course-code');
+          const nameEl = item.querySelector('.course-name');
+          if (codeEl) codeEl.textContent = course.code;
+          if (nameEl) nameEl.textContent = course.name;
+          item.addEventListener('click', () => {
+            addCourse(course.code, course.name);
+          });
+        });
+      }
+      courseDropdown.classList.add('show');
+    });
+
+    function addCourse(code, name) {
+      if (selectedCourses.length >= 10) {
+        showError('You can add up to 10 courses.');
+        courseDropdown.classList.remove('show');
+        return;
+      }
+      if (selectedCourses.find(c => c.code === code)) return;
+      selectedCourses.push({ code, name });
+      renderCourseTags();
+      courseInput.value = '';
+      courseDropdown.classList.remove('show');
+    }
+
+    function removeCourse(code) {
+      selectedCourses = selectedCourses.filter(c => c.code !== code);
+      renderCourseTags();
+    }
+
+    function renderCourseTags() {
+      // Clear existing tags
+      selectedCoursesEl.innerHTML = '';
+
+      selectedCourses.forEach(c => {
+        const tag = document.createElement('div');
+        tag.className = 'course-tag';
+
+        const codeNode = document.createTextNode(c.code);
+        tag.appendChild(codeNode);
+
+        const btn = document.createElement('button');
+        btn.setAttribute('aria-label', `Remove ${c.code}`);
+
+        const icon = document.createElement('i');
+        icon.className = 'fas fa-times';
+        btn.appendChild(icon);
+
+        btn.addEventListener('click', () => {
+          removeCourse(c.code);
+        });
+
+        tag.appendChild(btn);
+        selectedCoursesEl.appendChild(tag);
+      });
+    }
+
+    // Close course dropdown when clicking outside
+    document.addEventListener('click', e => {
+      if (!document.querySelector('.course-search-box').contains(e.target)) {
+        courseDropdown.classList.remove('show');
+      }
+    });
+
+    // ================================================================
+    // STEP 2 — FINISH
+    // ================================================================
+    document.getElementById('finishBtn').addEventListener('click', finishRegistration);
+
+    function finishRegistration() {
+      document.getElementById('successAlert').classList.add('show');
+      hideError();
+      document.getElementById('finishBtn').disabled = true;
+      setTimeout(() => { window.location.href = 'login.html'; }, 2000);
+    }
+  </script>
+</body>
+</html>
