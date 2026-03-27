@@ -1798,3 +1798,13 @@ The starred sheets query in `sheets.list.controller.js` had no `orderBy` on `sta
 
 **File:** `backend/src/modules/sheets/sheets.list.controller.js`
 **Validation:** 533/533 backend tests pass
+
+---
+
+## Hotfix: UI‑P0 — Appeal Modal off-center in Settings
+
+**Date:** 2026-03-26
+
+The Appeal Decision modal in `ModerationTab.jsx` renders inside the Settings tab `<main>` element, which has a `transform` applied by anime.js `fadeInUp` animation. CSS `position: fixed` inside a transformed parent is relative to the parent, not the viewport — causing the modal to float off-center. Fixed by wrapping the modal JSX in `createPortal(…, document.body)`.
+
+**File:** `frontend/studyhub-app/src/pages/settings/ModerationTab.jsx`
