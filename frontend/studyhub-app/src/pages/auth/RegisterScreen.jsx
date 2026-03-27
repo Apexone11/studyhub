@@ -10,7 +10,7 @@
 
 import { useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import Navbar from '../../components/Navbar'
+import Navbar from '../../components/navbar/Navbar'
 import { fadeInUp } from '../../lib/animations'
 import { validateAccountFields, getSteps } from './registerConstants'
 import useRegisterFlow from './useRegisterFlow'

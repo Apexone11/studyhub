@@ -7,7 +7,7 @@ const { SHEET_STATUS, AUTHOR_SELECT, leaderboardLimiter } = require('./sheets.co
 const { serializeSheet } = require('./sheets.serializer')
 const { buildSheetTextSearchClauses } = require('../../lib/sheetSearch')
 const { searchSheetsFTS } = require('../../lib/fullTextSearch')
-const { RISK_TIER } = require('../../lib/htmlSecurity')
+const { RISK_TIER } = require('../../lib/html/htmlSecurity')
 
 const router = express.Router()
 

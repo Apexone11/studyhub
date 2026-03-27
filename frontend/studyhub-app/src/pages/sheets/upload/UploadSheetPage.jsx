@@ -7,7 +7,7 @@
  * Navbar actions live in UploadNavActions.
  * Constants and small helpers live in uploadSheetConstants.
  * ═══════════════════════════════════════════════════════════════════════════ */
-import Navbar from '../../components/Navbar'
+import Navbar from '../../components/navbar/Navbar'
 import SafeJoyride from '../../components/SafeJoyride'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import { pageShell } from '../../lib/ui'

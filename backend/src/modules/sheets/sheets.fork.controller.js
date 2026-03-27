@@ -5,7 +5,7 @@ const { captureError } = require('../../core/monitoring/sentry')
 const requireAuth = require('../../core/auth/requireAuth')
 const requireVerifiedEmail = require('../../core/auth/requireVerifiedEmail')
 const { createNotification } = require('../../lib/notify')
-const { isModerationEnabled, scanContent } = require('../../lib/moderationEngine')
+const { isModerationEnabled, scanContent } = require('../../lib/moderation/moderationEngine')
 const { SHEET_STATUS, AUTHOR_SELECT, sheetWriteLimiter } = require('./sheets.constants')
 const { serializeSheet } = require('./sheets.serializer')
 

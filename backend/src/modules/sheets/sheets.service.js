@@ -1,7 +1,7 @@
 const path = require('node:path')
 const prisma = require('../../core/db/prisma')
 const { SHEET_STATUS } = require('./sheets.constants')
-const { normalizeContentFormat } = require('../../lib/htmlSecurity')
+const { normalizeContentFormat } = require('../../lib/html/htmlSecurity')
 const { shouldAutoPublish } = require('../../lib/trustGate')
 
 function normalizeSheetStatus(value, fallback = SHEET_STATUS.PUBLISHED) {

@@ -9,7 +9,7 @@ const {
   mapChallengeForClient,
   resendSignupChallenge,
   verifyChallengeCode,
-} = require('../../lib/verificationChallenges')
+} = require('../../lib/verification/verificationChallenges')
 const { registerLimiter, verificationLimiter } = require('./auth.constants')
 const {
   AppError,

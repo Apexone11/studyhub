@@ -5,7 +5,7 @@ import { API } from '../../config'
 import { trackEvent } from '../../lib/telemetry'
 import { usePageTitle } from '../../lib/usePageTitle'
 import { fadeInOnScroll } from '../../lib/animations'
-import Navbar from '../../components/Navbar'
+import Navbar from '../../components/navbar/Navbar'
 import { HeroSection, ProofBanner } from './HomeHero'
 
 // Below-fold sections are lazy-loaded so the hero paints without waiting for

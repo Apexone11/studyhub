@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import Navbar from './Navbar'
+import Navbar from '../navbar/Navbar'
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '../config'
 
 const RELATED_LINKS = [
@@ -31,7 +31,7 @@ export default function LegalPageLayout({
   const resolvedAsideNote = asideNote || (
     <>
       Questions or concerns can always be sent to{' '}
-      <a href={SUPPORT_MAILTO} style={{ color: '#2563eb', textDecoration: 'none', fontWeight: 600 }}>
+      <a href={SUPPORT_MAILTO} style={{ color: 'var(--sh-link, #2563eb)', textDecoration: 'none', fontWeight: 600 }}>
         {SUPPORT_EMAIL}
       </a>
       .

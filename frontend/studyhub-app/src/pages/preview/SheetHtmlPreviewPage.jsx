@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import Navbar from '../../components/Navbar'
+import Navbar from '../../components/navbar/Navbar'
 import { API } from '../../config'
 import { getApiErrorMessage, readJsonSafely } from '../../lib/http'
 import { pageShell } from '../../lib/ui'

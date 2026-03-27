@@ -143,7 +143,7 @@ async function _flushBurstDigest(prisma, userId) {
 
   let deliverMail, getFromAddress, getPublicAppUrl, escapeHtml
   try {
-    const transport = require('./emailTransport')
+    const transport = require('./email/emailTransport')
     deliverMail = transport.deliverMail
     getFromAddress = transport.getFromAddress
     getPublicAppUrl = transport.getPublicAppUrl
@@ -216,7 +216,7 @@ async function _flushBurstDigest(prisma, userId) {
 async function sendHighPriorityEmail(prisma, { userId, type, message, linkPath }) {
   let deliverMail, getFromAddress, getPublicAppUrl, escapeHtml
   try {
-    const transport = require('./emailTransport')
+    const transport = require('./email/emailTransport')
     deliverMail = transport.deliverMail
     getFromAddress = transport.getFromAddress
     getPublicAppUrl = transport.getPublicAppUrl

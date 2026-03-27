@@ -1,7 +1,7 @@
 const express = require('express')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
-const { issueStrike, reviewCase } = require('../../lib/moderationEngine')
+const { issueStrike, reviewCase } = require('../../lib/moderation/moderationEngine')
 const { findSimilarContent } = require('../../lib/plagiarismService')
 const { isSuperAdmin } = require('../../lib/superAdmin')
 const { PAGE_SIZE, parsePage } = require('./moderation.constants')

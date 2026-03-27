@@ -43,7 +43,7 @@ const mocks = vi.hoisted(() => {
 const mockTargets = new Map([
   [require.resolve('../src/lib/prisma'), mocks.prisma],
   [require.resolve('../src/lib/previewTokens'), { verifyHtmlPreviewToken: mocks.verifyHtmlPreviewToken }],
-  [require.resolve('../src/lib/htmlSecurity'), { validateHtmlForSubmission: mocks.validateHtmlForSubmission, RISK_TIER: { CLEAN: 0, FLAGGED: 1, HIGH_RISK: 2, QUARANTINED: 3 } }],
+  [require.resolve('../src/lib/html/htmlSecurity'), { validateHtmlForSubmission: mocks.validateHtmlForSubmission, RISK_TIER: { CLEAN: 0, FLAGGED: 1, HIGH_RISK: 2, QUARANTINED: 3 } }],
   [require.resolve('../src/monitoring/sentry'), mocks.sentry],
 ])
 

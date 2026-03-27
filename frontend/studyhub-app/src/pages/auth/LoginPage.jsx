@@ -12,7 +12,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { GoogleLogin } from '@react-oauth/google'
-import Navbar from '../../components/Navbar'
+import Navbar from '../../components/navbar/Navbar'
 import { API, GOOGLE_CLIENT_ID } from '../../config'
 import { fadeInUp } from '../../lib/animations'
 import { getAuthenticatedHomePath } from '../../lib/authNavigation'

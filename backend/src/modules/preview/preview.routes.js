@@ -1,10 +1,10 @@
 const express = require('express')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
-const { buildPreviewDocument, buildInteractiveDocument } = require('../../lib/htmlPreviewDocument')
+const { buildPreviewDocument, buildInteractiveDocument } = require('../../lib/html/htmlPreviewDocument')
 const { verifyHtmlPreviewToken } = require('../../lib/previewTokens')
 const { ERROR_CODES, sendError } = require('../../middleware/errorEnvelope')
-const { RISK_TIER } = require('../../lib/htmlSecurity')
+const { RISK_TIER } = require('../../lib/html/htmlSecurity')
 
 const router = express.Router()
 

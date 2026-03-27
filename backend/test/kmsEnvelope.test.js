@@ -25,7 +25,7 @@ const fakeEncryptedBlob = crypto.randomBytes(64)
 const originalModuleLoad = Module._load
 
 const mockTargets = new Map([
-  [require.resolve('../src/lib/kmsClient'), { getKmsClient: mocks.getKmsClient }],
+  [require.resolve('../src/lib/kms/kmsClient'), { getKmsClient: mocks.getKmsClient }],
   [require.resolve('../src/monitoring/sentry'), { captureError: mocks.captureError }],
 ])
 
@@ -38,7 +38,7 @@ Module._load = function patchedModuleLoad(requestId, parent, isMain) {
   return originalModuleLoad.apply(this, arguments)
 }
 
-const { encryptField, decryptField } = require('../src/lib/kmsEnvelope')
+const { encryptField, decryptField } = require('../src/lib/kms/kmsEnvelope')
 
 afterAll(() => {
   Module._load = originalModuleLoad

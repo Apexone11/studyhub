@@ -86,7 +86,7 @@ const mockTargets = new Map([
   [require.resolve('../src/middleware/auth'), mocks.auth],
   [require.resolve('../src/monitoring/sentry'), mocks.sentry],
   [require.resolve('../src/lib/deleteUserAccount'), { deleteUserAccount: mocks.deleteUserAccount }],
-  [require.resolve('../src/lib/htmlSecurity'), mocks.htmlSecurity],
+  [require.resolve('../src/lib/html/htmlSecurity'), mocks.htmlSecurity],
 ])
 
 const originalModuleLoad = Module._load
@@ -106,7 +106,7 @@ beforeAll(() => {
   }
 
   delete require.cache[adminRoutePath]
-  const adminRouterModule = require(adminRoutePath)
+  const adminRouterModule = require('../src/modules/admin')
   const adminRouter = adminRouterModule.default || adminRouterModule
 
   app = express()

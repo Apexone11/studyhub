@@ -27,7 +27,7 @@ export default function MentionText({ text, style }) {
         key={`${username}-${matchStart}`}
         to={`/users/${username}`}
         style={{
-          color: '#3b82f6',
+          color: 'var(--sh-info, #3b82f6)',
           fontWeight: 700,
           textDecoration: 'none',
         }}

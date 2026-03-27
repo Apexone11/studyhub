@@ -1,6 +1,6 @@
 const express = require('express')
 const { captureError } = require('../../monitoring/sentry')
-const { isHtmlUploadsEnabled, setHtmlUploadsEnabled, readEnvOverride } = require('../../lib/htmlKillSwitch')
+const { isHtmlUploadsEnabled, setHtmlUploadsEnabled, readEnvOverride } = require('../../lib/html/htmlKillSwitch')
 const prisma = require('../../lib/prisma')
 const { PAGE_SIZE, parsePage } = require('./admin.constants')
 

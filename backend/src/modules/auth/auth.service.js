@@ -1,16 +1,16 @@
 const { captureError } = require('../../monitoring/sentry')
-const { sendEmailVerification } = require('../../lib/email')
+const { sendEmailVerification } = require('../../lib/email/email')
 const {
   setAuthCookie,
   signAuthToken,
   signCsrfToken,
 } = require('../../lib/authTokens')
-const { maskEmailAddress } = require('../../lib/verificationCodes')
+const { maskEmailAddress } = require('../../lib/verification/verificationCodes')
 const {
   VerificationError,
   mapChallengeForClient,
-} = require('../../lib/verificationChallenges')
-const { isValidEmailAddress } = require('../../lib/emailValidation')
+} = require('../../lib/verification/verificationChallenges')
+const { isValidEmailAddress } = require('../../lib/email/emailValidation')
 const prisma = require('../../lib/prisma')
 const { USERNAME_REGEX, PASSWORD_MIN_LENGTH, COURSE_CODE_REGEX } = require('./auth.constants')
 

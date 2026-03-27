@@ -11,7 +11,7 @@
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import Navbar from '../../components/Navbar'
+import Navbar from '../../components/navbar/Navbar'
 import ReportModal from '../../components/ReportModal'
 import SafeJoyride from '../../components/SafeJoyride'
 import { SkeletonProfile } from '../../components/Skeleton'

@@ -49,14 +49,19 @@ function getInitialModerationStatus(user) {
  * Pure function — evaluates whether a user meets the criteria for promotion
  * to the 'trusted' trust level.
  *
+ * Rule: trusted = emailVerified + account age + clean moderation history.
+ *
  * @param {object} params
+ * @param {boolean} params.emailVerified        — whether the user has verified their email
  * @param {Date}    params.createdAt            — account creation timestamp
  * @param {number}  params.confirmedViolations  — count of confirmed moderation violations
  * @param {number}  params.activeStrikes        — count of currently active strikes
  * @param {boolean} params.hasActiveRestriction — whether the user has an active restriction
  * @returns {boolean}
  */
-function meetsPromotionCriteria({ createdAt, confirmedViolations, activeStrikes, hasActiveRestriction }) {
+function meetsPromotionCriteria({ emailVerified, createdAt, confirmedViolations, activeStrikes, hasActiveRestriction }) {
+  if (!emailVerified) return false
+
   const ageMs = Date.now() - new Date(createdAt).getTime()
   const ageDays = ageMs / (1000 * 60 * 60 * 24)
 
@@ -81,11 +86,11 @@ function meetsPromotionCriteria({ createdAt, confirmedViolations, activeStrikes,
  */
 async function checkAndPromoteTrust(userId) {
   const prisma = require('./prisma')
-  const { countActiveStrikes, hasActiveRestriction } = require('./moderationEngine')
+  const { countActiveStrikes, hasActiveRestriction } = require('./moderation/moderationEngine')
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, trustLevel: true, createdAt: true },
+    select: { id: true, trustLevel: true, createdAt: true, emailVerified: true },
   })
 
   if (!user) return { promoted: false, trustLevel: null }
@@ -106,6 +111,7 @@ async function checkAndPromoteTrust(userId) {
   ])
 
   const eligible = meetsPromotionCriteria({
+    emailVerified: Boolean(user.emailVerified),
     createdAt: user.createdAt,
     confirmedViolations,
     activeStrikes,

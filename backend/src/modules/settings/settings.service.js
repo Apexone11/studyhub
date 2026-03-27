@@ -1,12 +1,12 @@
 const { captureError } = require('../../monitoring/sentry')
-const { sendEmailVerification } = require('../../lib/email')
-const { isValidEmailAddress } = require('../../lib/emailValidation')
+const { sendEmailVerification } = require('../../lib/email/email')
+const { isValidEmailAddress } = require('../../lib/email/emailValidation')
 const {
   VERIFICATION_PURPOSE,
   VerificationError,
   getUserActiveChallenge,
   mapChallengeForClient,
-} = require('../../lib/verificationChallenges')
+} = require('../../lib/verification/verificationChallenges')
 const prisma = require('../../lib/prisma')
 
 const { COURSE_CODE_REGEX } = require('./settings.constants')

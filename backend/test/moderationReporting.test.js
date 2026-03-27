@@ -107,7 +107,7 @@ describe('moderationEngine issueStrike', () => {
     /* Also mock the moderationEngine targets */
     mockTargets.set(require.resolve('openai'), vi.fn(function MockOpenAI() { return {} }))
 
-    const enginePath = require.resolve('../src/lib/moderationEngine')
+    const enginePath = require.resolve('../src/lib/moderation/moderationEngine')
     delete require.cache[enginePath]
     const mod = require(enginePath)
     issueStrike = mod.issueStrike

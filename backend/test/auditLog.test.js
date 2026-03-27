@@ -30,7 +30,7 @@ const fakeEncryptedBlob = crypto.randomBytes(64)
 const originalModuleLoad = Module._load
 
 const mockTargets = new Map([
-  [require.resolve('../src/lib/kmsClient'), { getKmsClient: mocks.getKmsClient }],
+  [require.resolve('../src/lib/kms/kmsClient'), { getKmsClient: mocks.getKmsClient }],
   [require.resolve('../src/lib/prisma'), mocks.prisma],
   [require.resolve('../src/monitoring/sentry'), { captureError: vi.fn() }],
 ])
@@ -144,7 +144,7 @@ describe('auditLog', () => {
 
     it('records pii.read audit on getUserPII', async () => {
       // Set up a vault record to read
-      const { encryptField } = require('../src/lib/kmsEnvelope')
+      const { encryptField } = require('../src/lib/kms/kmsEnvelope')
       const envelope = await encryptField(JSON.stringify({ email: 'test@test.com' }))
       mocks.prisma.userSensitive.findUnique.mockResolvedValue({
         id: 1,

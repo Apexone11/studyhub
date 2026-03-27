@@ -11,7 +11,7 @@
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import Navbar from '../../components/Navbar'
+import Navbar from '../../components/navbar/Navbar'
 import { Skeleton } from '../../components/Skeleton'
 import { API } from '../../config'
 import { useSession } from '../../lib/session-context'

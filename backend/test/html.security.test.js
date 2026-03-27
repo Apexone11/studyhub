@@ -17,14 +17,14 @@ const {
   sanitizePreviewHtml,
   buildPreviewDocument,
   buildInteractiveDocument,
-} = require('../src/lib/htmlPreviewDocument')
+} = require('../src/lib/html/htmlPreviewDocument')
 
 const {
   classifyHtmlRisk,
   detectHtmlFeatures,
   validateHtmlForRuntime,
   RISK_TIER,
-} = require('../src/lib/htmlSecurity')
+} = require('../src/lib/html/htmlSecurity')
 
 /* ═══════════════════════════════════════════════════════════════════════════
  * 1) sanitizePreviewHtml — XSS corpus (must strip all dangerous patterns)

@@ -9,8 +9,8 @@
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import Navbar from '../../components/Navbar'
-import AppSidebar from '../../components/AppSidebar'
+import Navbar from '../../components/navbar/Navbar'
+import AppSidebar from '../../components/sidebar/AppSidebar'
 import SafeJoyride from '../../components/SafeJoyride'
 import MentionText from '../../components/MentionText'
 import { IconPlus } from '../../components/Icons'

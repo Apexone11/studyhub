@@ -96,7 +96,7 @@ const mockTargets = new Map([
   [require.resolve('../src/lib/accessControl'), mocks.accessControl],
   [require.resolve('../src/lib/storage'), mocks.storage],
   [require.resolve('../src/lib/attachmentPreview'), mocks.attachmentPreview],
-  [require.resolve('../src/lib/moderationEngine'), mocks.moderationEngine],
+  [require.resolve('../src/lib/moderation/moderationEngine'), mocks.moderationEngine],
 ])
 
 const originalModuleLoad = Module._load
@@ -116,7 +116,7 @@ beforeAll(() => {
   }
 
   delete require.cache[feedRoutePath]
-  const feedRouterModule = require(feedRoutePath)
+  const feedRouterModule = require('../src/modules/feed')
   const feedRouter = feedRouterModule.default || feedRouterModule
 
   app = express()

@@ -16,7 +16,7 @@ const require = createRequire(import.meta.url)
 const {
   buildPreviewDocument,
   buildInteractiveDocument,
-} = require('../src/lib/htmlPreviewDocument')
+} = require('../src/lib/html/htmlPreviewDocument')
 
 /* ═══════════════════════════════════════════════════════════════════════════
  * 1) buildInteractiveDocument — script preservation + dangerous tag stripping

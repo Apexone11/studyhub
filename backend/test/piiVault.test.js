@@ -28,7 +28,7 @@ const fakeEncryptedBlob = crypto.randomBytes(64)
 const originalModuleLoad = Module._load
 
 const mockTargets = new Map([
-  [require.resolve('../src/lib/kmsClient'), { getKmsClient: mocks.getKmsClient }],
+  [require.resolve('../src/lib/kms/kmsClient'), { getKmsClient: mocks.getKmsClient }],
   [require.resolve('../src/lib/prisma'), mocks.prisma],
   [require.resolve('../src/monitoring/sentry'), { captureError: vi.fn() }],
 ])
@@ -153,7 +153,7 @@ describe('piiVault', () => {
       const json = JSON.stringify(data)
 
       // Manually encrypt to build a realistic DB record
-      const { encryptField } = require('../src/lib/kmsEnvelope')
+      const { encryptField } = require('../src/lib/kms/kmsEnvelope')
       const envelope = await encryptField(json)
 
       const dbRecord = {

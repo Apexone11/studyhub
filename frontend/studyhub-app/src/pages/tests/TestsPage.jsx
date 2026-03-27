@@ -8,8 +8,8 @@
  * Tab bar: All Tests | My Attempts | Leaderboard (UI only, not yet wired).
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useState } from 'react'
-import Navbar from '../../components/Navbar'
-import AppSidebar from '../../components/AppSidebar'
+import Navbar from '../../components/navbar/Navbar'
+import AppSidebar from '../../components/sidebar/AppSidebar'
 import { PageShell, TeaserCard } from '../shared/pageScaffold'
 import { PAGE_FONT } from '../shared/pageUtils'
 

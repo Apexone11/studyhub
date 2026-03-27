@@ -74,8 +74,8 @@
 }
 
 .sheet-lab__tab--active {
-  color: #6366f1;
-  border-bottom-color: #6366f1;
+  color: var(--sh-brand, #6366f1);
+  border-bottom-color: var(--sh-brand, #6366f1);
 }
 
 .sheet-lab__tab-badge {
@@ -85,8 +85,8 @@
   min-width: 18px;
   height: 18px;
   border-radius: 9px;
-  background: #6366f1;
-  color: #fff;
+  background: var(--sh-brand, #6366f1);
+  color: var(--sh-surface, #fff);
   font-size: 10px;
   font-weight: 800;
   padding: 0 5px;
@@ -115,23 +115,23 @@
 }
 
 .sheet-lab__status-badge--draft {
-  background: #fef3c7;
-  color: #92400e;
+  background: var(--sh-warning-bg, #fef3c7);
+  color: var(--sh-warning-text, #92400e);
 }
 
 .sheet-lab__status-badge--published {
-  background: #dcfce7;
-  color: #166534;
+  background: var(--sh-success-bg, #dcfce7);
+  color: var(--sh-success-text, #166534);
 }
 
 .sheet-lab__status-badge--pending_review {
-  background: #dbeafe;
-  color: #1e40af;
+  background: var(--sh-info-bg, #dbeafe);
+  color: var(--sh-info-text, #1e40af);
 }
 
 .sheet-lab__status-badge--rejected {
-  background: #fee2e2;
-  color: #991b1b;
+  background: var(--sh-danger-bg, #fee2e2);
+  color: var(--sh-danger-text, #991b1b);
 }
 
 .sheet-lab__fork-badge {
@@ -194,19 +194,19 @@
 }
 
 .sheet-lab__btn--primary {
-  background: linear-gradient(135deg, #6366f1, #818cf8);
-  color: #fff;
+  background: linear-gradient(135deg, var(--sh-brand, #6366f1), var(--sh-brand-light, #818cf8));
+  color: var(--sh-surface, #fff);
 }
 
 .sheet-lab__btn--compare {
-  background: #f0fdf4;
-  color: #16a34a;
-  border: 1px solid #bbf7d0;
+  background: var(--sh-success-bg, #f0fdf4);
+  color: var(--sh-success-text, #16a34a);
+  border: 1px solid var(--sh-success-border, #bbf7d0);
 }
 
 .sheet-lab__btn--compare.active {
-  background: #16a34a;
-  color: #fff;
+  background: var(--sh-success, #16a34a);
+  color: var(--sh-surface, #fff);
 }
 
 .sheet-lab__btn--cancel {
@@ -230,7 +230,7 @@
   top: 0;
   bottom: 0;
   width: 2px;
-  background: linear-gradient(to bottom, #c7d2fe, var(--sh-border, #e2e8f0));
+  background: linear-gradient(to bottom, var(--sh-brand-soft, #c7d2fe), var(--sh-border, #e2e8f0));
   border-radius: 1px;
 }
 
@@ -253,14 +253,14 @@
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #6366f1;
-  border: 3px solid #e0e7ff;
+  background: var(--sh-brand, #6366f1);
+  border: 3px solid var(--sh-brand-soft, #e0e7ff);
   z-index: 1;
 }
 
 .sheet-lab__commit--selected .sheet-lab__commit-dot {
-  background: #16a34a;
-  border-color: #bbf7d0;
+  background: var(--sh-success, #16a34a);
+  border-color: var(--sh-success-border, #bbf7d0);
 }
 
 .sheet-lab__commit-card {
@@ -273,12 +273,12 @@
 }
 
 .sheet-lab__commit-card:hover {
-  border-color: #c7d2fe;
+  border-color: var(--sh-brand-soft, #c7d2fe);
   box-shadow: 0 4px 16px rgba(99, 102, 241, 0.08);
 }
 
 .sheet-lab__commit--selected .sheet-lab__commit-card {
-  border-color: #86efac;
+  border-color: var(--sh-success-border, #86efac);
   box-shadow: 0 4px 16px rgba(22, 163, 74, 0.1);
 }
 
@@ -322,7 +322,7 @@
   height: 20px;
   border-radius: 50%;
   object-fit: cover;
-  background: #e0e7ff;
+  background: var(--sh-brand-soft, #e0e7ff);
 }
 
 .sheet-lab__commit-checksum {

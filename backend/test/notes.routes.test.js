@@ -74,7 +74,7 @@ const mockTargets = new Map([
   [require.resolve('../src/middleware/requireVerifiedEmail'), mocks.requireVerifiedEmail],
   [require.resolve('../src/monitoring/sentry'), mocks.sentry],
   [require.resolve('../src/lib/accessControl'), mocks.accessControl],
-  [require.resolve('../src/lib/moderationEngine'), mocks.moderationEngine],
+  [require.resolve('../src/lib/moderation/moderationEngine'), mocks.moderationEngine],
   [require.resolve('../src/lib/notify'), mocks.notify],
   [require.resolve('../src/lib/mentions'), mocks.mentions],
   [require.resolve('../src/lib/activityTracker'), mocks.activityTracker],

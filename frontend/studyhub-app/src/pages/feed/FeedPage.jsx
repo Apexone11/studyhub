@@ -11,8 +11,8 @@
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import Navbar from '../../components/Navbar'
-import AppSidebar from '../../components/AppSidebar'
+import Navbar from '../../components/navbar/Navbar'
+import AppSidebar from '../../components/sidebar/AppSidebar'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import ReportModal from '../../components/ReportModal'
 import { useSession } from '../../lib/session-context'

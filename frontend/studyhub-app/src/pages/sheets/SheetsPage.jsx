@@ -5,8 +5,8 @@
  * Data: useSheetsData
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { Link } from 'react-router-dom'
-import Navbar from '../../components/Navbar'
-import AppSidebar from '../../components/AppSidebar'
+import Navbar from '../../components/navbar/Navbar'
+import AppSidebar from '../../components/sidebar/AppSidebar'
 import { IconUpload } from '../../components/Icons'
 import { pageShell, useResponsiveAppLayout } from '../../lib/ui'
 import { usePageTitle } from '../../lib/usePageTitle'

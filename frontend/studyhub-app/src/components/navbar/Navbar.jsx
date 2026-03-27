@@ -16,7 +16,7 @@ import {
   LogoMark,
   IconSearch,
 } from './Icons'
-import SearchModal from './SearchModal'
+import SearchModal from './search/SearchModal'
 import KeyboardShortcuts from './KeyboardShortcuts'
 import { pageWidths } from '../lib/ui'
 import { useSession } from '../lib/session-context'
@@ -234,7 +234,7 @@ export default function Navbar({
             <Link
               to="/register"
               style={publicPrimaryBtn}
-              onMouseEnter={e => { e.currentTarget.style.background = '#2563eb' }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'var(--sh-brand-hover, #2563eb)' }}
               onMouseLeave={e => { e.currentTarget.style.background = 'var(--sh-brand)' }}
             >
               Get Started

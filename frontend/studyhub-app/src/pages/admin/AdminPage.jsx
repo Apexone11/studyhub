@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import Navbar from '../../components/Navbar'
-import AppSidebar from '../../components/AppSidebar'
+import Navbar from '../../components/navbar/Navbar'
+import AppSidebar from '../../components/sidebar/AppSidebar'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import { pageShell, useResponsiveAppLayout } from '../../lib/ui'
 import { useLivePolling } from '../../lib/useLivePolling'
@@ -59,14 +59,14 @@ export default function AdminPage() {
   if (!d.user) return null
 
   const navActions = (
-    <Link to="/feed" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, border: '1px solid #334155', color: '#94a3b8', textDecoration: 'none', fontSize: 12, fontWeight: 700 }}>
+    <Link to="/feed" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, border: '1px solid var(--sh-slate-700, #334155)', color: 'var(--sh-slate-400, #94a3b8)', textDecoration: 'none', fontSize: 12, fontWeight: 700 }}>
       ← Feed
     </Link>
   )
 
   return (
   <>
-    <div style={{ minHeight: '100vh', background: '#edf0f5', fontFamily: FONT }}>
+    <div style={{ minHeight: '100vh', background: 'var(--sh-soft, #edf0f5)', fontFamily: FONT }}>
       <Navbar crumbs={[{ label: 'Admin', to: '/admin' }]} hideTabs actions={navActions} />
       <div style={{ ...pageShell('app'), display: 'grid', gridTemplateColumns: layout.columns.appTwoColumn, gap: 20 }}>
         <AppSidebar mode={layout.sidebarMode} />
@@ -74,11 +74,11 @@ export default function AdminPage() {
         <main id="main-content" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {isAdmin ? (
             <>
-              <section style={{ background: '#fff', borderRadius: 18, border: '1px solid #e2e8f0', padding: '18px 20px' }}>
+              <section style={{ background: 'var(--sh-surface, #fff)', borderRadius: 18, border: '1px solid var(--sh-border, #e2e8f0)', padding: '18px 20px' }}>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   {TABS.map(([value, label]) => (
                     <button key={value} type="button" onClick={() => setActiveTab(value)}
-                      style={{ padding: '8px 14px', borderRadius: 10, border: activeTab === value ? '1px solid #2563eb' : '1px solid #e2e8f0', background: activeTab === value ? '#eff6ff' : '#fff', color: activeTab === value ? '#1d4ed8' : '#475569', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                      style={{ padding: '8px 14px', borderRadius: 10, border: activeTab === value ? '1px solid #2563eb' : '1px solid var(--sh-border, #e2e8f0)', background: activeTab === value ? 'var(--sh-info-bg, #eff6ff)' : 'var(--sh-surface, #fff)', color: activeTab === value ? 'var(--sh-info-text, #1d4ed8)' : 'var(--sh-slate-600, #475569)', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
                       {label}
                     </button>
                   ))}
@@ -96,9 +96,9 @@ export default function AdminPage() {
               ) : null}
 
               {activeTab !== 'overview' && activeTab !== 'settings' && activeTab !== 'moderation' && activeTab !== 'schools' ? (
-                <section style={{ background: '#fff', borderRadius: 18, border: '1px solid #e2e8f0', padding: '22px' }}>
+                <section style={{ background: 'var(--sh-surface, #fff)', borderRadius: 18, border: '1px solid var(--sh-border, #e2e8f0)', padding: '22px' }}>
                   {tabState?.error ? (
-                    <div style={{ color: '#b91c1c', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, padding: '12px 14px', fontSize: 13, marginBottom: 14 }}>
+                    <div style={{ color: 'var(--sh-danger-text, #b91c1c)', background: 'var(--sh-danger-bg, #fef2f2)', border: '1px solid var(--sh-danger-border, #fecaca)', borderRadius: 12, padding: '12px 14px', fontSize: 13, marginBottom: 14 }}>
                       {tabState.error}
                     </div>
                   ) : null}
@@ -111,7 +111,7 @@ export default function AdminPage() {
                   {activeTab === 'email-suppressions' ? <EmailSuppressionsTab suppressionsState={d.suppressionsState} suppressionStatus={d.suppressionStatus} suppressionQueryInput={d.suppressionQueryInput} suppressionQuery={d.suppressionQuery} suppressionMessage={d.suppressionMessage} unsuppressReasonById={d.unsuppressReasonById} unsuppressErrorById={d.unsuppressErrorById} unsuppressSavingId={d.unsuppressSavingId} auditState={d.auditState} setSuppressionStatus={d.setSuppressionStatus} setSuppressionQueryInput={d.setSuppressionQueryInput} setSuppressionMessage={d.setSuppressionMessage} setSuppressionsState={d.setSuppressionsState} setUnsuppressReasonById={d.setUnsuppressReasonById} setUnsuppressErrorById={d.setUnsuppressErrorById} submitSuppressionSearch={d.submitSuppressionSearch} clearSuppressionFilters={d.clearSuppressionFilters} unsuppressRecipient={d.unsuppressRecipient} loadSuppressionAudit={d.loadSuppressionAudit} setAuditState={d.setAuditState} loadPagedData={d.loadPagedData} /> : null}
 
                   {tabState?.loading && !tabState.loaded ? (
-                    <div style={{ color: '#94a3b8', fontSize: 13, marginTop: 12 }}>Loading tab…</div>
+                    <div style={{ color: 'var(--sh-slate-400, #94a3b8)', fontSize: 13, marginTop: 12 }}>Loading tab…</div>
                   ) : null}
                 </section>
               ) : null}

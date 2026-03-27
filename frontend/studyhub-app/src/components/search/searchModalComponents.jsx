@@ -9,7 +9,7 @@ export function Highlight({ text, query }) {
   const parts = text.split(new RegExp(`(${escaped})`, 'gi'))
   return parts.map((part, i) =>
     part.toLowerCase() === query.toLowerCase()
-      ? <mark key={i} style={{ background: '#fef08a', color: 'inherit', borderRadius: 2, padding: '0 1px' }}>{part}</mark>
+      ? <mark key={i} style={{ background: 'var(--sh-highlight, #fef08a)', color: 'inherit', borderRadius: 2, padding: '0 1px' }}>{part}</mark>
       : part
   )
 }

@@ -2,7 +2,7 @@ import Module, { createRequire } from 'node:module'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const require = createRequire(import.meta.url)
-const emailLibPath = require.resolve('../src/lib/email')
+const emailLibPath = require.resolve('../src/lib/email/email')
 
 const mocks = vi.hoisted(() => {
   const sendMail = vi.fn().mockResolvedValue({
@@ -49,7 +49,7 @@ beforeAll(() => {
   }
 
   delete require.cache[emailLibPath]
-  emailLib = require(emailLibPath)
+  emailLib = require('../src/lib/email/email')
 })
 
 afterAll(() => {
