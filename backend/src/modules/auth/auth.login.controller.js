@@ -1,6 +1,7 @@
 const express = require('express')
 const bcrypt = require('bcryptjs')
 const prisma = require('../../lib/prisma')
+const { checkAndPromoteTrust } = require('../../lib/trustGate')
 const {
   VERIFICATION_PURPOSE,
   consumeChallenge,
@@ -84,6 +85,7 @@ router.post('/login', loginLimiter, async (req, res) => {
      * endpoints for backwards compatibility but is no longer triggered. */
 
     const authenticatedUser = await issueAuthenticatedSession(res, user.id)
+    void checkAndPromoteTrust(user.id)
     return res.json({
       message: 'Login successful!',
       user: authenticatedUser,

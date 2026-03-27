@@ -3,6 +3,7 @@ const { captureError } = require('../../monitoring/sentry')
 const { deleteUserAccount } = require('../../lib/deleteUserAccount')
 const prisma = require('../../lib/prisma')
 const { isSuperAdmin } = require('../../lib/superAdmin')
+const { logModerationEvent } = require('../../lib/moderationLogger')
 const { PAGE_SIZE, parsePage } = require('./admin.constants')
 
 const router = express.Router()
@@ -143,6 +144,48 @@ router.patch('/users/:id/role', async (req, res) => {
       data: { role },
       select: { id: true, username: true, role: true }
     })
+    res.json(user)
+  } catch (err) {
+    if (err.code === 'P2025') return res.status(404).json({ error: 'User not found.' })
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── PATCH /api/admin/users/:id/trust-level ──────────────────
+router.patch('/users/:id/trust-level', async (req, res) => {
+  const { trustLevel } = req.body || {}
+  if (!['new', 'trusted', 'restricted'].includes(trustLevel)) {
+    return res.status(400).json({ error: 'Trust level must be "new", "trusted", or "restricted".' })
+  }
+  const targetId = parseInt(req.params.id)
+  if (!Number.isInteger(targetId)) {
+    return res.status(400).json({ error: 'User id must be an integer.' })
+  }
+
+  try {
+    if (trustLevel === 'restricted' && await isSuperAdmin(targetId)) {
+      return res.status(403).json({ error: 'The super admin account cannot be restricted.', code: 'SUPER_ADMIN_PROTECTED' })
+    }
+
+    const data = { trustLevel }
+    if (trustLevel === 'trusted') data.trustedAt = new Date()
+    if (trustLevel === 'new') data.trustedAt = null
+
+    const user = await prisma.user.update({
+      where: { id: targetId },
+      data,
+      select: { id: true, username: true, trustLevel: true, trustedAt: true },
+    })
+
+    await logModerationEvent({
+      userId: targetId,
+      action: 'trust_level_changed',
+      reason: `Trust level set to ${trustLevel} by admin`,
+      performedBy: req.user.userId,
+      metadata: { newTrustLevel: trustLevel },
+    })
+
     res.json(user)
   } catch (err) {
     if (err.code === 'P2025') return res.status(404).json({ error: 'User not found.' })

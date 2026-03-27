@@ -176,6 +176,7 @@ async function getAuthenticatedUser(userId) {
       coverImageUrl: true,
       authProvider: true,
       accountType: true,
+      trustLevel: true,
       createdAt: true,
       enrollments: {
         include: {
@@ -205,6 +206,7 @@ function buildAuthenticatedUserPayload(user, extraFields = {}) {
     avatarUrl: user.avatarUrl || null,
     authProvider: user.authProvider || 'local',
     accountType: user.accountType || 'student',
+    trustLevel: user.trustLevel || 'new',
     createdAt: user.createdAt,
     enrollments: user.enrollments || [],
     counts: user._count
