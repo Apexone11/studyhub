@@ -99,7 +99,7 @@ async function checkAndPromoteTrust(userId) {
     hasActiveRestriction(userId),
     prisma.moderationCase.count({
       where: {
-        authorId: userId,
+        userId,
         status: 'confirmed',
       },
     }),
