@@ -1890,3 +1890,70 @@ Extended `usePageTiming` with a module-level `getLastPageTiming()` export. Added
 - **Lint:** 0 errors, 1 pre-existing warning (`react-hooks/incompatible-library`)
 - **Tests:** 38 passed, 0 failures — full green CI
 - **Build:** Not re-run (no production code changed)
+
+---
+
+## S-9: Trust Levels + Pending Review until Trusted
+
+**Date:** 2026-03-26
+**Spec:** S-9.1 through S-9.5
+
+### S-9 Goal
+
+Reduce moderation load by gating new users' public-facing content behind `pending_review` status until they earn automatic `trusted` promotion. Admin can override trust levels manually.
+
+### S-9 Schema Changes
+
+| Change | File |
+| ------ | ---- |
+| Added `trustLevel` (String, default `"new"`) to User model | `backend/prisma/schema.prisma` |
+| Added `trustedAt` (DateTime?) to User model | `backend/prisma/schema.prisma` |
+| Migration: `20260326000003_add_trust_level_to_user` | `backend/prisma/migrations/` |
+
+### S-9 Backend Changes
+
+| Change | File |
+| ------ | ---- |
+| Created `trustGate.js` — `shouldAutoPublish()`, `getInitialModerationStatus()`, `meetsPromotionCriteria()`, `checkAndPromoteTrust()` | `backend/src/lib/trustGate.js` |
+| Auth middleware: `trustLevel` added to `req.user` select and assignment | `backend/src/middleware/auth.js` |
+| Feed post creation: sets `moderationStatus` via trust gate | `backend/src/modules/feed/feed.posts.controller.js` |
+| Feed comment creation: sets `moderationStatus` via trust gate | `backend/src/modules/feed/feed.social.controller.js` |
+| Sheet publishing: `resolveNextSheetStatus()` now accepts `user` param, gates new users to `pending_review` | `backend/src/modules/sheets/sheets.service.js` |
+| Sheet create/update controllers: pass `user: req.user` to `resolveNextSheetStatus()` | `sheets.create.controller.js`, `sheets.update.controller.js` |
+| Sheet comment creation: sets `moderationStatus` via trust gate | `backend/src/modules/sheets/sheets.social.controller.js` |
+| Note creation: sets `moderationStatus` (public notes only) via trust gate | `backend/src/modules/notes/notes.routes.js` |
+| Note privacy toggle: sets `moderationStatus` when making public | `backend/src/modules/notes/notes.routes.js` |
+| Note comment creation: sets `moderationStatus` via trust gate | `backend/src/modules/notes/notes.routes.js` |
+| On-login auto-promotion: fire-and-forget `checkAndPromoteTrust()` after login | `backend/src/modules/auth/auth.login.controller.js` |
+| Auth service: `trustLevel` included in user payload for login and `/api/auth/me` | `backend/src/modules/auth/auth.service.js` |
+| Admin endpoint: `PATCH /api/admin/users/:id/trust-level` with audit logging | `backend/src/modules/admin/admin.users.controller.js` |
+| Admin users: `trustLevel` added to GET /users select | `backend/src/modules/admin/admin.users.controller.js` |
+| Moderation cases: `trustLevel` filter on GET /cases, included in user select | `moderation.admin.cases.controller.js` |
+
+### S-9 Frontend Changes
+
+| Change | File |
+| ------ | ---- |
+| Created `PendingReviewBanner` component | `frontend/.../components/PendingReviewBanner.jsx` |
+| FeedCard: shows banner when author's post is `pending_review` | `frontend/.../pages/feed/FeedCard.jsx` |
+| SheetViewerPage: shows banner when sheet is `pending_review` and user is owner | `frontend/.../pages/sheets/SheetViewerPage.jsx` |
+| NoteViewerPage: shows banner when note is `pending_review` and user is owner | `frontend/.../pages/notes/NoteViewerPage.jsx` |
+| Admin UsersTab: trust level column with inline dropdown | `frontend/.../pages/admin/UsersTab.jsx` |
+| Admin CasesSubTab: trust level filter dropdown + "new" badge | `frontend/.../pages/admin/CasesSubTab.jsx` |
+| Admin ModerationTab: trust filter state management | `frontend/.../pages/admin/ModerationTab.jsx` |
+| SettingsPage: trust status info/success banners | `frontend/.../pages/settings/SettingsPage.jsx` |
+
+### S-9 Tests
+
+| Test File | Tests | Coverage |
+| --------- | ----- | -------- |
+| `backend/test/trustGate.test.js` | 14 | Pure functions: shouldAutoPublish, getInitialModerationStatus, meetsPromotionCriteria |
+| `backend/test/trustLevel.integration.test.js` | 4 | Route-level: new/trusted/admin/restricted users get correct moderationStatus |
+
+### S-9 Validation
+
+- **Backend lint:** 0 new errors (6 pre-existing in unrelated files)
+- **Backend tests:** 551 passed, 0 failures
+- **Frontend lint:** 0 errors, 1 pre-existing warning
+- **Frontend tests:** 38 passed, 0 failures
+- **Frontend build:** Clean (315ms, 581 modules)
