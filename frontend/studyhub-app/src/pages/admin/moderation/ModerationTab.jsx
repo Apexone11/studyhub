@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { FONT } from './adminConstants'
 import { SUB_TABS, createState } from './moderationHelpers'
-import { showToast } from '../../lib/toast'
+import { showToast } from '../../../lib/toast'
 import OverviewSubTab from './OverviewSubTab'
 import CasesSubTab from './CasesSubTab'
 import StrikesSubTab from './StrikesSubTab'

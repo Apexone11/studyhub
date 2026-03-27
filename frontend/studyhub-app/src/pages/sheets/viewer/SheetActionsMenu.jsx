@@ -8,8 +8,8 @@ import {
   IconMoreHorizontal,
   IconDownload,
   IconEye,
-} from '../../components/Icons'
-import { API } from '../../config'
+} from '../../../components/Icons'
+import { API } from '../../../config'
 import { FONT, actionButton, linkButton, secondaryDropdown, dropdownItem } from './sheetViewerConstants'
 
 export default function SheetActionsMenu({

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import MentionText from '../../components/MentionText'
-import { SkeletonCard } from '../../components/Skeleton'
+import MentionText from '../../../components/MentionText'
+import { SkeletonCard } from '../../../components/Skeleton'
 import { FONT, panelStyle, timeAgo } from './sheetViewerConstants'
 
 export default function SheetCommentsPanel({

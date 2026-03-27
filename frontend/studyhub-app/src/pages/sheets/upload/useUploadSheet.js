@@ -6,10 +6,10 @@
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { API } from '../../config'
-import { useTutorial } from '../../lib/useTutorial'
-import { UPLOAD_STEPS, TUTORIAL_VERSIONS } from '../../lib/tutorialSteps'
-import { usePageTitle } from '../../lib/usePageTitle'
+import { API } from '../../../config'
+import { useTutorial } from '../../../lib/useTutorial'
+import { UPLOAD_STEPS, TUTORIAL_VERSIONS } from '../../../lib/tutorialSteps'
+import { usePageTitle } from '../../../lib/usePageTitle'
 import {
   UPLOAD_TUTORIAL_KEY,
   canEditHtmlWorkingCopy,

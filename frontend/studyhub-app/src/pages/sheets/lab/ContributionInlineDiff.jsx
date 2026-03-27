@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { API } from '../../config'
+import { API } from '../../../config'
 import { FONT } from './sheetViewerConstants'
 
 export default function ContributionInlineDiff({ contributionId }) {

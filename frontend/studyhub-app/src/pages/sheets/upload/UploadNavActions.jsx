@@ -2,7 +2,7 @@
  * UploadNavActions.jsx — Navbar action buttons for the upload sheet page
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { Link } from 'react-router-dom'
-import { IconCheck, IconEye, IconUpload } from '../../components/Icons'
+import { IconCheck, IconEye, IconUpload } from '../../../components/Icons'
 import { FONT } from './uploadSheetConstants'
 
 export default function UploadNavActions({

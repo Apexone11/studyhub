@@ -5,10 +5,10 @@
  */
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { API } from '../../config'
+import { API } from '../../../config'
 import { authHeaders } from './sheetLabConstants'
-import { getApiErrorMessage, readJsonSafely } from '../../lib/http'
-import { showToast } from '../../lib/toast'
+import { getApiErrorMessage, readJsonSafely } from '../../../lib/http'
+import { showToast } from '../../../lib/toast'
 import { DiffViewer } from './SheetLabPanels'
 
 export default function SheetLabReviews({ sheet, onReviewed }) {
