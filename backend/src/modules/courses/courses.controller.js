@@ -1,7 +1,7 @@
 const express = require('express')
 const requireAuth = require('../../middleware/auth')
 const { sendForbidden } = require('../../lib/accessControl')
-const { sendCourseRequestNotice } = require('../../lib/email')
+const { sendCourseRequestNotice } = require('../../lib/email/email')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
 const { POPULAR_THRESHOLD, RECOMMENDATION_LIMIT, parseOptionalInteger } = require('./courses.constants')

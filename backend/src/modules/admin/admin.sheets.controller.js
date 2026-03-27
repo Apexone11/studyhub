@@ -1,7 +1,7 @@
 const express = require('express')
 const { captureError } = require('../../monitoring/sentry')
-const { validateHtmlForRuntime, classifyHtmlRisk, RISK_TIER, generateRiskSummary, generateTierExplanation, groupFindingsByCategory } = require('../../lib/htmlSecurity')
-const { sanitizePreviewHtml } = require('../../lib/htmlPreviewDocument')
+const { validateHtmlForRuntime, classifyHtmlRisk, RISK_TIER, generateRiskSummary, generateTierExplanation, groupFindingsByCategory } = require('../../lib/html/htmlSecurity')
+const { sanitizePreviewHtml } = require('../../lib/html/htmlPreviewDocument')
 const prisma = require('../../lib/prisma')
 const { PAGE_SIZE, parsePage } = require('./admin.constants')
 

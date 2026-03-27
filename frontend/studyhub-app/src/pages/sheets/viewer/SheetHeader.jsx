@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import VerificationBadge from '../../components/VerificationBadge'
+import VerificationBadge from '../../components/verification/VerificationBadge'
 import { IconFork, IconStar, IconArrowLeft } from '../../components/Icons'
 import { FONT, statusPill, timeAgo } from './sheetViewerConstants'
 

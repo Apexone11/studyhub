@@ -7,7 +7,7 @@
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import Navbar from '../../components/Navbar'
+import Navbar from '../../components/navbar/Navbar'
 import SafeJoyride from '../../components/SafeJoyride'
 import { API } from '../../config'
 import { useSession } from '../../lib/session-context'

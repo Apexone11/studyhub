@@ -81,7 +81,7 @@ function meetsPromotionCriteria({ createdAt, confirmedViolations, activeStrikes,
  */
 async function checkAndPromoteTrust(userId) {
   const prisma = require('./prisma')
-  const { countActiveStrikes, hasActiveRestriction } = require('./moderationEngine')
+  const { countActiveStrikes, hasActiveRestriction } = require('./moderation/moderationEngine')
 
   const user = await prisma.user.findUnique({
     where: { id: userId },

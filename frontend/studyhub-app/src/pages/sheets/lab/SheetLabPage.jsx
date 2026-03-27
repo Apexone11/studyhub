@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import Navbar from '../../components/Navbar'
+import Navbar from '../../components/navbar/Navbar'
 import { IconArrowLeft, IconFork } from '../../components/Icons'
 import { pageShell } from '../../lib/ui'
 import { usePageTitle } from '../../lib/usePageTitle'

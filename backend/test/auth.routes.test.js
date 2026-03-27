@@ -87,9 +87,9 @@ const mocks = vi.hoisted(() => {
 
 const mockTargets = new Map([
   [require.resolve('../src/lib/prisma'), mocks.prisma],
-  [require.resolve('../src/lib/email'), mocks.email],
+  [require.resolve('../src/lib/email/email'), mocks.email],
   [require.resolve('../src/lib/authTokens'), mocks.authTokens],
-  [require.resolve('../src/lib/verificationChallenges'), mocks.verification],
+  [require.resolve('../src/lib/verification/verificationChallenges'), mocks.verification],
   [require.resolve('../src/monitoring/sentry'), mocks.sentry],
   [require.resolve('../src/lib/trustGate'), mocks.trustGate],
 ])

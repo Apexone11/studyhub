@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import Navbar from './Navbar'
+import Navbar from '../navbar/Navbar'
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '../config'
 
 const RELATED_LINKS = [

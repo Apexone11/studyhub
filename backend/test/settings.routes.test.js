@@ -97,10 +97,10 @@ const mockTargets = new Map([
   [require.resolve('../src/middleware/auth'), mocks.auth],
   [require.resolve('../src/monitoring/sentry'), mocks.sentry],
   [require.resolve('../src/lib/authTokens'), mocks.authTokens],
-  [require.resolve('../src/lib/email'), mocks.email],
+  [require.resolve('../src/lib/email/email'), mocks.email],
   [require.resolve('../src/lib/deleteUserAccount'), mocks.deleteUserAccount],
-  [require.resolve('../src/lib/verificationChallenges'), mocks.verification],
-  [require.resolve('../src/lib/emailValidation'), mocks.emailValidation],
+  [require.resolve('../src/lib/verification/verificationChallenges'), mocks.verification],
+  [require.resolve('../src/lib/email/emailValidation'), mocks.emailValidation],
   [require.resolve('../src/lib/googleAuth'), mocks.googleAuth],
 ])
 

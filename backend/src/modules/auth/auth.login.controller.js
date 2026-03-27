@@ -8,7 +8,7 @@ const {
   findChallengeByToken,
   sendOrRefreshLoginChallenge,
   verifyChallengeCode,
-} = require('../../lib/verificationChallenges')
+} = require('../../lib/verification/verificationChallenges')
 const { loginLimiter, verificationLimiter } = require('./auth.constants')
 const {
   AppError,

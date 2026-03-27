@@ -8,7 +8,7 @@ const {
   ALLOWED_STYLESHEET_HOSTS,
   ALLOWED_FONT_HOSTS,
   CSS_PATH_REQUIRED_HOSTS,
-} = require('../src/lib/htmlSecurityRules')
+} = require('../src/lib/html/htmlSecurityRules')
 
 // ── Cycle 51.1 — Core allowlist logic ───────────────────
 describe('Remote Asset Allowlist (Cycle 51.1)', () => {

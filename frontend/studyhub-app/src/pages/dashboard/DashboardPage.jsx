@@ -13,8 +13,8 @@
  * Tutorial: First-visit Joyride highlights hero, stats, sheets, quick actions.
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { Link } from 'react-router-dom'
-import Navbar from '../../components/Navbar'
-import AppSidebar from '../../components/AppSidebar'
+import Navbar from '../../components/navbar/Navbar'
+import AppSidebar from '../../components/sidebar/AppSidebar'
 import { pageShell, useResponsiveAppLayout } from '../../lib/ui'
 import { usePageTitle } from '../../lib/usePageTitle'
 import SafeJoyride from '../../components/SafeJoyride'

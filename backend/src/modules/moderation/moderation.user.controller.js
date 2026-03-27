@@ -1,11 +1,11 @@
 const express = require('express')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
-const { countActiveStrikes, hasActiveRestriction } = require('../../lib/moderationEngine')
+const { countActiveStrikes, hasActiveRestriction } = require('../../lib/moderation/moderationEngine')
 const { createNotification } = require('../../lib/notify')
 const { classifyReportPriority, classifyAppealPriority, REPEAT_OFFENDER_CASE_WINDOW_MS } = require('../../lib/notificationPolicy')
 const { appealLimiter, reportLimiter, REASON_CATEGORIES, APPEAL_REASON_CATEGORIES } = require('./moderation.constants')
-const { logModerationEvent } = require('../../lib/moderationLogger')
+const { logModerationEvent } = require('../../lib/moderation/moderationLogger')
 
 const router = express.Router()
 

@@ -38,7 +38,7 @@ describe('Login rate limiting', () => {
     [require.resolve('../src/lib/prisma'), mocks.prisma],
     [require.resolve('../src/monitoring/sentry'), mocks.sentry],
     [require.resolve('../src/lib/securityEvents'), mocks.securityEvents],
-    [require.resolve('../src/lib/email'), mocks.email],
+    [require.resolve('../src/lib/email/email'), mocks.email],
     [require.resolve('../src/lib/notify'), mocks.notify],
     [require.resolve('../src/lib/badges'), mocks.badges],
     [require.resolve('../src/lib/activityTracker'), mocks.activityTracker],

@@ -1,6 +1,6 @@
 // SubmitPage reserves the course-request route and keeps its future workflow scoped to one folder.
-import Navbar from '../../components/Navbar'
-import AppSidebar from '../../components/AppSidebar'
+import Navbar from '../../components/navbar/Navbar'
+import AppSidebar from '../../components/sidebar/AppSidebar'
 import { PageShell } from '../shared/pageScaffold'
 
 export default function SubmitPage() {

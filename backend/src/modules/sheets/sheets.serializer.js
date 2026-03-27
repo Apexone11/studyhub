@@ -1,7 +1,7 @@
 const prisma = require('../../core/db/prisma')
 const { AUTHOR_SELECT } = require('./sheets.constants')
-const { SCAN_STATUS, HTML_VERSION_KIND } = require('../../lib/htmlDraftWorkflow')
-const { RISK_TIER, generateRiskSummary, generateTierExplanation, groupFindingsByCategory } = require('../../lib/htmlSecurity')
+const { SCAN_STATUS, HTML_VERSION_KIND } = require('../../lib/html/htmlDraftWorkflow')
+const { RISK_TIER, generateRiskSummary, generateTierExplanation, groupFindingsByCategory } = require('../../lib/html/htmlSecurity')
 
 /**
  * Derive the preview mode string from the risk tier.

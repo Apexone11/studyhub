@@ -14,8 +14,8 @@
  * Features: auto-save with 1.5s debounce, private/shared toggle, course
  * tagging, markdown toolbar, live preview, word count.
  * ═══════════════════════════════════════════════════════════════════════════ */
-import Navbar from '../../components/Navbar'
-import AppSidebar from '../../components/AppSidebar'
+import Navbar from '../../components/navbar/Navbar'
+import AppSidebar from '../../components/sidebar/AppSidebar'
 import { useProtectedPage } from '../../lib/useProtectedPage'
 import { useResponsiveAppLayout } from '../../lib/ui'
 import { PageShell } from '../shared/pageScaffold'

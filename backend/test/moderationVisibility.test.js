@@ -11,7 +11,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
  */
 
 const require = createRequire(import.meta.url)
-const modEnginePath = require.resolve('../src/lib/moderationEngine')
+const modEnginePath = require.resolve('../src/lib/moderation/moderationEngine')
 
 const mockPrisma = {
   moderationCase: {

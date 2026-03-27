@@ -16,7 +16,7 @@ import {
   LogoMark,
   IconSearch,
 } from './Icons'
-import SearchModal from './SearchModal'
+import SearchModal from './search/SearchModal'
 import KeyboardShortcuts from './KeyboardShortcuts'
 import { pageWidths } from '../lib/ui'
 import { useSession } from '../lib/session-context'

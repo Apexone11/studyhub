@@ -8,7 +8,7 @@ const {
   getUserActiveChallenge,
   resendSettingsEmailChallenge,
   verifyChallengeCode,
-} = require('../../lib/verificationChallenges')
+} = require('../../lib/verification/verificationChallenges')
 const { twoFaLimiter } = require('./settings.constants')
 const {
   normalizeEmail,

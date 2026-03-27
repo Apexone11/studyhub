@@ -3,7 +3,7 @@ const { captureError } = require('../../monitoring/sentry')
 const { deleteUserAccount } = require('../../lib/deleteUserAccount')
 const prisma = require('../../lib/prisma')
 const { isSuperAdmin } = require('../../lib/superAdmin')
-const { logModerationEvent } = require('../../lib/moderationLogger')
+const { logModerationEvent } = require('../../lib/moderation/moderationLogger')
 const { PAGE_SIZE, parsePage } = require('./admin.constants')
 
 const router = express.Router()

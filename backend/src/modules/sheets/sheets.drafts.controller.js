@@ -4,7 +4,7 @@ const { captureError } = require('../../core/monitoring/sentry')
 const requireAuth = require('../../core/auth/requireAuth')
 const requireVerifiedEmail = require('../../core/auth/requireVerifiedEmail')
 const { sendForbidden } = require('../../lib/accessControl')
-const { validateHtmlForSubmission } = require('../../lib/htmlSecurity')
+const { validateHtmlForSubmission } = require('../../lib/html/htmlSecurity')
 const {
   HTML_VERSION_KIND,
   importHtmlDraft,
@@ -12,8 +12,8 @@ const {
   getHtmlScanStatus,
   acknowledgeHtmlScanWarning,
   upsertHtmlVersion,
-} = require('../../lib/htmlDraftWorkflow')
-const { isHtmlUploadsEnabled } = require('../../lib/htmlKillSwitch')
+} = require('../../lib/html/htmlDraftWorkflow')
+const { isHtmlUploadsEnabled } = require('../../lib/html/htmlKillSwitch')
 const { SHEET_STATUS, AUTHOR_SELECT, sheetWriteLimiter } = require('./sheets.constants')
 const { normalizeContentFormat } = require('./sheets.service')
 const { serializeSheet } = require('./sheets.serializer')

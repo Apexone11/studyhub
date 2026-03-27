@@ -34,7 +34,7 @@ const mockEmailTransport = {
 
 const mockTargets = new Map([
   [require.resolve('../src/lib/prisma'), mockPrisma],
-  [require.resolve('../src/lib/emailTransport'), mockEmailTransport],
+  [require.resolve('../src/lib/email/emailTransport'), mockEmailTransport],
 ])
 
 const originalModuleLoad = Module._load

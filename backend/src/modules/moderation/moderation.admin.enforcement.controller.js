@@ -1,10 +1,10 @@
 const express = require('express')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
-const { countActiveStrikes, restoreContent } = require('../../lib/moderationEngine')
+const { countActiveStrikes, restoreContent } = require('../../lib/moderation/moderationEngine')
 const { createNotification } = require('../../lib/notify')
 const { PAGE_SIZE, parsePage } = require('./moderation.constants')
-const { logModerationEvent } = require('../../lib/moderationLogger')
+const { logModerationEvent } = require('../../lib/moderation/moderationLogger')
 
 const router = express.Router()
 

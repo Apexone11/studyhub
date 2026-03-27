@@ -7,8 +7,8 @@
  */
 
 const { RISK_TIER, generateRiskSummary, generateTierExplanation, groupFindingsByCategory } = require('./htmlSecurity')
-const { sendHighRiskSheetAlert } = require('./email')
-const { createNotification } = require('./notify')
+const { sendHighRiskSheetAlert } = require('../email/email')
+const { createNotification } = require('../notify')
 
 const {
   SCAN_STATUS,
