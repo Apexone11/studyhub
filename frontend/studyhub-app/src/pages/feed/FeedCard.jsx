@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { Link } from 'react-router-dom'
 import MentionText from '../../components/MentionText'
 import {
@@ -20,7 +21,7 @@ import {
   pillStyle,
 } from './feedConstants'
 
-export default function FeedCard({
+function FeedCardInner({
   item,
   onReact,
   onStar,
@@ -301,3 +302,17 @@ export default function FeedCard({
     </article>
   )
 }
+
+function feedCardPropsAreEqual(prev, next) {
+  return (
+    prev.item === next.item
+    && prev.canDeletePost === next.canDeletePost
+    && prev.isPostMenuOpen === next.isPostMenuOpen
+    && prev.isDeletingPost === next.isDeletingPost
+    && prev.currentUser === next.currentUser
+    && prev.targetCommentId === next.targetCommentId
+  )
+}
+
+const FeedCard = memo(FeedCardInner, feedCardPropsAreEqual)
+export default FeedCard
