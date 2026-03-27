@@ -7,6 +7,7 @@
  *   - Their appeals history with outcomes
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useCallback, useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { API } from '../../config'
 import { FONT } from './settingsState'
 import { HistoryIcon } from '../admin/components/icons'
@@ -98,7 +99,7 @@ function AppealModal({ open, caseData, onClose, onSubmit }) {
     }
   }
 
-  return (
+  return createPortal(
     <div style={{
       position: 'fixed', inset: 0, zIndex: 9000,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -244,7 +245,8 @@ function AppealModal({ open, caseData, onClose, onSubmit }) {
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 

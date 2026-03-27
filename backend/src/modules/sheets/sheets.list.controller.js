@@ -123,12 +123,14 @@ router.get('/', optionalAuth, async (req, res) => {
       const starredRows = await prisma.starredSheet.findMany({
         where: { userId: req.user.userId, sheet: where },
         select: { sheetId: true },
+        orderBy: { sheetId: 'desc' },
         take,
         skip,
       })
-      const starredSheetIds = starredRows.map((row) => row.sheetId)
+      const starredSheetIds = [...new Set(starredRows.map((row) => row.sheetId))]
       const totalStarred = await prisma.starredSheet.count({ where: { userId: req.user.userId, sheet: where } })
 
+      const starredOrderBy = sortField === 'recommended' ? { createdAt: 'desc' } : { [sortField]: 'desc' }
       const sheets = await prisma.studySheet.findMany({
         where: { id: { in: starredSheetIds } },
         include: {
@@ -143,6 +145,7 @@ router.get('/', optionalAuth, async (req, res) => {
             },
           },
         },
+        orderBy: starredOrderBy,
       })
 
       const comments = await prisma.comment.groupBy({
@@ -152,14 +155,10 @@ router.get('/', optionalAuth, async (req, res) => {
       })
       const commentCountBySheetId = new Map(comments.map((row) => [row.sheetId, row._count._all]))
 
-      const sheetById = new Map(sheets.map((sheet) => [sheet.id, sheet]))
-      const ordered = starredSheetIds
-        .map((sheetId) => sheetById.get(sheetId))
-        .filter(Boolean)
-        .map((sheet) => serializeSheet(sheet, {
-          starred: true,
-          commentCount: commentCountBySheetId.get(sheet.id) || 0,
-        }))
+      const ordered = sheets.map((sheet) => serializeSheet(sheet, {
+        starred: true,
+        commentCount: commentCountBySheetId.get(sheet.id) || 0,
+      }))
 
       return res.json({ sheets: ordered, total: totalStarred, limit: take, offset: skip })
     }

@@ -1718,12 +1718,10 @@ Fork owners are now notified when the original sheet's title or status changes. 
 
 **Date:** 2026-03-26
 
-### Sec-1.1: Best-effort logout on tab close
+### Sec-1.1: CSRF exemption for logout
 
-- Exempted `POST /api/auth/logout` from CSRF validation in `backend/src/middleware/csrf.js` — required because `navigator.sendBeacon()` cannot set custom headers
-- Added `pagehide` event listener in `SessionProvider` that fires `navigator.sendBeacon()` to the logout endpoint when user is authenticated
-- Gated on `status === 'authenticated'` — does not fire for unauthenticated users
-- No `visibilitychange` (too aggressive — fires on tab switch) or `beforeunload` (deprecated for this purpose)
+- Exempted `POST /api/auth/logout` from CSRF validation in `backend/src/middleware/csrf.js` — allows logout via `navigator.sendBeacon()` (which cannot set custom headers) from the explicit sign-out button
+- **Reverted:** pagehide beacon listener was initially added but removed in a hotfix — `pagehide` fires on page refresh AND tab close (indistinguishable in JS), causing every F5 to log the user out. JWT sessions expire naturally after 24h; best-effort tab-close logout is not worth the breakage
 
 ### Sec-1.2: Session lifecycle tightening
 
@@ -1746,7 +1744,7 @@ Fork owners are now notified when the original sheet's title or status changes. 
 ### Testing
 
 - Backend: 2 new tests in `releaseA.stability.middleware.test.js` — CSRF exemption for logout + idempotency
-- Frontend: 3 new tests in `session-context.test.jsx` — modal appears on session-expired event, sendBeacon fires on pagehide when authenticated, sendBeacon does NOT fire when unauthenticated
+- Frontend: 1 new test in `session-context.test.jsx` — modal appears on session-expired event (pagehide beacon tests removed with the feature)
 - Wrapped existing session-context tests with `<MemoryRouter>` (required after `useNavigate` addition)
 
 ### Files Changed
@@ -1756,7 +1754,7 @@ Fork owners are now notified when the original sheet's title or status changes. 
 | `backend/src/middleware/csrf.js` | Added `/api/auth/logout` to CSRF skip list |
 | `backend/test/releaseA.stability.middleware.test.js` | Added 2 CSRF exemption tests |
 | `frontend/studyhub-app/src/lib/session.js` | Added `LOGGED_OUT_FLAG` constant, set in `logoutSession()` |
-| `frontend/studyhub-app/src/lib/session-context.jsx` | Pagehide listener, session-expired modal, replaced toast handler |
+| `frontend/studyhub-app/src/lib/session-context.jsx` | Session-expired modal, replaced toast handler (pagehide listener reverted) |
 | `frontend/studyhub-app/src/lib/session-context.test.jsx` | 3 new tests, MemoryRouter wrappers |
 | `frontend/studyhub-app/src/pages/auth/LoginPage.jsx` | Logged-out banner with flag detection |
 | `frontend/studyhub-app/src/pages/auth/LoginPage.css` | Added `login-alert--info` class |
@@ -1775,3 +1773,46 @@ Fork owners are now notified when the original sheet's title or status changes. 
 | Backend lint | Clean (6 pre-existing only) |
 | Frontend lint | Clean |
 | Frontend build | Clean (300ms) |
+
+---
+
+## Hotfix: Auth‑P0 — Pagehide beacon caused logout on every refresh
+
+**Date:** 2026-03-26
+
+The `pagehide` event fires on page refresh AND tab close — JavaScript cannot distinguish them. The pagehide beacon listener added in Sec-1.1 was calling `sendBeacon('/api/auth/logout')` on every F5, clearing the HttpOnly session cookie. Removed the listener entirely; JWT sessions expire naturally after 24h.
+
+**File:** `frontend/studyhub-app/src/lib/session-context.jsx` — removed pagehide useEffect
+**Tests:** Removed 2 pagehide beacon tests from `session-context.test.jsx`
+
+---
+
+## Hotfix: Star‑P0 — Starred tab duplicate sheets
+
+**Date:** 2026-03-26
+
+The starred sheets query in `sheets.list.controller.js` had no `orderBy` on `starredSheet.findMany()`, causing non-deterministic pagination. Also ignored the user's `sort` preference. Fixed:
+- Added `orderBy: { sheetId: 'desc' }` for deterministic pagination
+- Added `[...new Set()]` dedup safety net on starred IDs
+- Added `orderBy` matching user sort on the full sheet query (was previously unsorted)
+
+**File:** `backend/src/modules/sheets/sheets.list.controller.js`
+**Validation:** 533/533 backend tests pass
+
+---
+
+## Hotfix: UI‑P0 — Appeal Modal off-center in Settings
+
+**Date:** 2026-03-26
+
+The Appeal Decision modal in `ModerationTab.jsx` renders inside the Settings tab `<main>` element, which has a `transform` applied by anime.js `fadeInUp` animation. CSS `position: fixed` inside a transformed parent is relative to the parent, not the viewport — causing the modal to float off-center. Fixed by wrapping the modal JSX in `createPortal(…, document.body)`.
+
+**File:** `frontend/studyhub-app/src/pages/settings/ModerationTab.jsx`
+
+**Verification:**
+
+- Open Settings → Moderation → click "Appeal Decision" on any case
+- Confirm modal is centered on: desktop + mobile widths, light + dark mode
+- Confirm centering holds while the page is animating (tab switch triggers anime.js transform)
+
+**General rule:** Any modal rendered inside a transformed or animated container must be portaled to `document.body` to guarantee viewport centering. This applies to all Settings tabs (animated via `fadeInUp`) and any future page that uses anime.js entrance animations.
