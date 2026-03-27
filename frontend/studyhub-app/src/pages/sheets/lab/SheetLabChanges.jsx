@@ -4,10 +4,10 @@
  * then uses POST /api/sheets/:id/lab/commits to create a snapshot.
  */
 import { useCallback, useEffect, useState } from 'react'
-import { API } from '../../config'
+import { API } from '../../../config'
 import { authHeaders } from './sheetLabConstants'
-import { getApiErrorMessage, readJsonSafely } from '../../lib/http'
-import { showToast } from '../../lib/toast'
+import { getApiErrorMessage, readJsonSafely } from '../../../lib/http'
+import { showToast } from '../../../lib/toast'
 import { DiffViewer } from './SheetLabPanels'
 
 export default function SheetLabChanges({ sheet, onCommitCreated }) {

@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════════
  * HtmlScanModal.jsx — HTML security scan findings modal and tutorial overlay
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { FONT, tierColor, tierLabel } from './uploadSheetConstants'
+import { FONT, tierColor, tierLabel } from '../upload/uploadSheetConstants'
 
 /* ── Tutorial welcome modal ───────────────────────────────────────────── */
 export function TutorialModal({ show, onDismiss }) {

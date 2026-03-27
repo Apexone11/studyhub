@@ -7,17 +7,17 @@
  * Navbar actions live in UploadNavActions.
  * Constants and small helpers live in uploadSheetConstants.
  * ═══════════════════════════════════════════════════════════════════════════ */
-import Navbar from '../../components/navbar/Navbar'
-import SafeJoyride from '../../components/SafeJoyride'
-import ConfirmDialog from '../../components/ConfirmDialog'
-import { pageShell } from '../../lib/ui'
+import Navbar from '../../../components/navbar/Navbar'
+import SafeJoyride from '../../../components/SafeJoyride'
+import ConfirmDialog from '../../../components/ConfirmDialog'
+import { pageShell } from '../../../lib/ui'
 import { FONT } from './uploadSheetConstants'
 import {
   InfoFields, DescriptionField, HtmlImportSection,
   AttachmentSection, DraftBanner, StatusBanner, ErrorBanner, EditorPanel,
   UploadHelperCard,
 } from './UploadSheetFormFields'
-import { TutorialModal, HtmlScanModal } from './HtmlScanModal'
+import { TutorialModal, HtmlScanModal } from '../lab/HtmlScanModal'
 import UploadNavActions from './UploadNavActions'
 import useUploadSheet from './useUploadSheet'
 

@@ -6,9 +6,9 @@ import {
   IconFork,
   IconGitPullRequest,
   IconX,
-} from '../../components/Icons'
-import VerificationBadge from '../../components/verification/VerificationBadge'
-import { API } from '../../config'
+} from '../../../components/Icons'
+import VerificationBadge from '../../../components/verification/VerificationBadge'
+import { API } from '../../../config'
 import ContributionInlineDiff from './ContributionInlineDiff'
 import { FONT, panelStyle, linkButton, statusBadge } from './sheetViewerConstants'
 

@@ -3,7 +3,7 @@
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { IconEye, IconUpload } from '../../components/Icons'
+import { IconEye, IconUpload } from '../../../components/Icons'
 import { FONT, MiniPreview, tierColor, tierLabel } from './uploadSheetConstants'
 
 /* ── First-upload helper card ──────────────────────────────────────────── */

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { IconFork } from '../../components/Icons'
+import { IconFork } from '../../../components/Icons'
 import { FONT, panelStyle, timeAgo } from './sheetViewerConstants'
 
 export default function SheetContentPanel({

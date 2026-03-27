@@ -6,9 +6,9 @@
  * callback, so the hook stays lean while preserving identical behavior.
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useCallback } from 'react'
-import { API } from '../../config'
-import { showToast } from '../../lib/toast'
-import { checkImageSafety, isImageFile } from '../../lib/imageSafety'
+import { API } from '../../../config'
+import { showToast } from '../../../lib/toast'
+import { checkImageSafety, isImageFile } from '../../../lib/imageSafety'
 import { reduceScanState } from './uploadSheetWorkflow'
 import { authHeaders, validateAttachment } from './uploadSheetConstants'
 

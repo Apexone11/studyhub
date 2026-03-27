@@ -3,11 +3,11 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { API } from '../../config'
-import { getApiErrorMessage, isAuthSessionFailure, readJsonSafely } from '../../lib/http'
-import { useSession } from '../../lib/session-context'
-import { staggerEntrance } from '../../lib/animations'
-import { showToast } from '../../lib/toast'
+import { API } from '../../../config'
+import { getApiErrorMessage, isAuthSessionFailure, readJsonSafely } from '../../../lib/http'
+import { useSession } from '../../../lib/session-context'
+import { staggerEntrance } from '../../../lib/animations'
+import { showToast } from '../../../lib/toast'
 import { authHeaders } from './sheetLabConstants'
 
 export default function useSheetLab() {

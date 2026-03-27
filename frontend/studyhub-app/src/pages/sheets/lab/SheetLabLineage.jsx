@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { IconFork } from '../../components/Icons'
+import { IconFork } from '../../../components/Icons'
 import { timeAgo } from './sheetLabConstants'
 
 /* ── Fork tree node (recursive) ──────────────────────────── */

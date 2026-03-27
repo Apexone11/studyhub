@@ -3,10 +3,10 @@
  * Handles save via PATCH /api/sheets/:id with debounced autosave.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { API } from '../../config'
+import { API } from '../../../config'
 import { authHeaders } from './sheetLabConstants'
-import { getApiErrorMessage, readJsonSafely } from '../../lib/http'
-import { showToast } from '../../lib/toast'
+import { getApiErrorMessage, readJsonSafely } from '../../../lib/http'
+import { showToast } from '../../../lib/toast'
 
 const AUTOSAVE_DELAY = 1500
 

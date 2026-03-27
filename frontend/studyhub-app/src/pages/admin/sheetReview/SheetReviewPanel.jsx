@@ -11,8 +11,8 @@
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { API } from '../../config'
-import { getApiErrorMessage, readJsonSafely } from '../../lib/http'
+import { API } from '../../../config'
+import { getApiErrorMessage, readJsonSafely } from '../../../lib/http'
 import { FONT, overlayStyle, panelStyle, closeBtnStyle } from './sheetReviewConstants'
 import { SanitizedPreview, RawHtmlView, FindingsPanel, ReviewActionBar } from './SheetReviewDetails'
 
