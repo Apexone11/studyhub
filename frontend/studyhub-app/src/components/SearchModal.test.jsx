@@ -55,9 +55,13 @@ describe('SearchModal', () => {
 
     renderSearchModal()
 
-    await user.type(screen.getByPlaceholderText('Search sheets, courses, users...'), 'cmsc')
+    await user.type(screen.getByPlaceholderText('Search sheets, notes, courses, users...'), 'cmsc')
 
-    await user.click(await screen.findByText('CMSC101 — Intro to Programming'))
+    await user.click(
+      await screen.findByText((content, element) =>
+        element?.textContent === 'CMSC101 — Intro to Programming',
+      ),
+    )
 
     await waitFor(() => {
       expect(requestCredentials).toBe('include')

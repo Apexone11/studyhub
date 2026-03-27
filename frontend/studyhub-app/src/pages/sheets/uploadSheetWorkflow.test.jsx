@@ -8,14 +8,15 @@ import {
 } from './uploadSheetWorkflow'
 
 describe('uploadSheetWorkflow', () => {
-  it('enforces strict html import before edit', () => {
-    expect(canEditHtmlWorkingCopy({ hasOriginalVersion: false })).toBe(false)
+  it('always allows editing (original version check removed)', () => {
+    expect(canEditHtmlWorkingCopy()).toBe(true)
+    expect(canEditHtmlWorkingCopy({ hasOriginalVersion: false })).toBe(true)
     expect(canEditHtmlWorkingCopy({ hasOriginalVersion: true })).toBe(true)
   })
 
-  it('requires passed scan and required metadata before submit', () => {
+  it('requires metadata and respects tier-based scan rules', () => {
+    // Tier 0 (default): always submittable regardless of scan status
     expect(canSubmitHtmlReview({
-      hasOriginalVersion: true,
       scanStatus: 'passed',
       title: 'My HTML sheet',
       courseId: '101',
@@ -24,18 +25,28 @@ describe('uploadSheetWorkflow', () => {
     })).toBe(true)
 
     expect(canSubmitHtmlReview({
-      hasOriginalVersion: true,
       scanStatus: 'failed',
+      tier: 0,
+      title: 'My HTML sheet',
+      courseId: '101',
+      description: 'ready to publish',
+      html: '<main><h1>Ready</h1></main>',
+    })).toBe(true)
+
+    // Tier 3: never submittable (quarantined)
+    expect(canSubmitHtmlReview({
+      scanStatus: 'passed',
+      tier: 3,
       title: 'My HTML sheet',
       courseId: '101',
       description: 'ready to publish',
       html: '<main><h1>Ready</h1></main>',
     })).toBe(false)
 
+    // Missing required metadata rejects
     expect(canSubmitHtmlReview({
-      hasOriginalVersion: false,
       scanStatus: 'passed',
-      title: 'My HTML sheet',
+      title: '',
       courseId: '101',
       description: 'ready to publish',
       html: '<main><h1>Ready</h1></main>',
