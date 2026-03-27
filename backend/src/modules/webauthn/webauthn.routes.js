@@ -9,7 +9,7 @@ const {
   verifyRegistration,
   generateAuthenticationOptions,
   verifyAuthentication,
-} = require('../../lib/webauthn')
+} = require('../../lib/webauthn/webauthn')
 const prisma = require('../../lib/prisma')
 
 const router = express.Router()
