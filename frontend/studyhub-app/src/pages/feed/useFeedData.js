@@ -173,7 +173,7 @@ export function useFeedData({ user, search }) {
     intervalMs: 120000,
   })
 
-  const toggleReaction = async (item, type) => {
+  const toggleReaction = useCallback(async (item, type) => {
     const currentType = item.reactions?.userReaction || null
     const nextType = currentType === type ? null : type
     const endpoint = item.type === 'post' ? `${API}/api/feed/posts/${item.id}/react` : `${API}/api/sheets/${item.id}/react`
@@ -201,9 +201,9 @@ export function useFeedData({ user, search }) {
     } catch (error) {
       setFeedState((current) => ({ ...current, error: error.message || 'Could not update the reaction.' }))
     }
-  }
+  }, [])
 
-  const toggleStar = async (item) => {
+  const toggleStar = useCallback(async (item) => {
     try {
       const response = await fetch(`${API}/api/sheets/${item.id}/star`, {
         method: 'POST',
@@ -226,7 +226,7 @@ export function useFeedData({ user, search }) {
     } catch (error) {
       setFeedState((current) => ({ ...current, error: error.message || 'Could not update the star.' }))
     }
-  }
+  }, [])
 
   const canDeletePost = useCallback((item) => canUserDeletePost(user, item), [user])
 

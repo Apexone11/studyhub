@@ -102,16 +102,18 @@ export default function FeedPage() {
     }
   }, [targetCommentId, feedState.loading])
 
-  const confirmDeletePost = (item) => {
+  const confirmDeletePost = useCallback((item) => {
     if (!canDeletePost(item)) return
     setOpenPostMenuId(null)
     setDeleteTarget(item)
-  }
+  }, [canDeletePost])
 
-  const handleDeletePost = async (item) => {
+  const handleDeletePost = useCallback(async (item) => {
     setDeleteTarget(null)
     await deletePost(item)
-  }
+  }, [deletePost])
+
+  const handleReport = useCallback((type, id) => setReportTarget({ type, id }), [])
 
   return (
     <>
@@ -191,7 +193,7 @@ export default function FeedPage() {
                       onTogglePostMenu={setOpenPostMenuId}
                       isDeletingPost={Boolean(deletingPostIds[item.id])}
                       currentUser={user}
-                      onReport={(type, id) => setReportTarget({ type, id })}
+                      onReport={handleReport}
                       targetCommentId={targetCommentId}
                     />
                   ))}
