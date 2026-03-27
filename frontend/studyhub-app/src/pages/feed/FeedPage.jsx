@@ -9,7 +9,7 @@
  * Components: FeedComposer, FeedCard, FeedAside, FeedWidgets
  * Data: useFeedData
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
 import AppSidebar from '../../components/AppSidebar'
@@ -17,7 +17,6 @@ import ConfirmDialog from '../../components/ConfirmDialog'
 import ReportModal from '../../components/ReportModal'
 import { useSession } from '../../lib/session-context'
 import { pageShell, useResponsiveAppLayout } from '../../lib/ui'
-import { staggerEntrance } from '../../lib/animations'
 import { usePageTitle } from '../../lib/usePageTitle'
 import { SkeletonFeed } from '../../components/Skeleton'
 import SafeJoyride from '../../components/SafeJoyride'
@@ -27,7 +26,7 @@ import { FEED_STEPS, TUTORIAL_VERSIONS } from '../../lib/tutorialSteps'
 import { FONT, FILTERS } from './feedConstants'
 import { Panel, EmptyFeed, GettingStartedCard } from './FeedWidgets'
 import FeedComposer from './FeedComposer'
-import FeedCard from './FeedCard'
+import VirtualFeedList from './VirtualFeedList'
 import FeedAside from './FeedAside'
 import { useFeedData } from './useFeedData'
 import { useRecentlyViewed } from '../../lib/useRecentlyViewed'
@@ -51,8 +50,6 @@ export default function FeedPage() {
     canDeletePost, deletePost, submitPost, retryFeed,
   } = useFeedData({ user, search })
 
-  const feedListRef = useRef(null)
-  const feedAnimatedRef = useRef(false)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [openPostMenuId, setOpenPostMenuId] = useState(null)
   const [reportTarget, setReportTarget] = useState(null)
@@ -72,13 +69,6 @@ export default function FeedPage() {
     const nextType = activeFilter === 'announcements' ? 'announcement' : activeFilter.slice(0, -1)
     return feedState.items.filter((item) => item.type === nextType)
   }, [activeFilter, feedState.items])
-
-  useEffect(() => {
-    if (!feedState.loading && visibleItems.length > 0 && feedListRef.current && !feedAnimatedRef.current) {
-      feedAnimatedRef.current = true
-      staggerEntrance(feedListRef.current.children, { staggerMs: 50, duration: 450, y: 16 })
-    }
-  }, [feedState.loading, visibleItems.length])
 
   useEffect(() => {
     if (!targetPostId || feedState.loading) return
@@ -180,29 +170,22 @@ export default function FeedPage() {
               ) : visibleItems.length === 0 ? (
                 <EmptyFeed message={feedState.items.length === 0 && !search ? 'Your feed is empty' : 'No feed items matched this filter.'} isFirstRun={feedState.items.length === 0 && !search} />
               ) : (
-                <div ref={feedListRef} style={{ display: 'grid', gap: 14 }}>
-                  {visibleItems.map((item) => (
-                    <FeedCard
-                      key={item.feedKey}
-                      item={item}
-                      onReact={toggleReaction}
-                      onStar={toggleStar}
-                      onDeletePost={confirmDeletePost}
-                      canDeletePost={canDeletePost(item)}
-                      isPostMenuOpen={openPostMenuId === item.id}
-                      onTogglePostMenu={setOpenPostMenuId}
-                      isDeletingPost={Boolean(deletingPostIds[item.id])}
-                      currentUser={user}
-                      onReport={handleReport}
-                      targetCommentId={targetCommentId}
-                    />
-                  ))}
-                  {feedState.items.length < feedState.total && (
-                    <button onClick={loadMoreFeed} disabled={loadingMore} className="sh-load-more-btn">
-                      {loadingMore ? 'Loading…' : `Load More (${feedState.items.length} of ${feedState.total})`}
-                    </button>
-                  )}
-                </div>
+                <VirtualFeedList
+                  items={visibleItems}
+                  hasMore={feedState.items.length < feedState.total}
+                  loadingMore={loadingMore}
+                  onLoadMore={loadMoreFeed}
+                  onReact={toggleReaction}
+                  onStar={toggleStar}
+                  onDeletePost={confirmDeletePost}
+                  canDeletePost={canDeletePost}
+                  openPostMenuId={openPostMenuId}
+                  onTogglePostMenu={setOpenPostMenuId}
+                  deletingPostIds={deletingPostIds}
+                  currentUser={user}
+                  onReport={handleReport}
+                  targetCommentId={targetCommentId}
+                />
               )}
             </main>
 
