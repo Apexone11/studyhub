@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { trackEvent } from './telemetry'
 
+/** Last reported timing — exposed for dev overlay. */
+let _lastTiming = null
+export function getLastPageTiming() { return _lastTiming }
+
 /**
  * Lightweight page-load timing hook.
  *
@@ -68,6 +72,7 @@ export function usePageTiming(pageName) {
       apiLatencyMs,
       timeToContentMs,
     })
+    _lastTiming = { page: pageName, apiLatencyMs, timeToContentMs, ts: Date.now() }
 
     if (import.meta.env?.DEV) {
       console.debug(`[perf] ${pageName}`, { apiLatencyMs, timeToContentMs })

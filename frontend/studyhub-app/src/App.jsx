@@ -45,6 +45,8 @@ const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 import ScrollToTop from './components/ScrollToTop'
 import ToastContainer from './components/Toast'
 
+const PerfOverlay = import.meta.env?.DEV ? lazy(() => import('./components/PerfOverlay')) : null
+
 function PublicRoute({ children }) {
   const { user, isBootstrapping, isAuthenticated } = useSession()
 
@@ -212,6 +214,7 @@ function AppRoutes() {
         </Suspense>
         <ScrollToTop />
         <ToastContainer />
+        {PerfOverlay && <Suspense fallback={null}><PerfOverlay /></Suspense>}
       </SessionProvider>
     </BrowserRouter>
   )
