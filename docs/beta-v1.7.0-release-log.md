@@ -1773,3 +1773,28 @@ Fork owners are now notified when the original sheet's title or status changes. 
 | Backend lint | Clean (6 pre-existing only) |
 | Frontend lint | Clean |
 | Frontend build | Clean (300ms) |
+
+---
+
+## Hotfix: Auth‑P0 — Pagehide beacon caused logout on every refresh
+
+**Date:** 2026-03-26
+
+The `pagehide` event fires on page refresh AND tab close — JavaScript cannot distinguish them. The pagehide beacon listener added in Sec-1.1 was calling `sendBeacon('/api/auth/logout')` on every F5, clearing the HttpOnly session cookie. Removed the listener entirely; JWT sessions expire naturally after 24h.
+
+**File:** `frontend/studyhub-app/src/lib/session-context.jsx` — removed pagehide useEffect
+**Tests:** Removed 2 pagehide beacon tests from `session-context.test.jsx`
+
+---
+
+## Hotfix: Star‑P0 — Starred tab duplicate sheets
+
+**Date:** 2026-03-26
+
+The starred sheets query in `sheets.list.controller.js` had no `orderBy` on `starredSheet.findMany()`, causing non-deterministic pagination. Also ignored the user's `sort` preference. Fixed:
+- Added `orderBy: { sheetId: 'desc' }` for deterministic pagination
+- Added `[...new Set()]` dedup safety net on starred IDs
+- Added `orderBy` matching user sort on the full sheet query (was previously unsorted)
+
+**File:** `backend/src/modules/sheets/sheets.list.controller.js`
+**Validation:** 533/533 backend tests pass
