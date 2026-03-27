@@ -1,5 +1,5 @@
 const prisma = require('./prisma')
-const { encryptField, decryptField } = require('./kmsEnvelope')
+const { encryptField, decryptField } = require('./kms/kmsEnvelope')
 const { recordAudit } = require('./auditLog')
 
 const REJECTED_FIELDS = new Set(['address', 'streetAddress', 'mailingAddress', 'homeAddress', 'billingAddress', 'shippingAddress', 'physicalAddress'])

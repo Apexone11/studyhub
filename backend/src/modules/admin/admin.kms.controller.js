@@ -1,7 +1,7 @@
 const express = require('express')
 const { DescribeKeyCommand, GenerateDataKeyCommand } = require('@aws-sdk/client-kms')
 const { captureError } = require('../../monitoring/sentry')
-const { getKmsClient } = require('../../lib/kmsClient')
+const { getKmsClient } = require('../../lib/kms/kmsClient')
 
 const router = express.Router()
 
