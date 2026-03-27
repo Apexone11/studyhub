@@ -79,6 +79,7 @@ router.get('/users', async (req, res) => {
           id: true,
           username: true,
           role: true,
+          trustLevel: true,
           email: true,
           createdAt: true,
           _count: { select: { studySheets: true } }

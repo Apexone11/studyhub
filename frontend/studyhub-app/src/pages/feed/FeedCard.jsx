@@ -1,6 +1,7 @@
 import { memo } from 'react'
 import { Link } from 'react-router-dom'
 import MentionText from '../../components/MentionText'
+import PendingReviewBanner from '../../components/PendingReviewBanner'
 import {
   IconDownload,
   IconEye,
@@ -185,6 +186,9 @@ function FeedCardInner({
             </div>
           </div>
 
+          {item.moderationStatus === 'pending_review' && currentUser?.id === item.author?.id && (
+            <PendingReviewBanner />
+          )}
           {item.title ? <h3 style={{ margin: '0 0 10px', color: 'var(--sh-heading)', fontSize: 19 }}>{item.title}</h3> : null}
           <p style={{ margin: 0, color: 'var(--sh-subtext)', fontSize: 14, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
             <MentionText text={item.body || item.content || item.preview || item.description || 'No content yet.'} />

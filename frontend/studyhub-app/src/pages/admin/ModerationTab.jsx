@@ -21,6 +21,7 @@ export default function ModerationTab({ apiJson, setConfirmAction, formatDateTim
   const [caseStatus, setCaseStatus] = useState('pending')
   const [caseSource, setCaseSource] = useState('')
   const [caseClaimed, setCaseClaimed] = useState('')
+  const [caseTrustFilter, setCaseTrustFilter] = useState('')
   const [caseSort, setCaseSort] = useState('date')
   const [expandedCase, setExpandedCase] = useState(null)
   const [expandedCaseLoading, setExpandedCaseLoading] = useState(false)
@@ -50,12 +51,13 @@ export default function ModerationTab({ apiJson, setConfirmAction, formatDateTim
       const params = new URLSearchParams({ page, status: caseStatus })
       if (caseSource) params.set('source', caseSource)
       if (caseClaimed) params.set('claimed', caseClaimed)
+      if (caseTrustFilter) params.set('trustLevel', caseTrustFilter)
       const data = await apiJson(`/api/admin/moderation/cases?${params}`)
       setCasesState({ loading: false, loaded: true, error: '', page: data.page || page, total: data.total || 0, items: data.cases || [] })
     } catch (err) {
       setCasesState((s) => ({ ...s, loading: false, error: err.message || 'Could not load cases.' }))
     }
-  }, [apiJson, caseStatus, caseSource, caseClaimed])
+  }, [apiJson, caseStatus, caseSource, caseClaimed, caseTrustFilter])
 
   const loadStrikes = useCallback(async (page = 1) => {
     setStrikesState((s) => ({ ...s, loading: true, error: '', page }))
@@ -234,6 +236,7 @@ export default function ModerationTab({ apiJson, setConfirmAction, formatDateTim
         <CasesSubTab casesState={casesState} caseStatus={caseStatus} setCaseStatus={setCaseStatus}
           caseSource={caseSource} setCaseSource={setCaseSource}
           caseClaimed={caseClaimed} setCaseClaimed={setCaseClaimed}
+          caseTrustFilter={caseTrustFilter} setCaseTrustFilter={setCaseTrustFilter}
           caseSort={caseSort} setCaseSort={setCaseSort} expandedCase={expandedCase}
           setExpandedCase={setExpandedCase} expandedCaseLoading={expandedCaseLoading}
           casePreview={casePreview} casePreviewLoading={casePreviewLoading}

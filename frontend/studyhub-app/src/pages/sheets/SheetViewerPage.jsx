@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import Navbar from '../../components/Navbar'
 import ReportModal from '../../components/ReportModal'
 import ModerationBanner from '../../components/ModerationBanner'
+import PendingReviewBanner from '../../components/PendingReviewBanner'
 import AppSidebar from '../../components/AppSidebar'
 import SafeJoyride from '../../components/SafeJoyride'
 import { SkeletonCard } from '../../components/Skeleton'
@@ -241,6 +242,9 @@ export default function SheetViewerPage() {
 
               {sheet && user && sheet.userId === user.id && (
                 <ModerationBanner status={sheet.status === 'removed_by_moderation' ? 'confirmed_violation' : sheet.moderationStatus} />
+              )}
+              {sheet && sheet.status === 'pending_review' && user && sheet.userId === user.id && (
+                <PendingReviewBanner />
               )}
 
               {sheetState.loading ? (

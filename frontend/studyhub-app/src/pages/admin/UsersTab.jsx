@@ -1,7 +1,20 @@
+import { API } from '../../config'
 import { Pager } from './AdminWidgets'
 import { tableHeadStyle, tableCell, tableCellStrong, pillButton } from './adminConstants'
 
 export default function UsersTab({ usersState, currentUserId, patchRole, deleteUser, loadPagedData }) {
+  async function handleTrustLevelChange(userId, trustLevel) {
+    try {
+      await fetch(`${API}/api/admin/users/${userId}/trust-level`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ trustLevel }),
+      })
+      void loadPagedData('users', usersState.page)
+    } catch { /* silent */ }
+  }
+
   return (
     <>
       <div style={{ fontSize: 13, color: '#64748b', marginBottom: 14 }}>
@@ -11,20 +24,31 @@ export default function UsersTab({ usersState, currentUserId, patchRole, deleteU
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ background: '#f8fafc' }}>
-              {['Username', 'Email', 'Role', 'Sheets', 'Joined', 'Actions'].map((header) => (
+              {['Username', 'Email', 'Role', 'Trust', 'Sheets', 'Joined', 'Actions'].map((header) => (
                 <th key={header} style={tableHeadStyle}>{header}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {usersState.items.length === 0 && (
-              <tr><td colSpan={6} className="admin-empty">No users found.</td></tr>
+              <tr><td colSpan={7} className="admin-empty">No users found.</td></tr>
             )}
             {usersState.items.map((record) => (
               <tr key={record.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                 <td style={tableCellStrong}>{record.username}</td>
                 <td style={tableCell}>{record.email || '—'}</td>
                 <td style={tableCell}>{record.role}</td>
+                <td style={tableCell}>
+                  <select
+                    value={record.trustLevel || 'new'}
+                    onChange={(e) => void handleTrustLevelChange(record.id, e.target.value)}
+                    style={{ fontSize: 12, padding: '2px 4px', borderRadius: 4, border: '1px solid var(--sh-border)' }}
+                  >
+                    <option value="new">New</option>
+                    <option value="trusted">Trusted</option>
+                    <option value="restricted">Restricted</option>
+                  </select>
+                </td>
                 <td style={tableCell}>{record._count?.studySheets ?? 0}</td>
                 <td style={tableCell}>{new Date(record.createdAt).toLocaleDateString()}</td>
                 <td style={{ ...tableCell, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
