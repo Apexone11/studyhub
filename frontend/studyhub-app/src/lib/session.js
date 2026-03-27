@@ -2,6 +2,8 @@ import { API } from '../config'
 
 let inMemoryCsrfToken = ''
 
+export const LOGGED_OUT_FLAG = 'studyhub:logged-out'
+
 export function getStoredUser() {
   const rawUser = localStorage.getItem('user')
   if (!rawUser) return null
@@ -58,5 +60,6 @@ export async function logoutSession() {
     // Best effort only — always clear local cached user state.
   } finally {
     clearStoredSession()
+    try { sessionStorage.setItem(LOGGED_OUT_FLAG, '1') } catch { /* private mode */ }
   }
 }
