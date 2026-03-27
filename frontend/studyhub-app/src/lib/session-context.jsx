@@ -9,6 +9,7 @@ import {
   useState,
 } from 'react'
 import { flushSync } from 'react-dom'
+import { useNavigate } from 'react-router-dom'
 import { API } from '../config'
 import {
   AUTH_SESSION_EXPIRED_EVENT,
@@ -22,7 +23,6 @@ import {
   logoutSession,
   setStoredUser,
 } from './session'
-import { showToast } from './toast'
 
 export const SESSION_EXPIRED_FLAG = 'studyhub:session-expired'
 
@@ -60,11 +60,87 @@ async function fetchSessionUser() {
   return { status: 'authenticated', user: data, error: '' }
 }
 
+function SessionExpiredModal({ visible, onDismiss }) {
+  useEffect(() => {
+    if (!visible) return undefined
+    const handleKey = (e) => { if (e.key === 'Escape') onDismiss('/') }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [visible, onDismiss])
+
+  if (!visible) return null
+
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 99999,
+        background: 'rgba(15, 23, 42, 0.5)',
+        display: 'grid', placeItems: 'center', padding: 24,
+      }}
+      onClick={() => onDismiss('/')}
+      role="presentation"
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Session expired"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: 'var(--sh-surface, #fff)',
+          border: '1px solid var(--sh-border, #e2e8f0)',
+          borderRadius: 18, padding: 28,
+          width: '100%', maxWidth: 400,
+          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.2)',
+          fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+        }}
+      >
+        <h2 style={{ margin: '0 0 8px', fontSize: 18, color: 'var(--sh-heading, #0f172a)' }}>
+          Your session has expired
+        </h2>
+        <p style={{ margin: '0 0 20px', fontSize: 13, lineHeight: 1.6, color: 'var(--sh-muted, #64748b)' }}>
+          For your security, your session ended. Please sign in again to continue.
+        </p>
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          <button
+            type="button"
+            onClick={() => onDismiss('/')}
+            style={{
+              padding: '9px 16px', borderRadius: 10,
+              border: '1px solid var(--sh-border, #e2e8f0)',
+              background: 'var(--sh-surface, #fff)',
+              color: 'var(--sh-muted, #64748b)',
+              fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              fontFamily: 'inherit',
+            }}
+          >
+            Go to Home
+          </button>
+          <button
+            type="button"
+            onClick={() => onDismiss('/login')}
+            style={{
+              padding: '9px 16px', borderRadius: 10, border: 'none',
+              background: 'linear-gradient(135deg, #6366f1, #818cf8)',
+              color: '#fff',
+              fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              fontFamily: 'inherit',
+            }}
+          >
+            Sign in again
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function SessionProvider({ children }) {
   const [user, setUser] = useState(() => getStoredUser())
   const [status, setStatus] = useState('bootstrapping')
   const [error, setError] = useState('')
+  const [sessionExpiredVisible, setSessionExpiredVisible] = useState(false)
   const bootstrappedRef = useRef(false)
+  const navigate = useNavigate()
 
   const syncUser = useCallback((nextUser) => {
     setStoredUser(nextUser)
@@ -141,10 +217,9 @@ export function SessionProvider({ children }) {
     if (typeof window === 'undefined') return undefined
 
     const handleAuthExpired = () => {
-      /* Mark the expiry so LoginPage can show a contextual banner */
       try { sessionStorage.setItem(SESSION_EXPIRED_FLAG, '1') } catch { /* private mode */ }
-      showToast('Your session has expired. Please sign in again.', 'error', 5000)
       clearSession()
+      setSessionExpiredVisible(true)
     }
 
     window.addEventListener(AUTH_SESSION_EXPIRED_EVENT, handleAuthExpired)
@@ -152,6 +227,22 @@ export function SessionProvider({ children }) {
       window.removeEventListener(AUTH_SESSION_EXPIRED_EVENT, handleAuthExpired)
     }
   }, [clearSession])
+
+  // Best-effort logout on tab close / page exit
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+    if (status !== 'authenticated') return undefined
+
+    const handlePageHide = () => {
+      navigator.sendBeacon(`${API}/api/auth/logout`)
+      clearStoredSession()
+    }
+
+    window.addEventListener('pagehide', handlePageHide)
+    return () => {
+      window.removeEventListener('pagehide', handlePageHide)
+    }
+  }, [status])
 
   const completeAuthentication = useCallback((nextUser) => {
     /* Use flushSync so state is committed synchronously before the caller
@@ -168,6 +259,11 @@ export function SessionProvider({ children }) {
     await logoutSession()
     clearSession()
   }, [clearSession])
+
+  const dismissSessionExpired = useCallback((path) => {
+    setSessionExpiredVisible(false)
+    navigate(path, { replace: true })
+  }, [navigate])
 
   const value = useMemo(() => ({
     user,
@@ -186,6 +282,7 @@ export function SessionProvider({ children }) {
   return (
     <SessionContext.Provider value={value}>
       {children}
+      <SessionExpiredModal visible={sessionExpiredVisible} onDismiss={dismissSessionExpired} />
     </SessionContext.Provider>
   )
 }
