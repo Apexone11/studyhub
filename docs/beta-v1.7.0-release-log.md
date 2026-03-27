@@ -1816,3 +1816,51 @@ The Appeal Decision modal in `ModerationTab.jsx` renders inside the Settings tab
 - Confirm centering holds while the page is animating (tab switch triggers anime.js transform)
 
 **General rule:** Any modal rendered inside a transformed or animated container must be portaled to `document.body` to guarantee viewport centering. This applies to all Settings tabs (animated via `fadeInUp`) and any future page that uses anime.js entrance animations.
+
+---
+
+## S-10.3 — Frontend Performance + UI Jank Cleanup
+
+**Date:** 2026-03-26
+
+### S-10.3.1 — Feed Virtualization + Memoization
+
+Replaced the feed's `.map()` rendering with `@tanstack/react-virtual` virtualization. Only visible cards + 3 overscan rows are rendered in the DOM, regardless of total feed size. FeedCard wrapped in `React.memo` with a custom comparator that skips callback props. All callback props (`toggleReaction`, `toggleStar`, `confirmDeletePost`, `handleReport`) stabilized with `useCallback` so memo is effective.
+
+| Change | File(s) |
+|--------|---------|
+| Added `@tanstack/react-virtual` dependency | `package.json` |
+| Wrapped FeedCard in `React.memo` with `feedCardPropsAreEqual` comparator | `FeedCard.jsx` |
+| Stabilized `toggleReaction`, `toggleStar` with `useCallback([])` | `useFeedData.js` |
+| Stabilized `confirmDeletePost`, `handleDeletePost`, `handleReport` with `useCallback` | `FeedPage.jsx` |
+| Created `VirtualFeedList` component with `useVirtualizer` | `VirtualFeedList.jsx` (new) |
+| Replaced `.map()` grid with `<VirtualFeedList>`, removed stagger animation | `FeedPage.jsx` |
+| Unit tests for FeedCard memo contract and VirtualFeedList rendering | `FeedCard.test.jsx`, `VirtualFeedList.test.jsx` (new) |
+
+**Trade-off:** Removed the anime.js `staggerEntrance` animation on feed cards. The virtualizer manages its own DOM positioning with absolute + translateY, which is incompatible with stagger targeting `feedListRef.current.children`. Feed cards now appear instantly (which is faster, matching the performance goal).
+
+### S-10.3.2 — Sheet Content-First Rendering
+
+SheetViewerPage comment section deferred behind a collapse/expand toggle. Comments render collapsed by default — only the toggle button ("▸ Comments (N)") is visible on first paint. Users click to expand and load comments. This matches the existing pattern in NoteViewerPage's `NoteCommentSection`.
+
+| Change | File |
+|--------|------|
+| Added `commentsExpanded` state + toggle button, wrapped form + list in conditional | `SheetViewerPage.jsx` |
+
+**NoteViewerPage:** Already had lazy-expand comments via `NoteCommentSection` — no change needed.
+
+### S-10.3.3 — Performance Telemetry Visibility
+
+Extended `usePageTiming` with a module-level `getLastPageTiming()` export. Added a dev-only `PerfOverlay` component — a fixed dark badge (bottom-left) showing page name, API latency, and time-to-content from the last `page_timing` event. Auto-hides after 30 seconds. Tree-shaken from production builds via `import.meta.env?.DEV` gate.
+
+| Change | File |
+|--------|------|
+| Added `_lastTiming` variable + `getLastPageTiming()` export | `usePageTiming.js` |
+| Created PerfOverlay component (dev-only) | `PerfOverlay.jsx` (new) |
+| Mounted PerfOverlay conditionally in dev mode | `App.jsx` |
+
+### Validation
+
+- **Lint:** 0 errors, 1 pre-existing warning (`react-hooks/incompatible-library` on `useVirtualizer` — expected with TanStack Virtual + React Compiler)
+- **Tests:** 31 passed, 7 pre-existing failures (SearchModal, RegisterScreen, AnnouncementsPage, uploadSheetWorkflow — unrelated to this cycle)
+- **Build:** Clean production build in 283ms, PerfOverlay tree-shaken out
