@@ -8,6 +8,8 @@ const SHEET_STATUS = {
   QUARANTINED: 'quarantined',
 }
 
+const AUTHOR_SELECT = { id: true, username: true, emailVerified: true, isStaffVerified: true }
+
 const reactLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 30,
@@ -74,6 +76,7 @@ const diffLimiter = rateLimit({
 
 module.exports = {
   SHEET_STATUS,
+  AUTHOR_SELECT,
   reactLimiter,
   sheetWriteLimiter,
   commentLimiter,

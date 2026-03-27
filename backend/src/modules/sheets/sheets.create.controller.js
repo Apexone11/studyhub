@@ -8,7 +8,7 @@ const { isModerationEnabled, scanContent } = require('../../lib/moderationEngine
 const { updateFingerprint } = require('../../lib/plagiarismService')
 const { createProvenanceToken } = require('../../lib/provenance')
 const { isHtmlUploadsEnabled } = require('../../lib/htmlKillSwitch')
-const { SHEET_STATUS, sheetWriteLimiter } = require('./sheets.constants')
+const { SHEET_STATUS, AUTHOR_SELECT, sheetWriteLimiter } = require('./sheets.constants')
 const { trackActivity } = require('../../lib/activityTracker')
 const { checkAndAwardBadges } = require('../../lib/badges')
 const {
@@ -66,7 +66,7 @@ router.post('/', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (re
         allowDownloads: resolvedAllowDownloads,
       },
       include: {
-        author: { select: { id: true, username: true } },
+        author: { select: AUTHOR_SELECT },
         course: { include: { school: true } },
         htmlVersions: true,
       },

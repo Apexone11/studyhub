@@ -7,6 +7,7 @@ import {
   IconGitPullRequest,
   IconX,
 } from '../../components/Icons'
+import VerificationBadge from '../../components/VerificationBadge'
 import { API } from '../../config'
 import ContributionInlineDiff from './ContributionInlineDiff'
 import { FONT, panelStyle, linkButton, statusBadge } from './sheetViewerConstants'
@@ -84,6 +85,30 @@ export default function SheetViewerSidebar({ sheet, canEdit, previewKind, attach
   return (
     <aside style={{ display: 'grid', gap: 16 }}>
       <section style={panelStyle()}>
+        <h2 style={{ margin: '0 0 10px', fontSize: 15, color: 'var(--sh-heading)' }}>About</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{
+            width: 32, height: 32, borderRadius: '50%',
+            background: 'var(--sh-avatar-bg)', color: 'var(--sh-avatar-text)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 13, fontWeight: 800, textTransform: 'uppercase', flexShrink: 0,
+          }}>
+            {(sheet.author?.username || '?')[0]}
+          </div>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Link to={`/users/${sheet.author?.username}`} style={{ fontSize: 13, fontWeight: 700, color: 'var(--sh-heading)', textDecoration: 'none' }}>
+                {sheet.author?.username || 'Unknown'}
+              </Link>
+              <VerificationBadge user={sheet.author} size={13} />
+            </div>
+            {sheet.course?.code && (
+              <div style={{ fontSize: 11, color: 'var(--sh-muted)' }}>{sheet.course.code}{sheet.course.school?.short ? ` \u2022 ${sheet.course.school.short}` : ''}</div>
+            )}
+          </div>
+        </div>
+      </section>
+      <section style={panelStyle()}>
         <h2 style={{ margin: '0 0 10px', fontSize: 15, color: 'var(--sh-heading)' }}>Sheet stats</h2>
         <div style={{ display: 'grid', gap: 10, color: 'var(--sh-subtext)', fontSize: 13 }}>
           <div>{sheet.stars || 0} stars</div>
@@ -152,7 +177,7 @@ export default function SheetViewerSidebar({ sheet, canEdit, previewKind, attach
                     {sheet.forkSource.title}
                   </Link>
                   {sheet.forkSource.author ? (
-                    <> by <Link to={`/users/${sheet.forkSource.author.username}`} style={{ color: 'var(--sh-brand)', fontWeight: 600, textDecoration: 'none' }}>{sheet.forkSource.author.username}</Link></>
+                    <> by <Link to={`/users/${sheet.forkSource.author.username}`} style={{ color: 'var(--sh-brand)', fontWeight: 600, textDecoration: 'none' }}>{sheet.forkSource.author.username}</Link><VerificationBadge user={sheet.forkSource.author} size={11} /></>
                   ) : null}
                 </span>
               </div>

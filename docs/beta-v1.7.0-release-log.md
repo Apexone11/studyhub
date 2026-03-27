@@ -1957,3 +1957,72 @@ Reduce moderation load by gating new users' public-facing content behind `pendin
 - **Frontend lint:** 0 errors, 1 pre-existing warning
 - **Frontend tests:** 38 passed, 0 failures
 - **Frontend build:** Clean (315ms, 581 modules)
+
+---
+
+## Cycle Q-2 + V-1 — Sheet Page Polish + Verified Badges (2026-03-27)
+
+### Summary
+
+Restructured SheetViewerPage from a 664-line monolith into focused child components with a GitHub-like header layout. Added verified badges (staff overrides email). Full dark/light mode compliance with zero hardcoded colors.
+
+### Changes
+
+| Category | Detail |
+|----------|--------|
+| Schema | Added `isStaffVerified` Boolean field to User model |
+| Backend | Centralized `AUTHOR_SELECT` constant with verification fields across all 10 sheet controller/serializer files |
+| Backend | Admin endpoint `PATCH /api/admin/users/:id/staff-verified` for toggling staff verification |
+| Frontend | New `VerificationBadge` component with `getVerificationType()` utility — staff badge overrides email, tooltip on hover |
+| Frontend | Decomposed SheetViewerPage (664 → ~175 lines) into SheetHeader, SheetActionsMenu, SheetContentPanel, SheetCommentsPanel, RelatedSheetsPanel |
+| Frontend | GitHub-like header: breadcrumb navigation, title + status pill, author avatar + verified badge + course/school chips, fork lineage, stats summary |
+| Frontend | Primary/secondary action split: Star/Fork/Contribute visible, Share/Download/Helpful/Needs-work/Report/Study-status in kebab dropdown |
+| Frontend | Contribute-back modal uses `createPortal(jsx, document.body)` for proper fixed positioning |
+| Frontend | Professional logged-out CTAs for actions ("Sign in to star, fork, and contribute") and comments ("Join the conversation") |
+| Frontend | Comments auto-expand when count <= 3 |
+| Frontend | Related sheets capped at 6 with "Browse all" link |
+| Frontend | About section added to SheetViewerSidebar with author + verified badge |
+| Frontend | Admin UsersTab: staff-verified checkbox toggle |
+| UI | New icons: IconMoreHorizontal, IconShieldCheck, IconMailCheck |
+| UI | New style helpers: statusPill(), secondaryDropdown(), dropdownItem() |
+| Tests | 6 VerificationBadge unit tests (staff > email rule) |
+| Tests | 3 AUTHOR_SELECT constant tests |
+| Tests | Updated interactive-preview tests to reference SheetContentPanel after extraction |
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `backend/prisma/schema.prisma` | Added `isStaffVerified` to User model |
+| `backend/prisma/migrations/20260326100000_add_staff_verified/` | Migration SQL |
+| `backend/src/modules/sheets/sheets.constants.js` | Added `AUTHOR_SELECT` constant |
+| `backend/src/modules/sheets/*.controller.js` (8 files) | Replaced inline author selects with `AUTHOR_SELECT` |
+| `backend/src/modules/sheets/sheets.serializer.js` | Pass through verification fields in all author objects |
+| `backend/src/modules/admin/admin.users.controller.js` | Added staff-verified toggle endpoint + isStaffVerified in user list |
+| `frontend/studyhub-app/src/components/VerificationBadge.jsx` | New: badge component with tooltip |
+| `frontend/studyhub-app/src/components/verificationUtils.js` | New: `getVerificationType()` utility |
+| `frontend/studyhub-app/src/components/Icons.jsx` | Added 3 new icons |
+| `frontend/studyhub-app/src/pages/sheets/SheetHeader.jsx` | New: GitHub-like header |
+| `frontend/studyhub-app/src/pages/sheets/SheetActionsMenu.jsx` | New: primary/secondary actions with kebab dropdown |
+| `frontend/studyhub-app/src/pages/sheets/SheetContentPanel.jsx` | New: content rendering (HTML/markdown) |
+| `frontend/studyhub-app/src/pages/sheets/SheetCommentsPanel.jsx` | New: comments with auto-expand |
+| `frontend/studyhub-app/src/pages/sheets/RelatedSheetsPanel.jsx` | New: related sheets list |
+| `frontend/studyhub-app/src/pages/sheets/SheetViewerPage.jsx` | Rewritten as thin orchestrator (~175 lines) |
+| `frontend/studyhub-app/src/pages/sheets/SheetViewerSidebar.jsx` | Added About section with verified badge |
+| `frontend/studyhub-app/src/pages/sheets/sheetViewerConstants.js` | Added style helpers |
+| `frontend/studyhub-app/src/pages/admin/UsersTab.jsx` | Staff-verified checkbox |
+| `frontend/studyhub-app/src/components/VerificationBadge.test.jsx` | 6 unit tests |
+| `backend/test/verificationFields.test.js` | 3 constant tests |
+| `backend/test/interactive-preview.test.js` | Updated file paths for extracted component |
+
+### Validation
+
+| Check | Result |
+|-------|--------|
+| Backend tests | 467 pass, 2 fail (pre-existing: @aws-sdk/client-kms missing) |
+| Frontend lint | Clean |
+| Frontend build | Clean (326ms) |
+| Frontend tests | 35 pass, 7 fail (pre-existing: SearchModal, RegisterScreen, Announcements, uploadSheetWorkflow) |
+| New tests | 9/9 pass (6 badge + 3 constant) |
+| Dark mode | All styles use CSS custom property tokens |
+| No hardcoded colors | Verified (only rgba shadows, which are acceptable) |

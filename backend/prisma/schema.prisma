@@ -16,6 +16,7 @@ model User {
   trustedAt               DateTime?
   email                   String?   @unique
   emailVerified           Boolean   @default(false)
+  isStaffVerified         Boolean   @default(false)
   emailVerificationCode   String?
   emailVerificationExpiry DateTime?
   failedAttempts          Int       @default(0)

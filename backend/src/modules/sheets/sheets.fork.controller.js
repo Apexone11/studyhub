@@ -6,7 +6,7 @@ const requireAuth = require('../../core/auth/requireAuth')
 const requireVerifiedEmail = require('../../core/auth/requireVerifiedEmail')
 const { createNotification } = require('../../lib/notify')
 const { isModerationEnabled, scanContent } = require('../../lib/moderationEngine')
-const { SHEET_STATUS, sheetWriteLimiter } = require('./sheets.constants')
+const { SHEET_STATUS, AUTHOR_SELECT, sheetWriteLimiter } = require('./sheets.constants')
 const { serializeSheet } = require('./sheets.serializer')
 
 const router = express.Router()
@@ -57,14 +57,14 @@ router.post('/:id/fork', requireAuth, requireVerifiedEmail, sheetWriteLimiter, a
         userId: req.user.userId,
       },
       include: {
-        author: { select: { id: true, username: true } },
+        author: { select: AUTHOR_SELECT },
         course: { include: { school: true } },
         forkSource: {
           select: {
             id: true,
             title: true,
             userId: true,
-            author: { select: { id: true, username: true } },
+            author: { select: AUTHOR_SELECT },
           },
         },
       },
@@ -102,14 +102,14 @@ router.post('/:id/fork', requireAuth, requireVerifiedEmail, sheetWriteLimiter, a
           allowDownloads: original.allowDownloads,
         },
         include: {
-          author: { select: { id: true, username: true } },
+          author: { select: AUTHOR_SELECT },
           course: { include: { school: true } },
           forkSource: {
             select: {
               id: true,
               title: true,
               userId: true,
-              author: { select: { id: true, username: true } },
+              author: { select: AUTHOR_SELECT },
             },
           },
         },

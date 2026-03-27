@@ -9,7 +9,7 @@ const { isModerationEnabled, scanContent } = require('../../lib/moderationEngine
 const { updateFingerprint } = require('../../lib/plagiarismService')
 const { createProvenanceToken } = require('../../lib/provenance')
 const { isHtmlUploadsEnabled } = require('../../lib/htmlKillSwitch')
-const { SHEET_STATUS, sheetWriteLimiter } = require('./sheets.constants')
+const { SHEET_STATUS, AUTHOR_SELECT, sheetWriteLimiter } = require('./sheets.constants')
 const {
   normalizeSheetStatus,
   resolveNextSheetStatus,
@@ -128,7 +128,7 @@ router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
       where: { id: sheetId },
       data,
       include: {
-        author: { select: { id: true, username: true } },
+        author: { select: AUTHOR_SELECT },
         course: { include: { school: true } },
         htmlVersions: true,
         forkSource: {
@@ -136,7 +136,7 @@ router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
             id: true,
             title: true,
             userId: true,
-            author: { select: { id: true, username: true } },
+            author: { select: AUTHOR_SELECT },
           },
         },
       },
