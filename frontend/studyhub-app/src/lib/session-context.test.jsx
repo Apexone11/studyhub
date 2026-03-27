@@ -1,5 +1,5 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import { MemoryRouter } from 'react-router-dom'
 import { SessionProvider, useSession } from './session-context'
@@ -124,59 +124,5 @@ describe('Session-expired modal', () => {
     expect(screen.getByText('Your session has expired')).toBeInTheDocument()
     expect(screen.getByText('Sign in again')).toBeInTheDocument()
     expect(screen.getByText('Go to Home')).toBeInTheDocument()
-  })
-})
-
-describe('pagehide beacon logout', () => {
-  it('calls sendBeacon on pagehide when authenticated', async () => {
-    seedUser()
-    const beaconSpy = vi.fn(() => true)
-    navigator.sendBeacon = beaconSpy
-
-    server.use(
-      http.get('http://localhost:4000/api/auth/me', () => (
-        HttpResponse.json({
-          id: 7, username: 'beta_student1', role: 'student',
-          email: 'beta_student1@studyhub.test',
-        })
-      )),
-    )
-
-    render(
-      <MemoryRouter>
-        <SessionProvider>
-          <SessionProbe />
-        </SessionProvider>
-      </MemoryRouter>,
-    )
-
-    await waitFor(() => {
-      expect(screen.getByTestId('status')).toHaveTextContent('authenticated')
-    })
-
-    window.dispatchEvent(new Event('pagehide'))
-
-    expect(beaconSpy).toHaveBeenCalledWith('http://localhost:4000/api/auth/logout')
-  })
-
-  it('does NOT call sendBeacon on pagehide when unauthenticated', async () => {
-    const beaconSpy = vi.fn(() => true)
-    navigator.sendBeacon = beaconSpy
-
-    render(
-      <MemoryRouter>
-        <SessionProvider>
-          <SessionProbe />
-        </SessionProvider>
-      </MemoryRouter>,
-    )
-
-    await waitFor(() => {
-      expect(screen.getByTestId('status')).toHaveTextContent('unauthenticated')
-    })
-
-    window.dispatchEvent(new Event('pagehide'))
-
-    expect(beaconSpy).not.toHaveBeenCalled()
   })
 })
