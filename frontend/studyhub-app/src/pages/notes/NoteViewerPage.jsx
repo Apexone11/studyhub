@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom'
 import { useSession } from '../../lib/session-context'
 import ReportModal from '../../components/ReportModal'
 import ModerationBanner from '../../components/ModerationBanner'
+import PendingReviewBanner from '../../components/PendingReviewBanner'
 import { PAGE_FONT } from '../shared/pageUtils'
 import { MarkdownPreview, wordCount } from './notesConstants'
 import NoteCommentSection from './NoteCommentSection'
@@ -113,6 +114,9 @@ export default function NoteViewerPage() {
 
       {/* Moderation banner (owner only) */}
       {note.isOwner && <ModerationBanner status={note.moderationStatus} />}
+      {note.moderationStatus === 'pending_review' && note.isOwner && (
+        <PendingReviewBanner />
+      )}
 
       {/* Actions bar */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>

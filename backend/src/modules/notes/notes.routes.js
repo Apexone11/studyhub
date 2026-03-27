@@ -7,6 +7,7 @@ const { trackActivity } = require('../../lib/activityTracker')
 const { buildAnchorContext, validateAnchorInput } = require('../../lib/noteAnchor')
 const { isModerationEnabled, scanContent } = require('../../lib/moderationEngine')
 const { updateFingerprint } = require('../../lib/plagiarismService')
+const { getInitialModerationStatus } = require('../../lib/trustGate')
 const requireAuth = require('../../middleware/auth')
 const requireVerifiedEmail = require('../../middleware/requireVerifiedEmail')
 const optionalAuth = require('../../core/auth/optionalAuth')
@@ -143,6 +144,9 @@ router.post('/', requireAuth, mutateLimiter, requireVerifiedEmail, async (req, r
   if (contentStr.length > 50000) return res.status(400).json({ error: 'Content must be 50000 characters or fewer.' })
 
   try {
+    const moderationStatus = priv === false
+      ? getInitialModerationStatus(req.user)
+      : 'clean'  // Private notes don't need moderation hold
     const note = await prisma.note.create({
       data: {
         title: trimmedTitle,
@@ -150,6 +154,7 @@ router.post('/', requireAuth, mutateLimiter, requireVerifiedEmail, async (req, r
         userId: req.user.userId,
         courseId: courseId ? parseInt(courseId, 10) || null : null,
         private: priv !== false,
+        moderationStatus,
       },
       include: NOTE_INCLUDE,
     })
@@ -204,6 +209,11 @@ router.patch('/:id', requireAuth, mutateLimiter, requireVerifiedEmail, async (re
 
     // If making note private, reset allowDownloads
     if (data.private === true) data.allowDownloads = false
+
+    // If toggling from private to public, apply trust-gated moderation status
+    if (req.body.private === false && note.private === true) {
+      data.moderationStatus = getInitialModerationStatus(req.user)
+    }
 
     const updated = await prisma.note.update({
       where: { id: noteId },
@@ -328,6 +338,7 @@ router.post('/:id/comments', requireAuth, requireVerifiedEmail, commentLimiter, 
       ? buildAnchorContext(note.content, anchor.anchorText, anchor.anchorOffset)
       : null
 
+    const moderationStatus = getInitialModerationStatus(req.user)
     const comment = await prisma.noteComment.create({
       data: {
         content,
@@ -336,6 +347,7 @@ router.post('/:id/comments', requireAuth, requireVerifiedEmail, commentLimiter, 
         anchorText: anchor?.anchorText || null,
         anchorOffset: anchor ? anchor.anchorOffset : null,
         anchorContext,
+        moderationStatus,
       },
       include: COMMENT_INCLUDE,
     })

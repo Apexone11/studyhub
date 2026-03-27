@@ -9,6 +9,7 @@ const { createNotification } = require('../../lib/notify')
 const { notifyMentionedUsers } = require('../../lib/mentions')
 const { SHEET_STATUS, AUTHOR_SELECT, reactLimiter, commentLimiter } = require('./sheets.constants')
 const { canReadSheet } = require('./sheets.service')
+const { getInitialModerationStatus } = require('../../lib/trustGate')
 const { trackActivity } = require('../../lib/activityTracker')
 const { timedSection, logTiming } = require('../../lib/requestTiming')
 
@@ -145,8 +146,9 @@ router.post('/:id/comments', requireAuth, requireVerifiedEmail, commentLimiter, 
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
     if (!canReadSheet(sheet, req.user || null)) return res.status(404).json({ error: 'Sheet not found.' })
 
+    const moderationStatus = getInitialModerationStatus(req.user)
     const comment = await prisma.comment.create({
-      data: { content, sheetId, userId: req.user.userId },
+      data: { content, sheetId, userId: req.user.userId, moderationStatus },
       include: { author: { select: AUTHOR_SELECT } },
     })
 

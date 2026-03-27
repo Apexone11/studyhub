@@ -46,6 +46,7 @@ vi.mock('../../lib/useTutorial', () => ({
 
 vi.mock('../../lib/tutorialSteps', () => ({
   ANNOUNCEMENTS_STEPS: [],
+  TUTORIAL_VERSIONS: { announcements: 1 },
 }))
 
 vi.mock('../../lib/animations', () => ({

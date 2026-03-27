@@ -23,6 +23,10 @@ router.get('/cases', async (req, res) => {
     else if (claimed === 'unclaimed') where.claimedByAdminId = null
     else if (claimed === 'any') where.claimedByAdminId = { not: null }
 
+    if (req.query.trustLevel) {
+      where.user = { ...where.user, trustLevel: req.query.trustLevel }
+    }
+
     const [cases, total] = await Promise.all([
       prisma.moderationCase.findMany({
         where,
@@ -30,7 +34,7 @@ router.get('/cases', async (req, res) => {
         skip,
         take: PAGE_SIZE,
         include: {
-          user: { select: { id: true, username: true } },
+          user: { select: { id: true, username: true, avatarUrl: true, trustLevel: true } },
           reviewer: { select: { id: true, username: true } },
           reporter: { select: { id: true, username: true } },
           claimedBy: { select: { id: true, username: true } },
@@ -132,7 +136,7 @@ router.get('/cases/:id', async (req, res) => {
     const modCase = await prisma.moderationCase.findUnique({
       where: { id: caseId },
       include: {
-        user: { select: { id: true, username: true } },
+        user: { select: { id: true, username: true, avatarUrl: true, trustLevel: true } },
         reviewer: { select: { id: true, username: true } },
         reporter: { select: { id: true, username: true } },
         claimedBy: { select: { id: true, username: true } },

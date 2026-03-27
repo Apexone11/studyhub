@@ -1,0 +1,25 @@
+{
+  "plugins": {
+    "datadog": {
+      "enabled": true
+    },
+    "firecrawl": {
+      "enabled": true
+    },
+    "render": {
+      "enabled": true
+    },
+    "braintrust": {
+      "enabled": true
+    },
+    "huggingface-skills": {
+      "enabled": true
+    },
+    "runlayer": {
+      "enabled": true
+    },
+    "1password": {
+      "enabled": true
+    }
+  }
+}

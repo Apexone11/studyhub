@@ -1776,6 +1776,190 @@ Fork owners are now notified when the original sheet's title or status changes. 
 
 ---
 
+## Hotfix: Auth‑P0 — Pagehide beacon caused logout on every refresh
+
+**Date:** 2026-03-26
+
+The `pagehide` event fires on page refresh AND tab close — JavaScript cannot distinguish them. The pagehide beacon listener added in Sec-1.1 was calling `sendBeacon('/api/auth/logout')` on every F5, clearing the HttpOnly session cookie. Removed the listener entirely; JWT sessions expire naturally after 24h.
+
+**File:** `frontend/studyhub-app/src/lib/session-context.jsx` — removed pagehide useEffect
+**Tests:** Removed 2 pagehide beacon tests from `session-context.test.jsx`
+
+---
+
+## Hotfix: Star‑P0 — Starred tab duplicate sheets
+
+**Date:** 2026-03-26
+
+The starred sheets query in `sheets.list.controller.js` had no `orderBy` on `starredSheet.findMany()`, causing non-deterministic pagination. Also ignored the user's `sort` preference. Fixed:
+- Added `orderBy: { sheetId: 'desc' }` for deterministic pagination
+- Added `[...new Set()]` dedup safety net on starred IDs
+- Added `orderBy` matching user sort on the full sheet query (was previously unsorted)
+
+**File:** `backend/src/modules/sheets/sheets.list.controller.js`
+**Validation:** 533/533 backend tests pass
+
+---
+
+## Hotfix: UI‑P0 — Appeal Modal off-center in Settings
+
+**Date:** 2026-03-26
+
+The Appeal Decision modal in `ModerationTab.jsx` renders inside the Settings tab `<main>` element, which has a `transform` applied by anime.js `fadeInUp` animation. CSS `position: fixed` inside a transformed parent is relative to the parent, not the viewport — causing the modal to float off-center. Fixed by wrapping the modal JSX in `createPortal(…, document.body)`.
+
+**File:** `frontend/studyhub-app/src/pages/settings/ModerationTab.jsx`
+
+**Verification:**
+
+- Open Settings → Moderation → click "Appeal Decision" on any case
+- Confirm modal is centered on: desktop + mobile widths, light + dark mode
+- Confirm centering holds while the page is animating (tab switch triggers anime.js transform)
+
+**General rule:** Any modal rendered inside a transformed or animated container must be portaled to `document.body` to guarantee viewport centering. This applies to all Settings tabs (animated via `fadeInUp`) and any future page that uses anime.js entrance animations.
+
+---
+
+## S-10.3 — Frontend Performance + UI Jank Cleanup
+
+**Date:** 2026-03-26
+
+### S-10.3.1 — Feed Virtualization + Memoization
+
+Replaced the feed's `.map()` rendering with `@tanstack/react-virtual` virtualization. Only visible cards + 3 overscan rows are rendered in the DOM, regardless of total feed size. FeedCard wrapped in `React.memo` with a custom comparator that skips callback props. All callback props (`toggleReaction`, `toggleStar`, `confirmDeletePost`, `handleReport`) stabilized with `useCallback` so memo is effective.
+
+| Change | File(s) |
+|--------|---------|
+| Added `@tanstack/react-virtual` dependency | `package.json` |
+| Wrapped FeedCard in `React.memo` with `feedCardPropsAreEqual` comparator | `FeedCard.jsx` |
+| Stabilized `toggleReaction`, `toggleStar` with `useCallback([])` | `useFeedData.js` |
+| Stabilized `confirmDeletePost`, `handleDeletePost`, `handleReport` with `useCallback` | `FeedPage.jsx` |
+| Created `VirtualFeedList` component with `useVirtualizer` | `VirtualFeedList.jsx` (new) |
+| Replaced `.map()` grid with `<VirtualFeedList>`, removed stagger animation | `FeedPage.jsx` |
+| Unit tests for FeedCard memo contract and VirtualFeedList rendering | `FeedCard.test.jsx`, `VirtualFeedList.test.jsx` (new) |
+
+**Trade-off:** Removed the anime.js `staggerEntrance` animation on feed cards. The virtualizer manages its own DOM positioning with absolute + translateY, which is incompatible with stagger targeting `feedListRef.current.children`. Feed cards now appear instantly (which is faster, matching the performance goal).
+
+### S-10.3.2 — Sheet Content-First Rendering
+
+SheetViewerPage comment section deferred behind a collapse/expand toggle. Comments render collapsed by default — only the toggle button ("▸ Comments (N)") is visible on first paint. Users click to expand and load comments. This matches the existing pattern in NoteViewerPage's `NoteCommentSection`.
+
+| Change | File |
+|--------|------|
+| Added `commentsExpanded` state + toggle button, wrapped form + list in conditional | `SheetViewerPage.jsx` |
+
+**NoteViewerPage:** Already had lazy-expand comments via `NoteCommentSection` — no change needed.
+
+### S-10.3.3 — Performance Telemetry Visibility
+
+Extended `usePageTiming` with a module-level `getLastPageTiming()` export. Added a dev-only `PerfOverlay` component — a fixed dark badge (bottom-left) showing page name, API latency, and time-to-content from the last `page_timing` event. Auto-hides after 30 seconds. Tree-shaken from production builds via `import.meta.env?.DEV` gate.
+
+| Change | File |
+|--------|------|
+| Added `_lastTiming` variable + `getLastPageTiming()` export | `usePageTiming.js` |
+| Created PerfOverlay component (dev-only) | `PerfOverlay.jsx` (new) |
+| Mounted PerfOverlay conditionally in dev mode | `App.jsx` |
+
+### Validation
+
+- **Lint:** 0 errors, 1 pre-existing warning (`react-hooks/incompatible-library` on `useVirtualizer` — expected with TanStack Virtual + React Compiler)
+- **Tests:** 31 passed, 7 pre-existing failures (SearchModal, RegisterScreen, AnnouncementsPage, uploadSheetWorkflow — unrelated to this cycle, fixed in Q-Fix below)
+- **Build:** Clean production build in 283ms, PerfOverlay tree-shaken out
+
+---
+
+## Q-Fix: Test Suite Cleanup
+
+**Date:** 2026-03-26
+**Commit:** `fix(tests): repair 7 stale test assertions across 4 test files`
+
+### Problem
+
+7 test assertions across 4 test files had drifted from source code changes over prior cycles. The failures were not bugs — they were stale test expectations that no longer matched current behavior.
+
+### Root Causes & Fixes
+
+| Test File | Root Cause | Fix |
+| --------- | ---------- | --- |
+| `uploadSheetWorkflow.test.jsx` | `canEditHtmlWorkingCopy` no longer checks `hasOriginalVersion`; `canSubmitHtmlReview` uses tier-based logic (tier 0 auto-publishes, tier 3 quarantined) | Rewrote assertions to test tier-based scan rules and always-true edit permission |
+| `AnnouncementsPage.test.jsx` | `TUTORIAL_VERSIONS` export was added to `tutorialSteps.js` but mock was not updated | Added `TUTORIAL_VERSIONS: { announcements: 1 }` to the mock |
+| `SearchModal.test.jsx` | Search placeholder updated to include "notes" but test not updated; highlight `<mark>` tags split text across elements | Updated placeholder text; switched to function matcher for highlighted text |
+| `RegisterScreen.test.jsx` | Registration flow simplified from 3-step (Account → Verify → Courses) to 2-step (Account → Verify → auto-complete). Course selection deferred to `/my-courses` post-signup | Rewrote both tests: removed course selection step, updated complete payload to `{ verificationToken }` only, changed expected navigation from `/dashboard` to `/feed` |
+
+### Validation
+
+- **Lint:** 0 errors, 1 pre-existing warning (`react-hooks/incompatible-library`)
+- **Tests:** 38 passed, 0 failures — full green CI
+- **Build:** Not re-run (no production code changed)
+
+---
+
+## S-9: Trust Levels + Pending Review until Trusted
+
+**Date:** 2026-03-26
+**Spec:** S-9.1 through S-9.5
+
+### S-9 Goal
+
+Reduce moderation load by gating new users' public-facing content behind `pending_review` status until they earn automatic `trusted` promotion. Admin can override trust levels manually.
+
+### S-9 Schema Changes
+
+| Change | File |
+| ------ | ---- |
+| Added `trustLevel` (String, default `"new"`) to User model | `backend/prisma/schema.prisma` |
+| Added `trustedAt` (DateTime?) to User model | `backend/prisma/schema.prisma` |
+| Migration: `20260326000003_add_trust_level_to_user` | `backend/prisma/migrations/` |
+
+### S-9 Backend Changes
+
+| Change | File |
+| ------ | ---- |
+| Created `trustGate.js` — `shouldAutoPublish()`, `getInitialModerationStatus()`, `meetsPromotionCriteria()`, `checkAndPromoteTrust()` | `backend/src/lib/trustGate.js` |
+| Auth middleware: `trustLevel` added to `req.user` select and assignment | `backend/src/middleware/auth.js` |
+| Feed post creation: sets `moderationStatus` via trust gate | `backend/src/modules/feed/feed.posts.controller.js` |
+| Feed comment creation: sets `moderationStatus` via trust gate | `backend/src/modules/feed/feed.social.controller.js` |
+| Sheet publishing: `resolveNextSheetStatus()` now accepts `user` param, gates new users to `pending_review` | `backend/src/modules/sheets/sheets.service.js` |
+| Sheet create/update controllers: pass `user: req.user` to `resolveNextSheetStatus()` | `sheets.create.controller.js`, `sheets.update.controller.js` |
+| Sheet comment creation: sets `moderationStatus` via trust gate | `backend/src/modules/sheets/sheets.social.controller.js` |
+| Note creation: sets `moderationStatus` (public notes only) via trust gate | `backend/src/modules/notes/notes.routes.js` |
+| Note privacy toggle: sets `moderationStatus` when making public | `backend/src/modules/notes/notes.routes.js` |
+| Note comment creation: sets `moderationStatus` via trust gate | `backend/src/modules/notes/notes.routes.js` |
+| On-login auto-promotion: fire-and-forget `checkAndPromoteTrust()` after login | `backend/src/modules/auth/auth.login.controller.js` |
+| Auth service: `trustLevel` included in user payload for login and `/api/auth/me` | `backend/src/modules/auth/auth.service.js` |
+| Admin endpoint: `PATCH /api/admin/users/:id/trust-level` with audit logging | `backend/src/modules/admin/admin.users.controller.js` |
+| Admin users: `trustLevel` added to GET /users select | `backend/src/modules/admin/admin.users.controller.js` |
+| Moderation cases: `trustLevel` filter on GET /cases, included in user select | `moderation.admin.cases.controller.js` |
+
+### S-9 Frontend Changes
+
+| Change | File |
+| ------ | ---- |
+| Created `PendingReviewBanner` component | `frontend/.../components/PendingReviewBanner.jsx` |
+| FeedCard: shows banner when author's post is `pending_review` | `frontend/.../pages/feed/FeedCard.jsx` |
+| SheetViewerPage: shows banner when sheet is `pending_review` and user is owner | `frontend/.../pages/sheets/SheetViewerPage.jsx` |
+| NoteViewerPage: shows banner when note is `pending_review` and user is owner | `frontend/.../pages/notes/NoteViewerPage.jsx` |
+| Admin UsersTab: trust level column with inline dropdown | `frontend/.../pages/admin/UsersTab.jsx` |
+| Admin CasesSubTab: trust level filter dropdown + "new" badge | `frontend/.../pages/admin/CasesSubTab.jsx` |
+| Admin ModerationTab: trust filter state management | `frontend/.../pages/admin/ModerationTab.jsx` |
+| SettingsPage: trust status info/success banners | `frontend/.../pages/settings/SettingsPage.jsx` |
+
+### S-9 Tests
+
+| Test File | Tests | Coverage |
+| --------- | ----- | -------- |
+| `backend/test/trustGate.test.js` | 14 | Pure functions: shouldAutoPublish, getInitialModerationStatus, meetsPromotionCriteria |
+| `backend/test/trustLevel.integration.test.js` | 4 | Route-level: new/trusted/admin/restricted users get correct moderationStatus |
+
+### S-9 Validation
+
+- **Backend lint:** 0 new errors (6 pre-existing in unrelated files)
+- **Backend tests:** 551 passed, 0 failures
+- **Frontend lint:** 0 errors, 1 pre-existing warning
+- **Frontend tests:** 38 passed, 0 failures
+- **Frontend build:** Clean (315ms, 581 modules)
+
+---
+
 ## Cycle Q-2 + V-1 — Sheet Page Polish + Verified Badges (2026-03-27)
 
 ### Summary

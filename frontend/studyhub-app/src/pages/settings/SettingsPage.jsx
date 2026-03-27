@@ -160,12 +160,45 @@ export default function SettingsPage() {
     switch (tab) {
       case 'profile':
         return (
-          <ProfileTab
-            user={user}
-            sessionUser={sessionUser}
-            onAvatarChange={(url) => { setUser((u) => u ? { ...u, avatarUrl: url } : u); setSessionUser((u) => u ? { ...u, avatarUrl: url } : u) }}
-            onCoverChange={(url) => { setUser((u) => u ? { ...u, coverImageUrl: url } : u); setSessionUser((u) => u ? { ...u, coverImageUrl: url } : u) }}
-          />
+          <>
+            {sessionUser?.trustLevel === 'new' && (
+              <div style={{
+                background: 'var(--sh-info-bg, #dbeafe)',
+                border: '1px solid var(--sh-info-border, #93c5fd)',
+                borderRadius: 8,
+                padding: '12px 16px',
+                fontSize: 13,
+                color: 'var(--sh-info-text, #1e40af)',
+                marginBottom: 16,
+              }}>
+                <strong>Account Status: New</strong>
+                <p style={{ margin: '6px 0 0', lineHeight: 1.5 }}>
+                  Your account is new. To keep StudyHub safe, public posts and shared content may require review for a short time.
+                  After a few days of activity with no issues, your account will be automatically trusted.
+                </p>
+              </div>
+            )}
+            {sessionUser?.trustLevel === 'trusted' && (
+              <div style={{
+                background: 'var(--sh-success-bg, #d1fae5)',
+                border: '1px solid var(--sh-success-border, #6ee7b7)',
+                borderRadius: 8,
+                padding: '12px 16px',
+                fontSize: 13,
+                color: 'var(--sh-success-text, #065f46)',
+                marginBottom: 16,
+              }}>
+                <strong>Account Status: Trusted</strong>
+                <p style={{ margin: '6px 0 0' }}>Your content publishes immediately.</p>
+              </div>
+            )}
+            <ProfileTab
+              user={user}
+              sessionUser={sessionUser}
+              onAvatarChange={(url) => { setUser((u) => u ? { ...u, avatarUrl: url } : u); setSessionUser((u) => u ? { ...u, avatarUrl: url } : u) }}
+              onCoverChange={(url) => { setUser((u) => u ? { ...u, coverImageUrl: url } : u); setSessionUser((u) => u ? { ...u, coverImageUrl: url } : u) }}
+            />
+          </>
         )
       case 'security':
         return (

@@ -1,4 +1,4 @@
-// RegisterScreen.test covers the current account creation and course setup flow.
+// RegisterScreen.test covers the current two-step registration flow: Account → Verify → auto-complete.
 import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
@@ -28,7 +28,6 @@ function renderRegisterScreen() {
         <Routes>
           <Route path="/register" element={<RegisterScreen />} />
           <Route path="/feed" element={<div>Feed ready</div>} />
-          <Route path="/dashboard" element={<div>Dashboard ready</div>} />
           <Route path="/admin" element={<div>Admin ready</div>} />
         </Routes>
       </SessionProvider>
@@ -37,7 +36,7 @@ function renderRegisterScreen() {
 }
 
 describe('RegisterScreen', () => {
-  it('creates a local account, verifies email, and lets the user skip course setup', async () => {
+  it('creates a local account, verifies email, and auto-completes registration', async () => {
     const user = userEvent.setup()
     let registerStartPayload = null
     let verifyPayload = null
@@ -60,7 +59,6 @@ describe('RegisterScreen', () => {
         return HttpResponse.json({
           verified: true,
           verificationToken: 'signup-token',
-          nextStep: 'courses',
           expiresAt: '2026-03-16T12:15:00.000Z',
         })
       }),
@@ -82,18 +80,6 @@ describe('RegisterScreen', () => {
           },
         }, { status: 201 })
       }),
-      http.get('http://localhost:4000/api/courses/schools', () => (
-        HttpResponse.json([
-          {
-            id: 1,
-            name: 'University of Maryland',
-            short: 'UMD',
-            courses: [
-              { id: 101, code: 'CMSC131', name: 'Object-Oriented Programming I' },
-            ],
-          },
-        ])
-      )),
       http.get('http://localhost:4000/api/notifications', () => (
         HttpResponse.json({ notifications: [], unreadCount: 0 })
       )),
@@ -123,20 +109,15 @@ describe('RegisterScreen', () => {
       code: '123456',
     })
 
-    await screen.findByRole('heading', { name: 'Choose your courses' })
-    await user.click(screen.getByRole('button', { name: 'Skip For Now' }))
-
+    // After verify, registration auto-completes and navigates to /feed
     expect(registerCompletePayload).toMatchObject({
       verificationToken: 'signup-token',
-      schoolId: null,
-      courseIds: [],
-      customCourses: [],
     })
 
-    await screen.findByText('Dashboard ready')
+    await screen.findByText('Feed ready')
   })
 
-  it('verifies email and saves selected courses before finishing setup', async () => {
+  it('completes the full flow with a different user and navigates to feed', async () => {
     const user = userEvent.setup()
     let registerStartPayload = null
     let verifyPayload = null
@@ -149,7 +130,7 @@ describe('RegisterScreen', () => {
       http.post('http://localhost:4000/api/auth/register/start', async ({ request }) => {
         registerStartPayload = await request.json()
         return HttpResponse.json({
-          verificationToken: 'course-signup-token',
+          verificationToken: 'second-signup-token',
           deliveryHint: 'course_user@studyhub.test',
           resendAvailableAt: '2026-03-16T12:01:00.000Z',
         }, { status: 201 })
@@ -158,26 +139,10 @@ describe('RegisterScreen', () => {
         verifyPayload = await request.json()
         return HttpResponse.json({
           verified: true,
-          verificationToken: 'course-signup-token',
-          nextStep: 'courses',
+          verificationToken: 'second-signup-token',
           expiresAt: '2026-03-16T12:15:00.000Z',
         })
       }),
-      http.get('http://localhost:4000/api/courses/schools', () => (
-        HttpResponse.json([
-          {
-            id: 1,
-            name: 'University of Maryland',
-            short: 'UMD',
-            courses: [
-              { id: 101, code: 'CMSC131', name: 'Object-Oriented Programming I' },
-            ],
-          },
-        ])
-      )),
-      http.get('http://localhost:4000/api/notifications', () => (
-        HttpResponse.json({ notifications: [], unreadCount: 0 })
-      )),
       http.post('http://localhost:4000/api/auth/register/complete', async ({ request }) => {
         registerCompletePayload = await request.json()
         return HttpResponse.json({
@@ -190,18 +155,15 @@ describe('RegisterScreen', () => {
             twoFaEnabled: false,
             avatarUrl: null,
             createdAt: '2026-03-16T12:00:00.000Z',
-            enrollments: [
-              {
-                id: 1,
-                courseId: 101,
-                course: { id: 101, code: 'CMSC131', name: 'Object-Oriented Programming I' },
-              },
-            ],
-            counts: { courses: 1, sheets: 0, stars: 0 },
+            enrollments: [],
+            counts: { courses: 0, sheets: 0, stars: 0 },
             csrfToken: 'csrf-token',
           },
         }, { status: 201 })
       }),
+      http.get('http://localhost:4000/api/notifications', () => (
+        HttpResponse.json({ notifications: [], unreadCount: 0 })
+      )),
     )
 
     renderRegisterScreen()
@@ -224,22 +186,14 @@ describe('RegisterScreen', () => {
     await user.click(screen.getByRole('button', { name: 'Verify Email' }))
 
     expect(verifyPayload).toMatchObject({
-      verificationToken: 'course-signup-token',
+      verificationToken: 'second-signup-token',
       code: '654321',
     })
 
-    await screen.findByRole('heading', { name: 'Choose your courses' })
-    await user.selectOptions(screen.getByLabelText('School'), '1')
-    await user.click(screen.getByRole('checkbox', { name: /CMSC131/i }))
-    await user.click(screen.getByRole('button', { name: 'Finish Setup' }))
-
     expect(registerCompletePayload).toMatchObject({
-      verificationToken: 'course-signup-token',
-      schoolId: 1,
-      courseIds: [101],
-      customCourses: [],
+      verificationToken: 'second-signup-token',
     })
 
-    await screen.findByText('Dashboard ready')
+    await screen.findByText('Feed ready')
   })
 })

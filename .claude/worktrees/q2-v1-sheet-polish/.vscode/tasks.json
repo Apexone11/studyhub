@@ -1,0 +1,67 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Run Vite Dev Server",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"--prefix",
+				"frontend/studyhub-app",
+				"run",
+				"dev"
+			],
+			"isBackground": true
+		},
+		{
+			"label": "Beta: Bootstrap Stack",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"beta:bootstrap"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "Beta: Start (One Click)",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"beta:start:oneclick"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "Beta: Full Check",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"beta:check"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "Beta: Validate (One Click)",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"beta:validate:oneclick"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "Beta: Stop Stack",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"beta:down"
+			],
+			"problemMatcher": []
+		}
+	]
+}

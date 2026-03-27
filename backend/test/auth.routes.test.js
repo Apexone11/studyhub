@@ -79,6 +79,9 @@ const mocks = vi.hoisted(() => {
     sentry: {
       captureError: vi.fn(),
     },
+    trustGate: {
+      checkAndPromoteTrust: vi.fn().mockResolvedValue({ promoted: false, trustLevel: 'new' }),
+    },
   }
 })
 
@@ -88,6 +91,7 @@ const mockTargets = new Map([
   [require.resolve('../src/lib/authTokens'), mocks.authTokens],
   [require.resolve('../src/lib/verificationChallenges'), mocks.verification],
   [require.resolve('../src/monitoring/sentry'), mocks.sentry],
+  [require.resolve('../src/lib/trustGate'), mocks.trustGate],
 ])
 
 const originalModuleLoad = Module._load

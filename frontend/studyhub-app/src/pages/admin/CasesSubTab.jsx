@@ -375,6 +375,7 @@ const filterBtnStyle = (active) => ({
 export default function CasesSubTab({
   casesState, caseStatus, setCaseStatus,
   caseSource, setCaseSource, caseClaimed, setCaseClaimed,
+  caseTrustFilter, setCaseTrustFilter,
   caseSort, setCaseSort,
   loadCases, reviewCase,
   setSubTab, setStrikeForm, formatDateTime,
@@ -422,6 +423,16 @@ export default function CasesSubTab({
             </button>
           ))}
         </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--sh-muted)' }}>Trust:</span>
+          <select value={caseTrustFilter} onChange={(e) => setCaseTrustFilter(e.target.value)}
+            style={{ borderRadius: 8, border: '1px solid var(--sh-border)', padding: '5px 10px', fontSize: 11, color: 'var(--sh-text)', fontFamily: FONT, background: 'var(--sh-surface)' }}>
+            <option value="">All Trust</option>
+            <option value="new">New Users</option>
+            <option value="trusted">Trusted</option>
+            <option value="restricted">Restricted</option>
+          </select>
+        </div>
       </div>
 
       {renderError(casesState)}
@@ -444,7 +455,14 @@ export default function CasesSubTab({
                   <td style={tableCellStrong}>{c.id}</td>
                   <td style={tableCell}><span style={sourceBadge(c.source)}>{SOURCE_BADGE[c.source]?.label || c.source || '—'}</span></td>
                   <td style={tableCell}>{c.contentType || '—'}</td>
-                  <td style={tableCell}>{c.user?.username || c.userId || '—'}</td>
+                  <td style={tableCell}>
+                    {c.user?.username || c.userId || '—'}
+                    {c.user?.trustLevel === 'new' && (
+                      <span style={{ fontSize: 10, background: 'var(--sh-warning-bg, #fef3c7)', color: 'var(--sh-warning-text, #92400e)', padding: '1px 5px', borderRadius: 4, marginLeft: 4 }}>
+                        new
+                      </span>
+                    )}
+                  </td>
                   <td style={tableCell}>{typeof c.confidence === 'number' ? c.confidence.toFixed(2) : '—'}</td>
                   <td style={tableCell}><span style={statusPill(c.status)}>{c.status}</span></td>
                   <td style={tableCell}>{c.claimedBy?.username || '—'}</td>

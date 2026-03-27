@@ -27,6 +27,7 @@
   "dependencies": {
     "@react-oauth/google": "^0.13.4",
     "@sentry/react": "^10.43.0",
+    "@tanstack/react-virtual": "^3.13.23",
     "animejs": "^4.3.6",
     "dompurify": "^3.3.3",
     "marked": "^17.0.5",

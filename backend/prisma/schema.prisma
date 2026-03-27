@@ -12,6 +12,8 @@ model User {
   username                String    @unique
   passwordHash            String
   role                    String    @default("student")
+  trustLevel              String    @default("new")
+  trustedAt               DateTime?
   email                   String?   @unique
   emailVerified           Boolean   @default(false)
   isStaffVerified         Boolean   @default(false)
