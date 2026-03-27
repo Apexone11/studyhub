@@ -1711,3 +1711,67 @@ Fork owners are now notified when the original sheet's title or status changes. 
 | Backend lint | Clean (6 pre-existing only) |
 | Frontend lint | Clean |
 | Frontend build | Clean (296ms) |
+
+---
+
+## Cycle Sec-1 — Session Hardening + Logout UX Polish
+
+**Date:** 2026-03-26
+
+### Sec-1.1: Best-effort logout on tab close
+
+- Exempted `POST /api/auth/logout` from CSRF validation in `backend/src/middleware/csrf.js` — required because `navigator.sendBeacon()` cannot set custom headers
+- Added `pagehide` event listener in `SessionProvider` that fires `navigator.sendBeacon()` to the logout endpoint when user is authenticated
+- Gated on `status === 'authenticated'` — does not fire for unauthenticated users
+- No `visibilitychange` (too aggressive — fires on tab switch) or `beforeunload` (deprecated for this purpose)
+
+### Sec-1.2: Session lifecycle tightening
+
+- Removed redundant manual 401 checks from 5 components: `useDashboardData.js`, `useFeedData.js`, `SheetHtmlPreviewPage.jsx`, `AttachmentPreviewPage.jsx`, `SheetReviewPanel.jsx`
+- Also cleaned up cascading unused import in `FeedPage.jsx`
+- All 401 handling now flows through the global fetch shim → `AUTH_SESSION_EXPIRED_EVENT` → session-expired modal
+- Audited bootstrap 401 path: `refreshSession()` correctly sets `status = 'unauthenticated'` with empty error string (no error banner)
+- Audited `PrivateRoute`: correctly redirects to `/login` when unauthenticated (no white screen)
+
+### Sec-1.3: Session-expired modal + logout messaging
+
+- Replaced toast-based `AUTH_SESSION_EXPIRED_EVENT` handler with a blocking modal in `session-context.jsx`
+- Modal shows "Your session has expired" with "Sign in again" and "Go to Home" buttons
+- Escape key and backdrop click dismiss to home page
+- Uses CSS custom property tokens for all colors
+- Added `LOGGED_OUT_FLAG` (`studyhub:logged-out`) to `session.js` — set in `logoutSession()` after clearing stored session
+- `LoginPage.jsx` now reads both flags on mount: session-expired shows warning banner, logged-out shows info banner ("You've been signed out.")
+- Added `login-alert--info` CSS class using `--sh-info-*` tokens
+
+### Testing
+
+- Backend: 2 new tests in `releaseA.stability.middleware.test.js` — CSRF exemption for logout + idempotency
+- Frontend: 3 new tests in `session-context.test.jsx` — modal appears on session-expired event, sendBeacon fires on pagehide when authenticated, sendBeacon does NOT fire when unauthenticated
+- Wrapped existing session-context tests with `<MemoryRouter>` (required after `useNavigate` addition)
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `backend/src/middleware/csrf.js` | Added `/api/auth/logout` to CSRF skip list |
+| `backend/test/releaseA.stability.middleware.test.js` | Added 2 CSRF exemption tests |
+| `frontend/studyhub-app/src/lib/session.js` | Added `LOGGED_OUT_FLAG` constant, set in `logoutSession()` |
+| `frontend/studyhub-app/src/lib/session-context.jsx` | Pagehide listener, session-expired modal, replaced toast handler |
+| `frontend/studyhub-app/src/lib/session-context.test.jsx` | 3 new tests, MemoryRouter wrappers |
+| `frontend/studyhub-app/src/pages/auth/LoginPage.jsx` | Logged-out banner with flag detection |
+| `frontend/studyhub-app/src/pages/auth/LoginPage.css` | Added `login-alert--info` class |
+| `frontend/studyhub-app/src/pages/dashboard/useDashboardData.js` | Removed redundant 401 check |
+| `frontend/studyhub-app/src/pages/feed/useFeedData.js` | Removed redundant 401 check |
+| `frontend/studyhub-app/src/pages/feed/FeedPage.jsx` | Removed unused `clearSession` pass-through |
+| `frontend/studyhub-app/src/pages/preview/SheetHtmlPreviewPage.jsx` | Removed redundant 401 check |
+| `frontend/studyhub-app/src/pages/preview/AttachmentPreviewPage.jsx` | Removed redundant 401 check |
+| `frontend/studyhub-app/src/pages/admin/SheetReviewPanel.jsx` | Removed redundant 401 check |
+
+### Validation
+
+| Suite | Result |
+|-------|--------|
+| Backend tests | 533/533 pass (42 files) |
+| Backend lint | Clean (6 pre-existing only) |
+| Frontend lint | Clean |
+| Frontend build | Clean (300ms) |
