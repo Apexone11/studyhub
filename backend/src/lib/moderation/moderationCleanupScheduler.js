@@ -1,4 +1,4 @@
-const prisma = require('./prisma')
+const prisma = require('../prisma')
 const { logModerationEvent } = require('./moderationLogger')
 
 let cleanupInterval = null

@@ -13,9 +13,9 @@
  * Feature flag: OPENAI_API_KEY presence enables scanning. No key = no scan.
  * ═══════════════════════════════════════════════════════════════════════════ */
 const OpenAI = require('openai')
-const { captureError } = require('../monitoring/sentry')
-const prisma = require('./prisma')
-const { createNotification } = require('./notify')
+const { captureError } = require('../../monitoring/sentry')
+const prisma = require('../prisma')
+const { createNotification } = require('../notify')
 const { logModerationEvent } = require('./moderationLogger')
 
 /* ── Lazy-initialised OpenAI client ──────────────────────────────────────── */

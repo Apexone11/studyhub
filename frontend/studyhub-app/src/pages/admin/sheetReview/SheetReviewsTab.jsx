@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
-import { Pager, PipelineBadge } from './AdminWidgets'
-import { createPageState, filterSelectStyle, pillButton } from './adminConstants'
+import { Pager, PipelineBadge } from '../AdminWidgets'
+import { createPageState, filterSelectStyle, pillButton } from '../adminConstants'
 
 const TIER_LABELS = ['Clean', 'Flagged', 'High Risk', 'Quarantined']
 const TIER_BADGE_COLORS = [

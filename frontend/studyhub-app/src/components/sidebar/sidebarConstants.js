@@ -6,7 +6,7 @@
 import {
   IconFeed, IconSheets, IconTests, IconNotes,
   IconAnnouncements, IconProfile, IconSchool,
-} from './Icons'
+} from '../Icons'
 
 export const FOCUSABLE_DRAWER_SELECTORS = [
   'a[href]',

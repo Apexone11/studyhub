@@ -16,7 +16,7 @@
  * without a deploy.
  */
 
-const prisma = require('./prisma')
+const prisma = require('../prisma')
 
 const FLAG_NAME = 'html_uploads'
 

@@ -9,7 +9,7 @@ import {
 } from '../../../components/Icons'
 import VerificationBadge from '../../../components/verification/VerificationBadge'
 import { API } from '../../../config'
-import ContributionInlineDiff from './ContributionInlineDiff'
+import ContributionInlineDiff from '../lab/ContributionInlineDiff'
 import { FONT, panelStyle, linkButton, statusBadge } from './sheetViewerConstants'
 
 function ContributionList({ title, items, canReview, onReview, reviewingId }) {

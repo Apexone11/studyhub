@@ -1,4 +1,4 @@
-import { FONT } from './adminConstants'
+import { FONT } from '../adminConstants'
 import { statusPill } from './moderationHelpers'
 
 export default function OverviewSubTab({ data, loading, formatDateTime, onNavigateCase }) {

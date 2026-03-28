@@ -1,5 +1,5 @@
-import { AdminCard, AdminTable, AdminPill } from './components'
-import { formatDateTime } from './adminConstants'
+import { AdminCard, AdminTable, AdminPill } from '../components'
+import { formatDateTime } from '../adminConstants'
 
 export default function RestrictionsSubTab({ state, onLift, onPageChange }) {
   const columns = [

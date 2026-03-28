@@ -4,7 +4,7 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 import HomePage from './HomePage'
 
-vi.mock('../../components/Navbar', () => ({
+vi.mock('../../components/navbar/Navbar', () => ({
   default: () => <div data-testid="mock-navbar" />,
 }))
 

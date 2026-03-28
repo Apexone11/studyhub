@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { server } from '../../test/server'
 import ResetPasswordPage from './ResetPasswordPage'
 
-vi.mock('../../components/Navbar', () => ({
+vi.mock('../../components/navbar/Navbar', () => ({
   default: () => <div data-testid="mock-navbar" />,
 }))
 

@@ -1,5 +1,5 @@
-const { hashStoredSecret } = require('./authTokens')
-const prisma = require('./prisma')
+const { hashStoredSecret } = require('../authTokens')
+const prisma = require('../prisma')
 
 const {
   VERIFICATION_PURPOSE,

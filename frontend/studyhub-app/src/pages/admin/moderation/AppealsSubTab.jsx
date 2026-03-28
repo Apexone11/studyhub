@@ -1,5 +1,5 @@
-import { AdminCard, AdminTable, AdminPill } from './components'
-import { formatDateTime, formatLabel } from './adminConstants'
+import { AdminCard, AdminTable, AdminPill } from '../components'
+import { formatDateTime, formatLabel } from '../adminConstants'
 
 export default function AppealsSubTab({
   state, appealStatus, onAppealStatusChange,

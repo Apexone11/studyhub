@@ -6,11 +6,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { server } from '../../test/server'
 import AnnouncementsPage from './AnnouncementsPage'
 
-vi.mock('../../components/Navbar', () => ({
+vi.mock('../../components/navbar/Navbar', () => ({
   default: ({ actions }) => <div>{actions}</div>,
 }))
 
-vi.mock('../../components/AppSidebar', () => ({
+vi.mock('../../components/sidebar/AppSidebar', () => ({
   default: () => <div data-testid="app-sidebar" />,
 }))
 

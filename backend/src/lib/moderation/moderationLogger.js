@@ -1,4 +1,4 @@
-const prisma = require('./prisma')
+const prisma = require('../prisma')
 
 /**
  * Write a moderation audit log entry.

@@ -1,4 +1,4 @@
-const { SCHOOLS, COURSES } = require('./catalog/catalogData')
+const { SCHOOLS, COURSES } = require('../catalog/catalogData')
 
 /**
  * Ensures all seed courses exist for every school in the catalog.
