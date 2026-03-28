@@ -8,7 +8,8 @@ const SHEET_STATUS = {
   QUARANTINED: 'quarantined',
 }
 
-const AUTHOR_SELECT = { id: true, username: true, emailVerified: true, isStaffVerified: true }
+/* emailVerified is private — only expose via /api/auth/me or admin routes */
+const AUTHOR_SELECT = { id: true, username: true, avatarUrl: true, isStaffVerified: true }
 
 const reactLimiter = rateLimit({
   windowMs: 60 * 1000,

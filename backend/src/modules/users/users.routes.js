@@ -231,6 +231,8 @@ router.get('/:username', optionalAuth, async (req, res) => {
         avatarUrl: true,
         coverImageUrl: true,
         createdAt: true,
+        emailVerified: true,
+        isStaffVerified: true,
         _count: {
           select: {
             studySheets: { where: { status: 'published' } },
