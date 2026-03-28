@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { FONT } from './adminConstants'
+import { FONT } from '../adminConstants'
 import { SUB_TABS, createState } from './moderationHelpers'
 import { showToast } from '../../../lib/toast'
 import OverviewSubTab from './OverviewSubTab'

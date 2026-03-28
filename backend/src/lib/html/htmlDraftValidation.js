@@ -1,5 +1,5 @@
 const { classifyHtmlRisk, RISK_TIER } = require('./htmlSecurity')
-const { scanBufferWithClamAv } = require('./clamav')
+const { scanBufferWithClamAv } = require('../clamav')
 const {
   SCAN_STATUS,
   HTML_VERSION_KIND,

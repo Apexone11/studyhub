@@ -1,7 +1,7 @@
 const fs = require('node:fs/promises')
 const path = require('node:path')
 const nodemailer = require('nodemailer')
-const prisma = require('./prisma')
+const prisma = require('../prisma')
 const DEFAULT_ADMIN_EMAIL = 'abdulrfornah@getstudyhub.org'
 const RESEND_API_BASE_URL = 'https://api.resend.com'
 

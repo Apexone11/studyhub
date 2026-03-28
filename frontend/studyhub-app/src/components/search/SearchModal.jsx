@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { IconSearch, IconX } from './Icons'
-import { API } from '../config'
+import { IconSearch, IconX } from '../Icons'
+import { API } from '../../config'
 import { DEBOUNCE_MS, styles } from './searchModalConstants'
 import { SheetResults, NoteResults, CourseResults, UserResults } from './SearchResultItems'
-import { trackEvent } from '../lib/telemetry'
+import { trackEvent } from '../../lib/telemetry'
 
 export default function SearchModal({ open, onClose }) {
   const [query, setQuery] = useState('')

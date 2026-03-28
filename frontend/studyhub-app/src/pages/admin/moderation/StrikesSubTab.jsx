@@ -1,7 +1,7 @@
-import { AdminCard, AdminTable, AdminPill } from './components'
-import UserSearchInput from './components/UserSearchInput'
-import AdminInput from './components/AdminInput'
-import { formatDateTime } from './adminConstants'
+import { AdminCard, AdminTable, AdminPill } from '../components'
+import UserSearchInput from '../components/UserSearchInput'
+import AdminInput from '../components/AdminInput'
+import { formatDateTime } from '../adminConstants'
 
 export default function StrikesSubTab({
   state, strikeForm, strikeSaving, strikeError,

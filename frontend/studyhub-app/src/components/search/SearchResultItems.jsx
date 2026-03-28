@@ -1,4 +1,4 @@
-import { IconSheets, IconNotes, IconUsers, IconSchool } from './Icons'
+import { IconSheets, IconNotes, IconUsers, IconSchool } from '../Icons'
 import { Highlight, styles } from './searchModalConstants'
 
 export function SheetResults({ sheets, query, activeIndex, setActiveIndex, navigateToItem }) {

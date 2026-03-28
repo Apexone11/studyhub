@@ -15,12 +15,12 @@ import { Link, useLocation } from 'react-router-dom'
 import {
   LogoMark,
   IconSearch,
-} from './Icons'
-import SearchModal from './search/SearchModal'
-import KeyboardShortcuts from './KeyboardShortcuts'
-import { pageWidths } from '../lib/ui'
-import { useSession } from '../lib/session-context'
-import EmailVerificationBanner from './EmailVerificationBanner'
+} from '../Icons'
+import SearchModal from '../search/SearchModal'
+import KeyboardShortcuts from '../KeyboardShortcuts'
+import { pageWidths } from '../../lib/ui'
+import { useSession } from '../../lib/session-context'
+import EmailVerificationBanner from '../EmailVerificationBanner'
 import NavbarUserMenu from './NavbarUserMenu'
 import NavbarNotifications from './NavbarNotifications'
 import { S, getConfig } from './navbarConstants'

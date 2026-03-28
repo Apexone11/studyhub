@@ -20,9 +20,9 @@ export {
 // Sheet review constants
 export {
   SUB_TABS, statusPill, createState as createReviewState,
-} from '../../pages/admin/sheetReviewConstants'
+} from '../../pages/admin/sheetReview/sheetReviewConstants'
 
 // Moderation helpers
 export {
   statusPill as modStatusPill, createState as modCreateState,
-} from '../../pages/admin/moderationHelpers'
+} from '../../pages/admin/moderation/moderationHelpers'

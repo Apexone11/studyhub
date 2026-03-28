@@ -1,7 +1,7 @@
 const crypto = require('crypto')
-const { hashStoredSecret } = require('./authTokens')
+const { hashStoredSecret } = require('../authTokens')
 const { generateSixDigitCode, maskEmailAddress } = require('./verificationCodes')
-const prisma = require('./prisma')
+const prisma = require('../prisma')
 
 const VERIFICATION_PURPOSE = {
   SIGNUP: 'signup',

@@ -3,10 +3,10 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { IconBell } from './Icons'
-import { useSession } from '../lib/session-context'
-import { useLivePolling } from '../lib/useLivePolling'
-import { API } from '../config'
+import { IconBell } from '../Icons'
+import { useSession } from '../../lib/session-context'
+import { useLivePolling } from '../../lib/useLivePolling'
+import { API } from '../../config'
 import { S, handleIconHover, formatRelativeTime } from './navbarConstants'
 
 export default function NavbarNotifications() {

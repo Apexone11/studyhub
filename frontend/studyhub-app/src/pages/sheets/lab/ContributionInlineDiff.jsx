@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { API } from '../../../config'
-import { FONT } from './sheetViewerConstants'
+import { FONT } from '../viewer/sheetViewerConstants'
 
 export default function ContributionInlineDiff({ contributionId }) {
   const [diff, setDiff] = useState(null)

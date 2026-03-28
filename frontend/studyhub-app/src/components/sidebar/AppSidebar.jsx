@@ -4,9 +4,9 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { IconPlus, IconSettings } from './Icons'
-import { API } from '../config'
-import { useSession } from '../lib/session-context'
+import { IconPlus, IconSettings } from '../Icons'
+import { API } from '../../config'
+import { useSession } from '../../lib/session-context'
 import {
   FOCUSABLE_DRAWER_SELECTORS,
   NAV_LINKS,

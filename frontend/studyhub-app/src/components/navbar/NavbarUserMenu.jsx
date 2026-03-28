@@ -3,10 +3,10 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { IconChevronDown } from './Icons'
-import { useSession } from '../lib/session-context'
+import { IconChevronDown } from '../Icons'
+import { useSession } from '../../lib/session-context'
 import { S } from './navbarConstants'
-import { API } from '../config'
+import { API } from '../../config'
 
 export default function NavbarUserMenu({ user }) {
   const navigate = useNavigate()

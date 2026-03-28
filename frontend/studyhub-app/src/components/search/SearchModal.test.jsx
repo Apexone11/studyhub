@@ -3,8 +3,8 @@ import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
-import { server } from '../test/server'
-import SearchModal from './SearchModal'
+import { server } from '../../test/server'
+import SearchModal from '../search/SearchModal'
 
 function LocationProbe() {
   const location = useLocation()

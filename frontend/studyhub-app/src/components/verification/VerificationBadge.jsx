@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { IconShieldCheck, IconMailCheck } from './Icons'
+import { IconShieldCheck, IconMailCheck } from '../Icons'
 import { getVerificationType } from './verificationUtils'
 
 const BADGE_CONFIG = {

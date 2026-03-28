@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { FONT, tableHeadStyle, tableCell, tableCellStrong, pillButton } from './adminConstants'
-import { Pager } from './AdminWidgets'
+import { FONT, tableHeadStyle, tableCell, tableCellStrong, pillButton } from '../adminConstants'
+import { Pager } from '../AdminWidgets'
 import { statusPill } from './moderationHelpers'
-import ContentPreviewModal from './components/ContentPreviewModal'
-import { ExternalLinkIcon } from './components/icons'
+import ContentPreviewModal from '../components/ContentPreviewModal'
+import { ExternalLinkIcon } from '../components/icons'
 
 function renderError(state) {
   if (!state.error) return null
