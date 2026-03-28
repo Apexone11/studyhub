@@ -35,12 +35,13 @@ function shouldAutoPublish(user) {
 
 /**
  * Returns the initial moderation status string for newly created content.
+ * All content publishes immediately — moderation gating is disabled.
  *
  * @param {{ trustLevel: string, role?: string }} user
- * @returns {'clean' | 'pending_review'}
+ * @returns {'clean'}
  */
-function getInitialModerationStatus(user) {
-  return shouldAutoPublish(user) ? 'clean' : 'pending_review'
+function getInitialModerationStatus(_user) {
+  return 'clean'
 }
 
 /**
@@ -113,28 +114,13 @@ async function checkAndPromoteTrust(userId) {
 
   if (!eligible) return { promoted: false, trustLevel: user.trustLevel }
 
-  // Promote user and upgrade all their pending content to clean
-  await Promise.all([
-    prisma.user.update({
-      where: { id: userId },
-      data: {
-        trustLevel: TRUST_LEVELS.TRUSTED,
-        trustedAt: new Date(),
-      },
-    }),
-    prisma.feedPost.updateMany({
-      where: { userId, moderationStatus: 'pending_review' },
-      data: { moderationStatus: 'clean' },
-    }),
-    prisma.feedPostComment.updateMany({
-      where: { userId, moderationStatus: 'pending_review' },
-      data: { moderationStatus: 'clean' },
-    }),
-    prisma.note.updateMany({
-      where: { userId, moderationStatus: 'pending_review' },
-      data: { moderationStatus: 'clean' },
-    }),
-  ])
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      trustLevel: TRUST_LEVELS.TRUSTED,
+      trustedAt: new Date(),
+    },
+  })
 
   return { promoted: true, trustLevel: TRUST_LEVELS.TRUSTED }
 }

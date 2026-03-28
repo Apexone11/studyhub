@@ -32,18 +32,8 @@ router.get('/', async (req, res) => {
       }
     : { status: 'published', htmlRiskTier: { lt: 3 } }
   const postWhere = search
-    ? {
-        OR: [
-          { moderationStatus: 'clean', content: { contains: search, mode: 'insensitive' } },
-          { userId: req.user.userId, content: { contains: search, mode: 'insensitive' } },
-        ],
-      }
-    : {
-        OR: [
-          { moderationStatus: 'clean' },
-          { userId: req.user.userId },
-        ],
-      }
+    ? { content: { contains: search, mode: 'insensitive' } }
+    : undefined
   const announcementWhere = search
     ? {
         OR: [
@@ -54,31 +44,13 @@ router.get('/', async (req, res) => {
     : undefined
   const noteWhere = search
     ? {
+        private: false,
         OR: [
-          {
-            private: false,
-            moderationStatus: 'clean',
-            OR: [
-              { title: { contains: search, mode: 'insensitive' } },
-              { content: { contains: search, mode: 'insensitive' } },
-            ],
-          },
-          {
-            userId: req.user.userId,
-            private: false,
-            OR: [
-              { title: { contains: search, mode: 'insensitive' } },
-              { content: { contains: search, mode: 'insensitive' } },
-            ],
-          },
+          { title: { contains: search, mode: 'insensitive' } },
+          { content: { contains: search, mode: 'insensitive' } },
         ],
       }
-    : {
-        OR: [
-          { private: false, moderationStatus: 'clean' },
-          { userId: req.user.userId, private: false },
-        ],
-      }
+    : { private: false }
 
   try {
     const primarySections = await Promise.all([
@@ -179,7 +151,7 @@ router.get('/', async (req, res) => {
         sheetIds.length > 0
           ? prisma.comment.groupBy({
               by: ['sheetId'],
-              where: { sheetId: { in: sheetIds }, moderationStatus: 'clean' },
+              where: { sheetId: { in: sheetIds } },
               _count: { _all: true },
             })
           : []
@@ -188,7 +160,7 @@ router.get('/', async (req, res) => {
         postIds.length > 0
           ? prisma.feedPostComment.groupBy({
               by: ['postId'],
-              where: { postId: { in: postIds }, moderationStatus: 'clean' },
+              where: { postId: { in: postIds } },
               _count: { _all: true },
             })
           : []
@@ -231,7 +203,7 @@ router.get('/', async (req, res) => {
         noteIds.length > 0
           ? prisma.noteComment.groupBy({
               by: ['noteId'],
-              where: { noteId: { in: noteIds }, moderationStatus: 'clean' },
+              where: { noteId: { in: noteIds } },
               _count: { _all: true },
             })
           : []

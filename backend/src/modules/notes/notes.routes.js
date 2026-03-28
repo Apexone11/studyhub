@@ -75,8 +75,8 @@ router.get('/:id', optionalAuth, readLimiter, async (req, res) => {
 
     const isOwner = req.user && (req.user.userId === note.userId || req.user.role === 'admin')
 
-    // Private notes or flagged notes: only owner/admin can see
-    if ((note.private || note.moderationStatus !== 'clean') && !isOwner) {
+    // Private notes: only owner/admin can see
+    if (note.private && !isOwner) {
       return res.status(404).json({ error: 'Note not found.' })
     }
 
@@ -96,9 +96,8 @@ router.get('/', requireAuth, readLimiter, async (req, res) => {
     const where = {}
 
     if (shared === 'true') {
-      // Shared notes from all users — exclude flagged content
+      // Shared notes from all users
       where.private = false
-      where.moderationStatus = 'clean'
     } else {
       // Own notes only
       where.userId = req.user.userId
@@ -282,11 +281,7 @@ router.get('/:id/comments', optionalAuth, async (req, res) => {
     if (!note) return res.status(404).json({ error: 'Note not found.' })
     if (!canReadNote(note, req.user || null)) return res.status(404).json({ error: 'Note not found.' })
 
-    // Note owners and admins see all comments; others only see clean ones
-    const isNoteOwnerOrAdmin = req.user && (req.user.userId === note.userId || req.user.role === 'admin')
-    const commentWhere = isNoteOwnerOrAdmin
-      ? { noteId }
-      : { noteId, moderationStatus: 'clean' }
+    const commentWhere = { noteId }
 
     const [commentsSection, countSection] = await Promise.all([
       timedSection('comments', () =>

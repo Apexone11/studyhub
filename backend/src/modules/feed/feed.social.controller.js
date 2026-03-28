@@ -24,7 +24,7 @@ router.get('/posts/:id/comments', async (req, res) => {
     const [commentsSection, countSection] = await Promise.all([
       timedSection('comments', () =>
         prisma.feedPostComment.findMany({
-          where: { postId, moderationStatus: 'clean' },
+          where: { postId },
           include: { author: { select: { id: true, username: true } } },
           orderBy: { createdAt: 'desc' },
           take: limit,
@@ -32,7 +32,7 @@ router.get('/posts/:id/comments', async (req, res) => {
         })
       ),
       timedSection('count', () =>
-        prisma.feedPostComment.count({ where: { postId, moderationStatus: 'clean' } })
+        prisma.feedPostComment.count({ where: { postId } })
       ),
     ])
 
