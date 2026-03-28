@@ -447,8 +447,8 @@ describe('notes routes', () => {
     })
   })
 
-  describe('moderation visibility', () => {
-    it('GET /:id returns 404 for pending_review note when not owner', async () => {
+  describe('moderation visibility (gating disabled)', () => {
+    it('GET /:id returns pending_review note to non-owner (moderation gating disabled)', async () => {
       // optionalAuth gives userId: 42, but note belongs to userId: 99
       mocks.prisma.note.findUnique.mockResolvedValue({
         id: 7,
@@ -462,7 +462,8 @@ describe('notes routes', () => {
       })
 
       const res = await request(app).get('/7')
-      expect(res.status).toBe(404)
+      expect(res.status).toBe(200)
+      expect(res.body.title).toBe('Flagged Note')
     })
 
     it('GET /:id returns note for pending_review note when owner', async () => {
@@ -482,20 +483,15 @@ describe('notes routes', () => {
       expect(res.body.title).toBe('My Flagged Note')
     })
 
-    it('GET /?shared=true includes moderationStatus:clean filter', async () => {
+    it('GET /?shared=true does not filter by moderationStatus (gating disabled)', async () => {
       mocks.prisma.note.findMany.mockResolvedValue([])
       mocks.prisma.note.count.mockResolvedValue(0)
 
       await request(app).get('/?shared=true')
 
-      expect(mocks.prisma.note.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            private: false,
-            moderationStatus: 'clean',
-          }),
-        }),
-      )
+      const call = mocks.prisma.note.findMany.mock.calls[0][0]
+      expect(call.where.private).toBe(false)
+      expect(call.where.moderationStatus).toBeUndefined()
     })
 
     it('GET /?shared=true does not include own notes filter', async () => {

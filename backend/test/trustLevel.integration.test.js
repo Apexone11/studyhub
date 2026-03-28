@@ -106,7 +106,7 @@ beforeEach(() => {
 })
 
 describe('Trust Level — Feed Post Creation', () => {
-  it('new user: post is created with moderationStatus pending_review', async () => {
+  it('new user: post is created with moderationStatus clean (moderation gating disabled)', async () => {
     mocks.setUser({ userId: 42, username: 'new_user', role: 'student', trustLevel: 'new' })
 
     const mockPost = {
@@ -115,7 +115,7 @@ describe('Trust Level — Feed Post Creation', () => {
       userId: 42,
       courseId: null,
       allowDownloads: true,
-      moderationStatus: 'pending_review',
+      moderationStatus: 'clean',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       author: { id: 42, username: 'new_user', avatarUrl: null },
@@ -130,10 +130,9 @@ describe('Trust Level — Feed Post Creation', () => {
       .send({ content: 'Hello world' })
       .expect(201)
 
-    // Verify the Prisma create was called with pending_review
     expect(mocks.prisma.feedPost.create).toHaveBeenCalledTimes(1)
     const createArgs = mocks.prisma.feedPost.create.mock.calls[0][0]
-    expect(createArgs.data.moderationStatus).toBe('pending_review')
+    expect(createArgs.data.moderationStatus).toBe('clean')
   })
 
   it('trusted user: post is created with moderationStatus clean', async () => {
@@ -192,7 +191,7 @@ describe('Trust Level — Feed Post Creation', () => {
     expect(createArgs.data.moderationStatus).toBe('clean')
   })
 
-  it('restricted user: post is created with moderationStatus pending_review', async () => {
+  it('restricted user: post is created with moderationStatus clean (moderation gating disabled)', async () => {
     mocks.setUser({ userId: 44, username: 'restricted_user', role: 'student', trustLevel: 'restricted' })
 
     const mockPost = {
@@ -201,7 +200,7 @@ describe('Trust Level — Feed Post Creation', () => {
       userId: 44,
       courseId: null,
       allowDownloads: true,
-      moderationStatus: 'pending_review',
+      moderationStatus: 'clean',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       author: { id: 44, username: 'restricted_user', avatarUrl: null },
@@ -217,6 +216,6 @@ describe('Trust Level — Feed Post Creation', () => {
       .expect(201)
 
     const createArgs = mocks.prisma.feedPost.create.mock.calls[0][0]
-    expect(createArgs.data.moderationStatus).toBe('pending_review')
+    expect(createArgs.data.moderationStatus).toBe('clean')
   })
 })

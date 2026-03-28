@@ -29,17 +29,11 @@ describe('trustGate', () => {
   })
 
   describe('getInitialModerationStatus', () => {
-    it('returns clean for trusted users', () => {
+    it('returns clean for all users (moderation gating disabled)', () => {
       expect(getInitialModerationStatus({ trustLevel: 'trusted' })).toBe('clean')
-    })
-    it('returns clean for admins', () => {
       expect(getInitialModerationStatus({ trustLevel: 'new', role: 'admin' })).toBe('clean')
-    })
-    it('returns pending_review for new users', () => {
-      expect(getInitialModerationStatus({ trustLevel: 'new' })).toBe('pending_review')
-    })
-    it('returns pending_review for restricted users', () => {
-      expect(getInitialModerationStatus({ trustLevel: 'restricted' })).toBe('pending_review')
+      expect(getInitialModerationStatus({ trustLevel: 'new' })).toBe('clean')
+      expect(getInitialModerationStatus({ trustLevel: 'restricted' })).toBe('clean')
     })
   })
 
