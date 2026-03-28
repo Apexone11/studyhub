@@ -121,7 +121,10 @@ router.get('/', async (req, res) => {
         })
       })
 
-    if (!announcements.length && !sheets.length && !posts.length && !notes.length) {
+    // If every section genuinely failed (DB errors), return 500.
+    // If sections succeeded but returned 0 rows, that's a valid empty feed.
+    const allSectionsFailed = primarySections.every((section) => !section.ok)
+    if (allSectionsFailed) {
       console.error('[feed] all primary sections failed', {
         userId: req.user.userId,
         search,
