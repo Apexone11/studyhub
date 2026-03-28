@@ -50,10 +50,11 @@ router.post('/register', registerLimiter, async (req, res) => {
         passwordHash,
         email,
         accountType,
-        emailVerified: false,
+        emailVerified: true,
         emailVerificationCode: null,
         emailVerificationExpiry: null,
-        ...(email ? { trustLevel: TRUST_LEVELS.TRUSTED, trustedAt: new Date() } : {}),
+        trustLevel: TRUST_LEVELS.TRUSTED,
+        trustedAt: new Date(),
       },
       select: { id: true },
     })

@@ -5747,3 +5747,39 @@ Comprehensive moderation system overhaul covering tutorial persistence fix, admi
 | Frontend build | Clean (575 modules, 482ms) |
 | Backend tests | 531/531 pass (42 files) |
 | Backend lint | 6 pre-existing errors (unrelated files) |
+
+---
+
+## Cycle: Feed Visibility Fix + Security Hardening — 2026-03-28
+
+### Summary
+
+The feed page was showing zero items despite published content existing in the database. Root cause: the `htmlRiskTier < 3` filter on the feed listing endpoint hid sheets whose HTML scan set a high risk tier, while the sidebar leaderboard endpoint lacked this filter — creating an inconsistency where sheets appeared in leaderboards but not the main feed.
+
+### Fixed
+
+- **Empty feed bug** — Removed `htmlRiskTier` filter from feed listing (`feed.list.controller.js`), sheets listing (`sheets.list.controller.js`), and global search (`search.routes.js`). Feed cards only display text-only previews via `summarizeText()`, never rendered HTML. The actual HTML security enforcement remains in the sheet viewer and HTML preview endpoints where content is sandboxed.
+
+### Security
+
+- **emailVerified leak** — Removed `emailVerified` from the public `AUTHOR_SELECT` constant in `sheets.constants.js`. This field was unnecessarily exposed on every sheet author, feed post author, search result, and leaderboard entry. The user's own verification status is still available via `/api/auth/me` and admin routes. Added `avatarUrl` to `AUTHOR_SELECT` to maintain avatar rendering.
+- **Restriction details leak** — Removed `restrictionType` and `reason` from the 403 error response in `checkRestrictions.js`. Previously, restricted users could see why and how they were restricted in the HTTP response body.
+
+### Files Changed
+
+| Area | File |
+| ---- | ---- |
+| Backend — Feed | `backend/src/modules/feed/feed.list.controller.js` |
+| Backend — Sheets | `backend/src/modules/sheets/sheets.list.controller.js` |
+| Backend — Sheets | `backend/src/modules/sheets/sheets.constants.js` |
+| Backend — Search | `backend/src/modules/search/search.routes.js` |
+| Backend — Middleware | `backend/src/middleware/checkRestrictions.js` |
+
+### Validation
+
+| Suite | Result |
+| ------- | -------- |
+| Backend syntax check (node -c) | All 8 modified files pass |
+| Backend lint (changed files) | Clean — 0 errors |
+| Frontend changes | None — all frontend files reverted to original |
+| npm install | Blocked by filesystem permission issue on mounted workspace (pre-existing, unrelated to these changes) |

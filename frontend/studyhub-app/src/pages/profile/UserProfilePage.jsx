@@ -27,6 +27,7 @@ import ActivityHeatmap from '../../components/ActivityHeatmap'
 import { showToast } from '../../lib/toast'
 import { usePageTitle } from '../../lib/usePageTitle'
 import { readJsonSafely } from '../../lib/http'
+import VerificationBadge from '../../components/verification/VerificationBadge'
 
 import {
   authHeaders, fmtDate, pageWrapStyle, containerStyle, cardStyle, sectionHeadingStyle,
@@ -290,8 +291,9 @@ export default function UserProfilePage() {
               {/* Identity */}
               <div style={{ flex: 1, minWidth: 200 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
-                  <h1 style={{ margin: 0, fontSize: 'clamp(20px, 2.5vw, 26px)', fontWeight: 800, color: '#fff' }}>
+                  <h1 style={{ margin: 0, fontSize: 'clamp(20px, 2.5vw, 26px)', fontWeight: 800, color: '#fff', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                     {profile.username}
+                    <VerificationBadge user={profile} size={18} />
                   </h1>
                   {profile.role === 'admin'
                     ? <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 99, background: 'rgba(245,158,11,0.25)', color: '#fbbf24', border: '1px solid rgba(245,158,11,0.4)' }}>Admin</span>

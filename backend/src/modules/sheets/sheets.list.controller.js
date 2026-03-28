@@ -7,7 +7,8 @@ const { SHEET_STATUS, AUTHOR_SELECT, leaderboardLimiter } = require('./sheets.co
 const { serializeSheet } = require('./sheets.serializer')
 const { buildSheetTextSearchClauses } = require('../../lib/sheetSearch')
 const { searchSheetsFTS } = require('../../lib/fullTextSearch')
-const { RISK_TIER } = require('../../lib/html/htmlSecurity')
+/* RISK_TIER removed — sheet listings no longer filter by htmlRiskTier
+ * (security enforcement is in the sheet viewer / HTML preview endpoints) */
 
 const router = express.Router()
 
@@ -90,7 +91,6 @@ router.get('/', optionalAuth, async (req, res) => {
       }
     } else {
       where.status = SHEET_STATUS.PUBLISHED
-      where.htmlRiskTier = { lt: RISK_TIER.QUARANTINED }
     }
 
     if (courseId) where.courseId = Number.parseInt(courseId, 10)
