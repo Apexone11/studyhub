@@ -195,7 +195,6 @@ router.get('/', optionalAuth, async (req, res) => {
         prisma.note.findMany({
           where: {
             private: false,
-            moderationStatus: 'clean',
             OR: [
               { title: { contains: query, mode: 'insensitive' } },
               { content: { contains: query, mode: 'insensitive' } },
