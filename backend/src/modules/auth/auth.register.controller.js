@@ -10,6 +10,7 @@ const {
   resendSignupChallenge,
   verifyChallengeCode,
 } = require('../../lib/verification/verificationChallenges')
+const { TRUST_LEVELS } = require('../../lib/trustGate')
 const { registerLimiter, verificationLimiter } = require('./auth.constants')
 const {
   AppError,
@@ -52,6 +53,7 @@ router.post('/register', registerLimiter, async (req, res) => {
         emailVerified: false,
         emailVerificationCode: null,
         emailVerificationExpiry: null,
+        ...(email ? { trustLevel: TRUST_LEVELS.TRUSTED, trustedAt: new Date() } : {}),
       },
       select: { id: true },
     })
@@ -184,6 +186,8 @@ router.post('/register/complete', registerLimiter, async (req, res) => {
           emailVerified: true,
           emailVerificationCode: null,
           emailVerificationExpiry: null,
+          trustLevel: TRUST_LEVELS.TRUSTED,
+          trustedAt: new Date(),
         },
         select: { id: true },
       })

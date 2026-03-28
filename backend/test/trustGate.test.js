@@ -4,7 +4,6 @@ import {
   getInitialModerationStatus,
   meetsPromotionCriteria,
   TRUST_LEVELS,
-  PROMOTION_MIN_AGE_DAYS,
 } from '../src/lib/trustGate.js'
 
 describe('trustGate', () => {
@@ -45,35 +44,29 @@ describe('trustGate', () => {
   })
 
   describe('meetsPromotionCriteria', () => {
-    const now = new Date()
-    it('promotes a user with old account and clean record', () => {
-      const oldDate = new Date(now)
-      oldDate.setDate(oldDate.getDate() - (PROMOTION_MIN_AGE_DAYS + 1))
+    it('promotes a user with email and clean record', () => {
       expect(meetsPromotionCriteria({
-        createdAt: oldDate, confirmedViolations: 0, activeStrikes: 0, hasActiveRestriction: false,
+        hasEmail: true, confirmedViolations: 0, activeStrikes: 0, hasActiveRestriction: false,
       })).toBe(true)
     })
-    it('rejects a user with a too-new account', () => {
+    it('rejects a user without email', () => {
       expect(meetsPromotionCriteria({
-        createdAt: new Date(), confirmedViolations: 0, activeStrikes: 0, hasActiveRestriction: false,
+        hasEmail: false, confirmedViolations: 0, activeStrikes: 0, hasActiveRestriction: false,
       })).toBe(false)
     })
     it('rejects a user with confirmed violations', () => {
-      const oldDate = new Date(now); oldDate.setDate(oldDate.getDate() - (PROMOTION_MIN_AGE_DAYS + 1))
       expect(meetsPromotionCriteria({
-        createdAt: oldDate, confirmedViolations: 1, activeStrikes: 0, hasActiveRestriction: false,
+        hasEmail: true, confirmedViolations: 1, activeStrikes: 0, hasActiveRestriction: false,
       })).toBe(false)
     })
     it('rejects a user with active strikes', () => {
-      const oldDate = new Date(now); oldDate.setDate(oldDate.getDate() - (PROMOTION_MIN_AGE_DAYS + 1))
       expect(meetsPromotionCriteria({
-        createdAt: oldDate, confirmedViolations: 0, activeStrikes: 1, hasActiveRestriction: false,
+        hasEmail: true, confirmedViolations: 0, activeStrikes: 1, hasActiveRestriction: false,
       })).toBe(false)
     })
     it('rejects a user with active restriction', () => {
-      const oldDate = new Date(now); oldDate.setDate(oldDate.getDate() - (PROMOTION_MIN_AGE_DAYS + 1))
       expect(meetsPromotionCriteria({
-        createdAt: oldDate, confirmedViolations: 0, activeStrikes: 0, hasActiveRestriction: true,
+        hasEmail: true, confirmedViolations: 0, activeStrikes: 0, hasActiveRestriction: true,
       })).toBe(false)
     })
   })

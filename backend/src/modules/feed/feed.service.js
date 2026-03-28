@@ -98,6 +98,7 @@ function formatPost(item, commentCounts, reactionRows, currentReactions) {
     attachmentName: item.attachmentName || null,
     attachmentType: item.attachmentType || null,
     allowDownloads: item.allowDownloads !== false,
+    moderationStatus: item.moderationStatus || 'clean',
     linkPath: `/feed?post=${item.id}`,
   }
 }
@@ -113,6 +114,7 @@ function formatNote(item, commentCounts) {
     author: item.author ? { id: item.author.id, username: item.author.username, avatarUrl: item.author.avatarUrl || null } : null,
     course: item.course ? { id: item.course.id, code: item.course.code } : null,
     commentCount: commentCounts.get(item.id) || 0,
+    moderationStatus: item.moderationStatus || 'clean',
     linkPath: `/notes/${item.id}`,
   }
 }
