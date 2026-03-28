@@ -32,8 +32,18 @@ router.get('/', async (req, res) => {
       }
     : { status: 'published', htmlRiskTier: { lt: 3 } }
   const postWhere = search
-    ? { moderationStatus: 'clean', content: { contains: search, mode: 'insensitive' } }
-    : { moderationStatus: 'clean' }
+    ? {
+        OR: [
+          { moderationStatus: 'clean', content: { contains: search, mode: 'insensitive' } },
+          { userId: req.user.userId, content: { contains: search, mode: 'insensitive' } },
+        ],
+      }
+    : {
+        OR: [
+          { moderationStatus: 'clean' },
+          { userId: req.user.userId },
+        ],
+      }
   const announcementWhere = search
     ? {
         OR: [
@@ -44,14 +54,31 @@ router.get('/', async (req, res) => {
     : undefined
   const noteWhere = search
     ? {
-        private: false,
-        moderationStatus: 'clean',
         OR: [
-          { title: { contains: search, mode: 'insensitive' } },
-          { content: { contains: search, mode: 'insensitive' } },
+          {
+            private: false,
+            moderationStatus: 'clean',
+            OR: [
+              { title: { contains: search, mode: 'insensitive' } },
+              { content: { contains: search, mode: 'insensitive' } },
+            ],
+          },
+          {
+            userId: req.user.userId,
+            private: false,
+            OR: [
+              { title: { contains: search, mode: 'insensitive' } },
+              { content: { contains: search, mode: 'insensitive' } },
+            ],
+          },
         ],
       }
-    : { private: false, moderationStatus: 'clean' }
+    : {
+        OR: [
+          { private: false, moderationStatus: 'clean' },
+          { userId: req.user.userId, private: false },
+        ],
+      }
 
   try {
     const primarySections = await Promise.all([
@@ -83,7 +110,7 @@ router.get('/', async (req, res) => {
       settleSection('posts', () => prisma.feedPost.findMany({
         where: postWhere,
         select: {
-          id: true, content: true, createdAt: true, updatedAt: true,
+          id: true, content: true, createdAt: true, updatedAt: true, moderationStatus: true,
           attachmentUrl: true, attachmentName: true, attachmentType: true, allowDownloads: true,
           author: { select: { id: true, username: true, avatarUrl: true } },
           course: { select: { id: true, code: true } },
@@ -94,7 +121,7 @@ router.get('/', async (req, res) => {
       settleSection('notes', () => prisma.note.findMany({
         where: noteWhere,
         select: {
-          id: true, title: true, content: true, createdAt: true,
+          id: true, title: true, content: true, createdAt: true, moderationStatus: true,
           author: { select: { id: true, username: true, avatarUrl: true } },
           course: { select: { id: true, code: true } },
         },

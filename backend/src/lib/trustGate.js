@@ -19,8 +19,6 @@ const TRUST_LEVELS = {
   RESTRICTED: 'restricted',
 }
 
-const PROMOTION_MIN_AGE_DAYS = 7
-
 /**
  * Returns true if the user's content should bypass the moderation queue
  * and be published immediately.
@@ -49,23 +47,19 @@ function getInitialModerationStatus(user) {
  * Pure function — evaluates whether a user meets the criteria for promotion
  * to the 'trusted' trust level.
  *
- * Rule: trusted = emailVerified + account age + clean moderation history.
+ * Rule: trusted = has email + clean moderation history.
+ * Accounts with an email address are auto-trusted as long as they have no
+ * active strikes, restrictions, or confirmed violations.
  *
  * @param {object} params
- * @param {boolean} params.emailVerified        — whether the user has verified their email
- * @param {Date}    params.createdAt            — account creation timestamp
+ * @param {boolean} params.hasEmail             — whether the user has an email on file
  * @param {number}  params.confirmedViolations  — count of confirmed moderation violations
  * @param {number}  params.activeStrikes        — count of currently active strikes
  * @param {boolean} params.hasActiveRestriction — whether the user has an active restriction
  * @returns {boolean}
  */
-function meetsPromotionCriteria({ emailVerified, createdAt, confirmedViolations, activeStrikes, hasActiveRestriction }) {
-  if (!emailVerified) return false
-
-  const ageMs = Date.now() - new Date(createdAt).getTime()
-  const ageDays = ageMs / (1000 * 60 * 60 * 24)
-
-  if (ageDays < PROMOTION_MIN_AGE_DAYS) return false
+function meetsPromotionCriteria({ hasEmail, confirmedViolations, activeStrikes, hasActiveRestriction }) {
+  if (!hasEmail) return false
   if (confirmedViolations > 0) return false
   if (activeStrikes > 0) return false
   if (hasActiveRestriction) return false
@@ -90,7 +84,7 @@ async function checkAndPromoteTrust(userId) {
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, trustLevel: true, createdAt: true, emailVerified: true },
+    select: { id: true, trustLevel: true, email: true },
   })
 
   if (!user) return { promoted: false, trustLevel: null }
@@ -111,8 +105,7 @@ async function checkAndPromoteTrust(userId) {
   ])
 
   const eligible = meetsPromotionCriteria({
-    emailVerified: Boolean(user.emailVerified),
-    createdAt: user.createdAt,
+    hasEmail: Boolean(user.email),
     confirmedViolations,
     activeStrikes,
     hasActiveRestriction: activeRestriction,
@@ -120,20 +113,34 @@ async function checkAndPromoteTrust(userId) {
 
   if (!eligible) return { promoted: false, trustLevel: user.trustLevel }
 
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      trustLevel: TRUST_LEVELS.TRUSTED,
-      trustedAt: new Date(),
-    },
-  })
+  // Promote user and upgrade all their pending content to clean
+  await Promise.all([
+    prisma.user.update({
+      where: { id: userId },
+      data: {
+        trustLevel: TRUST_LEVELS.TRUSTED,
+        trustedAt: new Date(),
+      },
+    }),
+    prisma.feedPost.updateMany({
+      where: { userId, moderationStatus: 'pending_review' },
+      data: { moderationStatus: 'clean' },
+    }),
+    prisma.feedPostComment.updateMany({
+      where: { userId, moderationStatus: 'pending_review' },
+      data: { moderationStatus: 'clean' },
+    }),
+    prisma.note.updateMany({
+      where: { userId, moderationStatus: 'pending_review' },
+      data: { moderationStatus: 'clean' },
+    }),
+  ])
 
   return { promoted: true, trustLevel: TRUST_LEVELS.TRUSTED }
 }
 
 module.exports = {
   TRUST_LEVELS,
-  PROMOTION_MIN_AGE_DAYS,
   shouldAutoPublish,
   getInitialModerationStatus,
   meetsPromotionCriteria,
