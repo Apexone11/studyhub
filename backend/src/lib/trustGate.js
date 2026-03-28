@@ -35,12 +35,13 @@ function shouldAutoPublish(user) {
 
 /**
  * Returns the initial moderation status string for newly created content.
+ * All content publishes immediately — moderation gating is disabled.
  *
  * @param {{ trustLevel: string, role?: string }} user
- * @returns {'clean' | 'pending_review'}
+ * @returns {'clean'}
  */
-function getInitialModerationStatus(user) {
-  return shouldAutoPublish(user) ? 'clean' : 'pending_review'
+function getInitialModerationStatus(_user) {
+  return 'clean'
 }
 
 /**
