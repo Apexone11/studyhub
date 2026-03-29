@@ -10,6 +10,7 @@ const { reactLimiter, commentLimiter, feedWriteLimiter } = require('./feed.const
 const { reactionSummary } = require('./feed.service')
 const { getInitialModerationStatus } = require('../../lib/trustGate')
 const { timedSection, logTiming } = require('../../lib/requestTiming')
+const { runAbuseChecks } = require('../../lib/abuseDetection')
 
 const router = express.Router()
 
@@ -94,6 +95,15 @@ router.post('/posts/:id/comments', commentLimiter, async (req, res) => {
     if (isModerationEnabled()) {
       void scanContent({ contentType: 'feed_comment', contentId: comment.id, text: content, userId: req.user.userId })
     }
+
+    /* Abuse detection (fire-and-forget) */
+    void runAbuseChecks({
+      userId: req.user.userId,
+      actionType: 'comment_create',
+      contentType: 'feed_comment',
+      contentId: comment.id,
+      text: content,
+    })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })

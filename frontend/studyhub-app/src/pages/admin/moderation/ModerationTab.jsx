@@ -7,6 +7,7 @@ import CasesSubTab from './CasesSubTab'
 import StrikesSubTab from './StrikesSubTab'
 import AppealsSubTab from './AppealsSubTab'
 import RestrictionsSubTab from './RestrictionsSubTab'
+import AuditLogSubTab from './AuditLogSubTab'
 
 export default function ModerationTab({ apiJson, setConfirmAction, formatDateTime }) {
   const [subTab, setSubTab] = useState('overview')
@@ -257,6 +258,9 @@ export default function ModerationTab({ apiJson, setConfirmAction, formatDateTim
       {subTab === 'restrictions' && (
         <RestrictionsSubTab state={restrictionsState} onLift={liftRestriction}
           onPageChange={(p) => void loadRestrictions(p)} />
+      )}
+      {subTab === 'audit-log' && (
+        <AuditLogSubTab apiJson={apiJson} />
       )}
     </>
   )

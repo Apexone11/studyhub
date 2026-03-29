@@ -35,9 +35,10 @@ const AVATARS_DIR = path.join(UPLOADS_DIR, 'avatars')
 const COVERS_DIR = path.join(UPLOADS_DIR, 'covers')
 const ATTACHMENTS_DIR = path.join(UPLOADS_DIR, 'attachments')
 const SCHOOL_LOGOS_DIR = path.join(UPLOADS_DIR, 'school-logos')
+const CONTENT_IMAGES_DIR = path.join(UPLOADS_DIR, 'content-images')
 
 function ensureUploadDirectories() {
-  for (const directory of [UPLOADS_DIR, AVATARS_DIR, COVERS_DIR, ATTACHMENTS_DIR, SCHOOL_LOGOS_DIR]) {
+  for (const directory of [UPLOADS_DIR, AVATARS_DIR, COVERS_DIR, ATTACHMENTS_DIR, SCHOOL_LOGOS_DIR, CONTENT_IMAGES_DIR]) {
     fs.mkdirSync(directory, { recursive: true })
     fs.accessSync(directory, fs.constants.R_OK | fs.constants.W_OK)
   }
@@ -80,6 +81,10 @@ function buildCoverUrl(fileName) {
 
 function buildAttachmentUrl(fileName) {
   return `${PRIVATE_ATTACHMENT_PREFIX}${fileName}`
+}
+
+function buildContentImageUrl(fileName) {
+  return buildUploadUrl('content-images', fileName)
 }
 
 function isPathWithinRoot(candidatePath, rootDirectory) {
@@ -249,12 +254,14 @@ async function cleanupAvatarIfUnused(prisma, avatarUrl, context = {}) {
 module.exports = {
   ATTACHMENTS_DIR,
   AVATARS_DIR,
+  CONTENT_IMAGES_DIR,
   COVERS_DIR,
   SCHOOL_LOGOS_DIR,
   PRIVATE_ATTACHMENT_PREFIX,
   UPLOADS_DIR,
   buildAttachmentUrl,
   buildAvatarUrl,
+  buildContentImageUrl,
   buildCoverUrl,
   cleanupAttachmentIfUnused,
   cleanupAvatarIfUnused,

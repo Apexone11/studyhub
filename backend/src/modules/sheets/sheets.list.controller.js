@@ -101,6 +101,8 @@ router.get('/', optionalAuth, async (req, res) => {
       where.contentFormat = 'html'
     } else if (formatCandidate === 'pdf') {
       where.attachmentType = { contains: 'pdf', mode: 'insensitive' }
+    } else if (formatCandidate === 'richtext') {
+      where.contentFormat = 'richtext'
     } else if (formatCandidate === 'markdown') {
       where.contentFormat = 'markdown'
       where.NOT = { attachmentType: { contains: 'pdf', mode: 'insensitive' } }

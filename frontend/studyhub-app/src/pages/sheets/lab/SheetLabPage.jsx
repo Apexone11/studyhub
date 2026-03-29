@@ -8,6 +8,7 @@ import SheetLabChanges from './SheetLabChanges'
 import SheetLabContribute from './SheetLabContribute'
 import SheetLabReviews from './SheetLabReviews'
 import SheetLabHistory from './SheetLabHistory'
+import SheetLabAnalytics from './SheetLabAnalytics'
 import SheetLabLineage from './SheetLabLineage'
 import TutorialBanner from '../../../components/TutorialBanner'
 import useSheetLab from './useSheetLab'
@@ -28,6 +29,9 @@ function buildTabs(isOwner, isFork) {
   }
   if (isOwner && !isFork) {
     tabs.push({ id: 'reviews', label: 'Reviews' })
+  }
+  if (isOwner) {
+    tabs.push({ id: 'analytics', label: 'Analytics' })
   }
   return tabs
 }
@@ -175,6 +179,7 @@ export default function SheetLabPage() {
           {validTab === 'lineage' ? <SheetLabLineage lab={lab} /> : null}
           {validTab === 'contribute' ? <SheetLabContribute sheet={sheet} onContributed={() => lab.reloadSheet()} /> : null}
           {validTab === 'reviews' ? <SheetLabReviews sheet={sheet} onReviewed={() => lab.reloadSheet()} /> : null}
+          {validTab === 'analytics' ? <SheetLabAnalytics sheet={sheet} /> : null}
         </div>
       </div>
     </>

@@ -5,6 +5,7 @@ const { countActiveStrikes, restoreContent } = require('../../lib/moderation/mod
 const { createNotification } = require('../../lib/notify')
 const { PAGE_SIZE, parsePage } = require('./moderation.constants')
 const { logModerationEvent } = require('../../lib/moderation/moderationLogger')
+const { auditFromRequest, AUDIT_EVENTS } = require('../../lib/auditLog')
 
 const router = express.Router()
 
@@ -183,6 +184,7 @@ router.patch('/appeals/:id/review', async (req, res) => {
         })
       } catch { /* non-fatal */ }
 
+      auditFromRequest(req, AUDIT_EVENTS.MOD_APPEAL_RESOLVE, { targetUserId: appeal.userId })
       return res.json({ message: 'Appeal approved. Strike decayed.', appeal: updated })
     }
 
@@ -192,6 +194,7 @@ router.patch('/appeals/:id/review', async (req, res) => {
     })
 
     logModerationEvent({ userId: appeal.userId, action: 'appeal_rejected', caseId: appeal.caseId, appealId: appeal.id, performedBy: req.user.userId })
+    auditFromRequest(req, AUDIT_EVENTS.MOD_APPEAL_RESOLVE, { targetUserId: appeal.userId })
 
     try {
       await createNotification(prisma, {

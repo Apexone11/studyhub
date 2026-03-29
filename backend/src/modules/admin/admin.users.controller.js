@@ -4,6 +4,7 @@ const { deleteUserAccount } = require('../../lib/deleteUserAccount')
 const prisma = require('../../lib/prisma')
 const { isSuperAdmin } = require('../../lib/superAdmin')
 const { logModerationEvent } = require('../../lib/moderation/moderationLogger')
+const { auditFromRequest, AUDIT_EVENTS } = require('../../lib/auditLog')
 const { PAGE_SIZE, parsePage } = require('./admin.constants')
 
 const router = express.Router()
@@ -146,6 +147,7 @@ router.patch('/users/:id/role', async (req, res) => {
       data: { role },
       select: { id: true, username: true, role: true }
     })
+    auditFromRequest(req, AUDIT_EVENTS.AUTH_ROLE_CHANGE, { targetUserId: targetId })
     res.json(user)
   } catch (err) {
     if (err.code === 'P2025') return res.status(404).json({ error: 'User not found.' })
@@ -187,6 +189,7 @@ router.patch('/users/:id/trust-level', async (req, res) => {
       performedBy: req.user.userId,
       metadata: { newTrustLevel: trustLevel },
     })
+    auditFromRequest(req, AUDIT_EVENTS.ADMIN_USER_EDIT, { targetUserId: targetId })
 
     res.json(user)
   } catch (err) {
@@ -221,6 +224,7 @@ router.delete('/users/:id', async (req, res) => {
       userId: targetUser.id,
       username: targetUser.username,
     })
+    auditFromRequest(req, AUDIT_EVENTS.ADMIN_USER_EDIT, { targetUserId: targetId })
 
     res.json({ message: 'User deleted.' })
   } catch (err) {

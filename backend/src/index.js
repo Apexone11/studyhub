@@ -9,10 +9,11 @@ const { bootstrapRuntime } = require('./lib/bootstrap/bootstrap')
 const { validateEmailTransport } = require('./lib/email/email')
 const { startHtmlArchiveScheduler } = require('./lib/html/htmlArchiveScheduler')
 const { startModerationCleanupScheduler } = require('./lib/moderation/moderationCleanupScheduler')
-const { AVATARS_DIR, COVERS_DIR, SCHOOL_LOGOS_DIR, validateUploadStorage } = require('./lib/storage')
+const { AVATARS_DIR, CONTENT_IMAGES_DIR, COVERS_DIR, SCHOOL_LOGOS_DIR, validateUploadStorage } = require('./lib/storage')
 const csrfProtection = require('./middleware/csrf')
 const { guardedMode, isGuardedModeEnabled } = require('./middleware/guardedMode')
 const checkRestrictions = require('./middleware/checkRestrictions')
+const auditMiddleware = require('./middleware/auditMiddleware')
 const { getAuthTokenFromRequest, validateSecrets, verifyAuthToken } = require('./lib/authTokens')
 const { ERROR_CODES, sendError } = require('./middleware/errorEnvelope')
 
@@ -229,6 +230,10 @@ app.use((req, _res, next) => {
 // Skips GET/HEAD/OPTIONS, unauthenticated requests, and admin users.
 app.use(checkRestrictions)
 
+// Audit logging for security-relevant write operations. Hooks into res 'finish'
+// event — zero impact on response latency. Requires req.user from auth decode above.
+app.use(auditMiddleware)
+
 // Attach feature flag evaluation helper to every request.
 app.use(featureFlagMiddleware)
 
@@ -255,6 +260,17 @@ app.use('/uploads/school-logos', express.static(SCHOOL_LOGOS_DIR, {
   setHeaders: (res) => {
     res.setHeader('X-Content-Type-Options', 'nosniff')
     res.setHeader('Cache-Control', 'public, max-age=3600')
+  },
+}))
+
+// Content images embedded in rich text sheets — publicly accessible.
+app.use('/uploads/content-images', express.static(CONTENT_IMAGES_DIR, {
+  index: false,
+  setHeaders: (res) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff')
+    res.setHeader('Cache-Control', 'public, max-age=86400')
+    // Prevent content from being framed or used as script
+    res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self'")
   },
 }))
 

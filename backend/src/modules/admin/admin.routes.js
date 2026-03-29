@@ -7,6 +7,7 @@ const sheetsController = require('./admin.sheets.controller')
 const contentController = require('./admin.content.controller')
 const schoolsController = require('./admin.schools.controller')
 const kmsController = require('./admin.kms.controller')
+const auditController = require('./admin.audit.controller')
 
 const router = express.Router()
 
@@ -20,5 +21,6 @@ router.use(sheetsController)
 router.use(contentController)
 router.use(schoolsController)
 router.use(kmsController)
+router.use(auditController)
 
 module.exports = router

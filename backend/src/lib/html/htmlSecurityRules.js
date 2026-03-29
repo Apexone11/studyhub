@@ -211,6 +211,7 @@ function containsDangerousHrefOrSrc(value) {
 function normalizeContentFormat(value) {
   const normalized = String(value || '').trim().toLowerCase()
   if (normalized === 'html') return 'html'
+  if (normalized === 'richtext') return 'richtext'
   return 'markdown'
 }
 

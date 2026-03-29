@@ -54,6 +54,8 @@ import {
   ActivationChecklist,
   RecentSheets as DashboardRecentSheets,
 } from '../dashboard/DashboardWidgets'
+import ProfileStatsWidget from './ProfileStatsWidget'
+import FollowSuggestions from './FollowSuggestions'
 
 /* ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -515,6 +517,7 @@ function OwnOverviewTab({
 
       {/* Right column: identity / progress */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <ProfileStatsWidget username={profile.username} />
         <PinnedSheetsSection sheets={profile.pinnedSheets} />
         {activityData.length > 0 && (
           <div style={cardStyle}>
@@ -522,6 +525,7 @@ function OwnOverviewTab({
           </div>
         )}
         <BadgesSection badges={badges} />
+        <FollowSuggestions />
         {/* Followers / Following summary */}
         <div style={cardStyle}>
           <h2 style={{ ...sectionHeadingStyle, marginBottom: 12 }}>Community</h2>
@@ -602,6 +606,7 @@ function AchievementsTab({ activityData, badges }) {
 function OtherOverviewTab({ profile, activityData, badges }) {
   return (
     <div className="profile-columns">
+      <ProfileStatsWidget username={profile.username} />
       <PinnedSheetsSection sheets={profile.pinnedSheets} />
       <BadgesSection badges={badges} />
       {activityData.length > 0 && (

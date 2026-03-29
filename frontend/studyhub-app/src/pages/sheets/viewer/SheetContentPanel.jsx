@@ -1,3 +1,72 @@
+import { useEffect, useRef } from 'react'
+import { Link } from 'react-router-dom'
+import DOMPurify from 'dompurify'
+import { IconFork } from '../../../components/Icons'
+import { FONT, panelStyle, timeAgo } from './sheetViewerConstants'
+import { PURIFY_CONFIG } from '../../../components/editor/RichTextEditor'
+import { renderMath } from '../../../components/editor/MathExtension'
+import '../../../components/editor/richTextEditor.css'
+
+/* ── Rich text content renderer ────────────────────────────────────── */
+
+/**
+ * Renders sanitized rich text HTML produced by TipTap.
+ * Uses DOMPurify with a strict allowlist — no scripts, no dangerous attributes.
+ * Post-processes math nodes (data-math, data-math-display) via KaTeX.
+ */
+function RichTextContentBlock({ content }) {
+  const containerRef = useRef(null)
+
+  useEffect(() => {
+    if (!containerRef.current) return
+    // Render inline math nodes
+    containerRef.current.querySelectorAll('[data-math]').forEach((el) => {
+      const latex = el.getAttribute('data-math')
+      if (latex) el.innerHTML = renderMath(latex, false)
+    })
+    // Render block/display math nodes
+    containerRef.current.querySelectorAll('[data-math-display]').forEach((el) => {
+      const latex = el.getAttribute('data-math-display')
+      if (latex) el.innerHTML = renderMath(latex, true)
+    })
+  }, [content])
+
+  if (!content) {
+    return (
+      <div style={{ padding: '24px 18px', textAlign: 'center', color: 'var(--sh-muted)', fontSize: 13 }}>
+        No content available.
+      </div>
+    )
+  }
+
+  const sanitized = DOMPurify.sanitize(content, PURIFY_CONFIG)
+
+  return (
+    <div
+      style={{
+        borderRadius: 14, border: '1px solid var(--sh-border)',
+        background: 'var(--sh-surface)', overflow: 'hidden',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '8px 16px', borderBottom: '1px solid var(--sh-border)',
+          background: 'var(--sh-soft)', fontSize: 11, color: 'var(--sh-muted)', fontWeight: 600,
+        }}
+      >
+        <span>Rich text</span>
+      </div>
+      <div
+        ref={containerRef}
+        className="sh-richtext-viewer"
+        style={{ padding: '16px 20px', minHeight: 120 }}
+        dangerouslySetInnerHTML={{ __html: sanitized }}
+      />
+    </div>
+  )
+}
+
 /* ── Line-numbered content renderer (text content only) ─────────────── */
 function TextContentBlock({ content }) {
   if (!content) {
@@ -143,7 +212,9 @@ export default function SheetContentPanel({
         <p style={{ margin: '0 0 16px', color: 'var(--sh-subtext)', fontSize: 14, lineHeight: 1.7 }}>{sheet.description}</p>
       ) : null}
 
-      {isHtmlSheet ? (
+      {sheet.contentFormat === 'richtext' ? (
+        <RichTextContentBlock content={sheet.content} />
+      ) : isHtmlSheet ? (
         previewMode === 'disabled' ? (
           <div style={{ borderRadius: 16, border: '1px solid var(--sh-danger-border)', background: 'var(--sh-danger-bg)', padding: 24, textAlign: 'center' }}>
             <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--sh-danger)', marginBottom: 8 }}>Quarantined</div>

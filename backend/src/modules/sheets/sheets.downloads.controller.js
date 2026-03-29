@@ -44,7 +44,7 @@ router.get('/:id/download', attachmentDownloadLimiter, async (req, res) => {
       data: { downloads: { increment: 1 } },
     })
 
-    const downloadAsHtml = sheet.contentFormat === 'html'
+    const downloadAsHtml = sheet.contentFormat === 'html' || sheet.contentFormat === 'richtext'
     res.setHeader('Content-Type', downloadAsHtml ? 'text/html; charset=utf-8' : 'text/markdown; charset=utf-8')
     res.setHeader(
       'Content-Disposition',

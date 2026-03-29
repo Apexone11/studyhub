@@ -6182,3 +6182,296 @@ The feed page was showing zero items despite published content existing in the d
 | Frontend brace/paren balance check | ✅ All 15 files balanced |
 | Security audit (dangerouslySetInnerHTML, eval) | ✅ None found |
 | Note: Vite build unavailable due to node_modules corruption (unrelated to code changes) | ⚠️ Passes on clean install |
+
+---
+
+## Cycle C — Content & Editing
+
+### Track C1: Rich Text Editor Upgrade (TipTap/ProseMirror)
+
+**Goal:** Replace the plain textarea editor with a TipTap-powered WYSIWYG rich text editor for a modern editing experience. Sheets can now use a `richtext` content format alongside the existing `markdown` and `html` formats.
+
+**New files:**
+- `frontend/studyhub-app/src/components/editor/RichTextEditor.jsx` — TipTap editor wrapper with DOMPurify sanitization of all output HTML. Configures StarterKit (headings, bold, italic, strike, lists, blockquote, code, history), Underline, Link (with URL validation restricting to http/https/mailto), Placeholder, Image (base64 disabled for security), and CodeBlockLowlight extensions. Outputs sanitized HTML via a strict PURIFY_CONFIG allowlist.
+- `frontend/studyhub-app/src/components/editor/EditorToolbar.jsx` — Formatting toolbar with heading levels (H1-H3), inline formatting (bold, italic, underline, strikethrough, inline code), lists (bullet, ordered), block-level controls (blockquote, code block, horizontal rule), link insertion with URL validation popover, and undo/redo. Uses aria-label and aria-pressed for accessibility.
+- `frontend/studyhub-app/src/components/editor/richTextEditor.css` — Dark theme editor styles matching SheetLab aesthetic, plus light theme `.sh-richtext-viewer` class for the reader-side rendering.
+- `frontend/studyhub-app/src/components/editor/index.js` — Barrel export for clean imports.
+
+**Modified files:**
+- `frontend/studyhub-app/src/pages/sheets/lab/SheetLabEditor.jsx` — Tracks `activeFormat` state. Conditionally renders TipTap `RichTextEditor` for `richtext` format or falls back to textarea for `markdown`/`html`. Added "Upgrade to Rich Text" button for markdown sheets. Save function passes `contentFormat` to backend when format changes. Added `handleRichTextUpdate` callback for TipTap content changes.
+- `frontend/studyhub-app/src/pages/sheets/viewer/SheetContentPanel.jsx` — Added `RichTextContentBlock` component that renders richtext content with DOMPurify sanitization using the shared `PURIFY_CONFIG`. Routes `contentFormat === 'richtext'` sheets to this renderer instead of the line-numbered text block. Added proper imports for Link, DOMPurify, IconFork, FONT, panelStyle, timeAgo.
+- `backend/src/lib/html/htmlSecurityRules.js` — `normalizeContentFormat()` now accepts `'richtext'` as a valid format alongside `'html'` and `'markdown'`.
+- `backend/src/modules/sheets/sheets.list.controller.js` — Sheet list filter recognizes `richtext` format for API queries.
+- `backend/src/modules/sheets/sheets.downloads.controller.js` — Downloads richtext sheets as HTML files (since stored content is sanitized HTML).
+- `backend/src/modules/admin/admin.sheets.controller.js` — Admin filter recognizes `richtext` content format.
+- `frontend/studyhub-app/package.json` — Added TipTap dependencies: `@tiptap/react`, `@tiptap/starter-kit`, `@tiptap/pm`, `@tiptap/extension-link`, `@tiptap/extension-underline`, `@tiptap/extension-placeholder`, `@tiptap/extension-image`, `@tiptap/extension-code-block-lowlight`, `katex`, `lowlight`.
+
+**Security notes:**
+- All TipTap output HTML is sanitized through DOMPurify with a strict tag/attribute allowlist before storage and before rendering.
+- `Image` extension has `allowBase64: false` to prevent data exfiltration via base64-encoded images.
+- `Link` extension validates URLs to only allow `http://`, `https://`, and `mailto:` protocols. All links get `rel="noopener noreferrer nofollow"` and `target="_blank"`.
+- Richtext sheets bypass the HTML security review pipeline (no script execution possible with DOMPurify sanitization).
+- Viewer uses `dangerouslySetInnerHTML` only on DOMPurify-sanitized output with the same strict config.
+
+**Architecture notes:**
+- TipTap extensions are configured for extensibility: C2 (KaTeX) will add math nodes, C3 (syntax highlighting) will configure lowlight languages, C4 (image embedding) will enhance the Image extension.
+- Content format upgrade is one-way (markdown → richtext) since rich text HTML cannot losslessly revert to plain markdown.
+
+### Validation
+
+| Suite | Result |
+| ------- | -------- |
+| Backend syntax check (`node -c`) | ✅ All 4 files pass |
+| Frontend brace/paren balance check | ✅ All 5 files balanced |
+| Security audit (DOMPurify config, no raw innerHTML without sanitize) | ✅ Verified |
+| Note: TipTap packages require `npm install` on clean environment | ⚠️ Added to package.json |
+
+### Track C2: LaTeX/Math Support (KaTeX)
+
+**Goal:** Add inline and block math equation support to the rich text editor, powered by KaTeX. Students can type LaTeX notation and see rendered math in both the editor and viewer.
+
+**New files:**
+- `frontend/studyhub-app/src/components/editor/MathExtension.jsx` — Two TipTap node extensions:
+  - `MathInline`: Inline math (`$...$`) stored as `<span data-math="...">`. Renders via KaTeX in a custom NodeView. Double-click to edit.
+  - `MathBlock`: Display math (`$$...$$`) stored as `<div data-math-display="...">`. Centered, styled block with KaTeX rendering. Double-click to edit.
+  - `mathInputPlugin`: ProseMirror plugin that auto-converts `$latex$` into inline math nodes as you type.
+  - `renderMath()`: Shared KaTeX render helper used by both editor and viewer. Configures `trust: false`, `maxSize: 100`, `maxExpand: 500` for security.
+
+**Modified files:**
+- `frontend/studyhub-app/src/components/editor/RichTextEditor.jsx` — Added MathInline and MathBlock to extension list. Math input plugin auto-registered via MathInline's `addProseMirrorPlugins`.
+- `frontend/studyhub-app/src/components/editor/EditorToolbar.jsx` — Added inline math (italic x icon) and block math (Sigma icon) toolbar buttons with prompt-based LaTeX input. Added `insertInlineMath` and `insertBlockMath` callbacks.
+- `frontend/studyhub-app/src/components/editor/richTextEditor.css` — Added dark editor theme styles for `.sh-math-inline`, `.sh-math-block`, `.sh-math-error`, and selected math node highlighting. Added light viewer theme styles for math elements.
+- `frontend/studyhub-app/src/pages/sheets/viewer/SheetContentPanel.jsx` — Added `renderMath` import. `RichTextContentBlock` now post-processes `[data-math]` and `[data-math-display]` elements via `useEffect` + KaTeX rendering after HTML insertion.
+- `frontend/studyhub-app/src/components/editor/index.js` — Barrel now exports MathInline, MathBlock, renderMath.
+
+**Security notes:**
+- KaTeX is a pure math renderer — no JavaScript execution possible.
+- `trust: false` disables `\url` and `\href` commands to prevent link injection.
+- `maxSize: 100` and `maxExpand: 500` prevent denial-of-service via deeply nested or infinitely expanding macros.
+- LaTeX source stored as text attribute values — not as raw HTML — preventing injection.
+
+### Validation
+
+| Suite | Result |
+| ------- | -------- |
+| Frontend brace/paren balance check | ✅ All 5 files balanced |
+| Security audit (KaTeX trust/maxSize/maxExpand) | ✅ Verified |
+
+### Track C3: Code Syntax Highlighting
+
+**Goal:** Add syntax highlighting to code blocks in the rich text editor and viewer, powered by lowlight (highlight.js core).
+
+**New files:**
+- `frontend/studyhub-app/src/components/editor/codeHighlight.js` — Creates a lowlight instance with the `common` language bundle (~35 languages). Exports curated `CODE_LANGUAGES` list for UI dropdowns covering STEM/CS coursework: JavaScript, TypeScript, Python, Java, C, C++, C#, Go, Rust, SQL, HTML, CSS, JSON, Bash, Markdown, YAML, R, Ruby, PHP, Swift, Kotlin, Lua, XML.
+
+**Modified files:**
+- `frontend/studyhub-app/src/components/editor/RichTextEditor.jsx` — Imported `lowlight` instance and passed it to `CodeBlockLowlight.configure({ lowlight })`. Code blocks now auto-detect language and apply `hljs-*` CSS classes.
+- `frontend/studyhub-app/src/components/editor/richTextEditor.css` — Added comprehensive syntax highlighting color themes:
+  - **Editor (dark):** Purple keywords, green strings, amber numbers, blue functions, cyan types, orange variables, pink meta/regex, gray comments.
+  - **Viewer (light):** Matching palette adapted for light backgrounds with higher contrast.
+  - Both themes cover: keyword, string, number, comment, function, type, built_in, variable, attr, meta, regexp, deletion, addition, tag, name.
+- `frontend/studyhub-app/src/components/editor/index.js` — Barrel exports `lowlight` and `CODE_LANGUAGES`.
+
+**Architecture notes:**
+- Lowlight injects `hljs-*` class names into the stored HTML. The viewer gets syntax highlighting purely from CSS — no additional JS processing needed at render time.
+- DOMPurify PURIFY_CONFIG already allows `class` and `span` attributes/tags, so highlighted code survives sanitization.
+
+### Validation
+
+| Suite | Result |
+| ------- | -------- |
+| Frontend brace/paren balance check | ✅ All 3 files pass |
+| DOMPurify class/span allowlist verified | ✅ |
+
+### Track C4: Image Embedding in Sheets
+
+**Goal:** Allow users to embed images directly in rich text sheet content through a toolbar upload button.
+
+**New backend endpoint:**
+- `POST /api/upload/content-image` — Authenticated endpoint for uploading images to embed in rich text sheets. Stores in `uploads/content-images/` directory. Returns `{ url: '/uploads/content-images/...' }`. Includes:
+  - Rate limiting: 60 uploads per 15 minutes
+  - File validation: JPEG, PNG, WebP, GIF only, 5 MB max
+  - Magic byte validation: Verifies file signature matches declared MIME type
+  - Filename sanitization: `img-{userId}-{safe-name}-{timestamp}.{ext}`
+
+**Modified files:**
+- `backend/src/lib/storage.js` — Added `CONTENT_IMAGES_DIR` constant and `buildContentImageUrl()` helper. Added `content-images/` to `ensureUploadDirectories()`.
+- `backend/src/modules/upload/upload.routes.js` — Added content image upload endpoint with multer storage, file filter, rate limiter, and magic byte validation. Imported `CONTENT_IMAGES_DIR` and `buildContentImageUrl` from storage.
+- `backend/src/index.js` — Added static file serving for `/uploads/content-images` with security headers: `X-Content-Type-Options: nosniff`, `Cache-Control: public, max-age=86400`, `Content-Security-Policy: default-src 'none'; img-src 'self'`.
+- `frontend/studyhub-app/src/components/editor/EditorToolbar.jsx` — Added image upload button with hidden file input. Client-side validates file type and size (5 MB) before uploading. Uploads via `FormData` to `/api/upload/content-image`, then inserts image into TipTap editor via `setImage({ src, alt })`. Shows uploading state on button. Imported `API`, `authHeaders`, and `showToast`.
+
+**Security notes:**
+- Server-side magic byte validation prevents content-type spoofing (e.g., uploading scripts disguised as images).
+- TipTap Image extension has `allowBase64: false` — prevents inline data URI injection.
+- Static serving includes restrictive CSP header that only allows image content.
+- Images are publicly accessible (no auth required to view) since they're embedded in viewable sheets.
+- Client-side file type and size validation prevents unnecessary uploads.
+
+### Validation
+
+| Suite | Result |
+| ------- | -------- |
+| Backend syntax check (`node -c`) | ✅ All 3 files pass (storage.js, upload.routes.js, index.js) |
+| Frontend brace/paren balance check | ✅ EditorToolbar.jsx balanced |
+| Security: magic byte validation, CSP headers, no base64 | ✅ Verified |
+
+---
+
+## Cycle C Summary
+
+All 4 tracks of Cycle C — Content & Editing are complete:
+
+| Track | Feature | Status |
+| ------- | --------- | -------- |
+| C1 | Rich text editor (TipTap/ProseMirror) | ✅ Complete |
+| C2 | LaTeX/math support (KaTeX) | ✅ Complete |
+| C3 | Code syntax highlighting (lowlight) | ✅ Complete |
+| C4 | Image embedding in sheets | ✅ Complete |
+
+**New content format:** `richtext` — stores TipTap-produced HTML, sanitized via DOMPurify with strict allowlist. Sits alongside existing `markdown` and `html` formats.
+
+**New editor components:** 6 files in `frontend/studyhub-app/src/components/editor/`:
+- `RichTextEditor.jsx`, `EditorToolbar.jsx`, `MathExtension.jsx`, `codeHighlight.js`, `richTextEditor.css`, `index.js`
+
+**Dependencies added:** `@tiptap/*` suite, `katex`, `lowlight` — require `npm install` on clean environment.
+
+---
+
+# Cycle D — Admin & Moderation (2026-03-29)
+
+## D1: Sheet Analytics Endpoint & UI
+
+**Added:**
+- `GET /api/sheets/:id/analytics` — owner/admin-only endpoint returning engagement metrics, time-series sparklines, top contributors, fork tree, and recent activity feed.
+- `SheetLabAnalytics.jsx` — new Analytics tab in Sheet Lab with SVG sparkline charts, stat cards, contributor rankings, fork tree, and activity timeline.
+- Analytics tab appears only for sheet owners.
+
+**Backend:** `backend/src/modules/sheets/sheets.analytics.controller.js` — parallel `Promise.all` fetches for all metrics. Rate limited at 120 requests per 15 minutes.
+
+**Validation:** Syntax check passed. Brace/paren balance verified.
+
+## D2: Audit Logging System
+
+**Added:**
+- `backend/src/middleware/auditMiddleware.js` — response-event-based audit middleware. Hooks `res.on('finish')` to log successful 2xx mutations. Route-pattern matching covers: sheet CRUD, forks, contributions, uploads, admin operations, and auth events. Zero impact on response latency.
+- Middleware mounted in `backend/src/index.js` after auth decode and checkRestrictions, before featureFlagMiddleware.
+
+**Changed:**
+- `backend/src/lib/auditLog.js` — enhanced `recordAudit()` with error-safe try/catch and Sentry capture. New `auditFromRequest(req, event, { targetUserId })` convenience helper. Full `AUDIT_EVENTS` taxonomy (30+ event constants).
+- `backend/src/modules/admin/admin.users.controller.js` — targeted `auditFromRequest()` calls for role changes, trust-level changes, and user deletions with `targetUserId` context.
+- `backend/src/modules/moderation/moderation.admin.cases.controller.js` — audit calls for case review and strike issuance.
+- `backend/src/modules/moderation/moderation.admin.enforcement.controller.js` — audit calls for appeal approval/rejection.
+
+**Security:** Audit records are fire-and-forget (non-blocking). Failures captured by Sentry but never break request path.
+
+**Validation:** All 6 modified files pass `node -c` syntax check.
+
+## D3: Abuse Detection System
+
+**Added:**
+- `backend/src/lib/abuseDetection.js` — automated pattern-based threat detection service:
+  - **Rate anomaly detection:** In-memory sliding window counters track per-user action rates. Configurable threshold (default: 15 actions per 10 minutes).
+  - **Content spam fingerprinting:** Near-duplicate detection via normalized text comparison within configurable lookback window (default: 24 hours).
+  - **New account burst detection:** Heightened scrutiny for accounts created within 2 hours with lower thresholds (1/3 of normal).
+  - Auto-creates moderation cases with `source: 'auto_abuse_detection'` on signal trigger.
+  - All checks are fire-and-forget, never block request path.
+  - Configurable via environment variables: `ABUSE_DETECTION_ENABLED`, `ABUSE_RATE_WINDOW_MS`, `ABUSE_RATE_THRESHOLD`, `ABUSE_DUPLICATE_WINDOW_HOURS`, `ABUSE_NEW_ACCOUNT_HOURS`.
+
+**Changed:**
+- `backend/src/modules/sheets/sheets.create.controller.js` — integrated `runAbuseChecks()` for sheet creation.
+- `backend/src/modules/feed/feed.posts.controller.js` — integrated `runAbuseChecks()` for feed post creation.
+- `backend/src/modules/feed/feed.social.controller.js` — integrated `runAbuseChecks()` for feed comment creation.
+
+**Validation:** All 4 files pass syntax check.
+
+## D4: Moderation Dashboard Enhancements
+
+**Added:**
+- `backend/src/modules/admin/admin.audit.controller.js` — `GET /api/admin/audit-log` endpoint with pagination and filters (event prefix, actorId, targetUserId, date range). Resolves actor/target usernames for display.
+- `frontend/studyhub-app/src/pages/admin/moderation/AuditLogSubTab.jsx` — new Audit Log sub-tab in moderation dashboard. Color-coded event table with event type filter, paginated browsing, method badges, actor/target resolution.
+- Mounted in admin routes via `admin.routes.js`.
+
+**Changed:**
+- `frontend/studyhub-app/src/pages/admin/moderation/moderationHelpers.js` — added `['audit-log', 'Audit Log']` to `SUB_TABS`.
+- `frontend/studyhub-app/src/pages/admin/moderation/ModerationTab.jsx` — imported and rendered `AuditLogSubTab` for audit-log sub-tab.
+- `frontend/studyhub-app/src/pages/admin/moderation/OverviewSubTab.jsx` — added "Abuse Signals" stat card showing `abuseDetectionPending` count.
+- `backend/src/modules/moderation/moderation.admin.cases.controller.js` — overview endpoint now includes `abuseDetectionPending` count from `auto_abuse_detection` source.
+
+**Validation:** All backend files pass `node -c`. All frontend JSX files pass brace/paren balance check.
+
+## Cycle D Summary
+
+All 4 tracks of Cycle D — Admin & Moderation are complete:
+
+| Track | Feature | Status |
+| ------- | --------- | -------- |
+| D1 | Sheet analytics endpoint & UI | Complete |
+| D2 | Audit logging middleware + targeted calls | Complete |
+| D3 | Automated abuse detection system | Complete |
+| D4 | Moderation dashboard (audit log + abuse signals) | Complete |
+
+**Known requirements for deployment:**
+- `npm install` needed on clean environment (node_modules corruption from prior session).
+- `npx prisma migrate dev` needed for `AuditLog` model (migration already exists).
+- Abuse detection configurable via environment variables; enabled by default.
+
+---
+
+# Cycle B — Social & Discovery (2026-03-29)
+
+## B1: Enhanced User Profiles
+
+**Added:**
+- `GET /api/users/:username/stats` — Contribution statistics endpoint. Returns: totalSheets, totalStarsReceived, totalComments, totalForks, totalContributions, last30Days breakdown, and topCourses (top 5 courses by sheet count with course names). Respects profile visibility rules.
+- `frontend/studyhub-app/src/pages/profile/ProfileStatsWidget.jsx` — Contribution stats card component. Renders metric grid (sheets, stars, comments, forks, contributions), 30-day trend summary, and top courses pill list. Self-fetching from stats endpoint.
+
+**Changed:**
+- `UserProfilePage.jsx` — ProfileStatsWidget integrated into both OwnOverviewTab (right column, above pinned sheets) and OtherOverviewTab (above pinned sheets).
+
+## B2: Follow System Improvements
+
+**Added:**
+- `GET /api/users/me/follow-suggestions` — Follow suggestions endpoint. Algorithm: finds classmates (users enrolled in same courses) ranked by shared course count, backfills with popular users (by follower count). Excludes already-followed users and self. Returns up to 10 suggestions with `reason` (classmate/popular) and `sharedCourses` count.
+- `frontend/studyhub-app/src/pages/profile/FollowSuggestions.jsx` — "People You May Know" widget. Displays up to 6 suggestions with avatar, username, context (shared courses or follower count), and inline follow button with optimistic state.
+
+**Changed:**
+- `UserProfilePage.jsx` — FollowSuggestions widget integrated into OwnOverviewTab right column (after badges).
+
+**Route ordering:** `/me/follow-suggestions` route placed before `/:username` wildcard routes to prevent Express matching "me" as a username parameter.
+
+## B3: Discovery Engine
+
+**Added:**
+- `backend/src/modules/feed/feed.discovery.controller.js` — Three discovery endpoints:
+  - `GET /api/feed/trending` — Trending sheets with configurable period (24h/7d/30d). Scoring formula: `stars*3 + comments*2 + forks*5 + recencyBoost*10`. Optional auth; public access.
+  - `GET /api/feed/recommended` — Personalized recommendations. Fetches top sheets from enrolled courses excluding user's own and already-starred. Requires auth.
+  - `GET /api/feed/courses/:courseId/discover` — Course-specific discovery page. Returns top sheets, total count, and top 5 contributors for a course.
+- `frontend/studyhub-app/src/pages/feed/TrendingSection.jsx` — Trending sheets sidebar component with ranked list, rank badges, star/comment/fork counts. Self-fetching with configurable period and limit.
+
+**Changed:**
+- `feed.routes.js` — Discovery controller mounted before global auth gate (since trending is public).
+- `FeedAside.jsx` — TrendingSection integrated above leaderboard panels.
+
+**Rate limiting:** All discovery endpoints share a 120 requests per 15 minutes limiter.
+
+## B4: Social Interactions
+
+**Already existing (verified):**
+- Sheet reactions (like/dislike) via `POST /api/sheets/:id/react` with Reaction model.
+- @mentions in comments via `notifyMentionedUsers()` in both sheet and feed comment controllers.
+- Share via clipboard copy with analytics tracking in `useSheetViewer.handleShare()`.
+
+No new code needed — the existing social interaction surface is complete.
+
+## Cycle B Summary
+
+All 4 tracks of Cycle B — Social & Discovery are complete:
+
+| Track | Feature | Status |
+| ------- | --------- | -------- |
+| B1 | Enhanced user profiles (stats widget) | Complete |
+| B2 | Follow suggestions (classmate + popular) | Complete |
+| B3 | Discovery engine (trending, recommended, course) | Complete |
+| B4 | Social interactions (reactions, mentions, share) | Already existed |
+
+**Validation:** All backend files pass `node -c` syntax check. All frontend JSX files pass brace/paren balance check.
