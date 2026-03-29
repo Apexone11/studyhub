@@ -39,7 +39,7 @@
     "@tiptap/starter-kit": "^2.11.5",
     "dompurify": "^3.3.3",
     "katex": "^0.16.21",
-    "lowlight": "^3.4.0",
+    "lowlight": "^3.3.0",
     "marked": "^17.0.5",
     "posthog-js": "^1.360.2",
     "react": "^19.2.0",
