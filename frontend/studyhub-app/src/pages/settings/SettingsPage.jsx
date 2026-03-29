@@ -121,7 +121,7 @@ export default function SettingsPage() {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: FONT }}>
         <Navbar crumbs={[{ label: 'Settings', to: '/settings' }]} hideTabs />
-        <div style={{ maxWidth: 1180, margin: '0 auto', padding: '28px 24px 60px' }}>
+        <div style={{ maxWidth: 1180, width: '100%', margin: '0 auto', padding: '28px clamp(12px, 2vw, 24px) 60px', boxSizing: 'border-box' }}>
           <div style={{ display: 'grid', gap: 12 }}>
             <Skeleton width="100%" height={48} borderRadius={12} />
             <Skeleton width="100%" height={200} borderRadius={16} />
@@ -254,7 +254,7 @@ export default function SettingsPage() {
     <div style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: FONT }}>
       <Navbar crumbs={[{ label: 'Settings', to: '/settings' }]} hideTabs actions={navActions} />
 
-      <div className="settings-layout" style={{ maxWidth: 1180, margin: '0 auto', padding: '28px 24px 60px' }}>
+      <div className="settings-layout" style={{ maxWidth: 1180, width: '100%', margin: '0 auto', padding: '28px clamp(12px, 2vw, 24px) 60px', boxSizing: 'border-box' }}>
         <aside>
           <nav className="settings-nav" data-tutorial="settings-tabs">
             {NAV_TABS.map((item) => (

@@ -61,6 +61,7 @@ export default function AppSidebar({ mode = 'fixed' }) {
             ? <img
                 src={user.avatarUrl.startsWith('http') ? user.avatarUrl : `${API}${user.avatarUrl}`}
                 alt={user.username}
+                loading="lazy"
                 style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--sh-border)' }}
               />
             : <Avatar name={user.username} size={44} role={user.role} />

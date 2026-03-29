@@ -40,7 +40,7 @@ router.get('/sheets/review', async (req, res) => {
 
   /* Optional filters: contentFormat, htmlScanStatus, tier */
   const rawFormat = String(req.query.contentFormat || '').trim().toLowerCase()
-  const contentFormat = ['html', 'markdown'].includes(rawFormat) ? rawFormat : undefined
+  const contentFormat = ['html', 'markdown', 'richtext'].includes(rawFormat) ? rawFormat : undefined
 
   const rawScan = String(req.query.htmlScanStatus || '').trim().toLowerCase()
   const htmlScanStatus = ['queued', 'running', 'passed', 'flagged', 'pending_review', 'quarantined'].includes(rawScan) ? rawScan : undefined

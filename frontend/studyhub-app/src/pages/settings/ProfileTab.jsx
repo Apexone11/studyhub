@@ -41,6 +41,7 @@ export default function ProfileTab({ user, sessionUser, onAvatarChange, onCoverC
             <img
               src={coverUrl.startsWith('http') ? coverUrl : `${API}${coverUrl}`}
               alt="Profile cover"
+              loading="lazy"
               onError={() => setCoverImgError(true)}
               style={{ width: '100%', height: 120, objectFit: 'cover', display: 'block' }}
             />
@@ -100,7 +101,7 @@ export default function ProfileTab({ user, sessionUser, onAvatarChange, onCoverC
             }}
           >
             {avatarUrl && !imgError
-              ? <img src={avatarUrl.startsWith('http') ? avatarUrl : `${API}${avatarUrl}`} alt={user?.username || ''} onError={() => setImgError(true)} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+              ? <img src={avatarUrl.startsWith('http') ? avatarUrl : `${API}${avatarUrl}`} alt={user?.username || ''} loading="lazy" onError={() => setImgError(true)} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
               : <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--sh-avatar-text)' }}>{initials}</span>
             }
           </div>

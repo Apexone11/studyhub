@@ -5,7 +5,7 @@ export default function OverviewSubTab({ data, loading, formatDateTime, onNaviga
   if (loading) return <div style={{ color: 'var(--sh-muted)', fontSize: 13 }}>Loading overview...</div>
   if (!data) return <div style={{ color: 'var(--sh-muted)', fontSize: 13 }}>Could not load overview data.</div>
 
-  const { totalPending, sourceBreakdown, claimedBreakdown, recentResolved } = data
+  const { totalPending, sourceBreakdown, claimedBreakdown, recentResolved, abuseDetectionPending } = data
 
   return (
     <div style={{ display: 'grid', gap: 16 }}>
@@ -14,6 +14,7 @@ export default function OverviewSubTab({ data, loading, formatDateTime, onNaviga
         <StatCard label="Pending Cases" value={totalPending} color="var(--sh-warning-text)" bg="var(--sh-warning-bg)" />
         <StatCard label="Auto-detected" value={sourceBreakdown?.auto || 0} color="var(--sh-info-text)" bg="var(--sh-info-bg)" />
         <StatCard label="User Reports" value={sourceBreakdown?.user_report || 0} color="var(--sh-brand)" bg="var(--sh-soft)" />
+        <StatCard label="Abuse Signals" value={abuseDetectionPending || 0} color="#dc2626" bg="var(--sh-danger-bg)" />
       </div>
 
       {/* Claimed breakdown */}

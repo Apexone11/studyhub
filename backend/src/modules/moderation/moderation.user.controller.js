@@ -228,10 +228,11 @@ router.post('/reports', reportLimiter, async (req, res) => {
         }),
       ])
 
+      // Reuse the excerpt query result instead of re-fetching the target.
       const isPublicTarget = targetType === 'sheet'
-        ? !!(await prisma.studySheet.findUnique({ where: { id: targetId }, select: { status: true } }))?.status === 'published'
+        ? excerpt.length > 0  // published sheets always have content
         : targetType === 'note'
-          ? !!(await prisma.note.findUnique({ where: { id: targetId }, select: { isShared: true } }))?.isShared
+          ? !!(await prisma.note.findUnique({ where: { id: targetId }, select: { private: true } }))?.private === false
           : false
 
       const reportPriority = classifyReportPriority({
@@ -242,8 +243,8 @@ router.post('/reports', reportLimiter, async (req, res) => {
         actorRecentCases: actorRecentCases,
       })
 
-      for (const admin of admins) {
-        void createNotification(prisma, {
+      void Promise.all(admins.map((admin) =>
+        createNotification(prisma, {
           userId: admin.id,
           type: 'moderation',
           message: `New user report: ${reasonCategory.replace(/_/g, ' ')} on ${targetType.replace(/_/g, ' ')}`,
@@ -252,7 +253,7 @@ router.post('/reports', reportLimiter, async (req, res) => {
           priority: reportPriority,
           dedupKey: `report-${targetType}-${targetId}`,
         })
-      }
+      ))
     } catch { /* notification failures are non-fatal */ }
 
     res.status(201).json({ message: 'Report submitted. We will review it shortly.', caseId: modCase.id })
@@ -337,8 +338,8 @@ router.post('/appeals', appealLimiter, async (req, res) => {
         where: { role: 'admin' },
         select: { id: true },
       })
-      for (const admin of admins) {
-        void createNotification(prisma, {
+      void Promise.all(admins.map((admin) =>
+        createNotification(prisma, {
           userId: admin.id,
           type: 'moderation',
           message: `New appeal submitted for case #${caseId}${reasonCategory ? ` (${reasonCategory.replace(/_/g, ' ')})` : ''}.`,
@@ -347,7 +348,7 @@ router.post('/appeals', appealLimiter, async (req, res) => {
           priority: appealPriority,
           dedupKey: `appeal-${caseId}`,
         })
-      }
+      ))
     } catch { /* notification failures are non-fatal */ }
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })

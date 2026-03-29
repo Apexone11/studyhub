@@ -53,6 +53,7 @@ function ContentPane({ preview }) {
                   key={i}
                   src={`${API}${att.previewUrl || att.url}`}
                   alt="Attachment"
+                  loading="lazy"
                   style={{
                     maxWidth: '100%', maxHeight: 400, borderRadius: 10,
                     border: '1px solid var(--sh-border)', objectFit: 'contain',

@@ -1,4 +1,5 @@
 const express = require('express')
+const { previewLimiter } = require('../../lib/rateLimiters')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
 const { buildPreviewDocument, buildInteractiveDocument } = require('../../lib/html/htmlPreviewDocument')
@@ -7,6 +8,8 @@ const { ERROR_CODES, sendError } = require('../../middleware/errorEnvelope')
 const { RISK_TIER } = require('../../lib/html/htmlSecurity')
 
 const router = express.Router()
+
+router.use(previewLimiter)
 
 function parseInteger(value) {
   const parsed = Number.parseInt(value, 10)

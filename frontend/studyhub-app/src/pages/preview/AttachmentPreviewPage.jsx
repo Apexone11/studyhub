@@ -207,6 +207,7 @@ export default function AttachmentPreviewPage() {
                     <img
                       src={config.previewUrl}
                       alt={state.detail.attachmentName || 'Attachment preview'}
+                      loading="lazy"
                       style={{ width: '100%', maxHeight: '80vh', objectFit: 'contain', display: 'block' }}
                     />
                   ) : (

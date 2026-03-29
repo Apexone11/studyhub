@@ -10,6 +10,7 @@ const { createProvenanceToken } = require('../../lib/provenance')
 const { isHtmlUploadsEnabled } = require('../../lib/html/htmlKillSwitch')
 const { SHEET_STATUS, AUTHOR_SELECT, sheetWriteLimiter } = require('./sheets.constants')
 const { trackActivity } = require('../../lib/activityTracker')
+const { runAbuseChecks } = require('../../lib/abuseDetection')
 const { checkAndAwardBadges } = require('../../lib/badges')
 const {
   resolveNextSheetStatus,
@@ -87,6 +88,15 @@ router.post('/', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (re
       const textToScan = `${title} ${description || ''} ${contentFormat === 'markdown' ? content : ''}`.trim()
       void scanContent({ contentType: 'sheet', contentId: sheet.id, text: textToScan, userId: req.user.userId })
     }
+
+    /* Abuse detection — rate anomaly, duplicate, new-account checks (fire-and-forget) */
+    void runAbuseChecks({
+      userId: req.user.userId,
+      actionType: 'sheet_create',
+      contentType: 'sheet',
+      contentId: sheet.id,
+      text: `${title} ${description || ''} ${content || ''}`.slice(0, 1000),
+    })
 
     /* Content fingerprinting for plagiarism detection (fire-and-forget) */
     void updateFingerprint('sheet', sheet.id, content)

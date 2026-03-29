@@ -592,3 +592,19 @@
   font-weight: 700;
   color: var(--sh-subtext);
 }
+
+/* ── Mobile responsive ───────────────────────────────────────── */
+
+@media (max-width: 480px) {
+  .register-orb--blue {
+    width: 200px;
+    height: 200px;
+  }
+  .register-orb--purple {
+    width: 180px;
+    height: 180px;
+  }
+  .register-main {
+    padding: 24px 12px 60px;
+  }
+}

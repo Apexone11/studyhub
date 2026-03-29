@@ -148,6 +148,7 @@ export default function SheetViewerSidebar({ sheet, canEdit, previewKind, attach
               <img
                 src={attachmentPreviewUrl}
                 alt={sheet.attachmentName || 'Attachment preview'}
+                loading="lazy"
                 style={{ width: '100%', maxHeight: 220, objectFit: 'contain', display: 'block' }}
               />
             ) : (

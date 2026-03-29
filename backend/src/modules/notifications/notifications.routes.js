@@ -1,4 +1,5 @@
 const express = require('express')
+const { readLimiter } = require('../../lib/rateLimiters')
 const { assertOwnerOrAdmin } = require('../../lib/accessControl')
 const requireAuth = require('../../middleware/auth')
 const { captureError } = require('../../monitoring/sentry')
@@ -8,6 +9,7 @@ const router = express.Router()
 
 // All notification routes require auth
 router.use(requireAuth)
+router.use(readLimiter)
 
 // ── GET /api/notifications ─────────────────────────────────────
 router.get('/', async (req, res) => {

@@ -2,7 +2,7 @@
  * Sheet Lab — custom hook for all state management and API calls.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { API } from '../../../config'
 import { getApiErrorMessage, isAuthSessionFailure, readJsonSafely } from '../../../lib/http'
 import { useSession } from '../../../lib/session-context'
@@ -13,6 +13,7 @@ import { authHeaders } from './sheetLabConstants'
 export default function useSheetLab() {
   const navigate = useNavigate()
   const { id } = useParams()
+  const [searchParams] = useSearchParams()
   const sheetId = Number.parseInt(id, 10)
   const { user, clearSession } = useSession()
 
@@ -91,13 +92,22 @@ export default function useSheetLab() {
     }
   }, [sheet, user, sheetId, navigate])
 
-  // Default to editor tab for owners, history for everyone else
+  // Default to editor tab for owners, history for everyone else.
+  // URL ?tab= param takes priority (used by fork redirect).
+  const initialTabSet = useRef(false)
   useEffect(() => {
-    if (sheet && user) {
-      const owns = user.role === 'admin' || user.id === sheet.userId
-      setActiveTab(owns ? 'editor' : 'history')
+    if (sheet && user && !initialTabSet.current) {
+      initialTabSet.current = true
+      const urlTab = searchParams.get('tab')
+      const validTabs = ['editor', 'history', 'contribute', 'reviews', 'lineage']
+      if (urlTab && validTabs.includes(urlTab)) {
+        setActiveTab(urlTab)
+      } else {
+        const owns = user.role === 'admin' || user.id === sheet.userId
+        setActiveTab(owns ? 'editor' : 'history')
+      }
     }
-  }, [sheet, user])
+  }, [sheet, user, searchParams])
 
   // Load commits
   const loadCommits = useCallback(async (targetPage = 1) => {

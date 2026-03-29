@@ -34,6 +34,7 @@ export default function useSheetViewer() {
   const [htmlWarningAcked, setHtmlWarningAcked] = useState(false)
   const [viewerInteractive, setViewerInteractive] = useState(false)
   const [relatedSheets, setRelatedSheets] = useState([])
+  const [readmeData, setReadmeData] = useState(null)
   const sheetPanelRef = useRef(null)
   const animatedRef = useRef(false)
   const timing = usePageTiming('sheet')
@@ -191,6 +192,28 @@ export default function useSheetViewer() {
     return () => { controller.abort() }
   }, [sheet?.course?.id, sheet?.id])
 
+  /* ── README extras (contributors, latest commit) ────────────── */
+  useEffect(() => {
+    if (!sheet?.id) return
+    const controller = new AbortController()
+    ;(async () => {
+      try {
+        const response = await fetch(`${API}/api/sheets/${sheet.id}/readme`, {
+          headers: authHeaders(),
+          credentials: 'include',
+          signal: controller.signal,
+        })
+        if (!response.ok) return          // Non-200 — readme section simply won't render
+        const data = await readJsonSafely(response, null)
+        if (!controller.signal.aborted && data) setReadmeData(data)
+      } catch (err) {
+        if (err?.name === 'AbortError') return
+        /* README is supplementary — don't block the page for it */
+      }
+    })()
+    return () => { controller.abort() }
+  }, [sheet?.id])
+
   /* ── HTML runtime URL + warning gate ──────────────────────── */
   useEffect(() => {
     if (!isHtmlSheet || !sheet?.id) return
@@ -318,7 +341,7 @@ export default function useSheetViewer() {
       if (!response.ok) throw new Error(getApiErrorMessage(data, 'Could not fork this sheet.'))
       showToast('Sheet forked! Opening your copy in SheetLab…', 'success')
       trackEvent('sheet_forked', { sheetId: sheet.id })
-      navigate(`/sheets/${data.id}/lab`)
+      navigate(`/sheets/${data.id}/lab?tab=editor`)
     } catch (error) {
       showToast(error.message || 'Could not fork this sheet.', 'error')
     } finally {
@@ -462,6 +485,7 @@ export default function useSheetViewer() {
     viewerInteractive,
     toggleViewerInteractive,
     relatedSheets,
+    readmeData,
     sheetPanelRef,
     canEdit,
     isHtmlSheet,

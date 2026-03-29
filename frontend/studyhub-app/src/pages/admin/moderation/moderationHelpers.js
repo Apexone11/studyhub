@@ -4,6 +4,7 @@ export const SUB_TABS = [
   ['strikes', 'Strikes'],
   ['appeals', 'Appeals'],
   ['restrictions', 'Restrictions'],
+  ['audit-log', 'Audit Log'],
 ]
 
 export function statusPill(status) {

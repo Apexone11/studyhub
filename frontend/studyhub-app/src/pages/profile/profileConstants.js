@@ -19,8 +19,10 @@ export const pageWrapStyle = {
 
 export const containerStyle = {
   maxWidth: 1100,
+  width: '100%',
   margin: '0 auto',
-  padding: 'clamp(20px, 3vw, 40px) clamp(16px, 2vw, 24px)',
+  padding: 'clamp(20px, 3vw, 40px) clamp(12px, 2vw, 24px)',
+  boxSizing: 'border-box',
 }
 
 export const cardStyle = {

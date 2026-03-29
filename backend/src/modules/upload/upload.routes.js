@@ -11,9 +11,11 @@ const prisma = require('../../lib/prisma')
 const {
   ATTACHMENTS_DIR,
   AVATARS_DIR,
+  CONTENT_IMAGES_DIR,
   COVERS_DIR,
   buildAttachmentUrl,
   buildAvatarUrl,
+  buildContentImageUrl,
   buildCoverUrl,
   cleanupAttachmentIfUnused,
   cleanupAvatarIfUnused,
@@ -376,6 +378,68 @@ router.post('/post-attachment/:postId', requireAuth, attachmentUploadLimiter, (r
       safeUnlinkFile(req.file?.path)
       captureError(dbErr, { route: req.originalUrl })
       return sendError(res, 500, 'Failed to save attachment.', ERROR_CODES.UPLOAD_SAVE_FAILED)
+    }
+  })
+})
+
+// ── Content image upload (inline images in rich text sheets) ──
+const CONTENT_IMAGE_ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
+const CONTENT_IMAGE_ALLOWED_EXT  = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif'])
+const CONTENT_IMAGE_MAX_BYTES    = 5 * 1024 * 1024   // 5 MB per image
+
+const contentImageUploadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  message: { error: 'Too many image uploads. Please wait a bit.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
+const contentImageStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, CONTENT_IMAGES_DIR),
+  filename: (req, file, cb) => cb(null, `img-${req.user.userId}-${safeName(file.originalname)}`),
+})
+
+const contentImageUpload = multer({
+  storage: contentImageStorage,
+  limits: { fileSize: CONTENT_IMAGE_MAX_BYTES },
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase()
+    if (!CONTENT_IMAGE_ALLOWED_MIME.has(file.mimetype) || !CONTENT_IMAGE_ALLOWED_EXT.has(ext)) {
+      return cb(new Error('Content image must be a JPEG, PNG, WebP, or GIF image.'))
+    }
+    cb(null, true)
+  },
+})
+
+// POST /api/upload/content-image
+// Uploads an image for embedding in rich text sheet content.
+// Returns { url: '/uploads/content-images/...' } for the TipTap Image extension.
+router.post('/content-image', requireAuth, contentImageUploadLimiter, (req, res) => {
+  contentImageUpload.single('image')(req, res, async (err) => {
+    if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+      return sendError(res, 400, 'Image must be 5 MB or smaller.', ERROR_CODES.UPLOAD_INVALID)
+    }
+    if (err) return sendError(res, 400, err.message, ERROR_CODES.UPLOAD_INVALID)
+    if (!req.file) return sendError(res, 400, 'No file uploaded.', ERROR_CODES.UPLOAD_MISSING_FILE)
+
+    // Magic byte validation
+    if (!signatureMatchesExpected(req.file.path, Array.from(CONTENT_IMAGE_ALLOWED_MIME)).ok) {
+      return rejectSignatureMismatch(res, req.file, 'Image contents do not match a supported image format.')
+    }
+    const magic = validateMagicBytes(req.file.path, req.file.mimetype)
+    if (!magic.valid) {
+      return rejectSignatureMismatch(res, req.file,
+        `Image file signature does not match declared type (detected: ${magic.detectedType || 'unknown'}, declared: ${magic.declaredType}).`)
+    }
+
+    try {
+      const url = buildContentImageUrl(req.file.filename)
+      res.json({ url })
+    } catch (uploadErr) {
+      safeUnlinkFile(req.file?.path)
+      captureError(uploadErr, { route: req.originalUrl })
+      return sendError(res, 500, 'Failed to save image.', ERROR_CODES.UPLOAD_SAVE_FAILED)
     }
   })
 })

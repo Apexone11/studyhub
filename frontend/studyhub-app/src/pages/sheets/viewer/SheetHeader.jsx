@@ -90,19 +90,34 @@ export default function SheetHeader({ sheet, handleBack }) {
         </span>
       </div>
 
-      {/* Fork lineage */}
+      {/* Fork relationship banner */}
       {sheet.forkSource && (
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', color: 'var(--sh-subtext)', fontSize: 12 }}>
-          <IconFork size={13} />
+        <div style={{
+          display: 'flex', gap: 8, alignItems: 'center',
+          padding: '8px 14px', borderRadius: 10,
+          background: 'var(--sh-info-bg)', border: '1px solid var(--sh-info-border)',
+          color: 'var(--sh-info-text, var(--sh-subtext))', fontSize: 12,
+        }}>
+          <IconFork size={14} style={{ flexShrink: 0, opacity: 0.8 }} />
           <span>
             Forked from{' '}
-            <Link to={`/sheets/${sheet.forkSource.id}`} style={{ color: 'var(--sh-brand)', fontWeight: 600, textDecoration: 'none' }}>
+            <Link to={`/sheets/${sheet.forkSource.id}`} style={{ color: 'var(--sh-brand)', fontWeight: 700, textDecoration: 'none' }}>
               {sheet.forkSource.title}
             </Link>
             {sheet.forkSource.author && (
-              <> by <Link to={`/users/${sheet.forkSource.author.username}`} style={{ color: 'var(--sh-brand)', fontWeight: 600, textDecoration: 'none' }}>{sheet.forkSource.author.username}</Link></>
+              <> by <Link to={`/users/${sheet.forkSource.author.username}`} style={{ color: 'var(--sh-brand)', fontWeight: 700, textDecoration: 'none' }}>{sheet.forkSource.author.username}</Link></>
             )}
           </span>
+          <Link
+            to={`/sheets/${sheet.id}/lab?tab=contribute`}
+            style={{
+              marginLeft: 'auto', padding: '6px 12px', borderRadius: 6, minHeight: 28,
+              background: 'var(--sh-brand)', color: 'var(--sh-btn-primary-text)',
+              fontSize: 11, fontWeight: 700, textDecoration: 'none', flexShrink: 0,
+            }}
+          >
+            Contribute back
+          </Link>
         </div>
       )}
 

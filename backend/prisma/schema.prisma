@@ -69,6 +69,8 @@ model User {
   dailyActivity              UserDailyActivity[]
   badges                     UserBadge[]
   sensitiveData              UserSensitive?
+
+  @@index([role])
 }
 
 model School {
@@ -377,6 +379,8 @@ model SheetContribution {
   reviewerId    Int?
   status        String     @default("pending")
   message       String     @default("")
+  reviewComment String     @default("")
+  baseChecksum  String     @default("")
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
   reviewedAt    DateTime?

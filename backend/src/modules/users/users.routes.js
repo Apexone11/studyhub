@@ -219,6 +219,110 @@ router.patch('/me/pinned-sheets/reorder', requireAuth, async (req, res) => {
   }
 })
 
+// ── GET /api/users/me/follow-suggestions — People you may want to follow (B2) ──
+router.get('/me/follow-suggestions', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.userId
+
+    // Get user's enrolled course IDs
+    const enrollments = await prisma.enrollment.findMany({
+      where: { userId },
+      select: { courseId: true },
+    })
+    const courseIds = enrollments.map((e) => e.courseId)
+
+    // Get IDs the user already follows
+    const following = await prisma.userFollow.findMany({
+      where: { followerId: userId },
+      select: { followingId: true },
+    })
+    const followingIds = new Set([userId, ...following.map((f) => f.followingId)])
+
+    let suggestions = []
+
+    if (courseIds.length > 0) {
+      // Find classmates — users enrolled in the same courses, not already followed
+      const classmates = await prisma.enrollment.findMany({
+        where: {
+          courseId: { in: courseIds },
+          userId: { notIn: [...followingIds] },
+        },
+        select: {
+          userId: true,
+          user: {
+            select: {
+              id: true,
+              username: true,
+              avatarUrl: true,
+              role: true,
+              _count: { select: { studySheets: { where: { status: 'published' } }, followers: true } },
+            },
+          },
+        },
+        take: 50,
+      })
+
+      // Deduplicate by userId, count shared courses
+      const userCounts = new Map()
+      for (const row of classmates) {
+        const existing = userCounts.get(row.userId)
+        if (existing) {
+          existing.sharedCourses++
+        } else {
+          userCounts.set(row.userId, {
+            ...row.user,
+            sharedCourses: 1,
+            reason: 'classmate',
+          })
+        }
+      }
+      suggestions = [...userCounts.values()]
+        .sort((a, b) => b.sharedCourses - a.sharedCourses || b._count.followers - a._count.followers)
+        .slice(0, 10)
+    }
+
+    // If fewer than 10 suggestions, backfill with popular users
+    if (suggestions.length < 10) {
+      const needed = 10 - suggestions.length
+      const existingIds = new Set([...followingIds, ...suggestions.map((s) => s.id)])
+
+      const popular = await prisma.user.findMany({
+        where: {
+          id: { notIn: [...existingIds] },
+          role: { not: 'admin' },
+        },
+        select: {
+          id: true,
+          username: true,
+          avatarUrl: true,
+          role: true,
+          _count: { select: { studySheets: { where: { status: 'published' } }, followers: true } },
+        },
+        orderBy: { followers: { _count: 'desc' } },
+        take: needed,
+      })
+
+      for (const u of popular) {
+        suggestions.push({ ...u, sharedCourses: 0, reason: 'popular' })
+      }
+    }
+
+    res.json(suggestions.map((s) => ({
+      id: s.id,
+      username: s.username,
+      avatarUrl: s.avatarUrl,
+      role: s.role,
+      sheetCount: s._count?.studySheets || 0,
+      followerCount: s._count?.followers || 0,
+      sharedCourses: s.sharedCourses || 0,
+      reason: s.reason || 'popular',
+    })))
+  } catch (err) {
+    captureError(err, { route: req.originalUrl })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
 // ── GET /api/users/:username ───────────────────────────────────
 router.get('/:username', optionalAuth, async (req, res) => {
   try {
@@ -472,6 +576,81 @@ router.get('/:username/following', optionalAuth, async (req, res) => {
     res.json(follows.map((f) => f.following))
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── GET /api/users/:username/stats — Contribution statistics (B1) ──
+router.get('/:username/stats', optionalAuth, async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { username: req.params.username },
+      select: { id: true },
+    })
+    if (!user) return res.status(404).json({ error: 'User not found.' })
+
+    const accessDecision = await getProfileAccessDecision(prisma, req.user, user.id)
+    if (!accessDecision.allowed) {
+      return res.status(403).json({ error: 'Profile not accessible.' })
+    }
+
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+
+    const [
+      totalSheets,
+      totalStarsReceived,
+      totalComments,
+      totalForks,
+      totalContributions,
+      sheetsLast30d,
+      commentsLast30d,
+      topCourses,
+    ] = await Promise.all([
+      prisma.studySheet.count({ where: { userId: user.id, status: 'published' } }),
+      prisma.studySheet.aggregate({ where: { userId: user.id, status: 'published' }, _sum: { stars: true } }),
+      prisma.comment.count({ where: { userId: user.id } }),
+      prisma.studySheet.count({ where: { forkedFromId: { not: null }, userId: user.id, status: 'published' } }),
+      prisma.contribution.count({ where: { userId: user.id } }).catch(() => 0),
+      prisma.studySheet.count({ where: { userId: user.id, status: 'published', createdAt: { gte: thirtyDaysAgo } } }),
+      prisma.comment.count({ where: { userId: user.id, createdAt: { gte: thirtyDaysAgo } } }),
+      prisma.studySheet.groupBy({
+        by: ['courseId'],
+        where: { userId: user.id, status: 'published', courseId: { not: null } },
+        _count: true,
+        orderBy: { _count: { courseId: 'desc' } },
+        take: 5,
+      }),
+    ])
+
+    // Resolve course names for top courses
+    const courseIds = topCourses.map((c) => c.courseId).filter(Boolean)
+    const courses = courseIds.length > 0
+      ? await prisma.course.findMany({
+          where: { id: { in: courseIds } },
+          select: { id: true, code: true, name: true },
+        })
+      : []
+    const courseMap = Object.fromEntries(courses.map((c) => [c.id, c]))
+
+    res.json({
+      totalSheets,
+      totalStarsReceived: totalStarsReceived._sum.stars || 0,
+      totalComments,
+      totalForks,
+      totalContributions,
+      last30Days: {
+        sheets: sheetsLast30d,
+        comments: commentsLast30d,
+      },
+      topCourses: topCourses.map((tc) => ({
+        courseId: tc.courseId,
+        code: courseMap[tc.courseId]?.code || 'Unknown',
+        name: courseMap[tc.courseId]?.name || '',
+        sheetCount: tc._count,
+      })),
+    })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl })
     res.status(500).json({ error: 'Server error.' })
   }
 })

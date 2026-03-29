@@ -1,11 +1,13 @@
 /**
- * SheetLab Changes tab — shows uncommitted diff and lets owners commit.
+ * SheetLab Changes tab — shows uncommitted diff, lets owners commit,
+ * and allows comparing any two versions via dropdown selectors.
  * Fetches GET /api/sheets/:id/lab/uncommitted-diff for the diff,
- * then uses POST /api/sheets/:id/lab/commits to create a snapshot.
+ * POST /api/sheets/:id/lab/commits to create a snapshot,
+ * GET /api/sheets/:id/lab/diff/:a/:b to compare arbitrary versions.
  */
 import { useCallback, useEffect, useState } from 'react'
 import { API } from '../../../config'
-import { authHeaders } from './sheetLabConstants'
+import { authHeaders, truncateChecksum, timeAgo } from './sheetLabConstants'
 import { getApiErrorMessage, readJsonSafely } from '../../../lib/http'
 import { showToast } from '../../../lib/toast'
 import { DiffViewer } from './SheetLabPanels'
@@ -19,6 +21,13 @@ export default function SheetLabChanges({ sheet, onCommitCreated }) {
 
   const [commitMessage, setCommitMessage] = useState('')
   const [committing, setCommitting] = useState(false)
+
+  /* Version comparison state */
+  const [allCommits, setAllCommits] = useState([])
+  const [compareBase, setCompareBase] = useState('')
+  const [compareHead, setCompareHead] = useState('')
+  const [compareDiff, setCompareDiff] = useState(null)
+  const [loadingCompare, setLoadingCompare] = useState(false)
 
   const fetchDiff = useCallback(async () => {
     if (!sheet?.id) return
@@ -44,6 +53,54 @@ export default function SheetLabChanges({ sheet, onCommitCreated }) {
   useEffect(() => {
     fetchDiff()
   }, [fetchDiff])
+
+  /* Load all commits for the version comparison dropdowns */
+  const fetchCommits = useCallback(async () => {
+    if (!sheet?.id) return
+    try {
+      const response = await fetch(`${API}/api/sheets/${sheet.id}/lab/commits?page=1&limit=100`, {
+        headers: authHeaders(),
+        credentials: 'include',
+      })
+      const data = await readJsonSafely(response, {})
+      if (response.ok && Array.isArray(data.commits)) {
+        setAllCommits(data.commits)
+      }
+    } catch {
+      // Non-critical — silently skip
+    }
+  }, [sheet?.id])
+
+  useEffect(() => {
+    fetchCommits()
+  }, [fetchCommits])
+
+  /* Fetch diff between two selected versions */
+  useEffect(() => {
+    if (!compareBase || !compareHead || compareBase === compareHead || !sheet?.id) {
+      setCompareDiff(null)
+      return
+    }
+    let cancelled = false
+    const run = async () => {
+      setLoadingCompare(true)
+      try {
+        const response = await fetch(`${API}/api/sheets/${sheet.id}/lab/diff/${compareBase}/${compareHead}`, {
+          headers: authHeaders(),
+          credentials: 'include',
+        })
+        const data = await readJsonSafely(response, {})
+        if (!response.ok) throw new Error(getApiErrorMessage(data, 'Could not compute diff.'))
+        if (!cancelled) setCompareDiff(data.diff)
+      } catch (err) {
+        if (!cancelled) showToast(err.message, 'error')
+      } finally {
+        if (!cancelled) setLoadingCompare(false)
+      }
+    }
+    run()
+    return () => { cancelled = true }
+  }, [compareBase, compareHead, sheet?.id])
 
   const handleCommit = async () => {
     if (committing || !sheet?.id) return
@@ -79,18 +136,21 @@ export default function SheetLabChanges({ sheet, onCommitCreated }) {
 
   if (!hasChanges) {
     return (
-      <div style={emptyContainerStyle}>
-        <div style={emptyIconStyle}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--sh-success-text, #16a34a)" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-            <path d="M20 6L9 17l-5-5" />
-          </svg>
+      <div style={{ display: 'grid', gap: 16 }}>
+        <div style={emptyContainerStyle}>
+          <div style={emptyIconStyle}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--sh-success-text, #16a34a)" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+              <path d="M20 6L9 17l-5-5" />
+            </svg>
+          </div>
+          <p style={emptyTitleStyle}>Everything is committed</p>
+          <p style={emptyTextStyle}>
+            {lastCommit
+              ? `Last snapshot: "${lastCommit.message || 'Snapshot'}"`
+              : 'No snapshots yet. Edit your sheet and come back to see changes.'}
+          </p>
         </div>
-        <p style={emptyTitleStyle}>Everything is committed</p>
-        <p style={emptyTextStyle}>
-          {lastCommit
-            ? `Last snapshot: "${lastCommit.message || 'Snapshot'}"`
-            : 'No snapshots yet. Edit your sheet and come back to see changes.'}
-        </p>
+        {allCommits.length >= 2 ? <VersionCompare commits={allCommits} compareBase={compareBase} compareHead={compareHead} setCompareBase={setCompareBase} setCompareHead={setCompareHead} compareDiff={compareDiff} loadingCompare={loadingCompare} /> : null}
       </div>
     )
   }
@@ -130,6 +190,77 @@ export default function SheetLabChanges({ sheet, onCommitCreated }) {
           </button>
         </div>
       </div>
+
+      {/* Version comparison */}
+      {allCommits.length >= 2 ? <VersionCompare commits={allCommits} compareBase={compareBase} compareHead={compareHead} setCompareBase={setCompareBase} setCompareHead={setCompareHead} compareDiff={compareDiff} loadingCompare={loadingCompare} /> : null}
+    </div>
+  )
+}
+
+/* ── Version comparison sub-component ──────────────────────── */
+
+function VersionCompare({ commits, compareBase, compareHead, setCompareBase, setCompareHead, compareDiff, loadingCompare }) {
+  return (
+    <div style={compareBoxStyle} aria-label="Version comparison">
+      <h4 style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: 'var(--sh-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+        Compare versions
+      </h4>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 120 }}>
+          <label htmlFor="compare-base" style={dropdownLabelStyle}>Base (older)</label>
+          <select
+            id="compare-base"
+            value={compareBase}
+            onChange={(e) => setCompareBase(e.target.value)}
+            style={selectStyle}
+          >
+            <option value="">Select version...</option>
+            {commits.map((c) => (
+              <option key={c.id} value={c.id}>
+                {truncateChecksum(c.checksum)} — {c.message || 'Snapshot'} ({timeAgo(c.createdAt)})
+              </option>
+            ))}
+          </select>
+        </div>
+        <span style={{ color: 'var(--sh-muted)', fontWeight: 700, fontSize: 16, marginTop: 18 }}>→</span>
+        <div style={{ flex: 1, minWidth: 120 }}>
+          <label htmlFor="compare-head" style={dropdownLabelStyle}>Compare (newer)</label>
+          <select
+            id="compare-head"
+            value={compareHead}
+            onChange={(e) => setCompareHead(e.target.value)}
+            style={selectStyle}
+          >
+            <option value="">Select version...</option>
+            {commits.map((c) => (
+              <option key={c.id} value={c.id}>
+                {truncateChecksum(c.checksum)} — {c.message || 'Snapshot'} ({timeAgo(c.createdAt)})
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      {loadingCompare ? (
+        <div style={{ textAlign: 'center', padding: 16, color: 'var(--sh-muted)', fontSize: 13 }}>
+          Computing diff between versions...
+        </div>
+      ) : null}
+      {compareDiff ? (
+        <div style={{ marginTop: 12 }}>
+          {compareDiff.additions != null ? (
+            <div style={{ display: 'flex', gap: 12, marginBottom: 8, fontSize: 12, fontWeight: 700 }}>
+              <span style={{ color: 'var(--sh-success)' }}>+{compareDiff.additions} additions</span>
+              <span style={{ color: 'var(--sh-danger)' }}>−{compareDiff.deletions} deletions</span>
+            </div>
+          ) : null}
+          <DiffViewer diff={compareDiff} title="Version comparison" />
+        </div>
+      ) : null}
+      {compareBase && compareHead && compareBase === compareHead ? (
+        <div style={{ padding: '10px 14px', borderRadius: 10, fontSize: 13, color: 'var(--sh-info-text, #1d4ed8)', background: 'var(--sh-info-bg, #eff6ff)', border: '1px solid var(--sh-info-border, #dbeafe)', marginTop: 10 }}>
+          Base and compare versions are the same. Select two different versions to see changes.
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -191,4 +322,24 @@ const commitButtonStyle = {
   border: 'none', background: '#6366f1', color: '#fff',
   fontWeight: 700, fontSize: 13, cursor: 'pointer',
   fontFamily: 'inherit', whiteSpace: 'nowrap',
+}
+
+const compareBoxStyle = {
+  padding: 16, borderRadius: 14,
+  background: 'var(--sh-surface)',
+  border: '1px solid var(--sh-border)',
+}
+
+const dropdownLabelStyle = {
+  display: 'block', fontSize: 11, fontWeight: 700,
+  color: 'var(--sh-muted)', marginBottom: 4,
+  textTransform: 'uppercase', letterSpacing: '0.3px',
+}
+
+const selectStyle = {
+  width: '100%', padding: '8px 10px', borderRadius: 8,
+  border: '1px solid var(--sh-border)',
+  background: 'var(--sh-soft)', color: 'var(--sh-heading)',
+  fontSize: 12, fontFamily: 'inherit',
+  boxSizing: 'border-box',
 }

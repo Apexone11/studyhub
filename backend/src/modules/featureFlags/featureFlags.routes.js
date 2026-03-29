@@ -5,8 +5,11 @@ const prisma = require('../../lib/prisma')
 const { evaluateFlag } = require('../../lib/featureFlags')
 const { ERROR_CODES, sendError } = require('../../middleware/errorEnvelope')
 const { captureError } = require('../../monitoring/sentry')
+const { adminLimiter } = require('../../lib/rateLimiters')
 
 const router = express.Router()
+
+router.use(adminLimiter)
 
 // GET /api/flags — List all flags (admin only)
 router.get('/', requireAuth, requireAdmin, async (req, res) => {

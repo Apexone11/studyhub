@@ -282,3 +282,20 @@
   font-size: var(--type-sm);
   color: var(--sh-muted);
 }
+
+/* ── Mobile responsive ───────────────────────────────────────── */
+
+@media (max-width: 480px) {
+  .login-orb--blue {
+    width: 200px;
+    height: 200px;
+  }
+  .login-orb--purple {
+    width: 180px;
+    height: 180px;
+  }
+  .login-orb--green {
+    width: 300px;
+    height: 300px;
+  }
+}

@@ -38,7 +38,7 @@ function TreeNode({ node, depth = 0 }) {
             {node.author ? (
               <span className="lineage-node__author">
                 {node.author.avatarUrl ? (
-                  <img src={node.author.avatarUrl} alt="" className="lineage-node__avatar" />
+                  <img src={node.author.avatarUrl} alt="" loading="lazy" className="lineage-node__avatar" />
                 ) : (
                   <span className="lineage-node__avatar lineage-node__avatar--fallback">
                     {(node.author.username || '?')[0].toUpperCase()}

@@ -5,8 +5,11 @@ const requireAdmin = require('../../middleware/requireAdmin')
 const prisma = require('../../lib/prisma')
 const { captureError } = require('../../monitoring/sentry')
 const { createProvenanceToken, verifyProvenanceToken, detectTampering } = require('../../lib/provenance')
+const { readLimiter } = require('../../lib/rateLimiters')
 
 const router = express.Router()
+
+router.use(readLimiter)
 
 // POST /api/provenance/:sheetId — Generate provenance manifest (owner only)
 router.post('/:sheetId', requireAuth, async (req, res) => {

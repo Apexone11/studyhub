@@ -12,6 +12,7 @@ const requireAuth = require('../../middleware/auth')
 const { feedWriteLimiter, attachmentDownloadLimiter } = require('./feed.constants')
 const { formatFeedPostDetail, safeDownloadName } = require('./feed.service')
 const { getInitialModerationStatus } = require('../../lib/trustGate')
+const { runAbuseChecks } = require('../../lib/abuseDetection')
 
 const router = express.Router()
 
@@ -55,6 +56,15 @@ router.post('/posts', feedWriteLimiter, async (req, res) => {
     if (isModerationEnabled()) {
       void scanContent({ contentType: 'feed_post', contentId: post.id, text: content, userId: req.user.userId })
     }
+
+    /* Abuse detection — rate anomaly, duplicate, new-account checks (fire-and-forget) */
+    void runAbuseChecks({
+      userId: req.user.userId,
+      actionType: 'post_create',
+      contentType: 'feed_post',
+      contentId: post.id,
+      text: content,
+    })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })

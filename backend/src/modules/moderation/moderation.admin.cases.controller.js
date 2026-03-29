@@ -4,6 +4,7 @@ const prisma = require('../../lib/prisma')
 const { issueStrike, reviewCase } = require('../../lib/moderation/moderationEngine')
 const { findSimilarContent } = require('../../lib/plagiarismService')
 const { isSuperAdmin } = require('../../lib/superAdmin')
+const { auditFromRequest, AUDIT_EVENTS } = require('../../lib/auditLog')
 const { PAGE_SIZE, parsePage } = require('./moderation.constants')
 
 const router = express.Router()
@@ -63,6 +64,7 @@ router.get('/cases/overview', async (req, res) => {
       totalBySource,
       claimedByAdmin,
       recentResolved,
+      abuseDetectionPending,
     ] = await Promise.all([
       prisma.moderationCase.count({ where: { status: 'pending' } }),
       prisma.moderationCase.groupBy({
@@ -91,6 +93,7 @@ router.get('/cases/overview', async (req, res) => {
           reviewer: { select: { id: true, username: true } },
         },
       }),
+      prisma.moderationCase.count({ where: { status: 'pending', source: 'auto_abuse_detection' } }).catch(() => 0),
     ])
 
     /* Resolve admin usernames for the groupBy results */
@@ -120,6 +123,7 @@ router.get('/cases/overview', async (req, res) => {
       sourceBreakdown,
       claimedBreakdown,
       recentResolved,
+      abuseDetectionPending,
     })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
@@ -256,6 +260,7 @@ router.patch('/cases/:id/review', async (req, res) => {
       action,
       reviewNote,
     })
+    auditFromRequest(req, AUDIT_EVENTS.MOD_CASE_RESOLVE, { targetUserId: updated.userId || null })
 
     res.json({
       message: action === 'dismiss' ? 'Case dismissed.' : 'Case confirmed.',
@@ -468,6 +473,7 @@ router.post('/strikes', async (req, res) => {
     }
 
     const result = await issueStrike({ userId, reason, caseId })
+    auditFromRequest(req, AUDIT_EVENTS.MOD_STRIKE, { targetUserId: userId })
 
     res.status(201).json({
       message: 'Strike issued.',

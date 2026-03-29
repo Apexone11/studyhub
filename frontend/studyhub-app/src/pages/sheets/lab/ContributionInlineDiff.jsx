@@ -2,6 +2,54 @@ import { useState } from 'react'
 import { API } from '../../../config'
 import { FONT } from '../viewer/sheetViewerConstants'
 
+/**
+ * Compact diff viewer used in the contribution sidebar cards.
+ * Security: All diff content rendered as JSX text nodes — no dangerouslySetInnerHTML.
+ */
+
+/* ── Line number computation ─────────────────────────────────── */
+function computeLineNumbers(hunk) {
+  let oldNum = hunk.oldStart
+  let newNum = hunk.newStart
+  return hunk.lines.map((line) => {
+    const result = { oldNum: null, newNum: null }
+    if (line.type === 'equal') {
+      result.oldNum = oldNum++
+      result.newNum = newNum++
+    } else if (line.type === 'remove') {
+      result.oldNum = oldNum++
+    } else if (line.type === 'add') {
+      result.newNum = newNum++
+    }
+    return result
+  })
+}
+
+/* ── Word-level segment renderer ─────────────────────────────── */
+function SegmentSpans({ segments, mode }) {
+  if (!segments) return null
+  return segments.map((seg, si) => (
+    <span
+      key={si}
+      style={
+        seg.type === 'add'
+          ? { background: 'var(--sh-success-border)', borderRadius: 3, padding: '0 2px', fontWeight: 600 }
+          : seg.type === 'remove'
+            ? { background: 'var(--sh-danger-border)', borderRadius: 3, padding: '0 2px', textDecoration: 'line-through', opacity: 0.85 }
+            : undefined
+      }
+    >
+      {seg.text}
+    </span>
+  ))
+}
+
+/* ── Inline line number cell style ───────────────────────────── */
+const lineNumStyle = {
+  width: 32, minWidth: 32, padding: '1px 4px', textAlign: 'right',
+  color: 'var(--sh-slate-400)', fontSize: 10, userSelect: 'none', opacity: 0.7,
+}
+
 export default function ContributionInlineDiff({ contributionId }) {
   const [diff, setDiff] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -50,6 +98,7 @@ export default function ContributionInlineDiff({ contributionId }) {
       {error ? <div style={{ fontSize: 11, color: 'var(--sh-danger)', marginTop: 4 }}>{error}</div> : null}
       {visible && diff ? (
         <div style={{ marginTop: 8, border: '1px solid var(--sh-border)', borderRadius: 12, overflow: 'hidden', background: 'var(--sh-surface)' }}>
+          {/* Header with stats + mode toggle */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', background: 'var(--sh-soft)', borderBottom: '1px solid var(--sh-border)' }}>
             <div style={{ display: 'flex', gap: 10, fontSize: 11, fontWeight: 700 }}>
               <span style={{ color: 'var(--sh-success)' }}>+{diff.additions}</span>
@@ -64,38 +113,60 @@ export default function ContributionInlineDiff({ contributionId }) {
               </button>
             </div>
           </div>
+
           <div style={{ maxHeight: 300, overflowY: 'auto', fontFamily: "'SF Mono', 'Cascadia Code', 'Fira Code', monospace", fontSize: 11, lineHeight: 1.5 }}>
             {diffMode === 'unified' ? (
-              (diff.hunks || []).map((hunk, hi) => (
-                <div key={hi}>
-                  <div style={{ background: 'var(--sh-info-bg)', color: 'var(--sh-brand)', padding: '2px 10px', fontSize: 10, fontWeight: 600 }}>
-                    @@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@
-                  </div>
-                  {hunk.lines.map((line, li) => (
-                    <div key={li} style={{ padding: '1px 10px', whiteSpace: 'pre-wrap', wordBreak: 'break-all', background: line.type === 'add' ? 'var(--sh-success-bg)' : line.type === 'remove' ? 'var(--sh-danger-bg)' : 'transparent', color: line.type === 'add' ? 'var(--sh-success-text)' : line.type === 'remove' ? 'var(--sh-danger-text)' : 'var(--sh-subtext)' }}>
-                      {line.type === 'add' ? '+' : line.type === 'remove' ? '-' : ' '} {line.segments ? line.segments.map((seg, si) => (
-                        <span key={si} style={seg.type === 'add' ? { background: 'var(--sh-success-border)', borderRadius: 2 } : seg.type === 'remove' ? { background: 'var(--sh-danger-border)', borderRadius: 2, textDecoration: 'line-through' } : {}}>{seg.text}</span>
-                      )) : line.content}
-                    </div>
-                  ))}
-                </div>
-              ))
-            ) : (
+              /* ── Unified view with line numbers ─────────────── */
               (diff.hunks || []).map((hunk, hi) => {
+                const lineNums = computeLineNumbers(hunk)
+                return (
+                  <div key={hi}>
+                    <div style={{ background: 'var(--sh-info-bg)', color: 'var(--sh-brand)', padding: '2px 10px', fontSize: 10, fontWeight: 600 }}>
+                      @@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@
+                    </div>
+                    {hunk.lines.map((line, li) => (
+                      <div
+                        key={li}
+                        style={{
+                          display: 'flex', whiteSpace: 'pre-wrap', wordBreak: 'break-all',
+                          background: line.type === 'add' ? 'var(--sh-success-bg)' : line.type === 'remove' ? 'var(--sh-danger-bg)' : 'transparent',
+                          color: line.type === 'add' ? 'var(--sh-success-text)' : line.type === 'remove' ? 'var(--sh-danger-text)' : 'var(--sh-subtext)',
+                        }}
+                      >
+                        <span style={{ ...lineNumStyle, borderRight: '1px solid var(--sh-border)' }} aria-hidden="true">
+                          {lineNums[li].oldNum ?? ''}
+                        </span>
+                        <span style={lineNumStyle} aria-hidden="true">
+                          {lineNums[li].newNum ?? ''}
+                        </span>
+                        <span style={{ width: 16, minWidth: 16, paddingLeft: 4, fontWeight: 700, userSelect: 'none' }}>
+                          {line.type === 'add' ? '+' : line.type === 'remove' ? '-' : ' '}
+                        </span>
+                        <span style={{ padding: '1px 6px', flex: 1 }}>
+                          {line.segments ? <SegmentSpans segments={line.segments} mode={line.type} /> : (line.content || '\u00A0')}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })
+            ) : (
+              /* ── Split view with line numbers ──────────────── */
+              (diff.hunks || []).map((hunk, hi) => {
+                const lineNums = computeLineNumbers(hunk)
                 const rows = []
                 const lines = hunk.lines
                 let i = 0
                 while (i < lines.length) {
                   if (lines[i].type === 'equal') {
-                    rows.push({ left: lines[i], right: lines[i] })
+                    rows.push({ left: lines[i], right: lines[i], leftNum: lineNums[i].oldNum, rightNum: lineNums[i].newNum })
                     i++
                   } else {
-                    const removes = []
-                    const adds = []
-                    while (i < lines.length && lines[i].type === 'remove') { removes.push(lines[i]); i++ }
-                    while (i < lines.length && lines[i].type === 'add') { adds.push(lines[i]); i++ }
+                    const removes = [], adds = [], rNums = [], aNums = []
+                    while (i < lines.length && lines[i].type === 'remove') { removes.push(lines[i]); rNums.push(lineNums[i].oldNum); i++ }
+                    while (i < lines.length && lines[i].type === 'add') { adds.push(lines[i]); aNums.push(lineNums[i].newNum); i++ }
                     const max = Math.max(removes.length, adds.length)
-                    for (let j = 0; j < max; j++) rows.push({ left: removes[j] || null, right: adds[j] || null })
+                    for (let j = 0; j < max; j++) rows.push({ left: removes[j] || null, right: adds[j] || null, leftNum: rNums[j] ?? null, rightNum: aNums[j] ?? null })
                   }
                 }
                 return (
@@ -104,12 +175,14 @@ export default function ContributionInlineDiff({ contributionId }) {
                       @@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@
                     </div>
                     {rows.map((row, ri) => (
-                      <div key={ri} className="sheet-diff-split">
-                        <div style={{ padding: '1px 8px', whiteSpace: 'pre-wrap', wordBreak: 'break-all', borderRight: '1px solid var(--sh-border)', background: row.left?.type === 'remove' ? 'var(--sh-danger-bg)' : 'transparent', color: row.left?.type === 'remove' ? 'var(--sh-danger-text)' : 'var(--sh-subtext)', minHeight: '1.5em' }}>
-                          {row.left ? (row.left.segments ? row.left.segments.map((seg, si) => <span key={si} style={seg.type === 'remove' ? { background: 'var(--sh-danger-border)', borderRadius: 2 } : {}}>{seg.text}</span>) : row.left.content) : ''}
+                      <div key={ri} style={{ display: 'grid', gridTemplateColumns: '32px 1fr 32px 1fr', borderBottom: '1px solid var(--sh-soft)' }}>
+                        <span style={lineNumStyle} aria-hidden="true">{row.leftNum ?? ''}</span>
+                        <div style={{ padding: '1px 6px', whiteSpace: 'pre-wrap', wordBreak: 'break-all', background: row.left?.type === 'remove' ? 'var(--sh-danger-bg)' : 'transparent', color: row.left?.type === 'remove' ? 'var(--sh-danger-text)' : 'var(--sh-subtext)', minHeight: '1.5em', borderRight: '1px solid var(--sh-border)' }}>
+                          {row.left ? (row.left.segments ? <SegmentSpans segments={row.left.segments} mode="remove" /> : (row.left.content || '\u00A0')) : ''}
                         </div>
-                        <div style={{ padding: '1px 8px', whiteSpace: 'pre-wrap', wordBreak: 'break-all', background: row.right?.type === 'add' ? 'var(--sh-success-bg)' : 'transparent', color: row.right?.type === 'add' ? 'var(--sh-success-text)' : 'var(--sh-subtext)', minHeight: '1.5em' }}>
-                          {row.right ? (row.right.segments ? row.right.segments.map((seg, si) => <span key={si} style={seg.type === 'add' ? { background: 'var(--sh-success-border)', borderRadius: 2 } : {}}>{seg.text}</span>) : row.right.content) : ''}
+                        <span style={lineNumStyle} aria-hidden="true">{row.rightNum ?? ''}</span>
+                        <div style={{ padding: '1px 6px', whiteSpace: 'pre-wrap', wordBreak: 'break-all', background: row.right?.type === 'add' ? 'var(--sh-success-bg)' : 'transparent', color: row.right?.type === 'add' ? 'var(--sh-success-text)' : 'var(--sh-subtext)', minHeight: '1.5em' }}>
+                          {row.right ? (row.right.segments ? <SegmentSpans segments={row.right.segments} mode="add" /> : (row.right.content || '\u00A0')) : ''}
                         </div>
                       </div>
                     ))}
