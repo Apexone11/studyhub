@@ -114,15 +114,16 @@ router.get('/', async (req, res) => {
       .filter((section) => !section.ok)
       .map((section) => `${section.label} temporarily unavailable`)
 
-    primarySections
-      .filter((section) => !section.ok)
-      .forEach((section) => {
+    primarySections.forEach((section) => {
+      if (!section.ok) {
+        console.error(`[feed] section "${section.label}" failed:`, section.error?.message || section.error)
         captureError(section.error, {
           route: req.originalUrl,
           method: req.method,
           feedSection: section.label,
         })
-      })
+      }
+    })
 
     // If every section genuinely failed (DB errors), return 500.
     // If sections succeeded but returned 0 rows, that's a valid empty feed.
