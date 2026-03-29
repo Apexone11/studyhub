@@ -20,6 +20,10 @@ export default function SheetLabContribute({ sheet, onContributed }) {
   const [upstreamDiff, setUpstreamDiff] = useState(null)
   const [loadingUpstreamDiff, setLoadingUpstreamDiff] = useState(false)
   const [showUpstreamDiff, setShowUpstreamDiff] = useState(false)
+  /* Two-step submission: 'compose' → 'review' → submit */
+  const [submitStep, setSubmitStep] = useState('compose') // 'compose' | 'review'
+  const [previewDiff, setPreviewDiff] = useState(null)
+  const [loadingPreview, setLoadingPreview] = useState(false)
 
   const outgoing = sheet?.outgoingContributions || []
   const hasPending = outgoing.some((c) => c.status === 'pending')
@@ -69,6 +73,34 @@ export default function SheetLabContribute({ sheet, onContributed }) {
     }
   }
 
+  /* Step 1 → Step 2: Load diff preview and show confirmation */
+  const handleReviewChanges = async () => {
+    if (loadingPreview || !sheet?.id) return
+    setLoadingPreview(true)
+    try {
+      const response = await fetch(`${API}/api/sheets/${sheet.id}/lab/compare-upstream`, {
+        headers: authHeaders(),
+        credentials: 'include',
+      })
+      const data = await readJsonSafely(response, {})
+      if (!response.ok) throw new Error(getApiErrorMessage(data, 'Could not load changes preview.'))
+      if (data.identical) {
+        showToast('Your fork is identical to the original — nothing to contribute.', 'info')
+        return
+      }
+      setPreviewDiff(data)
+      setSubmitStep('review')
+    } catch (err) {
+      showToast(err.message, 'error')
+    } finally {
+      setLoadingPreview(false)
+    }
+  }
+
+  const handleBackToCompose = () => {
+    setSubmitStep('compose')
+  }
+
   const handleSubmit = async () => {
     if (submitting || !sheet?.id) return
     setSubmitting(true)
@@ -83,6 +115,8 @@ export default function SheetLabContribute({ sheet, onContributed }) {
       if (!response.ok) throw new Error(getApiErrorMessage(data, 'Could not submit contribution.'))
       showToast('Contribution submitted! The original author will be notified.', 'success')
       setMessage('')
+      setSubmitStep('compose')
+      setPreviewDiff(null)
       if (onContributed) onContributed()
     } catch (err) {
       showToast(err.message, 'error')
@@ -182,28 +216,78 @@ export default function SheetLabContribute({ sheet, onContributed }) {
         </div>
       ) : null}
 
-      {/* Submit form — only if no pending contribution */}
+      {/* Submit form — two-step flow, only if no pending contribution */}
       {!hasPending ? (
-        <div style={formBoxStyle}>
-          <label style={labelStyle} htmlFor="contribute-msg">Message (optional)</label>
-          <textarea
-            id="contribute-msg"
-            value={message}
-            onChange={(e) => setMessage(e.target.value.slice(0, 500))}
-            placeholder="Describe your changes..."
-            maxLength={500}
-            rows={3}
-            style={textareaStyle}
-          />
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={submitting}
-            style={submitButtonStyle}
-          >
-            {submitting ? 'Submitting...' : 'Submit contribution'}
-          </button>
-        </div>
+        submitStep === 'compose' ? (
+          /* Step 1: Compose message */
+          <div style={formBoxStyle}>
+            <label style={labelStyle} htmlFor="contribute-msg">Message (optional)</label>
+            <textarea
+              id="contribute-msg"
+              value={message}
+              onChange={(e) => setMessage(e.target.value.slice(0, 500))}
+              placeholder="Describe your changes..."
+              maxLength={500}
+              rows={3}
+              style={textareaStyle}
+            />
+            <button
+              type="button"
+              onClick={handleReviewChanges}
+              disabled={loadingPreview}
+              style={submitButtonStyle}
+            >
+              {loadingPreview ? 'Loading preview...' : 'Review changes'}
+            </button>
+          </div>
+        ) : (
+          /* Step 2: Review changes summary + confirm submission */
+          <div style={formBoxStyle}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+              <h4 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: 'var(--sh-heading)' }}>
+                Review your contribution
+              </h4>
+              <button type="button" onClick={handleBackToCompose} style={backButtonStyle}>
+                ← Edit message
+              </button>
+            </div>
+
+            {/* Changes summary card */}
+            {previewDiff?.diff ? (
+              <div style={changesSummaryStyle}>
+                <div style={{ display: 'flex', gap: 16, fontSize: 13, fontWeight: 700 }}>
+                  <span style={{ color: 'var(--sh-success)' }}>+{previewDiff.diff.additions} additions</span>
+                  <span style={{ color: 'var(--sh-danger)' }}>−{previewDiff.diff.deletions} deletions</span>
+                  <span style={{ color: 'var(--sh-muted)' }}>
+                    {(previewDiff.diff.hunks || []).length} {(previewDiff.diff.hunks || []).length === 1 ? 'section' : 'sections'} changed
+                  </span>
+                </div>
+                <DiffViewer diff={previewDiff.diff} title="Changes you are contributing" />
+              </div>
+            ) : null}
+
+            {/* Message preview */}
+            {message.trim() ? (
+              <div style={{ padding: '10px 14px', borderRadius: 10, background: 'var(--sh-soft)', border: '1px solid var(--sh-border)' }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--sh-muted)', textTransform: 'uppercase' }}>Your message</span>
+                <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--sh-heading)', lineHeight: 1.5 }}>{message.trim()}</p>
+              </div>
+            ) : (
+              <p style={{ margin: 0, fontSize: 12, color: 'var(--sh-muted)', fontStyle: 'italic' }}>No message attached.</p>
+            )}
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={submitting}
+                style={submitButtonStyle}
+              >
+                {submitting ? 'Submitting...' : 'Confirm & submit contribution'}
+              </button>
+            </div>
+          </div>
+        )
       ) : (
         <div style={pendingBannerStyle}>
           You already have a pending contribution. Wait for the author to review it before submitting another.
@@ -230,9 +314,16 @@ export default function SheetLabContribute({ sheet, onContributed }) {
                 </span>
               </div>
               {c.reviewer ? (
-                <div style={{ marginTop: 6, fontSize: 12, color: 'var(--sh-muted)' }}>
-                  Reviewed by <strong>{c.reviewer.username}</strong>
-                  {c.reviewedAt ? ` on ${new Date(c.reviewedAt).toLocaleDateString()}` : ''}
+                <div style={{ marginTop: 8, padding: '8px 12px', borderRadius: 10, background: 'var(--sh-soft)', border: '1px solid var(--sh-border)' }}>
+                  <div style={{ fontSize: 12, color: 'var(--sh-muted)' }}>
+                    {c.status === 'accepted' ? 'Accepted' : 'Rejected'} by <strong>{c.reviewer.username}</strong>
+                    {c.reviewedAt ? ` on ${new Date(c.reviewedAt).toLocaleDateString()}` : ''}
+                  </div>
+                  {c.reviewComment ? (
+                    <p style={{ margin: '6px 0 0', fontSize: 13, color: 'var(--sh-heading)', lineHeight: 1.5 }}>
+                      {c.reviewComment}
+                    </p>
+                  ) : null}
                 </div>
               ) : null}
               <div style={{ marginTop: 8 }}>
@@ -351,6 +442,19 @@ const diffToggleStyle = {
   border: '1px solid var(--sh-border)', background: 'var(--sh-soft)',
   color: 'var(--sh-muted)', fontSize: 11, fontWeight: 700,
   cursor: 'pointer', fontFamily: 'inherit',
+}
+
+const backButtonStyle = {
+  padding: '4px 12px', borderRadius: 8,
+  border: '1px solid var(--sh-border)', background: 'var(--sh-soft)',
+  color: 'var(--sh-muted)', fontSize: 12, fontWeight: 700,
+  cursor: 'pointer', fontFamily: 'inherit',
+}
+
+const changesSummaryStyle = {
+  display: 'grid', gap: 12,
+  padding: 14, borderRadius: 12,
+  background: 'var(--sh-soft)', border: '1px solid var(--sh-border)',
 }
 
 const emptyStyle = {

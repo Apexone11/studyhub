@@ -26,6 +26,7 @@ function serializeContribution(contribution) {
     id: contribution.id,
     status: contribution.status,
     message: contribution.message,
+    reviewComment: contribution.reviewComment || '',
     createdAt: contribution.createdAt,
     updatedAt: contribution.updatedAt,
     reviewedAt: contribution.reviewedAt,

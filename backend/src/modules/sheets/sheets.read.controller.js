@@ -79,4 +79,87 @@ router.get('/:id', optionalAuth, async (req, res) => {
   }
 })
 
+/* ── GET /:id/readme — lightweight readme extras (contributors + latest commit) ── */
+const readmeLimiter = require('express-rate-limit')({
+  windowMs: 60 * 1000,
+  max: 120,
+  message: { error: 'Too many requests. Please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
+router.get('/:id/readme', readmeLimiter, optionalAuth, async (req, res) => {
+  const sheetId = Number.parseInt(req.params.id, 10)
+  if (!Number.isInteger(sheetId)) return res.status(400).json({ error: 'Invalid sheet id.' })
+
+  try {
+    const sheet = await prisma.studySheet.findUnique({
+      where: { id: sheetId },
+      select: {
+        id: true, userId: true, status: true, visibility: true, courseId: true,
+        author: { select: AUTHOR_SELECT },
+      },
+    })
+
+    if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
+    if (!canReadSheet(sheet, req.user || null)) return res.status(404).json({ error: 'Sheet not found.' })
+
+    /* Fetch contributors (unique users from accepted contributions) and latest commit in parallel */
+    const [acceptedContributions, latestCommit, forkCount] = await Promise.all([
+      prisma.sheetContribution.findMany({
+        where: { targetSheetId: sheetId, status: 'accepted' },
+        select: { proposer: { select: AUTHOR_SELECT } },
+        orderBy: { reviewedAt: 'desc' },
+        take: 20,
+      }),
+      prisma.sheetCommit.findFirst({
+        where: { sheetId },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          message: true,
+          checksum: true,
+          createdAt: true,
+          author: { select: AUTHOR_SELECT },
+        },
+      }),
+      prisma.studySheet.count({ where: { forkOf: sheetId } }),
+    ])
+
+    /* Deduplicate contributors by user ID, include sheet author first */
+    const seen = new Set()
+    const contributors = []
+
+    /* Author is always the first contributor */
+    if (sheet.author) {
+      seen.add(sheet.author.id)
+      contributors.push(sheet.author)
+    }
+
+    for (const contrib of acceptedContributions) {
+      if (contrib.proposer && !seen.has(contrib.proposer.id)) {
+        seen.add(contrib.proposer.id)
+        contributors.push(contrib.proposer)
+      }
+    }
+
+    res.json({
+      contributors,
+      latestCommit: latestCommit
+        ? {
+            id: latestCommit.id,
+            message: latestCommit.message,
+            checksum: latestCommit.checksum ? latestCommit.checksum.slice(0, 7) : null,
+            createdAt: latestCommit.createdAt,
+            author: latestCommit.author,
+          }
+        : null,
+      forkCount,
+    })
+  } catch (error) {
+    captureError(error, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
 module.exports = router

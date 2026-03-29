@@ -13,8 +13,10 @@ import { DiffViewer } from './SheetLabPanels'
 
 export default function SheetLabReviews({ sheet, onReviewed }) {
   const [reviewing, setReviewing] = useState(null)
-  const [diffData, setDiffData] = useState({})
+  const [diffData, setDiffData] = useState({})       // { [contributionId]: diff }
+  const [conflictFlags, setConflictFlags] = useState({}) // { [contributionId]: boolean }
   const [loadingDiff, setLoadingDiff] = useState(null)
+  const [reviewComments, setReviewComments] = useState({}) // { [contributionId]: string }
 
   const incoming = sheet?.incomingContributions || []
   const pending = incoming.filter((c) => c.status === 'pending')
@@ -24,14 +26,18 @@ export default function SheetLabReviews({ sheet, onReviewed }) {
     if (reviewing) return
     setReviewing(contributionId)
     try {
+      const comment = (reviewComments[contributionId] || '').trim()
       const response = await fetch(`${API}/api/sheets/contributions/${contributionId}`, {
         method: 'PATCH',
         headers: authHeaders(),
         credentials: 'include',
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({ action, reviewComment: comment }),
       })
       const data = await readJsonSafely(response, {})
       if (!response.ok) throw new Error(getApiErrorMessage(data, `Could not ${action} contribution.`))
+      if (data.conflictWarning) {
+        showToast(data.conflictWarning, 'warning')
+      }
       showToast(
         action === 'accept'
           ? 'Contribution accepted! Your sheet has been updated.'
@@ -64,6 +70,9 @@ export default function SheetLabReviews({ sheet, onReviewed }) {
       const data = await readJsonSafely(response, {})
       if (!response.ok) throw new Error(getApiErrorMessage(data, 'Could not load diff.'))
       setDiffData((prev) => ({ ...prev, [contributionId]: data.diff }))
+      if (data.hasConflict) {
+        setConflictFlags((prev) => ({ ...prev, [contributionId]: true }))
+      }
     } catch (err) {
       showToast(err.message, 'error')
     } finally {
@@ -116,6 +125,9 @@ export default function SheetLabReviews({ sheet, onReviewed }) {
               diffData={diffData}
               loadingDiff={loadingDiff}
               onToggleDiff={toggleDiff}
+              hasConflict={conflictFlags[c.id] || false}
+              reviewComment={reviewComments[c.id] || ''}
+              onReviewCommentChange={(val) => setReviewComments((prev) => ({ ...prev, [c.id]: val }))}
             />
           ))}
         </div>
@@ -147,9 +159,23 @@ export default function SheetLabReviews({ sheet, onReviewed }) {
 
 /* ── Contribution card ────────────────────────────────────── */
 
-function ContributionCard({ contribution: c, showActions, reviewing, onReview, diffData, loadingDiff, onToggleDiff }) {
+function ContributionCard({ contribution: c, showActions, reviewing, onReview, diffData, loadingDiff, onToggleDiff, hasConflict, reviewComment, onReviewCommentChange }) {
   return (
     <div style={cardStyle}>
+      {/* Conflict warning banner */}
+      {hasConflict && showActions ? (
+        <div style={conflictBannerStyle}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+            <line x1="12" y1="9" x2="12" y2="13" />
+            <line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
+          <div>
+            <strong>Potential conflict detected.</strong> The original sheet has been modified since this contribution was submitted. Accepting will overwrite those changes with the fork&apos;s content. Review the diff carefully before merging.
+          </div>
+        </div>
+      ) : null}
+
       {/* Top row: status + proposer + date */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -178,11 +204,18 @@ function ContributionCard({ contribution: c, showActions, reviewing, onReview, d
         </p>
       ) : null}
 
-      {/* Reviewer info */}
+      {/* Reviewer info + saved review comment */}
       {c.reviewer ? (
-        <div style={{ marginTop: 6, fontSize: 12, color: 'var(--sh-muted)' }}>
-          {c.status === 'accepted' ? 'Accepted' : 'Rejected'} by <strong>{c.reviewer.username}</strong>
-          {c.reviewedAt ? ` on ${new Date(c.reviewedAt).toLocaleDateString()}` : ''}
+        <div style={{ marginTop: 8, padding: '8px 12px', borderRadius: 10, background: 'var(--sh-soft)', border: '1px solid var(--sh-border)' }}>
+          <div style={{ fontSize: 12, color: 'var(--sh-muted)' }}>
+            {c.status === 'accepted' ? 'Accepted' : 'Rejected'} by <strong>{c.reviewer.username}</strong>
+            {c.reviewedAt ? ` on ${new Date(c.reviewedAt).toLocaleDateString()}` : ''}
+          </div>
+          {c.reviewComment ? (
+            <p style={{ margin: '6px 0 0', fontSize: 13, color: 'var(--sh-heading)', lineHeight: 1.5 }}>
+              {c.reviewComment}
+            </p>
+          ) : null}
         </div>
       ) : null}
 
@@ -201,14 +234,17 @@ function ContributionCard({ contribution: c, showActions, reviewing, onReview, d
             <button
               type="button"
               onClick={() => {
-                if (window.confirm('Accept this contribution? Their changes will be merged into your sheet.')) {
+                const confirmMsg = hasConflict
+                  ? 'Warning: The original sheet has changed since this contribution was submitted. Accepting will overwrite those changes. Continue?'
+                  : 'Accept this contribution? Their changes will be merged into your sheet.'
+                if (window.confirm(confirmMsg)) {
                   onReview(c.id, 'accept')
                 }
               }}
               disabled={reviewing === c.id}
-              style={acceptButtonStyle}
+              style={hasConflict ? conflictAcceptButtonStyle : acceptButtonStyle}
             >
-              {reviewing === c.id ? 'Merging...' : 'Accept & Merge'}
+              {reviewing === c.id ? 'Merging...' : hasConflict ? 'Accept & Merge (conflict)' : 'Accept & Merge'}
             </button>
             <button
               type="button"
@@ -225,6 +261,27 @@ function ContributionCard({ contribution: c, showActions, reviewing, onReview, d
           </>
         ) : null}
       </div>
+
+      {/* Review comment textarea — shown for pending contributions when showActions is true */}
+      {showActions && c.status === 'pending' ? (
+        <div style={{ marginTop: 10 }}>
+          <label
+            htmlFor={`review-comment-${c.id}`}
+            style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--sh-muted)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 4 }}
+          >
+            Review comment (optional)
+          </label>
+          <textarea
+            id={`review-comment-${c.id}`}
+            value={reviewComment || ''}
+            onChange={(e) => onReviewCommentChange(e.target.value.slice(0, 1000))}
+            placeholder="Leave feedback for the contributor..."
+            maxLength={1000}
+            rows={2}
+            style={reviewCommentTextareaStyle}
+          />
+        </div>
+      ) : null}
 
       {/* Diff viewer */}
       {diffData[c.id] ? (
@@ -294,12 +351,34 @@ const acceptButtonStyle = {
   fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
 }
 
+const conflictAcceptButtonStyle = {
+  padding: '5px 14px', borderRadius: 8, border: '1px solid var(--sh-warning-border, #fde68a)',
+  background: 'var(--sh-warning-bg, #fffbeb)', color: 'var(--sh-warning-text, #92400e)',
+  fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+}
+
 const rejectButtonStyle = {
   padding: '5px 14px', borderRadius: 8,
   border: '1px solid var(--sh-danger-border, #fecaca)',
   background: 'var(--sh-danger-bg, #fef2f2)',
   color: 'var(--sh-danger-text, #dc2626)',
   fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+}
+
+const reviewCommentTextareaStyle = {
+  width: '100%', boxSizing: 'border-box', padding: '8px 10px',
+  borderRadius: 8, border: '1px solid var(--sh-border)',
+  background: 'var(--sh-soft)', color: 'var(--sh-heading)',
+  fontSize: 12, fontFamily: 'inherit', resize: 'vertical',
+}
+
+const conflictBannerStyle = {
+  display: 'flex', alignItems: 'flex-start', gap: 8,
+  padding: '10px 14px', borderRadius: 10, fontSize: 12, lineHeight: 1.5,
+  background: 'var(--sh-danger-bg, #fef2f2)',
+  border: '1px solid var(--sh-danger-border, #fecaca)',
+  color: 'var(--sh-danger-text, #dc2626)',
+  marginBottom: 10,
 }
 
 const emptyStyle = {

@@ -1,6 +1,77 @@
-import { Link } from 'react-router-dom'
-import { IconFork } from '../../../components/Icons'
-import { FONT, panelStyle, timeAgo } from './sheetViewerConstants'
+/* ── Line-numbered content renderer (text content only) ─────────────── */
+function TextContentBlock({ content }) {
+  if (!content) {
+    return (
+      <div style={{ padding: '24px 18px', textAlign: 'center', color: 'var(--sh-muted)', fontSize: 13 }}>
+        No content available.
+      </div>
+    )
+  }
+
+  /* Security: content is rendered as textContent via React JSX — never as raw HTML.
+     String.split is safe regardless of content.  No dangerouslySetInnerHTML. */
+  const lines = String(content).split('\n')
+
+  return (
+    <div
+      style={{
+        borderRadius: 14, border: '1px solid var(--sh-border)',
+        background: 'var(--sh-surface)', overflow: 'hidden',
+      }}
+    >
+      {/* Sticky header bar */}
+      <div
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '8px 16px', borderBottom: '1px solid var(--sh-border)',
+          background: 'var(--sh-soft)', fontSize: 11, color: 'var(--sh-muted)', fontWeight: 600,
+        }}
+      >
+        <span>{lines.length} {lines.length === 1 ? 'line' : 'lines'}</span>
+      </div>
+
+      <div style={{ overflowX: 'auto' }}>
+        <table
+          style={{
+            width: '100%', borderCollapse: 'collapse', fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
+            fontSize: 13, lineHeight: 1.7, tableLayout: 'auto',
+          }}
+          role="presentation"
+        >
+          <tbody>
+            {lines.map((line, i) => (
+              <tr
+                key={i}
+                style={{
+                  background: i % 2 === 0 ? 'transparent' : 'var(--sh-soft)',
+                }}
+              >
+                <td
+                  style={{
+                    width: 1, padding: '1px 12px 1px 16px', textAlign: 'right',
+                    color: 'var(--sh-slate-400)', fontSize: 11, userSelect: 'none',
+                    verticalAlign: 'top', whiteSpace: 'nowrap', borderRight: '1px solid var(--sh-border)',
+                  }}
+                  aria-hidden="true"
+                >
+                  {i + 1}
+                </td>
+                <td
+                  style={{
+                    padding: '1px 16px', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                    color: 'var(--sh-text)',
+                  }}
+                >
+                  {line || '\u00A0'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
 
 export default function SheetContentPanel({
   sheet,
@@ -183,21 +254,7 @@ export default function SheetContentPanel({
           </div>
         )
       ) : (
-        <div
-          style={{
-            borderRadius: 16,
-            border: '1px solid var(--sh-border)',
-            background: 'var(--sh-soft)',
-            padding: 18,
-            color: 'var(--sh-text)',
-            fontSize: 14,
-            lineHeight: 1.8,
-            whiteSpace: 'pre-wrap',
-            overflowX: 'auto',
-          }}
-        >
-          {sheet.content}
-        </div>
+        <TextContentBlock content={sheet.content} />
       )}
     </section>
   )

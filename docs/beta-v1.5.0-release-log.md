@@ -5783,3 +5783,351 @@ The feed page was showing zero items despite published content existing in the d
 | Backend lint (changed files) | Clean — 0 errors |
 | Frontend changes | None — all frontend files reverted to original |
 | npm install | Blocked by filesystem permission issue on mounted workspace (pre-existing, unrelated to these changes) |
+
+---
+
+## Sheet Experience Cycle — Track 1: Sheet Viewer Polish
+
+**Date**: 2026-03-29
+**Scope**: Frontend-only changes to improve the sheet viewer's layout, readability, navigation, and accessibility.
+
+### Changes
+
+#### 1.1 — Responsive Two-Panel Layout (SheetViewerPage.jsx)
+- On compact screens (phone/tablet ≤ 1179px), the right sidebar (`SheetViewerSidebar`) is now hidden instead of stacking below all content.
+- A new compact stats bar renders inline within the main column on compact screens, showing stars, forks, comments, downloads, and a "View history" link.
+- The grid `gridTemplateColumns` is now explicitly set based on `layout.isCompact` for clear responsive behavior.
+
+#### 1.2 — Content Readability Upgrade (SheetContentPanel.jsx)
+- Plain text sheet content now renders in a `TextContentBlock` component with:
+  - Line numbers in a left gutter (monospaced, right-aligned, aria-hidden).
+  - Alternating zebra-stripe row backgrounds for readability.
+  - A sticky header bar showing line count.
+  - Monospace font family (JetBrains Mono / Fira Code / Cascadia Code fallback).
+- **Security**: Content is rendered via React JSX text nodes only — no `dangerouslySetInnerHTML`. All user content is escaped by React's default behavior.
+
+#### 1.3 — Navigation Tab Strip (SheetViewerPage.jsx)
+- Added a GitHub-style tab navigation bar below the header: **Content | Comments (n) | Related (n)**.
+- Tabs scroll to their respective sections smoothly via `scrollIntoView`.
+- Active tab is highlighted with the brand color and a bottom border indicator.
+- Tabs are horizontally scrollable on small screens (`overflowX: auto`).
+
+#### 1.4 — Actions Menu Cleanup (SheetActionsMenu.jsx)
+- Dropdown items are now grouped under labeled sections: **Share & Export**, **Feedback**, **Study Status**, and **Safety**.
+- Added `role="menu"` and `role="menuitem"` ARIA attributes for screen readers.
+- Emoji icons marked `aria-hidden="true"` to prevent screen reader noise.
+
+#### Accessibility Fixes
+- **SheetActionsMenu**: Added `Escape` key listener to close the dropdown menu.
+- **Contribute Modal** (SheetViewerPage): Added `role="dialog"`, `aria-modal="true"`, `aria-label`, and `Escape` key handling.
+
+### Security Review
+
+| Check | Result |
+| ----- | ------ |
+| XSS (dangerouslySetInnerHTML) | ✅ Not used — all content rendered as JSX text |
+| URL injection | ✅ All URLs use safe template literals with integer IDs |
+| iframe sandbox | ✅ Unchanged — existing sandbox restrictions preserved |
+| State/race conditions | ✅ None detected |
+| Null safety | ✅ Proper guards on `sheet`, `user`, layout checks |
+
+### Files Changed
+
+| Area | File | Lines |
+| ---- | ---- | ----- |
+| Frontend — Viewer | `frontend/studyhub-app/src/pages/sheets/viewer/SheetViewerPage.jsx` | 236 → 323 |
+| Frontend — Viewer | `frontend/studyhub-app/src/pages/sheets/viewer/SheetContentPanel.jsx` | 204 → 262 |
+| Frontend — Viewer | `frontend/studyhub-app/src/pages/sheets/viewer/SheetActionsMenu.jsx` | 198 → 225 |
+
+### Validation
+
+| Suite | Result |
+| ------- | -------- |
+| Vite build (`vite build --logLevel error`) | ✅ Clean — 0 errors |
+| Syntax balance check (braces/parens/brackets) | ✅ All 3 files balanced |
+| Security audit (XSS, injection, state, a11y) | ✅ No critical or high issues |
+
+---
+
+## Sheet Experience Cycle — Track 2: README-Style Sheet Landing Pages
+
+**Date**: 2026-03-29
+**Scope**: Backend endpoint + frontend component for a GitHub-style README landing section on every sheet.
+
+### Changes
+
+#### 2.1 — Backend: GET /api/sheets/:id/readme Endpoint
+- New lightweight endpoint in `sheets.read.controller.js` that returns:
+  - `contributors` — deduplicated list from accepted contributions (author always first), capped at 20.
+  - `latestCommit` — most recent commit with message, truncated checksum (7 chars), timestamp, author.
+  - `forkCount` — total fork count.
+- **Security**: Enforces `canReadSheet()` authorization check. Uses `optionalAuth` (same as main GET /:id). Rate limited at 120 req/min.
+- **Data safety**: Uses `AUTHOR_SELECT` constant which excludes `emailVerified` and other private fields.
+
+#### 2.2 — Frontend: SheetReadme Component (NEW file)
+- `SheetReadme.jsx` — GitHub-style landing section rendered above the content panel.
+- Shows: description (plain text, pre-wrap), metadata badges (stars, forks, downloads, updated time, course code), contributor avatar row with stacked circles, latest commit info with author + message + checksum + time.
+- **Security**: All user content rendered via React JSX text nodes — no `dangerouslySetInnerHTML`. No HTML rendering of description.
+
+#### 2.3 — Wiring (useSheetViewer + SheetViewerPage)
+- Added `readmeData` state and fetch effect in `useSheetViewer.js`. Uses `readJsonSafely` for robust JSON parsing with AbortError handling.
+- `SheetViewerPage.jsx` renders `<SheetReadme>` above the content panel when sheet data is available.
+- README fetch is supplementary — failures don't block the page.
+
+### Security Review
+
+| Check | Result |
+| ----- | ------ |
+| XSS (dangerouslySetInnerHTML) | ✅ Not used anywhere in new code |
+| Authorization bypass | ✅ canReadSheet() enforced on readme endpoint |
+| Data leakage | ✅ AUTHOR_SELECT excludes private fields |
+| Rate limiting | ✅ 120 req/min applied to readme endpoint |
+| Error handling | ✅ AbortError handled, readJsonSafely for parsing |
+| SQL/Prisma injection | ✅ Integer-validated ID, parameterized queries |
+
+### Files Changed
+
+| Area | File | Status |
+| ---- | ---- | ------ |
+| Backend — Sheets | `backend/src/modules/sheets/sheets.read.controller.js` | Modified (82 → 166 lines) |
+| Frontend — Viewer | `frontend/studyhub-app/src/pages/sheets/viewer/SheetReadme.jsx` | **NEW** (184 lines) |
+| Frontend — Viewer | `frontend/studyhub-app/src/pages/sheets/viewer/SheetViewerPage.jsx` | Modified (+4 lines) |
+| Frontend — Viewer | `frontend/studyhub-app/src/pages/sheets/viewer/useSheetViewer.js` | Modified (484 → 504 lines) |
+
+### Validation
+
+| Suite | Result |
+| ------- | -------- |
+| Backend syntax check (node -c) | ✅ Clean |
+| Vite build | ✅ Clean — 0 errors |
+| Syntax balance check | ✅ All files balanced |
+| Security audit (agent) | ✅ No critical issues; medium findings fixed (rate limit + error handling) |
+
+---
+
+## Sheet Experience Cycle — Track 3: Improved Diff Viewing
+
+**Date**: 2026-03-29
+**Scope**: Line numbers, word-level highlighting polish, and responsive layout for both SheetLab and contribution inline diff viewers.
+
+### Changes
+
+#### 3.1 — SheetLabPanels: Line Number Gutters
+- Added `computeLineNumbers(hunk)` helper that tracks old/new line counters through each hunk's lines (equal increments both, remove increments old, add increments new).
+- **UnifiedDiffView**: Added two line number columns (old + new) before the gutter character, using `sheet-lab__diff-linenum--old` and `sheet-lab__diff-linenum--new` CSS classes.
+- **SplitDiffView**: Changed grid from 2-column (`1fr 1fr`) to 4-column (`42px 1fr 42px 1fr`) to accommodate line number gutters. Added `leftNum`/`rightNum` tracking in row construction.
+- Added `HunkSeparator` component for cleaner hunk header rendering.
+
+#### 3.2 — ContributionInlineDiff: Line Numbers + Word Segments
+- Added `computeLineNumbers()` (same logic as SheetLabPanels) for compact contribution diff cards.
+- Added `SegmentSpans` component for word-level highlights using inline CSS variable tokens (`--sh-success-border`, `--sh-danger-border`).
+- Both unified and split views now render line number gutters (32px width, right-aligned).
+- Split view uses `display: grid; grid-template-columns: 32px 1fr 32px 1fr`.
+
+#### 3.3 — SheetLabPage.css: Style Updates
+- Added `.sheet-lab__diff-linenum` base class (42px, right-aligned, opacity 0.7, monospace font).
+- Added `.sheet-lab__diff-linenum--old` with border-right separator.
+- Updated `.sheet-lab__split-row` and `.sheet-lab__split-header` grids to 4-column layout.
+- Updated `.sheet-lab__split-col-header` with `grid-column: span 2`.
+- Enhanced `.sheet-lab__word-add` and `.sheet-lab__word-remove` with border-radius, padding, and font-weight.
+- Added responsive rules for mobile: 30px linenum width, 9px font size.
+
+### Security Review
+
+| Check | Result |
+| ----- | ------ |
+| XSS (dangerouslySetInnerHTML) | ✅ Not used — all diff content rendered as JSX text nodes |
+| User content escaping | ✅ `line.content` and `seg.text` escaped by React default behavior |
+| Injection via diff data | ✅ All values are string/number literals from backend LCS engine |
+| State/race conditions | ✅ None — stateless rendering from props |
+
+### Files Changed
+
+| Area | File | Status |
+| ---- | ---- | ------ |
+| Frontend — Lab | `frontend/studyhub-app/src/pages/sheets/lab/SheetLabPanels.jsx` | Modified (179 → 235 lines) |
+| Frontend — Lab | `frontend/studyhub-app/src/pages/sheets/lab/ContributionInlineDiff.jsx` | Modified (128 → 202 lines) |
+| Frontend — Lab | `frontend/studyhub-app/src/pages/sheets/lab/SheetLabPage.css` | Modified (line number + responsive rules added) |
+
+### Validation
+
+| Suite | Result |
+| ------- | -------- |
+| Vite build | ✅ Clean — 0 errors |
+| Syntax balance check (braces/parens/brackets) | ✅ All 3 files balanced |
+| Security audit (agent) | ✅ CLEAN — No XSS risks detected |
+
+---
+
+## Sheet Experience Cycle — Track 4: Better Fork & Contribution UX
+
+**Date**: 2026-03-29
+**Scope**: Smoother fork→edit→contribute flow with preview step, review comments, and enhanced fork banner.
+
+### Changes
+
+#### 4.1 — One-Click Fork with Redirect to Editor
+- Updated `handleFork` in `useSheetViewer.js` to navigate to `/sheets/{id}/lab?tab=editor` after fork creation.
+- Updated `useSheetLab.js` to read `?tab=` URL parameter and set initial active tab accordingly. Validates against a whitelist of known tab names (`editor`, `history`, `contribute`, `reviews`, `lineage`).
+- Uses a `useRef` flag to prevent re-initialization on subsequent renders.
+
+#### 4.2 — Two-Step Contribution Submission with Preview
+- Refactored `SheetLabContribute.jsx` with a `submitStep` state (`compose` → `review`).
+- Step 1 (compose): User writes message, clicks "Review changes" which loads upstream comparison diff.
+- Step 2 (review): Shows changes summary card (additions/deletions/hunks count), full diff viewer, message preview, and "Confirm & submit" button.
+- Prevents empty contributions: if fork is identical to original, shows toast and stays on step 1.
+- Back button returns to compose step without losing message.
+
+#### 4.3 — Review Comments on Contributions
+- **Schema**: Added `reviewComment String @default("")` to `SheetContribution` model.
+- **Backend**: `PATCH /contributions/:id` now accepts `reviewComment` field (trimmed, max 1000 chars). Stored alongside accept/reject action.
+- **Serializer**: `serializeContribution` now includes `reviewComment` field in API responses.
+- **Frontend (Reviews tab)**: Added review comment textarea on each pending contribution card. Comment sent with accept/reject action.
+- **Frontend (Contribute tab)**: Displays saved review comments in a styled card alongside reviewer info on past contributions.
+
+#### 4.4 — Enhanced Fork Relationship Banner
+- Upgraded the subtle fork lineage text in `SheetHeader.jsx` to a proper styled banner with:
+  - Info-colored background (`--sh-info-bg`, `--sh-info-border`)
+  - Fork icon, title link, author link
+  - "Contribute back" quick-action button linking to `/sheets/{id}/lab?tab=contribute`
+
+### Security Review
+
+| Check | Result |
+| ----- | ------ |
+| XSS (dangerouslySetInnerHTML) | ✅ Not used — all user content rendered as JSX text nodes |
+| Input sanitization | ✅ reviewComment trimmed + 1000 char limit; message trimmed + 500 char limit |
+| Authorization bypass | ✅ Only sheet owner/admin can review; only fork owner can contribute |
+| SQL/Prisma injection | ✅ All queries use parameterized IDs |
+| URL parameter safety | ✅ Tab param validated against whitelist; no open redirect vectors |
+| Data leakage | ✅ serializeContribution only exposes safe fields |
+| Race conditions | ✅ initialTabSet ref prevents tab re-init; pending check prevents double submissions |
+
+### Files Changed
+
+| Area | File | Status |
+| ---- | ---- | ------ |
+| Schema | `backend/prisma/schema.prisma` | Modified (+1 field: reviewComment) |
+| Backend — Contributions | `backend/src/modules/sheets/sheets.contributions.controller.js` | Modified (+reviewComment handling) |
+| Backend — Serializer | `backend/src/modules/sheets/sheets.serializer.js` | Modified (+reviewComment field) |
+| Frontend — Lab | `frontend/.../lab/SheetLabContribute.jsx` | Modified (two-step flow + review comment display) |
+| Frontend — Lab | `frontend/.../lab/SheetLabReviews.jsx` | Modified (+review comment textarea + display) |
+| Frontend — Lab | `frontend/.../lab/useSheetLab.js` | Modified (+URL tab param reading) |
+| Frontend — Viewer | `frontend/.../viewer/useSheetViewer.js` | Modified (fork redirect URL) |
+| Frontend — Viewer | `frontend/.../viewer/SheetHeader.jsx` | Modified (enhanced fork banner) |
+
+### Validation
+
+| Suite | Result |
+| ------- | -------- |
+| Vite build | ✅ Clean — 0 errors |
+| Backend syntax check (node -c) | ✅ Clean |
+| Syntax balance check (braces/parens/brackets) | ✅ All 4 frontend files balanced |
+| Security audit (agent, 20 checks) | ✅ All PASS — no vulnerabilities detected |
+
+---
+
+## Sheet Experience Cycle — Track 5: Sheet Version History
+
+**Date**: 2026-03-29
+**Scope**: Visual commit timeline extraction, enhanced avatars/badges, and arbitrary version comparison.
+
+### Changes
+
+#### 5.1 — Visual Commit Timeline (SheetLabHistory.jsx — NEW)
+- Extracted 250-line `HistoryTab` from `SheetLabPage.jsx` into dedicated `SheetLabHistory.jsx` component.
+- **SheetLabPage.jsx** reduced from 437 to ~190 lines — now a thin orchestrator importing tab components.
+- Enhanced timeline dots: now show author avatar or initial letter instead of plain colored circles.
+- Latest commit dot gets a distinct brand-colored background for visual prominence.
+- Added commit kind metadata with icons: Fork base (⑂), Restored (↩), Merged (⤞).
+- Added "Browse at this version" link on each commit card.
+- Added `.sheet-lab__browse-btn` and `.sheet-lab__commit-dot--latest` CSS classes.
+- Cleaned up unused imports from SheetLabPage (`DiffViewer`, `timeAgo`, `truncateChecksum`).
+
+#### 5.2 — Compare Any Two Versions (SheetLabChanges.jsx)
+- Added `VersionCompare` sub-component with two `<select>` dropdowns (base/compare) populated from all commits.
+- Loads all commits via `GET /api/sheets/:id/lab/commits?page=1&limit=100` for dropdown options.
+- Computes diff between selected pair using existing `GET /api/sheets/:id/lab/diff/:a/:b` endpoint.
+- Shows additions/deletions summary and full diff viewer for selected pair.
+- Guard: same version selected shows informational banner instead of fetching.
+- Cancel flag pattern prevents state updates after component unmount.
+- Version comparison available even when no uncommitted changes exist.
+- No backend changes needed — existing diff endpoint already supports arbitrary commit pair comparison.
+
+### Security Review
+
+| Check | Result |
+| ----- | ------ |
+| XSS (dangerouslySetInnerHTML) | ✅ Not used — all content rendered as JSX text nodes |
+| User text rendering | ✅ Commit messages, usernames, checksums all React-escaped |
+| URL construction | ✅ Only integer IDs from API + hardcoded params; no open redirects |
+| Dropdown values | ✅ Commit IDs from API response, not user input |
+| Async cancellation | ✅ Cancel flag pattern in version comparison effect |
+| Authorization | ✅ Server-side canReadSheet/assertOwnerOrAdmin on all endpoints |
+| Data leakage | ✅ Only necessary fields exposed in commit list responses |
+
+### Files Changed
+
+| Area | File | Status |
+| ---- | ---- | ------ |
+| Frontend — Lab | `frontend/.../lab/SheetLabHistory.jsx` | **NEW** (~250 lines) |
+| Frontend — Lab | `frontend/.../lab/SheetLabChanges.jsx` | Modified (+VersionCompare, ~100 lines added) |
+| Frontend — Lab | `frontend/.../lab/SheetLabPage.jsx` | Modified (437 → ~190 lines, removed inline HistoryTab) |
+| Frontend — Lab | `frontend/.../lab/SheetLabPage.css` | Modified (enhanced dot, browse-btn styles) |
+
+### Validation
+
+| Suite | Result |
+| ------- | -------- |
+| Vite build | ✅ Clean — 0 errors |
+| Syntax balance check (braces/parens/brackets) | ✅ All 3 JSX files balanced |
+| Security audit (agent, 20 checks) | ✅ All PASS — no vulnerabilities detected |
+
+---
+
+## Track 6 — Branch-like Workflow Enhancements
+
+**Date:** 2026-03-29
+
+### 6.1 Draft/Publish Toggle in SheetLabEditor
+
+**Goal:** Allow sheet owners to publish or revert sheets to draft directly from the editor.
+
+**Changes:**
+- `frontend/studyhub-app/src/pages/sheets/lab/SheetLabEditor.jsx` — Added `publishing`, `sheetStatus` state. New `handleTogglePublish()` saves dirty content first, then toggles status via `PATCH /api/sheets/:id`. Status bar now shows draft/published badge and toggle button.
+
+### 6.2 Activity Feed
+
+**Goal:** Unified chronological feed of commits, contributions, and comments per sheet.
+
+**Changes:**
+- `backend/src/modules/sheets/sheets.activity.controller.js` — NEW. `GET /:id/activity` with rate limiting (120 req/min), `optionalAuth`, `canReadSheet` access check. Parallel-fetches commits, contributions, comments via `Promise.all`, normalizes to unified activity items (type, date, actor, message, meta), sorts by date desc, paginates. Comment bodies truncated to 120 chars. Uses `AUTHOR_SELECT` to prevent private field leakage.
+- `backend/src/modules/sheets/sheets.routes.js` — Mounted `activityController` after existing routes.
+- `frontend/studyhub-app/src/pages/sheets/viewer/SheetActivityFeed.jsx` — NEW. Timeline-style activity feed component with type-specific icons/colors, actor avatars, pagination. Fetches from activity endpoint.
+- `frontend/studyhub-app/src/pages/sheets/viewer/SheetViewerPage.jsx` — Added "Activity" tab to navigation strip, renders `SheetActivityFeed` between content and comments sections.
+
+### 6.3 Merge Conflict Detection
+
+**Goal:** Warn reviewers when the target sheet has diverged since a contribution was submitted, preventing unintentional data loss on merge.
+
+**Changes:**
+- `backend/prisma/schema.prisma` — Added `baseChecksum String @default("")` to `SheetContribution` model.
+- `backend/src/modules/sheets/sheets.contributions.controller.js` — On contribution creation, captures `baseChecksum` of target sheet content. On accept, compares current target checksum with stored `baseChecksum`; includes `conflictWarning` in response if diverged. Diff endpoint also returns `hasConflict` boolean.
+- `frontend/studyhub-app/src/pages/sheets/lab/SheetLabReviews.jsx` — Stores `conflictFlags` per contribution. Shows danger-styled conflict warning banner on pending contributions with detected conflicts. Accept button changes to warning style with "(conflict)" label. Confirmation dialog includes explicit conflict warning. Response-side conflict toast notification.
+
+**Security notes:**
+- No `dangerouslySetInnerHTML` or `eval` in any new code.
+- All user content rendered through React JSX text nodes.
+- `AUTHOR_SELECT` used consistently — no email/password exposure.
+- Activity endpoint rate-limited and access-controlled via `canReadSheet`.
+- `baseChecksum` computed server-side via SHA256 — no client-side tampering possible.
+- Input validation: `reviewComment` capped at 1000 chars, `commitMessage` at 500, `parsePositiveInt` for IDs.
+
+### Validation
+
+| Suite | Result |
+| ------- | -------- |
+| Backend syntax check (`node -c`) | ✅ All 3 files pass |
+| Vite build | ✅ Clean — 0 errors |
+| Security audit (dangerouslySetInnerHTML, eval, innerHTML) | ✅ None found |
+| AUTHOR_SELECT field check | ✅ Only id, username, avatarUrl, isStaffVerified exposed |

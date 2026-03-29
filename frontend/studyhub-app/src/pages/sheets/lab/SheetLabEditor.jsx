@@ -42,9 +42,12 @@ export default function SheetLabEditor({ sheet, onContentSaved }) {
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [lastSaved, setLastSaved] = useState(null)
+  const [publishing, setPublishing] = useState(false)
+  const [sheetStatus, setSheetStatus] = useState('draft')
   const autosaveTimer = useRef(null)
   const contentFormat = sheet?.contentFormat || 'markdown'
   const isHtml = contentFormat === 'html'
+  const isDraft = sheetStatus === 'draft'
 
   // Hydrate from sheet
   useEffect(() => {
@@ -52,6 +55,7 @@ export default function SheetLabEditor({ sheet, onContentSaved }) {
     setContent(sheet.content || '')
     setTitle(sheet.title || '')
     setDescription(sheet.description || '')
+    setSheetStatus(sheet.status || 'draft')
     setDirty(false)
     setLastSaved(null)
   }, [sheet?.id]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -82,6 +86,35 @@ export default function SheetLabEditor({ sheet, onContentSaved }) {
       setSaving(false)
     }
   }, [sheet?.id, onContentSaved])
+
+  // Publish or revert to draft — saves content first, then toggles status
+  const handleTogglePublish = async () => {
+    if (!sheet?.id || publishing) return
+    setPublishing(true)
+    try {
+      // Save current content first if dirty
+      if (dirty) {
+        if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
+        await save(content, title, description)
+      }
+      const newStatus = isDraft ? 'published' : 'draft'
+      const response = await fetch(`${API}/api/sheets/${sheet.id}`, {
+        method: 'PATCH',
+        headers: authHeaders(),
+        credentials: 'include',
+        body: JSON.stringify({ status: newStatus }),
+      })
+      const data = await readJsonSafely(response, {})
+      if (!response.ok) throw new Error(getApiErrorMessage(data, `Could not ${isDraft ? 'publish' : 'unpublish'}.`))
+      setSheetStatus(newStatus)
+      showToast(isDraft ? 'Sheet published!' : 'Sheet moved back to draft.', 'success')
+      if (onContentSaved) onContentSaved()
+    } catch (err) {
+      showToast(err.message, 'error')
+    } finally {
+      setPublishing(false)
+    }
+  }
 
   // Debounced autosave
   useEffect(() => {
@@ -155,11 +188,24 @@ export default function SheetLabEditor({ sheet, onContentSaved }) {
         padding: '8px 12px', borderRadius: 10,
         background: 'var(--sh-soft)', border: '1px solid var(--sh-border)',
         fontSize: 12, color: 'var(--sh-muted)',
+        flexWrap: 'wrap', gap: 8,
       }}>
-        <span>
-          {saving ? 'Saving…' : dirty ? 'Unsaved changes' : lastSaved ? `Saved ${formatTime(lastSaved)}` : 'No changes'}
-        </span>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {/* Draft / Published status indicator */}
+          <span style={{
+            padding: '2px 8px', borderRadius: 6, fontWeight: 700, fontSize: 10,
+            textTransform: 'uppercase',
+            background: isDraft ? 'var(--sh-warning-bg, #fffbeb)' : 'var(--sh-success-bg, #f0fdf4)',
+            color: isDraft ? 'var(--sh-warning-text, #92400e)' : 'var(--sh-success-text, #166534)',
+            border: `1px solid ${isDraft ? 'var(--sh-warning-border, #fde68a)' : 'var(--sh-success-border, #bbf7d0)'}`,
+          }}>
+            {isDraft ? 'Draft' : 'Published'}
+          </span>
+          <span>
+            {saving ? 'Saving…' : dirty ? 'Unsaved changes' : lastSaved ? `Saved ${formatTime(lastSaved)}` : 'No changes'}
+          </span>
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <span style={{
             padding: '2px 8px', borderRadius: 6, fontWeight: 700, fontSize: 10,
             background: isHtml ? '#dbeafe' : '#e0e7ff',
@@ -181,6 +227,22 @@ export default function SheetLabEditor({ sheet, onContentSaved }) {
             }}
           >
             {saving ? 'Saving…' : 'Save now'}
+          </button>
+          <button
+            type="button"
+            onClick={handleTogglePublish}
+            disabled={publishing || saving}
+            style={{
+              border: 'none', borderRadius: 8, padding: '4px 12px',
+              background: isDraft ? 'var(--sh-success, #16a34a)' : 'var(--sh-warning-bg, #fffbeb)',
+              color: isDraft ? '#fff' : 'var(--sh-warning-text, #92400e)',
+              fontWeight: 700, fontSize: 11,
+              cursor: publishing ? 'wait' : 'pointer',
+              fontFamily: 'inherit',
+              border: isDraft ? 'none' : '1px solid var(--sh-warning-border, #fde68a)',
+            }}
+          >
+            {publishing ? (isDraft ? 'Publishing…' : 'Saving…') : isDraft ? 'Publish' : 'Revert to draft'}
           </button>
         </div>
       </div>

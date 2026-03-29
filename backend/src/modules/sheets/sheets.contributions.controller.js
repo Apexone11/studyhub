@@ -19,6 +19,7 @@ const router = express.Router()
 router.patch('/contributions/:contributionId', contributionReviewLimiter, requireAuth, requireVerifiedEmail, async (req, res) => {
   const contributionId = Number.parseInt(req.params.contributionId, 10)
   const action = typeof req.body.action === 'string' ? req.body.action.trim().toLowerCase() : ''
+  const reviewComment = typeof req.body.reviewComment === 'string' ? req.body.reviewComment.trim().slice(0, 1000) : ''
 
   if (!Number.isInteger(contributionId)) {
     return res.status(400).json({ error: 'Contribution id must be an integer.' })
@@ -32,7 +33,7 @@ router.patch('/contributions/:contributionId', contributionReviewLimiter, requir
       where: { id: contributionId },
       include: {
         targetSheet: {
-          select: { id: true, userId: true, title: true, attachmentUrl: true },
+          select: { id: true, userId: true, title: true, content: true, attachmentUrl: true },
         },
         forkSheet: {
           select: {
@@ -59,6 +60,13 @@ router.patch('/contributions/:contributionId', contributionReviewLimiter, requir
     }
     if (req.user.role !== 'admin' && req.user.userId !== contribution.targetSheet.userId) {
       return sendForbidden(res, 'Only the original author can review this contribution.')
+    }
+
+    // Conflict detection: check if target sheet has diverged since contribution was created
+    let hasConflict = false
+    if (action === 'accept' && contribution.baseChecksum) {
+      const currentChecksum = computeChecksum(contribution.targetSheet.content || '')
+      hasConflict = currentChecksum !== contribution.baseChecksum
     }
 
     if (action === 'accept') {
@@ -118,6 +126,7 @@ router.patch('/contributions/:contributionId', contributionReviewLimiter, requir
         status: action === 'accept' ? 'accepted' : 'rejected',
         reviewerId: req.user.userId,
         reviewedAt: new Date(),
+        reviewComment,
       },
       include: {
         proposer: { select: AUTHOR_SELECT },
@@ -147,10 +156,14 @@ router.patch('/contributions/:contributionId', contributionReviewLimiter, requir
       linkPath: `/sheets/${contribution.targetSheet.id}`,
     })
 
-    res.json({
+    const responseData = {
       message: action === 'accept' ? 'Contribution accepted.' : 'Contribution rejected.',
       contribution: serializeContribution(updatedContribution),
-    })
+    }
+    if (hasConflict) {
+      responseData.conflictWarning = 'The target sheet was modified since this contribution was submitted. The merge overwrote those changes.'
+    }
+    res.json(responseData)
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
@@ -182,7 +195,7 @@ router.post('/:id/contributions', requireAuth, requireVerifiedEmail, contributio
 
     const targetSheet = await prisma.studySheet.findUnique({
       where: { id: forkSheet.forkOf },
-      select: { id: true, title: true, userId: true },
+      select: { id: true, title: true, userId: true, content: true },
     })
     if (!targetSheet) return res.status(404).json({ error: 'Original sheet not found.' })
     if (targetSheet.userId === req.user.userId) {
@@ -207,6 +220,7 @@ router.post('/:id/contributions', requireAuth, requireVerifiedEmail, contributio
         forkSheetId,
         proposerId: req.user.userId,
         message,
+        baseChecksum: computeChecksum(targetSheet.content || ''),
       },
       include: {
         proposer: { select: AUTHOR_SELECT },
@@ -268,7 +282,14 @@ router.get('/contributions/:contributionId/diff', requireAuth, diffLimiter, asyn
     )
     addWordSegments(diff.hunks)
 
-    res.json({ diff })
+    // Check for potential conflicts (target sheet changed since contribution was created)
+    let hasConflict = false
+    if (contribution.baseChecksum) {
+      const currentChecksum = computeChecksum(contribution.targetSheet.content || '')
+      hasConflict = currentChecksum !== contribution.baseChecksum
+    }
+
+    res.json({ diff, hasConflict })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
