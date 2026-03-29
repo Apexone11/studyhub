@@ -273,7 +273,7 @@ export default function SheetViewerPage() {
         >
           <div
             style={{
-              background: 'var(--sh-surface)', borderRadius: 18, padding: 28, width: '100%', maxWidth: 440,
+              background: 'var(--sh-surface)', borderRadius: 18, padding: '24px 18px', width: 'calc(100% - 32px)', maxWidth: 440, boxSizing: 'border-box',
               boxShadow: '0 20px 60px rgba(0,0,0,0.2)', fontFamily: FONT,
             }}
             onClick={(e) => e.stopPropagation()}

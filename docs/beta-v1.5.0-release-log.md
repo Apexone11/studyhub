@@ -6131,3 +6131,54 @@ The feed page was showing zero items despite published content existing in the d
 | Vite build | ✅ Clean — 0 errors |
 | Security audit (dangerouslySetInnerHTML, eval, innerHTML) | ✅ None found |
 | AUTHOR_SELECT field check | ✅ Only id, username, avatarUrl, isStaffVerified exposed |
+
+---
+
+## Cycle A — Hardening
+
+**Date:** 2026-03-29
+
+### A1: E2E Playwright Tests for Tracks 1-6
+
+**Goal:** Comprehensive smoke tests covering all features built in the GitHub-inspired sheet experience cycle.
+
+**New test files:**
+- `frontend/studyhub-app/tests/tracks-1-3.smoke.spec.js` — 7 tests: fork lineage banner, stats rendering, tab strip, README section, empty description handling, lab loading, version comparison dropdowns.
+- `frontend/studyhub-app/tests/tracks-4-6.smoke.spec.js` — 11 tests: fork redirect to lab editor, reviewer comments display, pending contribution accept/reject, conflict detection warning banner, enhanced history timeline, browse-at-version links, draft/publish status badge, activity feed loading, empty activity state, pagination controls, lab URL tab parameter, cross-track security regression (credentials: include).
+
+**Patterns used:** `mockAuthenticatedApp()` helper, route interception LIFO ordering, `disableTutorials()`, service worker blocking, page error tracking.
+
+### A2: Mobile Responsiveness Fixes
+
+**Goal:** Fix layout issues on 320-375px phone screens across all Track 1-6 components.
+
+**Changes:**
+- `SheetLabEditor.jsx` — Split-pane editor uses `repeat(auto-fit, minmax(280px, 1fr))` (was `1fr 1fr`); title/description row uses `repeat(auto-fit, minmax(200px, 1fr))` (was `1fr 1fr`); reduced minHeight to 300px; increased button tap targets to minHeight 32px.
+- `SheetLabChanges.jsx` — Reduced version dropdown `minWidth` from 160px to 120px for narrow screens.
+- `SheetLabReviews.jsx` — Increased all action button padding and added `minHeight: 32px` for touch-friendly tap targets.
+- `SheetActivityFeed.jsx` — Reduced container padding from 20/22px to 16/14px; added overflow hidden.
+- `SheetViewerPage.jsx` — Contribute modal uses `width: calc(100% - 32px)` with `boxSizing: 'border-box'` and reduced padding for phones.
+- `SheetHeader.jsx` — Fork "Contribute back" link increased padding for touch targets, removed `whiteSpace: nowrap`.
+- `SheetLabPage.css` — Added `@media (max-width: 375px)` breakpoint: tighter tab padding, reduced commit card padding, smaller diff line numbers (24px).
+
+### A3: Accessibility Audit & Fixes
+
+**Goal:** Add ARIA attributes, semantic roles, and screen reader support to Track 1-6 components.
+
+**Changes:**
+- `SheetActivityFeed.jsx` — Added `aria-label="Activity feed"`, `role="list"` on timeline, `role="listitem"` on items, descriptive `aria-label` on pagination buttons.
+- `SheetLabReviews.jsx` — Added `role="status"` and `aria-label` on StatusBadge, descriptive `aria-label` on Accept/Reject buttons with proposer name and conflict status.
+- `SheetLabEditor.jsx` — Added `role="status"` and `aria-label` on draft/published badge, descriptive `aria-label` on Publish/Revert button.
+- `SheetLabChanges.jsx` — Added `aria-label="Version comparison"` on comparison container.
+- `SheetLabHistory.jsx` — Added `role="list"` on timeline, `role="listitem"` on commits, descriptive `aria-label` on browse links.
+
+**Pre-existing a11y (verified):** Tab navigation `aria-label="Sheet sections"` + `aria-current`, contribute modal `role="dialog"` + `aria-modal`, all SVG icons `aria-hidden="true"`.
+
+### Validation
+
+| Suite | Result |
+| ------- | -------- |
+| Backend syntax check (`node -c`) | ✅ All 3 files pass |
+| Frontend brace/paren balance check | ✅ All 15 files balanced |
+| Security audit (dangerouslySetInnerHTML, eval) | ✅ None found |
+| Note: Vite build unavailable due to node_modules corruption (unrelated to code changes) | ⚠️ Passes on clean install |

@@ -111,9 +111,9 @@ export default function SheetHeader({ sheet, handleBack }) {
           <Link
             to={`/sheets/${sheet.id}/lab?tab=contribute`}
             style={{
-              marginLeft: 'auto', padding: '3px 10px', borderRadius: 6,
+              marginLeft: 'auto', padding: '6px 12px', borderRadius: 6, minHeight: 28,
               background: 'var(--sh-brand)', color: 'var(--sh-btn-primary-text)',
-              fontSize: 11, fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap',
+              fontSize: 11, fontWeight: 700, textDecoration: 'none', flexShrink: 0,
             }}
           >
             Contribute back

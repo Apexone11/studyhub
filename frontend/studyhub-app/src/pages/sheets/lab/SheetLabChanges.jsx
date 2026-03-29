@@ -201,12 +201,12 @@ export default function SheetLabChanges({ sheet, onCommitCreated }) {
 
 function VersionCompare({ commits, compareBase, compareHead, setCompareBase, setCompareHead, compareDiff, loadingCompare }) {
   return (
-    <div style={compareBoxStyle}>
+    <div style={compareBoxStyle} aria-label="Version comparison">
       <h4 style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: 'var(--sh-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
         Compare versions
       </h4>
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-        <div style={{ flex: 1, minWidth: 160 }}>
+        <div style={{ flex: 1, minWidth: 120 }}>
           <label htmlFor="compare-base" style={dropdownLabelStyle}>Base (older)</label>
           <select
             id="compare-base"
@@ -223,7 +223,7 @@ function VersionCompare({ commits, compareBase, compareHead, setCompareBase, set
           </select>
         </div>
         <span style={{ color: 'var(--sh-muted)', fontWeight: 700, fontSize: 16, marginTop: 18 }}>→</span>
-        <div style={{ flex: 1, minWidth: 160 }}>
+        <div style={{ flex: 1, minWidth: 120 }}>
           <label htmlFor="compare-head" style={dropdownLabelStyle}>Compare (newer)</label>
           <select
             id="compare-head"

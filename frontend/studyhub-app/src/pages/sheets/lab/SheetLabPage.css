@@ -1024,3 +1024,36 @@
     max-width: 100%;
   }
 }
+
+/* ── Small phone (≤375px) — tighter spacing ────────────────── */
+
+@media (max-width: 375px) {
+  .sheet-lab__tabs {
+    gap: 0;
+  }
+
+  .sheet-lab__tab {
+    padding: 8px 10px;
+    font-size: 11px;
+  }
+
+  .sheet-lab__commit {
+    padding-left: 30px;
+    padding-right: 8px;
+  }
+
+  .sheet-lab__commit-top {
+    gap: 6px;
+  }
+
+  .sheet-lab__split-row,
+  .sheet-lab__split-header {
+    grid-template-columns: 24px 1fr 24px 1fr;
+  }
+
+  .sheet-lab__diff-linenum,
+  .sheet-lab__split-linenum {
+    width: 24px;
+    min-width: 24px;
+  }
+}

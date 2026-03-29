@@ -157,7 +157,7 @@ export default function SheetLabEditor({ sheet, onContentSaved }) {
   return (
     <div style={{ display: 'grid', gap: 14 }}>
       {/* Title + description fields */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
         <div>
           <label style={labelStyle}>Title</label>
           <input
@@ -192,13 +192,17 @@ export default function SheetLabEditor({ sheet, onContentSaved }) {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {/* Draft / Published status indicator */}
-          <span style={{
-            padding: '2px 8px', borderRadius: 6, fontWeight: 700, fontSize: 10,
-            textTransform: 'uppercase',
-            background: isDraft ? 'var(--sh-warning-bg, #fffbeb)' : 'var(--sh-success-bg, #f0fdf4)',
-            color: isDraft ? 'var(--sh-warning-text, #92400e)' : 'var(--sh-success-text, #166534)',
-            border: `1px solid ${isDraft ? 'var(--sh-warning-border, #fde68a)' : 'var(--sh-success-border, #bbf7d0)'}`,
-          }}>
+          <span
+            role="status"
+            aria-label={isDraft ? 'Sheet status: draft' : 'Sheet status: published'}
+            style={{
+              padding: '2px 8px', borderRadius: 6, fontWeight: 700, fontSize: 10,
+              textTransform: 'uppercase',
+              background: isDraft ? 'var(--sh-warning-bg, #fffbeb)' : 'var(--sh-success-bg, #f0fdf4)',
+              color: isDraft ? 'var(--sh-warning-text, #92400e)' : 'var(--sh-success-text, #166534)',
+              border: `1px solid ${isDraft ? 'var(--sh-warning-border, #fde68a)' : 'var(--sh-success-border, #bbf7d0)'}`,
+            }}
+          >
             {isDraft ? 'Draft' : 'Published'}
           </span>
           <span>
@@ -219,10 +223,10 @@ export default function SheetLabEditor({ sheet, onContentSaved }) {
             onClick={handleManualSave}
             disabled={!dirty || saving}
             style={{
-              border: 'none', borderRadius: 8, padding: '4px 12px',
+              border: 'none', borderRadius: 8, padding: '6px 14px',
               background: dirty ? '#6366f1' : 'var(--sh-border)',
               color: dirty ? '#fff' : 'var(--sh-muted)',
-              fontWeight: 700, fontSize: 11, cursor: dirty ? 'pointer' : 'default',
+              fontWeight: 700, fontSize: 11, cursor: dirty ? 'pointer' : 'default', minHeight: 32,
               fontFamily: 'inherit',
             }}
           >
@@ -232,11 +236,12 @@ export default function SheetLabEditor({ sheet, onContentSaved }) {
             type="button"
             onClick={handleTogglePublish}
             disabled={publishing || saving}
+            aria-label={isDraft ? 'Publish this sheet to make it visible to others' : 'Revert this sheet back to draft status'}
             style={{
-              border: 'none', borderRadius: 8, padding: '4px 12px',
+              borderRadius: 8, padding: '6px 14px',
               background: isDraft ? 'var(--sh-success, #16a34a)' : 'var(--sh-warning-bg, #fffbeb)',
               color: isDraft ? '#fff' : 'var(--sh-warning-text, #92400e)',
-              fontWeight: 700, fontSize: 11,
+              fontWeight: 700, fontSize: 11, minHeight: 32,
               cursor: publishing ? 'wait' : 'pointer',
               fontFamily: 'inherit',
               border: isDraft ? 'none' : '1px solid var(--sh-warning-border, #fde68a)',
@@ -250,12 +255,12 @@ export default function SheetLabEditor({ sheet, onContentSaved }) {
       {/* Split-pane editor + preview */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: '1fr 1fr',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
         gap: 0,
         borderRadius: 14,
         overflow: 'hidden',
         border: '1px solid var(--sh-border)',
-        minHeight: 450,
+        minHeight: 300,
       }}>
         {/* Editor */}
         <div style={{ position: 'relative' }}>

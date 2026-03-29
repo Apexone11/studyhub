@@ -85,7 +85,7 @@ export default function SheetActivityFeed({ sheetId }) {
   }
 
   return (
-    <div style={containerStyle}>
+    <div style={containerStyle} aria-label="Activity feed">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
         <h3 style={{ ...headingStyle, marginBottom: 0 }}>
           Activity <span style={{ fontWeight: 500, fontSize: 12, color: 'var(--sh-muted)' }}>({total})</span>
@@ -93,7 +93,7 @@ export default function SheetActivityFeed({ sheetId }) {
       </div>
 
       {/* Timeline */}
-      <div style={{ position: 'relative', paddingLeft: 24 }}>
+      <div style={{ position: 'relative', paddingLeft: 24 }} role="list" aria-label="Activity timeline">
         {/* Vertical line */}
         <div style={{
           position: 'absolute', left: 9, top: 4, bottom: 4, width: 2,
@@ -103,7 +103,7 @@ export default function SheetActivityFeed({ sheetId }) {
         {items.map((item) => {
           const meta = TYPE_META[item.type] || TYPE_META.commit
           return (
-            <div key={item.id} style={itemStyle}>
+            <div key={item.id} style={itemStyle} role="listitem">
               {/* Dot */}
               <div style={{
                 position: 'absolute', left: -18, top: 4,
@@ -151,6 +151,7 @@ export default function SheetActivityFeed({ sheetId }) {
             disabled={page <= 1 || loading}
             onClick={() => fetchActivity(page - 1)}
             style={pageBtnStyle(page <= 1)}
+            aria-label={`Go to previous page (currently on page ${page} of ${totalPages})`}
           >
             Previous
           </button>
@@ -162,6 +163,7 @@ export default function SheetActivityFeed({ sheetId }) {
             disabled={page >= totalPages || loading}
             onClick={() => fetchActivity(page + 1)}
             style={pageBtnStyle(page >= totalPages)}
+            aria-label={`Go to next page (currently on page ${page} of ${totalPages})`}
           >
             Next
           </button>
@@ -174,11 +176,12 @@ export default function SheetActivityFeed({ sheetId }) {
 /* ── Styles ────────────────────────────────────────────────── */
 
 const containerStyle = {
-  padding: '20px 22px',
+  padding: '16px 14px',
   background: 'var(--sh-surface)',
   border: '1px solid var(--sh-border)',
   borderRadius: 14,
   fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+  overflow: 'hidden',
 }
 
 const headingStyle = {

@@ -96,7 +96,7 @@ export default function SheetLabHistory({ lab }) {
           </p>
         </div>
       ) : (
-        <div className="sheet-lab__timeline" ref={timelineRef}>
+        <div className="sheet-lab__timeline" ref={timelineRef} role="list">
           {commits.map((commit, index) => {
             const isSelected = compareSelection.includes(commit.id)
             const isExpanded = expandedCommitId === commit.id
@@ -106,6 +106,7 @@ export default function SheetLabHistory({ lab }) {
               <div
                 key={commit.id}
                 className={`sheet-lab__commit${isSelected ? ' sheet-lab__commit--selected' : ''}`}
+                role="listitem"
               >
                 {/* Timeline dot — author avatar or initial */}
                 <div className={`sheet-lab__commit-dot${isFirst ? ' sheet-lab__commit-dot--latest' : ''}`}>
@@ -194,6 +195,7 @@ export default function SheetLabHistory({ lab }) {
                         to={`/sheets/${sheetId}/lab?tab=history&version=${commit.id}`}
                         className="sheet-lab__browse-btn"
                         onClick={(e) => e.stopPropagation()}
+                        aria-label={`Browse this version: ${commit.message || 'Snapshot'} by ${commit.author?.username || 'Unknown'}`}
                       >
                         Browse at this version
                       </Link>

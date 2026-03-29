@@ -106,7 +106,7 @@ export default function SheetLabReviews({ sheet, onReviewed }) {
       {pending.length > 0 ? (
         <div style={{ display: 'grid', gap: 10 }}>
           <div style={attentionBannerStyle}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" role="img" aria-label="Attention" aria-hidden="true">
               <circle cx="12" cy="12" r="10" />
               <line x1="12" y1="8" x2="12" y2="12" />
               <line x1="12" y1="16" x2="12.01" y2="16" />
@@ -243,6 +243,7 @@ function ContributionCard({ contribution: c, showActions, reviewing, onReview, d
               }}
               disabled={reviewing === c.id}
               style={hasConflict ? conflictAcceptButtonStyle : acceptButtonStyle}
+              aria-label={`Accept contribution from ${c.proposer?.username || 'unknown user'}${hasConflict ? ' (conflict detected)' : ''}`}
             >
               {reviewing === c.id ? 'Merging...' : hasConflict ? 'Accept & Merge (conflict)' : 'Accept & Merge'}
             </button>
@@ -255,6 +256,7 @@ function ContributionCard({ contribution: c, showActions, reviewing, onReview, d
               }}
               disabled={reviewing === c.id}
               style={rejectButtonStyle}
+              aria-label={`Reject contribution from ${c.proposer?.username || 'unknown user'}`}
             >
               Reject
             </button>
@@ -309,10 +311,14 @@ function StatusBadge({ status }) {
   }
   const s = styles[status] || styles.pending
   return (
-    <span style={{
-      display: 'inline-flex', fontSize: 11, fontWeight: 700, padding: '2px 8px',
-      borderRadius: 6, textTransform: 'capitalize', ...s,
-    }}>
+    <span
+      role="status"
+      style={{
+        display: 'inline-flex', fontSize: 11, fontWeight: 700, padding: '2px 8px',
+        borderRadius: 6, textTransform: 'capitalize', ...s,
+      }}
+      aria-label={`Contribution status: ${status}`}
+    >
       {status}
     </span>
   )
@@ -339,26 +345,26 @@ const cardStyle = {
 }
 
 const diffToggleStyle = {
-  padding: '5px 10px', borderRadius: 8,
+  padding: '7px 12px', borderRadius: 8, minHeight: 32,
   border: '1px solid var(--sh-border)', background: 'var(--sh-soft)',
   color: 'var(--sh-muted)', fontSize: 11, fontWeight: 700,
   cursor: 'pointer', fontFamily: 'inherit',
 }
 
 const acceptButtonStyle = {
-  padding: '5px 14px', borderRadius: 8, border: 'none',
+  padding: '7px 14px', borderRadius: 8, border: 'none', minHeight: 32,
   background: '#16a34a', color: '#fff',
   fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
 }
 
 const conflictAcceptButtonStyle = {
-  padding: '5px 14px', borderRadius: 8, border: '1px solid var(--sh-warning-border, #fde68a)',
+  padding: '7px 14px', borderRadius: 8, border: '1px solid var(--sh-warning-border, #fde68a)', minHeight: 32,
   background: 'var(--sh-warning-bg, #fffbeb)', color: 'var(--sh-warning-text, #92400e)',
   fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
 }
 
 const rejectButtonStyle = {
-  padding: '5px 14px', borderRadius: 8,
+  padding: '7px 14px', borderRadius: 8, minHeight: 32,
   border: '1px solid var(--sh-danger-border, #fecaca)',
   background: 'var(--sh-danger-bg, #fef2f2)',
   color: 'var(--sh-danger-text, #dc2626)',
