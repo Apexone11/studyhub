@@ -1,24 +1,7 @@
 import { cleanup, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
-
-// Mock @tanstack/react-virtual since jsdom has no layout engine
-vi.mock('@tanstack/react-virtual', () => ({
-  useVirtualizer: ({ count }) => ({
-    getVirtualItems: () =>
-      Array.from({ length: count }, (_, i) => ({
-        index: i,
-        key: `vitem-${i}`,
-        start: i * 200,
-        size: 200,
-      })),
-    getTotalSize: () => count * 200,
-    measureElement: () => {},
-  }),
-}))
-
-// Must import AFTER mock is set up
-const { default: VirtualFeedList } = await import('./VirtualFeedList')
+import VirtualFeedList from './VirtualFeedList'
 
 afterEach(() => { cleanup() })
 
@@ -38,7 +21,7 @@ const makeItems = (n) => Array.from({ length: n }, (_, i) => ({
 const noop = () => {}
 
 describe('VirtualFeedList', () => {
-  it('renders the correct number of virtualized items', () => {
+  it('renders the correct number of items', () => {
     const items = makeItems(5)
     render(
       <MemoryRouter>
