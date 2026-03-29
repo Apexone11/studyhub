@@ -52,6 +52,7 @@ function SchoolLogoCard({ school, selected, onClick, size = 'md' }) {
           <img
             src={school.logoUrl.startsWith('http') ? school.logoUrl : `${API}${school.logoUrl}`}
             alt={`${school.name} logo`}
+            loading="lazy"
             style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'center' }}
             onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'grid' }}
           />
@@ -276,7 +277,7 @@ export default function MyCoursesPage() {
     <div style={{ minHeight: '100vh', background: 'var(--sh-bg)' }}>
       <Navbar crumbs={[{ label: 'My Courses', to: '/my-courses' }]} hideTabs />
 
-      <div ref={mainRef} style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 20px 60px' }}>
+      <div ref={mainRef} style={{ maxWidth: 1100, width: '100%', margin: '0 auto', padding: '24px clamp(12px, 2vw, 20px) 60px', boxSizing: 'border-box' }}>
         {/* ── Hero header ─────────────────────────────────────────── */}
         <div style={{
           borderRadius: 18, overflow: 'hidden', marginBottom: 24,

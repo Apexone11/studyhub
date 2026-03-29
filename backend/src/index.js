@@ -1,4 +1,5 @@
 const express = require('express')
+const compression = require('compression')
 const cors = require('cors')
 const rateLimit = require('express-rate-limit')
 const helmet = require('helmet')
@@ -129,6 +130,9 @@ const previewSurfaceCsp = [
 ].join('; ')
 
 app.disable('x-powered-by')
+
+// Gzip/Brotli compression for all text-based responses.
+app.use(compression())
 
 if (isProd) {
   app.set('trust proxy', 1)

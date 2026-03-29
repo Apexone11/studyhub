@@ -54,7 +54,7 @@ export default function FollowSuggestions() {
               >
                 <div style={avatarStyle}>
                   {user.avatarUrl ? (
-                    <img src={user.avatarUrl} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                    <img src={user.avatarUrl} alt="" loading="lazy" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
                   ) : (
                     <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--sh-brand)' }}>
                       {(user.username || '?')[0].toUpperCase()}

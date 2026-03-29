@@ -1,4 +1,5 @@
 const express = require('express')
+const { readLimiter } = require('../../lib/rateLimiters')
 const requireAuth = require('../../middleware/auth')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
@@ -6,6 +7,7 @@ const prisma = require('../../lib/prisma')
 const router = express.Router()
 
 router.use(requireAuth)
+router.use(readLimiter)
 
 router.get('/summary', async (req, res) => {
   try {

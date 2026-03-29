@@ -36,7 +36,7 @@ export function ProfileAvatar({ profile, initials, isOwnProfile, onAvatarClick }
       aria-label={isOwnProfile ? 'Upload profile photo' : undefined}
     >
       {profile.avatarUrl && !imgError
-        ? <img src={profile.avatarUrl.startsWith('http') ? profile.avatarUrl : `${API}${profile.avatarUrl}`} alt={profile.username} onError={() => setImgError(true)} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+        ? <img src={profile.avatarUrl.startsWith('http') ? profile.avatarUrl : `${API}${profile.avatarUrl}`} alt={profile.username} loading="lazy" onError={() => setImgError(true)} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
         : <span style={{ fontSize: 'clamp(20px, 3vw, 28px)', fontWeight: 800, color: 'var(--sh-avatar-text)' }}>{initials}</span>
       }
       {isOwnProfile && (
@@ -336,7 +336,7 @@ export function FollowModal({ followModal, followList, followListLoading, onClos
                   flexShrink: 0, overflow: 'hidden',
                 }}>
                   {u.avatarUrl
-                    ? <img src={u.avatarUrl.startsWith('http') ? u.avatarUrl : `${API}${u.avatarUrl}`} alt={u.username} onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling.style.display = '' }} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                    ? <img src={u.avatarUrl.startsWith('http') ? u.avatarUrl : `${API}${u.avatarUrl}`} alt={u.username} loading="lazy" onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling.style.display = '' }} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
                     : null
                   }
                   <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--sh-avatar-text)', display: u.avatarUrl ? 'none' : '' }}>{u.username.slice(0, 2).toUpperCase()}</span>

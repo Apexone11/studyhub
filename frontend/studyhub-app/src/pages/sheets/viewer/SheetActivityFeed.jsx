@@ -119,7 +119,7 @@ export default function SheetActivityFeed({ sheetId }) {
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 10px', alignItems: 'baseline' }}>
                 <span style={actorStyle}>
                   {item.actor?.avatarUrl ? (
-                    <img src={item.actor.avatarUrl} alt="" style={avatarStyle} />
+                    <img src={item.actor.avatarUrl} alt="" loading="lazy" style={avatarStyle} />
                   ) : null}
                   {item.actor?.username || 'Unknown'}
                 </span>

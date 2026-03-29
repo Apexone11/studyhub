@@ -39,7 +39,7 @@ export default function NavbarUserMenu({ user }) {
         aria-haspopup="true"
       >
         {user.avatarUrl
-          ? <img src={user.avatarUrl.startsWith('http') ? user.avatarUrl : `${API}${user.avatarUrl}`} alt="" style={{ ...S.avatar, objectFit: 'cover' }} />
+          ? <img src={user.avatarUrl.startsWith('http') ? user.avatarUrl : `${API}${user.avatarUrl}`} alt="" loading="lazy" style={{ ...S.avatar, objectFit: 'cover' }} />
           : <div style={S.avatar} aria-hidden="true">{initials}</div>
         }
         <span style={S.username}>{user.username}</span>

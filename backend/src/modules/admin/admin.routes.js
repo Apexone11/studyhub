@@ -1,4 +1,5 @@
 const express = require('express')
+const { adminLimiter } = require('../../lib/rateLimiters')
 const requireAuth = require('../../middleware/auth')
 const requireAdmin = require('../../middleware/requireAdmin')
 const usersController = require('./admin.users.controller')
@@ -14,6 +15,7 @@ const router = express.Router()
 // All admin routes require auth + admin role
 router.use(requireAuth)
 router.use(requireAdmin)
+router.use(adminLimiter)
 
 router.use(usersController)
 router.use(emailController)

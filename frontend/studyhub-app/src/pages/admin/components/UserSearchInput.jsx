@@ -78,7 +78,7 @@ export default function UserSearchInput({ value, onChange, label = 'User' }) {
           fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 14,
         }}>
           {value.avatarUrl ? (
-            <img src={value.avatarUrl} alt="" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover' }} />
+            <img src={value.avatarUrl} alt="" loading="lazy" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover' }} />
           ) : (
             <div style={{
               width: 28, height: 28, borderRadius: '50%',
@@ -154,7 +154,7 @@ export default function UserSearchInput({ value, onChange, label = 'User' }) {
               onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
             >
               {user.avatarUrl ? (
-                <img src={user.avatarUrl} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />
+                <img src={user.avatarUrl} alt="" loading="lazy" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />
               ) : (
                 <div style={{
                   width: 32, height: 32, borderRadius: '50%',

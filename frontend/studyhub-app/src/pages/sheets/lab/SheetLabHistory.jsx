@@ -114,6 +114,7 @@ export default function SheetLabHistory({ lab }) {
                     <img
                       src={commit.author.avatarUrl}
                       alt=""
+                      loading="lazy"
                       style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
                     />
                   ) : (
@@ -159,7 +160,7 @@ export default function SheetLabHistory({ lab }) {
                   <div className="sheet-lab__commit-meta">
                     <span className="sheet-lab__commit-author">
                       {commit.author?.avatarUrl ? (
-                        <img src={commit.author.avatarUrl} alt="" className="sheet-lab__commit-avatar" />
+                        <img src={commit.author.avatarUrl} alt="" loading="lazy" className="sheet-lab__commit-avatar" />
                       ) : (
                         <span
                           className="sheet-lab__commit-avatar"

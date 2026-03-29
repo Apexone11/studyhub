@@ -69,6 +69,8 @@ model User {
   dailyActivity              UserDailyActivity[]
   badges                     UserBadge[]
   sensitiveData              UserSensitive?
+
+  @@index([role])
 }
 
 model School {

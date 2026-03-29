@@ -26,7 +26,7 @@ export function Avatar({ username, role, size = 42, avatarUrl }) {
       }}
     >
       {resolvedUrl
-        ? <img src={resolvedUrl} alt={username} onError={() => setImgError(true)} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+        ? <img src={resolvedUrl} alt={username} loading="lazy" onError={() => setImgError(true)} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
         : initials
       }
     </div>

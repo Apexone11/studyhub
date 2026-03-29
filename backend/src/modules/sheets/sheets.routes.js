@@ -1,4 +1,5 @@
 const express = require('express')
+const { readLimiter, writeLimiter } = require('../../lib/rateLimiters')
 const listController = require('./sheets.list.controller')
 const crudController = require('./sheets.crud.controller')
 const draftsController = require('./sheets.drafts.controller')
@@ -11,6 +12,12 @@ const activityController = require('./sheets.activity.controller')
 const analyticsController = require('./sheets.analytics.controller')
 
 const router = express.Router()
+
+// Rate limit: reads 200/min, writes 60/min per IP.
+router.use((req, res, next) => {
+  if (req.method === 'GET' || req.method === 'HEAD') return readLimiter(req, res, next)
+  return writeLimiter(req, res, next)
+})
 
 // Static / prefix routes must come before parameterised /:id routes so Express
 // does not treat "leaderboard", "drafts", or "contributions" as an :id value.

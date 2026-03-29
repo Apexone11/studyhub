@@ -1,10 +1,13 @@
 const express = require('express')
+const { readLimiter } = require('../../lib/rateLimiters')
 const { sendForbidden } = require('../../lib/accessControl')
 const requireAuth = require('../../middleware/auth')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
 
 const router = express.Router()
+
+router.use(readLimiter)
 
 // ── GET /api/announcements — public ──────────────────────────
 router.get('/', async (req, res) => {

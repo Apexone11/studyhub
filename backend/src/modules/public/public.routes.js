@@ -6,10 +6,13 @@
  *   the previously hardcoded proof stats.
  */
 const express = require('express')
+const { publicLimiter } = require('../../lib/rateLimiters')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
 
 const router = express.Router()
+
+router.use(publicLimiter)
 
 // Simple in-memory cache so the landing page doesn't hammer the DB on every
 // anonymous page load.  Stats are accurate within 5 minutes.

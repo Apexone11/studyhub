@@ -4,15 +4,18 @@ const requireAdmin = require('../../middleware/requireAdmin')
 const adminCasesController = require('./moderation.admin.cases.controller')
 const adminEnforcementController = require('./moderation.admin.enforcement.controller')
 const userController = require('./moderation.user.controller')
+const { writeLimiter } = require('../../lib/rateLimiters')
 
 const adminRouter = express.Router()
 adminRouter.use(requireAuth)
 adminRouter.use(requireAdmin)
+adminRouter.use(writeLimiter)
 adminRouter.use('/', adminCasesController)
 adminRouter.use('/', adminEnforcementController)
 
 const userRouter = express.Router()
 userRouter.use(requireAuth)
+userRouter.use(writeLimiter)
 userRouter.use('/', userController)
 
 module.exports = { adminRouter, userRouter }

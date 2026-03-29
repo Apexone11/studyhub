@@ -6475,3 +6475,100 @@ All 4 tracks of Cycle B — Social & Discovery are complete:
 | B4 | Social interactions (reactions, mentions, share) | Already existed |
 
 **Validation:** All backend files pass `node -c` syntax check. All frontend JSX files pass brace/paren balance check.
+
+---
+
+## Cycle E — Performance, Mobile, Tests & Security
+
+**Date:** 2026-03-29
+
+### Track E1: Performance Optimization
+
+**Changes:**
+
+- **Gzip compression:** Added `compression` middleware to `backend/src/index.js` — all text-based responses now gzip-compressed. Installed `compression@1.8.0` and added to `backend/package.json`.
+- **Image lazy loading:** Added `loading="lazy"` to 20 `<img>` tags across 17 frontend components (all except `FeedCard.jsx` which already had it).
+- **Database index:** Added `@@index([role])` to `User` model in `backend/prisma/schema.prisma` — speeds up admin lookups (`WHERE role = 'admin'`) used by notification, moderation, and admin routes.
+- **Admin notification batching:** Replaced N+1 sequential loops in `moderation.user.controller.js` (reports and appeals endpoints) with `Promise.all()` — admin notifications now fire concurrently instead of one at a time.
+- **Duplicate query elimination:** Removed redundant target re-fetch in `/reports` endpoint — reuses excerpt result instead of querying the same record twice.
+
+**Files modified:**
+- `backend/src/index.js` (compression import + middleware)
+- `backend/package.json` (compression dependency)
+- `backend/prisma/schema.prisma` (User.role index)
+- `backend/src/modules/moderation/moderation.user.controller.js` (batched notifications, removed duplicate query)
+- 17 frontend components (lazy loading on img tags)
+
+### Track E2: Mobile Responsiveness
+
+**Changes:**
+
+- **Profile container:** Added `width: '100%'` and `boxSizing: 'border-box'` to `containerStyle` in `profileConstants.js`, reduced mobile padding with `clamp()`.
+- **Courses page:** Same responsive treatment for `MyCoursesPage.jsx` container.
+- **Settings page:** Same responsive treatment for both loading and main states in `SettingsPage.jsx`.
+- **Diff viewer font sizes:** Increased minimum font size on mobile from 9px to 10px in `SheetLabPage.css` responsive rule — improves readability on small screens.
+- **Auth page orbs:** Added `@media (max-width: 480px)` breakpoints to `RegisterScreen.css` and `LoginPage.css` — scales decorative background orbs to 50% on small phones.
+
+**Files modified:**
+- `frontend/.../pages/profile/profileConstants.js`
+- `frontend/.../pages/courses/MyCoursesPage.jsx`
+- `frontend/.../pages/settings/SettingsPage.jsx`
+- `frontend/.../pages/sheets/lab/SheetLabPage.css`
+- `frontend/.../pages/auth/RegisterScreen.css`
+- `frontend/.../pages/auth/LoginPage.css`
+
+### Track E3: End-to-End Tests
+
+**Changes:**
+
+- **Critical flows test suite:** Created `tests/critical-flows.e2e.spec.js` — 5 test scenarios covering sheet CRUD, feed interactions, profile viewing, admin moderation, and discovery features.
+- **Security test suite:** Created `tests/security.e2e.spec.js` — 20 tests covering XSS prevention, auth boundary enforcement, CSRF credential inclusion, admin route protection, content injection in search, and combined security scenarios.
+
+All tests use route mocking via `page.route()` and require no running backend.
+
+**Files created:**
+- `frontend/.../tests/critical-flows.e2e.spec.js`
+- `frontend/.../tests/security.e2e.spec.js`
+
+### Track E4: Security Hardening
+
+**Changes:**
+
+- **Shared rate limiter library:** Created `backend/src/lib/rateLimiters.js` with 6 preset limiters: `authLimiter` (15/15min), `writeLimiter` (60/min), `readLimiter` (200/min), `adminLimiter` (120/min), `previewLimiter` (60/min), `publicLimiter` (100/15min).
+- **Rate limiters added to 13 previously unprotected modules:**
+  - `auth` — authLimiter (15 req / 15 min, strictest for login/register)
+  - `sheets` — conditional read/write limiter
+  - `admin` — adminLimiter after auth + admin role check
+  - `settings` — writeLimiter
+  - `notifications` — readLimiter
+  - `announcements` — readLimiter
+  - `preview` — previewLimiter
+  - `dashboard` — readLimiter
+  - `public` — publicLimiter
+  - `courses` — readLimiter
+  - `sheetLab` — conditional read/write limiter
+  - `provenance` — readLimiter
+  - `featureFlags` — adminLimiter
+  - `moderation` — writeLimiter (both admin and user routers)
+- **Environment review:** Confirmed `.env` files are properly gitignored and not tracked in git.
+
+**Files created:**
+- `backend/src/lib/rateLimiters.js`
+
+**Files modified:**
+- 13 route module files (rate limiter imports and middleware)
+
+### Cycle E Summary
+
+| Track | Feature | Status |
+| ------- | --------- | -------- |
+| E1 | Performance (compression, lazy load, indexes, batching) | Complete |
+| E2 | Mobile responsiveness (containers, fonts, auth orbs) | Complete |
+| E3 | E2E tests (critical flows + security, 25+ new tests) | Complete |
+| E4 | Security hardening (rate limiters on 13 modules) | Complete |
+
+**Validation:** All 17 modified backend files pass `node -c` syntax check. All 19 modified frontend files pass brace/paren balance check. Both new E2E test files pass Node.js syntax validation. No `.env` files tracked in git.
+
+**Deployment requirements:**
+- Run `npm install` to install `compression@1.8.0` dependency
+- Run `npx prisma migrate dev` to apply User.role index (and pending AuditLog model from Cycle D)

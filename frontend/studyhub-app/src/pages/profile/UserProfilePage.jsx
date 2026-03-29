@@ -262,6 +262,7 @@ export default function UserProfilePage() {
               <img
                 src={profile.coverImageUrl.startsWith('http') ? profile.coverImageUrl : `${API}${profile.coverImageUrl}`}
                 alt=""
+                loading="lazy"
                 onError={() => setCoverImgError(true)}
                 style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
               />
