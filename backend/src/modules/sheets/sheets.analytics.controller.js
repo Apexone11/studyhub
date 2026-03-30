@@ -96,15 +96,10 @@ router.get('/:id/analytics', requireAuth, analyticsLimiter, async (req, res) => 
       // Total commits
       prisma.sheetCommit.count({ where: { sheetId } }),
 
-      // Stars over last 30 days (grouped by date)
-      prisma.starredSheet.findMany({
-        where: {
-          sheetId,
-          createdAt: { gte: daysAgo(30) },
-        },
-        select: { createdAt: true },
-        orderBy: { createdAt: 'asc' },
-      }),
+      // StarredSheet has no createdAt — return empty array for star history.
+      // Stars are tracked as a counter on StudySheet; per-star timestamps
+      // would require a schema migration to add createdAt to StarredSheet.
+      Promise.resolve([]),
 
       // Comments over last 30 days
       prisma.comment.findMany({
@@ -118,7 +113,7 @@ router.get('/:id/analytics', requireAuth, analyticsLimiter, async (req, res) => 
 
       // Top contributors by contribution count
       prisma.sheetContribution.groupBy({
-        by: ['userId'],
+        by: ['proposerId'],
         where: { targetSheetId: sheetId },
         _count: { id: true },
         orderBy: { _count: { id: 'desc' } },
@@ -132,7 +127,7 @@ router.get('/:id/analytics', requireAuth, analyticsLimiter, async (req, res) => 
           id: true,
           title: true,
           stars: true,
-          author: { select: { id: true, username: true, displayName: true } },
+          author: { select: { id: true, username: true } },
           createdAt: true,
         },
         orderBy: { createdAt: 'desc' },
@@ -148,17 +143,16 @@ router.get('/:id/analytics', requireAuth, analyticsLimiter, async (req, res) => 
     const commentHistory = groupByDate(recentComments.map((c) => c.createdAt))
 
     // Resolve top contributor usernames
-    const contributorIds = topContributors.map((c) => c.userId)
+    const contributorIds = topContributors.map((c) => c.proposerId)
     const contributorUsers = contributorIds.length
       ? await prisma.user.findMany({
           where: { id: { in: contributorIds } },
-          select: { id: true, username: true, displayName: true },
+          select: { id: true, username: true },
         })
       : []
     const userMap = new Map(contributorUsers.map((u) => [u.id, u]))
     const topReferrers = topContributors.map((c) => ({
-      username: userMap.get(c.userId)?.username || 'unknown',
-      displayName: userMap.get(c.userId)?.displayName || null,
+      username: userMap.get(c.proposerId)?.username || 'unknown',
       contributions: c._count.id,
     }))
 
@@ -227,7 +221,7 @@ async function buildRecentActivity(sheetId) {
       select: {
         id: true,
         createdAt: true,
-        user: { select: { username: true } },
+        author: { select: { username: true } },
       },
       orderBy: { createdAt: 'desc' },
       take: 10,
@@ -238,7 +232,7 @@ async function buildRecentActivity(sheetId) {
         id: true,
         status: true,
         createdAt: true,
-        user: { select: { username: true } },
+        proposer: { select: { username: true } },
       },
       orderBy: { createdAt: 'desc' },
       take: 10,
@@ -259,13 +253,13 @@ async function buildRecentActivity(sheetId) {
     ...comments.map((c) => ({
       type: 'comment',
       date: c.createdAt,
-      actor: c.user?.username || 'unknown',
+      actor: c.author?.username || 'unknown',
       detail: null,
     })),
     ...contributions.map((c) => ({
       type: `contribution_${c.status}`,
       date: c.createdAt,
-      actor: c.user?.username || 'unknown',
+      actor: c.proposer?.username || 'unknown',
       detail: null,
     })),
     ...commits.map((c) => ({
