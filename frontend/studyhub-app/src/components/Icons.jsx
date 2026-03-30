@@ -95,6 +95,22 @@ export function IconNotes({ size, ...p }) {
   )
 }
 
+// Messages — speech bubble with node accent
+export function IconMessages({ size, ...p }) {
+  return (
+    <Svg size={size} {...p}>
+      {/* speech bubble */}
+      <path
+        d="M4 6 Q4 4 6 4 L18 4 Q20 4 20 6 L20 14 Q20 16 18 16 L8 16 L5 19 L5 16 L6 16 Q4 16 4 14 Z"
+        stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"
+      />
+      {/* message lines */}
+      <line x1="8" y1="8" x2="16" y2="8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      <line x1="8" y1="12" x2="13" y2="12" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    </Svg>
+  )
+}
+
 // Announcements — megaphone / bullhorn
 export function IconAnnouncements({ size, ...p }) {
   return (

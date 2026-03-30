@@ -35,7 +35,7 @@ export function TeaserCard({ title, sub, chips = [] }) {
   return (
     <div
       style={{
-        background: '#fff',
+        background: 'var(--sh-surface)',
         borderRadius: 14,
         border: '1px solid #e2e8f0',
         padding: '14px 16px',
@@ -49,10 +49,10 @@ export function TeaserCard({ title, sub, chips = [] }) {
           position: 'absolute',
           top: 0,
           right: 0,
-          background: '#f1f5f9',
+          background: 'var(--sh-soft)',
           fontSize: 9,
           fontWeight: 600,
-          color: '#64748b',
+          color: 'var(--sh-muted)',
           padding: '3px 10px',
           borderRadius: '0 0 0 8px',
         }}
@@ -69,8 +69,8 @@ export function TeaserCard({ title, sub, chips = [] }) {
               fontSize: 10,
               padding: '2px 8px',
               borderRadius: 99,
-              background: chip.bg || '#f1f5f9',
-              color: chip.color || '#64748b',
+              background: chip.bg || 'var(--sh-soft)',
+              color: chip.color || 'var(--sh-muted)',
               border: chip.border ? `1px solid ${chip.border}` : 'none',
             }}
           >
@@ -78,7 +78,7 @@ export function TeaserCard({ title, sub, chips = [] }) {
           </span>
         ))}
       </div>
-      <div style={{ height: 4, background: '#f1f5f9', borderRadius: 99, marginTop: 10 }} />
+      <div style={{ height: 4, background: 'var(--sh-soft)', borderRadius: 99, marginTop: 10 }} />
     </div>
   )
 }

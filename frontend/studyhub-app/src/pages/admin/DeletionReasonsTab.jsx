@@ -4,13 +4,13 @@ import { tableHeadStyle, tableCell, tableCellStrong } from './adminConstants'
 export default function DeletionReasonsTab({ deletionsState, loadPagedData }) {
   return (
     <>
-      <div style={{ fontSize: 13, color: '#64748b', marginBottom: 14 }}>
+      <div style={{ fontSize: 13, color: 'var(--sh-muted)', marginBottom: 14 }}>
         {deletionsState.total} deletion records
       </div>
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
-            <tr style={{ background: '#f8fafc' }}>
+            <tr style={{ background: 'var(--sh-soft)' }}>
               {['Username', 'Reason', 'Details', 'Date'].map((header) => (
                 <th key={header} style={tableHeadStyle}>{header}</th>
               ))}

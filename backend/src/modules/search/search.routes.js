@@ -7,6 +7,7 @@ const { searchSheetsFTS, searchCoursesFTS, searchUsersFTS } = require('../../lib
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
 const { timedSection, logTiming } = require('../../lib/requestTiming')
+const { getBlockedUserIds } = require('../../lib/social/blockFilter')
 
 const router = express.Router()
 
@@ -61,6 +62,10 @@ router.get('/', optionalAuth, async (req, res) => {
   const useFTS = req.query.fts === 'true'
 
   try {
+    // Hide blocked users and their content from search results
+    const blockedIds = await getBlockedUserIds(prisma, req.user?.userId)
+    const blockedIdSet = new Set(blockedIds)
+
     const sections = []
     const sheetTextSearchClauses = buildSheetTextSearchClauses(query)
 
@@ -215,10 +220,19 @@ router.get('/', optionalAuth, async (req, res) => {
     }
 
     const resolved = await Promise.all(sections)
-    const sheets = resolved[0].data || []
+    // Filter blocked users from all result sets
+    const filterBlocked = (items, userIdField = 'author') =>
+      blockedIds.length === 0
+        ? items
+        : items.filter((item) => {
+            const uid = typeof userIdField === 'function' ? userIdField(item) : item[userIdField]?.id
+            return !uid || !blockedIdSet.has(uid)
+          })
+
+    const sheets = filterBlocked(resolved[0].data || [])
     const courses = resolved[1].data || []
-    const matchedUsers = resolved[2].data || []
-    const notes = resolved[3].data || []
+    const matchedUsers = filterBlocked(resolved[2].data || [], (u) => u.id)
+    const notes = filterBlocked(resolved[3].data || [])
     let users = matchedUsers
 
     if (wantUsers && matchedUsers.length) {

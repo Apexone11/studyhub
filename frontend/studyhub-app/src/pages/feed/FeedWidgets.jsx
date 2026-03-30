@@ -1,36 +1,10 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { API } from '../../config'
+import UserAvatar from '../../components/UserAvatar'
 
+/* Re-export UserAvatar as Avatar for backward compatibility with FeedCard imports */
 export function Avatar({ username, role, size = 42, avatarUrl }) {
-  const initials = (username || '?').slice(0, 2).toUpperCase()
-  const [imgError, setImgError] = useState(false)
-  const resolvedUrl = avatarUrl && !imgError
-    ? (avatarUrl.startsWith('http') ? avatarUrl : `${API}${avatarUrl}`)
-    : null
-
-  return (
-    <div
-      style={{
-        width: size,
-        height: size,
-        borderRadius: '50%',
-        background: role === 'admin' ? 'var(--sh-brand)' : 'var(--sh-avatar-bg)',
-        color: role === 'admin' ? '#fff' : 'var(--sh-avatar-text)',
-        display: 'grid',
-        placeItems: 'center',
-        fontSize: size * 0.35,
-        fontWeight: 800,
-        flexShrink: 0,
-        overflow: 'hidden',
-      }}
-    >
-      {resolvedUrl
-        ? <img src={resolvedUrl} alt={username} loading="lazy" onError={() => setImgError(true)} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
-        : initials
-      }
-    </div>
-  )
+  return <UserAvatar username={username} role={role} size={size} avatarUrl={avatarUrl} />
 }
 
 export function Panel({ title, children, helper }) {

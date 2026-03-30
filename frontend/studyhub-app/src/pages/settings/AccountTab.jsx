@@ -230,7 +230,7 @@ export default function AccountTab({ user, busyKey, setBusyKey, handlePatch, syn
                 border: '1px solid #cbd5e1',
                 fontSize: 14,
                 fontFamily: FONT,
-                color: '#0f172a',
+                color: 'var(--sh-heading)',
               }}
             >
               <option value="">Select a reason</option>
@@ -251,7 +251,7 @@ export default function AccountTab({ user, busyKey, setBusyKey, handlePatch, syn
                 border: '1px solid #cbd5e1',
                 fontSize: 14,
                 fontFamily: FONT,
-                color: '#0f172a',
+                color: 'var(--sh-heading)',
                 resize: 'vertical',
                 boxSizing: 'border-box',
               }}

@@ -20,8 +20,8 @@ export default function TestsPage() {
     <PageShell nav={<Navbar crumbs={[{ label: 'Practice Tests', to: '/tests' }]} hideTabs />} sidebar={<AppSidebar />}>
       {/* Page header with tab bar */}
       <div style={{ marginBottom: 18 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', marginBottom: 4 }}>Practice Tests</h1>
-        <p style={{ fontSize: 13, color: '#64748b', marginBottom: 14 }}>Course-linked tests with instant scoring. Planned for Version 2.</p>
+        <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--sh-heading)', marginBottom: 4 }}>Practice Tests</h1>
+        <p style={{ fontSize: 13, color: 'var(--sh-muted)', marginBottom: 14 }}>Course-linked tests with instant scoring. Planned for Version 2.</p>
         <div style={{ display: 'flex', gap: 6 }}>
           {[
             ['all', 'All Tests'],
@@ -39,8 +39,8 @@ export default function TestsPage() {
                 fontWeight: 600,
                 cursor: 'pointer',
                 fontFamily: PAGE_FONT,
-                background: browseTab === id ? '#0f172a' : '#fff',
-                color: browseTab === id ? '#fff' : '#64748b',
+                background: browseTab === id ? 'var(--sh-heading)' : 'var(--sh-surface)',
+                color: browseTab === id ? '#fff' : 'var(--sh-muted)',
                 boxShadow: browseTab === id ? 'none' : '0 1px 3px rgba(0,0,0,0.06)',
               }}
             >

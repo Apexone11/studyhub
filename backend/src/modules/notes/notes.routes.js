@@ -1,5 +1,8 @@
 const express = require('express')
+const multer = require('multer')
+const path = require('path')
 const rateLimit = require('express-rate-limit')
+const { NOTE_IMAGES_DIR } = require('../../lib/storage')
 const { assertOwnerOrAdmin } = require('../../lib/accessControl')
 const { createNotification } = require('../../lib/notify')
 const { notifyMentionedUsers } = require('../../lib/mentions')
@@ -176,7 +179,8 @@ router.post('/', requireAuth, mutateLimiter, requireVerifiedEmail, async (req, r
 
 // ── PATCH /api/notes/:id ────────────────────────────────────────────��──────────────────────────────��
 router.patch('/:id', requireAuth, mutateLimiter, requireVerifiedEmail, async (req, res) => {
-  const noteId = parseInt(req.params.id)
+  const noteId = parseInt(req.params.id, 10)
+  if (!Number.isInteger(noteId) || noteId < 1) return res.status(400).json({ error: 'Invalid note id.' })
   try {
     const note = await prisma.note.findUnique({ where: { id: noteId } })
     if (!note) return res.status(404).json({ error: 'Note not found.' })
@@ -214,6 +218,22 @@ router.patch('/:id', requireAuth, mutateLimiter, requireVerifiedEmail, async (re
       data.moderationStatus = getInitialModerationStatus(req.user)
     }
 
+    // Auto-save version snapshot when content changes significantly (>50 chars diff)
+    if (data.content !== undefined && note.content) {
+      const lenDiff = Math.abs(data.content.length - note.content.length)
+      if (lenDiff > 50 || (data.title && data.title !== note.title)) {
+        void prisma.noteVersion.create({
+          data: {
+            noteId,
+            userId: req.user.userId,
+            title: note.title,
+            content: note.content,
+            message: null, // auto-saved
+          },
+        }).catch(() => {}) // fire-and-forget
+      }
+    }
+
     const updated = await prisma.note.update({
       where: { id: noteId },
       data,
@@ -240,7 +260,8 @@ router.patch('/:id', requireAuth, mutateLimiter, requireVerifiedEmail, async (re
 
 // ── DELETE /api/notes/:id ───────────────────────────────────────
 router.delete('/:id', requireAuth, mutateLimiter, async (req, res) => {
-  const noteId = parseInt(req.params.id)
+  const noteId = parseInt(req.params.id, 10)
+  if (!Number.isInteger(noteId) || noteId < 1) return res.status(400).json({ error: 'Invalid note id.' })
   try {
     const note = await prisma.note.findUnique({ where: { id: noteId } })
     if (!note) return res.status(404).json({ error: 'Note not found.' })
@@ -265,13 +286,13 @@ router.delete('/:id', requireAuth, mutateLimiter, async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 // ── GET /api/notes/:id/comments ─────────────────────────────────
-router.get('/:id/comments', optionalAuth, async (req, res) => {
+router.get('/:id/comments', optionalAuth, readLimiter, async (req, res) => {
   req._timingStart = Date.now()
   const noteId = parseInt(req.params.id, 10)
   if (!Number.isInteger(noteId) || noteId < 1) return res.status(400).json({ error: 'Invalid note id.' })
 
   const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 50))
-  const offset = Math.max(0, parseInt(req.query.offset, 10) || 0)
+  const offset = Math.min(10000, Math.max(0, parseInt(req.query.offset, 10) || 0))
 
   try {
     const noteSection = await timedSection('note-lookup', () =>
@@ -313,7 +334,9 @@ router.post('/:id/comments', requireAuth, requireVerifiedEmail, commentLimiter, 
   const noteId = parseInt(req.params.id, 10)
   if (!Number.isInteger(noteId) || noteId < 1) return res.status(400).json({ error: 'Invalid note id.' })
 
-  const content = typeof req.body.content === 'string' ? req.body.content.trim() : ''
+  const rawContent = typeof req.body.content === 'string' ? req.body.content.trim() : ''
+  // Strip HTML tags from comments — comments are plain text only
+  const content = rawContent.replace(/<[^>]*>/g, '')
   if (!content) return res.status(400).json({ error: 'Comment cannot be empty.' })
   if (content.length > 500) return res.status(400).json({ error: 'Comment must be 500 characters or fewer.' })
 
@@ -441,6 +464,277 @@ router.delete('/:id/comments/:commentId', requireAuth, commentLimiter, async (re
     captureError(err, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
   }
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Note Version History
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── POST /api/notes/:id/versions — Save a named version snapshot ───
+router.post('/:id/versions', requireAuth, mutateLimiter, requireVerifiedEmail, async (req, res) => {
+  const noteId = parseInt(req.params.id, 10)
+  if (!Number.isInteger(noteId) || noteId < 1) return res.status(400).json({ error: 'Invalid note id.' })
+
+  try {
+    const note = await prisma.note.findUnique({ where: { id: noteId } })
+    if (!note) return res.status(404).json({ error: 'Note not found.' })
+    if (!assertOwnerOrAdmin({ res, user: req.user, ownerId: note.userId, message: 'Not your note.', targetType: 'note', targetId: noteId })) return
+
+    const message = typeof req.body.message === 'string' ? req.body.message.trim().slice(0, 200) : null
+
+    const version = await prisma.noteVersion.create({
+      data: {
+        noteId,
+        userId: req.user.userId,
+        title: note.title,
+        content: note.content,
+        message,
+      },
+    })
+
+    res.status(201).json(version)
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── GET /api/notes/:id/versions — List version history ─────────────
+router.get('/:id/versions', requireAuth, readLimiter, async (req, res) => {
+  const noteId = parseInt(req.params.id, 10)
+  if (!Number.isInteger(noteId) || noteId < 1) return res.status(400).json({ error: 'Invalid note id.' })
+
+  try {
+    const note = await prisma.note.findUnique({ where: { id: noteId }, select: { id: true, userId: true } })
+    if (!note) return res.status(404).json({ error: 'Note not found.' })
+    if (!assertOwnerOrAdmin({ res, user: req.user, ownerId: note.userId, message: 'Not your note.', targetType: 'note', targetId: noteId })) return
+
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20))
+    const versions = await prisma.noteVersion.findMany({
+      where: { noteId },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      select: { id: true, title: true, message: true, createdAt: true },
+    })
+
+    res.json(versions)
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── GET /api/notes/:id/versions/:versionId — Get a specific version ─
+router.get('/:id/versions/:versionId', requireAuth, readLimiter, async (req, res) => {
+  const noteId = parseInt(req.params.id, 10)
+  const versionId = parseInt(req.params.versionId, 10)
+  if (!Number.isInteger(noteId) || noteId < 1) return res.status(400).json({ error: 'Invalid note id.' })
+  if (!Number.isInteger(versionId) || versionId < 1) return res.status(400).json({ error: 'Invalid version id.' })
+
+  try {
+    const note = await prisma.note.findUnique({ where: { id: noteId }, select: { id: true, userId: true } })
+    if (!note) return res.status(404).json({ error: 'Note not found.' })
+    if (!assertOwnerOrAdmin({ res, user: req.user, ownerId: note.userId, message: 'Not your note.', targetType: 'note', targetId: noteId })) return
+
+    const version = await prisma.noteVersion.findUnique({ where: { id: versionId } })
+    if (!version || version.noteId !== noteId) return res.status(404).json({ error: 'Version not found.' })
+
+    res.json(version)
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── POST /api/notes/:id/versions/:versionId/restore — Restore version
+router.post('/:id/versions/:versionId/restore', requireAuth, mutateLimiter, requireVerifiedEmail, async (req, res) => {
+  const noteId = parseInt(req.params.id, 10)
+  const versionId = parseInt(req.params.versionId, 10)
+  if (!Number.isInteger(noteId) || noteId < 1) return res.status(400).json({ error: 'Invalid note id.' })
+  if (!Number.isInteger(versionId) || versionId < 1) return res.status(400).json({ error: 'Invalid version id.' })
+
+  try {
+    const note = await prisma.note.findUnique({ where: { id: noteId } })
+    if (!note) return res.status(404).json({ error: 'Note not found.' })
+    if (!assertOwnerOrAdmin({ res, user: req.user, ownerId: note.userId, message: 'Not your note.', targetType: 'note', targetId: noteId })) return
+
+    const version = await prisma.noteVersion.findUnique({ where: { id: versionId } })
+    if (!version || version.noteId !== noteId) return res.status(404).json({ error: 'Version not found.' })
+
+    // Save current state as a version before restoring
+    await prisma.noteVersion.create({
+      data: {
+        noteId,
+        userId: req.user.userId,
+        title: note.title,
+        content: note.content,
+        message: `Auto-saved before restoring version from ${new Date(version.createdAt).toLocaleDateString()}`,
+      },
+    })
+
+    // Restore the old version
+    const updated = await prisma.note.update({
+      where: { id: noteId },
+      data: { title: version.title, content: version.content },
+      include: NOTE_INCLUDE,
+    })
+
+    res.json(updated)
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Note Stars
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── POST /api/notes/:id/star ─────────────────────────────────────
+router.post('/:id/star', requireAuth, mutateLimiter, async (req, res) => {
+  const noteId = parseInt(req.params.id, 10)
+  if (!Number.isInteger(noteId) || noteId < 1) return res.status(400).json({ error: 'Invalid note id.' })
+
+  try {
+    const note = await prisma.note.findUnique({ where: { id: noteId }, select: { id: true, private: true, userId: true } })
+    if (!note) return res.status(404).json({ error: 'Note not found.' })
+    if (!canReadNote(note, req.user)) return res.status(404).json({ error: 'Note not found.' })
+
+    const existing = await prisma.noteStar.findUnique({
+      where: { userId_noteId: { userId: req.user.userId, noteId } },
+    })
+    if (existing) return res.json({ starred: true })
+
+    await prisma.noteStar.create({ data: { userId: req.user.userId, noteId } })
+    res.json({ starred: true })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── DELETE /api/notes/:id/star ───────────────────────────────────
+router.delete('/:id/star', requireAuth, mutateLimiter, async (req, res) => {
+  const noteId = parseInt(req.params.id, 10)
+  if (!Number.isInteger(noteId) || noteId < 1) return res.status(400).json({ error: 'Invalid note id.' })
+
+  try {
+    await prisma.noteStar.deleteMany({ where: { userId: req.user.userId, noteId } })
+    res.json({ starred: false })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Note Pin / Tags
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── PATCH /api/notes/:id/pin — Toggle pinned status ──────────────
+router.patch('/:id/pin', requireAuth, mutateLimiter, async (req, res) => {
+  const noteId = parseInt(req.params.id, 10)
+  if (!Number.isInteger(noteId) || noteId < 1) return res.status(400).json({ error: 'Invalid note id.' })
+
+  try {
+    const note = await prisma.note.findUnique({ where: { id: noteId }, select: { id: true, userId: true, pinned: true } })
+    if (!note) return res.status(404).json({ error: 'Note not found.' })
+    if (!assertOwnerOrAdmin({ res, user: req.user, ownerId: note.userId, message: 'Not your note.', targetType: 'note', targetId: noteId })) return
+
+    const pinned = req.body.pinned !== undefined ? Boolean(req.body.pinned) : !note.pinned
+    const updated = await prisma.note.update({ where: { id: noteId }, data: { pinned } })
+    res.json({ pinned: updated.pinned })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── PATCH /api/notes/:id/tags — Update tags ──────────────────────
+router.patch('/:id/tags', requireAuth, mutateLimiter, async (req, res) => {
+  const noteId = parseInt(req.params.id, 10)
+  if (!Number.isInteger(noteId) || noteId < 1) return res.status(400).json({ error: 'Invalid note id.' })
+
+  try {
+    const note = await prisma.note.findUnique({ where: { id: noteId }, select: { id: true, userId: true } })
+    if (!note) return res.status(404).json({ error: 'Note not found.' })
+    if (!assertOwnerOrAdmin({ res, user: req.user, ownerId: note.userId, message: 'Not your note.', targetType: 'note', targetId: noteId })) return
+
+    const tags = Array.isArray(req.body.tags) ? req.body.tags : []
+    // Sanitize: max 10 tags, each max 30 chars, lowercase trimmed, unique
+    const cleaned = [...new Set(
+      tags.map(t => typeof t === 'string' ? t.trim().toLowerCase().slice(0, 30) : '')
+        .filter(Boolean)
+    )].slice(0, 10)
+
+    const updated = await prisma.note.update({
+      where: { id: noteId },
+      data: { tags: JSON.stringify(cleaned) },
+    })
+    res.json({ tags: JSON.parse(updated.tags) })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Note Image Upload
+// ═══════════════════════════════════════════════════════════════════════════
+
+const NOTE_IMAGE_ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
+const NOTE_IMAGE_ALLOWED_EXT = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp'])
+const NOTE_IMAGE_MAX_BYTES = 5 * 1024 * 1024 // 5 MB
+
+function safeName(original) {
+  return `${Date.now()}-${original.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80)}`
+}
+
+const noteImageStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, NOTE_IMAGES_DIR),
+  filename: (req, file, cb) => cb(null, `note-${req.user.userId}-${safeName(file.originalname)}`),
+})
+
+const noteImageUpload = multer({
+  storage: noteImageStorage,
+  limits: { fileSize: NOTE_IMAGE_MAX_BYTES },
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase()
+    if (!NOTE_IMAGE_ALLOWED_MIME.has(file.mimetype) || !NOTE_IMAGE_ALLOWED_EXT.has(ext)) {
+      return cb(new Error('Only JPEG, PNG, GIF, and WebP images are allowed.'))
+    }
+    cb(null, true)
+  },
+})
+
+// ── POST /api/notes/:id/images — Upload an image for embedding ───
+router.post('/:id/images', requireAuth, mutateLimiter, requireVerifiedEmail, (req, res) => {
+  const noteId = parseInt(req.params.id, 10)
+  if (!Number.isInteger(noteId) || noteId < 1) return res.status(400).json({ error: 'Invalid note id.' })
+
+  noteImageUpload.single('image')(req, res, async (err) => {
+    if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ error: 'Image must be 5 MB or smaller.' })
+    }
+    if (err) return res.status(400).json({ error: err.message })
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'No image file attached. Use multipart/form-data with field name "image".' })
+    }
+
+    try {
+      const note = await prisma.note.findUnique({ where: { id: noteId }, select: { id: true, userId: true } })
+      if (!note) return res.status(404).json({ error: 'Note not found.' })
+      if (!assertOwnerOrAdmin({ res, user: req.user, ownerId: note.userId, message: 'Not your note.', targetType: 'note', targetId: noteId })) return
+
+      // Return the URL for markdown embedding
+      const imageUrl = `/uploads/note-images/${req.file.filename}`
+      res.status(201).json({ url: imageUrl, markdown: `![image](${imageUrl})` })
+    } catch (uploadErr) {
+      captureError(uploadErr, { route: req.originalUrl, method: req.method })
+      res.status(500).json({ error: 'Server error.' })
+    }
+  })
 })
 
 module.exports = router

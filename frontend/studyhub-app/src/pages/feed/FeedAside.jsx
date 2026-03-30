@@ -7,6 +7,7 @@ import { linkButton } from './feedConstants'
 import { Panel, LeaderboardPanel } from './FeedWidgets'
 import { timeAgo } from '../sheets/sheetsPageConstants'
 import TrendingSection from './TrendingSection'
+import FeedFollowSuggestions from './FeedFollowSuggestions'
 
 export default function FeedAside({ leaderboards, starredUpdates, recentlyViewed = [] }) {
   return (
@@ -98,6 +99,7 @@ export default function FeedAside({ leaderboards, starredUpdates, recentlyViewed
           </Link>
         </Panel>
       ) : null}
+      <FeedFollowSuggestions />
       <TrendingSection period="7d" limit={6} />
       <LeaderboardPanel title="Top Starred" items={leaderboards.stars} empty="No starred sheets yet." renderLabel={(item) => item.title} />
       <LeaderboardPanel title="Most Downloaded" items={leaderboards.downloads} empty="No downloads yet." renderLabel={(item) => item.title} />

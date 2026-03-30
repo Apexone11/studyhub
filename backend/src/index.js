@@ -3,6 +3,7 @@ const compression = require('compression')
 const cors = require('cors')
 const rateLimit = require('express-rate-limit')
 const helmet = require('helmet')
+const http = require('http')
 const path = require('node:path')
 require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') })
 const { initSentry, captureError } = require('./monitoring/sentry')
@@ -43,6 +44,8 @@ const provenanceRoutes = require('./modules/provenance')
 const featureFlagRoutes = require('./modules/featureFlags')
 const webauthnRoutes = require('./modules/webauthn')
 const publicRoutes = require('./modules/public')
+const messagingRoutes = require('./modules/messaging')
+const { initSocketIO } = require('./lib/socketio')
 const { featureFlagMiddleware } = require('./lib/featureFlags')
 
 if (sentryEnabled) {
@@ -338,6 +341,9 @@ app.use('/api/flags', featureFlagRoutes)
 // Mount WebAuthn passkey endpoints under /api/webauthn.
 app.use('/api/webauthn', webauthnRoutes)
 
+// Mount messaging endpoints under /api/messages.
+app.use('/api/messages', messagingRoutes)
+
 // Public unauthenticated data endpoints (landing page stats, etc.).
 app.use('/api/public', publicRoutes)
 
@@ -367,7 +373,10 @@ async function startServer() {
     console.warn('[ops-warning] Guarded mode is enabled; non-admin write actions are temporarily blocked.')
   }
 
-  return app.listen(PORT, () => {
+  const server = http.createServer(app)
+  initSocketIO(server)
+
+  return server.listen(PORT, () => {
     startHtmlArchiveScheduler()
     startModerationCleanupScheduler()
     console.log(`Server running on http://localhost:${PORT}`)

@@ -6,13 +6,11 @@ import { useNavigate } from 'react-router-dom'
 import { IconChevronDown } from '../Icons'
 import { useSession } from '../../lib/session-context'
 import { S } from './navbarConstants'
-import { API } from '../../config'
+import UserAvatar from '../UserAvatar'
 
 export default function NavbarUserMenu({ user }) {
   const navigate = useNavigate()
   const { signOut } = useSession()
-  const initials = user?.username?.slice(0, 2).toUpperCase() || '??'
-
   const [showUserMenu, setShowUserMenu] = useState(false)
   const userMenuRef = useRef(null)
 
@@ -38,10 +36,7 @@ export default function NavbarUserMenu({ user }) {
         aria-expanded={showUserMenu}
         aria-haspopup="true"
       >
-        {user.avatarUrl
-          ? <img src={user.avatarUrl.startsWith('http') ? user.avatarUrl : `${API}${user.avatarUrl}`} alt="" style={{ ...S.avatar, objectFit: 'cover' }} />
-          : <div style={S.avatar} aria-hidden="true">{initials}</div>
-        }
+        <UserAvatar username={user.username} avatarUrl={user.avatarUrl} role={user.role} size={32} border="1.5px solid var(--sh-nav-tab-active)" />
         <span style={S.username}>{user.username}</span>
         <IconChevronDown size={13} style={{ color: 'var(--sh-nav-search-text)', transform: showUserMenu ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} aria-hidden="true" />
       </div>

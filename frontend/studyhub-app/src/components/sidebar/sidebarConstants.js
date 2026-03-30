@@ -4,7 +4,7 @@
 // re-exported here for backward-compatible imports.
 
 import {
-  IconFeed, IconSheets, IconTests, IconNotes,
+  IconFeed, IconSheets, IconTests, IconNotes, IconMessages,
   IconAnnouncements, IconProfile, IconSchool,
 } from '../Icons'
 
@@ -22,6 +22,7 @@ export const NAV_LINKS = [
   { icon: IconSheets,        label: 'Study Sheets',   to: '/sheets' },
   { icon: IconTests,         label: 'Practice Tests', to: '/tests' },
   { icon: IconNotes,         label: 'My Notes',       to: '/notes' },
+  { icon: IconMessages,      label: 'Messages',       to: '/messages' },
   { icon: IconAnnouncements, label: 'Announcements',  to: '/announcements' },
   { icon: IconSchool,        label: 'My Courses',     to: '/my-courses' },
   { icon: IconProfile,       label: 'My Profile',     to: '__MY_PROFILE__' },

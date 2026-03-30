@@ -23,7 +23,9 @@ import { useSession } from '../../lib/session-context'
 import EmailVerificationBanner from '../EmailVerificationBanner'
 import NavbarUserMenu from './NavbarUserMenu'
 import NavbarNotifications from './NavbarNotifications'
-import { S, getConfig } from './navbarConstants'
+import ChatPanel from '../ChatPanel'
+import { IconMessages } from '../Icons'
+import { S, getConfig, handleIconHover } from './navbarConstants'
 
 // ─── COMPONENT ────────────────────────────────────────────────────
 /**
@@ -60,6 +62,8 @@ export default function Navbar({
 
   // search modal state
   const [searchOpen, setSearchOpen] = useState(false)
+  // chat panel state
+  const [chatOpen, setChatOpen] = useState(false)
 
   // Global Ctrl+K / Cmd+K shortcut to open search
   useEffect(() => {
@@ -187,6 +191,7 @@ export default function Navbar({
           </div>
         )}
         <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
+        <ChatPanel open={chatOpen} onClose={() => setChatOpen(false)} />
         <KeyboardShortcuts />
 
         {!user && isLanding && <div style={{ flex: 1 }} />}
@@ -206,6 +211,19 @@ export default function Navbar({
           >
             ← {backTo === '/feed' ? 'Feed' : backTo === '/sheets' ? 'Sheets' : 'Back'}
           </Link>
+        )}
+
+        {/* chat panel toggle */}
+        {user && (
+          <button
+            onClick={() => setChatOpen(true)}
+            aria-label="Open messages"
+            style={S.iconBtn}
+            onMouseEnter={e => handleIconHover(e, true)}
+            onMouseLeave={e => handleIconHover(e, false)}
+          >
+            <IconMessages size={18} />
+          </button>
         )}
 
         {/* notification bell */}

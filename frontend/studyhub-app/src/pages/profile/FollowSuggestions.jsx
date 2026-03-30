@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { FONT, cardStyle, sectionHeadingStyle } from './profileConstants'
+import UserAvatar from '../../components/UserAvatar'
 
 const API = import.meta.env.VITE_API_URL || ''
 
@@ -52,15 +53,7 @@ export default function FollowSuggestions() {
                 to={`/users/${user.username}`}
                 style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', flex: 1, minWidth: 0 }}
               >
-                <div style={avatarStyle}>
-                  {user.avatarUrl ? (
-                    <img src={user.avatarUrl} alt="" loading="lazy" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
-                  ) : (
-                    <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--sh-brand)' }}>
-                      {(user.username || '?')[0].toUpperCase()}
-                    </span>
-                  )}
-                </div>
+                <UserAvatar username={user.username} avatarUrl={user.avatarUrl} size={36} />
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--sh-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {user.username}
@@ -104,17 +97,6 @@ const rowStyle = {
   transition: 'background .15s',
 }
 
-const avatarStyle = {
-  width: 36,
-  height: 36,
-  borderRadius: '50%',
-  background: 'var(--sh-soft)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  flexShrink: 0,
-  overflow: 'hidden',
-}
 
 const followBtnStyle = {
   fontSize: 12,

@@ -40,6 +40,7 @@ const AnnouncementsPage = lazy(() => import('./pages/announcements/Announcements
 const SubmitPage = lazy(() => import('./pages/submit/SubmitPage'))
 const MyCoursesPage = lazy(() => import('./pages/courses/MyCoursesPage'))
 const SheetLabPage = lazy(() => import('./pages/sheets/lab/SheetLabPage'))
+const MessagesPage = lazy(() => import('./pages/messages/MessagesPage'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 
 import ScrollToTop from './components/ScrollToTop'
@@ -85,6 +86,7 @@ const ROUTE_TITLES = {
   '/sheets/upload': 'Upload Sheet',
   '/tests': 'Practice Tests',
   '/notes': 'My Notes',
+  '/messages': 'Messages',
   '/announcements': 'Announcements',
   '/submit': 'Submit Request',
   '/my-courses': 'My Courses',
@@ -197,6 +199,7 @@ function AppRoutes() {
             <Route path="/tests"         element={<PrivateRoute><TestsPage /></PrivateRoute>} />
             <Route path="/tests/:id"     element={<PrivateRoute><TestTakerPage /></PrivateRoute>} />
             <Route path="/notes"         element={<PrivateRoute><NotesPage /></PrivateRoute>} />
+            <Route path="/messages"      element={<PrivateRoute><MessagesPage /></PrivateRoute>} />
             <Route path="/notes/:id"    element={<NoteViewerPage />} />
             <Route path="/announcements" element={<PrivateRoute><AnnouncementsPage /></PrivateRoute>} />
             <Route path="/submit"        element={<PrivateRoute><SubmitPage /></PrivateRoute>} />

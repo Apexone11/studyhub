@@ -39,6 +39,8 @@ model User {
   announcements              Announcement[]
   notes                      Note[]
   noteComments               NoteComment[]
+  noteStars                  NoteStar[]
+  noteVersions               NoteVersion[]
   reactions                  Reaction[]
   feedPosts                  FeedPost[]
   feedPostComments           FeedPostComment[]
@@ -69,6 +71,20 @@ model User {
   dailyActivity              UserDailyActivity[]
   badges                     UserBadge[]
   sensitiveData              UserSensitive?
+  blockedUsers               UserBlock[]     @relation("BlockedByUser")
+  blockedByUsers             UserBlock[]     @relation("BlockedUser")
+  mutedUsers                 UserMute[]      @relation("MutedByUser")
+  mutedByUsers               UserMute[]      @relation("MutedUser")
+  conversationsCreated       Conversation[]  @relation("ConversationCreator")
+  conversationParticipants   ConversationParticipant[]
+  messagesSent               Message[]       @relation("MessageSender")
+  messageReactions           MessageReaction[] @relation("MessageReactionUser")
+  studyGroupsCreated         StudyGroup[]      @relation("StudyGroupCreator")
+  studyGroupMemberships      StudyGroupMember[]
+  groupResources             GroupResource[]
+  groupSessionRsvps          GroupSessionRsvp[]
+  groupDiscussionPosts       GroupDiscussionPost[]
+  groupDiscussionReplies     GroupDiscussionReply[]
 
   @@index([role])
 }
@@ -96,6 +112,7 @@ model Course {
   enrollments Enrollment[]
   notes       Note[]
   feedPosts   FeedPost[]
+  studyGroups StudyGroup[]
 
   @@unique([schoolId, code])
 }
@@ -253,6 +270,8 @@ model Note {
   courseId         Int?
   private          Boolean       @default(true)
   allowDownloads   Boolean       @default(false)
+  pinned           Boolean       @default(false)
+  tags             String        @default("[]")
   moderationStatus String        @default("clean")
   contentHash      String?
   contentSimhash   String?
@@ -261,6 +280,8 @@ model Note {
   author           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   course           Course?       @relation(fields: [courseId], references: [id])
   noteComments     NoteComment[]
+  noteStars        NoteStar[]
+  noteVersions     NoteVersion[]
 }
 
 model NoteComment {
@@ -276,6 +297,31 @@ model NoteComment {
   createdAt        DateTime @default(now())
   note             Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
   author           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([noteId, createdAt(sort: Desc)])
+}
+
+model NoteStar {
+  userId    Int
+  noteId    Int
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  note      Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@id([userId, noteId])
+  @@index([noteId])
+}
+
+model NoteVersion {
+  id        Int      @id @default(autoincrement())
+  noteId    Int
+  userId    Int
+  title     String
+  content   String
+  message   String?
+  createdAt DateTime @default(now())
+  note      Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  author    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([noteId, createdAt(sort: Desc)])
 }
@@ -750,4 +796,230 @@ model WebAuthnCredential {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+model UserBlock {
+  blockerId  Int
+  blockedId  Int
+  reason     String?
+  createdAt  DateTime @default(now())
+  blocker    User     @relation("BlockedByUser", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked    User     @relation("BlockedUser", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@id([blockerId, blockedId])
+  @@index([blockedId])
+}
+
+model UserMute {
+  muterId   Int
+  mutedId   Int
+  createdAt DateTime @default(now())
+  muter     User     @relation("MutedByUser", fields: [muterId], references: [id], onDelete: Cascade)
+  muted     User     @relation("MutedUser", fields: [mutedId], references: [id], onDelete: Cascade)
+
+  @@id([muterId, mutedId])
+  @@index([mutedId])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// StudyHub Connect — Real-time Messaging
+// ═══════════════════════════════════════════════════════════════════════════
+
+model Conversation {
+  id          Int      @id @default(autoincrement())
+  type        String   @default("dm")   // "dm" or "group"
+  name        String?                    // display name for group chats
+  avatarUrl   String?                    // custom avatar for group chats
+  createdById Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  createdBy    User                      @relation("ConversationCreator", fields: [createdById], references: [id])
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@index([updatedAt(sort: Desc)])
+}
+
+model ConversationParticipant {
+  conversationId Int
+  userId         Int
+  role           String   @default("member") // "member" or "admin" (group only)
+  joinedAt       DateTime @default(now())
+  lastReadAt     DateTime @default(now())    // for read receipts
+  muted          Boolean  @default(false)    // mute notifications for this convo
+  archived       Boolean  @default(false)    // hide from main list
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([conversationId, userId])
+  @@index([userId, archived])
+}
+
+model Message {
+  id             Int      @id @default(autoincrement())
+  conversationId Int
+  senderId       Int
+  content        String   @db.Text
+  type           String   @default("text") // "text", "image", "system"
+  replyToId      Int?                       // thread replies
+  editedAt       DateTime?
+  deletedAt      DateTime?                  // soft delete
+  createdAt      DateTime @default(now())
+
+  conversation Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User              @relation("MessageSender", fields: [senderId], references: [id])
+  replyTo      Message?          @relation("MessageReply", fields: [replyToId], references: [id])
+  replies      Message[]         @relation("MessageReply")
+  reactions    MessageReaction[]
+
+  @@index([conversationId, createdAt(sort: Desc)])
+  @@index([senderId])
+}
+
+model MessageReaction {
+  id        Int      @id @default(autoincrement())
+  messageId Int
+  userId    Int
+  emoji     String   @db.VarChar(16) // e.g. "thumbsup", "heart", "laugh"
+  createdAt DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation("MessageReactionUser", fields: [userId], references: [id])
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Study Groups — Collaborative study sessions and resource sharing
+// ═══════════════════════════════════════════════════════════════════════════
+
+model StudyGroup {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String   @default("")
+  avatarUrl   String?
+  courseId     Int?                          // null = freeform group
+  privacy     String   @default("public")   // "public", "private", "invite_only"
+  maxMembers  Int      @default(50)
+  createdById Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  course      Course?             @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  createdBy   User                @relation("StudyGroupCreator", fields: [createdById], references: [id])
+  members     StudyGroupMember[]
+  resources   GroupResource[]
+  sessions    GroupSession[]
+  posts       GroupDiscussionPost[]
+
+  @@index([courseId])
+  @@index([privacy, updatedAt(sort: Desc)])
+  @@index([createdById])
+}
+
+model StudyGroupMember {
+  id        Int      @id @default(autoincrement())
+  groupId   Int
+  userId    Int
+  role      String   @default("member")   // "admin", "moderator", "member"
+  status    String   @default("active")   // "active", "pending", "invited", "banned"
+  joinedAt  DateTime @default(now())
+
+  group StudyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+  @@index([userId, status])
+  @@index([groupId, status])
+}
+
+model GroupResource {
+  id          Int      @id @default(autoincrement())
+  groupId     Int
+  userId      Int                           // who added it
+  title       String
+  description String   @default("")
+  resourceType String  @default("link")     // "link", "sheet", "note", "file"
+  resourceUrl  String?                      // external link or file path
+  sheetId     Int?                          // linked StudySheet
+  noteId      Int?                          // linked Note
+  pinned      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  group StudyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([groupId, pinned, createdAt(sort: Desc)])
+}
+
+model GroupSession {
+  id           Int      @id @default(autoincrement())
+  groupId      Int
+  title        String
+  description  String   @default("")
+  location     String   @default("")       // room, zoom link, etc.
+  scheduledAt  DateTime
+  durationMins Int      @default(60)
+  recurring    String?                      // "weekly", "biweekly", null
+  status       String   @default("upcoming") // "upcoming", "in_progress", "completed", "cancelled"
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  group StudyGroup         @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  rsvps GroupSessionRsvp[]
+
+  @@index([groupId, scheduledAt(sort: Desc)])
+  @@index([scheduledAt])
+}
+
+model GroupSessionRsvp {
+  id        Int      @id @default(autoincrement())
+  sessionId Int
+  userId    Int
+  status    String   @default("going")     // "going", "maybe", "not_going"
+  createdAt DateTime @default(now())
+
+  session GroupSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, userId])
+  @@index([sessionId, status])
+}
+
+model GroupDiscussionPost {
+  id        Int      @id @default(autoincrement())
+  groupId   Int
+  userId    Int
+  title     String
+  content   String   @db.Text
+  type      String   @default("discussion") // "discussion", "question", "announcement", "poll"
+  pinned    Boolean  @default(false)
+  resolved  Boolean  @default(false)        // for Q&A threads
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  group   StudyGroup             @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  author  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  replies GroupDiscussionReply[]
+
+  @@index([groupId, pinned, createdAt(sort: Desc)])
+  @@index([groupId, type, createdAt(sort: Desc)])
+}
+
+model GroupDiscussionReply {
+  id        Int      @id @default(autoincrement())
+  postId    Int
+  userId    Int
+  content   String   @db.Text
+  isAnswer  Boolean  @default(false)        // mark as accepted answer for Q&A
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  post   GroupDiscussionPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([postId, createdAt])
 }

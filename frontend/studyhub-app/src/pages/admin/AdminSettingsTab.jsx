@@ -67,7 +67,7 @@ export default function AdminSettingsTab({ user, htmlKillSwitch, htmlToggleSavin
               </button>
             )}
           </div>
-          <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.7 }}>
+          <div style={{ fontSize: 12, color: 'var(--sh-muted)', lineHeight: 1.7 }}>
             {htmlKillSwitch.envOverride
               ? `Environment variable STUDYHUB_HTML_UPLOADS is set to "${htmlKillSwitch.envOverride}" — this overrides the toggle. Change the env var and restart to use the admin toggle.`
               : htmlKillSwitch.enabled

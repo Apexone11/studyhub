@@ -77,7 +77,7 @@ function scopeConfig(scope, id) {
 
 function panelStyle() {
   return {
-    background: '#fff',
+    background: 'var(--sh-surface)',
     borderRadius: 18,
     border: '1px solid #e2e8f0',
     padding: 18,
@@ -90,9 +90,9 @@ function linkButton() {
     alignItems: 'center',
     gap: 6,
     borderRadius: 999,
-    border: '1px solid #dbeafe',
-    background: '#eff6ff',
-    color: '#1d4ed8',
+    border: '1px solid var(--sh-info-border, #dbeafe)',
+    background: 'var(--sh-info-bg)',
+    color: 'var(--sh-info-text, #1d4ed8)',
     padding: '8px 12px',
     fontSize: 12,
     fontWeight: 700,
@@ -198,7 +198,7 @@ export default function AttachmentPreviewPage() {
                   style={{
                     border: '1px solid #dbe2ef',
                     borderRadius: 14,
-                    background: '#fff',
+                    background: 'var(--sh-surface)',
                     overflow: 'hidden',
                     minHeight: 420,
                   }}
