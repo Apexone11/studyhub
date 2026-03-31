@@ -2228,3 +2228,191 @@ Comprehensive study groups UX overhaul (backend + frontend), messaging notificat
 ## Improvement Phase (starting 2026-03-31)
 
 All major features are now implemented. Going forward, weekly cycles focus on improving existing features: UX polish, edge case fixes, performance, accessibility, and test coverage. No new features will be added.
+
+---
+
+## Cycle 59 — Real-time, Accessibility, Performance (2026-03-31)
+
+### Summary
+
+Four targeted improvements across the platform: real-time Socket.io integration for ChatPanel and Study Group discussions, accessible focus trapping for all modals, skeleton loading states, and study group real-time events.
+
+### 1. ChatPanel Real-time Messaging
+
+Full Socket.io integration added to `ChatPanel.jsx`:
+- Live message delivery via `message:new`, `message:edit`, `message:delete` socket events.
+- Typing indicators: emits `typing:start`/`typing:stop` with throttle; displays "{username} is typing..." in the chat UI.
+- Conversation room management: `conversation:join` on selection, `message:read` receipts on view.
+- Uses `useRef` for active conversation ID to prevent stale closure bugs in socket event handlers.
+
+### 2. Accessible Focus Trapping (useFocusTrap hook)
+
+New reusable hook: `frontend/.../lib/useFocusTrap.js`
+- Tab/Shift+Tab cycling within container boundaries.
+- Escape key closes modal (configurable via `escapeCloses` option).
+- Auto-focus first focusable element or caller-specified `initialFocusRef`.
+- Body scroll lock (configurable via `lockScroll` option).
+- Focus restore to previously-focused element on close.
+
+Applied to 5 components, replacing ad-hoc Escape key handlers:
+- `ConfirmDialog.jsx` (with `initialFocusRef` on confirm button)
+- `SearchModal.jsx` (with `initialFocusRef` on search input)
+- `ReportModal.jsx`
+- `ActionBlockedModal.jsx`
+- `ChatPanel.jsx` (with `lockScroll: false`)
+
+### 3. Skeleton Loading Fallback
+
+Replaced plain-text "Loading page..." `RouteFallback` in `App.jsx` with a full skeleton UI:
+- Navbar skeleton: logo placeholder, text bar, avatar circle.
+- Content skeleton: title line, three text lines, 3-card grid with avatar + text placeholders.
+- Uses `sh-skeleton` CSS class for shimmer animation.
+- All colors use CSS custom property tokens (`--sh-bg`, `--sh-surface`, `--sh-border`).
+
+### 4. Study Groups Real-time Discussions
+
+Backend (`studyGroups.routes.js`):
+- After creating a discussion post, emits `group:discussion:new` to `studygroup:{groupId}` room.
+- After creating a reply, emits `group:discussion:reply` with `groupId` and `postId` fields.
+
+Backend (`socketio.js`):
+- On socket connection, auto-joins `studygroup:{groupId}` rooms for all active memberships.
+- Wrapped in try-catch for graceful degradation if StudyGroupMember table unavailable.
+
+Frontend (`useStudyGroupsData.js`):
+- Listens for `group:discussion:new`: prepends new post to discussions (with deduplication).
+- Listens for `group:discussion:reply`: increments `replyCount` on the matching post.
+- Uses `activeGroupIdRef` to avoid stale closures and filter events by active group.
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `frontend/.../lib/useFocusTrap.js` | New reusable focus trap hook |
+| `frontend/.../components/ChatPanel.jsx` | Socket.io integration, typing indicators, focus trap |
+| `frontend/.../components/ConfirmDialog.jsx` | Applied useFocusTrap, removed manual Escape handler |
+| `frontend/.../components/search/SearchModal.jsx` | Applied useFocusTrap, removed duplicate Escape/focus logic |
+| `frontend/.../components/ReportModal.jsx` | Applied useFocusTrap, removed manual Escape handler |
+| `frontend/.../components/ActionBlockedModal.jsx` | Applied useFocusTrap, removed manual Escape handler |
+| `frontend/.../App.jsx` | Skeleton RouteFallback replacing plain text |
+| `frontend/.../pages/studyGroups/useStudyGroupsData.js` | Real-time discussion event listeners |
+| `backend/src/modules/studyGroups/studyGroups.routes.js` | Socket.io emit for new posts and replies |
+| `backend/src/lib/socketio.js` | Auto-join study group rooms on connection |
+
+### Validation
+
+- Frontend lint: 0 errors
+- Frontend build: success
+- No new test failures
+
+---
+
+## Cycle 60 — Testing, Code Quality, Accessibility, Resilience (2026-03-31)
+
+### Summary
+
+Four-pronged improvement cycle: backend test coverage for messaging, large page decomposition, WCAG accessibility audit, and Socket.io error resilience.
+
+### 1. Messaging Backend Integration Tests (24 tests)
+
+New test file: `backend/test/messaging.routes.test.js`
+
+Coverage areas:
+- GET /conversations: list formatting, blocked user filtering, database error handling.
+- POST /conversations: validation, block enforcement, new conversation creation.
+- GET /conversations/:id/messages: participant verification, message retrieval.
+- POST /conversations/:id/messages: text creation with socket broadcast, HTML sanitization, max length validation, empty content with attachments (GIF-only), HTTPS-only attachments, missing URL rejection, non-participant rejection.
+- PATCH /messages/:id: owner edit within 15-min window, expired window rejection, non-owner rejection.
+- DELETE /messages/:id: soft delete with socket broadcast, non-existent message handling.
+- POST /messages/:id/reactions: reaction creation with broadcast, missing emoji rejection.
+- GET /online: online user list from Socket.io tracking.
+
+All 24 tests pass. Uses the established vi.hoisted + Module._load mock pattern.
+
+### 2. MessagesPage Decomposition (1903 -> 201 lines)
+
+Extracted 9 components into `pages/messages/components/`:
+
+| Component | Lines | Purpose |
+|-----------|-------|---------|
+| ConversationList.jsx | 243 | Conversation sidebar with search and ConversationItem sub-component |
+| MessageThread.jsx | 516 | Message display, input area, polls, GIFs, attachments |
+| MessageBubble.jsx | 321 | Individual message bubble with LinkPreview sub-component |
+| NewConversationModal.jsx | 311 | DM/group conversation creation modal |
+| MessagePollDisplay.jsx | 99 | Poll voting and display |
+| GifSearchPanel.jsx | 91 | Tenor GIF search panel |
+| ConfirmDeleteModal.jsx | 82 | Delete confirmation dialog |
+| MessageSearchBar.jsx | 41 | Message text search |
+| TypingIndicator.jsx | 32 | Typing indicator animation |
+
+MessagesPage.jsx is now a thin orchestrator that owns layout, routing state, and hook wiring only.
+
+`groupReactions` utility moved to `messagesHelpers.js`.
+
+### 3. WCAG 2.1 AA Accessibility Audit
+
+AppSidebar.jsx:
+- Added `aria-current="page"` to active navigation links.
+- Added `aria-label="Add course"` to the Add Course button.
+- Added `aria-label="Close navigation"` to the drawer close button.
+
+NavbarNotifications.jsx:
+- Added `aria-live="polite"` and `aria-label` to the unread count badge.
+
+NavbarUserMenu.jsx:
+- Changed `aria-haspopup="true"` to `aria-haspopup="menu"`.
+- Added `role="menu"` to dropdown, `role="menuitem"` to items, `role="separator"` to divider.
+
+ConversationList.jsx:
+- Added `aria-label` to search input and new conversation button.
+- Added `role="list"` and `role="listitem"` to conversation list items.
+
+MessageThread.jsx:
+- Added `role="log"` and `aria-live="polite"` to the messages area.
+- Added `aria-label` to all icon-only buttons (search, attach, image, GIF, poll, send).
+- Added `aria-label="Message input"` to the textarea.
+
+NewConversationModal.jsx:
+- Added `aria-label="Search users"` to user search input.
+- Added `aria-label="Close modal"` to close button.
+
+### 4. Socket.io Error Handling
+
+useSocket.js:
+- Added `connectionError` state exposed to consumers.
+- Added `connect_error` handler that surfaces persistent errors (auth failures, polling errors).
+- Added `disconnect` handler for server-initiated disconnects.
+- Added `reconnect_failed` handler (fires after exhausting 10 reconnection attempts).
+- Added `reconnect` handler that clears error state.
+- Configured reconnection: 10 attempts, 1-10s exponential backoff.
+
+MessagesPage.jsx:
+- Added connection status banner (`role="alert"`) that appears when socket is disconnected.
+- Uses `--sh-info-*` tokens for non-alarming visual treatment.
+
+ChatPanel.jsx:
+- Added compact "Live updates paused" banner when connection is lost.
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `backend/test/messaging.routes.test.js` | New: 24 integration tests for messaging API |
+| `frontend/.../pages/messages/MessagesPage.jsx` | Refactored from 1903 to 201 lines; added socket error banner |
+| `frontend/.../pages/messages/components/*.jsx` | New: 9 extracted component files |
+| `frontend/.../pages/messages/messagesHelpers.js` | Added groupReactions utility |
+| `frontend/.../lib/useSocket.js` | Added error handling, reconnection config, connectionError state |
+| `frontend/.../components/ChatPanel.jsx` | Added socket error banner |
+| `frontend/.../components/sidebar/AppSidebar.jsx` | aria-current, aria-labels |
+| `frontend/.../components/navbar/NavbarNotifications.jsx` | aria-live on badge |
+| `frontend/.../components/navbar/NavbarUserMenu.jsx` | role=menu, role=menuitem |
+| `frontend/.../pages/messages/components/ConversationList.jsx` | role=list, aria-labels |
+| `frontend/.../pages/messages/components/MessageThread.jsx` | role=log, aria-live, aria-labels |
+| `frontend/.../pages/messages/components/NewConversationModal.jsx` | aria-labels |
+
+### Validation
+
+- Frontend lint: 0 errors
+- Frontend build: success
+- Backend messaging tests: 24/24 passing
+- No pre-existing test regressions

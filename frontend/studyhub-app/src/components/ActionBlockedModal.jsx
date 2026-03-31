@@ -6,28 +6,20 @@
  *  reason    — optional server-provided restriction reason
  *  onClose   — callback to dismiss
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useFocusTrap } from '../lib/useFocusTrap'
 
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 
 export default function ActionBlockedModal({ open, reason, onClose }) {
   const navigate = useNavigate()
-
-  useEffect(() => {
-    if (!open) return
-    function onKey(e) {
-      if (e.key === 'Escape') onClose?.()
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [open, onClose])
+  const trapRef = useFocusTrap({ active: open, onClose })
 
   if (!open) return null
 
   return (
     <div style={styles.overlay} onClick={onClose} role="presentation">
-      <div style={styles.modal} onClick={(e) => e.stopPropagation()} role="alertdialog" aria-modal="true">
+      <div ref={trapRef} style={styles.modal} onClick={(e) => e.stopPropagation()} role="alertdialog" aria-modal="true">
         <div style={styles.iconWrap}>
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--sh-danger-text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="10"/>

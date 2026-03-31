@@ -88,3 +88,12 @@ export function truncateText(text, maxLength = 60) {
   if (text.length <= maxLength) return text
   return text.slice(0, maxLength) + '...'
 }
+
+export function groupReactions(reactions) {
+  const groups = {}
+  for (const r of reactions) {
+    if (!groups[r.emoji]) groups[r.emoji] = { emoji: r.emoji, count: 0 }
+    groups[r.emoji].count++
+  }
+  return Object.values(groups)
+}

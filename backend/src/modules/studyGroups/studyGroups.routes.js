@@ -43,6 +43,7 @@ const prisma = require('../../lib/prisma')
 const { readLimiter, writeLimiter } = require('../../lib/rateLimiters')
 const { getBlockedUserIds } = require('../../lib/social/blockFilter')
 const { createNotification } = require('../../lib/notify')
+const { getIO } = require('../../lib/socketio')
 
 const router = express.Router()
 
@@ -1770,7 +1771,7 @@ router.post('/:id/discussions', writeLimiter, requireAuth, async (req, res) => {
       console.error('Failed to create notifications:', notifErr.message)
     }
 
-    res.status(201).json({
+    const formattedPost = {
       id: post.id,
       groupId: post.groupId,
       userId: post.userId,
@@ -1783,7 +1784,15 @@ router.post('/:id/discussions', writeLimiter, requireAuth, async (req, res) => {
       replyCount: 0,
       createdAt: post.createdAt,
       updatedAt: post.updatedAt,
-    })
+    }
+
+    // Emit real-time event to group members
+    try {
+      const io = getIO()
+      io.to(`studygroup:${groupId}`).emit('group:discussion:new', formattedPost)
+    } catch { /* fire-and-forget */ }
+
+    res.status(201).json(formattedPost)
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
@@ -2037,16 +2046,25 @@ router.post('/:id/discussions/:postId/replies', writeLimiter, requireAuth, async
       },
     })
 
-    res.status(201).json({
+    const formattedReply = {
       id: reply.id,
       postId: reply.postId,
+      groupId,
       userId: reply.userId,
       author: reply.author,
       content: reply.content,
       isAnswer: reply.isAnswer,
       createdAt: reply.createdAt,
       updatedAt: reply.updatedAt,
-    })
+    }
+
+    // Emit real-time event to group members
+    try {
+      const io = getIO()
+      io.to(`studygroup:${groupId}`).emit('group:discussion:reply', formattedReply)
+    } catch { /* fire-and-forget */ }
+
+    res.status(201).json(formattedReply)
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })

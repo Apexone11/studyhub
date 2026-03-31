@@ -160,9 +160,43 @@ function PreferencesBootstrap() {
 
 function RouteFallback() {
   return (
-    <div className="page-shell" style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>
-      <div className="auth-card" style={{ width: 'min(92vw, 420px)', textAlign: 'center' }}>
-        <p style={{ margin: 0 }}>Loading page...</p>
+    <div style={{ minHeight: '100vh', background: 'var(--sh-bg, #f8fafc)' }}>
+      {/* Navbar skeleton */}
+      <div style={{
+        height: 56, background: 'var(--sh-surface, #fff)',
+        borderBottom: '1px solid var(--sh-border, #e2e8f0)',
+        display: 'flex', alignItems: 'center', padding: '0 24px', gap: 16,
+      }}>
+        <div className="sh-skeleton" style={{ width: 28, height: 28, borderRadius: 6 }} />
+        <div className="sh-skeleton" style={{ width: 120, height: 14, borderRadius: 6 }} />
+        <div style={{ flex: 1 }} />
+        <div className="sh-skeleton" style={{ width: 32, height: 32, borderRadius: '50%' }} />
+      </div>
+      {/* Content skeleton */}
+      <div style={{ maxWidth: 800, margin: '32px auto', padding: '0 20px' }}>
+        <div className="sh-skeleton" style={{ width: '45%', height: 22, borderRadius: 8, marginBottom: 20 }} />
+        <div className="sh-skeleton" style={{ width: '100%', height: 14, borderRadius: 6, marginBottom: 12 }} />
+        <div className="sh-skeleton" style={{ width: '80%', height: 14, borderRadius: 6, marginBottom: 12 }} />
+        <div className="sh-skeleton" style={{ width: '60%', height: 14, borderRadius: 6, marginBottom: 24 }} />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 16 }}>
+          {[1, 2, 3].map((i) => (
+            <div key={i} style={{
+              background: 'var(--sh-surface, #fff)', borderRadius: 16,
+              border: '1px solid var(--sh-border, #e2e8f0)', padding: '20px 22px',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                <div className="sh-skeleton" style={{ width: 36, height: 36, borderRadius: '50%' }} />
+                <div style={{ flex: 1 }}>
+                  <div className="sh-skeleton" style={{ width: '60%', height: 12, borderRadius: 6, marginBottom: 6 }} />
+                  <div className="sh-skeleton" style={{ width: '40%', height: 10, borderRadius: 6 }} />
+                </div>
+              </div>
+              <div className="sh-skeleton" style={{ width: '75%', height: 14, borderRadius: 6, marginBottom: 8 }} />
+              <div className="sh-skeleton" style={{ width: '100%', height: 10, borderRadius: 6, marginBottom: 6 }} />
+              <div className="sh-skeleton" style={{ width: '85%', height: 10, borderRadius: 6 }} />
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )

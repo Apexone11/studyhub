@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react'
+import { useRef } from 'react'
+import { useFocusTrap } from '../lib/useFocusTrap'
 
 /**
  * Reusable confirmation dialog that replaces window.confirm().
@@ -24,18 +25,7 @@ export default function ConfirmDialog({
   onCancel,
 }) {
   const confirmRef = useRef(null)
-
-  // Focus the confirm button on open and trap Escape
-  useEffect(() => {
-    if (!open) return
-    setTimeout(() => confirmRef.current?.focus(), 50)
-
-    function onKey(e) {
-      if (e.key === 'Escape') onCancel?.()
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [open, onCancel])
+  const trapRef = useFocusTrap({ active: open, onClose: onCancel, initialFocusRef: confirmRef })
 
   if (!open) return null
 
@@ -43,7 +33,7 @@ export default function ConfirmDialog({
 
   return (
     <div style={styles.overlay} onClick={onCancel} role="presentation">
-      <div style={styles.modal} onClick={(e) => e.stopPropagation()} role="alertdialog" aria-modal="true" aria-labelledby="confirm-dialog-title">
+      <div ref={trapRef} style={styles.modal} onClick={(e) => e.stopPropagation()} role="alertdialog" aria-modal="true" aria-labelledby="confirm-dialog-title">
         <h3 id="confirm-dialog-title" style={styles.title}>{title}</h3>
         {message && <p style={styles.message}>{message}</p>}
         <div style={styles.actions}>

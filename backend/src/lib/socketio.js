@@ -118,6 +118,17 @@ function initSocketIO(httpServer) {
         socket.join(`conversation:${conversationId}`)
       }
 
+      // Join active study group rooms
+      try {
+        const groupMemberships = await prisma.studyGroupMember.findMany({
+          where: { userId: socket.userId, status: 'active' },
+          select: { groupId: true },
+        })
+        for (const { groupId } of groupMemberships) {
+          socket.join(`studygroup:${groupId}`)
+        }
+      } catch { /* graceful degradation if table missing */ }
+
       // Notify others that this user is online
       io.emit('user:online', { userId: socket.userId, username: socket.username })
 

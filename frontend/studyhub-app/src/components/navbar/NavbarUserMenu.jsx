@@ -34,7 +34,7 @@ export default function NavbarUserMenu({ user }) {
         tabIndex={0}
         aria-label={`User menu: ${user.username}`}
         aria-expanded={showUserMenu}
-        aria-haspopup="true"
+        aria-haspopup="menu"
       >
         <UserAvatar username={user.username} avatarUrl={user.avatarUrl} role={user.role} size={32} border="1.5px solid var(--sh-nav-tab-active)" />
         <span style={S.username}>{user.username}</span>
@@ -42,21 +42,21 @@ export default function NavbarUserMenu({ user }) {
       </div>
 
       {showUserMenu && (
-        <div style={S.userMenu}>
-          <button type="button" style={S.userMenuItem} onClick={() => { setShowUserMenu(false); navigate(`/users/${user.username}`) }}
+        <div style={S.userMenu} role="menu">
+          <button type="button" style={S.userMenuItem} role="menuitem" onClick={() => { setShowUserMenu(false); navigate(`/users/${user.username}`) }}
             onMouseEnter={e => e.currentTarget.style.background = 'var(--sh-soft)'}
             onMouseLeave={e => e.currentTarget.style.background = 'none'}
           >
             My Profile
           </button>
-          <button type="button" style={S.userMenuItem} onClick={() => { setShowUserMenu(false); navigate('/settings') }}
+          <button type="button" style={S.userMenuItem} role="menuitem" onClick={() => { setShowUserMenu(false); navigate('/settings') }}
             onMouseEnter={e => e.currentTarget.style.background = 'var(--sh-soft)'}
             onMouseLeave={e => e.currentTarget.style.background = 'none'}
           >
             Settings
           </button>
-          <div style={{ borderTop: '1px solid var(--sh-border)', margin: '4px 0' }} />
-          <button type="button" style={{ ...S.userMenuItem, color: 'var(--sh-danger)' }}
+          <div style={{ borderTop: '1px solid var(--sh-border)', margin: '4px 0' }} role="separator" />
+          <button type="button" style={{ ...S.userMenuItem, color: 'var(--sh-danger)' }} role="menuitem"
             onClick={async () => { setShowUserMenu(false); await signOut(); navigate('/login') }}
             onMouseEnter={e => e.currentTarget.style.background = 'var(--sh-soft)'}
             onMouseLeave={e => e.currentTarget.style.background = 'none'}

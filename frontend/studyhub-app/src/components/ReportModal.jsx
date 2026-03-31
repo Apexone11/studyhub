@@ -8,8 +8,9 @@
  *  onClose       — callback when modal is dismissed
  *  onReported    — optional callback after successful submission
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { API } from '../config'
+import { useFocusTrap } from '../lib/useFocusTrap'
 
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 
@@ -41,7 +42,7 @@ export default function ReportModal({ open, targetType, targetId, onClose, onRep
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
-  const modalRef = useRef(null)
+  const trapRef = useFocusTrap({ active: open, onClose })
 
   /* Reset state on open */
   useEffect(() => {
@@ -53,16 +54,6 @@ export default function ReportModal({ open, targetType, targetId, onClose, onRep
       setSubmitting(false)
     }
   }, [open])
-
-  /* Escape to close */
-  useEffect(() => {
-    if (!open) return
-    function onKey(e) {
-      if (e.key === 'Escape') onClose?.()
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [open, onClose])
 
   if (!open) return null
 
@@ -106,7 +97,7 @@ export default function ReportModal({ open, targetType, targetId, onClose, onRep
   return (
     <div style={styles.overlay} onClick={onClose} role="presentation">
       <div
-        ref={modalRef}
+        ref={trapRef}
         style={styles.modal}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
