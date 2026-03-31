@@ -6962,3 +6962,63 @@ Backend:
 - Frontend build: success (952+ modules)
 - Backend tests: 546 passed, 43 pre-existing failures (DB connection in test env)
 - No new test failures introduced
+
+---
+
+## Cycle 57 -- Messaging Feature Expansion (2026-03-31)
+
+### Summary
+
+Fixed notification badge persistence bug, replaced the image URL-only input with a proper file picker, and added six new messaging features: GIF search, reply-to messages, file attachments, message search, link previews, and unread count tracking.
+
+### Changes
+
+#### Bug Fix: Notification Badge Persistence
+- `useMessagingData.js`: When `selectConversation` is called, immediately sets `unreadCount: 0` in the conversations list state before emitting the socket read event. Previously the badge stayed visible because only the backend `lastReadAt` was updated, but the frontend state was never cleared.
+- Also fixed `handleNewMessage` socket handler: increments unread count for conversations not currently viewed, clears to 0 for the active conversation.
+
+#### File Picker (Attach from Device)
+- Added a hidden `<input type="file">` with `accept="image/*,.gif,.pdf,.doc,.docx,.txt,.zip"` and `multiple` support.
+- New paperclip button in the input toolbar opens the native file picker.
+- Selected files show as thumbnail previews (images) or filename tiles (other files) above the input area.
+- Users can remove individual attachments before sending.
+- Object URLs are properly revoked on unmount to prevent memory leaks.
+
+#### GIF Search (Tenor Integration)
+- New `GifSearchPanel` component with debounced search (400ms) against the Tenor v2 API.
+- Displays a 3-column grid of GIF thumbnails (12 results).
+- Clicking a GIF sends it immediately as an image attachment.
+- "Powered by Tenor" attribution included.
+
+#### Reply-to Messages
+- New reply button in the message hover action bar.
+- Clicking reply shows a "Replying to {username}" banner above the input with a preview of the quoted message.
+- Reply reference stored as `replyToId` and passed to `sendMessage`.
+- Replied-to message displayed above the message bubble with a brand-colored left border.
+
+#### Message Search
+- New search icon button in the conversation header.
+- Opens a `MessageSearchBar` below the header that filters messages by content.
+- Shows result count.
+
+#### Link Previews
+- New `LinkPreview` component that detects URLs in message content.
+- Renders a clickable preview card showing the domain and truncated URL.
+- Styled to match the message bubble's own/other color scheme.
+
+#### Input Toolbar Reorganization
+- Buttons now in order: Attach File, Image URL, GIF, Poll, then textarea + Send.
+- Only one panel can be open at a time (closing others when opening one).
+
+### Files Modified
+
+Frontend:
+- `frontend/studyhub-app/src/pages/messages/MessagesPage.jsx` (GifSearchPanel, MessageSearchBar, LinkPreview components; MessageThread rewrite with file picker, reply-to, GIF; MessageBubble with reply display and link previews)
+- `frontend/studyhub-app/src/pages/messages/useMessagingData.js` (unread badge fix in selectConversation and handleNewMessage)
+
+### Validation
+
+- Frontend lint: 0 errors
+- Backend lint: 0 errors
+- Frontend build: success (960+ modules)
+- No new test failures

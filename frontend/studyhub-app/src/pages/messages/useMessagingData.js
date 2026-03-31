@@ -118,6 +118,11 @@ export function useMessagingData(socket, currentUserId) {
       setHasMoreMessages(true)
       setTypingUsers(new Map())
 
+      // Clear unread badge immediately in the conversation list
+      setConversations((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, unreadCount: 0 } : c))
+      )
+
       // Join the conversation room via socket
       if (socket) {
         socket.emit('conversation:join', { conversationId: id })
@@ -125,7 +130,7 @@ export function useMessagingData(socket, currentUserId) {
 
       await loadMessages(id)
 
-      // Mark as read
+      // Mark as read on backend
       if (socket) {
         socket.emit('message:read', { conversationId: id })
       }
@@ -437,11 +442,18 @@ export function useMessagingData(socket, currentUserId) {
         // Auto-mark as read
         socket.emit('message:read', { conversationId: message.conversationId })
       }
-      // Update conversation list
+      // Update conversation list — clear unread if this is the active conversation
+      const isActive = activeConversation && message.conversationId === activeConversation.id
       setConversations((prev) =>
         prev.map((conv) =>
           conv.id === message.conversationId
-            ? { ...conv, lastMessage: message, updatedAt: message.createdAt }
+            ? {
+                ...conv,
+                lastMessage: message,
+                updatedAt: message.createdAt,
+                // Clear unread if we're viewing this conversation; increment otherwise
+                unreadCount: isActive ? 0 : ((conv.unreadCount || 0) + (message.sender?.id !== currentUserId ? 1 : 0)),
+              }
             : conv,
         ),
       )
