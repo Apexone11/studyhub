@@ -12,13 +12,13 @@
 
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
+import UserAvatar from '../../components/UserAvatar'
 import { PAGE_FONT } from '../shared/pageUtils'
 import {
   formatRelativeTime,
   formatSessionTime,
   formatDuration,
   getRoleLabel,
-  getMemberInitials,
   getSessionStatusLabel,
   getPostTypeLabel,
   truncateText,
@@ -491,42 +491,40 @@ const styles = {
 /* ═══════════════════════════════════════════════════════════════════════════
    Tab 1: GroupOverviewTab
 ═══════════════════════════════════════════════════════════════════════════ */
-export function GroupOverviewTab({ group }) {
+export function GroupOverviewTab({ group, activities, activitiesLoading, upcomingSessions }) {
   if (!group) {
     return <div style={styles.loading}>Loading group information...</div>
   }
 
   const stats = [
-    { label: 'Members', value: group.memberCount || 0 },
-    { label: 'Resources', value: group.resourceCount || 0 },
-    { label: 'Upcoming Sessions', value: group.upcomingSessionCount || 0 },
-    { label: 'Discussion Posts', value: group.discussionPostCount || 0 },
+    { label: 'Members', value: group.memberCount || 0, icon: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2' },
+    { label: 'Resources', value: group.resourceCount || 0, icon: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z' },
+    { label: 'Upcoming Sessions', value: group.upcomingSessionCount || 0, icon: 'M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z' },
+    { label: 'Discussions', value: group.discussionPostCount || 0, icon: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z' },
   ]
 
-  const recentActivities = [
-    ...(group.recentResources?.map(r => ({
-      type: 'resource',
-      title: r.title,
-      date: r.createdAt,
-    })) || []),
-    ...(group.upcomingSessions?.map(s => ({
-      type: 'session',
-      title: s.title,
-      date: s.startedAt,
-    })) || []),
-  ]
-    .sort((a, b) => new Date(b.date) - new Date(a.date))
-    .slice(0, 5)
+  const activityTypeLabels = {
+    discussion: 'posted',
+    resource: 'shared a resource',
+    member_joined: 'joined the group',
+  }
 
   return (
     <div style={styles.tabContainer}>
+      {/* About section */}
       <section style={styles.section}>
-        <h2 style={styles.sectionTitle}>About</h2>
+        <h2 style={styles.sectionTitle}>About this group</h2>
         <p style={{ fontSize: 'var(--type-base)', color: 'var(--sh-text)', lineHeight: '1.6' }}>
           {group.description || 'No description available.'}
         </p>
+        {group.courseName && (
+          <div style={{ marginTop: 'var(--space-3)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+            <span style={{ ...styles.badge, ...styles.badgeGreen }}>{group.courseName}</span>
+          </div>
+        )}
       </section>
 
+      {/* Stats grid */}
       <section style={styles.section}>
         <h2 style={styles.sectionTitle}>Quick Stats</h2>
         <div style={styles.statsGrid}>
@@ -539,19 +537,81 @@ export function GroupOverviewTab({ group }) {
         </div>
       </section>
 
-      {recentActivities.length > 0 && (
+      {/* Upcoming sessions preview */}
+      {Array.isArray(upcomingSessions) && upcomingSessions.length > 0 && (
         <section style={styles.section}>
-          <h2 style={styles.sectionTitle}>Recent Activity</h2>
-          <div style={styles.recentActivityList}>
-            {recentActivities.map((activity, idx) => (
-              <div key={idx} style={styles.activityItem}>
-                <strong>{activity.title}</strong>
-                <div style={styles.activityTime}>{formatRelativeTime(activity.date)}</div>
+          <h2 style={styles.sectionTitle}>Upcoming Sessions</h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+            {upcomingSessions.map((s) => (
+              <div key={s.id} style={{
+                padding: 'var(--space-3) var(--space-4)',
+                background: 'var(--sh-soft)',
+                borderRadius: 'var(--radius)',
+                border: '1px solid var(--sh-border)',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              }}>
+                <div>
+                  <div style={{ fontSize: 'var(--type-sm)', fontWeight: 600, color: 'var(--sh-heading)' }}>{s.title}</div>
+                  <div style={{ fontSize: 'var(--type-xs)', color: 'var(--sh-muted)', marginTop: 'var(--space-1)' }}>
+                    {formatSessionTime(s.scheduledAt)}
+                    {s.location ? ` -- ${s.location}` : ''}
+                  </div>
+                </div>
+                <span style={{ ...styles.badge, ...styles.badgeGreen }}>{getSessionStatusLabel(s.status)}</span>
               </div>
             ))}
           </div>
         </section>
       )}
+
+      {/* Activity feed */}
+      <section style={styles.section}>
+        <h2 style={styles.sectionTitle}>Recent Activity</h2>
+        {activitiesLoading ? (
+          <div style={styles.loading}>Loading activity...</div>
+        ) : !activities || activities.length === 0 ? (
+          <div style={styles.emptyState}>
+            <div style={styles.emptyTitle}>No activity yet</div>
+            <div style={styles.emptyText}>Activity will appear here as members post, share resources, and join.</div>
+          </div>
+        ) : (
+          <div style={styles.recentActivityList}>
+            {activities.map((activity, idx) => (
+              <div key={idx} style={{
+                ...styles.activityItem,
+                display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
+              }}>
+                {activity.actor?.avatarUrl ? (
+                  <img src={activity.actor.avatarUrl} alt="" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover' }} />
+                ) : (
+                  <div style={{
+                    width: 28, height: 28, borderRadius: '50%',
+                    background: 'var(--sh-brand-soft)', color: 'var(--sh-brand)',
+                    display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 700,
+                  }}>
+                    {(activity.actor?.username || '?')[0].toUpperCase()}
+                  </div>
+                )}
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 'var(--type-sm)' }}>
+                    <strong style={{ color: 'var(--sh-heading)' }}>{activity.actor?.username || 'Unknown'}</strong>
+                    {' '}{activityTypeLabels[activity.type] || activity.type}
+                    {activity.title && activity.type !== 'member_joined' ? (
+                      <> -- <span style={{ color: 'var(--sh-heading)' }}>{truncateText(activity.title, 40)}</span></>
+                    ) : null}
+                  </div>
+                  <div style={styles.activityTime}>{formatRelativeTime(activity.timestamp)}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Created date */}
+      <div style={{ textAlign: 'center', color: 'var(--sh-muted)', fontSize: 'var(--type-xs)', padding: 'var(--space-4)' }}>
+        Created {formatRelativeTime(group.createdAt)}
+      </div>
     </div>
   )
 }
@@ -1080,10 +1140,8 @@ export function GroupSessionsTab({
                         onChange={(e) => setFormData({ ...formData, recurring: e.target.value })}
                       >
                         <option value="none">None</option>
-                        <option value="daily">Daily</option>
                         <option value="weekly">Weekly</option>
                         <option value="biweekly">Bi-weekly</option>
-                        <option value="monthly">Monthly</option>
                       </select>
                     </div>
                   </div>
@@ -1152,10 +1210,10 @@ export function GroupSessionsTab({
                 <div>
                   <div style={styles.sessionTitle}>{session.title}</div>
                   <div style={styles.sessionDetails}>
-                    <span>{formatSessionTime(session.startedAt)}</span>
+                    <span>{formatSessionTime(session.scheduledAt)}</span>
                     <span>{session.location || 'No location specified'}</span>
-                    <span>Duration: {formatDuration(parseInt(session.duration, 10))}</span>
-                    <span>{session.rsvpCount || 0} going</span>
+                    <span>Duration: {formatDuration(parseInt(session.durationMins || session.duration, 10))}</span>
+                    <span>{session.rsvpCount || 0} going{session.rsvpMaybeCount ? `, ${session.rsvpMaybeCount} maybe` : ''}</span>
                   </div>
                 </div>
                 <span style={styles.badge}>{getSessionStatusLabel(session.status)}</span>
@@ -1163,36 +1221,25 @@ export function GroupSessionsTab({
 
               {isMember && (
                 <div style={{ marginTop: 'var(--space-3)', display: 'flex', gap: 'var(--space-2)' }}>
-                  <button
-                    onClick={() => onRsvp(session.id, 'going')}
-                    style={{
-                      ...styles.button,
-                      ...styles.buttonSecondary,
-                      ...styles.buttonSmall,
-                    }}
-                  >
-                    Going
-                  </button>
-                  <button
-                    onClick={() => onRsvp(session.id, 'maybe')}
-                    style={{
-                      ...styles.button,
-                      ...styles.buttonSecondary,
-                      ...styles.buttonSmall,
-                    }}
-                  >
-                    Maybe
-                  </button>
-                  <button
-                    onClick={() => onRsvp(session.id, 'not_going')}
-                    style={{
-                      ...styles.button,
-                      ...styles.buttonSecondary,
-                      ...styles.buttonSmall,
-                    }}
-                  >
-                    Not Going
-                  </button>
+                  {['going', 'maybe', 'not_going'].map((status) => {
+                    const isSelected = session.userRsvpStatus === status
+                    const label = status === 'not_going' ? 'Not Going' : status.charAt(0).toUpperCase() + status.slice(1)
+                    return (
+                      <button
+                        key={status}
+                        onClick={() => onRsvp(session.id, status)}
+                        style={{
+                          ...styles.button,
+                          ...styles.buttonSmall,
+                          ...(isSelected
+                            ? { backgroundColor: 'var(--sh-brand)', color: 'white', border: '1px solid var(--sh-brand)' }
+                            : styles.buttonSecondary),
+                        }}
+                      >
+                        {label}
+                      </button>
+                    )
+                  })}
                 </div>
               )}
             </div>
@@ -1209,7 +1256,7 @@ export function GroupSessionsTab({
                 <div>
                   <div style={styles.sessionTitle}>{session.title}</div>
                   <div style={styles.sessionDetails}>
-                    <span>{formatSessionTime(session.startedAt)}</span>
+                    <span>{formatSessionTime(session.scheduledAt)}</span>
                     <span>{session.location || 'No location specified'}</span>
                   </div>
                 </div>
@@ -1375,6 +1422,7 @@ export function GroupDiscussionsTab({
   onDeletePost,
   onAddReply,
   onResolve,
+  onUpvote,
   isAdminOrMod,
   isMember,
   userId,
@@ -1600,6 +1648,7 @@ export function GroupDiscussionsTab({
                 onReplySubmit={handleReplySubmit}
                 onResolve={onResolve}
                 onDelete={onDeletePost}
+                onUpvote={onUpvote}
                 replyFormData={replyFormData}
                 setReplyFormData={setReplyFormData}
                 isAdminOrMod={isAdminOrMod}
@@ -1627,6 +1676,7 @@ export function GroupDiscussionsTab({
                 onReplySubmit={handleReplySubmit}
                 onResolve={onResolve}
                 onDelete={onDeletePost}
+                onUpvote={onUpvote}
                 replyFormData={replyFormData}
                 setReplyFormData={setReplyFormData}
                 isAdminOrMod={isAdminOrMod}
@@ -1725,12 +1775,15 @@ function DiscussionPostItem({
   onReplySubmit,
   onResolve,
   onDelete,
+  onUpvote,
   replyFormData,
   setReplyFormData,
   isAdminOrMod,
   userId,
 }) {
-  const isAuthor = post.authorId === userId
+  const isAuthor = post.userId === userId || post.authorId === userId
+  const authorName = post.author?.username || post.authorName || 'Unknown'
+  const isResolved = post.resolved || post.isResolved
   const badgeStyle = post.type === 'question'
     ? styles.badgeOrange
     : post.type === 'announcement'
@@ -1748,22 +1801,46 @@ function DiscussionPostItem({
     >
       <div style={styles.discussionHeader}>
         <div style={{ flex: 1 }}>
-          <div style={styles.discussionTitle}>{post.title}</div>
-          {post.isResolved && post.type === 'question' && (
-            <span style={{ ...styles.badge, ...styles.badgeGreen, marginRight: 'var(--space-2)' }}>
-              Resolved
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-1)' }}>
+            <div style={styles.discussionTitle}>{post.title}</div>
+            {isResolved && post.type === 'question' && (
+              <span style={{ ...styles.badge, ...styles.badgeGreen }}>
+                Resolved
+              </span>
+            )}
+            <span style={{ ...styles.badge, ...badgeStyle }}>
+              {getPostTypeLabel(post.type)}
             </span>
-          )}
-          <span style={{ ...styles.badge, ...badgeStyle }}>
-            {getPostTypeLabel(post.type)}
-          </span>
+          </div>
         </div>
+
+        {/* Upvote button */}
+        {onUpvote && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onUpvote(post.id) }}
+            style={{
+              background: 'none', border: '1px solid var(--sh-border)',
+              borderRadius: 'var(--radius-control)', padding: '4px 10px',
+              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
+              color: post.userHasUpvoted ? 'var(--sh-brand)' : 'var(--sh-muted)',
+              fontFamily: 'inherit', fontSize: 'var(--type-xs)', fontWeight: 600,
+              transition: 'all 0.15s',
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill={post.userHasUpvoted ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
+            {post.upvoteCount || 0}
+          </button>
+        )}
       </div>
 
       <div style={styles.discussionMeta}>
-        <span>{post.authorName || 'Unknown'}</span>
-        <span> - {formatRelativeTime(post.createdAt)}</span>
-        <span> - {post.replyCount || 0} replies</span>
+        {post.author?.avatarUrl ? (
+          <img src={post.author.avatarUrl} alt="" style={{ width: 16, height: 16, borderRadius: '50%', verticalAlign: 'middle' }} />
+        ) : null}
+        <span>{authorName}</span>
+        <span> -- {formatRelativeTime(post.createdAt)}</span>
+        <span> -- {post.replyCount || 0} replies</span>
+        {(post.upvoteCount || 0) > 0 && <span> -- {post.upvoteCount} upvote{post.upvoteCount !== 1 ? 's' : ''}</span>}
       </div>
 
       {expanded && (
@@ -1772,41 +1849,40 @@ function DiscussionPostItem({
             {post.content}
           </p>
 
-          {(isAuthor || isAdminOrMod) && post.type === 'question' && (
-            <button
-              onClick={() => onResolve(post.id)}
-              style={{
-                ...styles.button,
-                ...styles.buttonSmall,
-                marginBottom: 'var(--space-4)',
-                backgroundColor: post.isResolved ? 'var(--sh-success)' : 'var(--sh-brand)',
-                color: 'white',
-              }}
-            >
-              {post.isResolved ? 'Marked Resolved' : 'Mark Resolved'}
-            </button>
-          )}
+          <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-4)', flexWrap: 'wrap' }}>
+            {(isAuthor || isAdminOrMod) && post.type === 'question' && (
+              <button
+                onClick={() => onResolve(post.id)}
+                style={{
+                  ...styles.button,
+                  ...styles.buttonSmall,
+                  backgroundColor: isResolved ? 'var(--sh-success)' : 'var(--sh-brand)',
+                  color: 'white',
+                }}
+              >
+                {isResolved ? 'Marked Resolved' : 'Mark Resolved'}
+              </button>
+            )}
 
-          {(isAuthor || isAdminOrMod) && (
-            <button
-              onClick={() => onDelete(post.id)}
-              style={{
-                ...styles.button,
-                ...styles.buttonSmall,
-                ...styles.buttonDanger,
-                marginLeft: 'var(--space-2)',
-                marginBottom: 'var(--space-4)',
-              }}
-            >
-              Delete
-            </button>
-          )}
+            {(isAuthor || isAdminOrMod) && (
+              <button
+                onClick={() => onDelete(post.id)}
+                style={{
+                  ...styles.button,
+                  ...styles.buttonSmall,
+                  ...styles.buttonDanger,
+                }}
+              >
+                Delete
+              </button>
+            )}
+          </div>
 
           {post.replies && post.replies.length > 0 && (
             <div style={styles.repliesList}>
               {post.replies.map((reply) => (
                 <div key={reply.id} style={styles.reply}>
-                  <div style={styles.replyAuthor}>{reply.authorName || 'Unknown'}</div>
+                  <div style={styles.replyAuthor}>{reply.author?.username || reply.authorName || 'Unknown'}</div>
                   <div style={styles.replyContent}>{reply.content}</div>
                   <div style={styles.replyTime}>{formatRelativeTime(reply.createdAt)}</div>
                 </div>
@@ -1858,6 +1934,7 @@ export function GroupMembersTab({
   const [formData, setFormData] = useState({ username: '' })
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [memberSearch, setMemberSearch] = useState('')
 
   const handleInviteClick = () => {
     setFormData({ username: '' })
@@ -1962,10 +2039,20 @@ export function GroupMembersTab({
     )
   }
 
+  const filteredMembers = memberSearch.trim()
+    ? members.filter((m) => (m.username || '').toLowerCase().includes(memberSearch.toLowerCase()))
+    : members
+
+  // Group by role for nicer display
+  const adminMembers = filteredMembers.filter((m) => m.role === 'admin')
+  const modMembers = filteredMembers.filter((m) => m.role === 'moderator')
+  const regularMembers = filteredMembers.filter((m) => m.role === 'member')
+
   return (
     <div style={styles.tabContainer}>
-      {isAdmin && (
-        <div style={{ marginBottom: 'var(--space-4)' }}>
+      {/* Top bar: invite + search */}
+      <div style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-4)', alignItems: 'center', flexWrap: 'wrap' }}>
+        {isAdmin && (
           <button
             onClick={handleInviteClick}
             style={{ ...styles.button, ...styles.buttonPrimary }}
@@ -1973,65 +2060,103 @@ export function GroupMembersTab({
           >
             Invite Member
           </button>
-        </div>
-      )}
+        )}
+        <input
+          type="text"
+          placeholder="Search members..."
+          value={memberSearch}
+          onChange={(e) => setMemberSearch(e.target.value)}
+          style={{ ...styles.input, flex: 1, minWidth: 160, maxWidth: 280 }}
+        />
+        <span style={{ fontSize: 'var(--type-xs)', color: 'var(--sh-muted)' }}>
+          {members.length} member{members.length !== 1 ? 's' : ''}
+        </span>
+      </div>
 
       <div style={styles.section}>
-        <div style={styles.memberGrid}>
-          {members.map((member) => (
-            <div key={member.id} style={styles.memberCard}>
-              <div style={styles.memberAvatar}>
-                {getMemberInitials(member.username)}
-              </div>
-              <div style={styles.memberName}>{member.username}</div>
-              <span
-                style={{
-                  ...styles.badge,
-                  display: 'inline-block',
-                  marginBottom: 'var(--space-2)',
-                }}
-              >
-                {getRoleLabel(member.role)}
-              </span>
-              <div style={{ fontSize: 'var(--type-xs)', color: 'var(--sh-muted)', marginBottom: 'var(--space-2)' }}>
-                Joined {formatRelativeTime(member.joinedAt)}
-              </div>
+        {[
+          { label: 'Admins', list: adminMembers },
+          { label: 'Moderators', list: modMembers },
+          { label: 'Members', list: regularMembers },
+        ].filter((g) => g.list.length > 0).map((group) => (
+          <div key={group.label} style={{ marginBottom: 'var(--space-4)' }}>
+            <h3 style={{ fontSize: 'var(--type-sm)', fontWeight: 600, color: 'var(--sh-muted)', marginBottom: 'var(--space-3)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              {group.label} ({group.list.length})
+            </h3>
+            <div style={styles.memberGrid}>
+              {group.list.map((member) => {
+                const statusBadge = member.status === 'invited'
+                  ? { label: 'Invited', style: styles.badgeOrange }
+                  : member.status === 'pending'
+                    ? { label: 'Pending', style: styles.badgeOrange }
+                    : member.status === 'banned'
+                      ? { label: 'Banned', style: styles.badgeRed }
+                      : null
 
-              {isAdmin && member.id !== currentUserId && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                  <select
-                    value={member.role}
-                    onChange={(e) => onUpdateMember(member.id, { role: e.target.value })}
-                    style={{
-                      ...styles.select,
-                      fontSize: 'var(--type-xs)',
-                      padding: '0.375rem',
-                    }}
-                  >
-                    <option value="member">Member</option>
-                    <option value="moderator">Moderator</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                  <button
-                    onClick={() => {
-                      if (window.confirm('Remove this member?')) {
-                        onRemoveMember(member.id)
-                      }
-                    }}
-                    style={{
-                      ...styles.button,
-                      ...styles.buttonDanger,
-                      ...styles.buttonSmall,
-                      fontSize: 'var(--type-xs)',
-                    }}
-                  >
-                    Remove
-                  </button>
-                </div>
-              )}
+                return (
+                  <div key={member.id || member.userId} style={styles.memberCard}>
+                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-2)' }}>
+                      <UserAvatar username={member.username || 'User'} avatarUrl={member.avatarUrl || member.user?.avatarUrl} size={48} />
+                    </div>
+                    <div style={styles.memberName}>{member.username || member.user?.username || 'Unknown'}</div>
+                    <div style={{ display: 'flex', gap: 4, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 'var(--space-2)' }}>
+                      <span style={{ ...styles.badge, display: 'inline-block' }}>
+                        {getRoleLabel(member.role)}
+                      </span>
+                      {statusBadge && (
+                        <span style={{ ...styles.badge, ...statusBadge.style, display: 'inline-block' }}>
+                          {statusBadge.label}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 'var(--type-xs)', color: 'var(--sh-muted)', marginBottom: 'var(--space-2)' }}>
+                      Joined {formatRelativeTime(member.joinedAt)}
+                    </div>
+
+                    {isAdmin && (member.id || member.userId) !== currentUserId && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                        <select
+                          value={member.role}
+                          onChange={(e) => onUpdateMember(member.id || member.userId, { role: e.target.value })}
+                          style={{
+                            ...styles.select,
+                            fontSize: 'var(--type-xs)',
+                            padding: '0.375rem',
+                          }}
+                        >
+                          <option value="member">Member</option>
+                          <option value="moderator">Moderator</option>
+                          <option value="admin">Admin</option>
+                        </select>
+                        <button
+                          onClick={() => {
+                            if (window.confirm('Remove this member?')) {
+                              onRemoveMember(member.id || member.userId)
+                            }
+                          }}
+                          style={{
+                            ...styles.button,
+                            ...styles.buttonDanger,
+                            ...styles.buttonSmall,
+                            fontSize: 'var(--type-xs)',
+                          }}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
-          ))}
-        </div>
+          </div>
+        ))}
+
+        {filteredMembers.length === 0 && (
+          <div style={styles.emptyState}>
+            <div style={styles.emptyText}>No members match your search.</div>
+          </div>
+        )}
       </div>
 
       {createPortal(

@@ -34,6 +34,9 @@ export function useMessagingData(socket, currentUserId) {
   const [hasMoreMessages, setHasMoreMessages] = useState(true)
   const [typingUsers, setTypingUsers] = useState(new Map())
   const typingTimerRef = useRef(null)
+  // Ref tracks activeConversation.id so socket handlers always see the latest value
+  // (avoids stale closure bug where incoming messages increment unread on the active conversation)
+  const activeConversationIdRef = useRef(null)
 
   /* ── Load conversations ──────────────────────────────────────────────── */
   const loadConversations = useCallback(async () => {
@@ -114,6 +117,7 @@ export function useMessagingData(socket, currentUserId) {
         )
       }
       setActiveConversation(conversation)
+      activeConversationIdRef.current = conversation.id
       setMessages([])
       setHasMoreMessages(true)
       setTypingUsers(new Map())
@@ -148,7 +152,8 @@ export function useMessagingData(socket, currentUserId) {
 
   /* ── Send message — POST /api/messages/conversations/:id/messages ────── */
   const sendMessage = useCallback(async (content, replyToId = null, options = {}) => {
-    if (!activeConversation || !content.trim()) return
+    const hasAttachments = Array.isArray(options.attachments) && options.attachments.length > 0
+    if (!activeConversation || (!content.trim() && !hasAttachments && !options.poll)) return
 
     const optimisticMessage = {
       id: `temp_${Date.now()}`,
@@ -307,6 +312,7 @@ export function useMessagingData(socket, currentUserId) {
       setConversations((prev) => prev.filter((conv) => conv.id !== id))
       if (activeConversation?.id === id) {
         setActiveConversation(null)
+        activeConversationIdRef.current = null
         setMessages([])
       }
       showToast('Conversation deleted', 'success')
@@ -371,6 +377,7 @@ export function useMessagingData(socket, currentUserId) {
       setConversations((prev) => prev.filter((conv) => conv.id !== id))
       if (activeConversation?.id === id) {
         setActiveConversation(null)
+        activeConversationIdRef.current = null
         setMessages([])
       }
       showToast('Conversation archived', 'success')
@@ -429,8 +436,12 @@ export function useMessagingData(socket, currentUserId) {
     if (!socket) return
 
     const handleNewMessage = (message) => {
+      // Use ref for active conversation check to avoid stale closure issues
+      const activeId = activeConversationIdRef.current
+      const isActive = activeId != null && message.conversationId === activeId
+
       // Add message to current thread if viewing that conversation
-      if (activeConversation && message.conversationId === activeConversation.id) {
+      if (isActive) {
         setMessages((prev) => {
           // Avoid duplicates (optimistic message already added)
           if (prev.some((m) => m.id === message.id)) return prev
@@ -443,7 +454,6 @@ export function useMessagingData(socket, currentUserId) {
         socket.emit('message:read', { conversationId: message.conversationId })
       }
       // Update conversation list — clear unread if this is the active conversation
-      const isActive = activeConversation && message.conversationId === activeConversation.id
       setConversations((prev) =>
         prev.map((conv) =>
           conv.id === message.conversationId
@@ -524,8 +534,18 @@ export function useMessagingData(socket, currentUserId) {
       }))
     }
 
+    // When the server confirms a read receipt from this user, ensure unread is cleared
+    const handleMessageRead = (data) => {
+      if (data.userId === currentUserId && data.conversationId) {
+        setConversations((prev) =>
+          prev.map((c) => (c.id === data.conversationId ? { ...c, unreadCount: 0 } : c))
+        )
+      }
+    }
+
     // Listen with correct backend event names
     socket.on('message:new', handleNewMessage)
+    socket.on('message:read', handleMessageRead)
     socket.on('message:edit', handleEditMessage)
     socket.on('message:delete', handleDeleteMessage)
     socket.on('typing:start', handleTypingStart)
@@ -535,6 +555,7 @@ export function useMessagingData(socket, currentUserId) {
 
     return () => {
       socket.off('message:new', handleNewMessage)
+      socket.off('message:read', handleMessageRead)
       socket.off('message:edit', handleEditMessage)
       socket.off('message:delete', handleDeleteMessage)
       socket.off('typing:start', handleTypingStart)
@@ -542,7 +563,7 @@ export function useMessagingData(socket, currentUserId) {
       socket.off('reaction:add', handleReactionAdd)
       socket.off('reaction:remove', handleReactionRemove)
     }
-  }, [socket, activeConversation, currentUserId])
+  }, [socket, currentUserId])
 
   return {
     conversations,

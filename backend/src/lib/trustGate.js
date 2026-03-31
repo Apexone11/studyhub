@@ -20,6 +20,12 @@ const TRUST_LEVELS = {
 }
 
 /**
+ * Minimum account age (in hours) before a clean account is auto-promoted.
+ * After this period, new accounts with no violations are trusted automatically.
+ */
+const AUTO_TRUST_AGE_HOURS = 4
+
+/**
  * Returns true if the user's content should bypass the moderation queue
  * and be published immediately.
  *
@@ -48,24 +54,39 @@ function getInitialModerationStatus(_user) {
  * Pure function — evaluates whether a user meets the criteria for promotion
  * to the 'trusted' trust level.
  *
- * Rule: trusted = has email + clean moderation history.
- * Accounts with an email address are auto-trusted as long as they have no
- * active strikes, restrictions, or confirmed violations.
+ * Two paths to trusted:
+ *   1. Has email + clean moderation history (instant promotion).
+ *   2. Account age >= AUTO_TRUST_AGE_HOURS + clean moderation history
+ *      (time-based promotion, even without email).
+ *
+ * In both cases, any confirmed violations, active strikes, or active
+ * restrictions prevent promotion.
  *
  * @param {object} params
- * @param {boolean} params.hasEmail             — whether the user has an email on file
- * @param {number}  params.confirmedViolations  — count of confirmed moderation violations
- * @param {number}  params.activeStrikes        — count of currently active strikes
- * @param {boolean} params.hasActiveRestriction — whether the user has an active restriction
+ * @param {boolean}      params.hasEmail             — whether the user has an email on file
+ * @param {number}       params.confirmedViolations  — count of confirmed moderation violations
+ * @param {number}       params.activeStrikes        — count of currently active strikes
+ * @param {boolean}      params.hasActiveRestriction — whether the user has an active restriction
+ * @param {Date|string}  [params.createdAt]          — account creation timestamp (for age-based check)
  * @returns {boolean}
  */
-function meetsPromotionCriteria({ hasEmail, confirmedViolations, activeStrikes, hasActiveRestriction }) {
-  if (!hasEmail) return false
+function meetsPromotionCriteria({ hasEmail, confirmedViolations, activeStrikes, hasActiveRestriction, createdAt }) {
+  // Hard blocks: any moderation issue prevents promotion
   if (confirmedViolations > 0) return false
   if (activeStrikes > 0) return false
   if (hasActiveRestriction) return false
 
-  return true
+  // Path 1: email on file -> instant trust
+  if (hasEmail) return true
+
+  // Path 2: account age threshold (no email needed)
+  if (createdAt) {
+    const ageMs = Date.now() - new Date(createdAt).getTime()
+    const ageHours = ageMs / (1000 * 60 * 60)
+    if (ageHours >= AUTO_TRUST_AGE_HOURS) return true
+  }
+
+  return false
 }
 
 /**
@@ -85,7 +106,7 @@ async function checkAndPromoteTrust(userId) {
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, trustLevel: true, email: true },
+    select: { id: true, trustLevel: true, email: true, createdAt: true },
   })
 
   if (!user) return { promoted: false, trustLevel: null }
@@ -110,6 +131,7 @@ async function checkAndPromoteTrust(userId) {
     confirmedViolations,
     activeStrikes,
     hasActiveRestriction: activeRestriction,
+    createdAt: user.createdAt,
   })
 
   if (!eligible) return { promoted: false, trustLevel: user.trustLevel }

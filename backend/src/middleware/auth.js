@@ -1,6 +1,7 @@
 const { getAuthTokenFromRequest, verifyAuthToken } = require('../lib/authTokens')
 const { ERROR_CODES, sendError } = require('./errorEnvelope')
 const prisma = require('../lib/prisma')
+const { TRUST_LEVELS, checkAndPromoteTrust } = require('../lib/trustGate')
 
 async function requireAuth(req, res, next) {
   const token = getAuthTokenFromRequest(req)
@@ -21,6 +22,13 @@ async function requireAuth(req, res, next) {
       return sendError(res, 401, 'Invalid or expired token.', ERROR_CODES.AUTH_EXPIRED)
     }
     req.user = { userId: user.id, username: user.username, role: user.role, trustLevel: user.trustLevel }
+
+    // Fire-and-forget: auto-promote "new" users that have met the age/email threshold.
+    // This runs asynchronously and does not block the request.
+    if (user.trustLevel === TRUST_LEVELS.NEW) {
+      void checkAndPromoteTrust(user.id).catch(() => {})
+    }
+
     next()
   } catch {
     return sendError(res, 401, 'Invalid or expired token.', ERROR_CODES.AUTH_EXPIRED)

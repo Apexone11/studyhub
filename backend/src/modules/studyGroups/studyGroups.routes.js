@@ -143,14 +143,25 @@ function validateResourceUrl(url) {
  * Format group for response (with counts)
  */
 async function formatGroup(group, currentUserId = null) {
-  const memberCount = await prisma.studyGroupMember.count({
-    where: { groupId: group.id, status: 'active' },
-  })
+  // Run aggregate queries in parallel for performance
+  const [memberCount, resourceCount, upcomingSessionCount, discussionPostCount, userMembershipResult] =
+    await Promise.all([
+      prisma.studyGroupMember.count({
+        where: { groupId: group.id, status: 'active' },
+      }),
+      prisma.groupResource.count({
+        where: { groupId: group.id },
+      }),
+      prisma.groupSession.count({
+        where: { groupId: group.id, scheduledAt: { gte: new Date() }, status: { in: ['upcoming', 'in_progress'] } },
+      }),
+      prisma.groupDiscussionPost.count({
+        where: { groupId: group.id },
+      }),
+      currentUserId ? requireGroupMember(group.id, currentUserId) : Promise.resolve(null),
+    ])
 
-  let userMembership = null
-  if (currentUserId) {
-    userMembership = await requireGroupMember(group.id, currentUserId)
-  }
+  const userMembership = userMembershipResult
 
   // Derive convenience fields for frontend
   const isMember = userMembership && userMembership.status === 'active'
@@ -183,6 +194,9 @@ async function formatGroup(group, currentUserId = null) {
     createdAt: group.createdAt,
     updatedAt: group.updatedAt,
     memberCount,
+    resourceCount,
+    upcomingSessionCount,
+    discussionPostCount,
     isMember: !!isMember,
     userRole,
     userMembership: userMembership ? {
@@ -825,11 +839,10 @@ router.post('/:id/invite', writeLimiter, requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Invalid group ID.' })
     }
 
-    const { userId } = req.body
-    const targetUserId = parseId(userId)
-    if (targetUserId === null) {
-      return res.status(400).json({ error: 'Invalid target user ID.' })
-    }
+    const { userId, username } = req.body
+
+    // Accept either userId (number) or username (string) for invite lookup
+    let targetUserId = parseId(userId)
 
     const group = await prisma.studyGroup.findUnique({
       where: { id: groupId },
@@ -845,10 +858,32 @@ router.post('/:id/invite', writeLimiter, requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Moderator access required.' })
     }
 
-    // Check if target user exists
-    const targetUser = await prisma.user.findUnique({
-      where: { id: targetUserId },
-    })
+    // If username was provided instead of userId, look up the user
+    let targetUser = null
+    if (targetUserId !== null) {
+      targetUser = await prisma.user.findUnique({
+        where: { id: targetUserId },
+      })
+    } else if (username && typeof username === 'string') {
+      targetUser = await prisma.user.findUnique({
+        where: { username: username.trim() },
+      })
+      if (targetUser) {
+        targetUserId = targetUser.id
+      }
+    }
+
+    if (targetUserId === null || !targetUser) {
+      return res.status(404).json({ error: 'User not found.' })
+    }
+
+    // Check if target user exists (already fetched above)
+    // This block remains for compatibility with the userId-only path
+    if (!targetUser) {
+      targetUser = await prisma.user.findUnique({
+        where: { id: targetUserId },
+      })
+    }
     if (!targetUser) {
       return res.status(404).json({ error: 'User not found.' })
     }
@@ -1211,8 +1246,7 @@ router.get('/:id/sessions', readLimiter, requireAuth, async (req, res) => {
         where: { groupId },
         include: {
           rsvps: {
-            where: { userId: req.user.userId },
-            select: { status: true },
+            select: { status: true, userId: true },
           },
         },
         orderBy: { scheduledAt: 'asc' },
@@ -1222,20 +1256,28 @@ router.get('/:id/sessions', readLimiter, requireAuth, async (req, res) => {
       prisma.groupSession.count({ where: { groupId } }),
     ])
 
-    const formatted = sessions.map((s) => ({
-      id: s.id,
-      groupId: s.groupId,
-      title: s.title,
-      description: s.description,
-      location: s.location,
-      scheduledAt: s.scheduledAt,
-      durationMins: s.durationMins,
-      recurring: s.recurring,
-      status: s.status,
-      userRsvpStatus: s.rsvps[0]?.status || null,
-      createdAt: s.createdAt,
-      updatedAt: s.updatedAt,
-    }))
+    const formatted = sessions.map((s) => {
+      const userRsvp = s.rsvps.find((r) => r.userId === req.user.userId)
+      const goingCount = s.rsvps.filter((r) => r.status === 'going').length
+      const maybeCount = s.rsvps.filter((r) => r.status === 'maybe').length
+      return {
+        id: s.id,
+        groupId: s.groupId,
+        title: s.title,
+        description: s.description,
+        location: s.location,
+        scheduledAt: s.scheduledAt,
+        durationMins: s.durationMins,
+        recurring: s.recurring,
+        status: s.status,
+        userRsvpStatus: userRsvp?.status || null,
+        rsvpCount: goingCount,
+        rsvpMaybeCount: maybeCount,
+        rsvpTotal: s.rsvps.length,
+        createdAt: s.createdAt,
+        updatedAt: s.updatedAt,
+      }
+    })
 
     res.json({ sessions: formatted, total, limit: limitNum, offset: offsetNum })
   } catch (err) {
@@ -1601,6 +1643,7 @@ router.get('/:id/discussions', readLimiter, requireAuth, async (req, res) => {
         include: {
           author: { select: { id: true, username: true, avatarUrl: true } },
           replies: { select: { id: true } },
+          upvotes: { select: { userId: true } },
         },
         orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
         skip: offsetNum,
@@ -1620,6 +1663,8 @@ router.get('/:id/discussions', readLimiter, requireAuth, async (req, res) => {
       pinned: p.pinned,
       resolved: p.resolved,
       replyCount: p.replies.length,
+      upvoteCount: p.upvotes.length,
+      userHasUpvoted: p.upvotes.some((u) => u.userId === req.user.userId),
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,
     }))
@@ -2192,6 +2237,195 @@ router.patch('/:id/discussions/:postId/resolve', writeLimiter, requireAuth, asyn
       replyCount: 0,
       createdAt: updated.createdAt,
       updatedAt: updated.updatedAt,
+    })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ===== DISCUSSION UPVOTES =====
+
+/**
+ * POST /api/study-groups/:id/discussions/:postId/upvote
+ * Toggle upvote on a discussion post
+ */
+router.post('/:id/discussions/:postId/upvote', writeLimiter, requireAuth, async (req, res) => {
+  try {
+    const groupId = parseId(req.params.id)
+    const postId = parseId(req.params.postId)
+    if (groupId === null || postId === null) {
+      return res.status(400).json({ error: 'Invalid IDs.' })
+    }
+
+    const member = await requireGroupMember(groupId, req.user.userId)
+    if (!member || member.status !== 'active') {
+      return res.status(403).json({ error: 'Active membership required.' })
+    }
+
+    const post = await prisma.groupDiscussionPost.findUnique({ where: { id: postId } })
+    if (!post || post.groupId !== groupId) {
+      return res.status(404).json({ error: 'Post not found.' })
+    }
+
+    // Toggle: check if already upvoted
+    const existing = await prisma.discussionUpvote.findUnique({
+      where: { postId_userId: { postId, userId: req.user.userId } },
+    })
+
+    if (existing) {
+      await prisma.discussionUpvote.delete({ where: { id: existing.id } })
+      const count = await prisma.discussionUpvote.count({ where: { postId } })
+      return res.json({ upvoted: false, upvoteCount: count })
+    }
+
+    await prisma.discussionUpvote.create({
+      data: { postId, userId: req.user.userId },
+    })
+    const count = await prisma.discussionUpvote.count({ where: { postId } })
+    res.json({ upvoted: true, upvoteCount: count })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+/**
+ * POST /api/study-groups/:id/discussions/:postId/replies/:replyId/upvote
+ * Toggle upvote on a discussion reply
+ */
+router.post('/:id/discussions/:postId/replies/:replyId/upvote', writeLimiter, requireAuth, async (req, res) => {
+  try {
+    const groupId = parseId(req.params.id)
+    const replyId = parseId(req.params.replyId)
+    if (groupId === null || replyId === null) {
+      return res.status(400).json({ error: 'Invalid IDs.' })
+    }
+
+    const member = await requireGroupMember(groupId, req.user.userId)
+    if (!member || member.status !== 'active') {
+      return res.status(403).json({ error: 'Active membership required.' })
+    }
+
+    const reply = await prisma.groupDiscussionReply.findUnique({
+      where: { id: replyId },
+      include: { post: { select: { groupId: true } } },
+    })
+    if (!reply || reply.post.groupId !== groupId) {
+      return res.status(404).json({ error: 'Reply not found.' })
+    }
+
+    const existing = await prisma.discussionUpvote.findUnique({
+      where: { replyId_userId: { replyId, userId: req.user.userId } },
+    })
+
+    if (existing) {
+      await prisma.discussionUpvote.delete({ where: { id: existing.id } })
+      const count = await prisma.discussionUpvote.count({ where: { replyId } })
+      return res.json({ upvoted: false, upvoteCount: count })
+    }
+
+    await prisma.discussionUpvote.create({
+      data: { replyId, userId: req.user.userId },
+    })
+    const count = await prisma.discussionUpvote.count({ where: { replyId } })
+    res.json({ upvoted: true, upvoteCount: count })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ===== GROUP ACTIVITY FEED =====
+
+/**
+ * GET /api/study-groups/:id/activity
+ * Returns recent group activity (posts, resources, members, sessions)
+ */
+router.get('/:id/activity', readLimiter, requireAuth, async (req, res) => {
+  try {
+    const groupId = parseId(req.params.id)
+    if (groupId === null) {
+      return res.status(400).json({ error: 'Invalid group ID.' })
+    }
+
+    const member = await requireGroupMember(groupId, req.user.userId)
+    if (!member) {
+      return res.status(404).json({ error: 'Not a member.' })
+    }
+
+    const limit = Math.min(parseInt(req.query.limit, 10) || 10, 30)
+
+    // Fetch recent items in parallel
+    const [recentPosts, recentResources, recentMembers, upcomingSessions] = await Promise.all([
+      prisma.groupDiscussionPost.findMany({
+        where: { groupId },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        select: { id: true, title: true, type: true, createdAt: true, author: { select: { id: true, username: true, avatarUrl: true } } },
+      }),
+      prisma.groupResource.findMany({
+        where: { groupId },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        select: { id: true, title: true, type: true, createdAt: true, user: { select: { id: true, username: true, avatarUrl: true } } },
+      }),
+      prisma.studyGroupMember.findMany({
+        where: { groupId, status: 'active' },
+        orderBy: { joinedAt: 'desc' },
+        take: limit,
+        select: { userId: true, role: true, joinedAt: true, user: { select: { id: true, username: true, avatarUrl: true } } },
+      }),
+      prisma.groupSession.findMany({
+        where: { groupId, scheduledAt: { gte: new Date() }, status: { in: ['upcoming', 'in_progress'] } },
+        orderBy: { scheduledAt: 'asc' },
+        take: 5,
+        select: { id: true, title: true, scheduledAt: true, location: true, status: true },
+      }),
+    ])
+
+    // Merge into a unified activity feed sorted by date
+    const activities = []
+
+    for (const p of recentPosts) {
+      activities.push({
+        type: 'discussion',
+        subType: p.type,
+        id: p.id,
+        title: p.title,
+        actor: p.author,
+        timestamp: p.createdAt,
+      })
+    }
+
+    for (const r of recentResources) {
+      activities.push({
+        type: 'resource',
+        subType: r.type,
+        id: r.id,
+        title: r.title,
+        actor: r.user,
+        timestamp: r.createdAt,
+      })
+    }
+
+    for (const m of recentMembers) {
+      activities.push({
+        type: 'member_joined',
+        id: m.userId,
+        title: m.user?.username || 'Unknown',
+        actor: m.user,
+        role: m.role,
+        timestamp: m.joinedAt,
+      })
+    }
+
+    // Sort by timestamp descending, take top N
+    activities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+
+    res.json({
+      activities: activities.slice(0, limit),
+      upcomingSessions,
     })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
