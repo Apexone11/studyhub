@@ -65,8 +65,8 @@ export const FEATURES = [
   },
   {
     Icon: IconCheck,
-    title: 'Always Free',
-    desc: 'No paywalls, no subscriptions, no ads. StudyHub is free forever.',
+    title: 'Free to Start',
+    desc: 'Core study tools are free. Sign up, share, and collaborate with your classmates today.',
     toneClass: 'home-feature--green'
   }
 ]
@@ -108,7 +108,7 @@ export const TESTIMONIALS = [
     color: '#10b981',
   },
   {
-    text: 'The fact that it is completely free with no ads makes it stand out from every other study platform.',
+    text: 'The collaborative study sheets and forking system make it stand out from every other study platform.',
     name: 'Aisha R.',
     school: 'Morgan State University',
     initial: 'A',
@@ -118,7 +118,7 @@ export const TESTIMONIALS = [
 
 export const PROOF_ITEMS = [
   { stroke: '#3b82f6', label: 'No credit card required' },
-  { stroke: '#10b981', label: 'No ads, ever' },
+  { stroke: '#10b981', label: 'Student built' },
   { stroke: '#8b5cf6', label: 'Open source' },
   { stroke: '#f59e0b', label: 'Sign up in 60 seconds' },
 ]

@@ -95,7 +95,7 @@ export function MessageBubble({
         size={28}
       />
 
-      <div style={{ maxWidth: '60%', position: 'relative' }}>
+      <div style={{ maxWidth: '75%', position: 'relative' }}>
         {/* Reply-to reference */}
         {replyToMsg && !isDeleted && (
           <div style={{

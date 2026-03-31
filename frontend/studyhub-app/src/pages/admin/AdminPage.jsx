@@ -66,7 +66,7 @@ export default function AdminPage() {
 
   return (
   <>
-    <div style={{ minHeight: '100vh', background: 'var(--sh-soft, #edf0f5)', fontFamily: FONT }}>
+    <div style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: FONT }}>
       <Navbar crumbs={[{ label: 'Admin', to: '/admin' }]} hideTabs actions={navActions} />
       <div style={{ ...pageShell('app'), display: 'grid', gridTemplateColumns: layout.columns.appTwoColumn, gap: 20 }}>
         <AppSidebar mode={layout.sidebarMode} />

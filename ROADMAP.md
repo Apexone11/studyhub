@@ -4,11 +4,11 @@ This document outlines the current state of StudyHub and the planned direction f
 
 ---
 
-## Current Release: V1.5.0
+## Current Release: V1.7.0
 
-V1.5.0 is the live production release. It transformed StudyHub from a study sheet sharing tool into a full collaboration platform with version control, content moderation, and profile achievements.
+V1.7.0 is the live production release. It builds on V1.5.0 with real-time messaging, study groups, security hardening, and accessibility improvements.
 
-### V1.5.0 Feature Summary
+### V1.7.0 Feature Summary
 
 | Area | What shipped |
 | ---- | ------------ |
@@ -17,19 +17,21 @@ V1.5.0 is the live production release. It transformed StudyHub from a study shee
 | Profiles | Cover images, pinned sheets (up to 6), activity heatmap, 12 achievement badges |
 | Content Moderation | AI scanning, tiered risk classification (Tier 0-3), admin review queue, strikes, appeals |
 | Authentication | WebAuthn passkeys, Google OAuth, JWT httpOnly cookies, bcrypt |
-| Search | Full-text PostgreSQL search, global modal search across sheets/courses/users |
+| Search | Full-text PostgreSQL search, global modal search across sheets/courses/users/notes/groups |
 | HTML Sheets | Accept-all submission, detect-classify-route pipeline, safe preview sandbox |
-| Onboarding | Tutorial popups, getting started card, activation checklist, email verification banner |
-| Discovery | Popular courses sidebar, composite "Best" ranking, content quality signal badges |
-| Study Continuity | Recently viewed tracking, study status markers, study queue dashboard widget |
+| Messaging | Real-time DMs and group chats via Socket.io, typing indicators, read receipts, GIF support, polls, reactions |
+| Study Groups | Create/join groups, shared resources, scheduled sessions with RSVP, discussion boards with real-time replies |
+| Block/Mute | Bidirectional block system, one-directional mute, enforced across all social features |
+| Security | Cookie hardening, rate limiting, attachment validation, trust gate with auto-promotion |
+| Accessibility | WCAG 2.1 AA, focus trapping, aria-labels, skip-to-content, keyboard shortcuts, reduced motion support |
 | Infrastructure | Feature flags, provenance manifests, PWA offline support, Sentry + PostHog telemetry |
-| Accessibility | WCAG 2.2 AA, skip-to-content, aria-live announcements, keyboard shortcuts, reduced motion support |
+| Performance | Skeleton loading states, Suspense boundaries, code-split routes |
 
 ---
 
 ## V2.0 — Next Major Release
 
-V2.0 focuses on three themes: **smarter studying**, **deeper collaboration**, and **campus expansion**.
+V2.0 focuses on three themes: **smarter studying**, **deeper collaboration**, and **sustainable growth**.
 
 ### AI Tutor
 
@@ -44,13 +46,6 @@ V2.0 focuses on three themes: **smarter studying**, **deeper collaboration**, an
 - Auto-scoring with immediate feedback and explanations
 - Spaced repetition scheduling for missed questions
 - Course-level question banks built from community sheets
-
-### Study Groups
-
-- Create private or course-scoped study groups
-- Shared sheet collections within a group
-- Group discussion threads tied to specific sheets or sections
-- Collaborative real-time editing sessions (multiplayer SheetLab)
 
 ### Mobile App
 
@@ -72,6 +67,13 @@ V2.0 focuses on three themes: **smarter studying**, **deeper collaboration**, an
 - Campus ambassador program with onboarding tools
 - School-specific branding and course catalog imports
 - Cross-campus sheet discovery for shared courses
+
+### Monetization (StudyHub Pro)
+
+- **Ad-supported free tier**: tasteful, non-intrusive ads on public pages to sustain the platform
+- **StudyHub Pro subscription**: ad-free experience, AI Tutor access, advanced analytics, priority support, and extended storage
+- **Institutional licenses**: campus-wide Pro access for universities that partner with StudyHub
+- Core study tools (sheets, forks, contributions, groups, messaging) remain free
 
 ---
 
@@ -108,6 +110,7 @@ These items are planned for the release following V2.0. Scope may shift based on
 2. **Adoption metrics** — what features drive engagement and retention
 3. **Campus needs** — requirements from new schools joining the platform
 4. **Technical debt** — infrastructure improvements that unblock future features
+5. **Sustainability** — features that help StudyHub sustain long-term through revenue
 
 ---
 

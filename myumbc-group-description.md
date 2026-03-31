@@ -19,7 +19,7 @@ Think of it like GitHub, but for your study materials. You can:
 - **Private notes** — Keep your own markdown notes linked to your classes
 - **Download anything** — Grab study sheets and practice tests to review offline
 
-No paywalls. No ads. No email required to sign up. Just students helping students.
+Free to use. No email required to sign up. Just students helping students.
 
 **Website:** https://www.getstudyhub.net
 **Discord:** [link to your Discord server]
@@ -34,7 +34,7 @@ Join us, share your best notes, and let's make studying at UMBC a little less pa
 
 StudyHub is a free platform that gives UMBC students a GitHub-style way to create, share, fork, and improve study materials by course.
 
-Upload your notes. Fork someone else's. Contribute improvements back. Browse by course. Take practice tests. Keep private notes. Download anything. No paywalls, no ads, no email required.
+Upload your notes. Fork someone else's. Contribute improvements back. Browse by course. Take practice tests. Keep private notes. Download anything. Free to use, no email required.
 
 Built by a UMBC student, for UMBC students. Stop losing study guides in dead group chats.
 

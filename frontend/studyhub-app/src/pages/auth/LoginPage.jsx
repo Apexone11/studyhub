@@ -177,7 +177,7 @@ export default function LoginPage() {
                   onSuccess={handleGoogleSuccess}
                   onError={() => setError('Google sign-in was cancelled or failed.')}
                   size="large"
-                  width="368"
+                  width="300"
                   text="signin_with"
                   shape="rectangular"
                   theme="outline"

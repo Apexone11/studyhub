@@ -2416,3 +2416,103 @@ ChatPanel.jsx:
 - Frontend build: success
 - Backend messaging tests: 24/24 passing
 - No pre-existing test regressions
+
+---
+
+## Cycle 61 — Mobile/Tablet Responsiveness, Dark Mode, Roadmap Update (2026-03-31)
+
+### Summary
+
+Systematic audit and fix of mobile/tablet responsiveness across all pages, dark mode hardcoded color fixes, roadmap update with monetization plans, and removal of "no ads" promises in preparation for future ad and subscription features.
+
+### 1. Dark Mode Fixes
+
+Replaced all hardcoded hex colors with CSS custom property tokens (`var(--sh-*)`) in critical shared components:
+
+pageScaffold.jsx:
+- PageShell background: `#edf0f5` -> `var(--sh-bg)`; added `overflowX: 'hidden'`
+- TeaserCard border: `#e2e8f0` -> `var(--sh-border)`; title/subtitle colors -> tokens
+- MiniPreview: Replaced 12+ hardcoded colors (headings, code blocks, blockquotes, list items, paragraph text) with semantic tokens (`--sh-heading`, `--sh-text`, `--sh-muted`, `--sh-border`, `--sh-slate-*`, `--sh-brand`, `--sh-info-*`)
+
+DashboardPage.jsx:
+- Background: `#edf0f5` -> `var(--sh-bg)`
+- Border color: `#334155` -> `var(--sh-text)`
+
+AdminPage.jsx:
+- Background fallback simplified to `var(--sh-bg)`
+
+AboutPage.jsx:
+- Section backgrounds: `#f8fafc` -> `var(--sh-bg)` (two sections)
+
+### 2. Mobile/Tablet Responsive Fixes
+
+Auth pages:
+- LoginPage.jsx: GoogleLogin width reduced from 368px to 300px (fits all phone viewports)
+- RegisterStepFields.jsx: GoogleLogin width reduced from 380px to 300px
+
+Message components:
+- MessageBubble.jsx: `maxWidth` changed from 60% to 75% for better readability on phones
+
+AboutPage responsive grids:
+- Story grid (stats + text): converted from inline style to `about-story-grid` CSS class with mobile stacking at 767px
+- Roadmap grid (V1/V2 columns): converted to `about-roadmap-grid` CSS class with mobile stacking at 767px
+- Team card: added `about-team-card` class that stacks vertically on phones (500px breakpoint)
+
+responsive.css additions:
+- `.about-story-grid`: 2-column on desktop, 1-column on phone
+- `.about-roadmap-grid`: 2-column on desktop, 1-column on phone
+- `.about-team-card`: horizontal on desktop, vertical centered on phone
+
+### 3. Removed "No Ads" / "Free Forever" References
+
+Replaced promises about no ads/subscriptions with community-focused messaging that is compatible with future monetization:
+
+homeConstants.js:
+- Feature title: "Always Free" -> "Free to Start"
+- Feature description: removed "No paywalls, no subscriptions, no ads. StudyHub is free forever." -> "Core study tools are free. Sign up, share, and collaborate with your classmates today."
+- Testimonial: removed "completely free with no ads" reference, replaced with praise for collaborative features
+- Proof item: "No ads, ever" -> "Student built"
+
+AboutPage.jsx:
+- Hero badge: "Free Forever" -> "Community Driven"
+- Goals: "No paywalls, no subscriptions, no premium tiers" -> "Core study tools are free to use. Share, discover, and collaborate without barriers."
+- Privacy goal: removed "No third-party ads" -> "Your data stays yours."
+- Stats: "0 Dollars it costs" -> "30+ Maryland schools supported"
+
+myumbc-group-description.md:
+- Removed "No paywalls. No ads." references in both description variants
+
+### 4. Roadmap Updates
+
+ROADMAP.md (complete rewrite):
+- Updated current release from V1.5.0 to V1.7.0 with all shipped features (messaging, study groups, block/mute, security hardening, accessibility, performance)
+- Removed "Study Groups" from V2.0 roadmap (already shipped)
+- Added "Monetization (StudyHub Pro)" section to V2.0: ad-supported free tier, Pro subscription with AI/analytics/ad-free, institutional licenses
+- Added sustainability as a priority factor for roadmap decisions
+
+AboutPage.jsx roadmap data:
+- V1 items updated: added messaging, study groups, block/mute
+- V2 items updated: replaced "Study groups" with "StudyHub Pro with advanced features"
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `frontend/.../pages/shared/pageScaffold.jsx` | Dark mode: 15+ hardcoded colors replaced with tokens; added overflowX hidden |
+| `frontend/.../pages/auth/LoginPage.jsx` | GoogleLogin width: 368 -> 300 |
+| `frontend/.../pages/auth/RegisterStepFields.jsx` | GoogleLogin width: 380 -> 300 |
+| `frontend/.../pages/dashboard/DashboardPage.jsx` | Dark mode: hardcoded colors replaced |
+| `frontend/.../pages/admin/AdminPage.jsx` | Dark mode: background token fix |
+| `frontend/.../pages/legal/AboutPage.jsx` | Removed no-ads references, updated roadmap data, added responsive grid classes |
+| `frontend/.../pages/home/homeConstants.js` | Removed no-ads/free-forever messaging |
+| `frontend/.../pages/messages/components/MessageBubble.jsx` | maxWidth 60% -> 75% for mobile |
+| `frontend/.../styles/responsive.css` | Added about-story-grid, about-roadmap-grid, about-team-card responsive rules |
+| `ROADMAP.md` | Full rewrite: V1.7.0 current, monetization plans, updated priorities |
+| `myumbc-group-description.md` | Removed no-ads references |
+
+### Validation
+
+- Frontend lint: 0 errors
+- Backend lint: 0 errors
+- Frontend build: success
+- No test regressions
