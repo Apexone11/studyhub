@@ -6,15 +6,17 @@ const ROADMAP_VERSION_1 = [
   'Forks, stars, downloads, comments, and public profiles',
   'Per-course organization with school directories',
   'Private markdown notes linked to your courses',
-  'Verified email, password reset, and 2-step verification',
+  'Real-time messaging (DMs and group chats)',
+  'Study groups with shared resources and discussions',
+  'Block/mute system and content moderation',
   'Account settings, course management, and team announcements',
 ]
 
 const ROADMAP_VERSION_2 = [
-  'AI Tutor — ask questions about your study materials',
+  'AI Tutor -- ask questions about your study materials',
   'Practice Tests with auto-scoring',
-  'Mobile App (iOS & Android)',
-  'Study groups & real-time collaboration',
+  'Mobile App (iOS and Android)',
+  'StudyHub Pro with advanced features',
   'Smarter recommendations and campus expansion',
 ]
 
@@ -32,7 +34,7 @@ export default function AboutPage() {
       {/* ── HERO ─────────────────────────────────────── */}
       <section style={s.hero}>
         <div style={s.heroInner}>
-          <div style={s.heroBadge}>Open Source · Student Built · Free Forever</div>
+          <div style={s.heroBadge}>Open Source · Student Built · Community Driven</div>
           <h1 style={s.heroH1}>Built by Students,<br />for Students</h1>
           <p style={s.heroSub}>
             StudyHub is a collaborative study platform where you can create, share, and build on
@@ -49,7 +51,7 @@ export default function AboutPage() {
       <section style={s.section}>
         <div style={s.sectionInner}>
           <h2 style={s.sectionH2}>Why We Built This</h2>
-          <div style={s.storyGrid}>
+          <div className="about-story-grid">
             <div style={s.storyText}>
               <p style={s.p}>
                 Every semester, students at the University of Maryland scramble to find good study
@@ -67,7 +69,7 @@ export default function AboutPage() {
             </div>
             <div style={s.storyStats}>
               <StatCard value="∞" label="Study sheets you can create" />
-              <StatCard value="0" label="Dollars it costs" />
+              <StatCard value="30+" label="Maryland schools supported" />
               <StatCard value="100%" label="Open source" />
             </div>
           </div>
@@ -75,14 +77,14 @@ export default function AboutPage() {
       </section>
 
       {/* ── OUR GOALS ───────────────────────────────── */}
-      <section style={{ ...s.section, background: '#f8fafc' }}>
+      <section style={{ ...s.section, background: 'var(--sh-bg)' }}>
         <div style={s.sectionInner}>
           <h2 style={s.sectionH2}>Our Goals</h2>
           <div style={s.goalsGrid}>
-            <GoalCard faIcon="fa-book-open"    color="#2563eb" title="Open Access"            desc="All study materials are free. No paywalls, no subscriptions, no premium tiers." />
+            <GoalCard faIcon="fa-book-open"    color="#2563eb" title="Open Access"            desc="Core study tools are free to use. Share, discover, and collaborate without barriers." />
             <GoalCard faIcon="fa-users"         color="#7c3aed" title="Student Collaboration"  desc="Notes improve when many minds work on them. Fork, edit, and build on each other's work." />
             <GoalCard faIcon="fa-map-location-dot" color="#0891b2" title="Start Local, Go National" desc="Maryland first. Then every university. Students everywhere deserve better study tools." />
-            <GoalCard faIcon="fa-shield-halved" color="#16a34a" title="Privacy First"          desc="We collect only what we need. No selling data. No third-party ads." />
+            <GoalCard faIcon="fa-shield-halved" color="#16a34a" title="Privacy First"          desc="We collect only what we need. Your data stays yours." />
           </div>
         </div>
       </section>
@@ -104,10 +106,10 @@ export default function AboutPage() {
       </section>
 
       {/* ── ROADMAP ─────────────────────────────────── */}
-      <section style={{ ...s.section, background: '#f8fafc' }}>
+      <section style={{ ...s.section, background: 'var(--sh-bg)' }}>
         <div style={s.sectionInner}>
           <h2 style={s.sectionH2}>Roadmap</h2>
-          <div style={s.roadmapGrid}>
+          <div className="about-roadmap-grid">
             <RoadmapColumn title="Version 1 — Live Now" color="#16a34a" items={ROADMAP_VERSION_1} />
             <RoadmapColumn title="Version 2 — Coming Soon" color="#2563eb" items={ROADMAP_VERSION_2} />
           </div>
@@ -118,7 +120,7 @@ export default function AboutPage() {
       <section style={s.section}>
         <div style={s.sectionInner}>
           <h2 style={s.sectionH2}>The Team</h2>
-          <div style={s.teamCard}>
+          <div className="about-team-card" style={s.teamCard}>
             <div style={s.teamAvatar}>A</div>
             <div>
               <div style={s.teamName}>Abdul Rahman Fornah</div>
@@ -203,7 +205,7 @@ const s = {
   section: { padding: '80px 20px' },
   sectionInner: { maxWidth: 1000, margin: '0 auto' },
   sectionH2: { fontSize: 'clamp(24px, 3vw, 36px)', fontWeight: 'bold', color: 'var(--sh-heading)', margin: '0 0 40px', textAlign: 'center' },
-  storyGrid: { display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 280px', gap: 48, alignItems: 'start' },
+  storyGrid: { display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(200px, 280px)', gap: 48, alignItems: 'start' },
   storyText: {},
   p: { fontSize: 16, color: 'var(--sh-subtext)', lineHeight: 1.8, margin: '0 0 16px' },
   storyStats: { display: 'flex', flexDirection: 'column', gap: 16 },

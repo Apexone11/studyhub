@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { API } from '../../config';
 import { authHeaders } from '../shared/pageUtils';
 import { showToast } from '../../lib/toast';
+import { useSocket } from '../../lib/useSocket';
 
 /**
  * Comprehensive hook for managing Study Groups data
@@ -914,6 +915,44 @@ export function useStudyGroupsData() {
   useEffect(() => {
     loadGroups();
   }, [loadGroups]);
+
+  // ── Real-time discussion updates via Socket.io ──────────────────────────
+  const { socket } = useSocket();
+  const activeGroupIdRef = useRef(activeGroup?.id);
+  useEffect(() => { activeGroupIdRef.current = activeGroup?.id; }, [activeGroup?.id]);
+
+  useEffect(() => {
+    if (!socket) return;
+
+    function handleNewDiscussion(post) {
+      // Only update if we are viewing that group
+      if (post.groupId !== activeGroupIdRef.current) return;
+      setDiscussions((prev) => {
+        // Deduplicate — avoid adding if already present (e.g. own post)
+        if (prev.some((p) => p.id === post.id)) return prev;
+        return [post, ...prev];
+      });
+    }
+
+    function handleNewReply(reply) {
+      if (reply.groupId !== activeGroupIdRef.current) return;
+      setDiscussions((prev) =>
+        prev.map((p) =>
+          p.id === reply.postId
+            ? { ...p, replyCount: (p.replyCount ?? 0) + 1 }
+            : p
+        )
+      );
+    }
+
+    socket.on('group:discussion:new', handleNewDiscussion);
+    socket.on('group:discussion:reply', handleNewReply);
+
+    return () => {
+      socket.off('group:discussion:new', handleNewDiscussion);
+      socket.off('group:discussion:reply', handleNewReply);
+    };
+  }, [socket]);
 
   return {
     // Group list

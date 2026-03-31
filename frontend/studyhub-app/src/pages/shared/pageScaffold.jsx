@@ -10,7 +10,7 @@ export function PageShell({ nav, sidebar, children }) {
     : sidebar
 
   return (
-    <div style={{ minHeight: '100vh', background: '#edf0f5', fontFamily: PAGE_FONT }}>
+    <div style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: PAGE_FONT, overflowX: 'hidden' }}>
       {nav}
       <div style={pageShell('app')}>
         <div
@@ -37,7 +37,7 @@ export function TeaserCard({ title, sub, chips = [] }) {
       style={{
         background: 'var(--sh-surface)',
         borderRadius: 14,
-        border: '1px solid #e2e8f0',
+        border: '1px solid var(--sh-border)',
         padding: '14px 16px',
         marginBottom: 9,
         position: 'relative',
@@ -59,8 +59,8 @@ export function TeaserCard({ title, sub, chips = [] }) {
       >
         Version 2
       </span>
-      <div style={{ fontSize: 14, fontWeight: 700, color: '#334155', marginBottom: 5, paddingRight: 64 }}>{title}</div>
-      <div style={{ fontSize: 12, color: '#94a3b8', lineHeight: 1.55, marginBottom: 8 }}>{sub}</div>
+      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--sh-text)', marginBottom: 5, paddingRight: 64 }}>{title}</div>
+      <div style={{ fontSize: 12, color: 'var(--sh-muted)', lineHeight: 1.55, marginBottom: 8 }}>{sub}</div>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         {chips.map((chip, index) => (
           <span
@@ -85,7 +85,7 @@ export function TeaserCard({ title, sub, chips = [] }) {
 
 export function MiniPreview({ md }) {
   if (!md) {
-    return <div style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic' }}>Start typing to see a live preview…</div>
+    return <div style={{ fontSize: 12, color: 'var(--sh-muted)', fontStyle: 'italic' }}>Start typing to see a live preview...</div>
   }
 
   const escapeHtml = (value) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -106,9 +106,9 @@ export function MiniPreview({ md }) {
           style={{
             fontSize: size,
             fontWeight: 700,
-            color: '#0f172a',
+            color: 'var(--sh-heading)',
             margin: level === 1 ? '0 0 10px' : '8px 0 4px',
-            borderBottom: level <= 2 ? '1px solid #f1f5f9' : 'none',
+            borderBottom: level <= 2 ? '1px solid var(--sh-border)' : 'none',
             paddingBottom: level <= 2 ? 5 : 0,
           }}
         >
@@ -130,9 +130,9 @@ export function MiniPreview({ md }) {
       }
 
       nodes.push(
-        <div key={index} style={{ background: '#0f172a', borderRadius: 9, padding: '12px 14px', marginBottom: 10 }}>
-          {language ? <div style={{ fontSize: 9, color: '#64748b', letterSpacing: '.08em', marginBottom: 6 }}>{language.toUpperCase()}</div> : null}
-          <pre style={{ margin: 0, fontFamily: 'monospace', fontSize: 11, color: '#e2e8f0', lineHeight: 1.7, overflowX: 'auto' }}>{code}</pre>
+        <div key={index} style={{ background: 'var(--sh-slate-900)', borderRadius: 9, padding: '12px 14px', marginBottom: 10 }}>
+          {language ? <div style={{ fontSize: 9, color: 'var(--sh-slate-500)', letterSpacing: '.08em', marginBottom: 6 }}>{language.toUpperCase()}</div> : null}
+          <pre style={{ margin: 0, fontFamily: 'monospace', fontSize: 11, color: 'var(--sh-slate-200)', lineHeight: 1.7, overflowX: 'auto' }}>{code}</pre>
         </div>,
       )
       index += 1
@@ -144,14 +144,14 @@ export function MiniPreview({ md }) {
         <div
           key={index}
           style={{
-            borderLeft: '3px solid #3b82f6',
-            background: '#eff6ff',
+            borderLeft: '3px solid var(--sh-brand)',
+            background: 'var(--sh-info-bg)',
             padding: '8px 12px',
             borderRadius: '0 8px 8px 0',
             marginBottom: 8,
           }}
         >
-          <div style={{ fontSize: 12, color: '#1e40af', fontStyle: 'italic' }}>{line.slice(2)}</div>
+          <div style={{ fontSize: 12, color: 'var(--sh-info-text)', fontStyle: 'italic' }}>{line.slice(2)}</div>
         </div>,
       )
       index += 1
@@ -167,7 +167,7 @@ export function MiniPreview({ md }) {
       nodes.push(
         <ul key={`ul${index}`} style={{ margin: '0 0 8px 18px', padding: 0 }}>
           {items.map((item, itemIndex) => (
-            <li key={itemIndex} style={{ fontSize: 12, color: '#334155', lineHeight: 1.7 }}>
+            <li key={itemIndex} style={{ fontSize: 12, color: 'var(--sh-text)', lineHeight: 1.7 }}>
               {item}
             </li>
           ))}
@@ -183,7 +183,7 @@ export function MiniPreview({ md }) {
     }
 
     nodes.push(
-      <p key={index} style={{ fontSize: 12, color: '#334155', lineHeight: 1.7, margin: '0 0 6px' }}>
+      <p key={index} style={{ fontSize: 12, color: 'var(--sh-text)', lineHeight: 1.7, margin: '0 0 6px' }}>
         {line}
       </p>,
     )

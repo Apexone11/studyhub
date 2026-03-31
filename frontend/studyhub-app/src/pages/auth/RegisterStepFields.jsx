@@ -82,7 +82,7 @@ export function AccountStep({ form, setField, loading, onSubmit, onGoogleSuccess
               onSuccess={onGoogleSuccess}
               onError={() => setError('Google sign-up was cancelled or failed.')}
               size="large"
-              width="380"
+              width="300"
               text="signup_with"
               shape="rectangular"
               theme="outline"

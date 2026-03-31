@@ -5,7 +5,8 @@ const prisma = require('./prisma')
  * Removes special tsquery characters, splits words, and joins with &.
  */
 function sanitizeSearchQuery(input) {
-  return String(input || '').trim()
+  // Cap input length to prevent ReDoS on extremely long tsquery strings.
+  return String(input || '').trim().slice(0, 500)
     .split(/\s+/)
     .filter(Boolean)
     .map((w) => w.replace(/[^\p{L}\p{N}-]/gu, ''))

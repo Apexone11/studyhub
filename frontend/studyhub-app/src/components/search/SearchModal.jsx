@@ -5,6 +5,7 @@ import { API } from '../../config'
 import { DEBOUNCE_MS, styles } from './searchModalConstants'
 import { SheetResults, NoteResults, CourseResults, UserResults, GroupResults } from './SearchResultItems'
 import { trackEvent } from '../../lib/telemetry'
+import { useFocusTrap } from '../../lib/useFocusTrap'
 
 export default function SearchModal({ open, onClose }) {
   const [query, setQuery] = useState('')
@@ -15,6 +16,7 @@ export default function SearchModal({ open, onClose }) {
   const timerRef = useRef(null)
   const abortRef = useRef(null)
   const navigate = useNavigate()
+  const trapRef = useFocusTrap({ active: open, onClose, initialFocusRef: inputRef })
 
   // Reset state when modal opens, cancel pending work when it closes
   useEffect(() => {
@@ -22,8 +24,7 @@ export default function SearchModal({ open, onClose }) {
       setQuery('')
       setResults({ sheets: [], courses: [], users: [], notes: [], groups: [] })
       setActiveIndex(-1)
-      const focusTimer = setTimeout(() => inputRef.current?.focus(), 50)
-      return () => clearTimeout(focusTimer)
+      return
     }
     // Modal closing — cancel any pending debounce timer and in-flight fetch
     clearTimeout(timerRef.current)
@@ -37,16 +38,6 @@ export default function SearchModal({ open, onClose }) {
       if (abortRef.current) abortRef.current.abort()
     }
   }, [])
-
-  // Close on Escape
-  useEffect(() => {
-    if (!open) return
-    function onKey(e) {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [open, onClose])
 
   const fetchResults = useCallback(async (searchQuery) => {
     if (abortRef.current) abortRef.current.abort()
@@ -133,7 +124,7 @@ export default function SearchModal({ open, onClose }) {
 
   return (
     <div style={styles.overlay} onClick={onClose} role="presentation">
-      <div style={styles.modal} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Search sheets, courses, and users">
+      <div ref={trapRef} style={styles.modal} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Search sheets, courses, and users">
         {/* Search input */}
         <div style={styles.inputRow}>
           <IconSearch size={16} style={{ color: 'var(--sh-slate-500, #64748b)', flexShrink: 0 }} />

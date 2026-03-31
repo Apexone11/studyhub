@@ -15,6 +15,9 @@ import { Link } from 'react-router-dom'
 import { API } from '../config'
 import { authHeaders } from '../pages/shared/pageUtils'
 import { showToast } from '../lib/toast'
+import { useSocket } from '../lib/useSocket'
+import { useSession } from '../lib/session-context'
+import { useFocusTrap } from '../lib/useFocusTrap'
 import UserAvatar from './UserAvatar'
 
 const PAGE_FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
@@ -119,13 +122,20 @@ function GifSearchPanel({ onSelect, onClose }) {
 
 /* ======================================================================= */
 export default function ChatPanel({ open, onClose }) {
+  const { socket, connectionError: socketError } = useSocket()
+  const { user } = useSession()
+  const currentUserId = user?.id
+
   const [conversations, setConversations] = useState([])
   const [activeId, setActiveId] = useState(null)
   const [messages, setMessages] = useState([])
   const [loading, setLoading] = useState(false)
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
+  const [typingUsers, setTypingUsers] = useState([])
   const messagesEndRef = useRef(null)
+  const activeIdRef = useRef(null)
+  const typingTimerRef = useRef(null)
 
   // Feature parity state
   const [showGifPicker, setShowGifPicker] = useState(false)
@@ -135,12 +145,113 @@ export default function ChatPanel({ open, onClose }) {
   const [replyTo, setReplyTo] = useState(null)
   const [hoveredMsgId, setHoveredMsgId] = useState(null)
   const fileInputRef = useRef(null)
+  const panelTrapRef = useFocusTrap({ active: open, onClose, lockScroll: false })
+
+  // Keep activeIdRef in sync
+  useEffect(() => { activeIdRef.current = activeId }, [activeId])
 
   /* -- Close all feature panels ----------------------------------------- */
   function closeAllPanels() {
     setShowGifPicker(false)
     setShowImageInput(false)
     setImageUrl('')
+  }
+
+  /* -- Socket.io: real-time messages + typing ------------------------------ */
+  useEffect(() => {
+    if (!socket || !currentUserId) return
+
+    function handleNewMessage(message) {
+      const currentActiveId = activeIdRef.current
+      // If message is for the active conversation, add it to thread
+      if (currentActiveId && message.conversationId === currentActiveId) {
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === message.id)) return prev
+          return [...prev, message]
+        })
+        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+        // Emit read receipt
+        socket.emit('message:read', { conversationId: currentActiveId })
+      }
+      // Update conversation list (last message + unread)
+      setConversations((prev) =>
+        prev.map((c) => {
+          if (c.id !== message.conversationId) return c
+          return {
+            ...c,
+            lastMessage: { content: message.content, createdAt: message.createdAt },
+            unreadCount: (c.id === currentActiveId) ? 0 : (c.unreadCount || 0) + 1,
+          }
+        })
+      )
+    }
+
+    function handleMessageEdit(data) {
+      setMessages((prev) =>
+        prev.map((m) => m.id === data.id ? { ...m, content: data.content, editedAt: data.editedAt } : m)
+      )
+    }
+
+    function handleMessageDelete(data) {
+      setMessages((prev) =>
+        prev.map((m) => m.id === data.id ? { ...m, deletedAt: data.deletedAt || new Date().toISOString() } : m)
+      )
+    }
+
+    function handleTypingStart(data) {
+      if (data.userId === currentUserId) return
+      const currentActiveId = activeIdRef.current
+      if (data.conversationId !== currentActiveId) return
+      setTypingUsers((prev) => {
+        if (prev.some((u) => u.userId === data.userId)) return prev
+        return [...prev, { userId: data.userId, username: data.username }]
+      })
+    }
+
+    function handleTypingStop(data) {
+      if (data.userId === currentUserId) return
+      setTypingUsers((prev) => prev.filter((u) => u.userId !== data.userId))
+    }
+
+    socket.on('message:new', handleNewMessage)
+    socket.on('message:edit', handleMessageEdit)
+    socket.on('message:delete', handleMessageDelete)
+    socket.on('typing:start', handleTypingStart)
+    socket.on('typing:stop', handleTypingStop)
+
+    return () => {
+      socket.off('message:new', handleNewMessage)
+      socket.off('message:edit', handleMessageEdit)
+      socket.off('message:delete', handleMessageDelete)
+      socket.off('typing:start', handleTypingStart)
+      socket.off('typing:stop', handleTypingStop)
+    }
+  }, [socket, currentUserId])
+
+  /* -- Emit typing start (throttled) ------------------------------------- */
+  function emitTypingStart() {
+    if (!socket || !activeId) return
+    if (typingTimerRef.current) return // Already typing
+    socket.emit('typing:start', { conversationId: activeId })
+    typingTimerRef.current = setTimeout(() => {
+      typingTimerRef.current = null
+    }, 3000)
+  }
+
+  /* -- Join conversation room when selecting ------------------------------ */
+  function selectConversation(id) {
+    // Clear typing for previous conversation
+    setTypingUsers([])
+    if (typingTimerRef.current) {
+      if (socket && activeId) socket.emit('typing:stop', { conversationId: activeId })
+      clearTimeout(typingTimerRef.current)
+      typingTimerRef.current = null
+    }
+    setActiveId(id)
+    if (socket) {
+      socket.emit('conversation:join', { conversationId: id })
+      socket.emit('message:read', { conversationId: id })
+    }
   }
 
   /* -- Load conversations ------------------------------------------------ */
@@ -296,7 +407,7 @@ export default function ChatPanel({ open, onClose }) {
 
   /* -- Message bubble sub-component for thread view ---------------------- */
   function MessageBubble({ msg }) {
-    const isOwn = msg.sender?.username === 'me' || msg.senderId === msg._currentUserId
+    const isOwn = msg.sender?.id === currentUserId || msg.senderId === currentUserId
     const isHovered = hoveredMsgId === msg.id
     const isDeleted = Boolean(msg.deletedAt)
 
@@ -413,7 +524,7 @@ export default function ChatPanel({ open, onClose }) {
         }}
       />
       {/* Panel */}
-      <div style={{
+      <div ref={panelTrapRef} style={{
         position: 'absolute', top: 0, right: 0, bottom: 0, width: 'min(380px, 100vw)',
         background: 'var(--sh-surface)', borderLeft: '1px solid var(--sh-border)',
         boxShadow: '-4px 0 24px rgba(0,0,0,0.1)',
@@ -428,7 +539,7 @@ export default function ChatPanel({ open, onClose }) {
           {activeId ? (
             <>
               <button
-                onClick={() => { setActiveId(null); setMessages([]); setReplyTo(null); closeAllPanels(); setAttachmentPreviews([]) }}
+                onClick={() => { setActiveId(null); setMessages([]); setReplyTo(null); closeAllPanels(); setAttachmentPreviews([]); setTypingUsers([]) }}
                 aria-label="Back to conversations"
                 style={{
                   background: 'none', border: 'none', cursor: 'pointer',
@@ -467,6 +578,23 @@ export default function ChatPanel({ open, onClose }) {
           </button>
         </div>
 
+        {/* Socket connection warning */}
+        {socketError && (
+          <div role="alert" style={{
+            padding: '6px 12px',
+            background: 'var(--sh-info-bg)',
+            borderBottom: '1px solid var(--sh-info-border)',
+            color: 'var(--sh-info-text)',
+            fontSize: 11,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+          }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--sh-warning-text)', flexShrink: 0 }} />
+            Live updates paused
+          </div>
+        )}
+
         {/* Body */}
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {!activeId ? (
@@ -492,7 +620,7 @@ export default function ChatPanel({ open, onClose }) {
                 return (
                   <button
                     key={c.id}
-                    onClick={() => setActiveId(c.id)}
+                    onClick={() => selectConversation(c.id)}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 10,
                       width: '100%', padding: '10px 16px', border: 'none',
@@ -538,6 +666,12 @@ export default function ChatPanel({ open, onClose }) {
                 ) : messages.map(msg => (
                   <MessageBubble key={msg.id} msg={msg} />
                 ))}
+                {/* Typing indicator */}
+                {typingUsers.length > 0 && (
+                  <div style={{ padding: '4px 0', fontSize: 11, color: 'var(--sh-muted)', fontStyle: 'italic' }}>
+                    {typingUsers.map((u) => u.username).join(', ')} {typingUsers.length === 1 ? 'is' : 'are'} typing...
+                  </div>
+                )}
                 <div ref={messagesEndRef} />
               </div>
             </div>
@@ -661,7 +795,7 @@ export default function ChatPanel({ open, onClose }) {
 
               <textarea
                 value={input}
-                onChange={e => setInput(e.target.value)}
+                onChange={e => { setInput(e.target.value); if (e.target.value.trim()) emitTypingStart() }}
                 onKeyDown={handleKeyDown}
                 placeholder="Type a message..."
                 aria-label="Message input"

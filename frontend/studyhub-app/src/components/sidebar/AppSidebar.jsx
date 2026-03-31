@@ -86,6 +86,7 @@ export default function AppSidebar({ mode = 'fixed' }) {
               key={to}
               to={to}
               className={`sh-sidebar-nav-link${isActive ? ' sh-sidebar-nav-link--active' : ''}`}
+              aria-current={isActive ? 'page' : undefined}
             >
               <Icon size={15} />
               {link.label}
@@ -116,6 +117,7 @@ export default function AppSidebar({ mode = 'fixed' }) {
           onClick={() => navigate('/my-courses')}
           className="sh-btn sh-btn--secondary sh-btn--sm"
           style={{ marginTop: 10, width: '100%', justifyContent: 'center', gap: 5 }}
+          aria-label="Add course"
         >
           <IconPlus size={12} />Add Course
         </button>
@@ -243,6 +245,7 @@ export default function AppSidebar({ mode = 'fixed' }) {
                   onClick={() => setDrawerOpen(false)}
                   ref={closeButtonRef}
                   className="sh-btn sh-btn--secondary sh-btn--sm"
+                  aria-label="Close navigation"
                 >
                   Close
                 </button>

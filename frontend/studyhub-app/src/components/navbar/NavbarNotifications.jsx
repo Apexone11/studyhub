@@ -125,14 +125,18 @@ export default function NavbarNotifications() {
       >
         <IconBell size={17} />
         {unreadCount > 0 && (
-          <span style={{
-            position: 'absolute', top: 2, right: 2,
-            background: 'var(--sh-nav-badge-bg)', color: 'var(--sh-nav-text)',
-            fontSize: 10, fontWeight: 800,
-            borderRadius: 99, minWidth: 16, height: 16,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: '0 3px', lineHeight: 1,
-          }}>
+          <span
+            style={{
+              position: 'absolute', top: 2, right: 2,
+              background: 'var(--sh-nav-badge-bg)', color: 'var(--sh-nav-text)',
+              fontSize: 10, fontWeight: 800,
+              borderRadius: 99, minWidth: 16, height: 16,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: '0 3px', lineHeight: 1,
+            }}
+            aria-live="polite"
+            aria-label={`${unreadCount} unread notifications`}
+          >
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}

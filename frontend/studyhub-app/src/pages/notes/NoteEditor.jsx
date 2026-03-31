@@ -353,7 +353,9 @@ export default function NoteEditor({
             if (!printWin) return
             const previewEl = document.querySelector('[data-note-preview]')
             const previewHtml = previewEl ? previewEl.innerHTML : '<p>No content to export.</p>'
-            printWin.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${editorTitle || 'Note'}</title><style>
+            // HTML-escape the title to prevent XSS in the print window
+            const safeTitle = (editorTitle || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+            printWin.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${safeTitle || 'Note'}</title><style>
 body { font-family: 'Plus Jakarta Sans', -apple-system, sans-serif; max-width: 700px; margin: 40px auto; padding: 0 24px; color: #1e293b; line-height: 1.7; }
 h1 { font-size: 24px; font-weight: 800; margin-bottom: 8px; }
 h2 { font-size: 20px; font-weight: 700; }
@@ -365,7 +367,7 @@ blockquote { border-left: 3px solid #3b82f6; margin: 12px 0; padding: 8px 16px; 
 img { max-width: 100%; border-radius: 8px; }
 table { border-collapse: collapse; width: 100%; } th, td { border: 1px solid #e2e8f0; padding: 8px 12px; text-align: left; }
 @media print { body { margin: 0; } }
-</style></head><body><h1>${editorTitle || 'Untitled Note'}</h1>${previewHtml}</body></html>`)
+</style></head><body><h1>${safeTitle || 'Untitled Note'}</h1>${previewHtml}</body></html>`)
             printWin.document.close()
             setTimeout(() => printWin.print(), 300)
           }}

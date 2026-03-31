@@ -71,12 +71,12 @@ async function verifyMessageParticipant(req, res, messageId) {
 }
 
 /**
- * Sanitize message content to prevent stored XSS.  Strips HTML tags.
+ * Sanitize message content to prevent stored XSS.
+ * Uses sanitize-html to strip all tags reliably (regex is bypassable).
  */
+const sanitizeHtml = require('sanitize-html')
 function sanitizeMessageContent(content) {
-  return String(content)
-    .replace(/<[^>]*>/g, '')
-    .trim()
+  return sanitizeHtml(String(content), { allowedTags: [], allowedAttributes: {} }).trim()
 }
 
 const messageWriteLimiter = rateLimit({

@@ -440,3 +440,41 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ── About page: story grid (stats column stacks below on phone) ───── */
+.about-story-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(200px, 280px);
+  gap: 48px;
+  align-items: start;
+}
+
+@media (max-width: 767px) {
+  .about-story-grid {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+}
+
+/* ── About page: roadmap grid (side by side -> stacked on phone) ───── */
+.about-roadmap-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+}
+
+@media (max-width: 767px) {
+  .about-roadmap-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+
+/* ── About page: team card (stack on phone) ────────────────────────── */
+@media (max-width: 500px) {
+  .about-team-card {
+    flex-direction: column;
+    text-align: center;
+    align-items: center;
+  }
+}

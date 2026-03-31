@@ -76,7 +76,7 @@ export default function DashboardPage() {
         style={{
           padding: '6px 12px',
           borderRadius: 8,
-          border: '1px solid #334155',
+          border: '1px solid var(--sh-text)',
           background: 'transparent',
           color: 'var(--sh-subtext)',
           fontSize: 12,
@@ -91,7 +91,7 @@ export default function DashboardPage() {
   )
 
   return (
-    <div style={{ minHeight: '100vh', background: '#edf0f5', fontFamily: FONT }}>
+    <div style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: FONT }}>
       <Navbar crumbs={[{ label: 'Dashboard', to: '/dashboard' }]} hideTabs actions={navActions} />
       {/* 2-column responsive grid: sidebar | dashboard content
        * Desktop: sidebar visible, Compact: sidebar as drawer */}

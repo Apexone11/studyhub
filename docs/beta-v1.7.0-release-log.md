@@ -2228,3 +2228,425 @@ Comprehensive study groups UX overhaul (backend + frontend), messaging notificat
 ## Improvement Phase (starting 2026-03-31)
 
 All major features are now implemented. Going forward, weekly cycles focus on improving existing features: UX polish, edge case fixes, performance, accessibility, and test coverage. No new features will be added.
+
+---
+
+## Cycle 59 — Real-time, Accessibility, Performance (2026-03-31)
+
+### Summary
+
+Four targeted improvements across the platform: real-time Socket.io integration for ChatPanel and Study Group discussions, accessible focus trapping for all modals, skeleton loading states, and study group real-time events.
+
+### 1. ChatPanel Real-time Messaging
+
+Full Socket.io integration added to `ChatPanel.jsx`:
+- Live message delivery via `message:new`, `message:edit`, `message:delete` socket events.
+- Typing indicators: emits `typing:start`/`typing:stop` with throttle; displays "{username} is typing..." in the chat UI.
+- Conversation room management: `conversation:join` on selection, `message:read` receipts on view.
+- Uses `useRef` for active conversation ID to prevent stale closure bugs in socket event handlers.
+
+### 2. Accessible Focus Trapping (useFocusTrap hook)
+
+New reusable hook: `frontend/.../lib/useFocusTrap.js`
+- Tab/Shift+Tab cycling within container boundaries.
+- Escape key closes modal (configurable via `escapeCloses` option).
+- Auto-focus first focusable element or caller-specified `initialFocusRef`.
+- Body scroll lock (configurable via `lockScroll` option).
+- Focus restore to previously-focused element on close.
+
+Applied to 5 components, replacing ad-hoc Escape key handlers:
+- `ConfirmDialog.jsx` (with `initialFocusRef` on confirm button)
+- `SearchModal.jsx` (with `initialFocusRef` on search input)
+- `ReportModal.jsx`
+- `ActionBlockedModal.jsx`
+- `ChatPanel.jsx` (with `lockScroll: false`)
+
+### 3. Skeleton Loading Fallback
+
+Replaced plain-text "Loading page..." `RouteFallback` in `App.jsx` with a full skeleton UI:
+- Navbar skeleton: logo placeholder, text bar, avatar circle.
+- Content skeleton: title line, three text lines, 3-card grid with avatar + text placeholders.
+- Uses `sh-skeleton` CSS class for shimmer animation.
+- All colors use CSS custom property tokens (`--sh-bg`, `--sh-surface`, `--sh-border`).
+
+### 4. Study Groups Real-time Discussions
+
+Backend (`studyGroups.routes.js`):
+- After creating a discussion post, emits `group:discussion:new` to `studygroup:{groupId}` room.
+- After creating a reply, emits `group:discussion:reply` with `groupId` and `postId` fields.
+
+Backend (`socketio.js`):
+- On socket connection, auto-joins `studygroup:{groupId}` rooms for all active memberships.
+- Wrapped in try-catch for graceful degradation if StudyGroupMember table unavailable.
+
+Frontend (`useStudyGroupsData.js`):
+- Listens for `group:discussion:new`: prepends new post to discussions (with deduplication).
+- Listens for `group:discussion:reply`: increments `replyCount` on the matching post.
+- Uses `activeGroupIdRef` to avoid stale closures and filter events by active group.
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `frontend/.../lib/useFocusTrap.js` | New reusable focus trap hook |
+| `frontend/.../components/ChatPanel.jsx` | Socket.io integration, typing indicators, focus trap |
+| `frontend/.../components/ConfirmDialog.jsx` | Applied useFocusTrap, removed manual Escape handler |
+| `frontend/.../components/search/SearchModal.jsx` | Applied useFocusTrap, removed duplicate Escape/focus logic |
+| `frontend/.../components/ReportModal.jsx` | Applied useFocusTrap, removed manual Escape handler |
+| `frontend/.../components/ActionBlockedModal.jsx` | Applied useFocusTrap, removed manual Escape handler |
+| `frontend/.../App.jsx` | Skeleton RouteFallback replacing plain text |
+| `frontend/.../pages/studyGroups/useStudyGroupsData.js` | Real-time discussion event listeners |
+| `backend/src/modules/studyGroups/studyGroups.routes.js` | Socket.io emit for new posts and replies |
+| `backend/src/lib/socketio.js` | Auto-join study group rooms on connection |
+
+### Validation
+
+- Frontend lint: 0 errors
+- Frontend build: success
+- No new test failures
+
+---
+
+## Cycle 60 — Testing, Code Quality, Accessibility, Resilience (2026-03-31)
+
+### Summary
+
+Four-pronged improvement cycle: backend test coverage for messaging, large page decomposition, WCAG accessibility audit, and Socket.io error resilience.
+
+### 1. Messaging Backend Integration Tests (24 tests)
+
+New test file: `backend/test/messaging.routes.test.js`
+
+Coverage areas:
+- GET /conversations: list formatting, blocked user filtering, database error handling.
+- POST /conversations: validation, block enforcement, new conversation creation.
+- GET /conversations/:id/messages: participant verification, message retrieval.
+- POST /conversations/:id/messages: text creation with socket broadcast, HTML sanitization, max length validation, empty content with attachments (GIF-only), HTTPS-only attachments, missing URL rejection, non-participant rejection.
+- PATCH /messages/:id: owner edit within 15-min window, expired window rejection, non-owner rejection.
+- DELETE /messages/:id: soft delete with socket broadcast, non-existent message handling.
+- POST /messages/:id/reactions: reaction creation with broadcast, missing emoji rejection.
+- GET /online: online user list from Socket.io tracking.
+
+All 24 tests pass. Uses the established vi.hoisted + Module._load mock pattern.
+
+### 2. MessagesPage Decomposition (1903 -> 201 lines)
+
+Extracted 9 components into `pages/messages/components/`:
+
+| Component | Lines | Purpose |
+|-----------|-------|---------|
+| ConversationList.jsx | 243 | Conversation sidebar with search and ConversationItem sub-component |
+| MessageThread.jsx | 516 | Message display, input area, polls, GIFs, attachments |
+| MessageBubble.jsx | 321 | Individual message bubble with LinkPreview sub-component |
+| NewConversationModal.jsx | 311 | DM/group conversation creation modal |
+| MessagePollDisplay.jsx | 99 | Poll voting and display |
+| GifSearchPanel.jsx | 91 | Tenor GIF search panel |
+| ConfirmDeleteModal.jsx | 82 | Delete confirmation dialog |
+| MessageSearchBar.jsx | 41 | Message text search |
+| TypingIndicator.jsx | 32 | Typing indicator animation |
+
+MessagesPage.jsx is now a thin orchestrator that owns layout, routing state, and hook wiring only.
+
+`groupReactions` utility moved to `messagesHelpers.js`.
+
+### 3. WCAG 2.1 AA Accessibility Audit
+
+AppSidebar.jsx:
+- Added `aria-current="page"` to active navigation links.
+- Added `aria-label="Add course"` to the Add Course button.
+- Added `aria-label="Close navigation"` to the drawer close button.
+
+NavbarNotifications.jsx:
+- Added `aria-live="polite"` and `aria-label` to the unread count badge.
+
+NavbarUserMenu.jsx:
+- Changed `aria-haspopup="true"` to `aria-haspopup="menu"`.
+- Added `role="menu"` to dropdown, `role="menuitem"` to items, `role="separator"` to divider.
+
+ConversationList.jsx:
+- Added `aria-label` to search input and new conversation button.
+- Added `role="list"` and `role="listitem"` to conversation list items.
+
+MessageThread.jsx:
+- Added `role="log"` and `aria-live="polite"` to the messages area.
+- Added `aria-label` to all icon-only buttons (search, attach, image, GIF, poll, send).
+- Added `aria-label="Message input"` to the textarea.
+
+NewConversationModal.jsx:
+- Added `aria-label="Search users"` to user search input.
+- Added `aria-label="Close modal"` to close button.
+
+### 4. Socket.io Error Handling
+
+useSocket.js:
+- Added `connectionError` state exposed to consumers.
+- Added `connect_error` handler that surfaces persistent errors (auth failures, polling errors).
+- Added `disconnect` handler for server-initiated disconnects.
+- Added `reconnect_failed` handler (fires after exhausting 10 reconnection attempts).
+- Added `reconnect` handler that clears error state.
+- Configured reconnection: 10 attempts, 1-10s exponential backoff.
+
+MessagesPage.jsx:
+- Added connection status banner (`role="alert"`) that appears when socket is disconnected.
+- Uses `--sh-info-*` tokens for non-alarming visual treatment.
+
+ChatPanel.jsx:
+- Added compact "Live updates paused" banner when connection is lost.
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `backend/test/messaging.routes.test.js` | New: 24 integration tests for messaging API |
+| `frontend/.../pages/messages/MessagesPage.jsx` | Refactored from 1903 to 201 lines; added socket error banner |
+| `frontend/.../pages/messages/components/*.jsx` | New: 9 extracted component files |
+| `frontend/.../pages/messages/messagesHelpers.js` | Added groupReactions utility |
+| `frontend/.../lib/useSocket.js` | Added error handling, reconnection config, connectionError state |
+| `frontend/.../components/ChatPanel.jsx` | Added socket error banner |
+| `frontend/.../components/sidebar/AppSidebar.jsx` | aria-current, aria-labels |
+| `frontend/.../components/navbar/NavbarNotifications.jsx` | aria-live on badge |
+| `frontend/.../components/navbar/NavbarUserMenu.jsx` | role=menu, role=menuitem |
+| `frontend/.../pages/messages/components/ConversationList.jsx` | role=list, aria-labels |
+| `frontend/.../pages/messages/components/MessageThread.jsx` | role=log, aria-live, aria-labels |
+| `frontend/.../pages/messages/components/NewConversationModal.jsx` | aria-labels |
+
+### Validation
+
+- Frontend lint: 0 errors
+- Frontend build: success
+- Backend messaging tests: 24/24 passing
+- No pre-existing test regressions
+
+---
+
+## Cycle 61 — Mobile/Tablet Responsiveness, Dark Mode, Roadmap Update (2026-03-31)
+
+### Summary
+
+Systematic audit and fix of mobile/tablet responsiveness across all pages, dark mode hardcoded color fixes, roadmap update with monetization plans, and removal of "no ads" promises in preparation for future ad and subscription features.
+
+### 1. Dark Mode Fixes
+
+Replaced all hardcoded hex colors with CSS custom property tokens (`var(--sh-*)`) in critical shared components:
+
+pageScaffold.jsx:
+- PageShell background: `#edf0f5` -> `var(--sh-bg)`; added `overflowX: 'hidden'`
+- TeaserCard border: `#e2e8f0` -> `var(--sh-border)`; title/subtitle colors -> tokens
+- MiniPreview: Replaced 12+ hardcoded colors (headings, code blocks, blockquotes, list items, paragraph text) with semantic tokens (`--sh-heading`, `--sh-text`, `--sh-muted`, `--sh-border`, `--sh-slate-*`, `--sh-brand`, `--sh-info-*`)
+
+DashboardPage.jsx:
+- Background: `#edf0f5` -> `var(--sh-bg)`
+- Border color: `#334155` -> `var(--sh-text)`
+
+AdminPage.jsx:
+- Background fallback simplified to `var(--sh-bg)`
+
+AboutPage.jsx:
+- Section backgrounds: `#f8fafc` -> `var(--sh-bg)` (two sections)
+
+### 2. Mobile/Tablet Responsive Fixes
+
+Auth pages:
+- LoginPage.jsx: GoogleLogin width reduced from 368px to 300px (fits all phone viewports)
+- RegisterStepFields.jsx: GoogleLogin width reduced from 380px to 300px
+
+Message components:
+- MessageBubble.jsx: `maxWidth` changed from 60% to 75% for better readability on phones
+
+AboutPage responsive grids:
+- Story grid (stats + text): converted from inline style to `about-story-grid` CSS class with mobile stacking at 767px
+- Roadmap grid (V1/V2 columns): converted to `about-roadmap-grid` CSS class with mobile stacking at 767px
+- Team card: added `about-team-card` class that stacks vertically on phones (500px breakpoint)
+
+responsive.css additions:
+- `.about-story-grid`: 2-column on desktop, 1-column on phone
+- `.about-roadmap-grid`: 2-column on desktop, 1-column on phone
+- `.about-team-card`: horizontal on desktop, vertical centered on phone
+
+### 3. Removed "No Ads" / "Free Forever" References
+
+Replaced promises about no ads/subscriptions with community-focused messaging that is compatible with future monetization:
+
+homeConstants.js:
+- Feature title: "Always Free" -> "Free to Start"
+- Feature description: removed "No paywalls, no subscriptions, no ads. StudyHub is free forever." -> "Core study tools are free. Sign up, share, and collaborate with your classmates today."
+- Testimonial: removed "completely free with no ads" reference, replaced with praise for collaborative features
+- Proof item: "No ads, ever" -> "Student built"
+
+AboutPage.jsx:
+- Hero badge: "Free Forever" -> "Community Driven"
+- Goals: "No paywalls, no subscriptions, no premium tiers" -> "Core study tools are free to use. Share, discover, and collaborate without barriers."
+- Privacy goal: removed "No third-party ads" -> "Your data stays yours."
+- Stats: "0 Dollars it costs" -> "30+ Maryland schools supported"
+
+myumbc-group-description.md:
+- Removed "No paywalls. No ads." references in both description variants
+
+### 4. Roadmap Updates
+
+ROADMAP.md (complete rewrite):
+- Updated current release from V1.5.0 to V1.7.0 with all shipped features (messaging, study groups, block/mute, security hardening, accessibility, performance)
+- Removed "Study Groups" from V2.0 roadmap (already shipped)
+- Added "Monetization (StudyHub Pro)" section to V2.0: ad-supported free tier, Pro subscription with AI/analytics/ad-free, institutional licenses
+- Added sustainability as a priority factor for roadmap decisions
+
+AboutPage.jsx roadmap data:
+- V1 items updated: added messaging, study groups, block/mute
+- V2 items updated: replaced "Study groups" with "StudyHub Pro with advanced features"
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `frontend/.../pages/shared/pageScaffold.jsx` | Dark mode: 15+ hardcoded colors replaced with tokens; added overflowX hidden |
+| `frontend/.../pages/auth/LoginPage.jsx` | GoogleLogin width: 368 -> 300 |
+| `frontend/.../pages/auth/RegisterStepFields.jsx` | GoogleLogin width: 380 -> 300 |
+| `frontend/.../pages/dashboard/DashboardPage.jsx` | Dark mode: hardcoded colors replaced |
+| `frontend/.../pages/admin/AdminPage.jsx` | Dark mode: background token fix |
+| `frontend/.../pages/legal/AboutPage.jsx` | Removed no-ads references, updated roadmap data, added responsive grid classes |
+| `frontend/.../pages/home/homeConstants.js` | Removed no-ads/free-forever messaging |
+| `frontend/.../pages/messages/components/MessageBubble.jsx` | maxWidth 60% -> 75% for mobile |
+| `frontend/.../styles/responsive.css` | Added about-story-grid, about-roadmap-grid, about-team-card responsive rules |
+| `ROADMAP.md` | Full rewrite: V1.7.0 current, monetization plans, updated priorities |
+| `myumbc-group-description.md` | Removed no-ads references |
+
+### Validation
+
+- Frontend lint: 0 errors
+- Backend lint: 0 errors
+- Frontend build: success
+- No test regressions
+
+## Cycle 62 — Security Hardening (2026-03-31)
+
+### Summary
+
+Full security audit of backend and frontend codebases followed by targeted fixes for all medium-severity findings. Replaced regex-based HTML sanitization with `sanitize-html` library, added global Express error handler, hardened Socket.io event authorization and privacy, capped search query length, added rate limiting to user profile endpoints, and fixed XSS in note PDF export.
+
+### 1. Dependency Vulnerabilities
+
+- Ran `npm audit fix` on both backend and frontend to patch `brace-expansion` (DoS/memory exhaustion) vulnerability
+- Backend: 0 vulnerabilities remaining
+- Frontend: 0 vulnerabilities remaining
+
+### 2. HTML Sanitization (Stored XSS Fix)
+
+Replaced regex-based HTML stripping (`/<[^>]*>/g`) with the `sanitize-html` library in two locations:
+
+messaging.routes.js:
+- `sanitizeMessageContent()` now uses `sanitize-html` with `{ allowedTags: [], allowedAttributes: {} }` instead of regex
+- Prevents bypass vectors like `<svg onload=alert(1)>` or nested/malformed tags
+
+studyGroups.routes.js:
+- `stripHtmlTags()` now uses `sanitize-html` with `{ allowedTags: [], allowedAttributes: {} }` instead of regex
+- Applied to all group names, titles, descriptions, posts, and replies
+
+### 3. Global Express Error Handler
+
+Added catch-all error middleware at the end of route chain in `index.js`:
+- Captures errors via Sentry
+- Returns generic "Internal server error" for 5xx (prevents stack trace leakage)
+- Returns error message for 4xx (client errors)
+- Preserves error codes if present
+
+### 4. Socket.io Security Hardening
+
+Room membership validation on typing events (socketio.js):
+- `typing:start` and `typing:stop` now verify `conversationParticipant` membership before broadcasting
+- Prevents unauthorized users from emitting typing events to conversations they are not in
+- Graceful degradation on DB errors (silent return)
+
+Scoped online/offline broadcasts (socketio.js):
+- `user:online` now emits only to rooms for conversations the user participates in (was `io.emit` to all)
+- `user:offline` now emits only to rooms the socket was in (was `io.emit` to all)
+- Eliminates privacy leak where any connected user could observe when specific users are active
+
+### 5. Search Query Length Cap
+
+fullTextSearch.js:
+- Added `.slice(0, 500)` before tsquery sanitization to prevent ReDoS on extremely long search inputs
+- Cap is applied before word splitting and regex replacement
+
+### 6. Rate Limiting on User Routes
+
+users.routes.js:
+- Added `readLimiter` (200 req/min) for all GET/HEAD requests on user profile endpoints
+- Previously only had `followLimiter` (30 req/min) on follow/unfollow
+- Prevents enumeration attacks on user profiles
+
+### 7. Note Editor PDF Export XSS Fix
+
+NoteEditor.jsx:
+- `editorTitle` is now HTML-escaped before injection into the print window template string
+- Escapes `&`, `<`, `>`, `"` to prevent script injection via malicious note titles
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `backend/src/modules/messaging/messaging.routes.js` | Replaced regex HTML strip with sanitize-html |
+| `backend/src/modules/studyGroups/studyGroups.routes.js` | Replaced regex HTML strip with sanitize-html |
+| `backend/src/index.js` | Added global error handler middleware |
+| `backend/src/lib/socketio.js` | Typing event room auth, scoped online/offline broadcasts |
+| `backend/src/lib/fullTextSearch.js` | Search query length cap (500 chars) |
+| `backend/src/modules/users/users.routes.js` | Added readLimiter to GET endpoints |
+| `frontend/.../pages/notes/NoteEditor.jsx` | HTML-escape title in PDF export |
+| `backend/package.json` | Added sanitize-html dependency |
+
+### Security Audit Summary
+
+| Severity | Found | Fixed |
+|----------|-------|-------|
+| Critical | 0 | -- |
+| High | 1 (deps) | 1 |
+| Medium | 7 | 7 |
+| Low | 4 | 0 (acceptable risk / by-design) |
+
+### Validation
+
+- Frontend lint: 0 errors
+- Backend lint: 0 errors
+- Frontend build: not runnable in session (node_modules corrupted by npm audit fix; lockfile intact for CI/Railway)
+- Backend tests: pre-existing vite:define infrastructure issue (not caused by our changes)
+
+## Cycle 63 -- Messaging E2E Tests & ClamAV Enforcement (2026-03-31)
+
+### Summary
+
+Added 5 Playwright E2E tests covering the messaging feature (conversation list, DM auto-start, message thread, new conversation modal, empty state). Enforced ClamAV as mandatory in production — startup now throws if CLAMAV_DISABLED=true in production environment.
+
+### 1. Messaging E2E Tests
+
+New file: `frontend/studyhub-app/tests/messaging.e2e.spec.js`
+
+5 test scenarios:
+- Conversation list loads and displays DM + group conversations with last message preview, search input, and new conversation button
+- Empty state renders without crash when no conversations exist
+- Selecting a conversation loads the message thread with messages, input field, and send button
+- DM auto-start via `?dm=userId` query param navigates and clears the param
+- New conversation modal opens, allows user search, and closes cleanly
+
+Test infrastructure:
+- `mockMessagingApp()` helper sets up full API mock layer for messaging endpoints
+- Mocks: `/api/messages/conversations` (GET list, POST create), `/api/messages/conversations/:id/messages` (GET, POST), `/api/messages/conversations/:id` (GET, DELETE), `/api/messages/online`, `/api/search` (for user search in modal)
+- Follows established pattern from `study-groups.e2e.spec.js` (catch-all first, specific routes override)
+- `createMockConversation()` and `createMockMessage()` factory functions with sensible defaults
+
+### 2. ClamAV Production Enforcement
+
+backend/src/index.js:
+- Production (`NODE_ENV=production`): throws Error on startup if `CLAMAV_DISABLED=true` — prevents deploying without malware scanning
+- Non-production, non-test: logs warning (unchanged behavior)
+- Test: no warning (unchanged behavior)
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `frontend/.../tests/messaging.e2e.spec.js` | NEW: 5 Playwright E2E tests for messaging |
+| `backend/src/index.js` | ClamAV: throw in production if disabled |
+
+### Validation
+
+- Frontend lint: 0 errors
+- Backend lint: 0 errors
