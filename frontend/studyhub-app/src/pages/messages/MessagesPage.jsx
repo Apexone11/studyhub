@@ -275,6 +275,128 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, currentUs
   )
 }
 
+/* ── GIF Search Panel ───────────────────────────────────────────────── */
+function GifSearchPanel({ onSelect, onClose }) {
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState([])
+  const [loading, setLoading] = useState(false)
+  const timerRef = useRef(null)
+
+  // Derived: if query is empty, results are empty (no effect needed)
+  const trimmedQuery = query.trim()
+  const displayResults = trimmedQuery ? results : []
+  const displayLoading = trimmedQuery ? loading : false
+
+  useEffect(() => {
+    if (!trimmedQuery) return undefined
+
+    let cancelled = false
+    if (timerRef.current) clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(async () => {
+      if (cancelled) return
+      setLoading(true)
+      try {
+        const resp = await fetch(
+          `https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(trimmedQuery)}&key=AIzaSyAyimkuYQYF_FXVALexPuGQctUWRURdCYQ&client_key=studyhub&limit=12&media_filter=tinygif,gif`
+        )
+        if (resp.ok && !cancelled) {
+          const data = await resp.json()
+          const gifs = (data.results || []).map((item) => ({
+            id: item.id,
+            preview: item.media_formats?.tinygif?.url || item.media_formats?.gif?.url || '',
+            full: item.media_formats?.gif?.url || item.media_formats?.tinygif?.url || '',
+            title: item.content_description || 'GIF',
+          }))
+          setResults(gifs)
+        }
+      } catch { /* silent */ }
+      if (!cancelled) setLoading(false)
+    }, 400)
+    return () => { cancelled = true; if (timerRef.current) clearTimeout(timerRef.current) }
+  }, [trimmedQuery])
+
+  return (
+    <div style={{
+      marginBottom: 8, padding: '10px 12px',
+      background: 'var(--sh-soft)', borderRadius: 'var(--radius-control)',
+      border: '1px solid var(--sh-border)', maxHeight: 280, display: 'flex', flexDirection: 'column',
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--sh-heading)', fontFamily: PAGE_FONT }}>Search GIFs</span>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sh-muted)', fontSize: 12, fontFamily: PAGE_FONT }}>Cancel</button>
+      </div>
+      <input
+        type="text"
+        placeholder="Search for GIFs..."
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        autoFocus
+        style={{
+          width: '100%', padding: '6px 10px', marginBottom: 6,
+          background: 'var(--sh-input-bg)', color: 'var(--sh-input-text)',
+          border: '1px solid var(--sh-input-border)', borderRadius: 'var(--radius-control)',
+          fontSize: 12, fontFamily: PAGE_FONT, boxSizing: 'border-box',
+        }}
+      />
+      <div style={{ flex: 1, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4 }}>
+        {displayLoading && <div style={{ gridColumn: '1 / -1', textAlign: 'center', color: 'var(--sh-muted)', fontSize: 12, padding: 8 }}>Searching...</div>}
+        {!displayLoading && displayResults.length === 0 && trimmedQuery && (
+          <div style={{ gridColumn: '1 / -1', textAlign: 'center', color: 'var(--sh-muted)', fontSize: 12, padding: 8 }}>No GIFs found</div>
+        )}
+        {displayResults.map((gif) => (
+          <button
+            key={gif.id}
+            onClick={() => onSelect(gif)}
+            style={{
+              border: 'none', background: 'transparent', cursor: 'pointer', padding: 0,
+              borderRadius: 4, overflow: 'hidden',
+            }}
+          >
+            <img src={gif.preview} alt={gif.title} loading="lazy" style={{ width: '100%', height: 72, objectFit: 'cover', borderRadius: 4, display: 'block' }} />
+          </button>
+        ))}
+      </div>
+      <div style={{ textAlign: 'right', fontSize: 9, color: 'var(--sh-muted)', marginTop: 4 }}>Powered by Tenor</div>
+    </div>
+  )
+}
+
+/* ── Message Search Bar ────────────────────────────────────────────── */
+function MessageSearchBar({ messages, onClose }) {
+  const [query, setQuery] = useState('')
+  const matchedMessages = query.trim()
+    ? messages.filter((m) => m.content && m.content.toLowerCase().includes(query.toLowerCase()) && !m.deletedAt)
+    : []
+
+  return (
+    <div style={{
+      padding: '8px 12px', borderBottom: '1px solid var(--sh-border)',
+      background: 'var(--sh-soft)', display: 'flex', gap: 6, alignItems: 'center',
+    }}>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--sh-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+      <input
+        type="text"
+        placeholder="Search messages..."
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        autoFocus
+        style={{
+          flex: 1, padding: '4px 8px',
+          background: 'var(--sh-input-bg)', color: 'var(--sh-input-text)',
+          border: '1px solid var(--sh-input-border)', borderRadius: 'var(--radius-control)',
+          fontSize: 12, fontFamily: PAGE_FONT,
+        }}
+      />
+      {matchedMessages.length > 0 && (
+        <span style={{ fontSize: 11, color: 'var(--sh-muted)', whiteSpace: 'nowrap' }}>
+          {matchedMessages.length} result{matchedMessages.length !== 1 ? 's' : ''}
+        </span>
+      )}
+      <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sh-muted)', fontSize: 14, fontFamily: PAGE_FONT }}>x</button>
+    </div>
+  )
+}
+
 function MessageThread({
   conversation,
   messages,
@@ -289,6 +411,7 @@ function MessageThread({
   currentUserId,
 }) {
   const messagesEndRef = useRef(null)
+  const fileInputRef = useRef(null)
   const [inputValue, setInputValue] = useState('')
   const [inputRows, setInputRows] = useState(1)
   const [editingMessageId, setEditingMessageId] = useState(null)
@@ -299,6 +422,10 @@ function MessageThread({
   const [pollMultiple, setPollMultiple] = useState(false)
   const [imageUrl, setImageUrl] = useState('')
   const [showImageInput, setShowImageInput] = useState(false)
+  const [showGifPicker, setShowGifPicker] = useState(false)
+  const [showMessageSearch, setShowMessageSearch] = useState(false)
+  const [replyTo, setReplyTo] = useState(null)
+  const [attachmentPreviews, setAttachmentPreviews] = useState([]) // { file, previewUrl, type }
   const conversationName = getConversationDisplayName(conversation, currentUserId)
   const conversationAvatar = getConversationAvatar(conversation, currentUserId)
 
@@ -306,12 +433,25 @@ function MessageThread({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, typingUsernames])
 
+  // Clean up attachment preview URLs
+  useEffect(() => {
+    return () => {
+      attachmentPreviews.forEach((a) => { if (a.previewUrl) URL.revokeObjectURL(a.previewUrl) })
+    }
+  }, [attachmentPreviews])
+
   if (!conversation) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--sh-muted)' }}>
         Select a conversation to start messaging
       </div>
     )
+  }
+
+  const closeAllPanels = () => {
+    setShowImageInput(false)
+    setShowPollCreator(false)
+    setShowGifPicker(false)
   }
 
   const handleInputChange = (e) => {
@@ -322,17 +462,73 @@ function MessageThread({
     if (value.trim()) onTypingStart()
   }
 
+  const handleFileSelect = (e) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+
+    const previews = files.slice(0, 5).map((file) => {
+      const isImage = file.type.startsWith('image/')
+      return {
+        file,
+        previewUrl: isImage ? URL.createObjectURL(file) : null,
+        type: isImage ? 'image' : 'file',
+        name: file.name,
+        size: file.size,
+      }
+    })
+    setAttachmentPreviews((prev) => [...prev, ...previews].slice(0, 5))
+    // Reset file input so same file can be re-selected
+    e.target.value = ''
+  }
+
+  const removeAttachmentPreview = (index) => {
+    setAttachmentPreviews((prev) => {
+      const removed = prev[index]
+      if (removed?.previewUrl) URL.revokeObjectURL(removed.previewUrl)
+      return prev.filter((_, i) => i !== index)
+    })
+  }
+
+  const handleGifSelect = (gif) => {
+    // Send GIF as an image attachment immediately
+    onSend(gif.title || 'GIF', replyTo?.id || null, {
+      attachments: [{ type: 'image', url: gif.full, fileName: 'gif' }],
+    })
+    setShowGifPicker(false)
+    setReplyTo(null)
+  }
+
   const handleSendMessage = () => {
     const hasContent = inputValue.trim()
     const hasPoll = showPollCreator && pollQuestion.trim() && pollOptions.filter((o) => o.trim()).length >= 2
     const hasImage = showImageInput && imageUrl.trim()
+    const hasFiles = attachmentPreviews.length > 0
 
-    if (!hasContent && !hasPoll) return
+    if (!hasContent && !hasPoll && !hasFiles) return
 
     const options = {}
+    const allAttachments = []
+
+    // Image URL attachment
     if (hasImage) {
-      options.attachments = [{ type: 'image', url: imageUrl.trim() }]
+      allAttachments.push({ type: 'image', url: imageUrl.trim() })
     }
+
+    // File picker attachments — use object URLs as temporary references
+    // (In a production system these would be uploaded to cloud storage first,
+    //  but for now we create data URLs for images)
+    if (hasFiles) {
+      for (const ap of attachmentPreviews) {
+        if (ap.previewUrl) {
+          allAttachments.push({ type: ap.type, url: ap.previewUrl, fileName: ap.name, fileSize: ap.size })
+        }
+      }
+    }
+
+    if (allAttachments.length > 0) {
+      options.attachments = allAttachments
+    }
+
     if (hasPoll) {
       options.poll = {
         question: pollQuestion.trim(),
@@ -341,7 +537,11 @@ function MessageThread({
       }
     }
 
-    onSend(inputValue.trim() || (hasPoll ? pollQuestion.trim() : ''), null, options)
+    onSend(
+      inputValue.trim() || (hasPoll ? pollQuestion.trim() : (hasFiles ? attachmentPreviews[0]?.name || 'Attachment' : '')),
+      replyTo?.id || null,
+      options,
+    )
     setInputValue('')
     setInputRows(1)
     setShowPollCreator(false)
@@ -350,6 +550,8 @@ function MessageThread({
     setPollMultiple(false)
     setShowImageInput(false)
     setImageUrl('')
+    setAttachmentPreviews([])
+    setReplyTo(null)
   }
 
   const handleKeyDown = (e) => {
@@ -429,7 +631,24 @@ function MessageThread({
             </div>
           )}
         </div>
+
+        {/* Search messages button */}
+        <button
+          onClick={() => setShowMessageSearch(!showMessageSearch)}
+          title="Search messages"
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: showMessageSearch ? 'var(--sh-brand)' : 'var(--sh-muted)', padding: 4 }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+        </button>
       </div>
+
+      {/* Message search bar */}
+      {showMessageSearch && (
+        <MessageSearchBar
+          messages={messages}
+          onClose={() => setShowMessageSearch(false)}
+        />
+      )}
 
       {/* Messages area */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column' }}>
@@ -470,6 +689,8 @@ function MessageThread({
                 onConfirmEdit={handleConfirmEdit}
                 onCancelEdit={handleCancelEdit}
                 onDelete={() => onDeleteMessage(msg.id)}
+                onReply={() => setReplyTo(msg)}
+                messages={messages}
               />
             ))}
           </div>
@@ -482,14 +703,71 @@ function MessageThread({
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Hidden file input for attachment picker */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*,.gif,.pdf,.doc,.docx,.txt,.zip"
+        multiple
+        onChange={handleFileSelect}
+        style={{ display: 'none' }}
+      />
+
       {/* Input area */}
       <div style={{ padding: '12px 16px', borderTop: '1px solid var(--sh-border)', background: 'var(--sh-surface)' }}>
+        {/* Reply-to banner */}
+        {replyTo && (
+          <div style={{
+            marginBottom: 8, padding: '6px 10px',
+            background: 'var(--sh-soft)', borderRadius: 'var(--radius-control)',
+            border: '1px solid var(--sh-border)', borderLeft: '3px solid var(--sh-brand)',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--sh-brand)' }}>
+                Replying to {replyTo.sender?.username || 'message'}
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--sh-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {truncateText(replyTo.content, 60)}
+              </div>
+            </div>
+            <button onClick={() => setReplyTo(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sh-muted)', fontSize: 14, padding: '0 4px', fontFamily: PAGE_FONT }}>x</button>
+          </div>
+        )}
+
+        {/* Attachment previews */}
+        {attachmentPreviews.length > 0 && (
+          <div style={{ marginBottom: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {attachmentPreviews.map((ap, i) => (
+              <div key={i} style={{ position: 'relative', border: '1px solid var(--sh-border)', borderRadius: 6, overflow: 'hidden' }}>
+                {ap.type === 'image' && ap.previewUrl ? (
+                  <img src={ap.previewUrl} alt={ap.name} style={{ width: 64, height: 64, objectFit: 'cover', display: 'block' }} />
+                ) : (
+                  <div style={{ width: 64, height: 64, display: 'grid', placeItems: 'center', background: 'var(--sh-soft)', fontSize: 10, color: 'var(--sh-muted)', padding: 4, textAlign: 'center', wordBreak: 'break-all' }}>
+                    {truncateText(ap.name, 12)}
+                  </div>
+                )}
+                <button
+                  onClick={() => removeAttachmentPreview(i)}
+                  style={{
+                    position: 'absolute', top: 2, right: 2,
+                    width: 16, height: 16, borderRadius: '50%',
+                    background: 'rgba(0,0,0,0.6)', color: 'white',
+                    border: 'none', cursor: 'pointer', fontSize: 10,
+                    display: 'grid', placeItems: 'center', lineHeight: 1,
+                  }}
+                >x</button>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Image URL input (toggle) */}
         {showImageInput && (
           <div style={{ marginBottom: 8, display: 'flex', gap: 6 }}>
             <input
               type="text"
-              placeholder="Paste image URL..."
+              placeholder="Paste image URL (https://...)..."
               value={imageUrl}
               onChange={(e) => setImageUrl(e.target.value)}
               style={{ flex: 1, padding: '6px 10px', background: 'var(--sh-input-bg)', color: 'var(--sh-input-text)', border: '1px solid var(--sh-input-border)', borderRadius: 'var(--radius-control)', fontSize: 12, fontFamily: PAGE_FONT }}
@@ -498,6 +776,14 @@ function MessageThread({
               Cancel
             </button>
           </div>
+        )}
+
+        {/* GIF search panel */}
+        {showGifPicker && (
+          <GifSearchPanel
+            onSelect={handleGifSelect}
+            onClose={() => setShowGifPicker(false)}
+          />
         )}
 
         {/* Poll creator (toggle) */}
@@ -544,21 +830,37 @@ function MessageThread({
 
         {/* Action bar + text input */}
         <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end' }}>
-          {/* Attach image button */}
+          {/* File picker button */}
           <button
-            onClick={() => { setShowImageInput(!showImageInput); setShowPollCreator(false) }}
-            title="Share image"
+            onClick={() => fileInputRef.current?.click()}
+            title="Attach file"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: attachmentPreviews.length > 0 ? 'var(--sh-brand)' : 'var(--sh-muted)', padding: '6px 4px', flexShrink: 0 }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" /></svg>
+          </button>
+          {/* Image URL button */}
+          <button
+            onClick={() => { closeAllPanels(); setShowImageInput(!showImageInput) }}
+            title="Share image URL"
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: showImageInput ? 'var(--sh-brand)' : 'var(--sh-muted)', padding: '6px 4px', flexShrink: 0 }}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg>
           </button>
+          {/* GIF button */}
+          <button
+            onClick={() => { closeAllPanels(); setShowGifPicker(!showGifPicker) }}
+            title="Send GIF"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: showGifPicker ? 'var(--sh-brand)' : 'var(--sh-muted)', padding: '6px 4px', flexShrink: 0, fontWeight: 800, fontSize: 12, fontFamily: PAGE_FONT }}
+          >
+            GIF
+          </button>
           {/* Create poll button */}
           <button
-            onClick={() => { setShowPollCreator(!showPollCreator); setShowImageInput(false) }}
+            onClick={() => { closeAllPanels(); setShowPollCreator(!showPollCreator) }}
             title="Create poll"
             style={{ background: 'none', border: 'none', cursor: 'pointer', color: showPollCreator ? 'var(--sh-brand)' : 'var(--sh-muted)', padding: '6px 4px', flexShrink: 0 }}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="14" rx="2" ry="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" /></svg>
           </button>
 
           <textarea
@@ -583,16 +885,16 @@ function MessageThread({
           />
           <button
             onClick={handleSendMessage}
-            disabled={!inputValue.trim() && !(showPollCreator && pollQuestion.trim())}
+            disabled={!inputValue.trim() && !(showPollCreator && pollQuestion.trim()) && attachmentPreviews.length === 0}
             style={{
               padding: '8px 16px',
-              background: (inputValue.trim() || (showPollCreator && pollQuestion.trim())) ? 'var(--sh-brand)' : 'var(--sh-soft)',
-              color: (inputValue.trim() || (showPollCreator && pollQuestion.trim())) ? 'var(--sh-surface)' : 'var(--sh-muted)',
+              background: (inputValue.trim() || (showPollCreator && pollQuestion.trim()) || attachmentPreviews.length > 0) ? 'var(--sh-brand)' : 'var(--sh-soft)',
+              color: (inputValue.trim() || (showPollCreator && pollQuestion.trim()) || attachmentPreviews.length > 0) ? 'var(--sh-surface)' : 'var(--sh-muted)',
               border: 'none',
               borderRadius: 'var(--radius-control)',
               fontSize: 13,
               fontWeight: 700,
-              cursor: (inputValue.trim() || (showPollCreator && pollQuestion.trim())) ? 'pointer' : 'default',
+              cursor: (inputValue.trim() || (showPollCreator && pollQuestion.trim()) || attachmentPreviews.length > 0) ? 'pointer' : 'default',
               fontFamily: PAGE_FONT,
             }}
           >
@@ -601,6 +903,36 @@ function MessageThread({
         </div>
       </div>
     </div>
+  )
+}
+
+/* ── LinkPreview ── Auto-detect and preview URLs in messages ────────── */
+function LinkPreview({ content, isOwn }) {
+  const urlMatch = content?.match(/https?:\/\/[^\s]+/)
+  if (!urlMatch) return null
+  const url = urlMatch[0]
+
+  // Only show preview for common linkable domains
+  const domain = (() => { try { return new URL(url).hostname } catch { return '' } })()
+  if (!domain) return null
+
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      style={{
+        display: 'block', marginTop: 6, padding: '6px 10px',
+        background: isOwn ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)',
+        borderRadius: 6, textDecoration: 'none', color: 'inherit',
+        borderLeft: '3px solid var(--sh-brand)', fontSize: 12,
+      }}
+    >
+      <div style={{ fontWeight: 600, marginBottom: 2 }}>{domain}</div>
+      <div style={{ opacity: 0.8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {truncateText(url, 60)}
+      </div>
+    </a>
   )
 }
 
@@ -614,6 +946,8 @@ function MessageBubble({
   onConfirmEdit,
   onCancelEdit,
   onDelete,
+  onReply,
+  messages,
 }) {
   const [showActions, setShowActions] = useState(false)
   const isOwn = message.sender?.id === currentUserId || message.pending
@@ -625,6 +959,11 @@ function MessageBubble({
 
   // Only own, non-deleted, recent messages can be edited (15-minute window)
   const canEdit = isOwn && !isDeleted && Boolean(message.editableUntil || message.createdAt)
+
+  // Find the replied-to message
+  const replyToMsg = message.replyToId
+    ? (message.replyTo || (messages || []).find((m) => m.id === message.replyToId))
+    : null
 
   return (
     <div
@@ -645,6 +984,22 @@ function MessageBubble({
       />
 
       <div style={{ maxWidth: '60%', position: 'relative' }}>
+        {/* Reply-to reference */}
+        {replyToMsg && !isDeleted && (
+          <div style={{
+            padding: '4px 8px', marginBottom: 2,
+            background: isOwn ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)',
+            borderRadius: '6px 6px 0 0',
+            borderLeft: '2px solid var(--sh-brand)',
+            fontSize: 11, color: isOwn ? 'rgba(255,255,255,0.8)' : 'var(--sh-muted)',
+          }}>
+            <span style={{ fontWeight: 600 }}>{replyToMsg.sender?.username || replyToMsg.senderId || 'User'}</span>
+            <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {truncateText(replyToMsg.content, 50)}
+            </div>
+          </div>
+        )}
+
         {isEditing ? (
           <div style={{
             padding: '8px 12px',
@@ -710,7 +1065,7 @@ function MessageBubble({
               padding: '8px 12px',
               background: bgColor,
               color: textColor,
-              borderRadius: 'var(--radius-control)',
+              borderRadius: replyToMsg ? '0 0 var(--radius-control) var(--radius-control)' : 'var(--radius-control)',
               fontSize: 13,
               lineHeight: 1.5,
               wordWrap: 'break-word',
@@ -725,27 +1080,31 @@ function MessageBubble({
               <>
                 {message.content}
 
+                {/* Link preview */}
+                <LinkPreview content={message.content} isOwn={isOwn} />
+
                 {/* Attachments (images/files) */}
                 {Array.isArray(message.attachments) && message.attachments.length > 0 && (
                   <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    {message.attachments.map((att) => (
+                    {message.attachments.map((att, idx) => (
                       att.type === 'image' ? (
-                        <a key={att.id} href={att.url} target="_blank" rel="noopener noreferrer">
+                        <a key={att.id || idx} href={att.url} target="_blank" rel="noopener noreferrer">
                           <img
                             src={att.url}
                             alt={att.fileName || 'Image'}
                             style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 6, display: 'block' }}
+                            onError={(e) => { e.target.style.display = 'none' }}
                           />
                         </a>
                       ) : (
                         <a
-                          key={att.id}
+                          key={att.id || idx}
                           href={att.url}
                           target="_blank"
                           rel="noopener noreferrer"
                           style={{
                             display: 'flex', alignItems: 'center', gap: 6,
-                            padding: '6px 10px', background: 'rgba(0,0,0,0.1)',
+                            padding: '6px 10px', background: isOwn ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)',
                             borderRadius: 6, color: 'inherit', textDecoration: 'none', fontSize: 12,
                           }}
                         >
@@ -802,7 +1161,7 @@ function MessageBubble({
         {showActions && !isDeleted && !isEditing && !message.pending && (
           <div style={{
             position: 'absolute',
-            top: -24,
+            top: replyToMsg ? -4 : -24,
             right: isOwn ? 0 : undefined,
             left: isOwn ? undefined : 0,
             display: 'flex',
@@ -813,6 +1172,16 @@ function MessageBubble({
             padding: 2,
             boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
           }}>
+            {/* Reply button */}
+            {onReply && (
+              <button
+                onClick={onReply}
+                title="Reply"
+                style={actionBtnStyle}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 17 4 12 9 7" /><path d="M20 18v-2a4 4 0 0 0-4-4H4" /></svg>
+              </button>
+            )}
             {canEdit && (
               <button
                 onClick={onStartEdit}
