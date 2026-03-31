@@ -1,12 +1,30 @@
 /* ═══════════════════════════════════════════════════════════════════════════
  * pages/messages/useMessagingData.js — Custom hook for messaging state & actions
+ *
+ * Wired to:
+ *   GET  /api/messages/conversations
+ *   GET  /api/messages/conversations/:id
+ *   GET  /api/messages/conversations/:id/messages
+ *   POST /api/messages/conversations (create)
+ *   POST /api/messages/conversations/:id/messages (send)
+ *   PATCH /api/messages/:messageId (edit)
+ *   DELETE /api/messages/:messageId (soft delete)
+ *   DELETE /api/messages/conversations/:id (archive/leave)
+ *   PATCH /api/messages/conversations/:id (mute/archive/rename)
+ *   POST /api/messages/:messageId/reactions (add reaction)
+ *   DELETE /api/messages/:messageId/reactions/:emoji (remove reaction)
+ *
+ * Socket.io events (backend names):
+ *   emit:   conversation:join, typing:start, typing:stop, message:read
+ *   listen: message:new, message:edit, message:delete,
+ *           typing:start, typing:stop, reaction:add, reaction:remove
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { API } from '../../config'
 import { authHeaders } from '../shared/pageUtils'
 import { showToast } from '../../lib/toast'
 
-export function useMessagingData(socket) {
+export function useMessagingData(socket, currentUserId) {
   /* ── State ───────────────────────────────────────────────────────────── */
   const [conversations, setConversations] = useState([])
   const [activeConversation, setActiveConversation] = useState(null)
@@ -15,6 +33,7 @@ export function useMessagingData(socket) {
   const [loadingMessages, setLoadingMessages] = useState(false)
   const [hasMoreMessages, setHasMoreMessages] = useState(true)
   const [typingUsers, setTypingUsers] = useState(new Map())
+  const typingTimerRef = useRef(null)
 
   /* ── Load conversations ──────────────────────────────────────────────── */
   const loadConversations = useCallback(async () => {
@@ -91,11 +110,17 @@ export function useMessagingData(socket) {
       setHasMoreMessages(true)
       setTypingUsers(new Map())
 
+      // Join the conversation room via socket
       if (socket) {
-        socket.emit('message:room:join', id)
+        socket.emit('conversation:join', { conversationId: id })
       }
 
       await loadMessages(id)
+
+      // Mark as read
+      if (socket) {
+        socket.emit('message:read', { conversationId: id })
+      }
     } catch {
       showToast('Failed to select conversation', 'error')
     }
@@ -108,31 +133,34 @@ export function useMessagingData(socket) {
     await loadMessages(activeConversation.id, oldestMessageId)
   }, [activeConversation, hasMoreMessages, loadingMessages, messages, loadMessages])
 
-  /* ── Send message ────────────────────────────────────────────────────── */
+  /* ── Send message — POST /api/messages/conversations/:id/messages ────── */
   const sendMessage = useCallback(async (content, replyToId = null) => {
     if (!activeConversation || !content.trim()) return
 
     const optimisticMessage = {
       id: `temp_${Date.now()}`,
       conversationId: activeConversation.id,
-      content,
+      content: content.trim(),
       replyToId,
+      sender: { id: currentUserId, username: null },
       createdAt: new Date().toISOString(),
       pending: true,
     }
     setMessages((prev) => [...prev, optimisticMessage])
 
     try {
-      const response = await fetch(`${API}/api/messages`, {
-        method: 'POST',
-        headers: authHeaders(),
-        credentials: 'include',
-        body: JSON.stringify({
-          conversationId: activeConversation.id,
-          content,
-          replyToId: replyToId || null,
-        }),
-      })
+      const response = await fetch(
+        `${API}/api/messages/conversations/${activeConversation.id}/messages`,
+        {
+          method: 'POST',
+          headers: authHeaders(),
+          credentials: 'include',
+          body: JSON.stringify({
+            content: content.trim(),
+            replyToId: replyToId || null,
+          }),
+        },
+      )
       if (!response.ok) {
         showToast('Failed to send message', 'error')
         setMessages((prev) => prev.filter((m) => m.id !== optimisticMessage.id))
@@ -141,12 +169,24 @@ export function useMessagingData(socket) {
       const sentMessage = await response.json()
       setMessages((prev) => prev.map((m) => (m.id === optimisticMessage.id ? sentMessage : m)))
 
-      setConversations((prev) => prev.map((conv) => (conv.id === activeConversation.id ? { ...conv, lastMessage: sentMessage } : conv)))
+      // Update conversation list with latest message
+      setConversations((prev) =>
+        prev.map((conv) =>
+          conv.id === activeConversation.id
+            ? { ...conv, lastMessage: sentMessage, updatedAt: sentMessage.createdAt }
+            : conv,
+        ),
+      )
+
+      // Stop typing indicator
+      if (socket) {
+        socket.emit('typing:stop', { conversationId: activeConversation.id })
+      }
     } catch {
       showToast('Failed to send message', 'error')
       setMessages((prev) => prev.filter((m) => m.id !== optimisticMessage.id))
     }
-  }, [activeConversation])
+  }, [activeConversation, currentUserId, socket])
 
   /* ── Start conversation ──────────────────────────────────────────────── */
   const startConversation = useCallback(async (participantIds, type, name = null) => {
@@ -162,11 +202,12 @@ export function useMessagingData(socket) {
         }),
       })
       if (!response.ok) {
-        showToast('Failed to start conversation', 'error')
+        const errData = await response.json().catch(() => ({}))
+        showToast(errData.error || 'Failed to start conversation', 'error')
         return null
       }
       const conversation = await response.json()
-      setConversations((prev) => [conversation, ...prev])
+      setConversations((prev) => [conversation, ...prev.filter((c) => c.id !== conversation.id)])
       return conversation
     } catch {
       showToast('Failed to start conversation', 'error')
@@ -174,7 +215,7 @@ export function useMessagingData(socket) {
     }
   }, [])
 
-  /* ── Edit message ────────────────────────────────────────────────────– */
+  /* ── Edit message ────────────────────────────────────────────────────── */
   const editMessage = useCallback(async (messageId, content) => {
     if (!content.trim()) return
 
@@ -182,14 +223,15 @@ export function useMessagingData(socket) {
     setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, content, editing: true } : m)))
 
     try {
-      const response = await fetch(`${API}/api/messages/${messageId}`, {
+      const response = await fetch(`${API}/api/messages/messages/${messageId}`, {
         method: 'PATCH',
         headers: authHeaders(),
         credentials: 'include',
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content: content.trim() }),
       })
       if (!response.ok) {
-        showToast('Failed to edit message', 'error')
+        const errData = await response.json().catch(() => ({}))
+        showToast(errData.error || 'Failed to edit message', 'error')
         setMessages((prev) => prev.map((m) => (m.id === messageId ? originalMessage : m)))
         return
       }
@@ -201,37 +243,53 @@ export function useMessagingData(socket) {
     }
   }, [messages])
 
-  /* ── Delete message ──────────────────────────────────────────────────– */
+  /* ── Delete message ──────────────────────────────────────────────────── */
   const deleteMessage = useCallback(async (messageId) => {
-    setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, deleted: true } : m)))
+    setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, deletedAt: new Date().toISOString() } : m)))
 
     try {
-      const response = await fetch(`${API}/api/messages/${messageId}`, {
+      const response = await fetch(`${API}/api/messages/messages/${messageId}`, {
         method: 'DELETE',
         headers: authHeaders(),
         credentials: 'include',
       })
       if (!response.ok) {
         showToast('Failed to delete message', 'error')
-        setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, deleted: false } : m)))
+        setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, deletedAt: null } : m)))
       }
     } catch {
       showToast('Failed to delete message', 'error')
-      setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, deleted: false } : m)))
+      setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, deletedAt: null } : m)))
     }
   }, [])
 
-  /* ── Add reaction to message ─────────────────────────────────────────– */
-  const addReaction = useCallback(async (messageId, emoji) => {
-    const message = messages.find((m) => m.id === messageId)
-    if (!message) return
-
-    const reactions = message.reactions || {}
-    const currentCount = (reactions[emoji] || 0)
-    setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, reactions: { ...reactions, [emoji]: currentCount + 1 } } : m)))
-
+  /* ── Delete / leave conversation ────────────────────────────────────── */
+  const deleteConversation = useCallback(async (id) => {
     try {
-      const response = await fetch(`${API}/api/messages/${messageId}/reactions`, {
+      const response = await fetch(`${API}/api/messages/conversations/${id}`, {
+        method: 'DELETE',
+        headers: authHeaders(),
+        credentials: 'include',
+      })
+      if (!response.ok) {
+        showToast('Failed to delete conversation', 'error')
+        return
+      }
+      setConversations((prev) => prev.filter((conv) => conv.id !== id))
+      if (activeConversation?.id === id) {
+        setActiveConversation(null)
+        setMessages([])
+      }
+      showToast('Conversation deleted', 'success')
+    } catch {
+      showToast('Failed to delete conversation', 'error')
+    }
+  }, [activeConversation])
+
+  /* ── Add reaction to message ─────────────────────────────────────────── */
+  const addReaction = useCallback(async (messageId, emoji) => {
+    try {
+      const response = await fetch(`${API}/api/messages/messages/${messageId}/reactions`, {
         method: 'POST',
         headers: authHeaders(),
         credentials: 'include',
@@ -239,53 +297,36 @@ export function useMessagingData(socket) {
       })
       if (!response.ok) {
         showToast('Failed to add reaction', 'error')
-        setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, reactions } : m)))
       }
     } catch {
       showToast('Failed to add reaction', 'error')
-      setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, reactions } : m)))
     }
-  }, [messages])
+  }, [])
 
-  /* ── Remove reaction from message ────────────────────────────────────– */
+  /* ── Remove reaction from message ────────────────────────────────────── */
   const removeReaction = useCallback(async (messageId, emoji) => {
-    const message = messages.find((m) => m.id === messageId)
-    if (!message) return
-
-    const reactions = message.reactions || {}
-    const currentCount = reactions[emoji] || 0
-    const nextReactions = { ...reactions }
-    if (currentCount <= 1) {
-      delete nextReactions[emoji]
-    } else {
-      nextReactions[emoji] = currentCount - 1
-    }
-    setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, reactions: nextReactions } : m)))
-
     try {
-      const response = await fetch(`${API}/api/messages/${messageId}/reactions/${emoji}`, {
+      const response = await fetch(`${API}/api/messages/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`, {
         method: 'DELETE',
         headers: authHeaders(),
         credentials: 'include',
       })
       if (!response.ok) {
         showToast('Failed to remove reaction', 'error')
-        setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, reactions } : m)))
       }
     } catch {
       showToast('Failed to remove reaction', 'error')
-      setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, reactions } : m)))
     }
-  }, [messages])
+  }, [])
 
-  /* ── Mark conversation as read ───────────────────────────────────────– */
+  /* ── Mark conversation as read ───────────────────────────────────────── */
   const markAsRead = useCallback((conversationId) => {
     if (socket) {
       socket.emit('message:read', { conversationId })
     }
   }, [socket])
 
-  /* ── Archive conversation ────────────────────────────────────────────– */
+  /* ── Archive conversation ────────────────────────────────────────────── */
   const archiveConversation = useCallback(async (id) => {
     try {
       const response = await fetch(`${API}/api/messages/conversations/${id}`, {
@@ -309,7 +350,7 @@ export function useMessagingData(socket) {
     }
   }, [activeConversation])
 
-  /* ── Toggle mute on conversation ────────────────────────────────────– */
+  /* ── Toggle mute on conversation ────────────────────────────────────── */
   const muteConversation = useCallback(async (id, muted) => {
     try {
       const response = await fetch(`${API}/api/messages/conversations/${id}`, {
@@ -331,90 +372,141 @@ export function useMessagingData(socket) {
     }
   }, [activeConversation])
 
-  /* ── Socket.io event listeners ───────────────────────────────────────– */
-  useEffect(() => {
+  /* ── Typing indicator helpers ────────────────────────────────────────── */
+  const emitTypingStart = useCallback(() => {
     if (!socket || !activeConversation) return
+    socket.emit('typing:start', { conversationId: activeConversation.id })
+
+    // Auto-stop after 3 seconds of no input
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current)
+    typingTimerRef.current = setTimeout(() => {
+      if (socket && activeConversation) {
+        socket.emit('typing:stop', { conversationId: activeConversation.id })
+      }
+    }, 3000)
+  }, [socket, activeConversation])
+
+  const emitTypingStop = useCallback(() => {
+    if (!socket || !activeConversation) return
+    socket.emit('typing:stop', { conversationId: activeConversation.id })
+    if (typingTimerRef.current) {
+      clearTimeout(typingTimerRef.current)
+      typingTimerRef.current = null
+    }
+  }, [socket, activeConversation])
+
+  /* ── Socket.io event listeners (matching backend event names) ────────── */
+  useEffect(() => {
+    if (!socket) return
 
     const handleNewMessage = (message) => {
-      if (message.conversationId === activeConversation.id) {
-        setMessages((prev) => [...prev, message])
+      // Add message to current thread if viewing that conversation
+      if (activeConversation && message.conversationId === activeConversation.id) {
+        setMessages((prev) => {
+          // Avoid duplicates (optimistic message already added)
+          if (prev.some((m) => m.id === message.id)) return prev
+          // Remove optimistic if this is the real version
+          const cleaned = prev.filter((m) => !m.pending || m.content !== message.content)
+          return [...cleaned, message]
+        })
+
+        // Auto-mark as read
+        socket.emit('message:read', { conversationId: message.conversationId })
       }
-      setConversations((prev) => prev.map((conv) => (conv.id === message.conversationId ? { ...conv, lastMessage: message } : conv)))
+      // Update conversation list
+      setConversations((prev) =>
+        prev.map((conv) =>
+          conv.id === message.conversationId
+            ? { ...conv, lastMessage: message, updatedAt: message.createdAt }
+            : conv,
+        ),
+      )
     }
 
-    const handleEditedMessage = (message) => {
+    const handleEditMessage = (message) => {
       setMessages((prev) => prev.map((m) => (m.id === message.id ? message : m)))
     }
 
-    const handleDeletedMessage = (messageId) => {
-      setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, deleted: true } : m)))
+    const handleDeleteMessage = (data) => {
+      const messageId = typeof data === 'object' ? data.messageId : data
+      setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, deletedAt: new Date().toISOString() } : m)))
     }
 
-    const handleTypingUpdate = (data) => {
-      const { conversationId, username, isTyping } = data
-      if (conversationId !== activeConversation.id) return
-
+    const handleTypingStart = (data) => {
+      if (!data.conversationId || !data.username) return
+      if (data.userId === currentUserId) return // Ignore own typing
       setTypingUsers((prev) => {
         const next = new Map(prev)
-        const typingSet = next.get(conversationId) || new Set()
-        if (isTyping) {
-          typingSet.add(username)
-        } else {
-          typingSet.delete(username)
+        const typingSet = next.get(data.conversationId) || new Set()
+        typingSet.add(data.username)
+        next.set(data.conversationId, typingSet)
+        return next
+      })
+    }
+
+    const handleTypingStop = (data) => {
+      if (!data.conversationId) return
+      setTypingUsers((prev) => {
+        const next = new Map(prev)
+        const typingSet = next.get(data.conversationId) || new Set()
+        if (data.username) {
+          typingSet.delete(data.username)
+        } else if (data.userId) {
+          // Fallback: remove by userId if username not provided
+          typingSet.delete(String(data.userId))
         }
         if (typingSet.size === 0) {
-          next.delete(conversationId)
+          next.delete(data.conversationId)
         } else {
-          next.set(conversationId, typingSet)
+          next.set(data.conversationId, typingSet)
         }
         return next
       })
     }
 
-    const handleReactionAdded = (data) => {
-      const { messageId, emoji } = data
+    const handleReactionAdd = (data) => {
+      if (!data.messageId || !data.reaction) return
       setMessages((prev) => prev.map((m) => {
-        if (m.id === messageId) {
-          const reactions = m.reactions || {}
-          return { ...m, reactions: { ...reactions, [emoji]: (reactions[emoji] || 0) + 1 } }
+        if (m.id === data.messageId) {
+          const reactions = Array.isArray(m.reactions) ? [...m.reactions, data.reaction] : [data.reaction]
+          return { ...m, reactions }
         }
         return m
       }))
     }
 
-    const handleReactionRemoved = (data) => {
-      const { messageId, emoji } = data
+    const handleReactionRemove = (data) => {
+      if (!data.messageId || !data.emoji) return
       setMessages((prev) => prev.map((m) => {
-        if (m.id === messageId) {
-          const reactions = m.reactions || {}
-          const count = reactions[emoji] || 0
-          if (count <= 1) {
-            const next = { ...reactions }
-            delete next[emoji]
-            return { ...m, reactions: next }
-          }
-          return { ...m, reactions: { ...reactions, [emoji]: count - 1 } }
+        if (m.id === data.messageId) {
+          const reactions = Array.isArray(m.reactions)
+            ? m.reactions.filter((r) => !(r.emoji === data.emoji && r.user?.id === data.userId))
+            : []
+          return { ...m, reactions }
         }
         return m
       }))
     }
 
+    // Listen with correct backend event names
     socket.on('message:new', handleNewMessage)
-    socket.on('message:edited', handleEditedMessage)
-    socket.on('message:deleted', handleDeletedMessage)
-    socket.on('typing:update', handleTypingUpdate)
-    socket.on('reaction:added', handleReactionAdded)
-    socket.on('reaction:removed', handleReactionRemoved)
+    socket.on('message:edit', handleEditMessage)
+    socket.on('message:delete', handleDeleteMessage)
+    socket.on('typing:start', handleTypingStart)
+    socket.on('typing:stop', handleTypingStop)
+    socket.on('reaction:add', handleReactionAdd)
+    socket.on('reaction:remove', handleReactionRemove)
 
     return () => {
       socket.off('message:new', handleNewMessage)
-      socket.off('message:edited', handleEditedMessage)
-      socket.off('message:deleted', handleDeletedMessage)
-      socket.off('typing:update', handleTypingUpdate)
-      socket.off('reaction:added', handleReactionAdded)
-      socket.off('reaction:removed', handleReactionRemoved)
+      socket.off('message:edit', handleEditMessage)
+      socket.off('message:delete', handleDeleteMessage)
+      socket.off('typing:start', handleTypingStart)
+      socket.off('typing:stop', handleTypingStop)
+      socket.off('reaction:add', handleReactionAdd)
+      socket.off('reaction:remove', handleReactionRemove)
     }
-  }, [socket, activeConversation])
+  }, [socket, activeConversation, currentUserId])
 
   return {
     conversations,
@@ -432,10 +524,13 @@ export function useMessagingData(socket) {
     startConversation,
     editMessage,
     deleteMessage,
+    deleteConversation,
     addReaction,
     removeReaction,
     markAsRead,
     archiveConversation,
     muteConversation,
+    emitTypingStart,
+    emitTypingStop,
   }
 }

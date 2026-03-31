@@ -17,6 +17,34 @@ const { captureError } = require('../monitoring/sentry')
 let io = null
 const onlineUsers = new Map() // userId -> Set<socketId>
 
+// Simple per-socket rate limiter for high-frequency events
+const socketRateLimits = new Map() // socketId -> { event: { count, resetAt } }
+
+function isSocketRateLimited(socketId, event, maxPerMinute = 30) {
+  const key = `${socketId}:${event}`
+  const now = Date.now()
+  const entry = socketRateLimits.get(key)
+
+  if (!entry || now > entry.resetAt) {
+    socketRateLimits.set(key, { count: 1, resetAt: now + 60000 })
+    return false
+  }
+
+  entry.count++
+  if (entry.count > maxPerMinute) {
+    return true
+  }
+  return false
+}
+
+// Clean up stale rate limit entries every 5 minutes
+setInterval(() => {
+  const now = Date.now()
+  for (const [key, entry] of socketRateLimits) {
+    if (now > entry.resetAt) socketRateLimits.delete(key)
+  }
+}, 5 * 60 * 1000)
+
 function initSocketIO(httpServer) {
   const isProd = process.env.NODE_ENV === 'production'
   const allowedOrigins = isProd
@@ -93,10 +121,11 @@ function initSocketIO(httpServer) {
       // Notify others that this user is online
       io.emit('user:online', { userId: socket.userId, username: socket.username })
 
-      // Handle typing indicators
+      // Handle typing indicators (rate limited: max 20 per minute)
       socket.on('typing:start', (data) => {
         const { conversationId } = data
         if (!conversationId) return
+        if (isSocketRateLimited(socket.id, 'typing', 20)) return
 
         io.to(`conversation:${conversationId}`).emit('typing:start', {
           userId: socket.userId,
@@ -108,6 +137,7 @@ function initSocketIO(httpServer) {
       socket.on('typing:stop', (data) => {
         const { conversationId } = data
         if (!conversationId) return
+        if (isSocketRateLimited(socket.id, 'typing', 20)) return
 
         io.to(`conversation:${conversationId}`).emit('typing:stop', {
           userId: socket.userId,
@@ -144,11 +174,12 @@ function initSocketIO(httpServer) {
         }
       })
 
-      // Handle conversation join
+      // Handle conversation join (rate limited: max 30 per minute)
       socket.on('conversation:join', async (data) => {
         try {
           const { conversationId } = data
           if (!conversationId) return
+          if (isSocketRateLimited(socket.id, 'join', 30)) return
 
           // Verify user is a participant
           const participant = await prisma.conversationParticipant.findUnique({
@@ -202,6 +233,11 @@ function initSocketIO(httpServer) {
             // Notify others that user is offline
             io.emit('user:offline', { userId: socket.userId })
           }
+        }
+
+        // Clean up rate limit entries for this socket
+        for (const key of socketRateLimits.keys()) {
+          if (key.startsWith(`${socket.id}:`)) socketRateLimits.delete(key)
         }
       })
     } catch (err) {

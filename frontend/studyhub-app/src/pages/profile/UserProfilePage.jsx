@@ -413,6 +413,27 @@ export default function UserProfilePage() {
                       </button>
                     )}
 
+                    {/* Message button — hidden when user is blocked */}
+                    {!isBlocked && (
+                      <button
+                        onClick={() => navigate(`/messages?dm=${profile.id}`)}
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10,
+                          fontWeight: 600, fontSize: 12, fontFamily: 'inherit',
+                          border: '1px solid rgba(255,255,255,0.25)',
+                          background: 'rgba(255,255,255,0.12)',
+                          color: '#fff',
+                          cursor: 'pointer',
+                          backdropFilter: 'blur(6px)',
+                        }}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                        </svg>
+                        Message
+                      </button>
+                    )}
+
                     {/* Mute button */}
                     <button
                       onClick={handleMuteToggle}

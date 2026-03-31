@@ -59,10 +59,18 @@ router.get('/', async (req, res) => {
   try {
     // Filter out content from blocked and muted users
     const userId = req.user?.userId
-    const [blockedIds, mutedIds] = await Promise.all([
-      getBlockedUserIds(prisma, userId),
-      getMutedUserIds(prisma, userId),
-    ])
+    let blockedIds = []
+    let mutedIds = []
+    try {
+      ;[blockedIds, mutedIds] = await Promise.all([
+        getBlockedUserIds(prisma, userId),
+        getMutedUserIds(prisma, userId),
+      ])
+    } catch (filterErr) {
+      // Graceful degradation: if block/mute tables unavailable, skip filtering
+      console.error('[feed] block/mute filter failed, skipping:', filterErr.message)
+      captureError(filterErr, { route: req.originalUrl, context: 'block-mute-filter' })
+    }
     const hideUserIds = [...new Set([...blockedIds, ...mutedIds])]
     const userFilter = hideUserIds.length > 0 ? { userId: { notIn: hideUserIds } } : {}
     const authorFilter = hideUserIds.length > 0 ? { author: { id: { notIn: hideUserIds } } } : {}
