@@ -7,6 +7,7 @@ const { cleanupAttachmentIfUnused } = require('../../lib/storage')
 const { validateHtmlForSubmission } = require('../../lib/html/htmlSecurity')
 const { isModerationEnabled, scanContent } = require('../../lib/moderation/moderationEngine')
 const { updateFingerprint } = require('../../lib/plagiarismService')
+const { findSimilarSheets } = require('../../lib/plagiarism')
 const { createProvenanceToken } = require('../../lib/provenance')
 const { isHtmlUploadsEnabled } = require('../../lib/html/htmlKillSwitch')
 const { SHEET_STATUS, AUTHOR_SELECT, sheetWriteLimiter } = require('./sheets.constants')
@@ -202,6 +203,70 @@ router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
 
     /* Content fingerprinting for plagiarism detection (fire-and-forget) */
     if (typeof content === 'string') void updateFingerprint('sheet', sheetId, content)
+
+    /* Plagiarism check: find very similar sheets and create moderation case if needed (fire-and-forget) */
+    if (typeof content === 'string') {
+      Promise.resolve().then(async () => {
+        try {
+          // Wait a brief moment for fingerprint to be computed
+          await new Promise((resolve) => setTimeout(resolve, 100))
+
+          const similarSheets = await findSimilarSheets(sheetId, 5) // threshold=5 means ~92%+ similar
+          if (similarSheets && similarSheets.length > 0) {
+            const verySimilar = similarSheets.filter((s) => s.distance <= 5)
+            if (verySimilar.length > 0) {
+              // Log for debugging
+              console.log(`[PLAGIARISM] Sheet ${sheetId} has ${verySimilar.length} very similar matches`, verySimilar.slice(0, 3))
+
+              // Check if a plagiarism case already exists for this sheet
+              const existingCase = await prisma.moderationCase.findFirst({
+                where: {
+                  contentType: 'sheet',
+                  contentId: sheetId,
+                  source: 'auto_plagiarism',
+                  status: 'pending',
+                },
+                select: { id: true },
+              })
+
+              if (!existingCase) {
+                // Create a moderation case for manual review
+                try {
+                  await prisma.moderationCase.create({
+                    data: {
+                      contentType: 'sheet',
+                      contentId: sheetId,
+                      userId: req.user.userId,
+                      status: 'pending',
+                      source: 'auto_plagiarism',
+                      category: 'plagiarism',
+                      reasonCategory: 'plagiarism',
+                      confidence: 0.95, // High confidence for simhash similarity
+                      excerpt: content.slice(0, 400),
+                      evidence: {
+                        similarSheets: verySimilar.map((s) => ({
+                          sheetId: s.sheetId,
+                          title: s.title,
+                          author: s.username,
+                          similarity: s.similarity,
+                          distance: s.distance,
+                        })),
+                        detectionMethod: 'simhash_similarity',
+                        threshold: 5,
+                      },
+                    },
+                  })
+                } catch (caseErr) {
+                  captureError(caseErr, { context: 'plagiarism-case-create', sheetId })
+                }
+              }
+            }
+          }
+        } catch (err) {
+          captureError(err, { context: 'plagiarism-check', sheetId })
+        }
+      })
+    }
 
     /* Auto-generate provenance manifest if one does not exist yet (fire-and-forget) */
     Promise.resolve().then(async () => {

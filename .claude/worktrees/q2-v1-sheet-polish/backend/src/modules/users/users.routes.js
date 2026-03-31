@@ -7,6 +7,7 @@ const { getAuthTokenFromRequest, verifyAuthToken } = require('../../lib/authToke
 const { getProfileAccessDecision, PROFILE_VISIBILITY } = require('../../lib/profileVisibility')
 const prisma = require('../../lib/prisma')
 const { checkAndAwardBadges } = require('../../lib/badges')
+const { getUserStreak, getWeeklyActivity } = require('../../lib/streaks')
 
 const router = express.Router()
 
@@ -470,6 +471,28 @@ router.get('/:username/following', optionalAuth, async (req, res) => {
     res.json(follows.map((f) => f.following))
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── GET /api/users/me/streak ────────────────────────────────────
+router.get('/me/streak', requireAuth, async (req, res) => {
+  try {
+    const streakData = await getUserStreak(prisma, req.user.userId)
+    res.json(streakData)
+  } catch (err) {
+    captureError(err, { route: req.originalUrl })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── GET /api/users/me/weekly-activity ───────────────────────────
+router.get('/me/weekly-activity', requireAuth, async (req, res) => {
+  try {
+    const weeklyData = await getWeeklyActivity(prisma, req.user.userId)
+    res.json(weeklyData)
+  } catch (err) {
+    captureError(err, { route: req.originalUrl })
     res.status(500).json({ error: 'Server error.' })
   }
 })

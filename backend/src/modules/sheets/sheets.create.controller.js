@@ -6,6 +6,7 @@ const requireVerifiedEmail = require('../../core/auth/requireVerifiedEmail')
 const { validateHtmlForSubmission } = require('../../lib/html/htmlSecurity')
 const { isModerationEnabled, scanContent } = require('../../lib/moderation/moderationEngine')
 const { updateFingerprint } = require('../../lib/plagiarismService')
+const { findSimilarSheets } = require('../../lib/plagiarism')
 const { createProvenanceToken } = require('../../lib/provenance')
 const { isHtmlUploadsEnabled } = require('../../lib/html/htmlKillSwitch')
 const { SHEET_STATUS, AUTHOR_SELECT, sheetWriteLimiter } = require('./sheets.constants')
@@ -100,6 +101,55 @@ router.post('/', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (re
 
     /* Content fingerprinting for plagiarism detection (fire-and-forget) */
     void updateFingerprint('sheet', sheet.id, content)
+
+    /* Plagiarism check: find very similar sheets and create moderation case if needed (fire-and-forget) */
+    Promise.resolve().then(async () => {
+      try {
+        // Wait a brief moment for fingerprint to be computed
+        await new Promise((resolve) => setTimeout(resolve, 100))
+
+        const similarSheets = await findSimilarSheets(sheet.id, 5) // threshold=5 means ~92%+ similar
+        if (similarSheets && similarSheets.length > 0) {
+          const verySimialar = similarSheets.filter((s) => s.distance <= 5)
+          if (verySimialar.length > 0) {
+            // Log for debugging
+            console.log(`[PLAGIARISM] Sheet ${sheet.id} has ${verySimialar.length} very similar matches`, verySimialar.slice(0, 3))
+
+            // Create a moderation case for manual review
+            try {
+              await prisma.moderationCase.create({
+                data: {
+                  contentType: 'sheet',
+                  contentId: sheet.id,
+                  userId: req.user.userId,
+                  status: 'pending',
+                  source: 'auto_plagiarism',
+                  category: 'plagiarism',
+                  reasonCategory: 'plagiarism',
+                  confidence: 0.95, // High confidence for simhash similarity
+                  excerpt: content.slice(0, 400),
+                  evidence: {
+                    similarSheets: verySimialar.map((s) => ({
+                      sheetId: s.sheetId,
+                      title: s.title,
+                      author: s.username,
+                      similarity: s.similarity,
+                      distance: s.distance,
+                    })),
+                    detectionMethod: 'simhash_similarity',
+                    threshold: 5,
+                  },
+                },
+              })
+            } catch (caseErr) {
+              captureError(caseErr, { context: 'plagiarism-case-create', sheetId: sheet.id })
+            }
+          }
+        }
+      } catch (err) {
+        captureError(err, { context: 'plagiarism-check', sheetId: sheet.id })
+      }
+    })
 
     /* Auto-generate provenance manifest (fire-and-forget) */
     Promise.resolve().then(async () => {

@@ -28,6 +28,7 @@ import { Panel, EmptyFeed, GettingStartedCard } from './FeedWidgets'
 import FeedComposer from './FeedComposer'
 import VirtualFeedList from './VirtualFeedList'
 import FeedAside from './FeedAside'
+import ForYouSection from './ForYouSection'
 import { useFeedData } from './useFeedData'
 import { useRecentlyViewed } from '../../lib/useRecentlyViewed'
 import SchoolSuggestionBanner from './SchoolSuggestionBanner'
@@ -116,7 +117,7 @@ export default function FeedPage() {
             <main id="main-content" style={{ display: 'grid', gap: 18 }}>
               <GettingStartedCard user={user} />
               <SchoolSuggestionBanner user={user} />
-              {newSinceLastVisit > 0 ? (
+              {newSinceLastVisit > 0 && activeFilter !== 'for-you' ? (
                 <div
                   style={{
                     background: 'var(--sh-info-bg)',
@@ -135,57 +136,67 @@ export default function FeedPage() {
                   {newSinceLastVisit} new {newSinceLastVisit === 1 ? 'post' : 'posts'} since your last visit
                 </div>
               ) : null}
-              <div data-tutorial="feed-composer">
-                <Panel title="Share with your classmates" helper="Post class notes, course questions, or links to your latest sheet.">
-                  <FeedComposer user={user} onSubmitPost={submitPost} />
-                </Panel>
-              </div>
+              {activeFilter !== 'for-you' && (
+                <div data-tutorial="feed-composer">
+                  <Panel title="Share with your classmates" helper="Post class notes, course questions, or links to your latest sheet.">
+                    <FeedComposer user={user} onSubmitPost={submitPost} />
+                  </Panel>
+                </div>
+              )}
 
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                 <div data-tutorial="feed-filters" style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                   {FILTERS.map((filter) => (
                     <button key={filter} type="button" onClick={() => setQueryParam('filter', filter === 'all' ? '' : filter)} className={`sh-chip${filter === activeFilter ? ' sh-chip--active' : ''}`}>
-                      {filter}
+                      {filter.replace('for-you', 'For You')}
                     </button>
                   ))}
                 </div>
-                <input data-tutorial="feed-search" value={search} onChange={(event) => setQueryParam('search', event.target.value)} placeholder="Search the feed..." className="sh-input" style={{ maxWidth: 240 }} />
+                {activeFilter !== 'for-you' && (
+                  <input data-tutorial="feed-search" value={search} onChange={(event) => setQueryParam('search', event.target.value)} placeholder="Search the feed..." className="sh-input" style={{ maxWidth: 240 }} />
+                )}
               </div>
 
-              {feedState.partial ? (
-                <div style={{ background: 'var(--sh-warning-bg)', color: 'var(--sh-warning-text)', border: '1px solid var(--sh-warning-border)', borderRadius: 14, padding: '12px 14px', fontSize: 13, lineHeight: 1.6 }}>
-                  Feed loaded in reduced mode. {feedState.degradedSections.join(', ')}.
-                </div>
-              ) : null}
-
-              {feedState.error ? (
-                <div style={{ background: 'var(--sh-danger-bg)', color: 'var(--sh-danger-text)', border: '1px solid var(--sh-danger)', borderRadius: 14, padding: '12px 14px', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                  <span>{feedState.error}</span>
-                  <button onClick={retryFeed} style={{ background: 'var(--sh-danger)', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: FONT }}>Retry</button>
-                </div>
-              ) : null}
-
-              {feedState.loading ? (
-                <SkeletonFeed count={3} />
-              ) : visibleItems.length === 0 ? (
-                <EmptyFeed message={feedState.items.length === 0 && !search ? 'Your feed is empty' : 'No feed items matched this filter.'} isFirstRun={feedState.items.length === 0 && !search} />
+              {activeFilter === 'for-you' ? (
+                <ForYouSection />
               ) : (
-                <VirtualFeedList
-                  items={visibleItems}
-                  hasMore={feedState.items.length < feedState.total}
-                  loadingMore={loadingMore}
-                  onLoadMore={loadMoreFeed}
-                  onReact={toggleReaction}
-                  onStar={toggleStar}
-                  onDeletePost={confirmDeletePost}
-                  canDeletePost={canDeletePost}
-                  openPostMenuId={openPostMenuId}
-                  onTogglePostMenu={setOpenPostMenuId}
-                  deletingPostIds={deletingPostIds}
-                  currentUser={user}
-                  onReport={handleReport}
-                  targetCommentId={targetCommentId}
-                />
+                <>
+                  {feedState.partial ? (
+                    <div style={{ background: 'var(--sh-warning-bg)', color: 'var(--sh-warning-text)', border: '1px solid var(--sh-warning-border)', borderRadius: 14, padding: '12px 14px', fontSize: 13, lineHeight: 1.6 }}>
+                      Feed loaded in reduced mode. {feedState.degradedSections.join(', ')}.
+                    </div>
+                  ) : null}
+
+                  {feedState.error ? (
+                    <div style={{ background: 'var(--sh-danger-bg)', color: 'var(--sh-danger-text)', border: '1px solid var(--sh-danger)', borderRadius: 14, padding: '12px 14px', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                      <span>{feedState.error}</span>
+                      <button onClick={retryFeed} style={{ background: 'var(--sh-danger)', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: FONT }}>Retry</button>
+                    </div>
+                  ) : null}
+
+                  {feedState.loading ? (
+                    <SkeletonFeed count={3} />
+                  ) : visibleItems.length === 0 ? (
+                    <EmptyFeed message={feedState.items.length === 0 && !search ? 'Your feed is empty' : 'No feed items matched this filter.'} isFirstRun={feedState.items.length === 0 && !search} />
+                  ) : (
+                    <VirtualFeedList
+                      items={visibleItems}
+                      hasMore={feedState.items.length < feedState.total}
+                      loadingMore={loadingMore}
+                      onLoadMore={loadMoreFeed}
+                      onReact={toggleReaction}
+                      onStar={toggleStar}
+                      onDeletePost={confirmDeletePost}
+                      canDeletePost={canDeletePost}
+                      openPostMenuId={openPostMenuId}
+                      onTogglePostMenu={setOpenPostMenuId}
+                      deletingPostIds={deletingPostIds}
+                      currentUser={user}
+                      onReport={handleReport}
+                      targetCommentId={targetCommentId}
+                    />
+                  )}
+                </>
               )}
             </main>
 

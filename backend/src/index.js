@@ -23,6 +23,7 @@ const sentryEnabled = initSentry()
 
 const app = express()
 const PORT = process.env.PORT || 4000
+const apiVersion = require('./middleware/apiVersion')
 const authRoutes = require('./modules/auth')
 const courseRoutes = require('./modules/courses')
 const sheetRoutes = require('./modules/sheets')
@@ -46,6 +47,8 @@ const webauthnRoutes = require('./modules/webauthn')
 const publicRoutes = require('./modules/public')
 const messagingRoutes = require('./modules/messaging')
 const studyGroupRoutes = require('./modules/studyGroups')
+const docsRoutes = require('./modules/docs')
+const sharingRoutes = require('./modules/sharing')
 const { initSocketIO } = require('./lib/socketio')
 const { featureFlagMiddleware } = require('./lib/featureFlags')
 
@@ -245,6 +248,9 @@ app.use(auditMiddleware)
 // Attach feature flag evaluation helper to every request.
 app.use(featureFlagMiddleware)
 
+// Attach API version headers to all responses.
+app.use(apiVersion)
+
 // Avatars and cover images are publicly retrievable. Study attachments stay
 // behind auth-checked preview/download handlers.
 app.use('/uploads/avatars', express.static(AVATARS_DIR, {
@@ -284,6 +290,9 @@ app.use('/uploads/content-images', express.static(CONTENT_IMAGES_DIR, {
 
 // Isolated preview surface. Auth cookies are scoped to /api and never sent here.
 app.use('/preview', previewRoutes)
+
+// Mount API documentation endpoint under /api/docs (public, no auth required).
+app.use('/api/docs', docsRoutes)
 
 // Mount authentication endpoints under /api/auth.
 app.use('/api/auth', authRoutes)
@@ -347,6 +356,9 @@ app.use('/api/messages', messagingRoutes)
 
 // Mount study groups endpoints under /api/study-groups.
 app.use('/api/study-groups', studyGroupRoutes)
+
+// Mount sharing (privacy controls v2) endpoints under /api/sharing.
+app.use('/api/sharing', sharingRoutes)
 
 // Public unauthenticated data endpoints (landing page stats, etc.).
 app.use('/api/public', publicRoutes)

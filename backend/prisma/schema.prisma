@@ -85,8 +85,48 @@ model User {
   groupSessionRsvps          GroupSessionRsvp[]
   groupDiscussionPosts       GroupDiscussionPost[]
   groupDiscussionReplies     GroupDiscussionReply[]
+  shareLinksCreated          ShareLink[]               @relation("ShareLinkCreator")
+  contentSharedBy            ContentShare[]            @relation("ContentSharedBy")
+  contentSharedWith          ContentShare[]            @relation("ContentSharedWith")
 
   @@index([role])
+}
+
+model ShareLink {
+  id          Int       @id @default(autoincrement())
+  token       String    @unique @default(uuid())
+  contentType String                          // "sheet" or "note"
+  contentId   Int
+  createdById Int
+  permission  String    @default("view")      // "view", "comment", "edit"
+  expiresAt   DateTime?                       // null = never expires
+  maxViews    Int?                            // null = unlimited
+  viewCount   Int       @default(0)
+  password    String?                         // optional password protection
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+
+  createdBy User @relation("ShareLinkCreator", fields: [createdById], references: [id])
+
+  @@index([token])
+  @@index([contentType, contentId])
+  @@index([createdById])
+}
+
+model ContentShare {
+  id          Int      @id @default(autoincrement())
+  contentType String                          // "sheet" or "note"
+  contentId   Int
+  sharedById  Int
+  sharedWithId Int
+  permission  String   @default("view")      // "view", "comment", "edit"
+  createdAt   DateTime @default(now())
+
+  sharedBy   User @relation("ContentSharedBy", fields: [sharedById], references: [id])
+  sharedWith User @relation("ContentSharedWith", fields: [sharedWithId], references: [id])
+
+  @@unique([contentType, contentId, sharedWithId])
+  @@index([sharedWithId, contentType])
 }
 
 model School {
