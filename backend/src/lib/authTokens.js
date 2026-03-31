@@ -94,9 +94,9 @@ function getAuthCookieOptions() {
     httpOnly: true,
     secure: isProd,
     sameSite: isProd ? 'none' : 'lax',
-    // Restrict the browser cookie to authenticated API routes so non-API
-    // preview surfaces can run on the backend origin without receiving it.
-    path: '/api',
+    // Use root path so the cookie is sent on both /api/* routes and
+    // /socket.io/* WebSocket handshake requests.
+    path: '/',
     maxAge: 24 * 60 * 60 * 1000,
   }
 }
