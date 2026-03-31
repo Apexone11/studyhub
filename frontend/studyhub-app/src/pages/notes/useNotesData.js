@@ -29,7 +29,7 @@ export function useNotesData() {
   useEffect(() => {
     let active = true
 
-    fetch(`${API}/api/notes`, { headers: authHeaders() })
+    fetch(`${API}/api/notes`, { headers: authHeaders(), credentials: 'include' })
       .then((response) => response.json())
       .then((data) => {
         if (active) {
@@ -45,7 +45,7 @@ export function useNotesData() {
         }
       })
 
-    fetch(`${API}/api/courses/schools`, { headers: authHeaders() })
+    fetch(`${API}/api/courses/schools`, { headers: authHeaders(), credentials: 'include' })
       .then((response) => response.json())
       .then((data) => {
         if (active) setCourses((data || []).flatMap((school) => (school.courses || []).map((course) => ({ ...course, schoolName: school.name }))))
@@ -96,6 +96,7 @@ export function useNotesData() {
         const response = await fetch(`${API}/api/notes/${noteId}`, {
           method: 'PATCH',
           headers: authHeaders(),
+          credentials: 'include',
           body: JSON.stringify({ title, content, private: isPrivate, courseId: courseId || null, allowDownloads }),
         })
         if (response.ok) {
@@ -141,6 +142,7 @@ export function useNotesData() {
       const response = await fetch(`${API}/api/notes`, {
         method: 'POST',
         headers: authHeaders(),
+        credentials: 'include',
         body: JSON.stringify({ title: 'Untitled Note', content: '' }),
       })
       if (!response.ok) {
@@ -161,6 +163,7 @@ export function useNotesData() {
       const response = await fetch(`${API}/api/notes/${activeNote.id}`, {
         method: 'DELETE',
         headers: authHeaders(),
+        credentials: 'include',
       })
       if (response.ok) {
         setNotes((prev) => prev.filter((n) => n.id !== activeNote.id))

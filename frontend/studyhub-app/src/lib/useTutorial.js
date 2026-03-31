@@ -23,17 +23,28 @@ import { useState, useCallback, useMemo } from 'react'
  * @param {number} [options.version=1] — increment to reset seen state for all users
  * @returns {{ joyrideProps: object, restart: () => void, seen: boolean }}
  */
+/** Check if tutorials are globally disabled via user preference */
+function areTutorialsDisabled() {
+  try {
+    return localStorage.getItem('studyhub_tutorials_disabled') === '1'
+  } catch {
+    return false
+  }
+}
+
 export function useTutorial(pageKey, steps, options = {}) {
   const { delayMs = 800, version = 1 } = options
   const storageKey = `tutorial_${pageKey}_v${version}_seen`
+  const globallyDisabled = useMemo(() => areTutorialsDisabled(), [])
 
   const alreadySeen = useMemo(() => {
+    if (globallyDisabled) return true
     try {
       return localStorage.getItem(storageKey) === '1'
     } catch {
       return true
     }
-  }, [storageKey])
+  }, [storageKey, globallyDisabled])
 
   const [run, setRun] = useState(false)
   const [hasTriggered, setHasTriggered] = useState(false)

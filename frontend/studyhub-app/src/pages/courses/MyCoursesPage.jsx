@@ -12,11 +12,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Navbar from '../../components/navbar/Navbar'
+import SafeJoyride from '../../components/SafeJoyride'
 import { Skeleton } from '../../components/Skeleton'
 import { API } from '../../config'
 import { useSession } from '../../lib/session-context'
 import { showToast } from '../../lib/toast'
 import { fadeInUp } from '../../lib/animations'
+import { useTutorial } from '../../lib/useTutorial'
+import { MY_COURSES_STEPS, TUTORIAL_VERSIONS } from '../../lib/tutorialSteps'
 import { usePageTitle } from '../../lib/usePageTitle'
 
 /* ── Helpers ────────────────────────────────────────────────────────────── */
@@ -118,6 +121,7 @@ function CourseChip({ course, selected, onToggle }) {
  * ═══════════════════════════════════════════════════════════════════════════ */
 export default function MyCoursesPage() {
   usePageTitle('My Courses')
+  const tutorial = useTutorial('myCourses', MY_COURSES_STEPS, { version: TUTORIAL_VERSIONS.myCourses })
   const { user, setSessionUser } = useSession()
   const mainRef = useCallback((node) => { if (node) fadeInUp(node, { duration: 400, y: 16 }) }, [])
 
@@ -325,7 +329,7 @@ export default function MyCoursesPage() {
             {/* ── Left: School + Course selection ─────────────────── */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
               {/* School section */}
-              <div style={{
+              <div data-tutorial="courses-list" style={{
                 background: 'var(--sh-surface)', borderRadius: 18,
                 border: '1px solid var(--sh-border)', padding: '20px 22px',
               }}>
@@ -386,7 +390,7 @@ export default function MyCoursesPage() {
 
               {/* Course section — only when school selected */}
               {selectedSchool && (
-                <div style={{
+                <div data-tutorial="courses-add" style={{
                   background: 'var(--sh-surface)', borderRadius: 18,
                   border: '1px solid var(--sh-border)', padding: '20px 22px',
                 }}>
@@ -469,7 +473,7 @@ export default function MyCoursesPage() {
             </div>
 
             {/* ── Right: Preview panel ────────────────────────────── */}
-            <div>
+            <div data-tutorial="courses-browse">
               <div style={{
                 background: 'var(--sh-surface)', borderRadius: 18,
                 border: '1px solid var(--sh-border)', padding: '20px 22px',
@@ -576,6 +580,8 @@ export default function MyCoursesPage() {
           </div>
         )}
       </div>
+
+      <SafeJoyride {...tutorial.joyrideProps} />
     </div>
   )
 }

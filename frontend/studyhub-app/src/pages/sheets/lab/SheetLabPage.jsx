@@ -1,7 +1,10 @@
 import { Link } from 'react-router-dom'
 import Navbar from '../../../components/navbar/Navbar'
+import SafeJoyride from '../../../components/SafeJoyride'
 import { IconArrowLeft, IconFork } from '../../../components/Icons'
 import { pageShell } from '../../../lib/ui'
+import { useTutorial } from '../../../lib/useTutorial'
+import { SHEET_LAB_STEPS, TUTORIAL_VERSIONS } from '../../../lib/tutorialSteps'
 import { usePageTitle } from '../../../lib/usePageTitle'
 import SheetLabEditor from './SheetLabEditor'
 import SheetLabChanges from './SheetLabChanges'
@@ -51,6 +54,7 @@ function StatusBadge({ status }) {
 
 export default function SheetLabPage() {
   usePageTitle('Sheet Lab')
+  const tutorial = useTutorial('sheetLab', SHEET_LAB_STEPS, { version: TUTORIAL_VERSIONS.sheetLab })
 
   const lab = useSheetLab()
   const { sheet, error, isOwner, isFork, activeTab, setActiveTab, handleBack, deleting, handleDeleteFork, publishing, handlePublish } = lab
@@ -138,7 +142,7 @@ export default function SheetLabPage() {
           ) : null}
 
           {/* ── Tab navigation ─────────────────────────── */}
-          <nav className="sheet-lab__tabs" aria-label="Sheet Lab tabs">
+          <nav data-tutorial="sheetlab-tabs" className="sheet-lab__tabs" aria-label="Sheet Lab tabs">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
@@ -173,15 +177,17 @@ export default function SheetLabPage() {
           ) : null}
 
           {/* ── Tab content ────────────────────────────────── */}
-          {validTab === 'editor' ? <SheetLabEditor sheet={sheet} onContentSaved={() => lab.loadCommits(1)} /> : null}
+          {validTab === 'editor' ? <div data-tutorial="sheetlab-editor"><SheetLabEditor sheet={sheet} onContentSaved={() => lab.loadCommits(1)} /></div> : null}
           {validTab === 'changes' ? <SheetLabChanges sheet={sheet} onCommitCreated={() => lab.loadCommits(1)} /> : null}
-          {validTab === 'history' ? <SheetLabHistory lab={lab} /> : null}
+          {validTab === 'history' ? <div data-tutorial="sheetlab-history"><SheetLabHistory lab={lab} /></div> : null}
           {validTab === 'lineage' ? <SheetLabLineage lab={lab} /> : null}
           {validTab === 'contribute' ? <SheetLabContribute sheet={sheet} onContributed={() => lab.reloadSheet()} /> : null}
           {validTab === 'reviews' ? <SheetLabReviews sheet={sheet} onReviewed={() => lab.reloadSheet()} /> : null}
-          {validTab === 'analytics' ? <SheetLabAnalytics sheet={sheet} /> : null}
+          {validTab === 'analytics' ? <div data-tutorial="sheetlab-analytics"><SheetLabAnalytics sheet={sheet} /></div> : null}
         </div>
       </div>
+
+      <SafeJoyride {...tutorial.joyrideProps} />
     </>
   )
 }

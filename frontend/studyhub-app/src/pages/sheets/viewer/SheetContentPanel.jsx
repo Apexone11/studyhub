@@ -147,6 +147,7 @@ export default function SheetContentPanel({
   isHtmlSheet,
   previewMode,
   canEdit,
+  canToggleInteractive,
   htmlWarningAcked,
   acceptHtmlWarning,
   safePreviewUrl,
@@ -278,7 +279,7 @@ export default function SheetContentPanel({
               background: 'var(--sh-surface)',
             }}
           >
-            {canEdit && previewMode === 'interactive' ? (
+            {canToggleInteractive && previewMode === 'interactive' ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderBottom: '1px solid var(--sh-border)', flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', borderRadius: 7, overflow: 'hidden', border: '1px solid var(--sh-border)' }}>
                   <button

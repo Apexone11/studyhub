@@ -53,6 +53,7 @@ export default function SheetViewerPage() {
     readmeData,
     sheetPanelRef,
     canEdit,
+    canToggleInteractive,
     isHtmlSheet,
     previewKind,
     attachmentPreviewUrl,
@@ -205,6 +206,7 @@ export default function SheetViewerPage() {
                     isHtmlSheet={isHtmlSheet}
                     previewMode={sheet.htmlWorkflow?.previewMode || 'interactive'}
                     canEdit={canEdit}
+                    canToggleInteractive={canToggleInteractive}
                     htmlWarningAcked={htmlWarningAcked}
                     acceptHtmlWarning={acceptHtmlWarning}
                     safePreviewUrl={safePreviewUrl}

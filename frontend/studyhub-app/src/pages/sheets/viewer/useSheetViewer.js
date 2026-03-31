@@ -169,6 +169,7 @@ export default function useSheetViewer() {
 
   const { sheet } = sheetState
   const canEdit = useMemo(() => user && sheet && (user.role === 'admin' || user.id === sheet.userId), [sheet, user])
+  const canToggleInteractive = useMemo(() => Boolean(user && sheet), [sheet, user])
   const isHtmlSheet = sheet?.contentFormat === 'html'
   const previewKind = attachmentPreviewKind(sheet?.attachmentType, sheet?.attachmentName)
   const attachmentPreviewUrl = sheet?.id ? `${API}/api/sheets/${sheet.id}/attachment/preview` : ''
@@ -488,6 +489,7 @@ export default function useSheetViewer() {
     readmeData,
     sheetPanelRef,
     canEdit,
+    canToggleInteractive,
     isHtmlSheet,
     previewKind,
     attachmentPreviewUrl,
