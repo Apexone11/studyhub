@@ -319,7 +319,7 @@ function GifSearchPanel({ onSelect, onClose }) {
     <div style={{
       marginBottom: 8, padding: '10px 12px',
       background: 'var(--sh-soft)', borderRadius: 'var(--radius-control)',
-      border: '1px solid var(--sh-border)', maxHeight: 280, display: 'flex', flexDirection: 'column',
+      border: '1px solid var(--sh-border)', maxHeight: 380, display: 'flex', flexDirection: 'column',
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
         <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--sh-heading)', fontFamily: PAGE_FONT }}>Search GIFs</span>
@@ -338,7 +338,7 @@ function GifSearchPanel({ onSelect, onClose }) {
           fontSize: 12, fontFamily: PAGE_FONT, boxSizing: 'border-box',
         }}
       />
-      <div style={{ flex: 1, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4 }}>
+      <div style={{ flex: 1, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
         {displayLoading && <div style={{ gridColumn: '1 / -1', textAlign: 'center', color: 'var(--sh-muted)', fontSize: 12, padding: 8 }}>Searching...</div>}
         {!displayLoading && displayResults.length === 0 && trimmedQuery && (
           <div style={{ gridColumn: '1 / -1', textAlign: 'center', color: 'var(--sh-muted)', fontSize: 12, padding: 8 }}>No GIFs found</div>
@@ -349,10 +349,10 @@ function GifSearchPanel({ onSelect, onClose }) {
             onClick={() => onSelect(gif)}
             style={{
               border: 'none', background: 'transparent', cursor: 'pointer', padding: 0,
-              borderRadius: 4, overflow: 'hidden',
+              borderRadius: 6, overflow: 'hidden',
             }}
           >
-            <img src={gif.preview} alt={gif.title} loading="lazy" style={{ width: '100%', height: 72, objectFit: 'cover', borderRadius: 4, display: 'block' }} />
+            <img src={gif.preview} alt={gif.title} loading="lazy" style={{ width: '100%', height: 110, objectFit: 'cover', borderRadius: 6, display: 'block' }} />
           </button>
         ))}
       </div>
@@ -490,8 +490,8 @@ function MessageThread({
   }
 
   const handleGifSelect = (gif) => {
-    // Send GIF as an image attachment immediately
-    onSend(gif.title || 'GIF', replyTo?.id || null, {
+    // Send GIF as an image-only attachment (no text description)
+    onSend('', replyTo?.id || null, {
       attachments: [{ type: 'image', url: gif.full, fileName: 'gif' }],
     })
     setShowGifPicker(false)

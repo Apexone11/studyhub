@@ -15,6 +15,13 @@ import { useSession } from '../../lib/session-context'
 import { PAGE_FONT } from '../shared/pageUtils'
 import { useStudyGroupsData } from './useStudyGroupsData'
 import { getPrivacyLabel, truncateText } from './studyGroupsHelpers'
+import {
+  GroupOverviewTab,
+  GroupResourcesTab,
+  GroupSessionsTab,
+  GroupDiscussionsTab,
+  GroupMembersTab,
+} from './GroupDetailTabs'
 import Navbar from '../../components/navbar/Navbar'
 import AppSidebar from '../../components/sidebar/AppSidebar'
 import UserAvatar from '../../components/UserAvatar'
@@ -230,6 +237,8 @@ function GroupListView() {
 ───────────────────────────────────────────────────────────────────────────── */
 function GroupDetailView({ groupId }) {
   const navigate = useNavigate()
+  const { user } = useSession()
+  const currentUserId = user?.id || null
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('overview')
 
@@ -238,16 +247,25 @@ function GroupDetailView({ groupId }) {
     loadGroupDetails, updateGroup, deleteGroup, joinGroup, leaveGroup,
     courses: allCourses,
     // Sub-resources
-    members, membersLoading, loadMembers, removeMember, updateMember,
-    resources, resourcesLoading, loadResources, addResource, deleteResource,
-    sessions, sessionsLoading, loadSessions, createSession, deleteSession, rsvpSession,
+    members, membersLoading, loadMembers, removeMember, updateMember, inviteMember,
+    resources, addResource, deleteResource,
+    sessions, sessionsLoading, loadSessions, createSession, rsvpSession,
     discussions, discussionsLoading, loadDiscussions, createPost, addReply, resolvePost, deletePost,
+    // Activity + upvotes
+    activities, activitiesLoading, upcomingSessionsPreview, loadActivity, toggleUpvote,
   } = useStudyGroupsData()
 
   // Load group details on mount
   useEffect(() => {
     loadGroupDetails(groupId)
   }, [groupId, loadGroupDetails])
+
+  // Load activity when overview tab is active
+  useEffect(() => {
+    if (activeTab === 'overview' && activeGroup?.isMember) {
+      loadActivity(groupId)
+    }
+  }, [activeTab, activeGroup, groupId, loadActivity])
 
   if (activeGroupLoading) {
     return (
@@ -420,18 +438,21 @@ function GroupDetailView({ groupId }) {
             {/* Tab content */}
             <div style={styles.tabContent}>
               {activeTab === 'overview' && (
-                <GroupOverviewTab group={activeGroup} />
+                <GroupOverviewTab
+                  group={activeGroup}
+                  activities={activities}
+                  activitiesLoading={activitiesLoading}
+                  upcomingSessions={upcomingSessionsPreview}
+                />
               )}
               {activeTab === 'resources' && (
                 <GroupResourcesTab
                   groupId={groupId}
                   resources={resources}
-                  loading={resourcesLoading}
-                  loadResources={loadResources}
-                  addResource={addResource}
-                  deleteResource={deleteResource}
+                  onAdd={(data) => addResource(groupId, data)}
+                  onDelete={(resourceId) => deleteResource(groupId, resourceId)}
+                  isAdminOrMod={isAdmin || activeGroup?.userRole === 'moderator'}
                   isMember={isMember}
-                  isAdmin={isAdmin}
                 />
               )}
               {activeTab === 'sessions' && (
@@ -440,11 +461,10 @@ function GroupDetailView({ groupId }) {
                   sessions={sessions}
                   loading={sessionsLoading}
                   loadSessions={loadSessions}
-                  createSession={createSession}
-                  deleteSession={deleteSession}
-                  rsvpSession={rsvpSession}
+                  onAdd={(data) => createSession(groupId, data)}
+                  onRsvp={(sessionId, status) => rsvpSession(groupId, sessionId, { status })}
+                  isAdminOrMod={isAdmin || activeGroup?.userRole === 'moderator'}
                   isMember={isMember}
-                  isAdmin={isAdmin}
                 />
               )}
               {activeTab === 'discussions' && (
@@ -453,12 +473,14 @@ function GroupDetailView({ groupId }) {
                   discussions={discussions}
                   loading={discussionsLoading}
                   loadDiscussions={loadDiscussions}
-                  createPost={createPost}
-                  addReply={addReply}
-                  resolvePost={resolvePost}
-                  deletePost={deletePost}
+                  onCreatePost={createPost}
+                  onAddReply={addReply}
+                  onResolve={resolvePost}
+                  onDeletePost={deletePost}
+                  onUpvote={(postId) => toggleUpvote(groupId, postId)}
                   isMember={isMember}
-                  isAdmin={isAdmin}
+                  isAdminOrMod={isAdmin || activeGroup?.userRole === 'moderator'}
+                  userId={currentUserId}
                 />
               )}
               {activeTab === 'members' && (
@@ -467,10 +489,11 @@ function GroupDetailView({ groupId }) {
                   members={members}
                   loading={membersLoading}
                   loadMembers={loadMembers}
-                  removeMember={removeMember}
-                  updateMember={updateMember}
+                  onRemoveMember={(userId) => removeMember(groupId, userId)}
+                  onUpdateMember={(userId, data) => updateMember(groupId, userId, data)}
+                  onInvite={(data) => inviteMember(groupId, data)}
                   isAdmin={isAdmin}
-                  isMember={isMember}
+                  currentUserId={currentUserId}
                 />
               )}
             </div>
@@ -896,413 +919,14 @@ function EditGroupModal({ open, group, onClose, onSubmit, courses }) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   TAB: OVERVIEW
+   NOTE: Tab components are imported from GroupDetailTabs.jsx
+   The inline tab components have been removed in favor of the shared components.
 ───────────────────────────────────────────────────────────────────────────── */
-function GroupOverviewTab({ group }) {
-  if (!group) return null
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
-      <div>
-        <h3 style={{ margin: 0, fontSize: 'var(--type-base)', fontWeight: 700, color: 'var(--sh-heading)', marginBottom: 'var(--space-3)' }}>About this group</h3>
-        <p style={{ margin: 0, fontSize: 'var(--type-sm)', color: 'var(--sh-text)', lineHeight: 1.6 }}>
-          {group.description || 'No description provided.'}
-        </p>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 'var(--space-4)' }}>
-        <div style={tabStyles.statCard}>
-          <div style={tabStyles.statValue}>{group.memberCount || 0}</div>
-          <div style={tabStyles.statLabel}>Members</div>
-        </div>
-        <div style={tabStyles.statCard}>
-          <div style={tabStyles.statValue}>{group.privacy === 'public' ? 'Public' : group.privacy === 'private' ? 'Private' : 'Invite Only'}</div>
-          <div style={tabStyles.statLabel}>Privacy</div>
-        </div>
-        {group.courseName && (
-          <div style={tabStyles.statCard}>
-            <div style={tabStyles.statValue}>{group.courseName}</div>
-            <div style={tabStyles.statLabel}>Course</div>
-          </div>
-        )}
-        <div style={tabStyles.statCard}>
-          <div style={tabStyles.statValue}>{group.maxMembers || 50}</div>
-          <div style={tabStyles.statLabel}>Max Members</div>
-        </div>
-      </div>
-      <div style={{ fontSize: 'var(--type-xs)', color: 'var(--sh-muted)' }}>
-        Created {new Date(group.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-      </div>
-    </div>
-  )
-}
 
-/* ─────────────────────────────────────────────────────────────────────────
-   TAB: MEMBERS
-───────────────────────────────────────────────────────────────────────────── */
-function GroupMembersTab({ groupId, members, loading, loadMembers, removeMember, updateMember, isAdmin }) {
-  useEffect(() => { loadMembers(groupId) }, [groupId, loadMembers])
-
-  if (loading) return <div style={tabStyles.loadingText}>Loading members...</div>
-
-  if (members.length === 0) return <div style={tabStyles.emptyText}>No members yet.</div>
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-      {members.map((m) => (
-        <div key={m.userId} style={tabStyles.memberRow}>
-          <UserAvatar username={m.username} avatarUrl={m.avatarUrl} size={36} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 'var(--type-sm)', fontWeight: 600, color: 'var(--sh-heading)' }}>{m.username}</div>
-            <div style={{ fontSize: 'var(--type-xs)', color: 'var(--sh-muted)' }}>
-              {m.role === 'admin' ? 'Admin' : m.role === 'moderator' ? 'Moderator' : 'Member'}
-              {' -- Joined '}{new Date(m.joinedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-            </div>
-          </div>
-          {isAdmin && m.role !== 'admin' && (
-            <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-              {m.role !== 'moderator' && (
-                <button
-                  onClick={() => updateMember(groupId, m.userId, { role: 'moderator' })}
-                  style={tabStyles.smallActionBtn}
-                >
-                  Promote
-                </button>
-              )}
-              <button
-                onClick={() => { if (window.confirm(`Remove ${m.username}?`)) removeMember(groupId, m.userId) }}
-                style={{ ...tabStyles.smallActionBtn, color: 'var(--sh-danger-text)', borderColor: 'var(--sh-danger-border)' }}
-              >
-                Remove
-              </button>
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
-  )
-}
-
-/* ─────────────────────────────────────────────────────────────────────────
-   TAB: RESOURCES
-───────────────────────────────────────────────────────────────────────────── */
-function GroupResourcesTab({ groupId, resources, loading, loadResources, addResource, deleteResource, isMember, isAdmin }) {
-  const [showForm, setShowForm] = useState(false)
-  const [title, setTitle] = useState('')
-  const [url, setUrl] = useState('')
-  const [description, setDescription] = useState('')
-  const [resourceType, setResourceType] = useState('link')
-
-  useEffect(() => { if (isMember) loadResources(groupId) }, [groupId, isMember, loadResources])
-
-  if (!isMember) return <div style={tabStyles.emptyText}>Join the group to see resources.</div>
-  if (loading) return <div style={tabStyles.loadingText}>Loading resources...</div>
-
-  const handleAdd = async (e) => {
-    e.preventDefault()
-    if (!title.trim()) return
-    try {
-      await addResource(groupId, { title: title.trim(), description: description.trim(), resourceType, resourceUrl: url.trim() || null })
-      setTitle(''); setUrl(''); setDescription(''); setResourceType('link'); setShowForm(false)
-    } catch { /* toast handled in hook */ }
-  }
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: 'var(--type-sm)', fontWeight: 600, color: 'var(--sh-text)' }}>{resources.length} resource{resources.length === 1 ? '' : 's'}</span>
-        <button onClick={() => setShowForm(!showForm)} style={tabStyles.addBtn}>{showForm ? 'Cancel' : 'Add Resource'}</button>
-      </div>
-
-      {showForm && (
-        <form onSubmit={handleAdd} style={tabStyles.inlineForm}>
-          <input type="text" placeholder="Title *" value={title} onChange={(e) => setTitle(e.target.value)} style={tabStyles.formInput} maxLength={200} />
-          <input type="text" placeholder="URL (optional)" value={url} onChange={(e) => setUrl(e.target.value)} style={tabStyles.formInput} />
-          <textarea placeholder="Description (optional)" value={description} onChange={(e) => setDescription(e.target.value)} style={tabStyles.formTextarea} rows={2} maxLength={500} />
-          <select value={resourceType} onChange={(e) => setResourceType(e.target.value)} style={tabStyles.formInput}>
-            <option value="link">Link</option>
-            <option value="sheet">Study Sheet</option>
-            <option value="note">Note</option>
-            <option value="file">File</option>
-          </select>
-          <button type="submit" disabled={!title.trim()} style={tabStyles.submitSmallBtn}>Add</button>
-        </form>
-      )}
-
-      {resources.length === 0 ? (
-        <div style={tabStyles.emptyText}>No resources shared yet. Be the first to add one!</div>
-      ) : (
-        resources.map((r) => (
-          <div key={r.id} style={tabStyles.resourceCard}>
-            <div style={{ flex: 1 }}>
-              <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center', marginBottom: 'var(--space-2)' }}>
-                <span style={tabStyles.typeBadge}>{r.resourceType}</span>
-                <span style={{ fontSize: 'var(--type-sm)', fontWeight: 600, color: 'var(--sh-heading)' }}>{r.title}</span>
-                {r.pinned && <span style={{ fontSize: 'var(--type-xs)', color: 'var(--sh-warning-text)', fontWeight: 600 }}>Pinned</span>}
-              </div>
-              {r.description && <p style={{ margin: 0, fontSize: 'var(--type-xs)', color: 'var(--sh-muted)', marginBottom: 'var(--space-2)' }}>{r.description}</p>}
-              {r.resourceUrl && (
-                <a href={r.resourceUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 'var(--type-xs)', color: 'var(--sh-brand)', textDecoration: 'none' }}>
-                  Open link
-                </a>
-              )}
-              <div style={{ fontSize: 'var(--type-xs)', color: 'var(--sh-muted)', marginTop: 'var(--space-2)' }}>
-                Shared by {r.user?.username || 'Unknown'} -- {new Date(r.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-              </div>
-            </div>
-            {(isAdmin || r.userId === r.user?.id) && (
-              <button onClick={() => { if (window.confirm('Delete this resource?')) deleteResource(groupId, r.id) }} style={tabStyles.deleteSmallBtn}>Delete</button>
-            )}
-          </div>
-        ))
-      )}
-    </div>
-  )
-}
-
-/* ─────────────────────────────────────────────────────────────────────────
-   TAB: SESSIONS
-───────────────────────────────────────────────────────────────────────────── */
-function GroupSessionsTab({ groupId, sessions, loading, loadSessions, createSession, deleteSession, rsvpSession, isMember, isAdmin }) {
-  const [showForm, setShowForm] = useState(false)
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const [location, setLocation] = useState('')
-  const [scheduledAt, setScheduledAt] = useState('')
-  const [durationMins, setDurationMins] = useState('60')
-
-  useEffect(() => { if (isMember) loadSessions(groupId) }, [groupId, isMember, loadSessions])
-
-  if (!isMember) return <div style={tabStyles.emptyText}>Join the group to see sessions.</div>
-  if (loading) return <div style={tabStyles.loadingText}>Loading sessions...</div>
-
-  const handleCreate = async (e) => {
-    e.preventDefault()
-    if (!title.trim() || !scheduledAt) return
-    try {
-      await createSession(groupId, { title: title.trim(), description: description.trim(), location: location.trim(), scheduledAt, durationMins: parseInt(durationMins, 10) || 60 })
-      setTitle(''); setDescription(''); setLocation(''); setScheduledAt(''); setDurationMins('60'); setShowForm(false)
-    } catch { /* toast handled in hook */ }
-  }
-
-  const upcoming = sessions.filter((s) => new Date(s.scheduledAt) >= new Date() && s.status !== 'cancelled')
-  const past = sessions.filter((s) => new Date(s.scheduledAt) < new Date() || s.status === 'cancelled')
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: 'var(--type-sm)', fontWeight: 600, color: 'var(--sh-text)' }}>{sessions.length} session{sessions.length === 1 ? '' : 's'}</span>
-        {isAdmin && <button onClick={() => setShowForm(!showForm)} style={tabStyles.addBtn}>{showForm ? 'Cancel' : 'Schedule Session'}</button>}
-      </div>
-
-      {showForm && (
-        <form onSubmit={handleCreate} style={tabStyles.inlineForm}>
-          <input type="text" placeholder="Session title *" value={title} onChange={(e) => setTitle(e.target.value)} style={tabStyles.formInput} maxLength={200} />
-          <textarea placeholder="Description (optional)" value={description} onChange={(e) => setDescription(e.target.value)} style={tabStyles.formTextarea} rows={2} maxLength={500} />
-          <input type="text" placeholder="Location (e.g., Library Room 204, Zoom link)" value={location} onChange={(e) => setLocation(e.target.value)} style={tabStyles.formInput} />
-          <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
-            <input type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} style={{ ...tabStyles.formInput, flex: 1 }} />
-            <input type="number" placeholder="Minutes" value={durationMins} onChange={(e) => setDurationMins(e.target.value)} style={{ ...tabStyles.formInput, width: 100 }} min={1} max={1440} />
-          </div>
-          <button type="submit" disabled={!title.trim() || !scheduledAt} style={tabStyles.submitSmallBtn}>Schedule</button>
-        </form>
-      )}
-
-      {sessions.length === 0 ? (
-        <div style={tabStyles.emptyText}>No study sessions scheduled yet.</div>
-      ) : (
-        <>
-          {upcoming.length > 0 && (
-            <div>
-              <h4 style={{ margin: '0 0 var(--space-3)', fontSize: 'var(--type-sm)', fontWeight: 700, color: 'var(--sh-heading)' }}>Upcoming</h4>
-              {upcoming.map((s) => (
-                <SessionCard key={s.id} session={s} groupId={groupId} isAdmin={isAdmin} deleteSession={deleteSession} rsvpSession={rsvpSession} />
-              ))}
-            </div>
-          )}
-          {past.length > 0 && (
-            <div>
-              <h4 style={{ margin: '0 0 var(--space-3)', fontSize: 'var(--type-sm)', fontWeight: 700, color: 'var(--sh-muted)' }}>Past</h4>
-              {past.map((s) => (
-                <SessionCard key={s.id} session={s} groupId={groupId} isAdmin={isAdmin} deleteSession={deleteSession} rsvpSession={rsvpSession} isPast />
-              ))}
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  )
-}
-
-function SessionCard({ session, groupId, isAdmin, deleteSession, rsvpSession, isPast }) {
-  const date = new Date(session.scheduledAt)
-  const endDate = new Date(date.getTime() + (session.durationMins || 60) * 60000)
-
-  return (
-    <div style={{ ...tabStyles.resourceCard, opacity: isPast ? 0.65 : 1, marginBottom: 'var(--space-3)' }}>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 'var(--type-sm)', fontWeight: 600, color: 'var(--sh-heading)', marginBottom: 'var(--space-2)' }}>{session.title}</div>
-        {session.description && <p style={{ margin: '0 0 var(--space-2)', fontSize: 'var(--type-xs)', color: 'var(--sh-muted)' }}>{session.description}</p>}
-        <div style={{ fontSize: 'var(--type-xs)', color: 'var(--sh-text)', marginBottom: 'var(--space-2)' }}>
-          {date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} at {date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} - {endDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
-        </div>
-        {session.location && <div style={{ fontSize: 'var(--type-xs)', color: 'var(--sh-muted)' }}>Location: {session.location}</div>}
-        {session.recurring && <div style={{ fontSize: 'var(--type-xs)', color: 'var(--sh-info-text)', fontWeight: 600, marginTop: 'var(--space-1)' }}>Repeats {session.recurring}</div>}
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', alignItems: 'flex-end' }}>
-        {!isPast && (
-          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-            <button onClick={() => rsvpSession(groupId, session.id, { status: 'going' })} style={{ ...tabStyles.rsvpBtn, ...(session.userRsvpStatus === 'going' ? tabStyles.rsvpActive : {}) }}>Going</button>
-            <button onClick={() => rsvpSession(groupId, session.id, { status: 'maybe' })} style={{ ...tabStyles.rsvpBtn, ...(session.userRsvpStatus === 'maybe' ? tabStyles.rsvpActive : {}) }}>Maybe</button>
-          </div>
-        )}
-        {isAdmin && !isPast && (
-          <button onClick={() => { if (window.confirm('Delete this session?')) deleteSession(groupId, session.id) }} style={tabStyles.deleteSmallBtn}>Delete</button>
-        )}
-        {session.status === 'cancelled' && <span style={{ fontSize: 'var(--type-xs)', color: 'var(--sh-danger-text)', fontWeight: 600 }}>Cancelled</span>}
-      </div>
-    </div>
-  )
-}
-
-/* ─────────────────────────────────────────────────────────────────────────
-   TAB: DISCUSSIONS
-───────────────────────────────────────────────────────────────────────────── */
-function GroupDiscussionsTab({ groupId, discussions, loading, loadDiscussions, createPost, addReply, resolvePost, deletePost, isMember, isAdmin }) {
-  const [showForm, setShowForm] = useState(false)
-  const [title, setTitle] = useState('')
-  const [content, setContent] = useState('')
-  const [expandedPost, setExpandedPost] = useState(null)
-  const [replyText, setReplyText] = useState('')
-
-  useEffect(() => { if (isMember) loadDiscussions(groupId) }, [groupId, isMember, loadDiscussions])
-
-  if (!isMember) return <div style={tabStyles.emptyText}>Join the group to see discussions.</div>
-  if (loading) return <div style={tabStyles.loadingText}>Loading discussions...</div>
-
-  const handleCreatePost = async (e) => {
-    e.preventDefault()
-    if (!title.trim() || !content.trim()) return
-    try {
-      await createPost(groupId, { title: title.trim(), content: content.trim() })
-      setTitle(''); setContent(''); setShowForm(false)
-    } catch { /* toast handled in hook */ }
-  }
-
-  const handleReply = async (postId) => {
-    if (!replyText.trim()) return
-    try {
-      await addReply(groupId, postId, { content: replyText.trim() })
-      setReplyText('')
-    } catch { /* toast handled in hook */ }
-  }
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: 'var(--type-sm)', fontWeight: 600, color: 'var(--sh-text)' }}>{discussions.length} discussion{discussions.length === 1 ? '' : 's'}</span>
-        <button onClick={() => setShowForm(!showForm)} style={tabStyles.addBtn}>{showForm ? 'Cancel' : 'New Discussion'}</button>
-      </div>
-
-      {showForm && (
-        <form onSubmit={handleCreatePost} style={tabStyles.inlineForm}>
-          <input type="text" placeholder="Discussion title *" value={title} onChange={(e) => setTitle(e.target.value)} style={tabStyles.formInput} maxLength={200} />
-          <textarea placeholder="What would you like to discuss? *" value={content} onChange={(e) => setContent(e.target.value)} style={tabStyles.formTextarea} rows={3} maxLength={2000} />
-          <button type="submit" disabled={!title.trim() || !content.trim()} style={tabStyles.submitSmallBtn}>Post</button>
-        </form>
-      )}
-
-      {discussions.length === 0 ? (
-        <div style={tabStyles.emptyText}>No discussions yet. Start a conversation!</div>
-      ) : (
-        discussions.map((post) => (
-          <div key={post.id} style={tabStyles.discussionCard}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', marginBottom: 'var(--space-2)' }}>
-                  {post.resolved && <span style={{ fontSize: 'var(--type-xs)', fontWeight: 600, color: 'var(--sh-success-text)', background: 'var(--sh-success-bg)', padding: '2px 8px', borderRadius: 'var(--radius-full)' }}>Resolved</span>}
-                  <span style={{ fontSize: 'var(--type-sm)', fontWeight: 600, color: 'var(--sh-heading)' }}>{post.title}</span>
-                </div>
-                <p style={{ margin: '0 0 var(--space-3)', fontSize: 'var(--type-sm)', color: 'var(--sh-text)', lineHeight: 1.5 }}>{post.content}</p>
-                <div style={{ fontSize: 'var(--type-xs)', color: 'var(--sh-muted)' }}>
-                  by {post.user?.username || 'Unknown'} -- {new Date(post.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                  {post.replyCount > 0 && ` -- ${post.replyCount} repl${post.replyCount === 1 ? 'y' : 'ies'}`}
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: 'var(--space-2)', flexShrink: 0 }}>
-                {isAdmin && !post.resolved && (
-                  <button onClick={() => resolvePost(groupId, post.id)} style={tabStyles.smallActionBtn}>Resolve</button>
-                )}
-                {isAdmin && (
-                  <button onClick={() => { if (window.confirm('Delete this discussion?')) deletePost(groupId, post.id) }} style={tabStyles.deleteSmallBtn}>Delete</button>
-                )}
-              </div>
-            </div>
-
-            {/* Expand/collapse replies */}
-            <button
-              onClick={() => setExpandedPost(expandedPost === post.id ? null : post.id)}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 'var(--type-xs)', color: 'var(--sh-brand)', fontWeight: 600, padding: 0, marginTop: 'var(--space-3)', fontFamily: PAGE_FONT }}
-            >
-              {expandedPost === post.id ? 'Hide replies' : `View replies (${post.replyCount || 0})`}
-            </button>
-
-            {expandedPost === post.id && (
-              <div style={{ marginTop: 'var(--space-3)', paddingLeft: 'var(--space-6)', borderLeft: '2px solid var(--sh-border)' }}>
-                {post.replies?.length > 0 ? post.replies.map((reply) => (
-                  <div key={reply.id} style={{ marginBottom: 'var(--space-3)' }}>
-                    <div style={{ fontSize: 'var(--type-sm)', color: 'var(--sh-text)', lineHeight: 1.5 }}>{reply.content}</div>
-                    <div style={{ fontSize: 'var(--type-xs)', color: 'var(--sh-muted)', marginTop: 'var(--space-1)' }}>
-                      {reply.user?.username || 'Unknown'} -- {new Date(reply.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    </div>
-                  </div>
-                )) : (
-                  <div style={{ fontSize: 'var(--type-xs)', color: 'var(--sh-muted)' }}>No replies yet.</div>
-                )}
-
-                {/* Reply form */}
-                <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-3)' }}>
-                  <input
-                    type="text"
-                    placeholder="Write a reply..."
-                    value={replyText}
-                    onChange={(e) => setReplyText(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter' && replyText.trim()) handleReply(post.id) }}
-                    style={{ ...tabStyles.formInput, flex: 1 }}
-                    maxLength={2000}
-                  />
-                  <button onClick={() => handleReply(post.id)} disabled={!replyText.trim()} style={tabStyles.submitSmallBtn}>Reply</button>
-                </div>
-              </div>
-            )}
-          </div>
-        ))
-      )}
-    </div>
-  )
-}
 
 /* ─────────────────────────────────────────────────────────────────────────
    TAB SHARED STYLES
 ───────────────────────────────────────────────────────────────────────────── */
-const tabStyles = {
-  loadingText: { padding: 'var(--space-12)', textAlign: 'center', color: 'var(--sh-muted)', fontSize: 'var(--type-sm)', fontFamily: PAGE_FONT },
-  emptyText: { padding: 'var(--space-12)', textAlign: 'center', color: 'var(--sh-muted)', fontSize: 'var(--type-sm)', fontFamily: PAGE_FONT },
-  statCard: { background: 'var(--sh-soft)', border: '1px solid var(--sh-border)', borderRadius: 'var(--radius-card)', padding: 'var(--space-6)', textAlign: 'center', fontFamily: PAGE_FONT },
-  statValue: { fontSize: 'var(--type-lg)', fontWeight: 700, color: 'var(--sh-heading)', marginBottom: 'var(--space-1)' },
-  statLabel: { fontSize: 'var(--type-xs)', color: 'var(--sh-muted)', fontWeight: 600 },
-  memberRow: { display: 'flex', alignItems: 'center', gap: 'var(--space-4)', padding: 'var(--space-4)', background: 'var(--sh-soft)', borderRadius: 'var(--radius-card)', border: '1px solid var(--sh-border)', fontFamily: PAGE_FONT },
-  addBtn: { padding: '8px 16px', borderRadius: 'var(--radius-control)', border: 'none', background: 'var(--sh-brand)', color: 'white', fontSize: 'var(--type-xs)', fontWeight: 600, cursor: 'pointer', fontFamily: PAGE_FONT, transition: 'opacity 0.12s' },
-  smallActionBtn: { padding: '4px 10px', borderRadius: 'var(--radius-control)', border: '1px solid var(--sh-border)', background: 'var(--sh-surface)', color: 'var(--sh-text)', fontSize: 'var(--type-xs)', fontWeight: 600, cursor: 'pointer', fontFamily: PAGE_FONT },
-  deleteSmallBtn: { padding: '4px 10px', borderRadius: 'var(--radius-control)', border: '1px solid var(--sh-danger-border)', background: 'var(--sh-danger-bg)', color: 'var(--sh-danger-text)', fontSize: 'var(--type-xs)', fontWeight: 600, cursor: 'pointer', fontFamily: PAGE_FONT },
-  inlineForm: { display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', padding: 'var(--space-4)', background: 'var(--sh-soft)', borderRadius: 'var(--radius-card)', border: '1px solid var(--sh-border)', fontFamily: PAGE_FONT },
-  formInput: { padding: '8px 12px', borderRadius: 'var(--radius-control)', border: '1px solid var(--sh-border)', background: 'var(--sh-input-bg)', color: 'var(--sh-input-text)', fontSize: 'var(--type-sm)', fontFamily: PAGE_FONT, boxSizing: 'border-box' },
-  formTextarea: { padding: '8px 12px', borderRadius: 'var(--radius-control)', border: '1px solid var(--sh-border)', background: 'var(--sh-input-bg)', color: 'var(--sh-input-text)', fontSize: 'var(--type-sm)', fontFamily: PAGE_FONT, resize: 'vertical', boxSizing: 'border-box' },
-  submitSmallBtn: { padding: '8px 16px', borderRadius: 'var(--radius-control)', border: 'none', background: 'var(--sh-brand)', color: 'white', fontSize: 'var(--type-xs)', fontWeight: 600, cursor: 'pointer', fontFamily: PAGE_FONT, alignSelf: 'flex-end' },
-  typeBadge: { display: 'inline-block', padding: '2px 8px', borderRadius: 'var(--radius-full)', background: 'var(--sh-pill-bg)', color: 'var(--sh-pill-text)', fontSize: 'var(--type-xs)', fontWeight: 600, textTransform: 'capitalize' },
-  resourceCard: { display: 'flex', gap: 'var(--space-4)', padding: 'var(--space-4)', background: 'var(--sh-soft)', borderRadius: 'var(--radius-card)', border: '1px solid var(--sh-border)', fontFamily: PAGE_FONT },
-  discussionCard: { padding: 'var(--space-4)', background: 'var(--sh-soft)', borderRadius: 'var(--radius-card)', border: '1px solid var(--sh-border)', fontFamily: PAGE_FONT },
-  rsvpBtn: { padding: '4px 10px', borderRadius: 'var(--radius-control)', border: '1px solid var(--sh-border)', background: 'var(--sh-surface)', color: 'var(--sh-text)', fontSize: 'var(--type-xs)', fontWeight: 600, cursor: 'pointer', fontFamily: PAGE_FONT },
-  rsvpActive: { background: 'var(--sh-brand)', color: 'white', borderColor: 'var(--sh-brand)' },
-}
 
 /* ─────────────────────────────────────────────────────────────────────────
    STYLES

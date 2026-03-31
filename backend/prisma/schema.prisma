@@ -86,6 +86,7 @@ model User {
   groupSessionRsvps          GroupSessionRsvp[]
   groupDiscussionPosts       GroupDiscussionPost[]
   groupDiscussionReplies     GroupDiscussionReply[]
+  discussionUpvotes          DiscussionUpvote[]
   shareLinksCreated          ShareLink[]               @relation("ShareLinkCreator")
   contentSharedBy            ContentShare[]            @relation("ContentSharedBy")
   contentSharedWith          ContentShare[]            @relation("ContentSharedWith")
@@ -1102,6 +1103,7 @@ model GroupDiscussionPost {
   group   StudyGroup             @relation(fields: [groupId], references: [id], onDelete: Cascade)
   author  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   replies GroupDiscussionReply[]
+  upvotes DiscussionUpvote[]
 
   @@index([groupId, pinned, createdAt(sort: Desc)])
   @@index([groupId, type, createdAt(sort: Desc)])
@@ -1116,8 +1118,26 @@ model GroupDiscussionReply {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  post   GroupDiscussionPost @relation(fields: [postId], references: [id], onDelete: Cascade)
-  author User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post    GroupDiscussionPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author  User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  upvotes DiscussionUpvote[]
 
   @@index([postId, createdAt])
+}
+
+model DiscussionUpvote {
+  id        Int      @id @default(autoincrement())
+  postId    Int?
+  replyId   Int?
+  userId    Int
+  createdAt DateTime @default(now())
+
+  post  GroupDiscussionPost?  @relation(fields: [postId], references: [id], onDelete: Cascade)
+  reply GroupDiscussionReply? @relation(fields: [replyId], references: [id], onDelete: Cascade)
+  user  User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@unique([replyId, userId])
+  @@index([postId])
+  @@index([replyId])
 }

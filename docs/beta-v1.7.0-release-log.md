@@ -2026,3 +2026,205 @@ Restructured SheetViewerPage from a 664-line monolith into focused child compone
 | New tests | 9/9 pass (6 badge + 3 constant) |
 | Dark mode | All styles use CSS custom property tokens |
 | No hardcoded colors | Verified (only rgba shadows, which are acceptable) |
+
+---
+
+## Cycle 55 -- Bug Fixes + Study Groups Tabs + Messaging Enhancements (2026-03-30)
+
+### Summary
+
+Fixed four production bugs (ChatPanel sidebar, "Unknown User" in messages, "Failed to join group", context menu), fully wired all five Study Group sub-feature tabs, and added image sharing and inline polls to messaging.
+
+### Bug Fixes
+
+- **ChatPanel "No conversations yet"**: API returns a plain array but code expected `data.conversations`. Fixed response parsing.
+- **"Unknown User" in thread header**: Normalized nested `{ user: { id, username } }` participant shape to flat `{ id, username }` in `selectConversation` and `startConversation`.
+- **"Failed to join group"**: `formatGroup()` was missing `isMember` boolean and `userRole` string fields the frontend expected. Also fixed `creatorId` to `createdById`.
+- **Context menu stays open**: Added click-outside handler with useRef/useEffect.
+
+### Study Groups -- All 5 Tabs Wired
+
+- **Overview**: Description, stat cards (members, privacy, course, max), creation date.
+- **Members**: List with avatars, roles, promote/remove admin actions.
+- **Resources**: Add/delete with title, URL, description, type select.
+- **Sessions**: Upcoming/past separation, RSVP buttons, create form with datetime-local.
+- **Discussions**: Post list, expand/collapse replies, inline reply, resolve/delete.
+
+### Messaging Enhancements
+
+- Image sharing via URL attachments with inline previews.
+- Inline polls: question, multiple options, single/multi-vote, percentage bars, close.
+- New Prisma models: MessageAttachment, MessagePoll, MessagePollOption, MessagePollVote.
+- Migration: `20260330000005_add_message_attachments_and_polls`.
+- New endpoints: POST poll/vote, POST poll/close.
+- Socket events: `poll:vote`, `poll:close`.
+
+### Validation
+
+- Backend lint: 0 errors | Frontend lint: 0 errors
+- Frontend build: success | Backend tests: 546 passed, 43 pre-existing failures
+
+---
+
+## Cycle 56 -- Feed HTML Cleanup + Security Hardening (2026-03-31)
+
+### Summary
+
+Fixed raw HTML showing in feed card previews and hardened messaging + study group security.
+
+### Feed HTML Cleanup
+
+- Added `stripHtml()` to `feed.service.js` -- removes `<style>`, `<script>`, all tags, decodes HTML entities.
+- `summarizeText()` now produces clean readable text instead of raw `<!DOCTYPE html>...` markup.
+- Search results for sheets and groups also sanitized via `summarizeText()`.
+
+### Messaging Security
+
+- New `verifyMessageParticipant()` helper -- checks message existence + conversation membership in one call, returns 404 (not 403) to avoid leaking message existence.
+- `sanitizeMessageContent()` strips HTML from all message content on write (POST/PATCH).
+- Reaction endpoints (POST/DELETE) now verify conversation participant membership.
+- Poll vote/close endpoints now verify conversation participant membership.
+- Attachment validation: max 5 per message, HTTPS-only URLs.
+- Poll option limit: max 10. Reaction length limit: max 32 chars.
+- Security policy: platform admins have zero access to conversations they are not participants of.
+
+### Study Group Security
+
+- `validateTitle()` now strips HTML tags.
+- `validateResourceUrl()` validates http/https URLs.
+- Private group detail returns 404 (not 403) to non-members.
+
+### Validation
+
+- Backend lint: 0 errors | Frontend lint: 0 errors
+- Frontend build: success | Backend tests: 546 passed, 43 pre-existing failures
+
+---
+
+## Cycle 57 -- Messaging Feature Expansion (2026-03-31)
+
+### Summary
+
+Fixed notification badge persistence, replaced image URL input with file picker, added GIF search, reply-to, message search, and link previews.
+
+### Bug Fix: Notification Badge
+
+- `selectConversation` now sets `unreadCount: 0` immediately in the conversation list state.
+- `handleNewMessage` socket handler increments unread for inactive conversations, clears for active.
+
+### New Features
+
+- **File Picker**: Paperclip button opens native file picker (images, GIFs, PDFs, docs, zip). Thumbnail previews with remove buttons. Max 5 attachments.
+- **GIF Search**: Tenor v2 API integration with debounced search, 3-column grid, click-to-send.
+- **Reply-to Messages**: Reply button on hover, "Replying to..." banner above input, quoted message rendered above bubble.
+- **Message Search**: Search icon in conversation header, filters messages by content, shows result count.
+- **Link Previews**: Auto-detects URLs in message content, shows domain + clickable preview card.
+- **Toolbar Reorganized**: Attach File, Image URL, GIF, Poll -- only one panel open at a time.
+
+### Validation
+
+- Frontend lint: 0 errors | Backend lint: 0 errors
+- Frontend build: success | No new test failures
+
+---
+
+## Cycle 58 -- Study Groups Polish & ChatPanel Parity (2026-03-31)
+
+### Summary
+
+Comprehensive study groups UX overhaul (backend + frontend), messaging notification badge stale-closure fix, and ChatPanel sidebar feature parity with the full MessagesPage.
+
+### Bug Fix: Messaging Notification Badge Persistence
+
+- Root cause: `handleNewMessage` socket handler captured stale `activeConversation` from the useEffect closure, so it could not detect the currently open conversation.
+- Fix: Added `activeConversationIdRef` (useRef) synced in `selectConversation`, `deleteConversation`, and `archiveConversation`. The socket handler now reads `activeConversationIdRef.current` instead of the closure variable.
+- Belt-and-suspenders: Added `handleMessageRead` listener that zeros unread count when the server confirms a read receipt.
+- Changed effect deps from `[socket, activeConversation, currentUserId]` to `[socket, currentUserId]` to prevent handler re-registration on every conversation switch.
+
+### Study Groups Backend Improvements
+
+- `formatGroup()` now runs parallel aggregate queries (`Promise.all`) for memberCount, resourceCount, upcomingSessionCount, and discussionPostCount.
+- Invite endpoint accepts both `userId` (number) and `username` (string) for flexible invites.
+- Sessions endpoint returns `rsvpCount`, `rsvpMaybeCount`, `rsvpTotal` per session.
+- Discussions endpoint includes `upvoteCount` and `userHasUpvoted` per post/reply.
+- New endpoints: `POST /:id/discussions/:postId/upvote`, `POST /:id/discussions/:postId/replies/:replyId/upvote` (toggle pattern), `GET /:id/activity` (merged activity feed).
+- New Prisma model `DiscussionUpvote` with migration `20260331000001_add_discussion_upvotes`.
+
+### Study Groups Frontend Overhaul (GroupDetailTabs.jsx)
+
+- **GroupOverviewTab**: Rewritten with About section (course badge), Quick Stats grid (uses backend counts), Upcoming Sessions preview cards, real activity feed with user avatars and action descriptions.
+- **GroupSessionsTab**: Fixed `startedAt` -> `scheduledAt` field name (global replace), removed unsupported daily/monthly recurring options, added RSVP count display, RSVP buttons highlight user's current selection.
+- **GroupDiscussionsTab**: Added upvote button (arrow SVG with count) on each post, `onUpvote` prop wired through.
+- **GroupMembersTab**: Added member search input, grouped members by role (Admins/Moderators/Members), uses UserAvatar, shows status badges. Fixed React hooks rule violation (useState before early return).
+- Removed duplicate inline tab components from StudyGroupsPage.jsx; now imports from GroupDetailTabs.jsx.
+
+### ChatPanel Sidebar Feature Parity
+
+- **GIF Search**: Compact Tenor v2 panel (9 results, 3-column grid) integrated into ChatPanel input area.
+- **File Attachments**: Paperclip button with native file picker, thumbnail previews (52x52), remove buttons. Max 5 attachments.
+- **Image URL Sharing**: Toggle input for pasting image URLs directly.
+- **Reply-to**: Hover reply button on message bubbles, "Replying to..." banner above input, quoted message rendering above reply bubble.
+- **Inline Attachment Rendering**: Message bubbles now display image attachments (clickable, max 140px) and file attachment links with icons.
+- Action toolbar with file/image/GIF buttons, only one panel open at a time.
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `frontend/.../pages/messages/useMessagingData.js` | Stale closure fix with activeConversationIdRef, handleMessageRead listener |
+| `backend/src/modules/studyGroups/studyGroups.routes.js` | Stat counts, invite by username, RSVP counts, upvote endpoints, activity feed |
+| `backend/prisma/schema.prisma` | Added DiscussionUpvote model with relations |
+| `backend/prisma/migrations/20260331000001_.../migration.sql` | DiscussionUpvote table, indexes, foreign keys |
+| `frontend/.../pages/studyGroups/useStudyGroupsData.js` | Activity feed state/loader, toggleUpvote, upcomingSessionsPreview |
+| `frontend/.../pages/studyGroups/GroupDetailTabs.jsx` | Full rewrite of all 5 tab components |
+| `frontend/.../pages/studyGroups/StudyGroupsPage.jsx` | Import tabs from GroupDetailTabs, remove inline duplicates, fix unused vars |
+| `frontend/.../components/ChatPanel.jsx` | Full rewrite with GIF, attachments, image URL, reply-to, attachment rendering |
+
+### GIF Picker UX Improvements
+
+- Enlarged GIF preview grid: images now 110px tall (was 72px) in MessagesPage, 90px (was 60px) in ChatPanel.
+- Increased max panel height to 380px (MessagesPage) and 300px (ChatPanel) for more visible results.
+- GIF-only messages no longer include Tenor's description text -- GIFs send as image-only, no caption.
+- Backend updated to allow attachment-only messages (empty content permitted when attachments present).
+- Frontend `sendMessage` hook updated to allow sending when content is empty but attachments exist.
+
+### Trust System: Time-Based Auto-Promotion
+
+- New accounts now automatically promoted from "new" to "trusted" after 4 hours, even without email.
+- Two promotion paths: (1) email on file + clean record = instant trust, (2) account age >= 4 hours + clean record = auto-trust.
+- Promotion check fires on every authenticated request (fire-and-forget, non-blocking) for "new" users via `requireAuth` middleware.
+- `meetsPromotionCriteria()` updated to accept `createdAt` parameter for age-based evaluation.
+- `checkAndPromoteTrust()` now passes `createdAt` to the criteria function.
+- Hard blocks remain: any confirmed violations, active strikes, or active restrictions prevent promotion regardless of age.
+
+### Security Hardening (Messaging)
+
+- Attachment URL validation strengthened: now uses `new URL()` parsing to reject malformed URLs beyond the `https://` prefix check.
+- Attachment fileName sanitized: strips `< > " / \ | ? *` characters, truncated to 255 chars to prevent path traversal or injection.
+- Existing security measures verified: HTML tag stripping on content, HTTPS-only attachments, max 5 attachments, 60/min rate limit, conversation membership check.
+
+### Additional Files Changed
+
+| File | Change |
+|------|--------|
+| `frontend/.../pages/messages/MessagesPage.jsx` | Enlarged GIF grid (110px), removed GIF description from send, maxHeight 380px |
+| `frontend/.../components/ChatPanel.jsx` | Enlarged GIF grid (90px), GIF sends without description, maxHeight 300px |
+| `frontend/.../pages/messages/useMessagingData.js` | Allow empty content with attachments |
+| `backend/src/modules/messaging/messaging.routes.js` | Allow empty content with attachments, URL parsing validation, fileName sanitization |
+| `backend/src/lib/trustGate.js` | AUTO_TRUST_AGE_HOURS constant, age-based promotion path, createdAt in criteria |
+| `backend/src/middleware/auth.js` | Fire-and-forget trust promotion check for "new" users on every auth request |
+
+### Validation
+
+- Frontend lint: 0 errors | Backend lint: 0 errors
+- Frontend build: success | No new test failures
+
+### Deploy Note
+
+- Run `npx prisma migrate deploy` on Railway for migration `20260331000001_add_discussion_upvotes`.
+
+---
+
+## Improvement Phase (starting 2026-03-31)
+
+All major features are now implemented. Going forward, weekly cycles focus on improving existing features: UX polish, edge case fixes, performance, accessibility, and test coverage. No new features will be added.

@@ -563,16 +563,16 @@ router.post('/conversations/:id/messages', requireAuth, messageWriteLimiter, asy
     const conversationId = parseInt(req.params.id, 10)
     const { content, type = 'text', replyToId, attachments = [], poll } = req.body
 
-    if (!content || typeof content !== 'string' || content.trim() === '') {
+    // Allow empty content when attachments are present (e.g. GIF-only messages)
+    const hasAttachments = Array.isArray(attachments) && attachments.length > 0
+    const rawContent = (typeof content === 'string') ? content.trim() : ''
+
+    if (!rawContent && !hasAttachments && !poll) {
       return res.status(400).json({ error: 'Message content required.' })
     }
 
     // Sanitize content to prevent stored XSS
-    const cleanContent = sanitizeMessageContent(content)
-
-    if (cleanContent.length === 0) {
-      return res.status(400).json({ error: 'Message content required.' })
-    }
+    const cleanContent = rawContent ? sanitizeMessageContent(rawContent) : ''
 
     if (cleanContent.length > MAX_MESSAGE_LENGTH) {
       return res.status(400).json({ error: `Message too long. Maximum ${MAX_MESSAGE_LENGTH} characters.` })
@@ -600,9 +600,21 @@ router.post('/conversations/:id/messages', requireAuth, messageWriteLimiter, asy
       if (!att.url || typeof att.url !== 'string') {
         return res.status(400).json({ error: 'Attachment URL required.' })
       }
-      // Only allow https URLs for attachments
+      // Only allow well-formed https URLs for attachments
       if (!att.url.startsWith('https://')) {
         return res.status(400).json({ error: 'Attachment URL must use HTTPS.' })
+      }
+      try {
+        const parsed = new URL(att.url)
+        if (parsed.protocol !== 'https:') {
+          return res.status(400).json({ error: 'Attachment URL must use HTTPS.' })
+        }
+      } catch {
+        return res.status(400).json({ error: 'Attachment URL is not valid.' })
+      }
+      // Sanitize fileName to prevent path traversal or injection
+      if (att.fileName && typeof att.fileName === 'string') {
+        att.fileName = att.fileName.replace(/[<>"/\\|?*]/g, '').slice(0, 255)
       }
     }
 

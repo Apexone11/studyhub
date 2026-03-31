@@ -864,6 +864,52 @@ export function useStudyGroupsData() {
     [searchParams, setSearchParams]
   );
 
+  // ── Activity feed ──────────────────────────────────────────────────
+  const [activities, setActivities] = useState([]);
+  const [activitiesLoading, setActivitiesLoading] = useState(false);
+  const [upcomingSessionsPreview, setUpcomingSessionsPreview] = useState([]);
+
+  const loadActivity = useCallback(async (groupId) => {
+    setActivitiesLoading(true);
+    try {
+      const resp = await fetch(`${API}/api/study-groups/${groupId}/activity?limit=10`, {
+        credentials: 'include',
+        headers: authHeaders(),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        setActivities(data.activities || []);
+        setUpcomingSessionsPreview(data.upcomingSessions || []);
+      }
+    } catch { /* silent */ }
+    setActivitiesLoading(false);
+  }, []);
+
+  // ── Upvote toggle ────────────────────────────────────────────────
+  const toggleUpvote = useCallback(async (groupId, postId) => {
+    try {
+      const resp = await fetch(`${API}/api/study-groups/${groupId}/discussions/${postId}/upvote`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: authHeaders(),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        setDiscussions((prev) =>
+          prev.map((p) =>
+            p.id === postId
+              ? { ...p, upvoteCount: data.upvoteCount, userHasUpvoted: data.upvoted }
+              : p
+          )
+        );
+        return data;
+      }
+    } catch {
+      showToast('Failed to toggle upvote', 'error');
+    }
+    return null;
+  }, []);
+
   // Load groups when filters/pagination change
   useEffect(() => {
     loadGroups();
@@ -931,6 +977,15 @@ export function useStudyGroupsData() {
     deletePost,
     addReply,
     resolvePost,
+
+    // Activity feed
+    activities,
+    activitiesLoading,
+    upcomingSessionsPreview,
+    loadActivity,
+
+    // Upvotes
+    toggleUpvote,
 
     // Filter and pagination utilities
     setFilters,

@@ -4,6 +4,10 @@
  * Renders as a fixed panel on the right side of the viewport.
  * Can be opened from any page via the chat icon in the navbar.
  * Uses createPortal to avoid stacking context issues.
+ *
+ * Features: conversation list, message thread, GIF search, file
+ * attachments, image URL sharing, reply-to, and inline attachment
+ * rendering in message bubbles.
  * ===================================================================== */
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
@@ -15,7 +19,7 @@ import UserAvatar from './UserAvatar'
 
 const PAGE_FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 
-/* -- Relative time helper ------------------------------------------------ */
+/* -- Helpers ------------------------------------------------------------- */
 function relTime(iso) {
   if (!iso) return ''
   const diff = Date.now() - new Date(iso).getTime()
@@ -27,6 +31,92 @@ function relTime(iso) {
   return `${Math.floor(h / 24)}d`
 }
 
+function truncate(text, max = 50) {
+  if (!text) return ''
+  return text.length > max ? text.slice(0, max) + '...' : text
+}
+
+/* ── Compact GIF Search Panel ──────────────────────────────────────────── */
+function GifSearchPanel({ onSelect, onClose }) {
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState([])
+  const [loading, setLoading] = useState(false)
+  const timerRef = useRef(null)
+
+  const trimmedQuery = query.trim()
+  const displayResults = trimmedQuery ? results : []
+  const displayLoading = trimmedQuery ? loading : false
+
+  useEffect(() => {
+    if (!trimmedQuery) return undefined
+    let cancelled = false
+    if (timerRef.current) clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(async () => {
+      if (cancelled) return
+      setLoading(true)
+      try {
+        const resp = await fetch(
+          `https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(trimmedQuery)}&key=AIzaSyAyimkuYQYF_FXVALexPuGQctUWRURdCYQ&client_key=studyhub&limit=12&media_filter=tinygif,gif`
+        )
+        if (resp.ok && !cancelled) {
+          const data = await resp.json()
+          const gifs = (data.results || []).map((item) => ({
+            id: item.id,
+            preview: item.media_formats?.tinygif?.url || item.media_formats?.gif?.url || '',
+            full: item.media_formats?.gif?.url || item.media_formats?.tinygif?.url || '',
+            title: item.content_description || 'GIF',
+          }))
+          setResults(gifs)
+        }
+      } catch { /* silent */ }
+      if (!cancelled) setLoading(false)
+    }, 400)
+    return () => { cancelled = true; if (timerRef.current) clearTimeout(timerRef.current) }
+  }, [trimmedQuery])
+
+  return (
+    <div style={{
+      marginBottom: 6, padding: '8px 10px',
+      background: 'var(--sh-soft)', borderRadius: 8,
+      border: '1px solid var(--sh-border)', maxHeight: 300, display: 'flex', flexDirection: 'column',
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--sh-heading)', fontFamily: PAGE_FONT }}>Search GIFs</span>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sh-muted)', fontSize: 11, fontFamily: PAGE_FONT }}>Cancel</button>
+      </div>
+      <input
+        type="text"
+        placeholder="Search for GIFs..."
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        autoFocus
+        style={{
+          width: '100%', padding: '5px 8px', marginBottom: 4,
+          background: 'var(--sh-surface)', color: 'var(--sh-text)',
+          border: '1px solid var(--sh-border)', borderRadius: 6,
+          fontSize: 12, fontFamily: PAGE_FONT, boxSizing: 'border-box',
+        }}
+      />
+      <div style={{ flex: 1, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 5 }}>
+        {displayLoading && <div style={{ gridColumn: '1 / -1', textAlign: 'center', color: 'var(--sh-muted)', fontSize: 11, padding: 6 }}>Searching...</div>}
+        {!displayLoading && displayResults.length === 0 && trimmedQuery && (
+          <div style={{ gridColumn: '1 / -1', textAlign: 'center', color: 'var(--sh-muted)', fontSize: 11, padding: 6 }}>No GIFs found</div>
+        )}
+        {displayResults.map((gif) => (
+          <button
+            key={gif.id}
+            onClick={() => onSelect(gif)}
+            style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 0, borderRadius: 5, overflow: 'hidden' }}
+          >
+            <img src={gif.preview} alt={gif.title} loading="lazy" style={{ width: '100%', height: 90, objectFit: 'cover', borderRadius: 5, display: 'block' }} />
+          </button>
+        ))}
+      </div>
+      <div style={{ textAlign: 'right', fontSize: 8, color: 'var(--sh-muted)', marginTop: 3 }}>Powered by Tenor</div>
+    </div>
+  )
+}
+
 /* ======================================================================= */
 export default function ChatPanel({ open, onClose }) {
   const [conversations, setConversations] = useState([])
@@ -36,6 +126,22 @@ export default function ChatPanel({ open, onClose }) {
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const messagesEndRef = useRef(null)
+
+  // Feature parity state
+  const [showGifPicker, setShowGifPicker] = useState(false)
+  const [showImageInput, setShowImageInput] = useState(false)
+  const [imageUrl, setImageUrl] = useState('')
+  const [attachmentPreviews, setAttachmentPreviews] = useState([])
+  const [replyTo, setReplyTo] = useState(null)
+  const [hoveredMsgId, setHoveredMsgId] = useState(null)
+  const fileInputRef = useRef(null)
+
+  /* -- Close all feature panels ----------------------------------------- */
+  function closeAllPanels() {
+    setShowGifPicker(false)
+    setShowImageInput(false)
+    setImageUrl('')
+  }
 
   /* -- Load conversations ------------------------------------------------ */
   const loadConversations = useCallback(async () => {
@@ -73,23 +179,96 @@ export default function ChatPanel({ open, onClose }) {
     return () => { cancelled = true }
   }, [activeId])
 
+  /* -- Clean up object URLs on unmount ----------------------------------- */
+  useEffect(() => {
+    return () => {
+      attachmentPreviews.forEach((a) => { if (a.previewUrl) URL.revokeObjectURL(a.previewUrl) })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  /* -- File selection handler -------------------------------------------- */
+  function handleFileSelect(e) {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+    const previews = files.slice(0, 5).map((file) => {
+      const isImage = file.type.startsWith('image/')
+      return {
+        file,
+        previewUrl: isImage ? URL.createObjectURL(file) : null,
+        type: isImage ? 'image' : 'file',
+        name: file.name,
+        size: file.size,
+      }
+    })
+    setAttachmentPreviews((prev) => [...prev, ...previews].slice(0, 5))
+    e.target.value = ''
+  }
+
+  function removeAttachmentPreview(index) {
+    setAttachmentPreviews((prev) => {
+      const removed = prev[index]
+      if (removed?.previewUrl) URL.revokeObjectURL(removed.previewUrl)
+      return prev.filter((_, i) => i !== index)
+    })
+  }
+
+  /* -- GIF select handler ------------------------------------------------ */
+  function handleGifSelect(gif) {
+    doSend('', {
+      attachments: [{ type: 'image', url: gif.full, fileName: 'gif' }],
+    })
+    setShowGifPicker(false)
+    setReplyTo(null)
+  }
+
   /* -- Send message ------------------------------------------------------- */
-  async function handleSend(e) {
-    e.preventDefault()
-    const text = input.trim()
-    if (!text || !activeId || sending) return
+  async function doSend(content, options = {}) {
+    const text = (content || '').trim()
+    const hasFiles = attachmentPreviews.length > 0
+    const hasImage = showImageInput && imageUrl.trim()
+    const hasOptionAttachments = Array.isArray(options.attachments) && options.attachments.length > 0
+
+    if (!text && !hasFiles && !hasImage && !hasOptionAttachments) return
+    if (!activeId || sending) return
+
+    const allAttachments = [...(options.attachments || [])]
+
+    if (hasImage) {
+      allAttachments.push({ type: 'image', url: imageUrl.trim() })
+    }
+
+    if (hasFiles) {
+      for (const ap of attachmentPreviews) {
+        if (ap.previewUrl) {
+          allAttachments.push({ type: ap.type, url: ap.previewUrl, fileName: ap.name, fileSize: ap.size })
+        }
+      }
+    }
+
+    const body = {
+      content: text,
+      replyToId: replyTo?.id || null,
+    }
+    if (allAttachments.length > 0) {
+      body.attachments = allAttachments
+    }
+
     setSending(true)
     try {
       const res = await fetch(`${API}/api/messages/conversations/${activeId}/messages`, {
         method: 'POST',
         credentials: 'include',
         headers: authHeaders(),
-        body: JSON.stringify({ content: text }),
+        body: JSON.stringify(body),
       })
       if (res.ok) {
         const msg = await res.json()
         setMessages(prev => [...prev, msg])
         setInput('')
+        setReplyTo(null)
+        setAttachmentPreviews([])
+        closeAllPanels()
         setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
       } else {
         showToast('Failed to send message', 'error')
@@ -99,9 +278,129 @@ export default function ChatPanel({ open, onClose }) {
     } finally { setSending(false) }
   }
 
+  function handleSend(e) {
+    e.preventDefault()
+    doSend(input)
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      doSend(input)
+    }
+  }
+
   if (!open) return null
 
   const activeConvo = conversations.find(c => c.id === activeId)
+
+  /* -- Message bubble sub-component for thread view ---------------------- */
+  function MessageBubble({ msg }) {
+    const isOwn = msg.sender?.username === 'me' || msg.senderId === msg._currentUserId
+    const isHovered = hoveredMsgId === msg.id
+    const isDeleted = Boolean(msg.deletedAt)
+
+    // Find reply-to message
+    const replyToMsg = msg.replyToId
+      ? (msg.replyTo || messages.find((m) => m.id === msg.replyToId))
+      : null
+
+    return (
+      <div
+        style={{ display: 'flex', justifyContent: isOwn ? 'flex-end' : 'flex-start', position: 'relative' }}
+        onMouseEnter={() => setHoveredMsgId(msg.id)}
+        onMouseLeave={() => setHoveredMsgId(null)}
+      >
+        <div style={{ maxWidth: '80%', position: 'relative' }}>
+          {/* Reply-to reference */}
+          {replyToMsg && !isDeleted && (
+            <div style={{
+              padding: '3px 6px', marginBottom: 1,
+              background: isOwn ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)',
+              borderRadius: '6px 6px 0 0',
+              borderLeft: '2px solid var(--sh-brand)',
+              fontSize: 10, color: isOwn ? 'rgba(255,255,255,0.8)' : 'var(--sh-muted)',
+            }}>
+              <span style={{ fontWeight: 600 }}>{replyToMsg.sender?.username || 'User'}</span>
+              <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {truncate(replyToMsg.content, 40)}
+              </div>
+            </div>
+          )}
+
+          <div style={{
+            padding: '8px 12px', borderRadius: replyToMsg && !isDeleted ? '0 0 12px 12px' : 12,
+            background: isOwn ? 'var(--sh-brand)' : 'var(--sh-soft)',
+            color: isOwn ? 'var(--sh-surface)' : 'var(--sh-text)',
+            fontSize: 13, lineHeight: 1.5, wordBreak: 'break-word',
+          }}>
+            {isDeleted ? (
+              <em style={{ opacity: 0.6 }}>[Message deleted]</em>
+            ) : (
+              msg.content
+            )}
+
+            {/* Inline attachments */}
+            {!isDeleted && Array.isArray(msg.attachments) && msg.attachments.length > 0 && (
+              <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {msg.attachments.map((att, idx) => (
+                  att.type === 'image' ? (
+                    <a key={att.id || idx} href={att.url} target="_blank" rel="noopener noreferrer">
+                      <img
+                        src={att.url}
+                        alt={att.fileName || 'Image'}
+                        style={{ maxWidth: '100%', maxHeight: 140, borderRadius: 4, display: 'block' }}
+                        onError={(e) => { e.target.style.display = 'none' }}
+                      />
+                    </a>
+                  ) : (
+                    <a
+                      key={att.id || idx}
+                      href={att.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 4,
+                        padding: '4px 8px',
+                        background: isOwn ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)',
+                        borderRadius: 4, color: 'inherit', textDecoration: 'none', fontSize: 11,
+                      }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
+                      {att.fileName || 'Download'}
+                      {att.fileSize ? ` (${Math.round(att.fileSize / 1024)}KB)` : ''}
+                    </a>
+                  )
+                ))}
+              </div>
+            )}
+
+            <div style={{ fontSize: 10, marginTop: 3, textAlign: 'right', opacity: 0.7 }}>
+              {new Date(msg.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+              {msg.editedAt ? ' (edited)' : ''}
+            </div>
+          </div>
+
+          {/* Reply action on hover */}
+          {isHovered && !isDeleted && !msg.pending && (
+            <button
+              onClick={() => setReplyTo(msg)}
+              title="Reply"
+              style={{
+                position: 'absolute', top: -8, right: isOwn ? 0 : undefined, left: isOwn ? undefined : 0,
+                width: 22, height: 22, borderRadius: 4,
+                background: 'var(--sh-surface)', border: '1px solid var(--sh-border)',
+                cursor: 'pointer', display: 'grid', placeItems: 'center',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.1)', color: 'var(--sh-muted)',
+              }}
+            >
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 17 4 12 9 7" /><path d="M20 18v-2a4 4 0 0 0-4-4H4" /></svg>
+            </button>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   const panel = (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1200, pointerEvents: 'none' }}>
@@ -129,7 +428,7 @@ export default function ChatPanel({ open, onClose }) {
           {activeId ? (
             <>
               <button
-                onClick={() => { setActiveId(null); setMessages([]) }}
+                onClick={() => { setActiveId(null); setMessages([]); setReplyTo(null); closeAllPanels(); setAttachmentPreviews([]) }}
                 aria-label="Back to conversations"
                 style={{
                   background: 'none', border: 'none', cursor: 'pointer',
@@ -236,74 +535,163 @@ export default function ChatPanel({ open, onClose }) {
                   <div style={{ padding: 24, textAlign: 'center', color: 'var(--sh-muted)', fontSize: 13 }}>
                     No messages yet. Say hello!
                   </div>
-                ) : messages.map(msg => {
-                  const isOwn = msg.sender?.username === 'me' || msg.senderId === msg._currentUserId
-                  return (
-                    <div key={msg.id} style={{ display: 'flex', justifyContent: isOwn ? 'flex-end' : 'flex-start' }}>
-                      <div style={{
-                        maxWidth: '75%', padding: '8px 12px', borderRadius: 12,
-                        background: isOwn ? 'var(--sh-brand)' : 'var(--sh-soft)',
-                        color: isOwn ? 'var(--sh-surface)' : 'var(--sh-text)',
-                        fontSize: 13, lineHeight: 1.5, wordBreak: 'break-word',
-                      }}>
-                        {msg.deletedAt ? (
-                          <em style={{ opacity: 0.6 }}>[Message deleted]</em>
-                        ) : (
-                          msg.content
-                        )}
-                        <div style={{
-                          fontSize: 10, marginTop: 4, textAlign: 'right',
-                          opacity: 0.7,
-                        }}>
-                          {new Date(msg.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                          {msg.editedAt ? ' (edited)' : ''}
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
+                ) : messages.map(msg => (
+                  <MessageBubble key={msg.id} msg={msg} />
+                ))}
                 <div ref={messagesEndRef} />
               </div>
             </div>
           )}
         </div>
 
-        {/* Message input (only when in a conversation) */}
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,.gif,.pdf,.doc,.docx,.txt,.zip"
+          multiple
+          onChange={handleFileSelect}
+          style={{ display: 'none' }}
+        />
+
+        {/* Message input area (only when in a conversation) */}
         {activeId && (
-          <form onSubmit={handleSend} style={{
-            padding: '10px 16px', borderTop: '1px solid var(--sh-border)',
-            display: 'flex', gap: 8, alignItems: 'flex-end',
-          }}>
-            <textarea
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(e) } }}
-              placeholder="Type a message..."
-              aria-label="Message input"
-              rows={1}
-              style={{
-                flex: 1, resize: 'none', border: '1px solid var(--sh-border)',
-                borderRadius: 10, padding: '8px 12px', fontSize: 13,
-                fontFamily: PAGE_FONT, background: 'var(--sh-surface)',
-                color: 'var(--sh-text)', outline: 'none', maxHeight: 80,
-                lineHeight: 1.4,
-              }}
-            />
-            <button
-              type="submit"
-              disabled={!input.trim() || sending}
-              aria-label="Send message"
-              style={{
-                background: 'var(--sh-brand)', color: 'var(--sh-surface)',
-                border: 'none', borderRadius: 10, padding: '8px 16px',
-                fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                opacity: (!input.trim() || sending) ? 0.5 : 1,
-                fontFamily: PAGE_FONT, transition: 'opacity .15s',
-              }}
-            >
-              Send
-            </button>
-          </form>
+          <div style={{ padding: '8px 12px', borderTop: '1px solid var(--sh-border)' }}>
+            {/* Reply-to banner */}
+            {replyTo && (
+              <div style={{
+                marginBottom: 6, padding: '5px 8px',
+                background: 'var(--sh-soft)', borderRadius: 6,
+                border: '1px solid var(--sh-border)', borderLeft: '3px solid var(--sh-brand)',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--sh-brand)' }}>
+                    Replying to {replyTo.sender?.username || 'message'}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--sh-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {truncate(replyTo.content, 50)}
+                  </div>
+                </div>
+                <button onClick={() => setReplyTo(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sh-muted)', fontSize: 13, padding: '0 3px', fontFamily: PAGE_FONT }}>x</button>
+              </div>
+            )}
+
+            {/* Attachment previews */}
+            {attachmentPreviews.length > 0 && (
+              <div style={{ marginBottom: 6, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                {attachmentPreviews.map((ap, i) => (
+                  <div key={i} style={{ position: 'relative', border: '1px solid var(--sh-border)', borderRadius: 4, overflow: 'hidden' }}>
+                    {ap.type === 'image' && ap.previewUrl ? (
+                      <img src={ap.previewUrl} alt={ap.name} style={{ width: 52, height: 52, objectFit: 'cover', display: 'block' }} />
+                    ) : (
+                      <div style={{ width: 52, height: 52, display: 'grid', placeItems: 'center', background: 'var(--sh-soft)', fontSize: 9, color: 'var(--sh-muted)', padding: 3, textAlign: 'center', wordBreak: 'break-all' }}>
+                        {truncate(ap.name, 10)}
+                      </div>
+                    )}
+                    <button
+                      onClick={() => removeAttachmentPreview(i)}
+                      style={{
+                        position: 'absolute', top: 1, right: 1,
+                        width: 14, height: 14, borderRadius: '50%',
+                        background: 'rgba(0,0,0,0.6)', color: 'white',
+                        border: 'none', cursor: 'pointer', fontSize: 9,
+                        display: 'grid', placeItems: 'center', lineHeight: 1,
+                      }}
+                    >x</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Image URL input */}
+            {showImageInput && (
+              <div style={{ marginBottom: 6, display: 'flex', gap: 4 }}>
+                <input
+                  type="text"
+                  placeholder="Paste image URL..."
+                  value={imageUrl}
+                  onChange={(e) => setImageUrl(e.target.value)}
+                  autoFocus
+                  style={{ flex: 1, padding: '5px 8px', background: 'var(--sh-surface)', color: 'var(--sh-text)', border: '1px solid var(--sh-border)', borderRadius: 6, fontSize: 11, fontFamily: PAGE_FONT }}
+                />
+                <button onClick={() => { setShowImageInput(false); setImageUrl('') }} style={{ padding: '3px 6px', background: 'var(--sh-soft)', color: 'var(--sh-muted)', border: '1px solid var(--sh-border)', borderRadius: 6, fontSize: 10, cursor: 'pointer', fontFamily: PAGE_FONT }}>
+                  Cancel
+                </button>
+              </div>
+            )}
+
+            {/* GIF search panel */}
+            {showGifPicker && (
+              <GifSearchPanel
+                onSelect={handleGifSelect}
+                onClose={() => setShowGifPicker(false)}
+              />
+            )}
+
+            {/* Action bar + text input */}
+            <form onSubmit={handleSend} style={{ display: 'flex', gap: 4, alignItems: 'flex-end' }}>
+              {/* File attach button */}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                title="Attach file"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: attachmentPreviews.length > 0 ? 'var(--sh-brand)' : 'var(--sh-muted)', padding: '5px 2px', flexShrink: 0 }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" /></svg>
+              </button>
+              {/* Image URL button */}
+              <button
+                type="button"
+                onClick={() => { closeAllPanels(); setShowImageInput(!showImageInput) }}
+                title="Share image URL"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: showImageInput ? 'var(--sh-brand)' : 'var(--sh-muted)', padding: '5px 2px', flexShrink: 0 }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg>
+              </button>
+              {/* GIF button */}
+              <button
+                type="button"
+                onClick={() => { closeAllPanels(); setShowGifPicker(!showGifPicker) }}
+                title="Send GIF"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: showGifPicker ? 'var(--sh-brand)' : 'var(--sh-muted)', padding: '5px 2px', flexShrink: 0, fontWeight: 800, fontSize: 11, fontFamily: PAGE_FONT }}
+              >
+                GIF
+              </button>
+
+              <textarea
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Type a message..."
+                aria-label="Message input"
+                rows={1}
+                maxLength={5000}
+                style={{
+                  flex: 1, resize: 'none', border: '1px solid var(--sh-border)',
+                  borderRadius: 10, padding: '7px 10px', fontSize: 12,
+                  fontFamily: PAGE_FONT, background: 'var(--sh-surface)',
+                  color: 'var(--sh-text)', outline: 'none', maxHeight: 80,
+                  lineHeight: 1.4,
+                }}
+              />
+              <button
+                type="submit"
+                disabled={!input.trim() && attachmentPreviews.length === 0 && !(showImageInput && imageUrl.trim())}
+                aria-label="Send message"
+                style={{
+                  background: 'var(--sh-brand)', color: 'var(--sh-surface)',
+                  border: 'none', borderRadius: 10, padding: '7px 14px',
+                  fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                  opacity: (!input.trim() && attachmentPreviews.length === 0 && !(showImageInput && imageUrl.trim())) || sending ? 0.5 : 1,
+                  fontFamily: PAGE_FONT, transition: 'opacity .15s',
+                  flexShrink: 0,
+                }}
+              >
+                Send
+              </button>
+            </form>
+          </div>
         )}
       </div>
     </div>
