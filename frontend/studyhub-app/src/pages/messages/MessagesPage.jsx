@@ -753,7 +753,7 @@ function NewConversationModal({ isOpen, onClose, onCreate, currentUserId }) {
         )
         if (response.ok) {
           const data = await response.json()
-          const users = (data.users || data.results || [])
+          const users = (data.results?.users || data.users || [])
             .filter((u) => u.id !== currentUserId)
           setSearchResults(users)
         } else {
