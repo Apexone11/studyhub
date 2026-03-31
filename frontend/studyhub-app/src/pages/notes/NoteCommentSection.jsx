@@ -123,7 +123,7 @@ export default function NoteCommentSection({ noteId, isOwner, user, noteContent 
                     style={{
                       padding: '5px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',
                       fontSize: 12, fontWeight: 600, fontFamily: PAGE_FONT,
-                      background: draft.trim() && !posting ? '#3b82f6' : 'var(--sh-soft)',
+                      background: draft.trim() && !posting ? 'var(--sh-brand, #3b82f6)' : 'var(--sh-soft)',
                       color: draft.trim() && !posting ? '#fff' : 'var(--sh-slate-400)',
                       transition: 'all .15s',
                     }}

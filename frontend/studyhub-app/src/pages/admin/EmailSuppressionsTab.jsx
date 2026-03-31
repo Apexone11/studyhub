@@ -55,7 +55,7 @@ export default function EmailSuppressionsTab({
               border: '1px solid #e2e8f0',
               padding: '7px 10px',
               fontSize: 12,
-              color: '#334155',
+              color: 'var(--sh-subtext)',
               fontFamily: FONT,
             }}
           >
@@ -92,7 +92,7 @@ export default function EmailSuppressionsTab({
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
-            <tr style={{ background: '#f8fafc' }}>
+            <tr style={{ background: 'var(--sh-soft)' }}>
               {['Email', 'Reason', 'Source', 'Updated', 'Status', 'Actions'].map((header) => (
                 <th key={header} style={tableHeadStyle}>{header}</th>
               ))}
@@ -183,7 +183,7 @@ export default function EmailSuppressionsTab({
             border: '1px solid #e2e8f0',
             borderRadius: 14,
             padding: '14px 16px',
-            background: '#f8fafc',
+            background: 'var(--sh-soft)',
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 10 }}>

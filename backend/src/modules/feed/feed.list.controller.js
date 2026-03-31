@@ -1,6 +1,7 @@
 const express = require('express')
 const prisma = require('../../lib/prisma')
 const { captureError } = require('../../monitoring/sentry')
+const { getBlockedUserIds, getMutedUserIds } = require('../../lib/social/blockFilter')
 const { parsePositiveInt } = require('../../core/http/validate')
 const {
   settleSection,
@@ -56,6 +57,16 @@ router.get('/', async (req, res) => {
     : { private: false }
 
   try {
+    // Filter out content from blocked and muted users
+    const userId = req.user?.userId
+    const [blockedIds, mutedIds] = await Promise.all([
+      getBlockedUserIds(prisma, userId),
+      getMutedUserIds(prisma, userId),
+    ])
+    const hideUserIds = [...new Set([...blockedIds, ...mutedIds])]
+    const userFilter = hideUserIds.length > 0 ? { userId: { notIn: hideUserIds } } : {}
+    const authorFilter = hideUserIds.length > 0 ? { author: { id: { notIn: hideUserIds } } } : {}
+
     const primarySections = await Promise.all([
       settleSection('announcements', () => prisma.announcement.findMany({
         where: announcementWhere,
@@ -64,7 +75,7 @@ router.get('/', async (req, res) => {
         take: announcementTake,
       })),
       settleSection('sheets', () => prisma.studySheet.findMany({
-        where: sheetWhere,
+        where: { ...sheetWhere, ...userFilter },
         select: {
           id: true, title: true, description: true, content: true,
           createdAt: true, stars: true, forks: true, downloads: true,
@@ -83,7 +94,7 @@ router.get('/', async (req, res) => {
         take,
       })),
       settleSection('posts', () => prisma.feedPost.findMany({
-        where: postWhere,
+        where: { ...postWhere, ...userFilter },
         select: {
           id: true, content: true, createdAt: true, updatedAt: true, moderationStatus: true,
           attachmentUrl: true, attachmentName: true, attachmentType: true, allowDownloads: true,
@@ -94,7 +105,7 @@ router.get('/', async (req, res) => {
         take,
       })),
       settleSection('notes', () => prisma.note.findMany({
-        where: noteWhere,
+        where: { ...noteWhere, ...userFilter },
         select: {
           id: true, title: true, content: true, createdAt: true, moderationStatus: true,
           author: { select: { id: true, username: true, avatarUrl: true } },

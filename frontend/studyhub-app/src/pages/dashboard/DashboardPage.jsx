@@ -78,7 +78,7 @@ export default function DashboardPage() {
           borderRadius: 8,
           border: '1px solid #334155',
           background: 'transparent',
-          color: '#94a3b8',
+          color: 'var(--sh-subtext)',
           fontSize: 12,
           fontWeight: 700,
           cursor: 'pointer',
@@ -194,11 +194,11 @@ export default function DashboardPage() {
           {error ? (
             <div
               style={{
-                background: '#fef2f2',
+                background: 'var(--sh-danger-bg)',
                 border: '1px solid #fecaca',
                 borderRadius: 14,
                 padding: '12px 14px',
-                color: '#b91c1c',
+                color: 'var(--sh-danger)',
                 fontSize: 13,
                 display: 'flex',
                 alignItems: 'center',
@@ -218,8 +218,8 @@ export default function DashboardPage() {
                   padding: '7px 12px',
                   borderRadius: 8,
                   border: '1px solid #fecaca',
-                  background: '#fff',
-                  color: '#b91c1c',
+                  background: 'var(--sh-surface)',
+                  color: 'var(--sh-danger)',
                   fontSize: 12,
                   fontWeight: 700,
                   cursor: 'pointer',

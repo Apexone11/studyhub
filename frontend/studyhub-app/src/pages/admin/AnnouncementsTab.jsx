@@ -28,7 +28,7 @@ export default function AnnouncementsTab({
           rows={4}
           style={{ ...inputStyle, resize: 'vertical' }}
         />
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#475569' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--sh-subtext)' }}>
           <input
             type="checkbox"
             checked={announceForm.pinned}
@@ -36,7 +36,7 @@ export default function AnnouncementsTab({
           />
           Pin this announcement
         </label>
-        {announceError ? <div style={{ color: '#b91c1c', fontSize: 12 }}>{announceError}</div> : null}
+        {announceError ? <div style={{ color: 'var(--sh-danger)', fontSize: 12 }}>{announceError}</div> : null}
         <button type="submit" disabled={announceSaving} style={primaryButton}>
           {announceSaving ? 'Posting…' : 'Post announcement'}
         </button>
@@ -47,14 +47,14 @@ export default function AnnouncementsTab({
           <div className="admin-empty">No announcements yet.</div>
         )}
         {announcementsState.items.map((record) => (
-          <div key={record.id} style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: '14px 16px', background: record.pinned ? '#fffbeb' : '#fff' }}>
+          <div key={record.id} style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: '14px 16px', background: record.pinned ? 'var(--sh-warning-bg)' : 'var(--sh-surface)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
               <div>
                 {record.pinned ? (
-                  <div style={{ fontSize: 10, fontWeight: 700, color: '#92400e', marginBottom: 5 }}>PINNED</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--sh-warning-text)', marginBottom: 5 }}>PINNED</div>
                 ) : null}
-                <div style={{ fontSize: 14, fontWeight: 800, color: '#0f172a', marginBottom: 6 }}>{record.title}</div>
-                <div style={{ fontSize: 13, color: '#475569', lineHeight: 1.7 }}>{record.body}</div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--sh-heading)', marginBottom: 6 }}>{record.title}</div>
+                <div style={{ fontSize: 13, color: 'var(--sh-subtext)', lineHeight: 1.7 }}>{record.body}</div>
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'start' }}>
                 <button type="button" onClick={() => void togglePin(record.id)} style={pillButton('#eff6ff', '#1d4ed8', '#bfdbfe')}>

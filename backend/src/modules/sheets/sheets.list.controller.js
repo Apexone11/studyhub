@@ -7,6 +7,7 @@ const { SHEET_STATUS, AUTHOR_SELECT, leaderboardLimiter } = require('./sheets.co
 const { serializeSheet } = require('./sheets.serializer')
 const { buildSheetTextSearchClauses } = require('../../lib/sheetSearch')
 const { searchSheetsFTS } = require('../../lib/fullTextSearch')
+const { cache } = require('../../lib/cache')
 /* RISK_TIER removed — sheet listings no longer filter by htmlRiskTier
  * (security enforcement is in the sheet viewer / HTML preview endpoints) */
 
@@ -14,7 +15,16 @@ const router = express.Router()
 
 router.get('/leaderboard', leaderboardLimiter, async (req, res) => {
   const type = req.query.type || 'stars'
+  const cacheKey = `sheet-leaderboard:${type}`
+
   try {
+    const cached = cache.get(cacheKey)
+    if (cached) {
+      return res.json(cached)
+    }
+
+    let result
+
     if (type === 'contributors') {
       const contributors = await prisma.user.findMany({
         select: {
@@ -32,30 +42,31 @@ router.get('/leaderboard', leaderboardLimiter, async (req, res) => {
         take: 5,
       })
 
-      return res.json(contributors.map((user) => ({
+      result = contributors.map((user) => ({
         username: user.username,
         avatarUrl: user.avatarUrl || null,
         count: user._count.studySheets,
-      })))
+      }))
+    } else {
+      const orderField = type === 'downloads' ? 'downloads' : 'stars'
+      result = await prisma.studySheet.findMany({
+        select: {
+          id: true,
+          title: true,
+          stars: true,
+          downloads: true,
+          allowDownloads: true,
+          author: { select: AUTHOR_SELECT },
+          course: { select: { code: true } },
+        },
+        where: { status: SHEET_STATUS.PUBLISHED },
+        orderBy: { [orderField]: 'desc' },
+        take: 5,
+      })
     }
 
-    const orderField = type === 'downloads' ? 'downloads' : 'stars'
-    const sheets = await prisma.studySheet.findMany({
-      select: {
-        id: true,
-        title: true,
-        stars: true,
-        downloads: true,
-        allowDownloads: true,
-        author: { select: AUTHOR_SELECT },
-        course: { select: { code: true } },
-      },
-      where: { status: SHEET_STATUS.PUBLISHED },
-      orderBy: { [orderField]: 'desc' },
-      take: 5,
-    })
-
-    res.json(sheets)
+    cache.set(cacheKey, result, 5 * 60 * 1000)
+    res.json(result)
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })

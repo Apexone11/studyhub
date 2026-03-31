@@ -97,7 +97,7 @@ export const MathInline = Node.create({
 
       // Double-click to edit
       dom.addEventListener('dblclick', () => {
-        const newLatex = prompt('Edit LaTeX (inline math):', node.attrs.latex) // eslint-disable-line no-alert
+        const newLatex = prompt('Edit LaTeX (inline math):', node.attrs.latex)  
         if (newLatex !== null && typeof getPos === 'function') {
           editor.chain().focus().command(({ tr }) => {
             tr.setNodeMarkup(getPos(), undefined, { latex: newLatex })
@@ -181,7 +181,7 @@ export const MathBlock = Node.create({
 
       // Double-click to edit
       dom.addEventListener('dblclick', () => {
-        const newLatex = prompt('Edit LaTeX (block math):', node.attrs.latex) // eslint-disable-line no-alert
+        const newLatex = prompt('Edit LaTeX (block math):', node.attrs.latex)  
         if (newLatex !== null && typeof getPos === 'function') {
           editor.chain().focus().command(({ tr }) => {
             tr.setNodeMarkup(getPos(), undefined, { latex: newLatex })

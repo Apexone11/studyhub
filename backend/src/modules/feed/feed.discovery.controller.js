@@ -6,6 +6,8 @@
  * Endpoints:
  *   GET /trending — Trending sheets (weighted score: stars + views + comments + recency)
  *   GET /recommended — Personalized recommendations based on enrolled courses (auth required)
+ *   GET /for-you — Unified "For You" feed (auth required) combining sheets, groups, people, trending
+ *   GET /recommended-groups — Study groups matching user's enrolled courses (auth required)
  *   GET /courses/:courseId/discover — Course-specific discovery (top sheets for a course)
  */
 const express = require('express')
@@ -13,6 +15,8 @@ const rateLimit = require('express-rate-limit')
 const prisma = require('../../lib/prisma')
 const { captureError } = require('../../monitoring/sentry')
 const { getAuthTokenFromRequest, verifyAuthToken } = require('../../lib/authTokens')
+const { getBlockedUserIds } = require('../../lib/social/blockFilter')
+const { cache } = require('../../lib/cache')
 
 const router = express.Router()
 
@@ -36,11 +40,18 @@ function optionalAuth(req, _res, next) {
  * Scoring: Weighted combination of stars, comment count, and recency.
  * Sheets published in the last 7 days get a boost.
  * Returns up to 20 results.
+ * Cached for 5 minutes per period.
  */
 router.get('/trending', discoveryLimiter, optionalAuth, async (req, res) => {
   try {
     const limit = Math.min(Number.parseInt(req.query.limit, 10) || 20, 50)
     const period = req.query.period || '7d'
+
+    const cacheKey = `trending:${period}`
+    const cached = cache.get(cacheKey)
+    if (cached) {
+      return res.json(cached)
+    }
 
     // Determine date range
     let since
@@ -88,11 +99,14 @@ router.get('/trending', discoveryLimiter, optionalAuth, async (req, res) => {
 
     scored.sort((a, b) => b._score - a._score)
 
-    res.json(scored.slice(0, limit).map(({ _score, ...sheet }) => ({
+    const result = scored.slice(0, limit).map(({ _score, ...sheet }) => ({
       ...sheet,
       commentCount: sheet._count?.comments || 0,
       forkCount: sheet._count?.forks || 0,
-    })))
+    }))
+
+    cache.set(cacheKey, result, 5 * 60 * 1000)
+    res.json(result)
   } catch (err) {
     captureError(err, { route: req.originalUrl })
     res.status(500).json({ error: 'Server error.' })
@@ -104,6 +118,7 @@ router.get('/trending', discoveryLimiter, optionalAuth, async (req, res) => {
  *
  * Algorithm: Fetch top-performing sheets in user's enrolled courses
  * that the user hasn't authored or already starred.
+ * Not cached due to per-user personalization.
  */
 router.get('/recommended', discoveryLimiter, optionalAuth, async (req, res) => {
   try {
@@ -165,6 +180,321 @@ router.get('/recommended', discoveryLimiter, optionalAuth, async (req, res) => {
       }))
 
     res.json(results)
+  } catch (err) {
+    captureError(err, { route: req.originalUrl })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+/**
+ * GET /api/feed/for-you — Unified "For You" personalized feed.
+ *
+ * Returns a curated combination of:
+ *   - Recommended sheets (max 6) from enrolled courses
+ *   - Recommended study groups (max 4) from enrolled courses
+ *   - Recommended people (max 4) to follow
+ *   - Trending sheets this week (max 4)
+ *
+ * Auth required. Cached for 2 minutes per user.
+ */
+router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required.' })
+    }
+
+    const userId = req.user.userId
+    const cacheKey = `for-you:${userId}`
+    const cached = cache.get(cacheKey)
+    if (cached) {
+      return res.json(cached)
+    }
+
+    // Get user's enrolled courses
+    const enrollments = await prisma.enrollment.findMany({
+      where: { userId },
+      select: { courseId: true },
+    })
+    const courseIds = enrollments.map((e) => e.courseId)
+
+    // Get blocked user IDs
+    const blockedIds = await getBlockedUserIds(prisma, userId)
+    const excludeUserIds = new Set([userId, ...blockedIds])
+
+    // Get starred sheets
+    const starredIds = await prisma.starredSheet.findMany({
+      where: { userId },
+      select: { sheetId: true },
+    })
+    const starredSet = new Set(starredIds.map((s) => s.sheetId))
+
+    // Get joined group IDs
+    const joinedGroups = await prisma.studyGroupMember.findMany({
+      where: { userId, status: 'active' },
+      select: { groupId: true },
+    })
+    const joinedGroupIds = new Set(joinedGroups.map((g) => g.groupId))
+
+    const results = {
+      sheets: [],
+      groups: [],
+      people: [],
+      trending: [],
+    }
+
+    // Parallel fetch all recommendations
+    const [sheetCandidates, trendingSheets, classmateRows, groupCandidates] = await Promise.all([
+      // Recommended sheets: top performers in enrolled courses
+      prisma.studySheet.findMany({
+        where: {
+          status: 'published',
+          courseId: courseIds.length > 0 ? { in: courseIds } : undefined,
+          userId: { not: userId },
+        },
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          stars: true,
+          contentFormat: true,
+          createdAt: true,
+          author: { select: { id: true, username: true, avatarUrl: true } },
+          course: { select: { id: true, code: true, name: true } },
+          _count: { select: { comments: true, forks: true } },
+        },
+        orderBy: [{ stars: 'desc' }, { createdAt: 'desc' }],
+        take: 50,
+      }),
+
+      // Trending this week: high-scoring recent sheets
+      prisma.studySheet.findMany({
+        where: {
+          status: 'published',
+          createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+        },
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          stars: true,
+          contentFormat: true,
+          createdAt: true,
+          author: { select: { id: true, username: true, avatarUrl: true } },
+          course: { select: { id: true, code: true, name: true } },
+          _count: { select: { comments: true, forks: true } },
+        },
+        orderBy: [{ stars: 'desc' }, { createdAt: 'desc' }],
+        take: 100,
+      }),
+
+      // Recommended people: classmates in shared courses
+      courseIds.length > 0
+        ? prisma.enrollment.findMany({
+            where: {
+              courseId: { in: courseIds },
+              userId: { notIn: [...excludeUserIds] },
+            },
+            select: {
+              userId: true,
+              user: {
+                select: {
+                  id: true,
+                  username: true,
+                  avatarUrl: true,
+                  role: true,
+                  _count: { select: { studySheets: { where: { status: 'published' } }, followers: true } },
+                },
+              },
+            },
+            take: 100,
+          })
+        : Promise.resolve([]),
+
+      // Recommended groups: public groups in enrolled courses, not yet joined
+      courseIds.length > 0
+        ? prisma.studyGroup.findMany({
+            where: {
+              courseId: { in: courseIds },
+              privacy: 'public',
+              id: { notIn: [...joinedGroupIds] },
+            },
+            select: {
+              id: true,
+              name: true,
+              description: true,
+              avatarUrl: true,
+              courseId: true,
+              privacy: true,
+              createdBy: { select: { id: true, username: true, avatarUrl: true } },
+              _count: { select: { members: { where: { status: 'active' } } } },
+            },
+            orderBy: [{ updatedAt: 'desc' }],
+            take: 50,
+          })
+        : Promise.resolve([]),
+    ])
+
+    // Score and rank sheets by weighted metrics: stars*3 + forks*5 + recencyBoost*10
+    const now = Date.now()
+    const scoredSheets = sheetCandidates
+      .filter((s) => !starredSet.has(s.id))
+      .map((sheet) => {
+        const ageHours = (now - new Date(sheet.createdAt).getTime()) / (1000 * 60 * 60)
+        const recencyBoost = Math.max(0, 1 - ageHours / (24 * 30))
+        const score =
+          (sheet.stars || 0) * 3 +
+          (sheet._count.forks || 0) * 5 +
+          recencyBoost * 10
+        return { ...sheet, _score: score }
+      })
+      .sort((a, b) => b._score - a._score)
+      .slice(0, 6)
+      .map(({ _score, ...sheet }) => ({
+        ...sheet,
+        commentCount: sheet._count?.comments || 0,
+        forkCount: sheet._count?.forks || 0,
+      }))
+
+    // Score trending sheets
+    const scoredTrending = trendingSheets
+      .map((sheet) => {
+        const ageHours = (now - new Date(sheet.createdAt).getTime()) / (1000 * 60 * 60)
+        const recencyBoost = Math.max(0, 1 - ageHours / (24 * 7))
+        const score =
+          (sheet.stars || 0) * 3 +
+          (sheet._count.comments || 0) * 2 +
+          (sheet._count.forks || 0) * 5 +
+          recencyBoost * 10
+        return { ...sheet, _score: score }
+      })
+      .sort((a, b) => b._score - a._score)
+      .slice(0, 4)
+      .map(({ _score, ...sheet }) => ({
+        ...sheet,
+        commentCount: sheet._count?.comments || 0,
+        forkCount: sheet._count?.forks || 0,
+      }))
+
+    // Deduplicate and rank classmates by shared courses
+    const userCounts = new Map()
+    for (const row of classmateRows) {
+      const existing = userCounts.get(row.userId)
+      if (existing) {
+        existing.sharedCourses++
+      } else {
+        userCounts.set(row.userId, {
+          id: row.user.id,
+          username: row.user.username,
+          avatarUrl: row.user.avatarUrl,
+          role: row.user.role,
+          sheetCount: row.user._count?.studySheets || 0,
+          followerCount: row.user._count?.followers || 0,
+          sharedCourses: 1,
+        })
+      }
+    }
+    const classmatesRanked = [...userCounts.values()]
+      .sort((a, b) => b.sharedCourses - a.sharedCourses || b.followerCount - a.followerCount)
+      .slice(0, 4)
+
+    // Rank groups by member count
+    const rankedGroups = groupCandidates
+      .map((g) => ({
+        id: g.id,
+        name: g.name,
+        description: g.description,
+        avatarUrl: g.avatarUrl,
+        courseId: g.courseId,
+        privacy: g.privacy,
+        createdBy: g.createdBy,
+        memberCount: g._count?.members || 0,
+      }))
+      .sort((a, b) => b.memberCount - a.memberCount)
+      .slice(0, 4)
+
+    results.sheets = scoredSheets
+    results.groups = rankedGroups
+    results.people = classmatesRanked
+    results.trending = scoredTrending
+
+    cache.set(cacheKey, results, 2 * 60 * 1000)
+    res.json(results)
+  } catch (err) {
+    captureError(err, { route: req.originalUrl })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+/**
+ * GET /api/feed/recommended-groups — Recommended study groups.
+ *
+ * Returns public study groups linked to user's enrolled courses
+ * that the user hasn't joined yet, ordered by member count descending.
+ * Auth required. Limit 10.
+ */
+router.get('/recommended-groups', discoveryLimiter, optionalAuth, async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required.' })
+    }
+
+    const userId = req.user.userId
+
+    // Get user's enrolled courses
+    const enrollments = await prisma.enrollment.findMany({
+      where: { userId },
+      select: { courseId: true },
+    })
+    const courseIds = enrollments.map((e) => e.courseId)
+
+    if (courseIds.length === 0) {
+      return res.json([])
+    }
+
+    // Get joined group IDs
+    const joinedGroups = await prisma.studyGroupMember.findMany({
+      where: { userId, status: 'active' },
+      select: { groupId: true },
+    })
+    const joinedGroupIds = new Set(joinedGroups.map((g) => g.groupId))
+
+    // Fetch public groups in user's courses that user hasn't joined
+    const groups = await prisma.studyGroup.findMany({
+      where: {
+        courseId: { in: courseIds },
+        privacy: 'public',
+        id: { notIn: [...joinedGroupIds] },
+      },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        avatarUrl: true,
+        courseId: true,
+        privacy: true,
+        createdBy: { select: { id: true, username: true, avatarUrl: true } },
+        course: { select: { id: true, code: true, name: true } },
+        _count: { select: { members: { where: { status: 'active' } } } },
+      },
+      orderBy: [{ updatedAt: 'desc' }],
+      take: 10,
+    })
+
+    const result = groups
+      .map((g) => ({
+        id: g.id,
+        name: g.name,
+        description: g.description,
+        avatarUrl: g.avatarUrl,
+        courseId: g.courseId,
+        course: g.course,
+        privacy: g.privacy,
+        createdBy: g.createdBy,
+        memberCount: g._count?.members || 0,
+      }))
+      .sort((a, b) => b.memberCount - a.memberCount)
+
+    res.json(result)
   } catch (err) {
     captureError(err, { route: req.originalUrl })
     res.status(500).json({ error: 'Server error.' })

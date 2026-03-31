@@ -38,14 +38,23 @@ export function useNotesData() {
           setLoadingNotes(false)
         }
       })
-      .catch(() => { if (active) setLoadingNotes(false) })
+      .catch(() => {
+        if (active) {
+          showToast('Failed to load notes', 'error')
+          setLoadingNotes(false)
+        }
+      })
 
     fetch(`${API}/api/courses/schools`, { headers: authHeaders() })
       .then((response) => response.json())
       .then((data) => {
         if (active) setCourses((data || []).flatMap((school) => (school.courses || []).map((course) => ({ ...course, schoolName: school.name }))))
       })
-      .catch(() => {})
+      .catch(() => {
+        if (active) {
+          showToast('Failed to load courses', 'error')
+        }
+      })
 
     return () => { active = false }
   }, [])
@@ -134,7 +143,10 @@ export function useNotesData() {
         headers: authHeaders(),
         body: JSON.stringify({ title: 'Untitled Note', content: '' }),
       })
-      if (!response.ok) return
+      if (!response.ok) {
+        showToast('Failed to create note', 'error')
+        return
+      }
       const note = await response.json()
       setNotes((prev) => [note, ...prev])
       selectNote(note)
@@ -145,26 +157,106 @@ export function useNotesData() {
 
   async function deleteNote() {
     if (!activeNote) return
-    const response = await fetch(`${API}/api/notes/${activeNote.id}`, {
-      method: 'DELETE',
-      headers: authHeaders(),
-    })
-    if (response.ok) {
-      setNotes((prev) => prev.filter((n) => n.id !== activeNote.id))
-      setActiveNote(null)
-      setConfirmDelete(false)
-      showToast('Note deleted', 'success')
-    } else {
-      showToast('Could not delete note', 'error')
+    try {
+      const response = await fetch(`${API}/api/notes/${activeNote.id}`, {
+        method: 'DELETE',
+        headers: authHeaders(),
+      })
+      if (response.ok) {
+        setNotes((prev) => prev.filter((n) => n.id !== activeNote.id))
+        setActiveNote(null)
+        setConfirmDelete(false)
+        showToast('Note deleted', 'success')
+      } else {
+        showToast('Could not delete note', 'error')
+      }
+    } catch {
+      showToast('Failed to delete note', 'error')
     }
   }
 
+  /* ── Star toggle ─────────────────────────────────────────────────────── */
+  async function toggleStar(noteId) {
+    const note = notes.find((n) => n.id === noteId)
+    if (!note) return
+    const isStarred = note._starred
+    // Optimistic update
+    setNotes((prev) => prev.map((n) => n.id === noteId ? { ...n, _starred: !isStarred } : n))
+    if (activeNote?.id === noteId) setActiveNote((prev) => prev ? { ...prev, _starred: !isStarred } : prev)
+    try {
+      const res = await fetch(`${API}/api/notes/${noteId}/star`, {
+        method: isStarred ? 'DELETE' : 'POST',
+        headers: authHeaders(),
+        credentials: 'include',
+      })
+      if (!res.ok) {
+        // Revert optimistic update on failure
+        setNotes((prev) => prev.map((n) => n.id === noteId ? { ...n, _starred: isStarred } : n))
+        if (activeNote?.id === noteId) setActiveNote((prev) => prev ? { ...prev, _starred: isStarred } : prev)
+        showToast('Failed to update star', 'error')
+      }
+    } catch {
+      // Revert optimistic update on error
+      setNotes((prev) => prev.map((n) => n.id === noteId ? { ...n, _starred: isStarred } : n))
+      if (activeNote?.id === noteId) setActiveNote((prev) => prev ? { ...prev, _starred: isStarred } : prev)
+      showToast('Failed to update star', 'error')
+    }
+  }
+
+  /* ── Pin toggle ─────────────────────────────────────────────────────── */
+  async function togglePin(noteId) {
+    const note = notes.find((n) => n.id === noteId)
+    if (!note) return
+    const wasPinned = note.pinned
+    // Optimistic update
+    setNotes((prev) => prev.map((n) => n.id === noteId ? { ...n, pinned: !wasPinned } : n))
+    if (activeNote?.id === noteId) setActiveNote((prev) => prev ? { ...prev, pinned: !wasPinned } : prev)
+    try {
+      const res = await fetch(`${API}/api/notes/${noteId}/pin`, {
+        method: 'PATCH',
+        headers: authHeaders(),
+        credentials: 'include',
+        body: JSON.stringify({ pinned: !wasPinned }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setNotes((prev) => prev.map((n) => n.id === noteId ? { ...n, pinned: data.pinned } : n))
+        if (activeNote?.id === noteId) setActiveNote((prev) => prev ? { ...prev, pinned: data.pinned } : prev)
+      } else {
+        // Revert optimistic update on failure
+        setNotes((prev) => prev.map((n) => n.id === noteId ? { ...n, pinned: wasPinned } : n))
+        if (activeNote?.id === noteId) setActiveNote((prev) => prev ? { ...prev, pinned: wasPinned } : prev)
+        showToast('Failed to update pin', 'error')
+      }
+    } catch {
+      // Revert optimistic update on error
+      setNotes((prev) => prev.map((n) => n.id === noteId ? { ...n, pinned: wasPinned } : n))
+      if (activeNote?.id === noteId) setActiveNote((prev) => prev ? { ...prev, pinned: wasPinned } : prev)
+      showToast('Failed to update pin', 'error')
+    }
+  }
+
+  /* ── Restore version ────────────────────────────────────────────────── */
+  function handleRestore(restoredNote) {
+    setNotes((prev) => prev.map((n) => n.id === restoredNote.id ? restoredNote : n))
+    selectNote(restoredNote)
+    showToast('Version restored', 'success')
+  }
+
   /* ── Filtered notes list ─────────────────────────────────────────────── */
-  const visibleNotes = notes.filter((note) => {
-    if (filterTab === 'private') return note.private !== false
-    if (filterTab === 'shared') return note.private === false
-    return true
-  })
+  const visibleNotes = notes
+    .filter((note) => {
+      if (filterTab === 'private') return note.private !== false
+      if (filterTab === 'shared') return note.private === false
+      if (filterTab === 'starred') return note._starred
+      return true
+    })
+    .sort((a, b) => {
+      // Pinned notes always float to top
+      if (a.pinned && !b.pinned) return -1
+      if (!a.pinned && b.pinned) return 1
+      return 0 // preserve server order (updatedAt desc) otherwise
+    })
 
   return {
     // State
@@ -195,5 +287,8 @@ export function useNotesData() {
     handleCourseChange,
     createNote,
     deleteNote,
+    toggleStar,
+    togglePin,
+    handleRestore,
   }
 }

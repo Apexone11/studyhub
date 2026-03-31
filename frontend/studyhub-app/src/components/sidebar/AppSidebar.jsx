@@ -5,13 +5,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { IconPlus, IconSettings } from '../Icons'
-import { API } from '../../config'
 import { useSession } from '../../lib/session-context'
+import UserAvatar from '../UserAvatar'
 import {
   FOCUSABLE_DRAWER_SELECTORS,
   NAV_LINKS,
   courseColor,
-  Avatar,
 } from './sidebarConstants'
 
 export default function AppSidebar({ mode = 'fixed' }) {
@@ -56,21 +55,15 @@ export default function AppSidebar({ mode = 'fixed' }) {
         display: 'flex', alignItems: 'center', gap: 12,
         padding: '4px 0', marginBottom: 8,
       }}>
-        <div style={{ position: 'relative' }}>
-          {user.avatarUrl
-            ? <img
-                src={user.avatarUrl.startsWith('http') ? user.avatarUrl : `${API}${user.avatarUrl}`}
-                alt={user.username}
-                style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--sh-border)' }}
-              />
-            : <Avatar name={user.username} size={44} role={user.role} />
-          }
-          <div style={{
-            position: 'absolute', bottom: 0, right: 0,
-            width: 12, height: 12, borderRadius: '50%',
-            background: '#10b981', border: '2px solid var(--sh-surface)',
-          }} />
-        </div>
+        <UserAvatar
+          username={user.username}
+          avatarUrl={user.avatarUrl}
+          role={user.role}
+          size={44}
+          border="2px solid var(--sh-border)"
+          showStatus
+          online
+        />
         <div style={{ minWidth: 0 }}>
           <div style={{ fontWeight: 700, fontSize: 'var(--type-sm)', color: 'var(--sh-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.username}</div>
           <div style={{ fontSize: 'var(--type-xs)', color: 'var(--sh-muted)', marginTop: 1 }}>

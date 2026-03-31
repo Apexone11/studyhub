@@ -3012,6 +3012,11 @@ textarea.sh-input {
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
 /* ── Focus ring styles (keyboard accessibility) ──────────────────── */
 *:focus-visible {
   outline: 2px solid #3b82f6;
@@ -3115,6 +3120,162 @@ select:focus-visible {
   }
 }
 
+/* ═══════════════════════════════════════════════════════════════════════
+ * RESPONSIVE LAYOUT — mobile & tablet breakpoints
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Profile page layouts ────────────────────────────────────────────── */
+.profile-cockpit {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.profile-hero {
+  position: relative;
+  min-height: 200px;
+}
+
+.profile-hero-ctas {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.profile-tabs {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.profile-tabs::-webkit-scrollbar { display: none; }
+
+.profile-tab-btn {
+  padding: 10px 18px;
+  border: none;
+  background: transparent;
+  color: var(--sh-muted);
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+}
+.profile-tab-btn:hover {
+  color: var(--sh-text);
+}
+.profile-tab-btn--active {
+  color: var(--sh-brand);
+  border-bottom-color: var(--sh-brand);
+  font-weight: 700;
+}
+
+/* ── Feed aside ──────────────────────────────────────────────────────── */
+.feed-aside {
+  min-width: 0;
+}
+
+/* ── Settings layout ─────────────────────────────────────────────────── */
+.settings-layout {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 24px;
+}
+.settings-nav {
+  position: sticky;
+  top: 80px;
+}
+
+/* ═══ Tablet: 768px–1024px ═══════════════════════════════════════════ */
+@media (max-width: 1024px) {
+  .profile-cockpit {
+    grid-template-columns: 1fr;
+  }
+  .settings-layout {
+    grid-template-columns: 180px 1fr;
+    gap: 16px;
+  }
+}
+
+/* ═══ Phone: ≤ 768px ═══════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  /* Profile */
+  .profile-cockpit {
+    grid-template-columns: 1fr;
+  }
+  .profile-hero {
+    min-height: 160px;
+  }
+  .profile-hero-ctas {
+    gap: 6px;
+  }
+  .profile-hero-ctas .sh-btn {
+    font-size: 12px;
+    padding: 7px 12px;
+  }
+  .profile-tab-btn {
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+
+  /* Settings: stack sidebar above content */
+  .settings-layout {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .settings-nav {
+    position: static;
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 8px;
+    scrollbar-width: none;
+  }
+  .settings-nav::-webkit-scrollbar { display: none; }
+  .settings-nav .settings-nav-btn {
+    white-space: nowrap;
+    flex-shrink: 0;
+    padding: 8px 14px !important;
+    margin-bottom: 0 !important;
+    font-size: 13px !important;
+  }
+
+  /* Feed aside: hide on mobile, shown on demand */
+  .feed-aside {
+    display: none !important;
+  }
+}
+
+/* ═══ Touch target minimums (44×44 per WCAG 2.5.5) ════════════════════ */
+@media (pointer: coarse) {
+  button, a, [role="button"], input[type="checkbox"], select {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  /* Small icon buttons get padding boost */
+  button:not(.sh-btn):not(.profile-tab-btn):not(.settings-nav-btn) {
+    padding: max(var(--btn-padding-y, 8px), 10px) max(var(--btn-padding-x, 12px), 12px);
+  }
+}
+
+/* ═══ Small phone: ≤ 480px ═══════════════════════════════════════════ */
+@media (max-width: 480px) {
+  .profile-hero-ctas {
+    flex-direction: column;
+  }
+  .profile-hero-ctas .sh-btn {
+    width: 100%;
+    justify-content: center;
+  }
+  .profile-columns {
+    grid-template-columns: 1fr !important;
+  }
+}
+
 /* ── CLS Prevention ────────────────────────────────────────────────── */
 /* Reserve minimum height for page shells to prevent layout shift */
 #root {
@@ -3187,4 +3348,47 @@ select:focus-visible {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--slate, #64748b);
+}
+
+/* ── Split-panel layouts (notes, messages) ─────────────────────────── */
+.notes-split-panel,
+.messages-split-panel {
+  display: grid;
+  gap: 0;
+  height: calc(100vh - 80px);
+}
+
+@media (min-width: 768px) {
+  .notes-split-panel {
+    grid-template-columns: 300px 1fr;
+  }
+
+  .messages-split-panel {
+    grid-template-columns: 340px 1fr;
+  }
+}
+
+@media (max-width: 767px) {
+  .notes-split-panel,
+  .messages-split-panel {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Split-panel scrolling ───────────────────────────────────────────── */
+.notes-split-panel > div:first-child,
+.messages-split-panel > div:first-child {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-right: 1px solid var(--sh-border);
+  background: var(--sh-bg);
+}
+
+.notes-split-panel > div:last-child,
+.messages-split-panel > div:last-child {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--sh-surface);
 }

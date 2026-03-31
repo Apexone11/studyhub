@@ -46,7 +46,7 @@ export default function NotesPage() {
   /* ── Loading gate ────────────────────────────────────────────────────── */
   if (authStatus === 'loading') {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontFamily: PAGE_FONT }}>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--sh-muted)', fontFamily: PAGE_FONT }}>
         Loading…
       </div>
     )
@@ -56,7 +56,7 @@ export default function NotesPage() {
   return (
     <PageShell nav={<Navbar crumbs={[{ label: 'My Notes', to: '/notes' }]} hideTabs />} sidebar={<AppSidebar />}>
       {authError ? (
-        <div style={{ background: '#fef9c3', border: '1px solid #fde68a', color: '#92400e', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 13 }}>
+        <div style={{ background: 'var(--sh-warning-bg, #fef9c3)', border: '1px solid var(--sh-warning-border, #fde68a)', color: 'var(--sh-warning-text, #92400e)', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 13 }}>
           {authError}
         </div>
       ) : null}
@@ -99,6 +99,9 @@ export default function NotesPage() {
               handleCourseChange={data.handleCourseChange}
               deleteNote={data.deleteNote}
               setActiveNote={data.setActiveNote}
+              toggleStar={data.toggleStar}
+              togglePin={data.togglePin}
+              handleRestore={data.handleRestore}
               layout={layout}
             />
           </div>
@@ -108,7 +111,7 @@ export default function NotesPage() {
       {/* Tutorial popup */}
       <SafeJoyride {...tutorial.joyrideProps} />
       {tutorial.seen && (
-        <button type="button" onClick={tutorial.restart} title="Show tutorial" style={{ position: 'fixed', bottom: 24, right: 24, width: 44, height: 44, borderRadius: '50%', border: 'none', background: '#3b82f6', color: '#fff', fontSize: 18, fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 14px rgba(59,130,246,0.4)', zIndex: 50, display: 'grid', placeItems: 'center' }}>?</button>
+        <button type="button" onClick={tutorial.restart} title="Show tutorial" style={{ position: 'fixed', bottom: 24, right: 24, width: 44, height: 44, borderRadius: '50%', border: 'none', background: 'var(--sh-brand)', color: 'var(--sh-surface)', fontSize: 18, fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 14px var(--sh-brand-shadow, rgba(59,130,246,0.4))', zIndex: 50, display: 'grid', placeItems: 'center' }}>?</button>
       )}
     </PageShell>
   )

@@ -4,7 +4,7 @@ export default function OverviewTab({ overview, loadOverview }) {
   return (
     <section
       style={{
-        background: '#fff',
+        background: 'var(--sh-surface)',
         borderRadius: 18,
         border: '1px solid #e2e8f0',
         padding: '22px',
@@ -24,8 +24,8 @@ export default function OverviewTab({ overview, loadOverview }) {
             padding: '7px 12px',
             borderRadius: 8,
             border: '1px solid #e2e8f0',
-            background: '#fff',
-            color: '#475569',
+            background: 'var(--sh-surface)',
+            color: 'var(--sh-subtext)',
             fontSize: 12,
             fontWeight: 700,
             cursor: 'pointer',

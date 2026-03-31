@@ -137,7 +137,7 @@ export default function EditorToolbar({ editor }) {
 
   const insertInlineMath = useCallback(() => {
     if (!editor) return
-    const latex = prompt('Enter LaTeX (inline math):') // eslint-disable-line no-alert
+    const latex = prompt('Enter LaTeX (inline math):')  
     if (latex !== null && latex.trim()) {
       editor.chain().focus().insertContent({
         type: 'mathInline',
@@ -148,7 +148,7 @@ export default function EditorToolbar({ editor }) {
 
   const insertBlockMath = useCallback(() => {
     if (!editor) return
-    const latex = prompt('Enter LaTeX (block/display math):') // eslint-disable-line no-alert
+    const latex = prompt('Enter LaTeX (block/display math):')  
     if (latex !== null && latex.trim()) {
       editor.chain().focus().insertContent({
         type: 'mathBlock',

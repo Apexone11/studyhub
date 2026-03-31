@@ -97,6 +97,10 @@ export default function UserProfilePage() {
   const [followers, setFollowers] = useState(0)
   const [toggling, setToggling] = useState(false)
   const [reportOpen, setReportOpen] = useState(false)
+  const [isBlocked, setIsBlocked] = useState(false)
+  const [isMuted, setIsMuted] = useState(false)
+  const [blockToggling, setBlockToggling] = useState(false)
+  const [muteToggling, setMuteToggling] = useState(false)
   const [followModal, setFollowModal] = useState(null)
   const [followList, setFollowList] = useState([])
   const [followListLoading, setFollowListLoading] = useState(false)
@@ -163,6 +167,8 @@ export default function UserProfilePage() {
         setProfile(data)
         setFollowing(data.isFollowing || false)
         setFollowers(data.followerCount || 0)
+        setIsBlocked(data.isBlocked || false)
+        setIsMuted(data.isMuted || false)
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
@@ -210,6 +216,51 @@ export default function UserProfilePage() {
       }
     } catch { showToast('Check your connection and try again.', 'error') }
     finally { setToggling(false) }
+  }
+
+  /* ── Block toggle ───────────────────────────────────────────────────── */
+  async function handleBlockToggle() {
+    if (!isAuthenticated) { navigate('/login'); return }
+    setBlockToggling(true)
+    try {
+      const method = isBlocked ? 'DELETE' : 'POST'
+      const res = await fetch(`${API}/api/users/${username}/block`, {
+        method, headers: authHeaders(), credentials: 'include',
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setIsBlocked(data.blocked)
+        if (data.blocked) {
+          setFollowing(false)
+          showToast(`Blocked ${username}`, 'success')
+        } else {
+          showToast(`Unblocked ${username}`, 'success')
+        }
+      } else {
+        showToast(data.error || 'Could not update block status.', 'error')
+      }
+    } catch { showToast('Check your connection and try again.', 'error') }
+    finally { setBlockToggling(false) }
+  }
+
+  /* ── Mute toggle ───────────────────────────────────────────────────── */
+  async function handleMuteToggle() {
+    if (!isAuthenticated) { navigate('/login'); return }
+    setMuteToggling(true)
+    try {
+      const method = isMuted ? 'DELETE' : 'POST'
+      const res = await fetch(`${API}/api/users/${username}/mute`, {
+        method, headers: authHeaders(), credentials: 'include',
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setIsMuted(data.muted)
+        showToast(data.muted ? `Muted ${username}` : `Unmuted ${username}`, 'success')
+      } else {
+        showToast(data.error || 'Could not update mute status.', 'error')
+      }
+    } catch { showToast('Check your connection and try again.', 'error') }
+    finally { setMuteToggling(false) }
   }
 
   /* ── Helpers ────────────────────────────────────────────────────────── */
@@ -342,39 +393,89 @@ export default function UserProfilePage() {
                     Edit Profile
                   </Link>
                 ) : currentUser ? (
-                  <button
-                    onClick={handleFollowToggle}
-                    disabled={toggling}
-                    style={{
-                      display: 'inline-flex', alignItems: 'center', padding: '8px 18px', borderRadius: 10,
-                      fontWeight: 700, fontSize: 13, fontFamily: 'inherit',
-                      border: following ? '1px solid rgba(16,185,129,0.5)' : '1px solid rgba(255,255,255,0.25)',
-                      background: following ? 'rgba(16,185,129,0.2)' : 'var(--sh-brand)',
-                      color: following ? '#6ee7b7' : '#fff',
-                      cursor: toggling ? 'wait' : 'pointer',
-                      backdropFilter: 'blur(6px)',
-                    }}
-                  >
-                    {toggling ? '...' : following ? 'Following' : 'Follow'}
-                  </button>
+                  <>
+                    {/* Follow button — hidden when user is blocked */}
+                    {!isBlocked && (
+                      <button
+                        onClick={handleFollowToggle}
+                        disabled={toggling}
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', padding: '8px 18px', borderRadius: 10,
+                          fontWeight: 700, fontSize: 13, fontFamily: 'inherit',
+                          border: following ? '1px solid rgba(16,185,129,0.5)' : '1px solid rgba(255,255,255,0.25)',
+                          background: following ? 'rgba(16,185,129,0.2)' : 'var(--sh-brand)',
+                          color: following ? '#6ee7b7' : '#fff',
+                          cursor: toggling ? 'wait' : 'pointer',
+                          backdropFilter: 'blur(6px)',
+                        }}
+                      >
+                        {toggling ? '...' : following ? 'Following' : 'Follow'}
+                      </button>
+                    )}
+
+                    {/* Mute button */}
+                    <button
+                      onClick={handleMuteToggle}
+                      disabled={muteToggling}
+                      title={isMuted ? 'Unmute this user' : 'Mute this user'}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10,
+                        fontWeight: 600, fontSize: 12, fontFamily: 'inherit',
+                        border: isMuted ? '1px solid var(--sh-warning-border)' : '1px solid var(--sh-border)',
+                        background: isMuted ? 'var(--sh-warning-bg)' : 'var(--sh-soft)',
+                        color: isMuted ? 'var(--sh-warning-text)' : 'var(--sh-subtext)',
+                        cursor: muteToggling ? 'wait' : 'pointer',
+                        backdropFilter: 'blur(6px)',
+                      }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        {isMuted
+                          ? <><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></>
+                          : <><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></>
+                        }
+                      </svg>
+                      {muteToggling ? '...' : isMuted ? 'Muted' : 'Mute'}
+                    </button>
+
+                    {/* Block button */}
+                    <button
+                      onClick={handleBlockToggle}
+                      disabled={blockToggling}
+                      title={isBlocked ? 'Unblock this user' : 'Block this user'}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10,
+                        fontWeight: 600, fontSize: 12, fontFamily: 'inherit',
+                        border: isBlocked ? '1px solid var(--sh-danger-border)' : '1px solid var(--sh-border)',
+                        background: isBlocked ? 'var(--sh-danger-bg)' : 'var(--sh-soft)',
+                        color: isBlocked ? 'var(--sh-danger-text)' : 'var(--sh-subtext)',
+                        cursor: blockToggling ? 'wait' : 'pointer',
+                        backdropFilter: 'blur(6px)',
+                      }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+                      </svg>
+                      {blockToggling ? '...' : isBlocked ? 'Blocked' : 'Block'}
+                    </button>
+
+                    {/* Report button */}
+                    <button
+                      onClick={() => setReportOpen(true)}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10,
+                        fontWeight: 600, fontSize: 12, fontFamily: 'inherit',
+                        border: '1px solid rgba(255,255,255,0.15)',
+                        background: 'rgba(255,255,255,0.08)',
+                        color: 'rgba(255,255,255,0.7)',
+                        cursor: 'pointer',
+                        backdropFilter: 'blur(6px)',
+                      }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+                      Report
+                    </button>
+                  </>
                 ) : null}
-                {currentUser && !isOwnProfile && (
-                  <button
-                    onClick={() => setReportOpen(true)}
-                    style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10,
-                      fontWeight: 600, fontSize: 12, fontFamily: 'inherit',
-                      border: '1px solid rgba(255,255,255,0.15)',
-                      background: 'rgba(255,255,255,0.08)',
-                      color: 'rgba(255,255,255,0.7)',
-                      cursor: 'pointer',
-                      backdropFilter: 'blur(6px)',
-                    }}
-                  >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
-                    Report
-                  </button>
-                )}
               </div>
             </div>
           </div>

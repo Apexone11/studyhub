@@ -13,7 +13,7 @@ function authHeaders() {
 
 function panelStyle() {
   return {
-    background: '#fff',
+    background: 'var(--sh-surface)',
     borderRadius: 16,
     border: '1px solid #e2e8f0',
     padding: 16,
@@ -236,7 +236,7 @@ export default function SheetHtmlPreviewPage() {
                       height: isFullscreen ? '100%' : 'calc(100vh - 260px)',
                       minHeight: isFullscreen ? 'unset' : 700,
                       border: 'none',
-                      background: '#fff',
+                      background: 'var(--sh-surface)',
                       borderRadius: isFullscreen ? 12 : 0,
                     }}
                   />
@@ -256,9 +256,9 @@ function buttonStyle() {
     alignItems: 'center',
     padding: '7px 11px',
     borderRadius: 8,
-    border: '1px solid #dbeafe',
-    background: '#eff6ff',
-    color: '#1d4ed8',
+    border: '1px solid var(--sh-info-border, #dbeafe)',
+    background: 'var(--sh-info-bg)',
+    color: 'var(--sh-info-text, #1d4ed8)',
     fontSize: 12,
     fontWeight: 700,
     textDecoration: 'none',

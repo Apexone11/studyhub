@@ -1,10 +1,11 @@
 /**
  * badges.js — Badge catalog + unlock engine
  *
- * 12 badges across 3 categories, 3 tiers each.
+ * 15 badges across 4 categories: studying, building, collaboration, and streaks.
  * Server-side unlock logic checks user stats and awards badges.
  */
 const { captureError } = require('../monitoring/sentry')
+const { getUserStreak } = require('./streaks')
 
 /**
  * Badge catalog — defines all available badges.
@@ -28,6 +29,11 @@ const BADGE_CATALOG = [
   { slug: 'helpful-reviewer', name: 'Helpful Reviewer', description: 'Review 5 contributions', category: 'collaboration', tier: 'silver', threshold: 5 },
   { slug: 'community-star', name: 'Community Star', description: 'Get 25 total stars across all sheets', category: 'collaboration', tier: 'gold', threshold: 25 },
   { slug: 'first-follower', name: 'First Follower', description: 'Get your first follower', category: 'collaboration', tier: 'bronze', threshold: 1 },
+
+  // ── Streaks category ────────────────────────────────────────
+  { slug: 'streak-3', name: '3-Day Streak', description: '3-day study streak', category: 'streaks', tier: 'bronze', threshold: 3 },
+  { slug: 'streak-7', name: '7-Day Streak', description: '7-day study streak', category: 'streaks', tier: 'silver', threshold: 7 },
+  { slug: 'streak-30', name: '30-Day Streak', description: '30-day study streak', category: 'streaks', tier: 'gold', threshold: 30 },
 ]
 
 /**
@@ -83,11 +89,12 @@ async function checkAndAwardBadges(prisma, userId) {
     const commitCount = user._count.sheetCommits
     const followerCount = user._count.followers
 
-    const [totalStars, forkCount, contributionCount, reviewCount] = await Promise.all([
+    const [totalStars, forkCount, contributionCount, reviewCount, streakData] = await Promise.all([
       prisma.studySheet.aggregate({ where: { userId }, _sum: { stars: true } }).then((r) => r._sum.stars || 0),
       prisma.studySheet.count({ where: { userId, forkOf: { not: null } } }),
       prisma.sheetContribution.count({ where: { proposerId: userId } }),
       prisma.sheetContribution.count({ where: { reviewerId: userId } }),
+      getUserStreak(prisma, userId),
     ])
 
     const statsMap = {
@@ -103,6 +110,9 @@ async function checkAndAwardBadges(prisma, userId) {
       'helpful-reviewer': reviewCount,
       'community-star': totalStars,
       'first-follower': followerCount,
+      'streak-3': streakData.currentStreak,
+      'streak-7': streakData.currentStreak,
+      'streak-30': streakData.currentStreak,
     }
 
     const toAward = []

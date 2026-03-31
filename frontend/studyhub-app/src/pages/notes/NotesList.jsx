@@ -39,20 +39,22 @@ export default function NotesList({
               ['all', 'All Notes'],
               ['private', 'Private'],
               ['shared', 'Shared'],
+              ['starred', '★ Starred'],
             ].map(([id, label]) => (
               <button
                 key={id}
                 onClick={() => { setFilterTab(id); setActiveNote(null) }}
+                aria-current={filterTab === id ? 'true' : undefined}
                 style={{
                   padding: '5px 14px',
                   borderRadius: 99,
-                  border: filterTab === id ? '1px solid #3b82f6' : '1px solid var(--sh-border, #e2e8f0)',
+                  border: filterTab === id ? '1px solid var(--sh-brand, #3b82f6)' : '1px solid var(--sh-border, #e2e8f0)',
                   fontSize: 12,
                   fontWeight: 600,
                   cursor: 'pointer',
                   fontFamily: PAGE_FONT,
-                  background: filterTab === id ? '#3b82f6' : 'var(--sh-surface, #fff)',
-                  color: filterTab === id ? '#fff' : 'var(--sh-muted, #64748b)',
+                  background: filterTab === id ? 'var(--sh-brand)' : 'var(--sh-surface, #fff)',
+                  color: filterTab === id ? 'var(--sh-surface)' : 'var(--sh-muted, #64748b)',
                   transition: 'all .15s',
                 }}
               >
@@ -67,10 +69,10 @@ export default function NotesList({
           disabled={creating}
           style={{
             display: 'flex', alignItems: 'center', gap: 6,
-            padding: '8px 16px', background: '#3b82f6', border: 'none',
-            borderRadius: 10, fontSize: 13, fontWeight: 600, color: '#fff',
+            padding: '8px 16px', background: 'var(--sh-brand)', border: 'none',
+            borderRadius: 10, fontSize: 13, fontWeight: 600, color: 'var(--sh-surface)',
             cursor: 'pointer', fontFamily: PAGE_FONT,
-            boxShadow: '0 2px 8px rgba(59,130,246,0.25)',
+            boxShadow: '0 2px 8px var(--sh-brand-shadow, rgba(59,130,246,0.25))',
             transition: 'box-shadow .15s',
           }}
         >
@@ -83,8 +85,8 @@ export default function NotesList({
         <SkeletonList count={4} />
       ) : visibleNotes.length === 0 ? (
         <div style={{ background: 'var(--sh-surface, #fff)', borderRadius: 16, border: '2px dashed var(--sh-border, #cbd5e1)', padding: '52px 24px', textAlign: 'center' }}>
-          <div style={{ width: 56, height: 56, borderRadius: 14, background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <div style={{ width: 56, height: 56, borderRadius: 14, background: 'linear-gradient(135deg, var(--sh-brand-bg, #eff6ff), var(--sh-soft, #dbeafe))', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16, color: 'var(--sh-brand)' }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
               <polyline points="14 2 14 8 20 8" />
               <line x1="12" y1="18" x2="12" y2="12" />
@@ -92,18 +94,20 @@ export default function NotesList({
             </svg>
           </div>
           <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--sh-heading, #0f172a)', marginBottom: 6 }}>
-            {filterTab === 'private' ? 'No private notes' : filterTab === 'shared' ? 'No shared notes' : 'No notes yet'}
+            {filterTab === 'private' ? 'No private notes' : filterTab === 'shared' ? 'No shared notes' : filterTab === 'starred' ? 'No starred notes' : 'No notes yet'}
           </div>
           <div style={{ fontSize: 13, color: 'var(--sh-muted, #94a3b8)', marginBottom: 18, lineHeight: 1.6 }}>
             {filterTab === 'private'
               ? 'Create a note and keep the Private checkbox checked.'
               : filterTab === 'shared'
                 ? 'Uncheck "Private" on a note to share it with classmates.'
-                : 'Create your first markdown note to get started.'}
+                : filterTab === 'starred'
+                  ? 'Click the ☆ icon on any note to star it for quick access.'
+                  : 'Create your first markdown note to get started.'}
           </div>
           <button
             onClick={createNote}
-            style={{ background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 24px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: PAGE_FONT, boxShadow: '0 2px 8px rgba(59,130,246,0.25)' }}
+            style={{ background: 'var(--sh-brand)', color: 'var(--sh-surface)', border: 'none', borderRadius: 10, padding: '10px 24px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: PAGE_FONT, boxShadow: '0 2px 8px var(--sh-brand-shadow, rgba(59,130,246,0.25))' }}
           >
             Create a Note
           </button>
@@ -117,25 +121,27 @@ export default function NotesList({
                 key={note.id}
                 onClick={() => selectNote(note)}
                 style={{
-                  background: isActive ? '#eff6ff' : 'var(--sh-surface, #fff)',
+                  background: isActive ? 'var(--sh-info-bg, #eff6ff)' : 'var(--sh-surface, #fff)',
                   borderRadius: 12,
-                  border: isActive ? '1.5px solid #93c5fd' : '1px solid var(--sh-border, #e2e8f0)',
+                  border: isActive ? '1.5px solid var(--sh-brand-border, #93c5fd)' : '1px solid var(--sh-border, #e2e8f0)',
                   padding: '14px 16px',
                   cursor: 'pointer',
                   transition: 'all .15s',
                 }}
-                onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.borderColor = '#93c5fd' }}
+                onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.borderColor = 'var(--sh-brand-border, #93c5fd)' }}
                 onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.borderColor = 'var(--sh-border, #e2e8f0)' }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--sh-heading, #0f172a)', lineHeight: 1.3 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--sh-heading, #0f172a)', lineHeight: 1.3, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    {note.pinned && <span title="Pinned" style={{ fontSize: 11 }}>📌</span>}
+                    {note._starred && <span title="Starred" style={{ fontSize: 11, color: 'var(--sh-warning-text, #f59e0b)' }}>★</span>}
                     {note.title || 'Untitled'}
                   </div>
                   <span
                     style={{
                       fontSize: 10, padding: '3px 8px', borderRadius: 99, fontWeight: 600,
-                      background: note.private !== false ? 'var(--sh-soft, #f1f5f9)' : '#dcfce7',
-                      color: note.private !== false ? 'var(--sh-muted, #64748b)' : '#16a34a',
+                      background: note.private !== false ? 'var(--sh-soft, #f1f5f9)' : 'var(--sh-success-bg, #dcfce7)',
+                      color: note.private !== false ? 'var(--sh-muted, #64748b)' : 'var(--sh-success-text, #16a34a)',
                       marginLeft: 8, whiteSpace: 'nowrap',
                     }}
                   >
@@ -148,7 +154,7 @@ export default function NotesList({
                   </div>
                 ) : null}
                 <div style={{ fontSize: 11, color: 'var(--sh-subtext, #94a3b8)', display: 'flex', gap: 10 }}>
-                  {note.course ? <span style={{ fontWeight: 600, color: '#3b82f6' }}>{note.course.code}</span> : null}
+                  {note.course ? <span style={{ fontWeight: 600, color: 'var(--sh-brand, #3b82f6)' }}>{note.course.code}</span> : null}
                   <span>{timeAgo(note.updatedAt)}</span>
                 </div>
               </div>

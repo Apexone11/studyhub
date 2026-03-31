@@ -48,6 +48,14 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
 })
 
+const leaderboardLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  message: { error: 'Too many leaderboard requests. Please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
 module.exports = {
   reactLimiter,
   feedReadLimiter,
@@ -55,4 +63,5 @@ module.exports = {
   commentLimiter,
   attachmentDownloadLimiter,
   authLimiter,
+  leaderboardLimiter,
 }

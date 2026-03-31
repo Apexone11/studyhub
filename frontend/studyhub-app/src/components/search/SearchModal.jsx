@@ -3,12 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { IconSearch, IconX } from '../Icons'
 import { API } from '../../config'
 import { DEBOUNCE_MS, styles } from './searchModalConstants'
-import { SheetResults, NoteResults, CourseResults, UserResults } from './SearchResultItems'
+import { SheetResults, NoteResults, CourseResults, UserResults, GroupResults } from './SearchResultItems'
 import { trackEvent } from '../../lib/telemetry'
 
 export default function SearchModal({ open, onClose }) {
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState({ sheets: [], courses: [], users: [], notes: [] })
+  const [results, setResults] = useState({ sheets: [], courses: [], users: [], notes: [], groups: [] })
   const [loading, setLoading] = useState(false)
   const [activeIndex, setActiveIndex] = useState(-1)
   const inputRef = useRef(null)
@@ -20,7 +20,7 @@ export default function SearchModal({ open, onClose }) {
   useEffect(() => {
     if (open) {
       setQuery('')
-      setResults({ sheets: [], courses: [], users: [], notes: [] })
+      setResults({ sheets: [], courses: [], users: [], notes: [], groups: [] })
       setActiveIndex(-1)
       const focusTimer = setTimeout(() => inputRef.current?.focus(), 50)
       return () => clearTimeout(focusTimer)
@@ -64,13 +64,14 @@ export default function SearchModal({ open, onClose }) {
       const data = await res.json()
       const apiLatencyMs = Math.round(performance.now() - fetchStart)
       const totalResults = (data.results?.sheets?.length || 0) + (data.results?.courses?.length || 0) +
-        (data.results?.users?.length || 0) + (data.results?.notes?.length || 0)
+        (data.results?.users?.length || 0) + (data.results?.notes?.length || 0) + (data.results?.groups?.length || 0)
       trackEvent('page_timing', { page: 'search', apiLatencyMs, totalResults })
       setResults({
         sheets: data.results?.sheets || [],
         courses: data.results?.courses || [],
         users: data.results?.users || [],
         notes: data.results?.notes || [],
+        groups: data.results?.groups || [],
       })
       setActiveIndex(-1)
     } catch (err) {
@@ -86,7 +87,7 @@ export default function SearchModal({ open, onClose }) {
 
     if (value.trim().length < 2) {
       if (abortRef.current) abortRef.current.abort()
-      setResults({ sheets: [], courses: [], users: [], notes: [] })
+      setResults({ sheets: [], courses: [], users: [], notes: [], groups: [] })
       setLoading(false)
       return
     }
@@ -101,6 +102,7 @@ export default function SearchModal({ open, onClose }) {
   results.notes.forEach((n) => flatItems.push({ type: 'note', data: n }))
   results.courses.forEach((c) => flatItems.push({ type: 'course', data: c }))
   results.users.forEach((u) => flatItems.push({ type: 'user', data: u }))
+  results.groups.forEach((g) => flatItems.push({ type: 'group', data: g }))
 
   function navigateToItem(item) {
     onClose()
@@ -108,6 +110,7 @@ export default function SearchModal({ open, onClose }) {
     else if (item.type === 'note') navigate(`/notes/${item.data.id}`)
     else if (item.type === 'course') navigate(`/sheets?courseId=${item.data.id}`)
     else if (item.type === 'user') navigate(`/users/${item.data.username}`)
+    else if (item.type === 'group') navigate(`/study-groups/${item.data.id}`)
   }
 
   function handleKeyDown(e) {
@@ -148,7 +151,7 @@ export default function SearchModal({ open, onClose }) {
           />
           {query && (
             <button
-              onClick={() => { setQuery(''); setResults({ sheets: [], courses: [], users: [], notes: [] }); inputRef.current?.focus() }}
+              onClick={() => { setQuery(''); setResults({ sheets: [], courses: [], users: [], notes: [], groups: [] }); inputRef.current?.focus() }}
               style={styles.clearBtn}
               title="Clear"
               aria-label="Clear search"
@@ -203,6 +206,17 @@ export default function SearchModal({ open, onClose }) {
             users={results.users}
             sheetsCount={results.sheets.length + results.notes.length}
             coursesCount={results.courses.length}
+            query={query}
+            activeIndex={activeIndex}
+            setActiveIndex={setActiveIndex}
+            navigateToItem={navigateToItem}
+          />
+
+          <GroupResults
+            groups={results.groups}
+            sheetsCount={results.sheets.length + results.notes.length}
+            coursesCount={results.courses.length}
+            usersCount={results.users.length}
             query={query}
             activeIndex={activeIndex}
             setActiveIndex={setActiveIndex}

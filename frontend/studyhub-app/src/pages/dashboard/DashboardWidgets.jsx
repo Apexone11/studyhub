@@ -129,8 +129,8 @@ export function StudyActivity({ activity }) {
             width: 34,
             height: 34,
             borderRadius: 10,
-            background: 'linear-gradient(135deg, #ecfdf5, #d1fae5)',
-            color: '#059669',
+            background: 'var(--sh-success-bg)',
+            color: 'var(--sh-success-text)',
             display: 'grid',
             placeItems: 'center',
           }}

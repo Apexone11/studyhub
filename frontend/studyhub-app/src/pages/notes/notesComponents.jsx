@@ -16,7 +16,7 @@ export function MarkdownPreview({ content }) {
 
   if (!html) {
     return (
-      <div style={{ color: '#94a3b8', fontSize: 13, fontStyle: 'italic', padding: '8px 0' }}>
+      <div style={{ color: 'var(--sh-muted, #94a3b8)', fontSize: 13, fontStyle: 'italic', padding: '8px 0' }}>
         Start typing to see preview…
       </div>
     )

@@ -7,10 +7,15 @@ import { linkButton } from './feedConstants'
 import { Panel, LeaderboardPanel } from './FeedWidgets'
 import { timeAgo } from '../sheets/sheetsPageConstants'
 import TrendingSection from './TrendingSection'
+import FeedFollowSuggestions from './FeedFollowSuggestions'
+import { StreakWidget, WeeklyProgressWidget, LeaderboardWidget } from './GamificationWidgets'
 
 export default function FeedAside({ leaderboards, starredUpdates, recentlyViewed = [] }) {
   return (
     <aside className="feed-aside" data-tutorial="feed-leaderboards" style={{ display: 'grid', gap: 16 }}>
+      <StreakWidget />
+      <WeeklyProgressWidget />
+      <LeaderboardWidget />
       {recentlyViewed.length > 0 ? (
         <Panel title="Resume studying" helper="Recently viewed sheets">
           <div style={{ display: 'grid', gap: 8 }}>
@@ -98,6 +103,7 @@ export default function FeedAside({ leaderboards, starredUpdates, recentlyViewed
           </Link>
         </Panel>
       ) : null}
+      <FeedFollowSuggestions />
       <TrendingSection period="7d" limit={6} />
       <LeaderboardPanel title="Top Starred" items={leaderboards.stars} empty="No starred sheets yet." renderLabel={(item) => item.title} />
       <LeaderboardPanel title="Most Downloaded" items={leaderboards.downloads} empty="No downloads yet." renderLabel={(item) => item.title} />

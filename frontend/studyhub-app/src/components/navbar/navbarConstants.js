@@ -24,6 +24,8 @@ export const ROUTE_CONFIG = {
   },
   '/tests':         { crumbs: [{ label: 'Practice Tests',  to: '/tests' }],         backTo: '/feed' },
   '/notes':         { crumbs: [{ label: 'My Notes',        to: '/notes' }],         backTo: '/feed' },
+  '/messages':      { crumbs: [{ label: 'Messages',        to: '/messages' }],      backTo: '/feed' },
+  '/study-groups':  { crumbs: [{ label: 'Study Groups',    to: '/study-groups' }],  backTo: '/feed' },
   '/announcements': { crumbs: [{ label: 'Announcements',   to: '/announcements' }], backTo: '/feed' },
   '/submit':        { crumbs: [{ label: 'Submit Request',  to: '/submit' }],         backTo: '/feed' },
   '/my-courses':    { crumbs: [{ label: 'My Courses',      to: '/my-courses' }],     backTo: '/feed' },

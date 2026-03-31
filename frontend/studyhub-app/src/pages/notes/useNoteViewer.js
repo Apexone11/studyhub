@@ -34,7 +34,8 @@ export function useNoteViewer() {
       })
 
     return () => { active = false }
-  }, [id, timing])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id])
 
   // Report timing when note content arrives
   useEffect(() => {
