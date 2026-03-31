@@ -2650,3 +2650,83 @@ backend/src/index.js:
 
 - Frontend lint: 0 errors
 - Backend lint: 0 errors
+
+## Cycle 64 -- Bug Fixes, Accessibility, UX Polish (2026-03-31)
+
+### Summary
+
+Fixed 2 reported bugs in ChatPanel (typing indicator leak, delete handler mismatch), wired useFocusTrap into messaging modals, fixed concurrent scroll lock in useFocusTrap, moved Tenor API key to config, improved Socket.io error handling, and added missing aria-labels across messaging components.
+
+### 1. Bug Fixes
+
+ChatPanel.jsx -- typing:stop not emitted on timeout (P1):
+- The typing throttle timeout only cleared the timer ref without emitting `typing:stop`
+- Other participants would see a permanent typing indicator after a user paused
+- Fix: emit `typing:stop` when the 3-second throttle window expires
+
+ChatPanel.jsx -- delete handler field mismatch (P2):
+- Handler compared `data.id` but backend emits `{ messageId, conversationId }`
+- Deletes from other clients would not render in ChatPanel until page reload
+- Fix: use `data.messageId || data.id` for backward compatibility
+
+### 2. Focus Trap for Messaging Modals
+
+NewConversationModal.jsx:
+- Wired `useFocusTrap({ active: isOpen, onClose })` with ref on root container
+- Keyboard users can now Tab within modal and Escape to close
+
+ConfirmDeleteModal.jsx:
+- Wired `useFocusTrap({ active: isOpen, onClose: onCancel })` with ref on root container
+- Same focus trap and Escape behavior as other modals
+
+### 3. useFocusTrap Concurrent Scroll Lock Fix
+
+useFocusTrap.js:
+- Replaced per-instance `prevOverflow` save/restore with a shared counter on `document.body`
+- `__focusTrapScrollLockCount` tracks active instances; scroll is restored only when the last active trap unmounts
+- Prevents premature scroll restoration when multiple modals are open simultaneously
+
+### 4. Tenor API Key Moved to Config
+
+config.js:
+- Added `TENOR_API_KEY` export with runtime config / env var / fallback chain
+- Key can now be rotated via `VITE_TENOR_API_KEY` or `window.__STUDYHUB_CONFIG__` without rebuilding
+
+GifSearchPanel.jsx:
+- Imports `TENOR_API_KEY` from config instead of hardcoding the key inline
+- Uses `encodeURIComponent` for safety in URL construction
+
+### 5. Socket.io Error Handling Improvement
+
+useSocket.js:
+- `connect_error` handler now checks structured error fields (`err.data.code`, `err.code`) before falling back to substring matching
+- Added dev-only `console.warn` with raw error object for diagnosis (uses `import.meta.env.DEV`)
+- Checks for `AUTH_REQUIRED`, `TRANSPORT_ERROR` codes alongside message matching
+
+### 6. Accessibility Polish
+
+MessageBubble.jsx:
+- Added `aria-label` to Reply ("Reply to message"), Edit ("Edit message"), and Delete ("Delete message") icon-only action buttons
+
+ConversationList.jsx:
+- Converted context menu trigger from non-semantic `<div>` to `<button>` element
+- Added `aria-label="Conversation options"`, `aria-haspopup="menu"`, `aria-expanded` attributes
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `frontend/.../components/ChatPanel.jsx` | P1: emit typing:stop on timeout; P2: fix delete handler field |
+| `frontend/.../messages/components/NewConversationModal.jsx` | Wire useFocusTrap |
+| `frontend/.../messages/components/ConfirmDeleteModal.jsx` | Wire useFocusTrap |
+| `frontend/.../lib/useFocusTrap.js` | Shared counter for concurrent scroll lock |
+| `frontend/.../config.js` | Add TENOR_API_KEY config export |
+| `frontend/.../messages/components/GifSearchPanel.jsx` | Import key from config |
+| `frontend/.../lib/useSocket.js` | Structured error field checking, dev logging |
+| `frontend/.../messages/components/MessageBubble.jsx` | aria-labels on action buttons |
+| `frontend/.../messages/components/ConversationList.jsx` | Semantic button for context menu |
+
+### Validation
+
+- Frontend lint: 0 errors
+- Backend lint: 0 errors

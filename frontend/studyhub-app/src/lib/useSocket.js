@@ -50,9 +50,20 @@ export function useSocket() {
 
       socketRef.current.on('connect_error', (err) => {
         setConnected(false)
+        // Use structured error fields where available; fall back to message matching.
+        // err.data may contain { code, reason } from the server.
+        const code = err?.data?.code || err?.code || ''
         const msg = err?.message || 'Connection failed'
+        const isAuthError = code === 'AUTH_REQUIRED' || msg === 'Auth required' || msg === 'Invalid token'
+        const isTransportError = code === 'TRANSPORT_ERROR' || msg.includes('xhr poll error') || msg.includes('websocket error')
+
+        if (import.meta.env.DEV) {
+          // Log raw error for diagnosis in development
+          console.warn('[useSocket] connect_error:', { code, message: msg, data: err?.data })
+        }
+
         // Only surface persistent errors — transient ones will auto-retry
-        if (msg.includes('Auth required') || msg.includes('xhr poll error')) {
+        if (isAuthError || isTransportError) {
           setConnectionError('Real-time connection unavailable. Messages will update on refresh.')
         }
       })

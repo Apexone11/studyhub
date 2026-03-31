@@ -97,21 +97,26 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, currentUs
         </div>
 
         {/* Context menu trigger */}
-        <div
+        <button
           onClick={(e) => {
             e.stopPropagation()
             setShowMenu(!showMenu)
           }}
+          aria-label="Conversation options"
+          aria-haspopup="menu"
+          aria-expanded={showMenu}
           style={{
             flexShrink: 0,
             padding: '2px 4px',
             cursor: 'pointer',
             color: 'var(--sh-muted)',
             borderRadius: 4,
+            background: 'none',
+            border: 'none',
           }}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" /></svg>
-        </div>
+        </button>
       </button>
 
       {showMenu && (

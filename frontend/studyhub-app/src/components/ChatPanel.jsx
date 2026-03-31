@@ -193,8 +193,10 @@ export default function ChatPanel({ open, onClose }) {
     }
 
     function handleMessageDelete(data) {
+      // Backend emits { messageId, conversationId } — use messageId, not id
+      const deletedId = data.messageId || data.id
       setMessages((prev) =>
-        prev.map((m) => m.id === data.id ? { ...m, deletedAt: data.deletedAt || new Date().toISOString() } : m)
+        prev.map((m) => m.id === deletedId ? { ...m, deletedAt: data.deletedAt || new Date().toISOString() } : m)
       )
     }
 
@@ -234,6 +236,9 @@ export default function ChatPanel({ open, onClose }) {
     if (typingTimerRef.current) return // Already typing
     socket.emit('typing:start', { conversationId: activeId })
     typingTimerRef.current = setTimeout(() => {
+      // Emit typing:stop when the throttle window expires so other
+      // participants do not see a permanent typing indicator.
+      if (socket && activeId) socket.emit('typing:stop', { conversationId: activeId })
       typingTimerRef.current = null
     }, 3000)
   }

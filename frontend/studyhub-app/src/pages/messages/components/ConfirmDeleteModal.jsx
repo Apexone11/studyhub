@@ -3,13 +3,17 @@
  * Confirmation dialog for deleting a conversation
  * ───────────────────────────────────────────────────────────── */
 import { createPortal } from 'react-dom'
+import { useFocusTrap } from '../../../lib/useFocusTrap'
 import { PAGE_FONT } from '../../shared/pageUtils'
 
 export function ConfirmDeleteModal({ isOpen, onConfirm, onCancel }) {
+  const focusTrapRef = useFocusTrap({ active: isOpen, onClose: onCancel })
+
   if (!isOpen) return null
 
   return createPortal(
     <div
+      ref={focusTrapRef}
       style={{
         position: 'fixed',
         top: 0,

@@ -5,6 +5,7 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import UserAvatar from '../../../components/UserAvatar'
+import { useFocusTrap } from '../../../lib/useFocusTrap'
 import { PAGE_FONT, authHeaders } from '../../shared/pageUtils'
 import { API } from '../../../config'
 
@@ -74,6 +75,8 @@ export function NewConversationModal({ isOpen, onClose, onCreate, currentUserId 
     setIsGroup(false)
   }
 
+  const focusTrapRef = useFocusTrap({ active: isOpen, onClose })
+
   if (!isOpen) return null
 
   const canCreate = isGroup
@@ -82,6 +85,7 @@ export function NewConversationModal({ isOpen, onClose, onCreate, currentUserId 
 
   return createPortal(
     <div
+      ref={focusTrapRef}
       style={{
         position: 'fixed',
         top: 0,
