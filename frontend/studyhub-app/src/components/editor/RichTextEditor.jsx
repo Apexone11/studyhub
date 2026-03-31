@@ -21,44 +21,10 @@ import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
 import Image from '@tiptap/extension-image'
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
-import DOMPurify from 'dompurify'
 import EditorToolbar from './EditorToolbar'
-import { MathInline, MathBlock, mathInputPlugin } from './MathExtension'
+import { MathInline, MathBlock } from './MathExtension'
 import { lowlight } from './codeHighlight'
-
-/* ── DOMPurify configuration for rich text output ─────────── */
-
-const PURIFY_CONFIG = {
-  USE_PROFILES: { html: true },
-  ALLOWED_TAGS: [
-    'p', 'br', 'strong', 'em', 'u', 's', 'code', 'pre',
-    'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-    'ul', 'ol', 'li',
-    'blockquote', 'hr',
-    'a', 'img',
-    'span', 'div', 'sub', 'sup',
-    // KaTeX tags (for C2)
-    'math', 'semantics', 'mrow', 'mi', 'mo', 'mn', 'msup', 'msub',
-    'mfrac', 'mover', 'munder', 'munderover', 'msqrt', 'mroot',
-    'mtable', 'mtr', 'mtd', 'mtext', 'mspace', 'annotation',
-  ],
-  ALLOWED_ATTR: [
-    'href', 'target', 'rel', 'src', 'alt', 'title', 'width', 'height',
-    'class', 'style', 'data-language', 'data-math', 'data-math-display',
-    'xmlns', 'encoding', 'mathvariant',
-  ],
-  ALLOW_DATA_ATTR: false,
-  ADD_ATTR: ['target'],
-}
-
-/**
- * Sanitize HTML output from TipTap before passing to parent.
- * Ensures no script injection even if extensions produce unexpected markup.
- */
-function sanitizeOutput(html) {
-  if (!html || html === '<p></p>') return ''
-  return DOMPurify.sanitize(html, PURIFY_CONFIG)
-}
+import { sanitizeOutput } from './editorSanitize'
 
 /* ── Main RichTextEditor component ─────────────────────────── */
 
@@ -78,7 +44,7 @@ export default function RichTextEditor({
   editable = true,
 }) {
   const onUpdateRef = useRef(onUpdate)
-  onUpdateRef.current = onUpdate
+  useEffect(() => { onUpdateRef.current = onUpdate })
 
   const editor = useEditor({
     extensions: [
@@ -131,7 +97,7 @@ export default function RichTextEditor({
         'aria-label': 'Sheet content editor',
       },
       // Prevent paste of dangerous content
-      handlePaste: (view, event) => {
+      handlePaste: () => {
         // Allow default TipTap paste handling — DOMPurify will sanitize on output
         return false
       },
@@ -177,8 +143,3 @@ export default function RichTextEditor({
   )
 }
 
-/**
- * Re-export sanitizeOutput for use by the viewer side
- * (SheetContentPanel needs to sanitize stored rich text before rendering).
- */
-export { sanitizeOutput, PURIFY_CONFIG }

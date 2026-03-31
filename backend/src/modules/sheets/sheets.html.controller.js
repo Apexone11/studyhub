@@ -6,7 +6,7 @@ const { validateHtmlForSubmission, RISK_TIER, generateRiskSummary, generateTierE
 const requireVerifiedEmail = require('../../core/auth/requireVerifiedEmail')
 const { signHtmlPreviewToken, HTML_PREVIEW_TOKEN_TTL_SECONDS } = require('../../lib/previewTokens')
 const { submitHtmlDraftForReview } = require('../../lib/html/htmlDraftWorkflow')
-const { SHEET_STATUS, sheetWriteLimiter } = require('./sheets.constants')
+const { sheetWriteLimiter } = require('./sheets.constants')
 const { canReadSheet, canModerateOrOwnSheet, resolvePreviewOrigin } = require('./sheets.service')
 const { tierToPreviewMode } = require('./sheets.serializer')
 const { serializeSheet } = require('./sheets.serializer')

@@ -99,9 +99,9 @@ describe('GET /api/courses/popular', () => {
     })
     expect(res.body[1].sheetCount).toBe(3)
 
-    // Verify the where clause excludes null courseIds
+    // Verify the where clause excludes null courseIds (Prisma 6.x syntax)
     const groupByCall = mocks.prisma.studySheet.groupBy.mock.calls[0][0]
-    expect(groupByCall.where.NOT).toEqual({ courseId: null })
+    expect(groupByCall.where.courseId).toEqual({ not: null })
   })
 
   it('returns empty array when no published sheets exist', async () => {

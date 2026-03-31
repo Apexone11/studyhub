@@ -12,6 +12,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import Navbar from '../../components/navbar/Navbar'
+import { IconShield, IconProfile, IconStar } from '../../components/Icons'
 import ReportModal from '../../components/ReportModal'
 import SafeJoyride from '../../components/SafeJoyride'
 import { SkeletonProfile } from '../../components/Skeleton'
@@ -280,7 +281,7 @@ export default function UserProfilePage() {
       <Navbar crumbs={[{ label: 'Profile', to: '#' }]} hideTabs />
       <div style={containerStyle}>
         <div style={{ background: 'var(--sh-surface)', borderRadius: 18, border: '1px solid var(--sh-border)', padding: 48, textAlign: 'center' }}>
-          <div style={{ fontSize: 36, color: 'var(--sh-muted)', marginBottom: 14 }}>{/private|classmates/i.test(error) ? '🔒' : '👤'}</div>
+          <div style={{ fontSize: 36, color: 'var(--sh-muted)', marginBottom: 14 }}>{/private|classmates/i.test(error) ? <IconShield size={36} /> : <IconProfile size={36} />}</div>
           <div style={{ fontWeight: 700, fontSize: 18, color: 'var(--sh-heading)', marginBottom: 8 }}>
             {/private|classmates/i.test(error) ? 'Profile not available' : 'User not found'}
           </div>
@@ -716,7 +717,7 @@ function AchievementsTab({ activityData, badges }) {
       <BadgesSection badges={badges} />
       {activityData.length === 0 && badges.length === 0 && (
         <div style={{ ...cardStyle, textAlign: 'center', padding: '48px 24px' }}>
-          <div style={{ fontSize: 36, marginBottom: 12 }}>🏆</div>
+          <div style={{ fontSize: 36, marginBottom: 12, color: 'var(--sh-muted)' }}><IconStar size={36} /></div>
           <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--sh-heading)', marginBottom: 6 }}>No achievements yet</div>
           <div style={{ fontSize: 13, color: 'var(--sh-muted)' }}>Start studying and contributing to unlock badges.</div>
         </div>

@@ -50,10 +50,15 @@ export default defineConfig(async ({ mode }) => {
                 || id.includes('/react/')
                 || id.includes('\\react-dom\\')
                 || id.includes('/react-dom/')
-                || id.includes('\\react-router')
-                || id.includes('/react-router')
               ) {
                 return 'react-vendor'
+              }
+
+              if (
+                id.includes('\\react-router')
+                || id.includes('/react-router')
+              ) {
+                return 'router-vendor'
               }
 
               if (

@@ -133,7 +133,7 @@ export default function NotesList({
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--sh-heading, #0f172a)', lineHeight: 1.3, display: 'flex', alignItems: 'center', gap: 4 }}>
-                    {note.pinned && <span title="Pinned" style={{ fontSize: 11 }}>📌</span>}
+                    {note.pinned && <span title="Pinned" style={{ fontSize: 11, color: 'var(--sh-brand)' }}>&#x25C9;</span>}
                     {note._starred && <span title="Starred" style={{ fontSize: 11, color: 'var(--sh-warning-text, #f59e0b)' }}>★</span>}
                     {note.title || 'Untitled'}
                   </div>

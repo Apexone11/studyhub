@@ -73,11 +73,11 @@ router.get('/', async (req, res) => {
     }
     const hideUserIds = [...new Set([...blockedIds, ...mutedIds])]
     const userFilter = hideUserIds.length > 0 ? { userId: { notIn: hideUserIds } } : {}
-    const authorFilter = hideUserIds.length > 0 ? { author: { id: { notIn: hideUserIds } } } : {}
+    const authorFilter = hideUserIds.length > 0 ? { authorId: { notIn: hideUserIds } } : {}
 
     const primarySections = await Promise.all([
       settleSection('announcements', () => prisma.announcement.findMany({
-        where: announcementWhere,
+        where: { ...announcementWhere, ...authorFilter },
         include: { author: { select: { id: true, username: true, avatarUrl: true } } },
         orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
         take: announcementTake,

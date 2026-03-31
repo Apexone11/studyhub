@@ -3,7 +3,7 @@
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { IconEye, IconUpload } from '../../../components/Icons'
+import { IconEye, IconUpload, IconPen } from '../../../components/Icons'
 import { FONT, MiniPreview, tierColor, tierLabel } from './uploadSheetConstants'
 
 /* ── First-upload helper card ──────────────────────────────────────────── */
@@ -229,7 +229,7 @@ export function DraftBanner({ isEditing, draftId, status, title, discarding, set
       gap: 10,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ fontSize: 18 }}>📝</span>
+        <IconPen size={18} />
         <div>
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--sh-warning-text)' }}>Continuing your draft</div>
           <div style={{ fontSize: 11, color: 'var(--sh-warning)' }}>
