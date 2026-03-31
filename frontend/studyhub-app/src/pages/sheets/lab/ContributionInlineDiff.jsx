@@ -26,7 +26,7 @@ function computeLineNumbers(hunk) {
 }
 
 /* ── Word-level segment renderer ─────────────────────────────── */
-function SegmentSpans({ segments, mode }) {
+function SegmentSpans({ segments }) {
   if (!segments) return null
   return segments.map((seg, si) => (
     <span
@@ -143,7 +143,7 @@ export default function ContributionInlineDiff({ contributionId }) {
                           {line.type === 'add' ? '+' : line.type === 'remove' ? '-' : ' '}
                         </span>
                         <span style={{ padding: '1px 6px', flex: 1 }}>
-                          {line.segments ? <SegmentSpans segments={line.segments} mode={line.type} /> : (line.content || '\u00A0')}
+                          {line.segments ? <SegmentSpans segments={line.segments} /> : (line.content || '\u00A0')}
                         </span>
                       </div>
                     ))}
@@ -178,11 +178,11 @@ export default function ContributionInlineDiff({ contributionId }) {
                       <div key={ri} style={{ display: 'grid', gridTemplateColumns: '32px 1fr 32px 1fr', borderBottom: '1px solid var(--sh-soft)' }}>
                         <span style={lineNumStyle} aria-hidden="true">{row.leftNum ?? ''}</span>
                         <div style={{ padding: '1px 6px', whiteSpace: 'pre-wrap', wordBreak: 'break-all', background: row.left?.type === 'remove' ? 'var(--sh-danger-bg)' : 'transparent', color: row.left?.type === 'remove' ? 'var(--sh-danger-text)' : 'var(--sh-subtext)', minHeight: '1.5em', borderRight: '1px solid var(--sh-border)' }}>
-                          {row.left ? (row.left.segments ? <SegmentSpans segments={row.left.segments} mode="remove" /> : (row.left.content || '\u00A0')) : ''}
+                          {row.left ? (row.left.segments ? <SegmentSpans segments={row.left.segments} /> : (row.left.content || '\u00A0')) : ''}
                         </div>
                         <span style={lineNumStyle} aria-hidden="true">{row.rightNum ?? ''}</span>
                         <div style={{ padding: '1px 6px', whiteSpace: 'pre-wrap', wordBreak: 'break-all', background: row.right?.type === 'add' ? 'var(--sh-success-bg)' : 'transparent', color: row.right?.type === 'add' ? 'var(--sh-success-text)' : 'var(--sh-subtext)', minHeight: '1.5em' }}>
-                          {row.right ? (row.right.segments ? <SegmentSpans segments={row.right.segments} mode="add" /> : (row.right.content || '\u00A0')) : ''}
+                          {row.right ? (row.right.segments ? <SegmentSpans segments={row.right.segments} /> : (row.right.content || '\u00A0')) : ''}
                         </div>
                       </div>
                     ))}

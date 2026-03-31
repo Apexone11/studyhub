@@ -93,16 +93,7 @@ describe('buildPreviewDocument — safe mode guarantees', () => {
  * 3) Preview CSP directives — verify correct policy composition
  * ═══════════════════════════════════════════════════════════════════════════ */
 describe('Preview CSP directives', () => {
-  const { BASE_PREVIEW_DIRECTIVES, RUNTIME_DIRECTIVES, SAFE_PREVIEW_DIRECTIVES } =
-    (() => {
-      try {
-        return require('../src/modules/preview/preview.routes')
-      } catch {
-        // Module exports the router, not the directives directly.
-        // We test the directives indirectly through the document tests above.
-        return { BASE_PREVIEW_DIRECTIVES: null, RUNTIME_DIRECTIVES: null, SAFE_PREVIEW_DIRECTIVES: null }
-      }
-    })()
+  // Directive constants are not directly exported — tested indirectly via source checks below.
 
   it('base directives block connect-src (prevents fetch/XHR exfil)', () => {
     // Read the source to verify the directive exists
@@ -181,7 +172,6 @@ describe('html-runtime endpoint — owner/admin gate', () => {
     )
 
     // The canModerateOrOwnSheet check must come BEFORE the tier checks
-    const ownerGateIndex = source.indexOf('canModerateOrOwnSheet(sheet, req.user)')
     const runtimeSection = source.indexOf("get('/:id/html-runtime'")
 
     // Find the owner gate within the runtime handler (after the route declaration)

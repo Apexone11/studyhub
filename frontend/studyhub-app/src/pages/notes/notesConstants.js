@@ -23,7 +23,7 @@ export const TOOLBAR_ACTIONS = [
   { key: 'sep2', sep: true },
   { key: 'code', label: '</>', title: 'Inline code', before: '`', after: '`', style: { fontFamily: 'monospace', fontSize: 11, fontWeight: 700 } },
   { key: 'codeblock', label: '{ }', title: 'Code block', before: '```\n', after: '\n```', style: { fontFamily: 'monospace', fontSize: 11, fontWeight: 700 } },
-  { key: 'link', label: '🔗', title: 'Link (Ctrl+K)', shortcut: 'k', before: '[', after: '](url)', style: { fontSize: 13 } },
+  { key: 'link', label: 'Lk', title: 'Link (Ctrl+K)', shortcut: 'k', before: '[', after: '](url)', style: { fontSize: 11, fontWeight: 700, textDecoration: 'underline' } },
   { key: 'quote', label: '❝', title: 'Blockquote', before: '> ', after: '', style: { fontSize: 15, lineHeight: '14px' } },
 ]
 

@@ -152,7 +152,7 @@ export default function SheetActionsMenu({
               style={{ ...dropdownItem(), color: sheet.reactions?.userReaction === 'like' ? 'var(--sh-success)' : 'var(--sh-text)' }}
               role="menuitem"
             >
-              <span style={{ fontSize: 14 }} aria-hidden="true">👍</span>
+              <span style={{ fontSize: 14 }} aria-hidden="true">&#x25B2;</span>
               Helpful {sheet.reactions?.likes || 0}
             </button>
             <button
@@ -161,7 +161,7 @@ export default function SheetActionsMenu({
               style={{ ...dropdownItem(), color: sheet.reactions?.userReaction === 'dislike' ? 'var(--sh-danger)' : 'var(--sh-text)' }}
               role="menuitem"
             >
-              <span style={{ fontSize: 14 }} aria-hidden="true">👎</span>
+              <span style={{ fontSize: 14 }} aria-hidden="true">&#x25BC;</span>
               Needs work {sheet.reactions?.dislikes || 0}
             </button>
 
@@ -215,8 +215,8 @@ export default function SheetActionsMenu({
       {/* Inline helpful/needs-work summary (read-only) */}
       {(sheet.reactions?.likes > 0 || sheet.reactions?.dislikes > 0) && (
         <span style={{ fontSize: 11, color: 'var(--sh-muted)', fontWeight: 600, display: 'flex', gap: 8 }}>
-          {sheet.reactions.likes > 0 && <span>👍 {sheet.reactions.likes}</span>}
-          {sheet.reactions.dislikes > 0 && <span>👎 {sheet.reactions.dislikes}</span>}
+          {sheet.reactions.likes > 0 && <span>&#x25B2; {sheet.reactions.likes}</span>}
+          {sheet.reactions.dislikes > 0 && <span>&#x25BC; {sheet.reactions.dislikes}</span>}
         </span>
       )}
     </div>

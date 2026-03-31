@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import DOMPurify from 'dompurify'
 import { IconFork } from '../../../components/Icons'
 import { FONT, panelStyle, timeAgo } from './sheetViewerConstants'
-import { PURIFY_CONFIG } from '../../../components/editor/RichTextEditor'
+import { PURIFY_CONFIG } from '../../../components/editor/editorSanitize'
 import { renderMath } from '../../../components/editor/MathExtension'
 import '../../../components/editor/richTextEditor.css'
 

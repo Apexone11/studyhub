@@ -5,8 +5,10 @@
  *   Desktop/Tablet: split panel (340px list | flex thread) side by side
  *   Phone: single panel (list OR thread), back button to return
  *
+ * Wired to real API via useMessagingData hook + useSocket for real-time.
  * Features: conversation list with search, message thread with typing indicator,
- * new conversation modal, message grouping by date, unread indicators.
+ * new conversation modal, message grouping by date, delete conversation,
+ * message context menu (edit/delete), unread indicators, user avatars.
  * ═══════════════════════════════════════════════════════════════════════════ */
 import Navbar from '../../components/navbar/Navbar'
 import AppSidebar from '../../components/sidebar/AppSidebar'
@@ -16,78 +18,23 @@ import { useResponsiveAppLayout } from '../../lib/ui'
 import { PageShell } from '../shared/pageScaffold'
 import { PAGE_FONT } from '../shared/pageUtils'
 import { usePageTitle } from '../../lib/usePageTitle'
-import { useState, useRef, useEffect } from 'react'
+import { useSession } from '../../lib/session-context'
+import { useSocket } from '../../lib/useSocket'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { createPortal } from 'react-dom'
-import { formatRelativeTime, formatMessageTime, formatDateSeparator, groupMessagesByDate, truncateText } from './messagesHelpers'
-
-/* ═══════════════════════════════════════════════════════════════════════════
- * Mock data and state management (replace with real data/hooks)
- * ═══════════════════════════════════════════════════════════════════════════ */
-
-const MOCK_CONVERSATIONS = [
-  {
-    id: 'conv-1',
-    type: 'dm',
-    participantUsername: 'alice_smith',
-    participantAvatar: null,
-    participantOnline: true,
-    lastMessage: 'Did you finish the calc homework?',
-    lastMessageTimestamp: new Date(Date.now() - 300000),
-    unreadCount: 2,
-  },
-  {
-    id: 'conv-2',
-    type: 'dm',
-    participantUsername: 'bob_jones',
-    participantAvatar: null,
-    participantOnline: false,
-    lastMessage: 'Yeah, the notes really helped. Thanks!',
-    lastMessageTimestamp: new Date(Date.now() - 3600000),
-    unreadCount: 0,
-  },
-  {
-    id: 'conv-3',
-    type: 'group',
-    groupName: 'CS101 Study Group',
-    groupAvatar: null,
-    lastMessage: 'Let me know if you need help with the project',
-    lastMessageTimestamp: new Date(Date.now() - 86400000),
-    unreadCount: 5,
-  },
-]
-
-const MOCK_MESSAGES = [
-  {
-    id: 'msg-1',
-    senderUsername: 'alice_smith',
-    senderAvatar: null,
-    content: 'Hey! How are you doing?',
-    timestamp: new Date(Date.now() - 7200000),
-    isOwn: false,
-    edited: false,
-    deleted: false,
-  },
-  {
-    id: 'msg-2',
-    senderUsername: 'current_user',
-    senderAvatar: null,
-    content: 'Great! Just working on the assignment.',
-    timestamp: new Date(Date.now() - 7000000),
-    isOwn: true,
-    edited: false,
-    deleted: false,
-  },
-  {
-    id: 'msg-3',
-    senderUsername: 'alice_smith',
-    senderAvatar: null,
-    content: 'Did you finish the calc homework?',
-    timestamp: new Date(Date.now() - 300000),
-    isOwn: false,
-    edited: false,
-    deleted: false,
-  },
-]
+import {
+  formatRelativeTime,
+  formatMessageTime,
+  formatDateSeparator,
+  groupMessagesByDate,
+  truncateText,
+  getConversationDisplayName,
+  getConversationAvatar,
+} from './messagesHelpers'
+import { useMessagingData } from './useMessagingData'
+import { API } from '../../config'
+import { authHeaders } from '../shared/pageUtils'
 
 /* ═══════════════════════════════════════════════════════════════════════════
  * Subcomponents
@@ -98,44 +45,16 @@ function ConversationList({
   activeConversationId,
   selectConversation,
   onNewClick,
+  onDeleteConversation,
   loading,
+  currentUserId,
 }) {
   const [searchQuery, setSearchQuery] = useState('')
 
-  const filtered = conversations.filter(conv => {
-    const name = conv.type === 'dm' ? conv.participantUsername : conv.groupName
+  const filtered = conversations.filter((conv) => {
+    const name = getConversationDisplayName(conv, currentUserId)
     return name.toLowerCase().includes(searchQuery.toLowerCase())
   })
-
-  if (loading) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-        <div style={{ padding: 16, borderBottom: '1px solid var(--sh-border)' }}>
-          <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--sh-heading)', marginBottom: 12 }}>Messages</h2>
-          <button
-            onClick={onNewClick}
-            style={{
-              width: '100%',
-              padding: '8px 12px',
-              background: 'var(--sh-brand)',
-              color: 'var(--sh-surface)',
-              border: 'none',
-              borderRadius: 'var(--radius-control)',
-              fontSize: 13,
-              fontWeight: 700,
-              cursor: 'pointer',
-              fontFamily: PAGE_FONT,
-            }}
-          >
-            New
-          </button>
-        </div>
-        <div style={{ padding: 16, color: 'var(--sh-muted)', textAlign: 'center', fontSize: 13 }}>
-          Loading conversations...
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -177,18 +96,24 @@ function ConversationList({
         />
       </div>
 
-      {filtered.length === 0 ? (
+      {loading ? (
+        <div style={{ padding: 24, textAlign: 'center', color: 'var(--sh-muted)', fontSize: 13 }}>
+          Loading conversations...
+        </div>
+      ) : filtered.length === 0 ? (
         <div style={{ padding: 24, textAlign: 'center', color: 'var(--sh-muted)', fontSize: 13 }}>
           {conversations.length === 0 ? 'No conversations yet. Start a chat!' : 'No conversations match your search.'}
         </div>
       ) : (
         <div style={{ flex: 1, overflowY: 'auto' }}>
-          {filtered.map(conv => (
+          {filtered.map((conv) => (
             <ConversationItem
               key={conv.id}
               conversation={conv}
               isActive={activeConversationId === conv.id}
               onClick={() => selectConversation(conv.id)}
+              onDelete={() => onDeleteConversation(conv.id)}
+              currentUserId={currentUserId}
             />
           ))}
         </div>
@@ -197,94 +122,168 @@ function ConversationList({
   )
 }
 
-function ConversationItem({ conversation, isActive, onClick }) {
-  const name = conversation.type === 'dm' ? conversation.participantUsername : conversation.groupName
-  const avatar = conversation.type === 'dm' ? conversation.participantAvatar : conversation.groupAvatar
-  const online = conversation.type === 'dm' ? conversation.participantOnline : false
+function ConversationItem({ conversation, isActive, onClick, onDelete, currentUserId }) {
+  const [showMenu, setShowMenu] = useState(false)
+  const name = getConversationDisplayName(conversation, currentUserId)
+  const avatar = getConversationAvatar(conversation, currentUserId)
+  const lastMsg = conversation.lastMessage
+  const lastMsgText = lastMsg
+    ? (lastMsg.content || lastMsg.sender?.username || '')
+    : ''
 
   return (
-    <button
-      onClick={onClick}
-      style={{
-        width: '100%',
-        padding: '12px 12px',
-        background: isActive ? 'var(--sh-brand-soft)' : 'transparent',
-        border: 'none',
-        borderLeft: isActive ? '3px solid var(--sh-brand)' : '3px solid transparent',
-        cursor: 'pointer',
-        display: 'flex',
-        gap: 10,
-        alignItems: 'flex-start',
-        fontFamily: PAGE_FONT,
-        transition: 'background 0.15s',
-      }}
-      onMouseEnter={(e) => {
-        if (!isActive) e.currentTarget.style.background = 'var(--sh-soft)'
-      }}
-      onMouseLeave={(e) => {
-        if (!isActive) e.currentTarget.style.background = 'transparent'
-      }}
-    >
-      <div style={{ position: 'relative', flexShrink: 0 }}>
-        <UserAvatar
-          username={name}
-          avatarUrl={avatar}
-          size={40}
-          showStatus={conversation.type === 'dm'}
-          online={online}
-        />
-        {conversation.unreadCount > 0 && (
-          <div
-            style={{
-              position: 'absolute',
-              top: -6,
-              right: -6,
-              width: 20,
-              height: 20,
-              borderRadius: '50%',
-              background: 'var(--sh-brand)',
-              color: 'var(--sh-surface)',
-              display: 'grid',
-              placeItems: 'center',
-              fontSize: 11,
-              fontWeight: 700,
-            }}
-          >
-            {conversation.unreadCount}
-          </div>
-        )}
-      </div>
+    <div style={{ position: 'relative' }}>
+      <button
+        onClick={onClick}
+        style={{
+          width: '100%',
+          padding: '12px 12px',
+          background: isActive ? 'var(--sh-brand-soft)' : 'transparent',
+          border: 'none',
+          borderLeft: isActive ? '3px solid var(--sh-brand)' : '3px solid transparent',
+          cursor: 'pointer',
+          display: 'flex',
+          gap: 10,
+          alignItems: 'flex-start',
+          fontFamily: PAGE_FONT,
+          transition: 'background 0.15s',
+        }}
+        onMouseEnter={(e) => {
+          if (!isActive) e.currentTarget.style.background = 'var(--sh-soft)'
+        }}
+        onMouseLeave={(e) => {
+          if (!isActive) e.currentTarget.style.background = 'transparent'
+        }}
+      >
+        <div style={{ position: 'relative', flexShrink: 0 }}>
+          <UserAvatar
+            username={name}
+            avatarUrl={avatar}
+            size={40}
+          />
+          {conversation.unreadCount > 0 && (
+            <div
+              style={{
+                position: 'absolute',
+                top: -6,
+                right: -6,
+                width: 20,
+                height: 20,
+                borderRadius: '50%',
+                background: 'var(--sh-brand)',
+                color: 'var(--sh-surface)',
+                display: 'grid',
+                placeItems: 'center',
+                fontSize: 11,
+                fontWeight: 700,
+              }}
+            >
+              {conversation.unreadCount}
+            </div>
+          )}
+        </div>
 
-      <div style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--sh-heading)', marginBottom: 2 }}>
-          {name}
+        <div style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--sh-heading)', marginBottom: 2 }}>
+            {name}
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--sh-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {truncateText(lastMsgText, 40)}
+          </div>
+          {lastMsg?.createdAt && (
+            <div style={{ fontSize: 11, color: 'var(--sh-muted)', marginTop: 4 }}>
+              {formatRelativeTime(lastMsg.createdAt)}
+            </div>
+          )}
         </div>
-        <div style={{ fontSize: 12, color: 'var(--sh-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {truncateText(conversation.lastMessage, 40)}
+
+        {/* Context menu trigger */}
+        <div
+          onClick={(e) => {
+            e.stopPropagation()
+            setShowMenu(!showMenu)
+          }}
+          style={{
+            flexShrink: 0,
+            padding: '2px 4px',
+            cursor: 'pointer',
+            color: 'var(--sh-muted)',
+            borderRadius: 4,
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" /></svg>
         </div>
-        <div style={{ fontSize: 11, color: 'var(--sh-muted)', marginTop: 4 }}>
-          {formatRelativeTime(conversation.lastMessageTimestamp)}
+      </button>
+
+      {showMenu && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 8,
+            right: 8,
+            background: 'var(--sh-surface)',
+            border: '1px solid var(--sh-border)',
+            borderRadius: 8,
+            boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+            zIndex: 100,
+            padding: 4,
+            minWidth: 140,
+          }}
+        >
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              setShowMenu(false)
+              onDelete()
+            }}
+            style={{
+              width: '100%',
+              padding: '8px 12px',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: 12,
+              fontWeight: 600,
+              color: 'var(--sh-danger-text)',
+              textAlign: 'left',
+              borderRadius: 6,
+              fontFamily: PAGE_FONT,
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--sh-danger-bg)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+          >
+            Delete Conversation
+          </button>
         </div>
-      </div>
-    </button>
+      )}
+    </div>
   )
 }
 
 function MessageThread({
   conversation,
   messages,
-  typingUsername,
+  typingUsernames,
   onBack,
-  loading,
+  onSend,
+  onDeleteMessage,
+  onEditMessage,
+  onTypingStart,
+  loadingMessages,
   isPhone,
+  currentUserId,
 }) {
   const messagesEndRef = useRef(null)
   const [inputValue, setInputValue] = useState('')
   const [inputRows, setInputRows] = useState(1)
+  const [editingMessageId, setEditingMessageId] = useState(null)
+  const [editContent, setEditContent] = useState('')
+  const conversationName = getConversationDisplayName(conversation, currentUserId)
+  const conversationAvatar = getConversationAvatar(conversation, currentUserId)
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, typingUsername])
+  }, [messages, typingUsernames])
 
   if (!conversation) {
     return (
@@ -294,31 +293,53 @@ function MessageThread({
     )
   }
 
-  const conversationName = conversation.type === 'dm' ? conversation.participantUsername : conversation.groupName
-  const conversationAvatar = conversation.type === 'dm' ? conversation.participantAvatar : conversation.groupAvatar
-  const online = conversation.type === 'dm' ? conversation.participantOnline : false
-
   const handleInputChange = (e) => {
     const value = e.target.value
     setInputValue(value)
-
     const lineCount = (value.match(/\n/g) || []).length + 1
     setInputRows(Math.min(Math.max(lineCount, 1), 4))
+    if (value.trim()) onTypingStart()
   }
 
   const handleSendMessage = () => {
     if (inputValue.trim()) {
-      console.log('Send message:', inputValue)
+      onSend(inputValue)
       setInputValue('')
       setInputRows(1)
     }
   }
 
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSendMessage()
+    }
+  }
+
+  const handleStartEdit = (msg) => {
+    setEditingMessageId(msg.id)
+    setEditContent(msg.content)
+  }
+
+  const handleConfirmEdit = () => {
+    if (editContent.trim() && editingMessageId) {
+      onEditMessage(editingMessageId, editContent)
+    }
+    setEditingMessageId(null)
+    setEditContent('')
+  }
+
+  const handleCancelEdit = () => {
+    setEditingMessageId(null)
+    setEditContent('')
+  }
+
   const messagesByDate = groupMessagesByDate(messages)
-  const dates = Object.keys(messagesByDate).sort()
+  const dates = Object.keys(messagesByDate).sort((a, b) => new Date(a) - new Date(b))
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--sh-surface)' }}>
+      {/* Header */}
       <div style={{
         padding: '12px 16px',
         borderBottom: '1px solid var(--sh-border)',
@@ -326,11 +347,11 @@ function MessageThread({
         alignItems: 'center',
         gap: 10,
         background: 'var(--sh-surface)',
-      }}
-      >
+      }}>
         {isPhone && (
           <button
             onClick={onBack}
+            aria-label="Back to conversations"
             style={{
               background: 'none',
               border: 'none',
@@ -345,7 +366,7 @@ function MessageThread({
               justifyContent: 'center',
             }}
           >
-            chevron left
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
           </button>
         )}
 
@@ -353,49 +374,35 @@ function MessageThread({
           username={conversationName}
           avatarUrl={conversationAvatar}
           size={32}
-          showStatus={conversation.type === 'dm'}
-          online={online}
         />
 
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--sh-heading)' }}>
             {conversationName}
           </div>
-          {conversation.type === 'dm' && (
-            <div style={{ fontSize: 11, color: online ? 'var(--sh-success)' : 'var(--sh-muted)' }}>
-              {online ? 'Online' : 'Offline'}
+          {conversation.type === 'group' && conversation.participants && (
+            <div style={{ fontSize: 11, color: 'var(--sh-muted)' }}>
+              {conversation.participants.length} member{conversation.participants.length !== 1 ? 's' : ''}
             </div>
           )}
         </div>
-
-        <button
-          style={{
-            background: 'none',
-            border: 'none',
-            color: 'var(--sh-muted)',
-            cursor: 'pointer',
-            fontSize: 18,
-            padding: '4px 8px',
-          }}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
-        </button>
       </div>
 
+      {/* Messages area */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column' }}>
-        {loading && (
+        {loadingMessages && messages.length === 0 && (
           <div style={{ color: 'var(--sh-muted)', textAlign: 'center', fontSize: 13 }}>
             Loading messages...
           </div>
         )}
 
-        {!loading && messages.length === 0 && (
+        {!loadingMessages && messages.length === 0 && (
           <div style={{ color: 'var(--sh-muted)', textAlign: 'center', fontSize: 13, margin: 'auto' }}>
             No messages yet. Say hello!
           </div>
         )}
 
-        {!loading && dates.map(date => (
+        {dates.map((date) => (
           <div key={date}>
             <div style={{
               textAlign: 'center',
@@ -404,29 +411,44 @@ function MessageThread({
               color: 'var(--sh-muted)',
               textTransform: 'uppercase',
               letterSpacing: '0.05em',
-            }}
-            >
+            }}>
               {formatDateSeparator(new Date(date))}
             </div>
 
-            {messagesByDate[date].map(msg => (
-              <MessageBubble key={msg.id} message={msg} />
+            {messagesByDate[date].map((msg) => (
+              <MessageBubble
+                key={msg.id}
+                message={msg}
+                currentUserId={currentUserId}
+                isEditing={editingMessageId === msg.id}
+                editContent={editContent}
+                onEditContentChange={setEditContent}
+                onStartEdit={() => handleStartEdit(msg)}
+                onConfirmEdit={handleConfirmEdit}
+                onCancelEdit={handleCancelEdit}
+                onDelete={() => onDeleteMessage(msg.id)}
+              />
             ))}
           </div>
         ))}
 
-        {typingUsername && <TypingIndicator username={typingUsername} />}
+        {typingUsernames.length > 0 && (
+          <TypingIndicator usernames={typingUsernames} />
+        )}
 
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Input area */}
       <div style={{ padding: '12px 16px', borderTop: '1px solid var(--sh-border)', background: 'var(--sh-surface)' }}>
         <div style={{ display: 'flex', gap: 8 }}>
           <textarea
             value={inputValue}
             onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
             placeholder="Type a message..."
             rows={inputRows}
+            maxLength={5000}
             style={{
               flex: 1,
               padding: '8px 12px',
@@ -463,91 +485,249 @@ function MessageThread({
   )
 }
 
-function MessageBubble({ message }) {
-  const bgColor = message.isOwn ? 'var(--sh-brand)' : 'var(--sh-soft)'
-  const textColor = message.isOwn ? 'var(--sh-surface)' : 'var(--sh-text)'
+function MessageBubble({
+  message,
+  currentUserId,
+  isEditing,
+  editContent,
+  onEditContentChange,
+  onStartEdit,
+  onConfirmEdit,
+  onCancelEdit,
+  onDelete,
+}) {
+  const [showActions, setShowActions] = useState(false)
+  const isOwn = message.sender?.id === currentUserId || message.pending
+  const isDeleted = Boolean(message.deletedAt)
+  const bgColor = isOwn ? 'var(--sh-brand)' : 'var(--sh-soft)'
+  const textColor = isOwn ? 'var(--sh-surface)' : 'var(--sh-text)'
+  const senderName = message.sender?.username || 'Unknown'
+  const senderAvatar = message.sender?.avatarUrl || null
+
+  // Only own, non-deleted, recent messages can be edited (15-minute window)
+  const canEdit = isOwn && !isDeleted && Boolean(message.editableUntil || message.createdAt)
 
   return (
-    <div style={{
-      display: 'flex',
-      gap: 8,
-      marginBottom: 12,
-      alignItems: 'flex-end',
-      flexDirection: message.isOwn ? 'row-reverse' : 'row',
-    }}
+    <div
+      style={{
+        display: 'flex',
+        gap: 8,
+        marginBottom: 12,
+        alignItems: 'flex-end',
+        flexDirection: isOwn ? 'row-reverse' : 'row',
+      }}
+      onMouseEnter={() => setShowActions(true)}
+      onMouseLeave={() => setShowActions(false)}
     >
       <UserAvatar
-        username={message.senderUsername}
-        avatarUrl={message.senderAvatar}
+        username={senderName}
+        avatarUrl={senderAvatar}
         size={28}
       />
 
-      <div
-        style={{
-          maxWidth: '60%',
-          padding: '8px 12px',
-          background: bgColor,
-          color: textColor,
-          borderRadius: 'var(--radius-control)',
-          fontSize: 13,
-          lineHeight: 1.5,
-          wordWrap: 'break-word',
-        }}
-      >
-        {message.deleted ? (
-          <span style={{ fontStyle: 'italic', opacity: 0.6 }}>
-            [Message deleted]
-          </span>
+      <div style={{ maxWidth: '60%', position: 'relative' }}>
+        {isEditing ? (
+          <div style={{
+            padding: '8px 12px',
+            background: 'var(--sh-soft)',
+            borderRadius: 'var(--radius-control)',
+            border: '1px solid var(--sh-brand)',
+          }}>
+            <textarea
+              value={editContent}
+              onChange={(e) => onEditContentChange(e.target.value)}
+              style={{
+                width: '100%',
+                padding: 4,
+                background: 'transparent',
+                color: 'var(--sh-text)',
+                border: 'none',
+                fontSize: 13,
+                fontFamily: PAGE_FONT,
+                resize: 'none',
+                outline: 'none',
+              }}
+              rows={2}
+              maxLength={5000}
+              autoFocus
+            />
+            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginTop: 4 }}>
+              <button
+                onClick={onCancelEdit}
+                style={{
+                  padding: '3px 8px',
+                  background: 'var(--sh-soft)',
+                  border: '1px solid var(--sh-border)',
+                  borderRadius: 4,
+                  fontSize: 11,
+                  cursor: 'pointer',
+                  color: 'var(--sh-text)',
+                  fontFamily: PAGE_FONT,
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={onConfirmEdit}
+                style={{
+                  padding: '3px 8px',
+                  background: 'var(--sh-brand)',
+                  border: 'none',
+                  borderRadius: 4,
+                  fontSize: 11,
+                  cursor: 'pointer',
+                  color: 'var(--sh-surface)',
+                  fontWeight: 600,
+                  fontFamily: PAGE_FONT,
+                }}
+              >
+                Save
+              </button>
+            </div>
+          </div>
         ) : (
-          <>
-            {message.content}
-          </>
-        )}
+          <div
+            style={{
+              padding: '8px 12px',
+              background: bgColor,
+              color: textColor,
+              borderRadius: 'var(--radius-control)',
+              fontSize: 13,
+              lineHeight: 1.5,
+              wordWrap: 'break-word',
+              opacity: message.pending ? 0.6 : 1,
+            }}
+          >
+            {isDeleted ? (
+              <span style={{ fontStyle: 'italic', opacity: 0.6 }}>
+                [Message deleted]
+              </span>
+            ) : (
+              message.content
+            )}
 
-        {message.edited && (
-          <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>
-            (edited)
+            {message.editedAt && !isDeleted && (
+              <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>
+                (edited)
+              </div>
+            )}
+
+            <div style={{ fontSize: 11, opacity: 0.7, marginTop: 4 }}>
+              {formatMessageTime(message.createdAt)}
+            </div>
           </div>
         )}
 
-        <div style={{ fontSize: 11, opacity: 0.7, marginTop: 4 }}>
-          {formatMessageTime(message.timestamp)}
-        </div>
+        {/* Reactions display */}
+        {Array.isArray(message.reactions) && message.reactions.length > 0 && !isDeleted && (
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
+            {groupReactions(message.reactions).map((group) => (
+              <span
+                key={group.emoji}
+                style={{
+                  padding: '2px 6px',
+                  background: 'var(--sh-soft)',
+                  border: '1px solid var(--sh-border)',
+                  borderRadius: 12,
+                  fontSize: 11,
+                  cursor: 'pointer',
+                }}
+              >
+                {group.emoji} {group.count}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Action buttons on hover */}
+        {showActions && !isDeleted && !isEditing && !message.pending && (
+          <div style={{
+            position: 'absolute',
+            top: -24,
+            right: isOwn ? 0 : undefined,
+            left: isOwn ? undefined : 0,
+            display: 'flex',
+            gap: 2,
+            background: 'var(--sh-surface)',
+            border: '1px solid var(--sh-border)',
+            borderRadius: 6,
+            padding: 2,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+          }}>
+            {canEdit && (
+              <button
+                onClick={onStartEdit}
+                title="Edit"
+                style={actionBtnStyle}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+              </button>
+            )}
+            {isOwn && (
+              <button
+                onClick={onDelete}
+                title="Delete"
+                style={{ ...actionBtnStyle, color: 'var(--sh-danger-text)' }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
 }
 
-function TypingIndicator({ username }) {
+const actionBtnStyle = {
+  background: 'transparent',
+  border: 'none',
+  cursor: 'pointer',
+  padding: '4px 6px',
+  borderRadius: 4,
+  color: 'var(--sh-muted)',
+  display: 'flex',
+  alignItems: 'center',
+}
+
+function groupReactions(reactions) {
+  const groups = {}
+  for (const r of reactions) {
+    if (!groups[r.emoji]) groups[r.emoji] = { emoji: r.emoji, count: 0 }
+    groups[r.emoji].count++
+  }
+  return Object.values(groups)
+}
+
+function TypingIndicator({ usernames }) {
+  const text = usernames.length === 1
+    ? `${usernames[0]} is typing`
+    : usernames.length === 2
+      ? `${usernames[0]} and ${usernames[1]} are typing`
+      : `${usernames[0]} and ${usernames.length - 1} others are typing`
+
   return (
     <div style={{
       display: 'flex',
       gap: 4,
       marginBottom: 12,
       alignItems: 'flex-end',
-    }}
-    >
-      <UserAvatar username={username} size={28} />
+    }}>
       <div style={{
         padding: '8px 12px',
         background: 'var(--sh-soft)',
         color: 'var(--sh-text)',
         borderRadius: 'var(--radius-control)',
         fontSize: 13,
-      }}
-      >
-        <span style={{ opacity: 0.7 }}>
-          {username} is typing
-        </span>
-        <span style={{ marginLeft: 4 }}>
-          ...
-        </span>
+      }}>
+        <span style={{ opacity: 0.7 }}>{text}</span>
+        <span style={{ marginLeft: 4 }}>...</span>
       </div>
     </div>
   )
 }
 
-function NewConversationModal({ isOpen, onClose, onCreate }) {
+function NewConversationModal({ isOpen, onClose, onCreate, currentUserId }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedUsers, setSelectedUsers] = useState([])
   const [groupName, setGroupName] = useState('')
@@ -559,30 +739,39 @@ function NewConversationModal({ isOpen, onClose, onCreate }) {
     const query = searchQuery.trim()
 
     if (!query) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSearchResults([])
       setLoading(false)
       return undefined
     }
 
     setLoading(true)
-    const timer = window.setTimeout(() => {
-      const mockResults = [
-        { username: 'alice_smith', avatarUrl: null },
-        { username: 'bob_jones', avatarUrl: null },
-        { username: 'charlie_brown', avatarUrl: null },
-      ].filter(u => u.username.includes(query.toLowerCase()))
-
-      setSearchResults(mockResults)
-      setLoading(false)
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await fetch(
+          `${API}/api/search?q=${encodeURIComponent(query)}&type=users&limit=10`,
+          { headers: authHeaders(), credentials: 'include' },
+        )
+        if (response.ok) {
+          const data = await response.json()
+          const users = (data.users || data.results || [])
+            .filter((u) => u.id !== currentUserId)
+          setSearchResults(users)
+        } else {
+          setSearchResults([])
+        }
+      } catch {
+        setSearchResults([])
+      } finally {
+        setLoading(false)
+      }
     }, 300)
 
     return () => window.clearTimeout(timer)
-  }, [searchQuery])
+  }, [searchQuery, currentUserId])
 
   const handleUserSelect = (user) => {
-    if (selectedUsers.find(u => u.username === user.username)) {
-      setSelectedUsers(selectedUsers.filter(u => u.username !== user.username))
+    if (selectedUsers.find((u) => u.id === user.id)) {
+      setSelectedUsers(selectedUsers.filter((u) => u.id !== user.id))
     } else {
       setSelectedUsers([...selectedUsers, user])
     }
@@ -595,7 +784,7 @@ function NewConversationModal({ isOpen, onClose, onCreate }) {
     onCreate({
       isGroup,
       groupName: isGroup ? groupName : null,
-      participantUsernames: selectedUsers.map(u => u.username),
+      participantIds: selectedUsers.map((u) => u.id),
     })
 
     setSearchQuery('')
@@ -606,19 +795,27 @@ function NewConversationModal({ isOpen, onClose, onCreate }) {
 
   if (!isOpen) return null
 
+  const canCreate = isGroup
+    ? (groupName.trim() && selectedUsers.length > 0)
+    : selectedUsers.length > 0
+
   return createPortal(
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: 'rgba(15, 23, 42, 0.5)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 9999,
-    }}
+    <div
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(15, 23, 42, 0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 9999,
+      }}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Start a conversation"
     >
       <div style={{
         width: '90%',
@@ -628,8 +825,7 @@ function NewConversationModal({ isOpen, onClose, onCreate }) {
         padding: 24,
         boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
         fontFamily: PAGE_FONT,
-      }}
-      >
+      }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--sh-heading)' }}>
             Start a Conversation
@@ -650,21 +846,11 @@ function NewConversationModal({ isOpen, onClose, onCreate }) {
 
         <div style={{ marginBottom: 16 }}>
           <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, marginBottom: 12 }}>
-            <input
-              type="radio"
-              name="type"
-              checked={!isGroup}
-              onChange={() => setIsGroup(false)}
-            />
+            <input type="radio" name="type" checked={!isGroup} onChange={() => setIsGroup(false)} />
             Direct Message
           </label>
           <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13 }}>
-            <input
-              type="radio"
-              name="type"
-              checked={isGroup}
-              onChange={() => setIsGroup(true)}
-            />
+            <input type="radio" name="type" checked={isGroup} onChange={() => setIsGroup(true)} />
             Group Chat
           </label>
         </div>
@@ -714,8 +900,7 @@ function NewConversationModal({ isOpen, onClose, onCreate }) {
           border: '1px solid var(--sh-border)',
           borderRadius: 'var(--radius)',
           padding: 8,
-        }}
-        >
+        }}>
           {loading && (
             <div style={{ padding: 8, color: 'var(--sh-muted)', textAlign: 'center', fontSize: 13 }}>
               Searching...
@@ -728,14 +913,14 @@ function NewConversationModal({ isOpen, onClose, onCreate }) {
             </div>
           )}
 
-          {!loading && searchResults.map(user => (
+          {!loading && searchResults.map((user) => (
             <button
-              key={user.username}
+              key={user.id}
               onClick={() => handleUserSelect(user)}
               style={{
                 width: '100%',
                 padding: '8px 12px',
-                background: selectedUsers.find(u => u.username === user.username) ? 'var(--sh-brand-soft)' : 'transparent',
+                background: selectedUsers.find((u) => u.id === user.id) ? 'var(--sh-brand-soft)' : 'transparent',
                 border: 'none',
                 textAlign: 'left',
                 cursor: 'pointer',
@@ -747,12 +932,12 @@ function NewConversationModal({ isOpen, onClose, onCreate }) {
                 transition: 'background 0.15s',
               }}
               onMouseEnter={(e) => {
-                if (!selectedUsers.find(u => u.username === user.username)) {
+                if (!selectedUsers.find((u) => u.id === user.id)) {
                   e.currentTarget.style.background = 'var(--sh-soft)'
                 }
               }}
               onMouseLeave={(e) => {
-                if (!selectedUsers.find(u => u.username === user.username)) {
+                if (!selectedUsers.find((u) => u.id === user.id)) {
                   e.currentTarget.style.background = 'transparent'
                 }
               }}
@@ -769,9 +954,9 @@ function NewConversationModal({ isOpen, onClose, onCreate }) {
               Selected ({selectedUsers.length}):
             </div>
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-              {selectedUsers.map(user => (
+              {selectedUsers.map((user) => (
                 <div
-                  key={user.username}
+                  key={user.id}
                   style={{
                     padding: '4px 8px',
                     background: 'var(--sh-brand-soft)',
@@ -822,24 +1007,99 @@ function NewConversationModal({ isOpen, onClose, onCreate }) {
           </button>
           <button
             onClick={handleCreate}
-            disabled={isGroup ? (!groupName.trim() || selectedUsers.length === 0) : selectedUsers.length === 0}
+            disabled={!canCreate}
             style={{
               padding: '8px 16px',
-              background: (isGroup ? (!groupName.trim() || selectedUsers.length === 0) : selectedUsers.length === 0)
-                ? 'var(--sh-soft)'
-                : 'var(--sh-brand)',
-              color: (isGroup ? (!groupName.trim() || selectedUsers.length === 0) : selectedUsers.length === 0)
-                ? 'var(--sh-muted)'
-                : 'var(--sh-surface)',
+              background: canCreate ? 'var(--sh-brand)' : 'var(--sh-soft)',
+              color: canCreate ? 'var(--sh-surface)' : 'var(--sh-muted)',
               border: 'none',
               borderRadius: 'var(--radius-control)',
               fontSize: 13,
               fontWeight: 700,
-              cursor: (isGroup ? (!groupName.trim() || selectedUsers.length === 0) : selectedUsers.length === 0) ? 'default' : 'pointer',
+              cursor: canCreate ? 'pointer' : 'default',
               fontFamily: PAGE_FONT,
             }}
           >
             Start Chat
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Confirm dialog for delete conversation
+ * ═══════════════════════════════════════════════════════════════════════════ */
+function ConfirmDeleteModal({ isOpen, onConfirm, onCancel }) {
+  if (!isOpen) return null
+
+  return createPortal(
+    <div
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(15, 23, 42, 0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 10000,
+      }}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Confirm delete conversation"
+    >
+      <div style={{
+        width: '90%',
+        maxWidth: 380,
+        background: 'var(--sh-surface)',
+        borderRadius: 'var(--radius-card)',
+        padding: 24,
+        boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+        fontFamily: PAGE_FONT,
+      }}>
+        <h3 style={{ fontSize: 16, fontWeight: 800, color: 'var(--sh-heading)', marginBottom: 12 }}>
+          Delete Conversation
+        </h3>
+        <p style={{ fontSize: 13, color: 'var(--sh-text)', marginBottom: 20, lineHeight: 1.5 }}>
+          Are you sure? For DMs this will archive the conversation. For groups you will leave the group. This cannot be undone.
+        </p>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button
+            onClick={onCancel}
+            style={{
+              padding: '8px 16px',
+              background: 'var(--sh-soft)',
+              color: 'var(--sh-text)',
+              border: '1px solid var(--sh-border)',
+              borderRadius: 'var(--radius-control)',
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: 'pointer',
+              fontFamily: PAGE_FONT,
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            style={{
+              padding: '8px 16px',
+              background: 'var(--sh-danger)',
+              color: 'var(--sh-surface)',
+              border: 'none',
+              borderRadius: 'var(--radius-control)',
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: 'pointer',
+              fontFamily: PAGE_FONT,
+            }}
+          >
+            Delete
           </button>
         </div>
       </div>
@@ -855,19 +1115,90 @@ function NewConversationModal({ isOpen, onClose, onCreate }) {
 export default function MessagesPage() {
   usePageTitle('Messages')
   const { status: authStatus, error: authError } = useProtectedPage()
+  const { user } = useSession()
   const layout = useResponsiveAppLayout()
+  const { socket } = useSocket()
 
-  const [conversations] = useState(MOCK_CONVERSATIONS)
-  const [activeConversationId, setActiveConversationId] = useState(MOCK_CONVERSATIONS[0]?.id || null)
-  const [messages] = useState(MOCK_MESSAGES)
-  const [typingUsername] = useState(null)
+  const currentUserId = user?.id || null
+
+  const {
+    conversations,
+    activeConversation,
+    messages,
+    loadingConversations,
+    loadingMessages,
+    typingUsers,
+    loadConversations,
+    selectConversation,
+    sendMessage,
+    startConversation,
+    editMessage,
+    deleteMessage,
+    deleteConversation,
+    setActiveConversation,
+    emitTypingStart,
+  } = useMessagingData(socket, currentUserId)
+
   const [showNewModal, setShowNewModal] = useState(false)
-  const [loading] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const dmInitRef = useRef(false)
 
-  const activeConversation = conversations.find(c => c.id === activeConversationId)
+  // Load conversations on mount
+  useEffect(() => {
+    if (user) {
+      loadConversations()
+    }
+  }, [user, loadConversations])
 
-  const showListPanel = !layout.isPhone || !activeConversationId
-  const showThreadPanel = !layout.isPhone || activeConversationId
+  // Auto-start DM if navigated with ?dm=userId from profile
+  useEffect(() => {
+    const dmUserId = searchParams.get('dm')
+    if (!dmUserId || !user || dmInitRef.current) return
+    dmInitRef.current = true
+
+    const targetId = parseInt(dmUserId, 10)
+    if (!Number.isFinite(targetId) || targetId === currentUserId) return
+
+    // Clear the dm param from URL
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      next.delete('dm')
+      return next
+    }, { replace: true })
+
+    // Start or open existing DM
+    startConversation([targetId], 'dm').then((conv) => {
+      if (conv) selectConversation(conv.id)
+    })
+  }, [searchParams, user, currentUserId, startConversation, selectConversation, setSearchParams])
+
+  // Get typing usernames for current conversation
+  const typingUsernames = activeConversation
+    ? Array.from(typingUsers.get(activeConversation.id) || [])
+    : []
+
+  const handleCreateConversation = useCallback(async (data) => {
+    const conv = await startConversation(
+      data.participantIds,
+      data.isGroup ? 'group' : 'dm',
+      data.groupName,
+    )
+    if (conv) {
+      setShowNewModal(false)
+      selectConversation(conv.id)
+    }
+  }, [startConversation, selectConversation])
+
+  const handleDeleteConversation = useCallback(() => {
+    if (deleteTarget) {
+      deleteConversation(deleteTarget)
+      setDeleteTarget(null)
+    }
+  }, [deleteTarget, deleteConversation])
+
+  const showListPanel = !layout.isPhone || !activeConversation
+  const showThreadPanel = !layout.isPhone || activeConversation
 
   if (authStatus === 'loading') {
     return (
@@ -878,8 +1209,7 @@ export default function MessagesPage() {
         justifyContent: 'center',
         color: 'var(--sh-muted)',
         fontFamily: PAGE_FONT,
-      }}
-      >
+      }}>
         Loading...
       </div>
     )
@@ -896,8 +1226,7 @@ export default function MessagesPage() {
           padding: '10px 14px',
           marginBottom: 12,
           fontSize: 13,
-        }}
-        >
+        }}>
           {authError}
         </div>
       )}
@@ -907,11 +1236,12 @@ export default function MessagesPage() {
           <div style={{ minWidth: 0 }}>
             <ConversationList
               conversations={conversations}
-              activeConversationId={activeConversationId}
-              selectConversation={setActiveConversationId}
+              activeConversationId={activeConversation?.id}
+              selectConversation={selectConversation}
               onNewClick={() => setShowNewModal(true)}
-              loading={loading}
-              layout={layout}
+              onDeleteConversation={(id) => setDeleteTarget(id)}
+              loading={loadingConversations}
+              currentUserId={currentUserId}
             />
           </div>
         )}
@@ -921,10 +1251,15 @@ export default function MessagesPage() {
             <MessageThread
               conversation={activeConversation}
               messages={messages}
-              typingUsername={typingUsername}
-              onBack={() => setActiveConversationId(null)}
-              loading={loading}
+              typingUsernames={typingUsernames}
+              onBack={() => setActiveConversation(null)}
+              onSend={sendMessage}
+              onDeleteMessage={deleteMessage}
+              onEditMessage={editMessage}
+              onTypingStart={emitTypingStart}
+              loadingMessages={loadingMessages}
               isPhone={layout.isPhone}
+              currentUserId={currentUserId}
             />
           </div>
         )}
@@ -933,10 +1268,14 @@ export default function MessagesPage() {
       <NewConversationModal
         isOpen={showNewModal}
         onClose={() => setShowNewModal(false)}
-        onCreate={(data) => {
-          console.log('Create conversation:', data)
-          setShowNewModal(false)
-        }}
+        onCreate={handleCreateConversation}
+        currentUserId={currentUserId}
+      />
+
+      <ConfirmDeleteModal
+        isOpen={deleteTarget !== null}
+        onConfirm={handleDeleteConversation}
+        onCancel={() => setDeleteTarget(null)}
       />
     </PageShell>
   )

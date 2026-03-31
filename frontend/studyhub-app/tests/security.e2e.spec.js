@@ -460,9 +460,6 @@ test.describe('Admin Route Protection', () => {
     await page.goto('/admin')
     await page.waitForLoadState('networkidle')
 
-    const adminStatsTab = page.locator('[data-testid="admin-stats-tab"], text=/Stats/i').first()
-    const isVisible = await adminStatsTab.isVisible().catch(() => false)
-
     // Admin page should be accessible
     expect(page.url()).toContain('/admin')
   })

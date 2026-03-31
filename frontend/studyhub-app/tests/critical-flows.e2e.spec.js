@@ -48,11 +48,6 @@ test('sheet CRUD flow: navigate sheets, verify list, upload button routes correc
   const uploadButton = page.getByRole('button', { name: /upload/i }).first()
   await expect(uploadButton).toBeVisible()
 
-  let uploadNavigated = false
-  page.on('popup', () => {
-    uploadNavigated = true
-  })
-
   // Mock sheet creation API
   await page.route('**/api/sheets', async (route) => {
     if (route.request().method() === 'POST') {

@@ -8,7 +8,7 @@
  * @tags @smoke @tracks-4-6
  */
 import { test, expect } from '@playwright/test'
-import { mockAuthenticatedApp, createSessionUser } from './helpers/mockStudyHubApi.js'
+import { mockAuthenticatedApp } from './helpers/mockStudyHubApi.js'
 
 test.use({ serviceWorkers: 'block' })
 

@@ -1,5 +1,5 @@
 const Sentry = require('@sentry/node')
-const { redactObject, redactHeaders, SENSITIVE_KEYS, REDACTED } = require('../lib/redact')
+const { redactObject, redactHeaders, REDACTED } = require('../lib/redact')
 
 let sentryEnabled = false
 

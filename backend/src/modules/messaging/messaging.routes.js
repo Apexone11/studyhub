@@ -11,6 +11,7 @@
  */
 
 const express = require('express')
+const rateLimit = require('express-rate-limit')
 const requireAuth = require('../../middleware/auth')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
@@ -19,6 +20,16 @@ const { readLimiter } = require('../../lib/rateLimiters')
 const { getBlockedUserIds } = require('../../lib/social/blockFilter')
 
 const router = express.Router()
+
+const MAX_MESSAGE_LENGTH = 5000
+
+const messageWriteLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  message: { error: 'Too many messages. Please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+})
 
 router.use(readLimiter)
 
@@ -76,6 +87,24 @@ router.get('/conversations', requireAuth, async (req, res) => {
       take: limitNum,
     })
 
+    // Compute unread counts per conversation
+    for (const cp of conversations) {
+      try {
+        const lastReadAt = cp.lastReadAt || new Date(0)
+        const unreadCount = await prisma.message.count({
+          where: {
+            conversationId: cp.conversation.id,
+            createdAt: { gt: lastReadAt },
+            senderId: { not: req.user.userId },
+            deletedAt: null,
+          },
+        })
+        cp._unreadCount = unreadCount
+      } catch {
+        cp._unreadCount = 0
+      }
+    }
+
     // Filter out conversations with blocked users and format response
     const result = conversations
       .filter((cp) => {
@@ -97,7 +126,7 @@ router.get('/conversations', requireAuth, async (req, res) => {
         })),
         createdBy: cp.conversation.createdBy,
         lastMessage: cp.conversation.messages[0] || null,
-        unreadCount: 0, // Placeholder — could compute from lastReadAt
+        unreadCount: cp._unreadCount || 0,
         muted: cp.muted,
         lastReadAt: cp.lastReadAt,
         createdAt: cp.conversation.createdAt,
@@ -434,13 +463,17 @@ router.get('/conversations/:id/messages', requireAuth, async (req, res) => {
  * POST /api/messages/conversations/:id/messages
  * Send a message
  */
-router.post('/conversations/:id/messages', requireAuth, async (req, res) => {
+router.post('/conversations/:id/messages', requireAuth, messageWriteLimiter, async (req, res) => {
   try {
     const conversationId = parseInt(req.params.id, 10)
     const { content, type = 'text', replyToId } = req.body
 
     if (!content || typeof content !== 'string' || content.trim() === '') {
       return res.status(400).json({ error: 'Message content required.' })
+    }
+
+    if (content.length > MAX_MESSAGE_LENGTH) {
+      return res.status(400).json({ error: `Message too long. Maximum ${MAX_MESSAGE_LENGTH} characters.` })
     }
 
     // Verify user is a participant
@@ -507,13 +540,17 @@ router.post('/conversations/:id/messages', requireAuth, async (req, res) => {
  * PATCH /api/messages/:messageId
  * Edit a message (owner only, within 15 min)
  */
-router.patch('/messages/:messageId', requireAuth, async (req, res) => {
+router.patch('/messages/:messageId', requireAuth, messageWriteLimiter, async (req, res) => {
   try {
     const messageId = parseInt(req.params.messageId, 10)
     const { content } = req.body
 
     if (!content || typeof content !== 'string' || content.trim() === '') {
       return res.status(400).json({ error: 'Message content required.' })
+    }
+
+    if (content.length > MAX_MESSAGE_LENGTH) {
+      return res.status(400).json({ error: `Message too long. Maximum ${MAX_MESSAGE_LENGTH} characters.` })
     }
 
     const message = await prisma.message.findUnique({

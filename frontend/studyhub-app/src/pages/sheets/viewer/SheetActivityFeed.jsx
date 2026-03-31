@@ -16,7 +16,7 @@ const TYPE_META = {
   contribution_opened:   { icon: '⑂', color: 'var(--sh-info-text, #1d4ed8)',     label: 'opened contribution' },
   contribution_merged:   { icon: '✓', color: 'var(--sh-success-text, #166534)',   label: 'merged contribution' },
   contribution_rejected: { icon: '✕', color: 'var(--sh-danger-text, #dc2626)',    label: 'rejected contribution' },
-  comment:               { icon: '💬', color: 'var(--sh-muted)',                  label: 'commented' },
+  comment:               { icon: '\u25CB', color: 'var(--sh-muted)',               label: 'commented' },
 }
 
 /* ── Main component ────────────────────────────────────────── */

@@ -12,28 +12,29 @@ import { FONT, cardStyle, sectionHeadingStyle } from './profileConstants'
 const API = import.meta.env.VITE_API_URL || ''
 
 export default function ProfileStatsWidget({ username }) {
-  const [stats, setStats] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [result, setResult] = useState({ forUser: null, stats: null, done: false })
+  const loading = result.forUser !== username || !result.done
+  const stats = result.forUser === username ? result.stats : null
 
   useEffect(() => {
     if (!username) return
-    setLoading(true)
+    let cancelled = false
     fetch(`${API}/api/users/${encodeURIComponent(username)}/stats`, { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : null))
-      .then((data) => setStats(data))
-      .catch(() => setStats(null))
-      .finally(() => setLoading(false))
+      .then((data) => { if (!cancelled) setResult({ forUser: username, stats: data, done: true }) })
+      .catch(() => { if (!cancelled) setResult({ forUser: username, stats: null, done: true }) })
+    return () => { cancelled = true }
   }, [username])
 
   if (loading) return null
   if (!stats) return null
 
   const metrics = [
-    { label: 'Sheets', value: stats.totalSheets, icon: '📄' },
-    { label: 'Stars earned', value: stats.totalStarsReceived, icon: '⭐' },
-    { label: 'Comments', value: stats.totalComments, icon: '💬' },
-    { label: 'Forks', value: stats.totalForks, icon: '🔀' },
-    { label: 'Contributions', value: stats.totalContributions, icon: '🤝' },
+    { label: 'Sheets', value: stats.totalSheets },
+    { label: 'Stars earned', value: stats.totalStarsReceived },
+    { label: 'Comments', value: stats.totalComments },
+    { label: 'Forks', value: stats.totalForks },
+    { label: 'Contributions', value: stats.totalContributions },
   ]
 
   return (

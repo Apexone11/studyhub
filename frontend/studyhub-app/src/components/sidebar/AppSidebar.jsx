@@ -67,7 +67,7 @@ export default function AppSidebar({ mode = 'fixed' }) {
         <div style={{ minWidth: 0 }}>
           <div style={{ fontWeight: 700, fontSize: 'var(--type-sm)', color: 'var(--sh-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.username}</div>
           <div style={{ fontSize: 'var(--type-xs)', color: 'var(--sh-muted)', marginTop: 1 }}>
-            {user.role === 'admin' ? '👑 Admin' : user.accountType === 'teacher' ? 'Teacher' : user.accountType === 'other' ? 'Member' : 'Student'}
+            {user.role === 'admin' ? 'Admin' : user.accountType === 'teacher' ? 'Teacher' : user.accountType === 'other' ? 'Member' : 'Student'}
             {joinDate ? ` · Joined ${joinDate}` : ''}
           </div>
         </div>

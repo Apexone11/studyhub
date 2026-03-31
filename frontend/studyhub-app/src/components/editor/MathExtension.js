@@ -218,7 +218,7 @@ export const MathBlock = Node.create({
  * and $$...$$ (at start of block) into block math.
  * This gives the familiar LaTeX typing experience.
  */
-export function mathInputPlugin({ editor }) {
+export function mathInputPlugin() {
   return new Plugin({
     key: new PluginKey('mathInput'),
     props: {

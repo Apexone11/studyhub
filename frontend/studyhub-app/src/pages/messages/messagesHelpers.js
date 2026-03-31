@@ -54,8 +54,9 @@ export function groupMessagesByDate(messages) {
   const groups = {}
 
   messages.forEach(msg => {
-    if (!msg.timestamp) return
-    const d = new Date(msg.timestamp)
+    const dateStr = msg.createdAt || msg.timestamp
+    if (!dateStr) return
+    const d = new Date(dateStr)
     const key = d.toDateString()
 
     if (!groups[key]) {
@@ -65,6 +66,21 @@ export function groupMessagesByDate(messages) {
   })
 
   return groups
+}
+
+export function getConversationDisplayName(conversation, currentUserId) {
+  if (!conversation) return ''
+  if (conversation.type === 'group') return conversation.name || 'Group Chat'
+  // For DMs, show the other participant's username
+  const other = conversation.participants?.find((p) => p.id !== currentUserId)
+  return other?.username || 'Unknown User'
+}
+
+export function getConversationAvatar(conversation, currentUserId) {
+  if (!conversation) return null
+  if (conversation.type === 'group') return conversation.avatarUrl || null
+  const other = conversation.participants?.find((p) => p.id !== currentUserId)
+  return other?.avatarUrl || null
 }
 
 export function truncateText(text, maxLength = 60) {
