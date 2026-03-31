@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { trackEvent } from './telemetry'
 
 /** Last reported timing — exposed for dev overlay. */
@@ -79,5 +79,5 @@ export function usePageTiming(pageName) {
     }
   }, [pageName])
 
-  return { markFetchStart, markFetchEnd, markContentVisible }
+  return useMemo(() => ({ markFetchStart, markFetchEnd, markContentVisible }), [markFetchStart, markFetchEnd, markContentVisible])
 }

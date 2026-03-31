@@ -45,6 +45,7 @@ const featureFlagRoutes = require('./modules/featureFlags')
 const webauthnRoutes = require('./modules/webauthn')
 const publicRoutes = require('./modules/public')
 const messagingRoutes = require('./modules/messaging')
+const studyGroupRoutes = require('./modules/studyGroups')
 const { initSocketIO } = require('./lib/socketio')
 const { featureFlagMiddleware } = require('./lib/featureFlags')
 
@@ -343,6 +344,9 @@ app.use('/api/webauthn', webauthnRoutes)
 
 // Mount messaging endpoints under /api/messages.
 app.use('/api/messages', messagingRoutes)
+
+// Mount study groups endpoints under /api/study-groups.
+app.use('/api/study-groups', studyGroupRoutes)
 
 // Public unauthenticated data endpoints (landing page stats, etc.).
 app.use('/api/public', publicRoutes)
