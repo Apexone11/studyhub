@@ -45,8 +45,13 @@ router.get('/conversations', requireAuth, async (req, res) => {
     const limitNum = Math.min(parseInt(limit, 10) || 20, 100)
     const offsetNum = Math.max(parseInt(offset, 10) || 0, 0)
 
-    // Get blocked user IDs
-    const blockedIds = await getBlockedUserIds(prisma, req.user.userId)
+    // Get blocked user IDs (graceful degradation if block table unavailable)
+    let blockedIds = []
+    try {
+      blockedIds = await getBlockedUserIds(prisma, req.user.userId)
+    } catch (blockErr) {
+      captureError(blockErr, { route: req.originalUrl, context: 'block-filter' })
+    }
 
     // Fetch conversations for the user
     const conversations = await prisma.conversationParticipant.findMany({
@@ -156,12 +161,16 @@ router.post('/conversations', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Invalid conversation type.' })
     }
 
-    // Check for blocks with all participants
-    const blockedIds = await getBlockedUserIds(prisma, req.user.userId)
-    for (const participantId of participantIds) {
-      if (blockedIds.includes(participantId)) {
-        return res.status(403).json({ error: 'Cannot message blocked user.' })
+    // Check for blocks with all participants (graceful if block table unavailable)
+    try {
+      const blockedIds = await getBlockedUserIds(prisma, req.user.userId)
+      for (const participantId of participantIds) {
+        if (blockedIds.includes(participantId)) {
+          return res.status(403).json({ error: 'Cannot message blocked user.' })
+        }
       }
+    } catch (blockErr) {
+      captureError(blockErr, { route: req.originalUrl, context: 'block-filter' })
     }
 
     // For DMs, check if conversation already exists

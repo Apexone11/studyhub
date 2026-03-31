@@ -54,7 +54,7 @@ export function useStudyGroupsData() {
       params.append('limit', limit.toString());
       params.append('offset', offset.toString());
 
-      const response = await fetch(`${API}/study-groups?${params}`, {
+      const response = await fetch(`${API}/api/study-groups?${params}`, {
         credentials: 'include',
         headers: authHeaders(),
       });
@@ -79,7 +79,7 @@ export function useStudyGroupsData() {
     setActiveGroupLoading(true);
     setActiveGroupError(null);
     try {
-      const response = await fetch(`${API}/study-groups/${groupId}`, {
+      const response = await fetch(`${API}/api/study-groups/${groupId}`, {
         credentials: 'include',
         headers: authHeaders(),
       });
@@ -101,7 +101,7 @@ export function useStudyGroupsData() {
    */
   const createGroup = useCallback(async (groupData) => {
     try {
-      const response = await fetch(`${API}/study-groups`, {
+      const response = await fetch(`${API}/api/study-groups`, {
         method: 'POST',
         credentials: 'include',
         headers: authHeaders(),
@@ -125,7 +125,7 @@ export function useStudyGroupsData() {
    */
   const updateGroup = useCallback(async (groupId, updates) => {
     try {
-      const response = await fetch(`${API}/study-groups/${groupId}`, {
+      const response = await fetch(`${API}/api/study-groups/${groupId}`, {
         method: 'PATCH',
         credentials: 'include',
         headers: authHeaders(),
@@ -159,7 +159,7 @@ export function useStudyGroupsData() {
    */
   const deleteGroup = useCallback(async (groupId) => {
     try {
-      const response = await fetch(`${API}/study-groups/${groupId}`, {
+      const response = await fetch(`${API}/api/study-groups/${groupId}`, {
         method: 'DELETE',
         credentials: 'include',
         headers: authHeaders(),
@@ -198,7 +198,7 @@ export function useStudyGroupsData() {
           };
         });
 
-        const response = await fetch(`${API}/study-groups/${groupId}/join`, {
+        const response = await fetch(`${API}/api/study-groups/${groupId}/join`, {
           method: 'POST',
           credentials: 'include',
           headers: authHeaders(),
@@ -242,7 +242,7 @@ export function useStudyGroupsData() {
           };
         });
 
-        const response = await fetch(`${API}/study-groups/${groupId}/leave`, {
+        const response = await fetch(`${API}/api/study-groups/${groupId}/leave`, {
           method: 'POST',
           credentials: 'include',
           headers: authHeaders(),
@@ -276,7 +276,7 @@ export function useStudyGroupsData() {
   const loadMembers = useCallback(async (groupId) => {
     setMembersLoading(true);
     try {
-      const response = await fetch(`${API}/study-groups/${groupId}/members`, {
+      const response = await fetch(`${API}/api/study-groups/${groupId}/members`, {
         credentials: 'include',
         headers: authHeaders(),
       });
@@ -297,7 +297,7 @@ export function useStudyGroupsData() {
    */
   const inviteMember = useCallback(async (groupId, userId) => {
     try {
-      const response = await fetch(`${API}/study-groups/${groupId}/invite`, {
+      const response = await fetch(`${API}/api/study-groups/${groupId}/invite`, {
         method: 'POST',
         credentials: 'include',
         headers: authHeaders(),
@@ -322,7 +322,7 @@ export function useStudyGroupsData() {
     async (groupId, userId, updates) => {
       try {
         const response = await fetch(
-          `${API}/study-groups/${groupId}/members/${userId}`,
+          `${API}/api/study-groups/${groupId}/members/${userId}`,
           {
             method: 'PATCH',
             credentials: 'include',
@@ -357,7 +357,7 @@ export function useStudyGroupsData() {
     async (groupId, userId) => {
       try {
         const response = await fetch(
-          `${API}/study-groups/${groupId}/members/${userId}`,
+          `${API}/api/study-groups/${groupId}/members/${userId}`,
           {
             method: 'DELETE',
             credentials: 'include',
@@ -386,7 +386,7 @@ export function useStudyGroupsData() {
     setResourcesLoading(true);
     try {
       const response = await fetch(
-        `${API}/study-groups/${groupId}/resources`,
+        `${API}/api/study-groups/${groupId}/resources`,
         {
           credentials: 'include',
           headers: authHeaders(),
@@ -411,7 +411,7 @@ export function useStudyGroupsData() {
     async (groupId, resourceData) => {
       try {
         const response = await fetch(
-          `${API}/study-groups/${groupId}/resources`,
+          `${API}/api/study-groups/${groupId}/resources`,
           {
             method: 'POST',
             credentials: 'include',
@@ -441,7 +441,7 @@ export function useStudyGroupsData() {
     async (groupId, resourceId, updates) => {
       try {
         const response = await fetch(
-          `${API}/study-groups/${groupId}/resources/${resourceId}`,
+          `${API}/api/study-groups/${groupId}/resources/${resourceId}`,
           {
             method: 'PATCH',
             credentials: 'include',
@@ -473,7 +473,7 @@ export function useStudyGroupsData() {
     async (groupId, resourceId) => {
       try {
         const response = await fetch(
-          `${API}/study-groups/${groupId}/resources/${resourceId}`,
+          `${API}/api/study-groups/${groupId}/resources/${resourceId}`,
           {
             method: 'DELETE',
             credentials: 'include',
@@ -500,7 +500,7 @@ export function useStudyGroupsData() {
     setSessionsLoading(true);
     try {
       const response = await fetch(
-        `${API}/study-groups/${groupId}/sessions`,
+        `${API}/api/study-groups/${groupId}/sessions`,
         {
           credentials: 'include',
           headers: authHeaders(),
@@ -525,7 +525,7 @@ export function useStudyGroupsData() {
     async (groupId, sessionData) => {
       try {
         const response = await fetch(
-          `${API}/study-groups/${groupId}/sessions`,
+          `${API}/api/study-groups/${groupId}/sessions`,
           {
             method: 'POST',
             credentials: 'include',
@@ -555,7 +555,7 @@ export function useStudyGroupsData() {
     async (groupId, sessionId, updates) => {
       try {
         const response = await fetch(
-          `${API}/study-groups/${groupId}/sessions/${sessionId}`,
+          `${API}/api/study-groups/${groupId}/sessions/${sessionId}`,
           {
             method: 'PATCH',
             credentials: 'include',
@@ -587,7 +587,7 @@ export function useStudyGroupsData() {
     async (groupId, sessionId) => {
       try {
         const response = await fetch(
-          `${API}/study-groups/${groupId}/sessions/${sessionId}`,
+          `${API}/api/study-groups/${groupId}/sessions/${sessionId}`,
           {
             method: 'DELETE',
             credentials: 'include',
@@ -614,7 +614,7 @@ export function useStudyGroupsData() {
     async (groupId, sessionId, status) => {
       try {
         const response = await fetch(
-          `${API}/study-groups/${groupId}/sessions/${sessionId}/rsvp`,
+          `${API}/api/study-groups/${groupId}/sessions/${sessionId}/rsvp`,
           {
             method: 'POST',
             credentials: 'include',
@@ -643,7 +643,7 @@ export function useStudyGroupsData() {
     setDiscussionsLoading(true);
     try {
       const response = await fetch(
-        `${API}/study-groups/${groupId}/discussions`,
+        `${API}/api/study-groups/${groupId}/discussions`,
         {
           credentials: 'include',
           headers: authHeaders(),
@@ -668,7 +668,7 @@ export function useStudyGroupsData() {
     async (groupId, postData) => {
       try {
         const response = await fetch(
-          `${API}/study-groups/${groupId}/discussions`,
+          `${API}/api/study-groups/${groupId}/discussions`,
           {
             method: 'POST',
             credentials: 'include',
@@ -698,7 +698,7 @@ export function useStudyGroupsData() {
     async (groupId, postId, updates) => {
       try {
         const response = await fetch(
-          `${API}/study-groups/${groupId}/discussions/${postId}`,
+          `${API}/api/study-groups/${groupId}/discussions/${postId}`,
           {
             method: 'PATCH',
             credentials: 'include',
@@ -730,7 +730,7 @@ export function useStudyGroupsData() {
     async (groupId, postId) => {
       try {
         const response = await fetch(
-          `${API}/study-groups/${groupId}/discussions/${postId}`,
+          `${API}/api/study-groups/${groupId}/discussions/${postId}`,
           {
             method: 'DELETE',
             credentials: 'include',
@@ -757,7 +757,7 @@ export function useStudyGroupsData() {
     async (groupId, postId, replyData) => {
       try {
         const response = await fetch(
-          `${API}/study-groups/${groupId}/discussions/${postId}/replies`,
+          `${API}/api/study-groups/${groupId}/discussions/${postId}/replies`,
           {
             method: 'POST',
             credentials: 'include',
@@ -788,7 +788,7 @@ export function useStudyGroupsData() {
     async (groupId, postId) => {
       try {
         const response = await fetch(
-          `${API}/study-groups/${groupId}/discussions/${postId}/resolve`,
+          `${API}/api/study-groups/${groupId}/discussions/${postId}/resolve`,
           {
             method: 'PATCH',
             credentials: 'include',
