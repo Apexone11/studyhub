@@ -396,8 +396,8 @@ export function ResumeStudying({ entries }) {
                 width: 42,
                 height: 42,
                 borderRadius: 12,
-                background: 'linear-gradient(135deg, #faf5ff, #ede9fe)',
-                color: '#7c3aed',
+                background: 'var(--sh-info-bg, linear-gradient(135deg, #faf5ff, #ede9fe))',
+                color: 'var(--sh-info-text, #7c3aed)',
                 display: 'grid',
                 placeItems: 'center',
               }}

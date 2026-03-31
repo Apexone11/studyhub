@@ -1199,6 +1199,93 @@ router.delete('/messages/:messageId/reactions/:emoji', requireAuth, async (req, 
   }
 })
 
+// ===== READ RECEIPTS =====
+
+/**
+ * POST /api/messages/conversations/:id/read
+ * Mark a conversation as read (HTTP fallback when Socket.io unavailable).
+ * Updates lastReadAt to now and returns the new unread count (0).
+ */
+router.post('/conversations/:id/read', requireAuth, async (req, res) => {
+  try {
+    const conversationId = parseInt(req.params.id, 10)
+    if (isNaN(conversationId)) {
+      return res.status(400).json({ error: 'Invalid conversation ID.' })
+    }
+
+    // Verify user is a participant
+    const participant = await prisma.conversationParticipant.findUnique({
+      where: {
+        conversationId_userId: {
+          conversationId,
+          userId: req.user.userId,
+        },
+      },
+    })
+
+    if (!participant) {
+      return res.status(403).json({ error: 'Not a participant.' })
+    }
+
+    // Update lastReadAt to now
+    await prisma.conversationParticipant.update({
+      where: {
+        conversationId_userId: {
+          conversationId,
+          userId: req.user.userId,
+        },
+      },
+      data: { lastReadAt: new Date() },
+    })
+
+    res.json({ conversationId, unreadCount: 0 })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+/**
+ * GET /api/messages/unread-total
+ * Get total unread message count across all conversations.
+ * Used by the navbar badge.
+ */
+router.get('/unread-total', requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.userId
+
+    const participants = await prisma.conversationParticipant.findMany({
+      where: { userId },
+      select: {
+        conversationId: true,
+        lastReadAt: true,
+      },
+    })
+
+    let total = 0
+    for (const cp of participants) {
+      try {
+        const count = await prisma.message.count({
+          where: {
+            conversationId: cp.conversationId,
+            createdAt: { gt: cp.lastReadAt || new Date(0) },
+            senderId: { not: userId },
+            deletedAt: null,
+          },
+        })
+        total += count
+      } catch {
+        // Skip on error
+      }
+    }
+
+    res.json({ total })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
 // ===== PRESENCE =====
 
 /**

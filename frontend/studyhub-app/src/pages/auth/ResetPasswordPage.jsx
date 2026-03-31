@@ -71,7 +71,7 @@ function ResetPasswordPage() {
                   <i className="fas fa-circle-exclamation" style={{ marginRight: 8 }}></i>
                   {error}
                   {error.includes('invalid') || error.includes('expired') ? (
-                    <span>{' '}<Link to="/forgot-password" style={{ color: '#dc2626', fontWeight: 'bold' }}>Request a new link</Link></span>
+                    <span>{' '}<Link to="/forgot-password" style={{ color: 'var(--sh-danger)', fontWeight: 'bold' }}>Request a new link</Link></span>
                   ) : null}
                 </div>
               )}
@@ -133,33 +133,33 @@ function ResetPasswordPage() {
 
       <footer style={styles.footer}>
         Built by students, for students ·{' '}
-        <span style={{ color: '#60a5fa' }}>StudyHub</span> · Open Source on GitHub
+        <span style={{ color: 'var(--sh-brand)' }}>StudyHub</span> · Open Source on GitHub
       </footer>
     </div>
   )
 }
 
 const styles = {
-  page: { minHeight: '100vh', display: 'flex', flexDirection: 'column', fontFamily: 'Arial, sans-serif', background: '#f0f4f8', color: '#111827' },
+  page: { minHeight: '100vh', display: 'flex', flexDirection: 'column', fontFamily: 'Arial, sans-serif', background: 'var(--sh-soft)', color: 'var(--sh-heading)' },
   center: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '60px 20px' },
-  card: { background: 'white', borderRadius: 16, padding: '48px 40px', width: '100%', maxWidth: 420, boxShadow: '0 4px 24px rgba(0,0,0,0.1)' },
+  card: { background: 'var(--sh-surface)', borderRadius: 16, padding: '48px 40px', width: '100%', maxWidth: 420, boxShadow: '0 4px 24px rgba(0,0,0,0.1)' },
   top: { textAlign: 'center', marginBottom: 32 },
   iconWrap: { marginBottom: 12 },
-  icon: { fontSize: 40, color: '#2563eb' },
-  h1: { fontSize: 26, color: '#1e3a5f', margin: '0 0 6px', fontWeight: 'bold' },
-  sub: { fontSize: 14, color: '#6b7280', margin: 0 },
-  errorBox: { background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', borderRadius: 8, padding: '10px 14px', fontSize: 14, marginBottom: 20 },
-  successBox: { background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#16a34a', borderRadius: 8, padding: '12px 16px', fontSize: 14 },
+  icon: { fontSize: 40, color: 'var(--sh-brand)' },
+  h1: { fontSize: 26, color: 'var(--sh-slate-800)', margin: '0 0 6px', fontWeight: 'bold' },
+  sub: { fontSize: 14, color: 'var(--sh-slate-500)', margin: 0 },
+  errorBox: { background: 'var(--sh-danger-bg)', border: '1px solid var(--sh-danger-border)', color: 'var(--sh-danger)', borderRadius: 8, padding: '10px 14px', fontSize: 14, marginBottom: 20 },
+  successBox: { background: 'var(--sh-success-bg)', border: '1px solid var(--sh-success-border)', color: 'var(--sh-success-text)', borderRadius: 8, padding: '12px 16px', fontSize: 14 },
   formGroup: { marginBottom: 20 },
-  label: { display: 'block', fontSize: 14, fontWeight: 'bold', color: '#374151', marginBottom: 8 },
+  label: { display: 'block', fontSize: 14, fontWeight: 'bold', color: 'var(--sh-slate-700)', marginBottom: 8 },
   inputWrap: { position: 'relative' },
-  inputIcon: { position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', fontSize: 15 },
-  input: { width: '100%', padding: '12px 14px 12px 40px', border: '2px solid #e5e7eb', borderRadius: 8, fontSize: 15, color: '#111827', outline: 'none', boxSizing: 'border-box', transition: 'border-color 0.2s', fontFamily: 'Arial, sans-serif' },
-  toggleBtn: { position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: 15, padding: 0 },
-  submitBtn: { width: '100%', background: '#2563eb', color: 'white', border: 'none', borderRadius: 8, padding: 14, fontSize: 16, fontWeight: 'bold', cursor: 'pointer', marginTop: 8, transition: 'background 0.2s', fontFamily: 'Arial, sans-serif' },
+  inputIcon: { position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--sh-slate-400)', fontSize: 15 },
+  input: { width: '100%', padding: '12px 14px 12px 40px', border: '2px solid var(--sh-border)', borderRadius: 8, fontSize: 15, color: 'var(--sh-heading)', outline: 'none', boxSizing: 'border-box', transition: 'border-color 0.2s', fontFamily: 'Arial, sans-serif' },
+  toggleBtn: { position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sh-slate-400)', fontSize: 15, padding: 0 },
+  submitBtn: { width: '100%', background: 'var(--sh-brand)', color: 'white', border: 'none', borderRadius: 8, padding: 14, fontSize: 16, fontWeight: 'bold', cursor: 'pointer', marginTop: 8, transition: 'background 0.2s', fontFamily: 'Arial, sans-serif' },
   backWrap: { textAlign: 'center', marginTop: 20 },
-  backLink: { color: '#2563eb', fontSize: 14, fontWeight: 'bold', textDecoration: 'none' },
-  footer: { background: '#1e3a5f', color: '#94a3b8', textAlign: 'center', padding: 20, fontSize: 13 },
+  backLink: { color: 'var(--sh-brand)', fontSize: 14, fontWeight: 'bold', textDecoration: 'none' },
+  footer: { background: 'var(--sh-slate-800)', color: 'var(--sh-subtext)', textAlign: 'center', padding: 20, fontSize: 13 },
 }
 
 export default ResetPasswordPage

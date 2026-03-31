@@ -77,7 +77,7 @@ export default function AdminSettingsTab({ user, htmlKillSwitch, htmlToggleSavin
           {htmlKillSwitch.error && (
             <div style={{ fontSize: 12, color: 'var(--sh-danger, #dc2626)', marginTop: 6 }}>{htmlKillSwitch.error}</div>
           )}
-          <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 8 }}>
+          <div style={{ fontSize: 11, color: 'var(--sh-subtext)', marginTop: 8 }}>
             Source: {htmlKillSwitch.source} {htmlKillSwitch.envOverride ? `(env: ${htmlKillSwitch.envOverride})` : ''}
           </div>
         </div>

@@ -141,7 +141,7 @@ export function MessageBubble({
               <button
                 onClick={onCancelEdit}
                 style={{
-                  padding: '3px 8px',
+                  padding: '4px 8px',
                   background: 'var(--sh-soft)',
                   border: '1px solid var(--sh-border)',
                   borderRadius: 4,
@@ -156,7 +156,7 @@ export function MessageBubble({
               <button
                 onClick={onConfirmEdit}
                 style={{
-                  padding: '3px 8px',
+                  padding: '4px 8px',
                   background: 'var(--sh-brand)',
                   border: 'none',
                   borderRadius: 4,
