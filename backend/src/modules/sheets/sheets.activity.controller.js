@@ -68,11 +68,11 @@ router.get('/:id/activity', rateLimiter, optionalAuth, async (req, res) => {
         orderBy: { createdAt: 'desc' },
         take: 100,
       }),
-      prisma.sheetComment.findMany({
+      prisma.comment.findMany({
         where: { sheetId },
         select: {
           id: true,
-          body: true,
+          content: true,
           createdAt: true,
           author: { select: AUTHOR_SELECT },
         },
@@ -126,7 +126,7 @@ router.get('/:id/activity', rateLimiter, optionalAuth, async (req, res) => {
         id: `comment-${c.id}`,
         date: c.createdAt,
         actor: c.author,
-        message: c.body ? (c.body.length > 120 ? c.body.slice(0, 120) + '…' : c.body) : '',
+        message: c.content ? (c.content.length > 120 ? c.content.slice(0, 120) + '...' : c.content) : '',
         meta: { commentId: c.id },
       })
     }

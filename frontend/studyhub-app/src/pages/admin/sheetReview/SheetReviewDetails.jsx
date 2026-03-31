@@ -21,7 +21,7 @@ export function SanitizedPreview({ iframeRef, sheetId }) {
         title={`admin-review-preview-${sheetId}`}
         sandbox=""
         referrerPolicy="no-referrer"
-        style={{ width: '100%', height: '100%', minHeight: 400, border: 'none', background: '#fff' }}
+        style={{ width: '100%', height: '100%', minHeight: 400, border: 'none', background: 'var(--sh-surface)' }}
       />
     </div>
   )
@@ -121,8 +121,8 @@ export function FindingsPanel({ findings, detail, runtimeValidation, onJumpToLin
 
       {/* Runtime validation — enriched issues with line locations */}
       {runtimeValidation && !runtimeValidation.ok && Array.isArray(runtimeValidation.enrichedIssues) && runtimeValidation.enrichedIssues.length > 0 && (
-        <div style={{ marginBottom: 14, padding: '12px 14px', borderRadius: 10, background: '#fef2f2', border: '1px solid #fecaca' }}>
-          <div style={{ fontSize: 12, fontWeight: 800, color: '#991b1b', marginBottom: 8 }}>
+        <div style={{ marginBottom: 14, padding: '12px 14px', borderRadius: 10, background: 'var(--sh-danger-bg)', border: '1px solid var(--sh-danger-border)' }}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--sh-danger)', marginBottom: 8 }}>
             Blocked from publishing — remote assets detected:
           </div>
           <div style={{ display: 'grid', gap: 6 }}>
@@ -134,16 +134,16 @@ export function FindingsPanel({ findings, detail, runtimeValidation, onJumpToLin
                     onClick={() => onJumpToLine && onJumpToLine(issue.line)}
                     style={{
                       background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-                      color: '#2563eb', fontWeight: 700, fontSize: 11, fontFamily: 'monospace',
+                      color: 'var(--sh-brand)', fontWeight: 700, fontSize: 11, fontFamily: 'monospace',
                       textDecoration: 'underline', flexShrink: 0,
                     }}
                   >
                     Line {issue.line}
                   </button>
                 ) : null}
-                <span style={{ color: '#7f1d1d' }}>
+                <span style={{ color: 'var(--sh-danger)' }}>
                   {issue.url ? (
-                    <code style={{ fontSize: 11, background: '#fee2e2', padding: '1px 4px', borderRadius: 3, wordBreak: 'break-all' }}>
+                    <code style={{ fontSize: 11, background: 'var(--sh-danger-light-bg)', padding: '1px 4px', borderRadius: 3, wordBreak: 'break-all' }}>
                       {issue.url}
                     </code>
                   ) : issue.message}
@@ -184,7 +184,7 @@ export function FindingsPanel({ findings, detail, runtimeValidation, onJumpToLin
                       <button
                         type="button"
                         onClick={() => onJumpToLine(f.line)}
-                        style={{ background: 'none', border: 'none', padding: '0 4px', cursor: 'pointer', color: '#2563eb', fontSize: 10, fontWeight: 700, fontFamily: 'monospace', textDecoration: 'underline' }}
+                        style={{ background: 'none', border: 'none', padding: '0 4px', cursor: 'pointer', color: 'var(--sh-brand)', fontSize: 10, fontWeight: 700, fontFamily: 'monospace', textDecoration: 'underline' }}
                       >
                         :L{f.line}
                       </button>

@@ -26,6 +26,8 @@ import NavbarNotifications from './NavbarNotifications'
 import ChatPanel from '../ChatPanel'
 import { IconMessages } from '../Icons'
 import { S, getConfig, handleIconHover } from './navbarConstants'
+import { API } from '../../config'
+import { authHeaders } from '../../pages/shared/pageUtils'
 
 // ─── COMPONENT ────────────────────────────────────────────────────
 /**
@@ -64,6 +66,29 @@ export default function Navbar({
   const [searchOpen, setSearchOpen] = useState(false)
   // chat panel state
   const [chatOpen, setChatOpen] = useState(false)
+  // unread messages count for badge
+  const [unreadMessages, setUnreadMessages] = useState(0)
+
+  // Fetch unread count on mount + poll every 30s
+  useEffect(() => {
+    if (!user) return
+    let cancelled = false
+    async function fetchCount() {
+      try {
+        const res = await fetch(`${API}/api/messages/unread-total`, {
+          credentials: 'include',
+          headers: authHeaders(),
+        })
+        if (res.ok && !cancelled) {
+          const data = await res.json()
+          setUnreadMessages(data.total || 0)
+        }
+      } catch { /* silent */ }
+    }
+    fetchCount()
+    const interval = setInterval(fetchCount, 30000)
+    return () => { cancelled = true; clearInterval(interval) }
+  }, [user])
 
   // Global Ctrl+K / Cmd+K shortcut to open search
   useEffect(() => {
@@ -191,7 +216,17 @@ export default function Navbar({
           </div>
         )}
         <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
-        <ChatPanel open={chatOpen} onClose={() => setChatOpen(false)} />
+        <ChatPanel open={chatOpen} onClose={() => {
+          setChatOpen(false)
+          // Re-fetch unread count after closing chat (user may have read messages)
+          if (user) {
+            fetch(`${API}/api/messages/unread-total`, {
+              credentials: 'include', headers: authHeaders(),
+            }).then(r => r.ok ? r.json() : null).then(d => {
+              if (d) setUnreadMessages(d.total || 0)
+            }).catch(() => {})
+          }
+        }} />
         <KeyboardShortcuts />
 
         {!user && isLanding && <div style={{ flex: 1 }} />}
@@ -217,12 +252,35 @@ export default function Navbar({
         {user && (
           <button
             onClick={() => setChatOpen(true)}
-            aria-label="Open messages"
-            style={S.iconBtn}
+            aria-label={unreadMessages > 0 ? `Open messages (${unreadMessages} unread)` : 'Open messages'}
+            style={{ ...S.iconBtn, position: 'relative' }}
             onMouseEnter={e => handleIconHover(e, true)}
             onMouseLeave={e => handleIconHover(e, false)}
           >
             <IconMessages size={18} />
+            {unreadMessages > 0 && (
+              <span style={{
+                position: 'absolute',
+                top: -4,
+                right: -4,
+                minWidth: 16,
+                height: 16,
+                borderRadius: 99,
+                background: 'var(--sh-danger)',
+                color: '#fff',
+                fontSize: 10,
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '0 4px',
+                lineHeight: 1,
+                border: '2px solid var(--sh-nav-bg, #0f172a)',
+                pointerEvents: 'none',
+              }}>
+                {unreadMessages > 9 ? '9+' : unreadMessages}
+              </span>
+            )}
           </button>
         )}
 

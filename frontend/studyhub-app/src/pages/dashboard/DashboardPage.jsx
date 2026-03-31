@@ -114,13 +114,13 @@ export default function DashboardPage() {
                 flexWrap: 'wrap',
               }}
             >
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#1e40af' }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--sh-brand-hover)' }}>
                 Welcome to StudyHub! Complete the steps below to set up your account.
               </div>
               <button
                 type="button"
                 onClick={() => setWelcomeDismissed(true)}
-                style={{ background: 'none', border: 'none', color: '#3b82f6', fontSize: 18, cursor: 'pointer', lineHeight: 1, padding: 4 }}
+                style={{ background: 'none', border: 'none', color: 'var(--sh-brand)', fontSize: 18, cursor: 'pointer', lineHeight: 1, padding: 4 }}
                 aria-label="Dismiss welcome banner"
               >
                 ×
@@ -132,11 +132,11 @@ export default function DashboardPage() {
             ref={heroRef}
             data-tutorial="dashboard-hero"
             style={{
-              background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%)',
+              background: 'linear-gradient(135deg, var(--sh-heading) 0%, var(--sh-slate-800) 100%)',
               borderRadius: 18,
-              border: '1px solid #1e3a5f',
+              border: '1px solid var(--sh-slate-800)',
               padding: '28px 30px',
-              color: '#fff',
+              color: 'white',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
@@ -145,13 +145,13 @@ export default function DashboardPage() {
             }}
           >
             <div>
-              <div style={{ fontSize: 13, color: '#93c5fd', fontWeight: 700, marginBottom: 8 }}>
+              <div style={{ fontSize: 13, color: 'var(--sh-slate-300)', fontWeight: 700, marginBottom: 8 }}>
                 SESSION READY
               </div>
               <h1 style={{ margin: 0, fontSize: 30, fontWeight: 800, letterSpacing: '-0.03em' }}>
                 Welcome back, {hero.username || user?.username || 'Student'}.
               </h1>
-              <p style={{ margin: '10px 0 0', fontSize: 14, lineHeight: 1.7, color: '#cbd5e1' }}>
+              <p style={{ margin: '10px 0 0', fontSize: 14, lineHeight: 1.7, color: 'var(--sh-slate-300)' }}>
                 Joined {formatJoinedDate(hero.createdAt || user?.createdAt)}.
                 {' '}
                 Your study sheets, notes, and practice tests are ready.
@@ -164,7 +164,7 @@ export default function DashboardPage() {
                 style={{
                   padding: '11px 16px',
                   borderRadius: 12,
-                  background: '#3b82f6',
+                  background: 'var(--sh-brand)',
                   color: '#fff',
                   fontSize: 13,
                   fontWeight: 700,
@@ -261,7 +261,7 @@ export default function DashboardPage() {
       {/* Tutorial popup */}
       <SafeJoyride {...tutorial.joyrideProps} />
       {tutorial.seen && (
-        <button type="button" onClick={tutorial.restart} title="Show tutorial" style={{ position: 'fixed', bottom: 24, right: 24, width: 44, height: 44, borderRadius: '50%', border: 'none', background: '#3b82f6', color: '#fff', fontSize: 18, fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 14px rgba(59,130,246,0.4)', zIndex: 50, display: 'grid', placeItems: 'center' }}>?</button>
+        <button type="button" onClick={tutorial.restart} title="Show tutorial" style={{ position: 'fixed', bottom: 24, right: 24, width: 44, height: 44, borderRadius: '50%', border: 'none', background: 'var(--sh-brand)', color: '#fff', fontSize: 18, fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 14px rgba(59,130,246,0.4)', zIndex: 50, display: 'grid', placeItems: 'center' }}>?</button>
       )}
     </div>
   )

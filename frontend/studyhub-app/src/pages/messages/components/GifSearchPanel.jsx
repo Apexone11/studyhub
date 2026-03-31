@@ -3,6 +3,7 @@
  * GIF search and selection panel (Tenor API)
  * ───────────────────────────────────────────────────────────── */
 import { useState, useRef, useEffect } from 'react'
+import { TENOR_API_KEY } from '../../../config'
 import { PAGE_FONT } from '../../shared/pageUtils'
 
 export function GifSearchPanel({ onSelect, onClose }) {
@@ -26,7 +27,7 @@ export function GifSearchPanel({ onSelect, onClose }) {
       setLoading(true)
       try {
         const resp = await fetch(
-          `https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(trimmedQuery)}&key=AIzaSyAyimkuYQYF_FXVALexPuGQctUWRURdCYQ&client_key=studyhub&limit=12&media_filter=tinygif,gif`
+          `https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(trimmedQuery)}&key=${encodeURIComponent(TENOR_API_KEY)}&client_key=studyhub&limit=12&media_filter=tinygif,gif`
         )
         if (resp.ok && !cancelled) {
           const data = await resp.json()

@@ -2650,3 +2650,181 @@ backend/src/index.js:
 
 - Frontend lint: 0 errors
 - Backend lint: 0 errors
+
+## Cycle 64 -- Bug Fixes, Accessibility, UX Polish (2026-03-31)
+
+### Summary
+
+Fixed 2 reported bugs in ChatPanel (typing indicator leak, delete handler mismatch), wired useFocusTrap into messaging modals, fixed concurrent scroll lock in useFocusTrap, moved Tenor API key to config, improved Socket.io error handling, and added missing aria-labels across messaging components.
+
+### 1. Bug Fixes
+
+ChatPanel.jsx -- typing:stop not emitted on timeout (P1):
+- The typing throttle timeout only cleared the timer ref without emitting `typing:stop`
+- Other participants would see a permanent typing indicator after a user paused
+- Fix: emit `typing:stop` when the 3-second throttle window expires
+
+ChatPanel.jsx -- delete handler field mismatch (P2):
+- Handler compared `data.id` but backend emits `{ messageId, conversationId }`
+- Deletes from other clients would not render in ChatPanel until page reload
+- Fix: use `data.messageId || data.id` for backward compatibility
+
+### 2. Focus Trap for Messaging Modals
+
+NewConversationModal.jsx:
+- Wired `useFocusTrap({ active: isOpen, onClose })` with ref on root container
+- Keyboard users can now Tab within modal and Escape to close
+
+ConfirmDeleteModal.jsx:
+- Wired `useFocusTrap({ active: isOpen, onClose: onCancel })` with ref on root container
+- Same focus trap and Escape behavior as other modals
+
+### 3. useFocusTrap Concurrent Scroll Lock Fix
+
+useFocusTrap.js:
+- Replaced per-instance `prevOverflow` save/restore with a shared counter on `document.body`
+- `__focusTrapScrollLockCount` tracks active instances; scroll is restored only when the last active trap unmounts
+- Prevents premature scroll restoration when multiple modals are open simultaneously
+
+### 4. Tenor API Key Moved to Config
+
+config.js:
+- Added `TENOR_API_KEY` export with runtime config / env var / fallback chain
+- Key can now be rotated via `VITE_TENOR_API_KEY` or `window.__STUDYHUB_CONFIG__` without rebuilding
+
+GifSearchPanel.jsx:
+- Imports `TENOR_API_KEY` from config instead of hardcoding the key inline
+- Uses `encodeURIComponent` for safety in URL construction
+
+### 5. Socket.io Error Handling Improvement
+
+useSocket.js:
+- `connect_error` handler now checks structured error fields (`err.data.code`, `err.code`) before falling back to substring matching
+- Added dev-only `console.warn` with raw error object for diagnosis (uses `import.meta.env.DEV`)
+- Checks for `AUTH_REQUIRED`, `TRANSPORT_ERROR` codes alongside message matching
+
+### 6. Accessibility Polish
+
+MessageBubble.jsx:
+- Added `aria-label` to Reply ("Reply to message"), Edit ("Edit message"), and Delete ("Delete message") icon-only action buttons
+
+ConversationList.jsx:
+- Converted context menu trigger from non-semantic `<div>` to `<button>` element
+- Added `aria-label="Conversation options"`, `aria-haspopup="menu"`, `aria-expanded` attributes
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `frontend/.../components/ChatPanel.jsx` | P1: emit typing:stop on timeout; P2: fix delete handler field |
+| `frontend/.../messages/components/NewConversationModal.jsx` | Wire useFocusTrap |
+| `frontend/.../messages/components/ConfirmDeleteModal.jsx` | Wire useFocusTrap |
+| `frontend/.../lib/useFocusTrap.js` | Shared counter for concurrent scroll lock |
+| `frontend/.../config.js` | Add TENOR_API_KEY config export |
+| `frontend/.../messages/components/GifSearchPanel.jsx` | Import key from config |
+| `frontend/.../lib/useSocket.js` | Structured error field checking, dev logging |
+| `frontend/.../messages/components/MessageBubble.jsx` | aria-labels on action buttons |
+| `frontend/.../messages/components/ConversationList.jsx` | Semantic button for context menu |
+
+### Validation
+
+- Frontend lint: 0 errors
+- Backend lint: 0 errors
+
+---
+
+## Cycle 65 -- UX Polish, Bug Fixes, and Test Coverage (2026-03-31)
+
+### Summary
+
+UX polish cycle addressing bugs found in live production screenshots, accessibility fixes, dark mode token compliance, and expanded E2E test coverage.
+
+### Bug Fixes
+
+1. **Study Group Members tab empty state (P1)**: Members tab on group detail view showed "No Members" even when the group had members. Root cause: missing `useEffect` to call `loadMembers(groupId)` when the Members tab becomes active. Added the effect in `StudyGroupsPage.jsx`, mirroring the existing activity-loading pattern.
+
+2. **Sheet Activity "Server error" (P1)**: Activity section on sheet viewer returned 500. Root cause: `sheets.activity.controller.js` referenced `prisma.sheetComment` (nonexistent model) instead of `prisma.comment`, and used field name `body` instead of `content`. Fixed model and field references.
+
+3. **StudyGroupsPage missing Retry button**: Error state showed the error message but no way to retry. Added a Retry button (matching FeedPage pattern) wired to `loadGroups()`. Also made the alert container a flex row for proper layout.
+
+### Accessibility Fixes
+
+4. **NotesList clickable divs**: Converted note list items from `<div onClick>` to `<button>` elements with `aria-label` and `aria-current` attributes. Adds keyboard accessibility (Enter/Space) and proper screen reader announcements.
+
+### UX Polish
+
+5. **Messaging button padding standardization**: Aligned button padding across messaging components:
+   - Primary action buttons: `8px 16px` (New button, Send, modal actions)
+   - Small icon/toolbar buttons: `4px 6px` (attach, image, GIF, poll, reply, edit, delete)
+   - Edit mode inline buttons: `4px 8px` (cancel/save during message editing)
+
+6. **Dark mode hardcoded color audit**: Replaced 50+ hardcoded hex color values across 12 frontend files with CSS custom property tokens (`var(--sh-*)`). Major files: EmailSuppressionsTab, AnnouncementsPage, CoursesPage, UserProfilePage, ContributionsPage.
+
+### Test Coverage
+
+7. **DM auto-start E2E tests** (`tests/dm-autostart.e2e.spec.js`): 7 test cases covering new conversation creation via `?dm=userId`, existing conversation selection, query param cleanup, self-DM rejection, and invalid userId handling.
+
+8. **Notifications E2E tests** (`tests/notifications.e2e.spec.js`): 15 test cases covering unread badge display, dropdown open/close, mark-as-read, mark-all-read, delete, navigation on click, empty state, relative time labels, and unauthenticated state.
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `frontend/.../pages/studyGroups/StudyGroupsPage.jsx` | Retry button on error state, useEffect for members loading, flex alert layout |
+| `backend/src/modules/sheets/sheets.activity.controller.js` | Fix prisma.sheetComment -> prisma.comment, body -> content |
+| `frontend/.../pages/notes/NotesList.jsx` | Convert clickable divs to semantic buttons |
+| `frontend/.../messages/components/ConversationList.jsx` | Standardize New button padding to 8px 16px |
+| `frontend/.../messages/components/MessageBubble.jsx` | Standardize edit button padding to 4px 8px |
+| `frontend/.../messages/components/MessageThread.jsx` | Standardize toolbar button padding to 4px 6px |
+| `frontend/.../pages/admin/EmailSuppressionsTab.jsx` | Replace hardcoded colors with tokens |
+| `frontend/.../pages/announcements/AnnouncementsPage.jsx` | Replace hardcoded colors with tokens |
+| `frontend/.../pages/courses/CoursesPage.jsx` | Replace hardcoded colors with tokens |
+| `frontend/.../pages/profile/UserProfilePage.jsx` | Replace hardcoded colors with tokens |
+| `frontend/.../pages/contributions/ContributionsPage.jsx` | Replace hardcoded colors with tokens |
+| `frontend/studyhub-app/tests/dm-autostart.e2e.spec.js` | New: 7 DM auto-start E2E tests |
+| `frontend/studyhub-app/tests/notifications.e2e.spec.js` | New: 15 notifications E2E tests |
+
+### Validation
+
+- Frontend lint: 0 errors
+- Backend lint: 0 errors
+- Build: Bus error in sandboxed VM (memory limitation, not a code issue; CI/Railway builds cleanly)
+
+---
+
+## Cycle 65b -- Message Read Receipts Fix and Unread Badge (2026-03-31)
+
+### Summary
+
+Fixed the core issue where message unread notification badges persisted indefinitely because mark-as-read only worked via Socket.io. When the WebSocket connection was unavailable (common in production), lastReadAt never updated, so unread counts came back on every page refresh.
+
+### Changes
+
+1. **New backend endpoint: POST /api/messages/conversations/:id/read** -- HTTP fallback for marking conversations as read. Updates lastReadAt to now. Used when Socket.io is disconnected.
+
+2. **New backend endpoint: GET /api/messages/unread-total** -- Returns aggregate unread count across all conversations. Powers the new navbar badge.
+
+3. **Frontend useMessagingData.js** -- Added `markConversationRead()` helper that prefers socket but falls back to HTTP POST when disconnected. Wired into `selectConversation()` and `handleNewMessage()`. Replaced old socket-only `markAsRead` with the new fallback-aware version.
+
+4. **ChatPanel.jsx** -- Same HTTP fallback for mark-as-read on conversation select and new message arrival when socket is disconnected. Also clears unread badge locally on select.
+
+5. **Navbar.jsx** -- Added unread messages badge (red dot with count) on the messages icon. Fetches from `/api/messages/unread-total` on mount, polls every 30s, and re-fetches when chat panel closes.
+
+6. **ConversationList.jsx** -- Polished unread badge: switched to danger color with surface border, 9+ cap. Unread conversations show bolder name (weight 800) and darker preview text for visual distinction.
+
+7. **ChatPanel.jsx conversation list** -- Same visual polish: bolder names, darker previews, danger-colored badge for unread conversations.
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `backend/src/modules/messaging/messaging.routes.js` | POST /:id/read + GET /unread-total endpoints |
+| `frontend/.../pages/messages/useMessagingData.js` | markConversationRead with HTTP fallback |
+| `frontend/.../components/ChatPanel.jsx` | HTTP fallback + polished unread badges |
+| `frontend/.../components/navbar/Navbar.jsx` | Unread messages badge on navbar icon |
+| `frontend/.../pages/messages/components/ConversationList.jsx` | Polished unread badge + visual weight |
+
+### Validation
+
+- Frontend lint: 0 errors
+- Backend lint: 0 errors

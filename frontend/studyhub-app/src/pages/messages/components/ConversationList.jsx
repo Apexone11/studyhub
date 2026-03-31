@@ -29,6 +29,7 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, currentUs
   const lastMsgText = lastMsg
     ? (lastMsg.content || lastMsg.sender?.username || '')
     : ''
+  const hasUnread = conversation.unreadCount > 0
 
   return (
     <div style={{ position: 'relative' }} role="listitem">
@@ -61,32 +62,49 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, currentUs
             size={40}
           />
           {conversation.unreadCount > 0 && (
-            <div
+            <span
+              aria-label={`${conversation.unreadCount} unread`}
               style={{
                 position: 'absolute',
-                top: -6,
-                right: -6,
-                width: 20,
-                height: 20,
-                borderRadius: '50%',
-                background: 'var(--sh-brand)',
-                color: 'var(--sh-surface)',
-                display: 'grid',
-                placeItems: 'center',
-                fontSize: 11,
+                top: -4,
+                right: -4,
+                minWidth: 18,
+                height: 18,
+                borderRadius: 99,
+                background: 'var(--sh-danger)',
+                color: '#fff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 10,
                 fontWeight: 700,
+                padding: '0 4px',
+                lineHeight: 1,
+                border: '2px solid var(--sh-surface)',
               }}
             >
-              {conversation.unreadCount}
-            </div>
+              {conversation.unreadCount > 9 ? '9+' : conversation.unreadCount}
+            </span>
           )}
         </div>
 
         <div style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--sh-heading)', marginBottom: 2 }}>
+          <div style={{
+            fontSize: 13,
+            fontWeight: hasUnread ? 800 : 600,
+            color: 'var(--sh-heading)',
+            marginBottom: 2,
+          }}>
             {name}
           </div>
-          <div style={{ fontSize: 12, color: 'var(--sh-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div style={{
+            fontSize: 12,
+            color: hasUnread ? 'var(--sh-text)' : 'var(--sh-muted)',
+            fontWeight: hasUnread ? 600 : 400,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}>
             {truncateText(lastMsgText, 40)}
           </div>
           {lastMsg?.createdAt && (
@@ -97,21 +115,26 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, currentUs
         </div>
 
         {/* Context menu trigger */}
-        <div
+        <button
           onClick={(e) => {
             e.stopPropagation()
             setShowMenu(!showMenu)
           }}
+          aria-label="Conversation options"
+          aria-haspopup="menu"
+          aria-expanded={showMenu}
           style={{
             flexShrink: 0,
             padding: '2px 4px',
             cursor: 'pointer',
             color: 'var(--sh-muted)',
             borderRadius: 4,
+            background: 'none',
+            border: 'none',
           }}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" /></svg>
-        </div>
+        </button>
       </button>
 
       {showMenu && (
@@ -184,7 +207,7 @@ export function ConversationList({
           onClick={onNewClick}
           style={{
             width: '100%',
-            padding: '8px 12px',
+            padding: '8px 16px',
             background: 'var(--sh-brand)',
             color: 'var(--sh-surface)',
             border: 'none',

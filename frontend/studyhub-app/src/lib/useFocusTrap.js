@@ -86,10 +86,18 @@ export function useFocusTrap({
     // Save current focus to restore later
     previousFocusRef.current = document.activeElement
 
-    // Lock body scroll
-    const prevOverflow = document.body.style.overflow
-    if (lockScroll) {
-      document.body.style.overflow = 'hidden'
+    // Lock body scroll using a shared counter so concurrent focus traps
+    // do not restore scroll prematurely when one unmounts while others remain.
+    if (lockScroll && typeof document !== 'undefined') {
+      const body = document.body
+      if (body.__focusTrapScrollLockCount == null) {
+        body.__focusTrapScrollLockCount = 0
+      }
+      if (body.__focusTrapScrollLockCount === 0) {
+        body.__focusTrapPrevOverflow = body.style.overflow
+        body.style.overflow = 'hidden'
+      }
+      body.__focusTrapScrollLockCount += 1
     }
 
     // Focus initial element after a tick (allows portal rendering)
@@ -109,9 +117,17 @@ export function useFocusTrap({
       clearTimeout(focusTimer)
       document.removeEventListener('keydown', handleKeyDown)
 
-      // Restore body scroll
-      if (lockScroll) {
-        document.body.style.overflow = prevOverflow
+      // Restore body scroll only when the last active focus trap unmounts
+      if (lockScroll && typeof document !== 'undefined') {
+        const body = document.body
+        if (body.__focusTrapScrollLockCount != null && body.__focusTrapScrollLockCount > 0) {
+          body.__focusTrapScrollLockCount -= 1
+          if (body.__focusTrapScrollLockCount === 0) {
+            body.style.overflow = body.__focusTrapPrevOverflow || ''
+            delete body.__focusTrapPrevOverflow
+            delete body.__focusTrapScrollLockCount
+          }
+        }
       }
 
       // Restore previous focus

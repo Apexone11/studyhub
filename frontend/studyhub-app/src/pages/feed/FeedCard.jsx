@@ -162,7 +162,7 @@ function FeedCardInner({
                             borderRadius: 8,
                             border: 'none',
                             background: 'transparent',
-                            color: '#dc2626',
+                            color: 'var(--sh-danger)',
                             fontSize: 13,
                             fontWeight: 600,
                             textAlign: 'left',
@@ -221,7 +221,7 @@ function FeedCardInner({
                     src={urls.previewUrl}
                     alt={item.attachmentName || 'Attachment preview'}
                     loading="lazy"
-                    style={{ width: '100%', maxHeight: 300, objectFit: 'contain', background: '#f8fafc' }}
+                    style={{ width: '100%', maxHeight: 300, objectFit: 'contain', background: 'var(--sh-soft)' }}
                   />
                 ) : (
                   <iframe
@@ -230,7 +230,7 @@ function FeedCardInner({
                     sandbox="allow-same-origin"
                     referrerPolicy="no-referrer"
                     loading="lazy"
-                    style={{ width: '100%', height: 300, border: 'none', background: '#fff' }}
+                    style={{ width: '100%', height: 300, border: 'none', background: 'var(--sh-surface)' }}
                   />
                 )}
               </div>

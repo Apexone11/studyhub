@@ -165,7 +165,7 @@ export default function EmailSuppressionsTab({
       </div>
 
       {suppressionsState.items.length === 0 && !suppressionsState.loading ? (
-        <div style={{ marginTop: 12, fontSize: 13, color: 'var(--sh-muted)' }}>
+        <div style={{ marginTop: 12, fontSize: 13, color: '#64748b' }}>
           No suppression records for this filter.
         </div>
       ) : null}
@@ -189,7 +189,7 @@ export default function EmailSuppressionsTab({
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 10 }}>
             <div>
               <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--sh-heading)', marginBottom: 3 }}>Audit timeline</div>
-              <div style={{ fontSize: 12, color: 'var(--sh-muted)' }}>{auditState.suppression?.email || `Suppression #${auditState.suppressionId}`}</div>
+              <div style={{ fontSize: 12, color: '#64748b' }}>{auditState.suppression?.email || `Suppression #${auditState.suppressionId}`}</div>
             </div>
             <button
               type="button"
@@ -215,14 +215,14 @@ export default function EmailSuppressionsTab({
                     <div style={{ fontSize: 11, color: 'var(--sh-subtext)' }}>{formatDateTime(entry.createdAt)}</div>
                   </div>
                   <div style={{ fontSize: 12, color: 'var(--sh-slate-600)', marginBottom: 4 }}>{entry.reason || 'No reason provided.'}</div>
-                  <div style={{ fontSize: 11, color: 'var(--sh-muted)' }}>
+                  <div style={{ fontSize: 11, color: '#64748b' }}>
                     Actor: {entry.performedBy?.username || 'System'}
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div style={{ color: 'var(--sh-muted)', fontSize: 12 }}>No audit entries recorded yet.</div>
+            <div style={{ color: '#64748b', fontSize: 12 }}>No audit entries recorded yet.</div>
           )}
 
           {auditState.loaded ? (

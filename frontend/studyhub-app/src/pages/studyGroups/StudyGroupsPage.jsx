@@ -62,7 +62,7 @@ function GroupListView() {
   // Load data with current filters
   const {
     groups, groupsLoading, groupsError, groupsTotal,
-    createGroup, joinGroup,
+    createGroup, joinGroup, loadGroups,
     courses: allCourses,
   } = useStudyGroupsData()
 
@@ -169,7 +169,25 @@ function GroupListView() {
               {/* Error state */}
               {groupsError && (
                 <div style={styles.alert('danger')}>
-                  {groupsError}
+                  <span>{groupsError}</span>
+                  <button
+                    onClick={loadGroups}
+                    style={{
+                      background: 'var(--sh-danger)',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 8,
+                      padding: '6px 14px',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                      fontFamily: PAGE_FONT,
+                      marginLeft: 12,
+                    }}
+                  >
+                    Retry
+                  </button>
                 </div>
               )}
 
@@ -266,6 +284,13 @@ function GroupDetailView({ groupId }) {
       loadActivity(groupId)
     }
   }, [activeTab, activeGroup, groupId, loadActivity])
+
+  // Load members when members tab is active
+  useEffect(() => {
+    if (activeTab === 'members') {
+      loadMembers(groupId)
+    }
+  }, [activeTab, groupId, loadMembers])
 
   if (activeGroupLoading) {
     return (
@@ -1426,6 +1451,9 @@ const styles = {
       },
     }
     return {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
       padding: 'var(--space-4) var(--space-6)',
       borderRadius: 'var(--radius-control)',
       fontSize: 'var(--type-sm)',

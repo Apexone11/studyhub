@@ -170,8 +170,16 @@ export default function ChatPanel({ open, onClose }) {
           return [...prev, message]
         })
         setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
-        // Emit read receipt
-        socket.emit('message:read', { conversationId: currentActiveId })
+        // Emit read receipt — prefer socket, fall back to HTTP
+        if (socket.connected) {
+          socket.emit('message:read', { conversationId: currentActiveId })
+        } else {
+          fetch(`${API}/api/messages/conversations/${currentActiveId}/read`, {
+            method: 'POST',
+            headers: authHeaders(),
+            credentials: 'include',
+          }).catch(() => {})
+        }
       }
       // Update conversation list (last message + unread)
       setConversations((prev) =>
@@ -193,8 +201,10 @@ export default function ChatPanel({ open, onClose }) {
     }
 
     function handleMessageDelete(data) {
+      // Backend emits { messageId, conversationId } — use messageId, not id
+      const deletedId = data.messageId || data.id
       setMessages((prev) =>
-        prev.map((m) => m.id === data.id ? { ...m, deletedAt: data.deletedAt || new Date().toISOString() } : m)
+        prev.map((m) => m.id === deletedId ? { ...m, deletedAt: data.deletedAt || new Date().toISOString() } : m)
       )
     }
 
@@ -234,6 +244,9 @@ export default function ChatPanel({ open, onClose }) {
     if (typingTimerRef.current) return // Already typing
     socket.emit('typing:start', { conversationId: activeId })
     typingTimerRef.current = setTimeout(() => {
+      // Emit typing:stop when the throttle window expires so other
+      // participants do not see a permanent typing indicator.
+      if (socket && activeId) socket.emit('typing:stop', { conversationId: activeId })
       typingTimerRef.current = null
     }, 3000)
   }
@@ -248,10 +261,21 @@ export default function ChatPanel({ open, onClose }) {
       typingTimerRef.current = null
     }
     setActiveId(id)
-    if (socket) {
+    if (socket && socket.connected) {
       socket.emit('conversation:join', { conversationId: id })
       socket.emit('message:read', { conversationId: id })
+    } else {
+      // HTTP fallback when socket is disconnected
+      fetch(`${API}/api/messages/conversations/${id}/read`, {
+        method: 'POST',
+        headers: authHeaders(),
+        credentials: 'include',
+      }).catch(() => {})
     }
+    // Clear unread badge immediately
+    setConversations((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, unreadCount: 0 } : c))
+    )
   }
 
   /* -- Load conversations ------------------------------------------------ */
@@ -631,10 +655,24 @@ export default function ChatPanel({ open, onClose }) {
                   >
                     <UserAvatar username={other.username} avatarUrl={other.avatarUrl} size={36} />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--sh-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <div style={{
+                        fontWeight: c.unreadCount > 0 ? 800 : 600,
+                        fontSize: 13,
+                        color: 'var(--sh-heading)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}>
                         {other.username || 'Unknown'}
                       </div>
-                      <div style={{ fontSize: 12, color: 'var(--sh-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <div style={{
+                        fontSize: 12,
+                        color: c.unreadCount > 0 ? 'var(--sh-text)' : 'var(--sh-muted)',
+                        fontWeight: c.unreadCount > 0 ? 600 : 400,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}>
                         {c.lastMessage?.content?.slice(0, 50) || 'No messages yet'}
                       </div>
                     </div>
@@ -642,12 +680,23 @@ export default function ChatPanel({ open, onClose }) {
                       {relTime(c.lastMessage?.createdAt || c.updatedAt)}
                     </span>
                     {c.unreadCount > 0 && (
-                      <span style={{
-                        width: 18, height: 18, borderRadius: '50%',
-                        background: 'var(--sh-brand)', color: 'var(--sh-surface)',
-                        fontSize: 10, fontWeight: 700, display: 'grid', placeItems: 'center',
-                        flexShrink: 0,
-                      }}>
+                      <span
+                        aria-label={`${c.unreadCount} unread`}
+                        style={{
+                          minWidth: 18,
+                          height: 18,
+                          borderRadius: 99,
+                          background: 'var(--sh-danger)',
+                          color: '#fff',
+                          fontSize: 10,
+                          fontWeight: 700,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: '0 4px',
+                          lineHeight: 1,
+                          flexShrink: 0,
+                        }}>
                         {c.unreadCount > 9 ? '9+' : c.unreadCount}
                       </span>
                     )}

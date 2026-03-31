@@ -281,9 +281,9 @@ export default function MyCoursesPage() {
         {/* ── Hero header ─────────────────────────────────────────── */}
         <div style={{
           borderRadius: 18, overflow: 'hidden', marginBottom: 24,
-          background: 'linear-gradient(135deg, #1e3a5f, #2563eb)',
+          background: 'linear-gradient(135deg, var(--sh-slate-800), var(--sh-brand))',
           padding: 'clamp(24px, 3vw, 40px) clamp(20px, 3vw, 36px)',
-          color: '#fff',
+          color: 'white',
         }}>
           <h1 style={{ margin: '0 0 8px', fontSize: 'clamp(22px, 3vw, 28px)', fontWeight: 800 }}>
             Personalize Your Feed

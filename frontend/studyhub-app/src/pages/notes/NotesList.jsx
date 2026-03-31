@@ -117,16 +117,22 @@ export default function NotesList({
           {visibleNotes.map((note) => {
             const isActive = activeNote?.id === note.id
             return (
-              <div
+              <button
                 key={note.id}
                 onClick={() => selectNote(note)}
+                aria-label={`Open note: ${note.title || 'Untitled'}`}
+                aria-current={isActive ? 'true' : undefined}
                 style={{
+                  display: 'block',
+                  width: '100%',
+                  textAlign: 'left',
                   background: isActive ? 'var(--sh-info-bg, #eff6ff)' : 'var(--sh-surface, #fff)',
                   borderRadius: 12,
                   border: isActive ? '1.5px solid var(--sh-brand-border, #93c5fd)' : '1px solid var(--sh-border, #e2e8f0)',
                   padding: '14px 16px',
                   cursor: 'pointer',
                   transition: 'all .15s',
+                  fontFamily: 'inherit',
                 }}
                 onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.borderColor = 'var(--sh-brand-border, #93c5fd)' }}
                 onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.borderColor = 'var(--sh-border, #e2e8f0)' }}
@@ -157,7 +163,7 @@ export default function NotesList({
                   {note.course ? <span style={{ fontWeight: 600, color: 'var(--sh-brand, #3b82f6)' }}>{note.course.code}</span> : null}
                   <span>{timeAgo(note.updatedAt)}</span>
                 </div>
-              </div>
+              </button>
             )
           })}
         </div>

@@ -96,6 +96,28 @@ export function useMessagingData(socket, currentUserId) {
     }
   }, [])
 
+  /* ── Mark conversation as read — socket preferred, HTTP fallback ──────── */
+  const markConversationRead = useCallback(async (conversationId) => {
+    if (socket && socket.connected) {
+      socket.emit('message:read', { conversationId })
+    } else {
+      // HTTP fallback when socket is disconnected
+      try {
+        await fetch(`${API}/api/messages/conversations/${conversationId}/read`, {
+          method: 'POST',
+          headers: authHeaders(),
+          credentials: 'include',
+        })
+      } catch {
+        // Silent failure — unread will recalculate on next load
+      }
+    }
+    // Always clear the local badge immediately
+    setConversations((prev) =>
+      prev.map((c) => (c.id === conversationId ? { ...c, unreadCount: 0 } : c))
+    )
+  }, [socket])
+
   /* ── Select conversation and load messages ────────────────────────────– */
   const selectConversation = useCallback(async (id) => {
     try {
@@ -122,26 +144,19 @@ export function useMessagingData(socket, currentUserId) {
       setHasMoreMessages(true)
       setTypingUsers(new Map())
 
-      // Clear unread badge immediately in the conversation list
-      setConversations((prev) =>
-        prev.map((c) => (c.id === id ? { ...c, unreadCount: 0 } : c))
-      )
-
       // Join the conversation room via socket
-      if (socket) {
+      if (socket && socket.connected) {
         socket.emit('conversation:join', { conversationId: id })
       }
 
       await loadMessages(id)
 
-      // Mark as read on backend
-      if (socket) {
-        socket.emit('message:read', { conversationId: id })
-      }
+      // Mark as read on backend (clears unread badge + updates lastReadAt)
+      markConversationRead(id)
     } catch {
       showToast('Failed to select conversation', 'error')
     }
-  }, [socket, loadMessages])
+  }, [socket, loadMessages, markConversationRead])
 
   /* ── Load more messages (pagination) ──────────────────────────────────– */
   const loadMoreMessages = useCallback(async () => {
@@ -356,10 +371,8 @@ export function useMessagingData(socket, currentUserId) {
 
   /* ── Mark conversation as read ───────────────────────────────────────── */
   const markAsRead = useCallback((conversationId) => {
-    if (socket) {
-      socket.emit('message:read', { conversationId })
-    }
-  }, [socket])
+    markConversationRead(conversationId)
+  }, [markConversationRead])
 
   /* ── Archive conversation ────────────────────────────────────────────── */
   const archiveConversation = useCallback(async (id) => {
@@ -450,8 +463,16 @@ export function useMessagingData(socket, currentUserId) {
           return [...cleaned, message]
         })
 
-        // Auto-mark as read
-        socket.emit('message:read', { conversationId: message.conversationId })
+        // Auto-mark as read — prefer socket, fall back to HTTP
+        if (socket && socket.connected) {
+          socket.emit('message:read', { conversationId: message.conversationId })
+        } else {
+          fetch(`${API}/api/messages/conversations/${message.conversationId}/read`, {
+            method: 'POST',
+            headers: authHeaders(),
+            credentials: 'include',
+          }).catch(() => {})
+        }
       }
       // Update conversation list — clear unread if this is the active conversation
       setConversations((prev) =>
