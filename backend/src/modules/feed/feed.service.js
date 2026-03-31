@@ -9,8 +9,26 @@ function settleSection(label, loader) {
     .catch((error) => ({ ok: false, label, error, durationMs: Date.now() - startedAt }))
 }
 
+/**
+ * Strip HTML tags and decode common entities to produce a plain-text summary.
+ * Sheets often store full HTML documents as their `content`, so this ensures
+ * the feed preview shows readable text rather than raw markup.
+ */
+function stripHtml(html) {
+  return String(html)
+    .replace(/<style[\s\S]*?<\/style>/gi, '')      // remove <style> blocks
+    .replace(/<script[\s\S]*?<\/script>/gi, '')     // remove <script> blocks
+    .replace(/<[^>]*>/g, ' ')                       // strip remaining tags
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+}
+
 function summarizeText(text = '', max = 180) {
-  const plain = String(text)
+  const plain = stripHtml(text)
     .replace(/\s+/g, ' ')
     .trim()
 
@@ -54,7 +72,7 @@ function formatSheet(item, starredIds, commentCounts, reactionRows, currentReact
     type: 'sheet',
     createdAt: item.createdAt,
     title: item.title,
-    description: item.description || '',
+    description: summarizeText(item.description || '', 190),
     preview: summarizeText(item.content, 190),
     author: item.author ? { id: item.author.id, username: item.author.username, avatarUrl: item.author.avatarUrl || null } : null,
     course: item.course ? { id: item.course.id, code: item.course.code } : null,
@@ -140,6 +158,7 @@ function formatFeedPostDetail(item, commentCount, reactionRows, currentReactions
 
 module.exports = {
   settleSection,
+  stripHtml,
   summarizeText,
   safeDownloadName,
   reactionSummary,

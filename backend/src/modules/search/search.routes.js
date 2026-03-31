@@ -8,6 +8,7 @@ const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
 const { timedSection, logTiming } = require('../../lib/requestTiming')
 const { getBlockedUserIds } = require('../../lib/social/blockFilter')
+const { summarizeText } = require('../feed/feed.service')
 
 const router = express.Router()
 
@@ -317,8 +318,18 @@ router.get('/', optionalAuth, async (req, res) => {
       },
     })
 
+    // Sanitize any HTML from descriptions before sending to the client
+    const cleanSheets = sheets.map((s) => ({
+      ...s,
+      description: s.description ? summarizeText(s.description, 200) : '',
+    }))
+    const cleanGroups = groups.map((g) => ({
+      ...g,
+      description: g.description ? summarizeText(g.description, 200) : '',
+    }))
+
     return res.json({
-      results: { sheets, courses, users, notes, groups },
+      results: { sheets: cleanSheets, courses, users, notes, groups: cleanGroups },
       query,
       type,
     })

@@ -1,6 +1,16 @@
 /**
  * studyGroups.routes.js — Study groups API
  *
+ * SECURITY POLICY:
+ * - All sub-resource endpoints (resources, sessions, discussions) require
+ *   active group membership before access is granted.
+ * - Private groups are invisible to non-members (404 instead of 403 to avoid
+ *   leaking group existence).
+ * - Admin/moderator role checks use group-level roles, never platform role.
+ * - All user-submitted text (names, titles, descriptions, posts, replies) is
+ *   sanitized through stripHtmlTags to prevent stored XSS.
+ * - Resource URLs must be valid http/https.
+ *
  * Endpoints:
  * Group CRUD & Membership:
  * - GET/POST /api/study-groups
@@ -103,14 +113,30 @@ function validateDescription(desc) {
 }
 
 /**
- * Validate title
+ * Validate title (strips HTML to prevent XSS)
  */
 function validateTitle(title) {
-  const trimmed = (title || '').trim()
+  const trimmed = stripHtmlTags(title || '').trim()
   if (!trimmed || trimmed.length < 1 || trimmed.length > 200) {
     return null
   }
   return trimmed
+}
+
+/**
+ * Validate a resource URL.  Must be a valid URL with https or http scheme.
+ */
+function validateResourceUrl(url) {
+  if (!url) return null
+  try {
+    const parsed = new URL(url)
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+      return null
+    }
+    return parsed.href
+  } catch {
+    return null
+  }
 }
 
 /**
@@ -126,18 +152,39 @@ async function formatGroup(group, currentUserId = null) {
     userMembership = await requireGroupMember(group.id, currentUserId)
   }
 
+  // Derive convenience fields for frontend
+  const isMember = userMembership && userMembership.status === 'active'
+  const userRole = userMembership ? userMembership.role : null
+
+  // Look up course name if courseId exists
+  let courseName = null
+  if (group.courseId) {
+    try {
+      const course = await prisma.course.findUnique({
+        where: { id: group.courseId },
+        select: { name: true },
+      })
+      courseName = course?.name || null
+    } catch {
+      // Non-critical, ignore
+    }
+  }
+
   return {
     id: group.id,
     name: group.name,
     description: group.description,
     avatarUrl: group.avatarUrl,
     courseId: group.courseId,
+    courseName,
     privacy: group.privacy,
     maxMembers: group.maxMembers,
     createdById: group.createdById,
     createdAt: group.createdAt,
     updatedAt: group.updatedAt,
     memberCount,
+    isMember: !!isMember,
+    userRole,
     userMembership: userMembership ? {
       id: userMembership.id,
       role: userMembership.role,
@@ -296,7 +343,8 @@ router.get('/:id', readLimiter, requireAuth, async (req, res) => {
     // Check if user can see this group (public or member)
     const userMembership = await requireGroupMember(groupId, req.user.userId)
     if (group.privacy !== 'public' && !userMembership) {
-      return res.status(403).json({ error: 'Not authorized.' })
+      // Return 404 to avoid leaking that a private group exists
+      return res.status(404).json({ error: 'Group not found.' })
     }
 
     const formatted = await formatGroup(group, req.user.userId)
@@ -474,7 +522,7 @@ router.post('/:id/join', writeLimiter, requireAuth, async (req, res) => {
     if (status === 'active') {
       try {
         await createNotification(prisma, {
-          userId: group.creatorId,
+          userId: group.createdById,
           type: 'group_join',
           message: `${req.user.username} joined your study group ${group.name}`,
           actorId: req.user.userId,
@@ -963,6 +1011,15 @@ router.post('/:id/resources', writeLimiter, requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Invalid resourceType.' })
     }
 
+    // Validate URL if provided
+    let validUrl = null
+    if (resourceUrl) {
+      validUrl = validateResourceUrl(resourceUrl)
+      if (!validUrl) {
+        return res.status(400).json({ error: 'Invalid resource URL. Must be a valid http or https URL.' })
+      }
+    }
+
     const resource = await prisma.groupResource.create({
       data: {
         groupId,
@@ -970,7 +1027,7 @@ router.post('/:id/resources', writeLimiter, requireAuth, async (req, res) => {
         title: validTitle,
         description: validDesc,
         resourceType,
-        resourceUrl: resourceUrl || null,
+        resourceUrl: validUrl,
         sheetId: sheetId ? parseId(sheetId) : null,
         noteId: noteId ? parseId(noteId) : null,
       },

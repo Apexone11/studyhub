@@ -1,12 +1,25 @@
 /**
  * messaging.routes.js — Real-time messaging API
  *
+ * SECURITY POLICY:
+ * - All conversation data is strictly participant-only.  There is no platform
+ *   admin bypass.  Even users with role "admin" or "staff" cannot access
+ *   conversations they are not a participant of.
+ * - Every endpoint that touches messages or sub-resources (reactions, polls)
+ *   verifies the requesting user is a ConversationParticipant.
+ * - Message content is sanitized (HTML stripped) on write to prevent stored XSS.
+ * - Attachment URLs must use HTTPS.
+ * - Socket.io rooms are scoped to conversations the user is a participant of;
+ *   the server verifies membership before joining rooms.
+ *
  * Endpoints:
  * - GET/POST /api/messages/conversations
  * - GET/PATCH/DELETE /api/messages/conversations/:id
  * - GET/POST /api/messages/conversations/:id/messages
  * - PATCH/DELETE /api/messages/:messageId
  * - POST/DELETE /api/messages/:messageId/reactions
+ * - POST /api/messages/:messageId/poll/vote
+ * - POST /api/messages/:messageId/poll/close
  * - GET /api/messages/online
  */
 
@@ -22,6 +35,49 @@ const { getBlockedUserIds } = require('../../lib/social/blockFilter')
 const router = express.Router()
 
 const MAX_MESSAGE_LENGTH = 5000
+
+/**
+ * Verify the requesting user is a participant in the conversation that
+ * contains the given message.  Returns { message, participant } on success,
+ * or sends an error response and returns null.
+ */
+async function verifyMessageParticipant(req, res, messageId) {
+  const message = await prisma.message.findUnique({
+    where: { id: messageId },
+    select: { id: true, conversationId: true, senderId: true, createdAt: true, deletedAt: true },
+  })
+
+  if (!message || message.deletedAt) {
+    res.status(404).json({ error: 'Message not found.' })
+    return null
+  }
+
+  const participant = await prisma.conversationParticipant.findUnique({
+    where: {
+      conversationId_userId: {
+        conversationId: message.conversationId,
+        userId: req.user.userId,
+      },
+    },
+  })
+
+  if (!participant) {
+    // Return 404 instead of 403 to avoid leaking message existence
+    res.status(404).json({ error: 'Message not found.' })
+    return null
+  }
+
+  return { message, participant }
+}
+
+/**
+ * Sanitize message content to prevent stored XSS.  Strips HTML tags.
+ */
+function sanitizeMessageContent(content) {
+  return String(content)
+    .replace(/<[^>]*>/g, '')
+    .trim()
+}
 
 const messageWriteLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -187,7 +243,20 @@ router.post('/conversations', requireAuth, async (req, res) => {
       })
 
       if (existingDm) {
-        return res.json(existingDm)
+        // Re-fetch with full participant data so the frontend has everything
+        const fullDm = await prisma.conversation.findUnique({
+          where: { id: existingDm.id },
+          include: {
+            participants: {
+              include: {
+                user: {
+                  select: { id: true, username: true, avatarUrl: true },
+                },
+              },
+            },
+          },
+        })
+        return res.json(fullDm)
       }
     }
 
@@ -456,6 +525,23 @@ router.get('/conversations/:id/messages', requireAuth, async (req, res) => {
             },
           },
         },
+        attachments: true,
+        poll: {
+          include: {
+            options: {
+              orderBy: { position: 'asc' },
+              include: {
+                votes: {
+                  include: {
+                    user: {
+                      select: { id: true, username: true },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
       take: limitNum,
@@ -470,19 +556,54 @@ router.get('/conversations/:id/messages', requireAuth, async (req, res) => {
 
 /**
  * POST /api/messages/conversations/:id/messages
- * Send a message
+ * Send a message with optional attachments and poll
  */
 router.post('/conversations/:id/messages', requireAuth, messageWriteLimiter, async (req, res) => {
   try {
     const conversationId = parseInt(req.params.id, 10)
-    const { content, type = 'text', replyToId } = req.body
+    const { content, type = 'text', replyToId, attachments = [], poll } = req.body
 
     if (!content || typeof content !== 'string' || content.trim() === '') {
       return res.status(400).json({ error: 'Message content required.' })
     }
 
-    if (content.length > MAX_MESSAGE_LENGTH) {
+    // Sanitize content to prevent stored XSS
+    const cleanContent = sanitizeMessageContent(content)
+
+    if (cleanContent.length === 0) {
+      return res.status(400).json({ error: 'Message content required.' })
+    }
+
+    if (cleanContent.length > MAX_MESSAGE_LENGTH) {
       return res.status(400).json({ error: `Message too long. Maximum ${MAX_MESSAGE_LENGTH} characters.` })
+    }
+
+    // Validate poll if provided
+    if (poll) {
+      if (!poll.question || typeof poll.question !== 'string' || poll.question.trim() === '') {
+        return res.status(400).json({ error: 'Poll question required.' })
+      }
+      if (!Array.isArray(poll.options) || poll.options.length < 2) {
+        return res.status(400).json({ error: 'Poll must have at least 2 options.' })
+      }
+      if (poll.options.length > 10) {
+        return res.status(400).json({ error: 'Poll cannot have more than 10 options.' })
+      }
+    }
+
+    // Validate attachments
+    if (attachments.length > 5) {
+      return res.status(400).json({ error: 'Maximum 5 attachments per message.' })
+    }
+
+    for (const att of attachments) {
+      if (!att.url || typeof att.url !== 'string') {
+        return res.status(400).json({ error: 'Attachment URL required.' })
+      }
+      // Only allow https URLs for attachments
+      if (!att.url.startsWith('https://')) {
+        return res.status(400).json({ error: 'Attachment URL must use HTTPS.' })
+      }
     }
 
     // Verify user is a participant
@@ -503,9 +624,38 @@ router.post('/conversations/:id/messages', requireAuth, messageWriteLimiter, asy
       data: {
         conversationId,
         senderId: req.user.userId,
-        content: content.trim(),
+        content: cleanContent,
         type,
         replyToId: replyToId ? parseInt(replyToId, 10) : null,
+        // Create attachments if provided
+        ...(attachments.length > 0 && {
+          attachments: {
+            create: attachments.map((att) => ({
+              type: att.type || 'image',
+              url: att.url,
+              fileName: att.fileName,
+              fileSize: att.fileSize,
+              mimeType: att.mimeType,
+              width: att.width,
+              height: att.height,
+            })),
+          },
+        }),
+        // Create poll if provided
+        ...(poll && {
+          poll: {
+            create: {
+              question: poll.question.trim(),
+              allowMultiple: poll.allowMultiple || false,
+              options: {
+                create: poll.options.map((opt, index) => ({
+                  text: opt.trim(),
+                  position: index,
+                })),
+              },
+            },
+          },
+        }),
       },
       include: {
         sender: {
@@ -518,6 +668,23 @@ router.post('/conversations/:id/messages', requireAuth, messageWriteLimiter, asy
           include: {
             user: {
               select: { id: true, username: true },
+            },
+          },
+        },
+        attachments: true,
+        poll: {
+          include: {
+            options: {
+              orderBy: { position: 'asc' },
+              include: {
+                votes: {
+                  include: {
+                    user: {
+                      select: { id: true, username: true },
+                    },
+                  },
+                },
+              },
             },
           },
         },
@@ -558,17 +725,21 @@ router.patch('/messages/:messageId', requireAuth, messageWriteLimiter, async (re
       return res.status(400).json({ error: 'Message content required.' })
     }
 
-    if (content.length > MAX_MESSAGE_LENGTH) {
+    const cleanContent = sanitizeMessageContent(content)
+
+    if (cleanContent.length === 0) {
+      return res.status(400).json({ error: 'Message content required.' })
+    }
+
+    if (cleanContent.length > MAX_MESSAGE_LENGTH) {
       return res.status(400).json({ error: `Message too long. Maximum ${MAX_MESSAGE_LENGTH} characters.` })
     }
 
-    const message = await prisma.message.findUnique({
-      where: { id: messageId },
-    })
+    // Verify participant AND message owner
+    const verified = await verifyMessageParticipant(req, res, messageId)
+    if (!verified) return
 
-    if (!message) {
-      return res.status(404).json({ error: 'Message not found.' })
-    }
+    const { message } = verified
 
     if (message.senderId !== req.user.userId) {
       return res.status(403).json({ error: 'Can only edit your own messages.' })
@@ -582,7 +753,7 @@ router.patch('/messages/:messageId', requireAuth, messageWriteLimiter, async (re
     const updated = await prisma.message.update({
       where: { id: messageId },
       data: {
-        content: content.trim(),
+        content: cleanContent,
         editedAt: new Date(),
       },
       include: {
@@ -593,6 +764,23 @@ router.patch('/messages/:messageId', requireAuth, messageWriteLimiter, async (re
           include: {
             user: {
               select: { id: true, username: true },
+            },
+          },
+        },
+        attachments: true,
+        poll: {
+          include: {
+            options: {
+              orderBy: { position: 'asc' },
+              include: {
+                votes: {
+                  include: {
+                    user: {
+                      select: { id: true, username: true },
+                    },
+                  },
+                },
+              },
             },
           },
         },
@@ -674,6 +862,227 @@ router.delete('/messages/:messageId', requireAuth, async (req, res) => {
   }
 })
 
+// ===== POLLS =====
+
+/**
+ * POST /api/messages/:messageId/poll/vote
+ * Vote on a poll option
+ */
+router.post('/messages/:messageId/poll/vote', requireAuth, messageWriteLimiter, async (req, res) => {
+  try {
+    const messageId = parseInt(req.params.messageId, 10)
+    const { optionId } = req.body
+
+    if (!optionId) {
+      return res.status(400).json({ error: 'Option ID required.' })
+    }
+
+    const optionIdNum = parseInt(optionId, 10)
+
+    // Verify the user is a participant in the conversation
+    const verified = await verifyMessageParticipant(req, res, messageId)
+    if (!verified) return
+
+    // Find the message's poll
+    const messagePoll = await prisma.message.findUnique({
+      where: { id: messageId },
+      include: {
+        poll: {
+          include: {
+            options: {
+              include: {
+                votes: true,
+              },
+            },
+          },
+        },
+      },
+    })
+
+    if (!messagePoll.poll) {
+      return res.status(400).json({ error: 'Message does not contain a poll.' })
+    }
+
+    // Check if poll is closed
+    if (messagePoll.poll.closedAt) {
+      return res.status(400).json({ error: 'Poll is closed.' })
+    }
+
+    // Find the option
+    const option = messagePoll.poll.options.find((opt) => opt.id === optionIdNum)
+    if (!option) {
+      return res.status(404).json({ error: 'Option not found.' })
+    }
+
+    // Check if user already voted
+    const existingVote = await prisma.messagePollVote.findFirst({
+      where: {
+        pollId: messagePoll.poll.id,
+        userId: req.user.userId,
+      },
+    })
+
+    // If allowMultiple is false and user already voted, remove previous vote
+    if (existingVote && !messagePoll.poll.allowMultiple) {
+      await prisma.messagePollVote.delete({
+        where: {
+          pollId_optionId_userId: {
+            pollId: messagePoll.poll.id,
+            optionId: existingVote.optionId,
+            userId: req.user.userId,
+          },
+        },
+      })
+    }
+
+    // Create new vote (upsert to handle if they voted for same option)
+    const vote = await prisma.messagePollVote.upsert({
+      where: {
+        pollId_optionId_userId: {
+          pollId: messagePoll.poll.id,
+          optionId: optionIdNum,
+          userId: req.user.userId,
+        },
+      },
+      update: { createdAt: new Date() },
+      create: {
+        pollId: messagePoll.poll.id,
+        optionId: optionIdNum,
+        userId: req.user.userId,
+      },
+      include: {
+        user: {
+          select: { id: true, username: true },
+        },
+      },
+    })
+
+    // Fetch updated poll with all votes
+    const updatedMessage = await prisma.message.findUnique({
+      where: { id: messageId },
+      include: {
+        poll: {
+          include: {
+            options: {
+              orderBy: { position: 'asc' },
+              include: {
+                votes: {
+                  include: {
+                    user: {
+                      select: { id: true, username: true },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    })
+
+    // Emit via Socket.io
+    try {
+      const io = getIO()
+      io.to(`conversation:${verified.message.conversationId}`).emit('poll:vote', {
+        messageId,
+        poll: updatedMessage.poll,
+      })
+    } catch (err) {
+      captureError(err, { source: 'socketio-poll-vote' })
+    }
+
+    res.status(201).json(vote)
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+/**
+ * POST /api/messages/:messageId/poll/close
+ * Close a poll (message sender or conversation admin only)
+ */
+router.post('/messages/:messageId/poll/close', requireAuth, async (req, res) => {
+  try {
+    const messageId = parseInt(req.params.messageId, 10)
+
+    // Verify the user is a participant in the conversation
+    const verified = await verifyMessageParticipant(req, res, messageId)
+    if (!verified) return
+
+    const { message: msgRecord, participant: userParticipant } = verified
+
+    const messagePollData = await prisma.message.findUnique({
+      where: { id: messageId },
+      include: {
+        poll: {
+          include: {
+            options: {
+              include: {
+                votes: {
+                  include: {
+                    user: {
+                      select: { id: true, username: true },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    })
+
+    if (!messagePollData.poll) {
+      return res.status(400).json({ error: 'Message does not contain a poll.' })
+    }
+
+    // Check permissions: message sender or conversation admin only
+    const isOwner = msgRecord.senderId === req.user.userId
+    const isConvoAdmin = userParticipant.role === 'admin'
+
+    if (!isOwner && !isConvoAdmin) {
+      return res.status(403).json({ error: 'Insufficient permissions.' })
+    }
+
+    // Close the poll
+    const closedPoll = await prisma.messagePoll.update({
+      where: { id: messagePollData.poll.id },
+      data: { closedAt: new Date() },
+      include: {
+        options: {
+          orderBy: { position: 'asc' },
+          include: {
+            votes: {
+              include: {
+                user: {
+                  select: { id: true, username: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    })
+
+    // Emit via Socket.io
+    try {
+      const io = getIO()
+      io.to(`conversation:${msgRecord.conversationId}`).emit('poll:close', {
+        messageId,
+        poll: closedPoll,
+      })
+    } catch (err) {
+      captureError(err, { source: 'socketio-poll-close' })
+    }
+
+    res.json(closedPoll)
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
 // ===== REACTIONS =====
 
 /**
@@ -686,16 +1095,17 @@ router.post('/messages/:messageId/reactions', requireAuth, async (req, res) => {
     const { emoji } = req.body
 
     if (!emoji || typeof emoji !== 'string' || emoji.trim() === '') {
-      return res.status(400).json({ error: 'Emoji required.' })
+      return res.status(400).json({ error: 'Reaction required.' })
     }
 
-    const message = await prisma.message.findUnique({
-      where: { id: messageId },
-    })
-
-    if (!message) {
-      return res.status(404).json({ error: 'Message not found.' })
+    // Limit reaction length to prevent abuse
+    if (emoji.trim().length > 32) {
+      return res.status(400).json({ error: 'Reaction too long.' })
     }
+
+    // Verify the user is a participant in the conversation
+    const verified = await verifyMessageParticipant(req, res, messageId)
+    if (!verified) return
 
     // Create or update reaction (upsert)
     const reaction = await prisma.messageReaction.upsert({
@@ -722,7 +1132,7 @@ router.post('/messages/:messageId/reactions', requireAuth, async (req, res) => {
     // Emit via Socket.io
     try {
       const io = getIO()
-      io.to(`conversation:${message.conversationId}`).emit('reaction:add', {
+      io.to(`conversation:${verified.message.conversationId}`).emit('reaction:add', {
         messageId,
         reaction,
       })
@@ -746,13 +1156,9 @@ router.delete('/messages/:messageId/reactions/:emoji', requireAuth, async (req, 
     const messageId = parseInt(req.params.messageId, 10)
     const emoji = decodeURIComponent(req.params.emoji)
 
-    const message = await prisma.message.findUnique({
-      where: { id: messageId },
-    })
-
-    if (!message) {
-      return res.status(404).json({ error: 'Message not found.' })
-    }
+    // Verify the user is a participant in the conversation
+    const verified = await verifyMessageParticipant(req, res, messageId)
+    if (!verified) return
 
     await prisma.messageReaction.deleteMany({
       where: {
@@ -765,7 +1171,7 @@ router.delete('/messages/:messageId/reactions/:emoji', requireAuth, async (req, 
     // Emit via Socket.io
     try {
       const io = getIO()
-      io.to(`conversation:${message.conversationId}`).emit('reaction:remove', {
+      io.to(`conversation:${verified.message.conversationId}`).emit('reaction:remove', {
         messageId,
         emoji,
         userId: req.user.userId,

@@ -79,6 +79,7 @@ model User {
   conversationParticipants   ConversationParticipant[]
   messagesSent               Message[]                 @relation("MessageSender")
   messageReactions           MessageReaction[]         @relation("MessageReactionUser")
+  messagePollVotes           MessagePollVote[]
   studyGroupsCreated         StudyGroup[]              @relation("StudyGroupCreator")
   studyGroupMemberships      StudyGroupMember[]
   groupResources             GroupResource[]
@@ -908,11 +909,13 @@ model Message {
   deletedAt      DateTime? // soft delete
   createdAt      DateTime  @default(now())
 
-  conversation Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender       User              @relation("MessageSender", fields: [senderId], references: [id])
-  replyTo      Message?          @relation("MessageReply", fields: [replyToId], references: [id])
-  replies      Message[]         @relation("MessageReply")
-  reactions    MessageReaction[]
+  conversation  Conversation       @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender        User               @relation("MessageSender", fields: [senderId], references: [id])
+  replyTo       Message?           @relation("MessageReply", fields: [replyToId], references: [id])
+  replies       Message[]          @relation("MessageReply")
+  reactions     MessageReaction[]
+  attachments   MessageAttachment[]
+  poll          MessagePoll?
 
   @@index([conversationId, createdAt(sort: Desc)])
   @@index([senderId])
@@ -930,6 +933,61 @@ model MessageReaction {
 
   @@unique([messageId, userId, emoji])
   @@index([messageId])
+}
+
+model MessageAttachment {
+  id        Int       @id @default(autoincrement())
+  messageId Int
+  type      String    @default("image") // "image", "file", "video"
+  url       String
+  fileName  String?
+  fileSize  Int?
+  mimeType  String?
+  width     Int?
+  height    Int?
+  createdAt DateTime  @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+}
+
+model MessagePoll {
+  id             Int       @id @default(autoincrement())
+  messageId      Int       @unique
+  question       String
+  allowMultiple  Boolean   @default(false)
+  closedAt       DateTime?
+  createdAt      DateTime  @default(now())
+
+  message Message                @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  options MessagePollOption[]
+  votes   MessagePollVote[]
+}
+
+model MessagePollOption {
+  id       Int    @id @default(autoincrement())
+  pollId   Int
+  text     String
+  position Int    @default(0)
+
+  poll  MessagePoll     @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  votes MessagePollVote[]
+
+  @@index([pollId])
+}
+
+model MessagePollVote {
+  pollId   Int
+  optionId Int
+  userId   Int
+  createdAt DateTime @default(now())
+
+  poll   MessagePoll      @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  option MessagePollOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  user   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([pollId, optionId, userId])
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
