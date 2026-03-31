@@ -6848,3 +6848,117 @@ Deployment Notes:
 - No new dependencies added (uses only Node.js Map).
 - Cache module is self-contained and doesn't modify global state.
 - Safe to deploy alongside existing code; old endpoints continue working unchanged.
+
+---
+
+## Cycle 55: Bug Fixes + Study Groups Feature Tabs + Messaging Enhancements (2026-03-30)
+
+### Fixed
+
+- **ChatPanel sidebar "No conversations yet"**: The slide-out messages panel was parsing `data.conversations` and `data.messages` but the API returns plain arrays. Fixed to handle both shapes: `Array.isArray(data) ? data : data.conversations || []`.
+- **"Unknown User" in conversation thread header**: `GET /conversations/:id` returned participants in nested `{ user: { id, username } }` format, but `getConversationDisplayName` expected flat `{ id, username }`. Added normalization in `selectConversation` and `startConversation` in `useMessagingData.js`.
+- **POST /conversations returning existing DM without participants**: When finding an existing DM, the endpoint returned the raw record without includes. Fixed to re-fetch with full participant data.
+- **"Failed to join group" error**: Backend `formatGroup()` returned `userMembership` object but frontend expected `isMember` (boolean) and `userRole` (string). Added `isMember` and `userRole` convenience fields to `formatGroup()`. Also fixed `group.creatorId` to `group.createdById` in the join notification. Also added `courseName` lookup to formatGroup response.
+- **`isCreator` always true**: `StudyGroupsPage.jsx` had `const isCreator = activeGroup.createdBy === activeGroup.createdBy` (self-comparison). Replaced with `isAdmin` check since admins can delete.
+- **Conversation context menu stays open**: Added `useEffect` click-outside handler with `menuRef` to close the context menu when clicking elsewhere.
+
+### Added
+
+- **Study Group Tab Content**: Replaced all 5 placeholder tabs (Overview, Resources, Sessions, Discussions, Members) with fully functional implementations wired to real API endpoints:
+  - **Overview**: Group description, member count, privacy, course, max members, creation date.
+  - **Resources**: List/add/delete resources with title, URL, description, type (link/sheet/note/file). Pinned resources shown first.
+  - **Sessions**: List/create/delete study sessions with date/time, location, duration, recurring options. RSVP buttons (Going/Maybe). Upcoming/past separation.
+  - **Discussions**: Q&A board with create post, expand/collapse replies, inline reply input, resolve/delete actions.
+  - **Members**: Member list with avatars, roles (Admin/Moderator/Member), join dates. Admin actions: promote to moderator, remove member.
+
+- **Image/File Sharing in Messages**: Backend accepts `attachments` array when creating messages. Frontend shows image previews inline and file download links. Image URL input toggle in the message composer.
+  - New database tables: `MessageAttachment` (with type, url, fileName, fileSize, mimeType, width, height).
+  - New migration: `20260330000005_add_message_attachments_and_polls`.
+
+- **Polls in Messages**: Full poll system for conversations.
+  - Create polls with question + 2-6 options, optional multi-select.
+  - Vote on poll options with live percentage display.
+  - Close polls (sender or conversation admin).
+  - New database tables: `MessagePoll`, `MessagePollOption`, `MessagePollVote`.
+  - New endpoints: `POST /api/messages/:messageId/poll/vote`, `POST /api/messages/:messageId/poll/close`.
+  - Socket.io events: `poll:vote`, `poll:close` for real-time updates.
+
+### Changed
+
+- `useMessagingData.sendMessage()` now accepts optional third argument `options` with `attachments` and `poll` fields. Backward compatible.
+- `ChatPanel.jsx` display name logic now uses `participants[0]` instead of `otherUser`.
+
+### Validation
+
+- Frontend lint: 0 errors
+- Backend lint: 0 errors
+- Frontend build: 952+ modules compiled successfully
+- Backend tests: 546 passed (43 pre-existing failures, none introduced by this cycle)
+
+### Files Modified
+
+Frontend:
+- `frontend/studyhub-app/src/components/ChatPanel.jsx` (response parsing, display name)
+- `frontend/studyhub-app/src/pages/messages/MessagesPage.jsx` (context menu fix, poll display, attachment display, enhanced message input)
+- `frontend/studyhub-app/src/pages/messages/useMessagingData.js` (participant normalization, sendMessage options)
+- `frontend/studyhub-app/src/pages/studyGroups/StudyGroupsPage.jsx` (all 5 tab implementations, isCreator fix, sub-resource hooks)
+
+Backend:
+- `backend/src/modules/messaging/messaging.routes.js` (existing DM fix, attachment/poll creation, poll vote/close endpoints)
+- `backend/src/modules/studyGroups/studyGroups.routes.js` (formatGroup isMember/userRole/courseName, createdById fix)
+- `backend/prisma/schema.prisma` (MessageAttachment, MessagePoll, MessagePollOption, MessagePollVote models)
+- `backend/prisma/migrations/20260330000005_add_message_attachments_and_polls/migration.sql` (new)
+
+### Deployment Notes
+
+- Run `npx prisma migrate deploy` on Railway after deploying to create the 4 new tables.
+- No breaking changes to existing API contracts.
+- All new features are additive and backward compatible.
+
+---
+
+## Cycle 56 -- Feed HTML Cleanup and Security Hardening (2026-03-31)
+
+### Summary
+
+Fixed raw HTML showing in feed card previews and performed a comprehensive security hardening pass across messaging and study groups.
+
+### Changes
+
+#### Feed HTML Cleanup
+- `backend/src/modules/feed/feed.service.js`: Added `stripHtml()` function that removes `<style>`, `<script>`, all HTML tags, and decodes common entities before truncating text in `summarizeText()`. Sheet descriptions and content previews on the feed now show clean readable text instead of raw markup.
+- `backend/src/modules/search/search.routes.js`: Search results for sheets and groups now run descriptions through `summarizeText()` for consistent HTML-free display.
+
+#### Messaging Security Hardening
+- Added `verifyMessageParticipant()` helper that checks both message existence and conversation membership in a single call, returning 404 (not 403) to avoid leaking message existence.
+- Added `sanitizeMessageContent()` that strips HTML tags from all message content on write (POST and PATCH) to prevent stored XSS.
+- Reaction endpoints (POST/DELETE) now verify the user is a conversation participant before allowing reactions.
+- Poll vote endpoint now verifies conversation participant membership before allowing votes.
+- Poll close endpoint now verifies conversation participant membership and uses conversation-level admin (not platform admin).
+- Added attachment validation: max 5 per message, HTTPS-only URLs required.
+- Added poll option limit: max 10 options per poll.
+- Added reaction length limit: max 32 characters.
+- Added comprehensive security policy header comment documenting that platform admins have zero access to conversations they are not participants of.
+
+#### Study Group Security Hardening
+- `validateTitle()` now strips HTML tags (was only trimming before).
+- Added `validateResourceUrl()` that validates resource URLs are valid http/https.
+- Resource creation endpoint now validates URLs before storing.
+- Private group detail endpoint now returns 404 (not 403) to avoid leaking group existence.
+- Added security policy header comment documenting access control model.
+
+### Files Modified
+
+Backend:
+- `backend/src/modules/feed/feed.service.js` (stripHtml, summarizeText rewrite, description sanitization)
+- `backend/src/modules/search/search.routes.js` (description sanitization in search results)
+- `backend/src/modules/messaging/messaging.routes.js` (verifyMessageParticipant, sanitizeMessageContent, participant checks on reactions/polls, attachment/poll validation, security policy header)
+- `backend/src/modules/studyGroups/studyGroups.routes.js` (validateTitle HTML strip, validateResourceUrl, privacy 404, security policy header)
+
+### Validation
+
+- Backend lint: 0 errors
+- Frontend lint: 0 errors
+- Frontend build: success (952+ modules)
+- Backend tests: 546 passed, 43 pre-existing failures (DB connection in test env)
+- No new test failures introduced

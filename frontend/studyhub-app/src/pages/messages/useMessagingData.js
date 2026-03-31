@@ -105,6 +105,14 @@ export function useMessagingData(socket, currentUserId) {
         return
       }
       const conversation = await response.json()
+      // Normalize participants to flat shape { id, username, avatarUrl }
+      // GET /conversations/:id returns nested { user: { id, username, avatarUrl } }
+      // but GET /conversations (list) returns flat { id, username, avatarUrl }
+      if (conversation.participants) {
+        conversation.participants = conversation.participants.map((p) =>
+          p.user ? { id: p.user.id, username: p.user.username, avatarUrl: p.user.avatarUrl } : p
+        )
+      }
       setActiveConversation(conversation)
       setMessages([])
       setHasMoreMessages(true)
@@ -134,7 +142,7 @@ export function useMessagingData(socket, currentUserId) {
   }, [activeConversation, hasMoreMessages, loadingMessages, messages, loadMessages])
 
   /* ── Send message — POST /api/messages/conversations/:id/messages ────── */
-  const sendMessage = useCallback(async (content, replyToId = null) => {
+  const sendMessage = useCallback(async (content, replyToId = null, options = {}) => {
     if (!activeConversation || !content.trim()) return
 
     const optimisticMessage = {
@@ -145,20 +153,30 @@ export function useMessagingData(socket, currentUserId) {
       sender: { id: currentUserId, username: null },
       createdAt: new Date().toISOString(),
       pending: true,
+      attachments: options.attachments || [],
+      poll: options.poll || null,
     }
     setMessages((prev) => [...prev, optimisticMessage])
 
     try {
+      const body = {
+        content: content.trim(),
+        replyToId: replyToId || null,
+      }
+      if (options.attachments && options.attachments.length > 0) {
+        body.attachments = options.attachments
+      }
+      if (options.poll) {
+        body.poll = options.poll
+      }
+
       const response = await fetch(
         `${API}/api/messages/conversations/${activeConversation.id}/messages`,
         {
           method: 'POST',
           headers: authHeaders(),
           credentials: 'include',
-          body: JSON.stringify({
-            content: content.trim(),
-            replyToId: replyToId || null,
-          }),
+          body: JSON.stringify(body),
         },
       )
       if (!response.ok) {
@@ -207,6 +225,12 @@ export function useMessagingData(socket, currentUserId) {
         return null
       }
       const conversation = await response.json()
+      // Normalize participants to flat shape
+      if (conversation.participants) {
+        conversation.participants = conversation.participants.map((p) =>
+          p.user ? { id: p.user.id, username: p.user.username, avatarUrl: p.user.avatarUrl } : p
+        )
+      }
       setConversations((prev) => [conversation, ...prev.filter((c) => c.id !== conversation.id)])
       return conversation
     } catch {

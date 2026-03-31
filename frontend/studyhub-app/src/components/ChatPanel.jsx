@@ -46,7 +46,7 @@ export default function ChatPanel({ open, onClose }) {
       })
       if (res.ok) {
         const data = await res.json()
-        setConversations(data.conversations || [])
+        setConversations(Array.isArray(data) ? data : (data.conversations || []))
       }
     } catch { /* silent */ } finally { setLoading(false) }
   }, [])
@@ -64,7 +64,8 @@ export default function ChatPanel({ open, onClose }) {
         })
         if (res.ok && !cancelled) {
           const data = await res.json()
-          setMessages((data.messages || []).reverse())
+          const msgs = Array.isArray(data) ? data : (data.messages || [])
+          setMessages(msgs)
           setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
         }
       } catch { /* silent */ }
@@ -138,7 +139,7 @@ export default function ChatPanel({ open, onClose }) {
                 &larr;
               </button>
               <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--sh-heading)', flex: 1 }}>
-                {activeConvo?.otherUser?.username || 'Chat'}
+                {activeConvo?.participants?.[0]?.username || activeConvo?.name || 'Chat'}
               </span>
             </>
           ) : (
@@ -188,7 +189,7 @@ export default function ChatPanel({ open, onClose }) {
               </div>
             ) : (
               conversations.map(c => {
-                const other = c.otherUser || c.participants?.[0]?.user || {}
+                const other = c.participants?.[0] || {}
                 return (
                   <button
                     key={c.id}

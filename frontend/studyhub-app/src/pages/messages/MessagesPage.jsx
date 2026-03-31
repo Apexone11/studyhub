@@ -124,6 +124,20 @@ function ConversationList({
 
 function ConversationItem({ conversation, isActive, onClick, onDelete, currentUserId }) {
   const [showMenu, setShowMenu] = useState(false)
+  const menuRef = useRef(null)
+
+  // Close menu on click outside
+  useEffect(() => {
+    if (!showMenu) return
+    function handleClickOutside(e) {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setShowMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showMenu])
+
   const name = getConversationDisplayName(conversation, currentUserId)
   const avatar = getConversationAvatar(conversation, currentUserId)
   const lastMsg = conversation.lastMessage
@@ -217,6 +231,7 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, currentUs
 
       {showMenu && (
         <div
+          ref={menuRef}
           style={{
             position: 'absolute',
             top: 8,
@@ -278,6 +293,12 @@ function MessageThread({
   const [inputRows, setInputRows] = useState(1)
   const [editingMessageId, setEditingMessageId] = useState(null)
   const [editContent, setEditContent] = useState('')
+  const [showPollCreator, setShowPollCreator] = useState(false)
+  const [pollQuestion, setPollQuestion] = useState('')
+  const [pollOptions, setPollOptions] = useState(['', ''])
+  const [pollMultiple, setPollMultiple] = useState(false)
+  const [imageUrl, setImageUrl] = useState('')
+  const [showImageInput, setShowImageInput] = useState(false)
   const conversationName = getConversationDisplayName(conversation, currentUserId)
   const conversationAvatar = getConversationAvatar(conversation, currentUserId)
 
@@ -302,11 +323,33 @@ function MessageThread({
   }
 
   const handleSendMessage = () => {
-    if (inputValue.trim()) {
-      onSend(inputValue)
-      setInputValue('')
-      setInputRows(1)
+    const hasContent = inputValue.trim()
+    const hasPoll = showPollCreator && pollQuestion.trim() && pollOptions.filter((o) => o.trim()).length >= 2
+    const hasImage = showImageInput && imageUrl.trim()
+
+    if (!hasContent && !hasPoll) return
+
+    const options = {}
+    if (hasImage) {
+      options.attachments = [{ type: 'image', url: imageUrl.trim() }]
     }
+    if (hasPoll) {
+      options.poll = {
+        question: pollQuestion.trim(),
+        options: pollOptions.filter((o) => o.trim()),
+        allowMultiple: pollMultiple,
+      }
+    }
+
+    onSend(inputValue.trim() || (hasPoll ? pollQuestion.trim() : ''), null, options)
+    setInputValue('')
+    setInputRows(1)
+    setShowPollCreator(false)
+    setPollQuestion('')
+    setPollOptions(['', ''])
+    setPollMultiple(false)
+    setShowImageInput(false)
+    setImageUrl('')
   }
 
   const handleKeyDown = (e) => {
@@ -441,7 +484,83 @@ function MessageThread({
 
       {/* Input area */}
       <div style={{ padding: '12px 16px', borderTop: '1px solid var(--sh-border)', background: 'var(--sh-surface)' }}>
-        <div style={{ display: 'flex', gap: 8 }}>
+        {/* Image URL input (toggle) */}
+        {showImageInput && (
+          <div style={{ marginBottom: 8, display: 'flex', gap: 6 }}>
+            <input
+              type="text"
+              placeholder="Paste image URL..."
+              value={imageUrl}
+              onChange={(e) => setImageUrl(e.target.value)}
+              style={{ flex: 1, padding: '6px 10px', background: 'var(--sh-input-bg)', color: 'var(--sh-input-text)', border: '1px solid var(--sh-input-border)', borderRadius: 'var(--radius-control)', fontSize: 12, fontFamily: PAGE_FONT }}
+            />
+            <button onClick={() => { setShowImageInput(false); setImageUrl('') }} style={{ padding: '4px 8px', background: 'var(--sh-soft)', color: 'var(--sh-muted)', border: '1px solid var(--sh-border)', borderRadius: 'var(--radius-control)', fontSize: 11, cursor: 'pointer', fontFamily: PAGE_FONT }}>
+              Cancel
+            </button>
+          </div>
+        )}
+
+        {/* Poll creator (toggle) */}
+        {showPollCreator && (
+          <div style={{ marginBottom: 8, padding: '10px 12px', background: 'var(--sh-soft)', borderRadius: 'var(--radius-control)', border: '1px solid var(--sh-border)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--sh-heading)', fontFamily: PAGE_FONT }}>Create Poll</span>
+              <button onClick={() => { setShowPollCreator(false); setPollQuestion(''); setPollOptions(['', '']); setPollMultiple(false) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sh-muted)', fontSize: 12, fontFamily: PAGE_FONT }}>Cancel</button>
+            </div>
+            <input
+              type="text"
+              placeholder="Ask a question..."
+              value={pollQuestion}
+              onChange={(e) => setPollQuestion(e.target.value)}
+              style={{ width: '100%', padding: '6px 10px', marginBottom: 6, background: 'var(--sh-input-bg)', color: 'var(--sh-input-text)', border: '1px solid var(--sh-input-border)', borderRadius: 'var(--radius-control)', fontSize: 12, fontFamily: PAGE_FONT, boxSizing: 'border-box' }}
+              maxLength={200}
+            />
+            {pollOptions.map((opt, i) => (
+              <div key={i} style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
+                <input
+                  type="text"
+                  placeholder={`Option ${i + 1}`}
+                  value={opt}
+                  onChange={(e) => { const next = [...pollOptions]; next[i] = e.target.value; setPollOptions(next) }}
+                  style={{ flex: 1, padding: '4px 8px', background: 'var(--sh-input-bg)', color: 'var(--sh-input-text)', border: '1px solid var(--sh-input-border)', borderRadius: 'var(--radius-control)', fontSize: 12, fontFamily: PAGE_FONT }}
+                  maxLength={100}
+                />
+                {pollOptions.length > 2 && (
+                  <button onClick={() => setPollOptions(pollOptions.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sh-danger-text)', fontSize: 14, padding: '0 4px' }}>x</button>
+                )}
+              </div>
+            ))}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+              {pollOptions.length < 6 && (
+                <button onClick={() => setPollOptions([...pollOptions, ''])} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sh-brand)', fontSize: 12, fontWeight: 600, fontFamily: PAGE_FONT, padding: 0 }}>+ Add option</button>
+              )}
+              <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--sh-muted)', fontFamily: PAGE_FONT }}>
+                <input type="checkbox" checked={pollMultiple} onChange={(e) => setPollMultiple(e.target.checked)} />
+                Allow multiple
+              </label>
+            </div>
+          </div>
+        )}
+
+        {/* Action bar + text input */}
+        <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end' }}>
+          {/* Attach image button */}
+          <button
+            onClick={() => { setShowImageInput(!showImageInput); setShowPollCreator(false) }}
+            title="Share image"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: showImageInput ? 'var(--sh-brand)' : 'var(--sh-muted)', padding: '6px 4px', flexShrink: 0 }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg>
+          </button>
+          {/* Create poll button */}
+          <button
+            onClick={() => { setShowPollCreator(!showPollCreator); setShowImageInput(false) }}
+            title="Create poll"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: showPollCreator ? 'var(--sh-brand)' : 'var(--sh-muted)', padding: '6px 4px', flexShrink: 0 }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+          </button>
+
           <textarea
             value={inputValue}
             onChange={handleInputChange}
@@ -464,16 +583,16 @@ function MessageThread({
           />
           <button
             onClick={handleSendMessage}
-            disabled={!inputValue.trim()}
+            disabled={!inputValue.trim() && !(showPollCreator && pollQuestion.trim())}
             style={{
               padding: '8px 16px',
-              background: inputValue.trim() ? 'var(--sh-brand)' : 'var(--sh-soft)',
-              color: inputValue.trim() ? 'var(--sh-surface)' : 'var(--sh-muted)',
+              background: (inputValue.trim() || (showPollCreator && pollQuestion.trim())) ? 'var(--sh-brand)' : 'var(--sh-soft)',
+              color: (inputValue.trim() || (showPollCreator && pollQuestion.trim())) ? 'var(--sh-surface)' : 'var(--sh-muted)',
               border: 'none',
               borderRadius: 'var(--radius-control)',
               fontSize: 13,
               fontWeight: 700,
-              cursor: inputValue.trim() ? 'pointer' : 'default',
+              cursor: (inputValue.trim() || (showPollCreator && pollQuestion.trim())) ? 'pointer' : 'default',
               fontFamily: PAGE_FONT,
             }}
           >
@@ -603,7 +722,47 @@ function MessageBubble({
                 [Message deleted]
               </span>
             ) : (
-              message.content
+              <>
+                {message.content}
+
+                {/* Attachments (images/files) */}
+                {Array.isArray(message.attachments) && message.attachments.length > 0 && (
+                  <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {message.attachments.map((att) => (
+                      att.type === 'image' ? (
+                        <a key={att.id} href={att.url} target="_blank" rel="noopener noreferrer">
+                          <img
+                            src={att.url}
+                            alt={att.fileName || 'Image'}
+                            style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 6, display: 'block' }}
+                          />
+                        </a>
+                      ) : (
+                        <a
+                          key={att.id}
+                          href={att.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 6,
+                            padding: '6px 10px', background: 'rgba(0,0,0,0.1)',
+                            borderRadius: 6, color: 'inherit', textDecoration: 'none', fontSize: 12,
+                          }}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
+                          {att.fileName || 'Download file'}
+                          {att.fileSize ? ` (${Math.round(att.fileSize / 1024)}KB)` : ''}
+                        </a>
+                      )
+                    ))}
+                  </div>
+                )}
+
+                {/* Poll */}
+                {message.poll && (
+                  <MessagePollDisplay poll={message.poll} messageId={message.id} currentUserId={currentUserId} isOwn={isOwn} />
+                )}
+              </>
             )}
 
             {message.editedAt && !isDeleted && (
@@ -688,6 +847,99 @@ const actionBtnStyle = {
   color: 'var(--sh-muted)',
   display: 'flex',
   alignItems: 'center',
+}
+
+/* ── MessagePollDisplay ─── Shows a poll with vote buttons ──────────── */
+function MessagePollDisplay({ poll, messageId, currentUserId, isOwn }) {
+  const [voting, setVoting] = useState(false)
+
+  if (!poll) return null
+
+  const isClosed = Boolean(poll.closedAt)
+  const totalVotes = poll.options?.reduce((sum, opt) => sum + (opt.votes?.length || 0), 0) || 0
+
+  const handleVote = async (optionId) => {
+    if (voting || isClosed) return
+    setVoting(true)
+    try {
+      await fetch(`${API}/api/messages/messages/${messageId}/poll/vote`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: authHeaders(),
+        body: JSON.stringify({ optionId }),
+      })
+    } catch { /* silent */ }
+    setVoting(false)
+  }
+
+  const handleClose = async () => {
+    if (isClosed) return
+    try {
+      await fetch(`${API}/api/messages/messages/${messageId}/poll/close`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: authHeaders(),
+      })
+    } catch { /* silent */ }
+  }
+
+  return (
+    <div style={{
+      marginTop: 8, padding: '10px 12px',
+      background: 'rgba(0,0,0,0.08)', borderRadius: 8,
+    }}>
+      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
+        {poll.question}
+        {isClosed && <span style={{ fontSize: 11, fontWeight: 400, marginLeft: 6, opacity: 0.7 }}>(Closed)</span>}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {poll.options?.map((opt) => {
+          const voteCount = opt.votes?.length || 0
+          const hasVoted = opt.votes?.some((v) => v.user?.id === currentUserId || v.userId === currentUserId)
+          const pct = totalVotes > 0 ? Math.round((voteCount / totalVotes) * 100) : 0
+
+          return (
+            <button
+              key={opt.id}
+              onClick={() => !isClosed && handleVote(opt.id)}
+              disabled={isClosed || voting}
+              style={{
+                position: 'relative', overflow: 'hidden',
+                padding: '6px 10px', borderRadius: 6,
+                border: hasVoted ? '2px solid var(--sh-brand)' : '1px solid rgba(255,255,255,0.2)',
+                background: 'rgba(255,255,255,0.1)',
+                color: 'inherit', cursor: isClosed ? 'default' : 'pointer',
+                fontSize: 12, fontWeight: hasVoted ? 600 : 400,
+                fontFamily: PAGE_FONT, textAlign: 'left',
+                display: 'flex', justifyContent: 'space-between',
+              }}
+            >
+              <div style={{
+                position: 'absolute', top: 0, left: 0, bottom: 0,
+                width: `${pct}%`, background: 'rgba(255,255,255,0.12)',
+                transition: 'width 0.3s',
+              }} />
+              <span style={{ position: 'relative', zIndex: 1 }}>{opt.text}</span>
+              <span style={{ position: 'relative', zIndex: 1, fontSize: 11, opacity: 0.8 }}>
+                {voteCount} ({pct}%)
+              </span>
+            </button>
+          )
+        })}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 11, opacity: 0.7 }}>
+        <span>{totalVotes} vote{totalVotes === 1 ? '' : 's'}{poll.allowMultiple ? ' (multiple choice)' : ''}</span>
+        {isOwn && !isClosed && (
+          <button
+            onClick={handleClose}
+            style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 11, fontWeight: 600, textDecoration: 'underline', fontFamily: PAGE_FONT }}
+          >
+            Close poll
+          </button>
+        )}
+      </div>
+    </div>
+  )
 }
 
 function groupReactions(reactions) {
