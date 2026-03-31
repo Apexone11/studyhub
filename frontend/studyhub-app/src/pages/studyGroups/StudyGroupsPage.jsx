@@ -24,8 +24,11 @@ import {
 } from './GroupDetailTabs'
 import Navbar from '../../components/navbar/Navbar'
 import AppSidebar from '../../components/sidebar/AppSidebar'
+import SafeJoyride from '../../components/SafeJoyride'
 import UserAvatar from '../../components/UserAvatar'
 import { useResponsiveAppLayout, pageShell } from '../../lib/ui'
+import { useTutorial } from '../../lib/useTutorial'
+import { STUDY_GROUPS_STEPS, TUTORIAL_VERSIONS } from '../../lib/tutorialSteps'
 import { usePageTitle } from '../../lib/usePageTitle'
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -47,6 +50,7 @@ export default function StudyGroupsPage() {
 function GroupListView() {
   usePageTitle('Study Groups')
   const layout = useResponsiveAppLayout()
+  const tutorial = useTutorial('studyGroups', STUDY_GROUPS_STEPS, { version: TUTORIAL_VERSIONS.studyGroups })
   const { isAuthenticated } = useSession()
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
@@ -136,7 +140,7 @@ function GroupListView() {
 
             <main id="main-content" style={styles.main}>
               {/* Title section with create button */}
-              <section style={styles.titleCard}>
+              <section data-tutorial="groups-list" style={styles.titleCard}>
                 <div style={styles.titleRow}>
                   <div>
                     <h1 style={styles.title}>Study Groups</h1>
@@ -144,6 +148,7 @@ function GroupListView() {
                   </div>
                   {isAuthenticated && (
                     <button
+                      data-tutorial="groups-create"
                       onClick={() => setCreateModalOpen(true)}
                       style={styles.createBtn}
                     >
@@ -204,7 +209,7 @@ function GroupListView() {
                 />
               ) : (
                 /* Groups grid */
-                <section style={styles.gridSection}>
+                <section data-tutorial="groups-resources" style={styles.gridSection}>
                   <div style={styles.gridHeader}>
                     <span style={styles.gridCount}>
                       {groupsTotal} group{groupsTotal === 1 ? '' : 's'}
@@ -246,6 +251,8 @@ function GroupListView() {
         />,
         document.body
       )}
+
+      <SafeJoyride {...tutorial.joyrideProps} />
     </>
   )
 }

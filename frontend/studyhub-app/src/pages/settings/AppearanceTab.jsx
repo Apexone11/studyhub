@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import {
   applyFontSize,
   applyTheme,
@@ -6,12 +6,47 @@ import {
   writeGlobalTheme,
 } from '../../lib/appearance'
 import { useSession } from '../../lib/session-context'
-import { Button, FormField, MsgList, SectionCard, Select } from './settingsShared'
+import { Button, FormField, MsgList, SectionCard, Select, ToggleRow } from './settingsShared'
 import { usePreferences } from './settingsState'
 
 export default function AppearanceTab() {
   const { user } = useSession()
   const { prefs, setPrefs, loading, saving, msg, loadError, save, retry } = usePreferences()
+
+  /* ── Tutorial toggle (localStorage-only, no backend call needed) ───── */
+  const [tutorialsEnabled, setTutorialsEnabled] = useState(() => {
+    try {
+      return localStorage.getItem('studyhub_tutorials_disabled') !== '1'
+    } catch {
+      return true
+    }
+  })
+
+  function handleTutorialToggle() {
+    const next = !tutorialsEnabled
+    setTutorialsEnabled(next)
+    try {
+      if (next) {
+        localStorage.removeItem('studyhub_tutorials_disabled')
+      } else {
+        localStorage.setItem('studyhub_tutorials_disabled', '1')
+      }
+    } catch {
+      // localStorage unavailable
+    }
+  }
+
+  function resetAllTutorials() {
+    try {
+      const keys = Object.keys(localStorage).filter((k) => k.startsWith('tutorial_') && k.endsWith('_seen'))
+      for (const key of keys) localStorage.removeItem(key)
+      // Also re-enable tutorials if they were disabled
+      localStorage.removeItem('studyhub_tutorials_disabled')
+      setTutorialsEnabled(true)
+    } catch {
+      // localStorage unavailable
+    }
+  }
 
   /* Apply theme and font size to the DOM in real-time as the user changes them */
   const currentTheme = prefs?.theme
@@ -96,6 +131,37 @@ export default function AppearanceTab() {
 
         <div style={{ padding: '14px 16px', borderRadius: 12, background: '#f8fafc', border: '1px solid #e2e8f0', fontSize: prefs.fontSize === 'small' ? 13 : prefs.fontSize === 'large' ? 17 : 15 }}>
           This is a preview of your selected font size. Adjust to your preference.
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Tutorials" subtitle="Control whether page tutorials appear automatically when you visit new features.">
+        <ToggleRow
+          label="Show tutorials"
+          description="When enabled, brief tutorial popups appear the first time you visit each page."
+          checked={tutorialsEnabled}
+          onChange={handleTutorialToggle}
+        />
+        <div style={{ marginTop: 12 }}>
+          <button
+            type="button"
+            onClick={resetAllTutorials}
+            style={{
+              background: 'none',
+              border: '1px solid var(--sh-border)',
+              borderRadius: 8,
+              padding: '7px 16px',
+              fontSize: 13,
+              fontWeight: 600,
+              color: 'var(--sh-muted)',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+            }}
+          >
+            Reset all tutorials
+          </button>
+          <div style={{ fontSize: 12, color: 'var(--sh-muted)', marginTop: 6 }}>
+            This will make all page tutorials appear again on your next visit.
+          </div>
         </div>
       </SectionCard>
 

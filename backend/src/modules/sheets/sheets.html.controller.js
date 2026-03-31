@@ -89,7 +89,7 @@ router.get('/:id/html-preview', requireAuth, async (req, res) => {
       expiresInSeconds: HTML_PREVIEW_TOKEN_TTL_SECONDS,
       sanitized: issues.length > 0,
       issues,
-      canInteract: canModerateOrOwnSheet(sheet, req.user),
+      canInteract: Boolean(req.user) && (tier < RISK_TIER.FLAGGED || canModerateOrOwnSheet(sheet, req.user)),
     })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
@@ -124,8 +124,10 @@ router.get('/:id/html-runtime', requireAuth, async (req, res) => {
 
     const tier = sheet.htmlRiskTier || 0
 
-    if (!canModerateOrOwnSheet(sheet, req.user)) {
-      return res.status(403).json({ error: 'Interactive preview is only available to the sheet owner or an admin.' })
+    // Tier 0 (clean) sheets: any authenticated user can toggle interactive mode.
+    // Higher-risk tiers: restrict to owner/admin only.
+    if (tier >= RISK_TIER.FLAGGED && !canModerateOrOwnSheet(sheet, req.user)) {
+      return res.status(403).json({ error: 'Interactive preview for flagged sheets is only available to the sheet owner or an admin.' })
     }
 
     if (tier >= RISK_TIER.QUARANTINED) {

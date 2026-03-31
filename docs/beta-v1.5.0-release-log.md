@@ -7022,3 +7022,46 @@ Frontend:
 - Backend lint: 0 errors
 - Frontend build: success (960+ modules)
 - No new test failures
+
+---
+
+## Cycle E Bug Fixes — Tutorials and Settings (2026-03-31)
+
+### Tutorial System Overhaul
+
+#### Updated Tutorial Content (`tutorialSteps.js`)
+- Bumped all existing TUTORIAL_VERSIONS to v2 to reset seen state for all users.
+- Refreshed content for all 9 existing page tutorials (Feed, Sheets, Dashboard, Notes, Settings, Profile, Viewer, Announcements, Upload).
+- Added 4 new page tutorials:
+  - **MESSAGES_STEPS** (3 steps) — Conversations, Compose, New conversation
+  - **STUDY_GROUPS_STEPS** (3 steps) — Group list, Create group, Shared resources
+  - **SHEET_LAB_STEPS** (4 steps) — Editor, Lab tabs, Version history, Sheet analytics
+  - **MY_COURSES_STEPS** (3 steps) — Enrolled courses, Add a course, Browse content
+
+#### Wired Tutorials into Page Components
+- **MessagesPage.jsx**: Imported useTutorial + MESSAGES_STEPS, added data-tutorial attributes to conversation list, message thread, and new conversation modal, rendered SafeJoyride.
+- **StudyGroupsPage.jsx**: Imported useTutorial + STUDY_GROUPS_STEPS, added data-tutorial attributes to title section, create button, and groups grid, rendered SafeJoyride.
+- **SheetLabPage.jsx**: Imported useTutorial + SHEET_LAB_STEPS, added data-tutorial attributes to tab nav, editor, history, and analytics sections, rendered SafeJoyride.
+- **MyCoursesPage.jsx**: Imported useTutorial + MY_COURSES_STEPS, added data-tutorial attributes to school list, course selection, and preview panel, rendered SafeJoyride.
+
+#### Show Tutorials Toggle in Settings
+- **AppearanceTab.jsx**: Added "Tutorials" section card with:
+  - Toggle to enable/disable automatic tutorial popups (stored in localStorage as `studyhub_tutorials_disabled`).
+  - "Reset all tutorials" button that clears all `tutorial_*_seen` keys and re-enables tutorials.
+- **useTutorial.js**: Added `areTutorialsDisabled()` check that reads the `studyhub_tutorials_disabled` localStorage key. When disabled, all tutorials are suppressed (treat as already seen).
+
+### Files Modified
+
+Frontend:
+- `frontend/studyhub-app/src/lib/tutorialSteps.js` (content rewrite + 4 new exports)
+- `frontend/studyhub-app/src/lib/useTutorial.js` (global disable check)
+- `frontend/studyhub-app/src/pages/messages/MessagesPage.jsx` (tutorial wiring)
+- `frontend/studyhub-app/src/pages/studyGroups/StudyGroupsPage.jsx` (tutorial wiring)
+- `frontend/studyhub-app/src/pages/sheets/lab/SheetLabPage.jsx` (tutorial wiring)
+- `frontend/studyhub-app/src/pages/courses/MyCoursesPage.jsx` (tutorial wiring)
+- `frontend/studyhub-app/src/pages/settings/AppearanceTab.jsx` (tutorial toggle + reset)
+
+### Validation
+
+- All modified files pass syntax/brace-balance checks
+- No new import errors

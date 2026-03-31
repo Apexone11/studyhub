@@ -10,8 +10,11 @@
  * ═══════════════════════════════════════════════════════════════════════════ */
 import Navbar from '../../components/navbar/Navbar'
 import AppSidebar from '../../components/sidebar/AppSidebar'
+import SafeJoyride from '../../components/SafeJoyride'
 import { useProtectedPage } from '../../lib/useProtectedPage'
 import { useResponsiveAppLayout } from '../../lib/ui'
+import { useTutorial } from '../../lib/useTutorial'
+import { MESSAGES_STEPS, TUTORIAL_VERSIONS } from '../../lib/tutorialSteps'
 import { PageShell } from '../shared/pageScaffold'
 import { PAGE_FONT } from '../shared/pageUtils'
 import { usePageTitle } from '../../lib/usePageTitle'
@@ -36,6 +39,7 @@ export default function MessagesPage() {
   const { status: authStatus, error: authError } = useProtectedPage()
   const { user } = useSession()
   const layout = useResponsiveAppLayout()
+  const tutorial = useTutorial('messages', MESSAGES_STEPS, { version: TUTORIAL_VERSIONS.messages })
   const { socket, connectionError: socketError } = useSocket()
 
   const currentUserId = user?.id || null
@@ -170,7 +174,7 @@ export default function MessagesPage() {
 
       <div className="messages-split-panel">
         {showListPanel && (
-          <div style={{ minWidth: 0 }}>
+          <div data-tutorial="messages-conversations" style={{ minWidth: 0 }}>
             <ConversationList
               conversations={conversations}
               activeConversationId={activeConversation?.id}
@@ -184,7 +188,7 @@ export default function MessagesPage() {
         )}
 
         {showThreadPanel && (
-          <div style={{ minWidth: 0, flex: 1 }}>
+          <div data-tutorial="messages-compose" style={{ minWidth: 0, flex: 1 }}>
             <MessageThread
               conversation={activeConversation}
               messages={messages}
@@ -202,18 +206,22 @@ export default function MessagesPage() {
         )}
       </div>
 
-      <NewConversationModal
-        isOpen={showNewModal}
-        onClose={() => setShowNewModal(false)}
-        onCreate={handleCreateConversation}
-        currentUserId={currentUserId}
-      />
+      <div data-tutorial="messages-new">
+        <NewConversationModal
+          isOpen={showNewModal}
+          onClose={() => setShowNewModal(false)}
+          onCreate={handleCreateConversation}
+          currentUserId={currentUserId}
+        />
+      </div>
 
       <ConfirmDeleteModal
         isOpen={deleteTarget !== null}
         onConfirm={handleDeleteConversation}
         onCancel={() => setDeleteTarget(null)}
       />
+
+      <SafeJoyride {...tutorial.joyrideProps} />
     </PageShell>
   )
 }

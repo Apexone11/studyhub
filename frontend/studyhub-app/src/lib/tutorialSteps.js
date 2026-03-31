@@ -4,25 +4,32 @@
  * Each page gets 3-5 steps max (Hick's Law — don't overwhelm users).
  * Steps target CSS selectors that exist on the page.
  * Keep content short and actionable.
+ *
+ * v2: Updated for all current features (Messages, Study Groups, Sheet Lab,
+ *     My Courses, Discovery, Contributions).
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 export const TUTORIAL_VERSIONS = {
-  feed: 1,
-  sheets: 1,
-  dashboard: 1,
-  notes: 1,
-  settings: 1,
-  profile: 1,
-  viewer: 1,
-  announcements: 1,
-  upload: 1,
+  feed: 2,
+  sheets: 2,
+  dashboard: 2,
+  notes: 2,
+  settings: 2,
+  profile: 2,
+  viewer: 2,
+  announcements: 2,
+  upload: 2,
+  messages: 1,
+  studyGroups: 1,
+  sheetLab: 1,
+  myCourses: 1,
 }
 
 export const FEED_STEPS = [
   {
     target: '[data-tutorial="feed-composer"]',
     title: 'Share with classmates',
-    content: 'Post updates, questions, or links to your latest study sheets here. Mention classmates with @username.',
+    content: 'Post updates, questions, or links to your latest study sheets. Mention classmates with @username.',
     disableBeacon: true,
   },
   {
@@ -37,8 +44,8 @@ export const FEED_STEPS = [
   },
   {
     target: '[data-tutorial="feed-leaderboards"]',
-    title: 'Leaderboards',
-    content: 'See top starred sheets, most downloaded content, and top contributors in your courses.',
+    title: 'Trending and leaderboards',
+    content: 'See trending sheets, top contributors, and follow suggestions in the sidebar.',
   },
 ]
 
@@ -57,7 +64,7 @@ export const SHEETS_STEPS = [
   {
     target: '[data-tutorial="sheets-upload"]',
     title: 'Upload a sheet',
-    content: 'Share your own study sheets with classmates. You can upload PDFs and images.',
+    content: 'Share your own study sheets. You can write in Markdown, paste HTML, or attach PDFs and images.',
   },
   {
     target: '[data-tutorial="sheets-toggles"]',
@@ -70,13 +77,13 @@ export const DASHBOARD_STEPS = [
   {
     target: '[data-tutorial="dashboard-hero"]',
     title: 'Welcome to your dashboard',
-    content: 'This is your personal study hub. See your stats, recent activity, and quick actions at a glance.',
+    content: 'Your personal study hub. See stats, recent activity, and quick actions at a glance.',
     disableBeacon: true,
   },
   {
     target: '[data-tutorial="dashboard-stats"]',
     title: 'Your stats',
-    content: 'Track your enrolled courses, uploaded sheets, and starred content.',
+    content: 'Track enrolled courses, uploaded sheets, starred content, and contributions.',
   },
   {
     target: '[data-tutorial="dashboard-sheets"]',
@@ -86,7 +93,7 @@ export const DASHBOARD_STEPS = [
   {
     target: '[data-tutorial="dashboard-actions"]',
     title: 'Quick actions',
-    content: 'Jump to common tasks like uploading sheets, taking practice tests, or reviewing notes.',
+    content: 'Jump to common tasks like uploading sheets, messaging classmates, or reviewing notes.',
   },
 ]
 
@@ -94,7 +101,7 @@ export const NOTES_STEPS = [
   {
     target: '[data-tutorial="notes-filters"]',
     title: 'Filter your notes',
-    content: 'View all notes, or filter by private and shared notes.',
+    content: 'View all notes, or filter by private, shared, and starred notes.',
     disableBeacon: true,
   },
   {
@@ -102,53 +109,58 @@ export const NOTES_STEPS = [
     title: 'Create a note',
     content: 'Start a new markdown note. Notes are private by default and auto-save as you type.',
   },
+  {
+    target: '[data-tutorial="notes-editor"]',
+    title: 'Rich editing',
+    content: 'Notes support full markdown with live preview. Assign a course to organize them.',
+  },
 ]
 
 export const SETTINGS_STEPS = [
   {
     target: '[data-tutorial="settings-avatar"]',
     title: 'Upload a profile photo',
-    content: 'Add a photo so other students can recognize you. Drag and zoom to crop it just right.',
+    content: 'Add a photo so other students can recognize you. Drag and zoom to crop.',
     disableBeacon: true,
   },
   {
     target: '[data-tutorial="settings-tabs"]',
     title: 'Settings categories',
-    content: 'Navigate between profile, security, notifications, privacy, courses, appearance, and account settings.',
+    content: 'Navigate between profile, security, notifications, privacy, courses, and appearance settings.',
   },
   {
     target: '[data-tutorial="settings-appearance"]',
     title: 'Customize appearance',
-    content: 'Switch between light and dark themes, and adjust your preferred font size.',
+    content: 'Switch between light and dark themes, adjust font size, and control tutorial visibility.',
   },
   {
     target: '[data-tutorial="settings-notifications"]',
     title: 'Notification preferences',
-    content: 'Control which notifications you receive — stars, comments, follows, and more.',
+    content: 'Control which notifications you receive — stars, comments, follows, messages, and more.',
   },
 ]
 
 export const PROFILE_STEPS = [
   {
     target: '[data-tutorial="profile-avatar"]',
-    title: 'Upload a photo',
-    content: 'Click your avatar to upload and crop a profile photo. Drag and zoom to get the perfect crop.',
+    title: 'Your profile',
+    content: 'Click your avatar to upload and crop a profile photo.',
     disableBeacon: true,
   },
   {
     target: '[data-tutorial="profile-stats"]',
     title: 'Profile stats',
-    content: 'See sheet count, followers, and following. Click followers or following to view the full list.',
+    content: 'See sheets, stars received, followers, and a detailed activity breakdown.',
   },
   {
     target: '[data-tutorial="profile-sheets"]',
-    title: 'Recent sheets',
-    content: 'Browse the latest public study sheets this user has shared.',
+    title: 'Sheets and contributions',
+    content: 'Browse published sheets, pinned content, and contribution history.',
   },
   {
-    target: '[data-tutorial="profile-courses"]',
-    title: 'Enrolled courses',
-    content: 'See which courses this student is enrolled in.',
+    target: '[data-tutorial="profile-follow"]',
+    title: 'Follow and connect',
+    content: 'Follow users to stay updated. Check out follow suggestions based on shared courses.',
   },
 ]
 
@@ -156,18 +168,23 @@ export const VIEWER_STEPS = [
   {
     target: '[data-tutorial="viewer-actions"]',
     title: 'Sheet actions',
-    content: 'Star, react, fork, or download this sheet. Contribute improvements back to the author.',
+    content: 'Star, fork, download, or contribute improvements back to the author.',
     disableBeacon: true,
   },
   {
     target: '[data-tutorial="viewer-content"]',
     title: 'Sheet content',
-    content: 'Read the study material here. HTML sheets render in a secure preview.',
+    content: 'Read the study material. HTML sheets have Safe and Interactive preview modes.',
   },
   {
     target: '[data-tutorial="viewer-comments"]',
     title: 'Discussion',
     content: 'Ask questions and discuss with classmates. Use @mentions to notify someone.',
+  },
+  {
+    target: '[data-tutorial="viewer-sheetlab"]',
+    title: 'Edit in Sheet Lab',
+    content: 'Open Sheet Lab to view version history, compare changes, track lineage, and see analytics.',
   },
 ]
 
@@ -181,7 +198,7 @@ export const ANNOUNCEMENTS_STEPS = [
   {
     target: '[data-tutorial="announcements-list"]',
     title: 'Stay up to date',
-    content: 'New announcements appear automatically. Pinned posts are highlighted in yellow.',
+    content: 'New announcements appear automatically. Pinned posts are highlighted.',
   },
 ]
 
@@ -201,5 +218,88 @@ export const UPLOAD_STEPS = [
     target: '[data-tutorial="upload-attachment"]',
     title: 'Attach files',
     content: 'Optionally attach a PDF or image (10MB max) for classmates to preview and download.',
+  },
+]
+
+/* ── New page tutorials ──────────────────────────────────────────────── */
+
+export const MESSAGES_STEPS = [
+  {
+    target: '[data-tutorial="messages-conversations"]',
+    title: 'Your conversations',
+    content: 'All your direct messages and group chats appear here. Unread counts update in real time.',
+    disableBeacon: true,
+  },
+  {
+    target: '[data-tutorial="messages-compose"]',
+    title: 'Send a message',
+    content: 'Type your message and press Enter to send. Messages support text up to 5000 characters.',
+  },
+  {
+    target: '[data-tutorial="messages-new"]',
+    title: 'Start a conversation',
+    content: 'Search for a classmate to start a new direct message or create a group chat.',
+  },
+]
+
+export const STUDY_GROUPS_STEPS = [
+  {
+    target: '[data-tutorial="groups-list"]',
+    title: 'Your study groups',
+    content: 'Join or create study groups to collaborate with classmates on shared courses.',
+    disableBeacon: true,
+  },
+  {
+    target: '[data-tutorial="groups-create"]',
+    title: 'Create a group',
+    content: 'Start a new study group. Add members, share resources, and schedule study sessions.',
+  },
+  {
+    target: '[data-tutorial="groups-resources"]',
+    title: 'Shared resources',
+    content: 'Each group has a shared space for study materials, scheduled sessions, and a discussion board.',
+  },
+]
+
+export const SHEET_LAB_STEPS = [
+  {
+    target: '[data-tutorial="sheetlab-editor"]',
+    title: 'Edit your sheet',
+    content: 'Make changes in the editor tab. Each save creates a new version you can compare later.',
+    disableBeacon: true,
+  },
+  {
+    target: '[data-tutorial="sheetlab-tabs"]',
+    title: 'Lab tabs',
+    content: 'Switch between Editor, Changes, History, Lineage, Reviews, and Analytics.',
+  },
+  {
+    target: '[data-tutorial="sheetlab-history"]',
+    title: 'Version history',
+    content: 'View all snapshots, restore previous versions, or browse content at any point in time.',
+  },
+  {
+    target: '[data-tutorial="sheetlab-analytics"]',
+    title: 'Sheet analytics',
+    content: 'Track stars, downloads, forks, and engagement trends for your sheet.',
+  },
+]
+
+export const MY_COURSES_STEPS = [
+  {
+    target: '[data-tutorial="courses-list"]',
+    title: 'Your enrolled courses',
+    content: 'All your courses appear here. Each course shows sheets shared by classmates.',
+    disableBeacon: true,
+  },
+  {
+    target: '[data-tutorial="courses-add"]',
+    title: 'Add a course',
+    content: 'Search for courses at your school and enroll to see relevant study sheets in your feed.',
+  },
+  {
+    target: '[data-tutorial="courses-browse"]',
+    title: 'Browse course content',
+    content: 'Click a course to see all sheets, notes, and classmates enrolled in it.',
   },
 ]
