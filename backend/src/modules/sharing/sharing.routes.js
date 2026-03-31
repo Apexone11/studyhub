@@ -1,6 +1,6 @@
 const express = require('express')
 const rateLimit = require('express-rate-limit')
-const { v4: uuidv4 } = require('uuid')
+const crypto = require('crypto')
 const requireAuth = require('../../middleware/auth')
 const optionalAuth = require('../../core/auth/optionalAuth')
 const { assertOwnerOrAdmin } = require('../../lib/accessControl')
@@ -96,7 +96,7 @@ router.post('/links', requireAuth, mutateLimiter, async (req, res) => {
     // Create share link
     const shareLink = await prisma.shareLink.create({
       data: {
-        token: uuidv4(),
+        token: crypto.randomUUID(),
         contentType,
         contentId: contentIdInt,
         createdById: req.user.userId,
