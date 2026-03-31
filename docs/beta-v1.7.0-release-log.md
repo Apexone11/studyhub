@@ -2516,3 +2516,137 @@ AboutPage.jsx roadmap data:
 - Backend lint: 0 errors
 - Frontend build: success
 - No test regressions
+
+## Cycle 62 — Security Hardening (2026-03-31)
+
+### Summary
+
+Full security audit of backend and frontend codebases followed by targeted fixes for all medium-severity findings. Replaced regex-based HTML sanitization with `sanitize-html` library, added global Express error handler, hardened Socket.io event authorization and privacy, capped search query length, added rate limiting to user profile endpoints, and fixed XSS in note PDF export.
+
+### 1. Dependency Vulnerabilities
+
+- Ran `npm audit fix` on both backend and frontend to patch `brace-expansion` (DoS/memory exhaustion) vulnerability
+- Backend: 0 vulnerabilities remaining
+- Frontend: 0 vulnerabilities remaining
+
+### 2. HTML Sanitization (Stored XSS Fix)
+
+Replaced regex-based HTML stripping (`/<[^>]*>/g`) with the `sanitize-html` library in two locations:
+
+messaging.routes.js:
+- `sanitizeMessageContent()` now uses `sanitize-html` with `{ allowedTags: [], allowedAttributes: {} }` instead of regex
+- Prevents bypass vectors like `<svg onload=alert(1)>` or nested/malformed tags
+
+studyGroups.routes.js:
+- `stripHtmlTags()` now uses `sanitize-html` with `{ allowedTags: [], allowedAttributes: {} }` instead of regex
+- Applied to all group names, titles, descriptions, posts, and replies
+
+### 3. Global Express Error Handler
+
+Added catch-all error middleware at the end of route chain in `index.js`:
+- Captures errors via Sentry
+- Returns generic "Internal server error" for 5xx (prevents stack trace leakage)
+- Returns error message for 4xx (client errors)
+- Preserves error codes if present
+
+### 4. Socket.io Security Hardening
+
+Room membership validation on typing events (socketio.js):
+- `typing:start` and `typing:stop` now verify `conversationParticipant` membership before broadcasting
+- Prevents unauthorized users from emitting typing events to conversations they are not in
+- Graceful degradation on DB errors (silent return)
+
+Scoped online/offline broadcasts (socketio.js):
+- `user:online` now emits only to rooms for conversations the user participates in (was `io.emit` to all)
+- `user:offline` now emits only to rooms the socket was in (was `io.emit` to all)
+- Eliminates privacy leak where any connected user could observe when specific users are active
+
+### 5. Search Query Length Cap
+
+fullTextSearch.js:
+- Added `.slice(0, 500)` before tsquery sanitization to prevent ReDoS on extremely long search inputs
+- Cap is applied before word splitting and regex replacement
+
+### 6. Rate Limiting on User Routes
+
+users.routes.js:
+- Added `readLimiter` (200 req/min) for all GET/HEAD requests on user profile endpoints
+- Previously only had `followLimiter` (30 req/min) on follow/unfollow
+- Prevents enumeration attacks on user profiles
+
+### 7. Note Editor PDF Export XSS Fix
+
+NoteEditor.jsx:
+- `editorTitle` is now HTML-escaped before injection into the print window template string
+- Escapes `&`, `<`, `>`, `"` to prevent script injection via malicious note titles
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `backend/src/modules/messaging/messaging.routes.js` | Replaced regex HTML strip with sanitize-html |
+| `backend/src/modules/studyGroups/studyGroups.routes.js` | Replaced regex HTML strip with sanitize-html |
+| `backend/src/index.js` | Added global error handler middleware |
+| `backend/src/lib/socketio.js` | Typing event room auth, scoped online/offline broadcasts |
+| `backend/src/lib/fullTextSearch.js` | Search query length cap (500 chars) |
+| `backend/src/modules/users/users.routes.js` | Added readLimiter to GET endpoints |
+| `frontend/.../pages/notes/NoteEditor.jsx` | HTML-escape title in PDF export |
+| `backend/package.json` | Added sanitize-html dependency |
+
+### Security Audit Summary
+
+| Severity | Found | Fixed |
+|----------|-------|-------|
+| Critical | 0 | -- |
+| High | 1 (deps) | 1 |
+| Medium | 7 | 7 |
+| Low | 4 | 0 (acceptable risk / by-design) |
+
+### Validation
+
+- Frontend lint: 0 errors
+- Backend lint: 0 errors
+- Frontend build: not runnable in session (node_modules corrupted by npm audit fix; lockfile intact for CI/Railway)
+- Backend tests: pre-existing vite:define infrastructure issue (not caused by our changes)
+
+## Cycle 63 -- Messaging E2E Tests & ClamAV Enforcement (2026-03-31)
+
+### Summary
+
+Added 5 Playwright E2E tests covering the messaging feature (conversation list, DM auto-start, message thread, new conversation modal, empty state). Enforced ClamAV as mandatory in production — startup now throws if CLAMAV_DISABLED=true in production environment.
+
+### 1. Messaging E2E Tests
+
+New file: `frontend/studyhub-app/tests/messaging.e2e.spec.js`
+
+5 test scenarios:
+- Conversation list loads and displays DM + group conversations with last message preview, search input, and new conversation button
+- Empty state renders without crash when no conversations exist
+- Selecting a conversation loads the message thread with messages, input field, and send button
+- DM auto-start via `?dm=userId` query param navigates and clears the param
+- New conversation modal opens, allows user search, and closes cleanly
+
+Test infrastructure:
+- `mockMessagingApp()` helper sets up full API mock layer for messaging endpoints
+- Mocks: `/api/messages/conversations` (GET list, POST create), `/api/messages/conversations/:id/messages` (GET, POST), `/api/messages/conversations/:id` (GET, DELETE), `/api/messages/online`, `/api/search` (for user search in modal)
+- Follows established pattern from `study-groups.e2e.spec.js` (catch-all first, specific routes override)
+- `createMockConversation()` and `createMockMessage()` factory functions with sensible defaults
+
+### 2. ClamAV Production Enforcement
+
+backend/src/index.js:
+- Production (`NODE_ENV=production`): throws Error on startup if `CLAMAV_DISABLED=true` — prevents deploying without malware scanning
+- Non-production, non-test: logs warning (unchanged behavior)
+- Test: no warning (unchanged behavior)
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `frontend/.../tests/messaging.e2e.spec.js` | NEW: 5 Playwright E2E tests for messaging |
+| `backend/src/index.js` | ClamAV: throw in production if disabled |
+
+### Validation
+
+- Frontend lint: 0 errors
+- Backend lint: 0 errors

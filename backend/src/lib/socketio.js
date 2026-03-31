@@ -129,14 +129,26 @@ function initSocketIO(httpServer) {
         }
       } catch { /* graceful degradation if table missing */ }
 
-      // Notify others that this user is online
-      io.emit('user:online', { userId: socket.userId, username: socket.username })
+      // Notify only conversation and group participants that this user is online
+      // (previously broadcast to all connected users — privacy leak)
+      for (const { conversationId } of conversations) {
+        io.to(`conversation:${conversationId}`).emit('user:online', { userId: socket.userId, username: socket.username })
+      }
 
       // Handle typing indicators (rate limited: max 20 per minute)
-      socket.on('typing:start', (data) => {
+      // Validates room membership before broadcasting to prevent unauthorized emission.
+      socket.on('typing:start', async (data) => {
         const { conversationId } = data
         if (!conversationId) return
         if (isSocketRateLimited(socket.id, 'typing', 20)) return
+
+        // Verify user is a participant before broadcasting
+        try {
+          const participant = await prisma.conversationParticipant.findUnique({
+            where: { conversationId_userId: { conversationId, userId: socket.userId } },
+          })
+          if (!participant) return
+        } catch { return }
 
         io.to(`conversation:${conversationId}`).emit('typing:start', {
           userId: socket.userId,
@@ -145,10 +157,18 @@ function initSocketIO(httpServer) {
         })
       })
 
-      socket.on('typing:stop', (data) => {
+      socket.on('typing:stop', async (data) => {
         const { conversationId } = data
         if (!conversationId) return
         if (isSocketRateLimited(socket.id, 'typing', 20)) return
+
+        // Verify user is a participant before broadcasting
+        try {
+          const participant = await prisma.conversationParticipant.findUnique({
+            where: { conversationId_userId: { conversationId, userId: socket.userId } },
+          })
+          if (!participant) return
+        } catch { return }
 
         io.to(`conversation:${conversationId}`).emit('typing:stop', {
           userId: socket.userId,
@@ -241,8 +261,12 @@ function initSocketIO(httpServer) {
           userSockets.delete(socket.id)
           if (userSockets.size === 0) {
             onlineUsers.delete(socket.userId)
-            // Notify others that user is offline
-            io.emit('user:offline', { userId: socket.userId })
+            // Notify only rooms the user was in that they are offline
+            for (const room of socket.rooms) {
+              if (room !== socket.id) {
+                io.to(room).emit('user:offline', { userId: socket.userId })
+              }
+            }
           }
         }
 

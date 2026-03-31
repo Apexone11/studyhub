@@ -83,11 +83,13 @@ async function isGroupAdminOrMod(groupId, userId) {
 }
 
 /**
- * Strip HTML tags from user content
+ * Strip HTML tags from user content.
+ * Uses sanitize-html to strip all tags reliably (regex is bypassable).
  */
+const sanitizeHtml = require('sanitize-html')
 function stripHtmlTags(text) {
   if (!text || typeof text !== 'string') return ''
-  return text.replace(/<[^>]*>/g, '')
+  return sanitizeHtml(text, { allowedTags: [], allowedAttributes: {} })
 }
 
 /**

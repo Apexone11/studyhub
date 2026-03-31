@@ -8,8 +8,15 @@ const { getProfileAccessDecision, PROFILE_VISIBILITY } = require('../../lib/prof
 const prisma = require('../../lib/prisma')
 const { checkAndAwardBadges } = require('../../lib/badges')
 const { getUserStreak, getWeeklyActivity } = require('../../lib/streaks')
+const { readLimiter } = require('../../lib/rateLimiters')
 
 const router = express.Router()
+
+// Apply read limiter to all GET requests on user routes
+router.use((req, res, next) => {
+  if (req.method === 'GET' || req.method === 'HEAD') return readLimiter(req, res, next)
+  next()
+})
 
 const followLimiter = rateLimit({
   windowMs: 60 * 1000,

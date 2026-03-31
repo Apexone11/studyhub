@@ -365,11 +365,22 @@ app.use('/api/public', publicRoutes)
 
 // Basic API health check.
 app.get('/', (req, res) => {
-    res.json({ message: 'StudyHub API is running ✅' })
+    res.json({ message: 'StudyHub API is running' })
 })
 
 app.get('/health', (req, res) => {
     res.json({ status: 'ok' })
+})
+
+// Global error handler — catches unhandled route errors and prevents stack trace leakage.
+// Express requires all 4 parameters to identify this as an error handler.
+app.use((err, req, res, _next) => {
+    captureError(err, { url: req.originalUrl, method: req.method })
+    const statusCode = err.statusCode || err.status || 500
+    res.status(statusCode).json({
+      error: statusCode >= 500 ? 'Internal server error' : (err.message || 'Something went wrong'),
+      ...(err.code ? { code: err.code } : {}),
+    })
 })
 
 async function startServer() {
@@ -381,7 +392,9 @@ async function startServer() {
   })
 
   const clamAvDisabled = String(process.env.CLAMAV_DISABLED || '').toLowerCase() === 'true'
-  if (process.env.NODE_ENV !== 'test' && clamAvDisabled) {
+  if (process.env.NODE_ENV === 'production' && clamAvDisabled) {
+    throw new Error('[security] CLAMAV_DISABLED must not be true in production. Attachment malware scanning is required.')
+  } else if (process.env.NODE_ENV !== 'test' && clamAvDisabled) {
     console.warn('[security-warning] CLAMAV_DISABLED=true; attachment malware scanning is bypassed.')
   }
 
