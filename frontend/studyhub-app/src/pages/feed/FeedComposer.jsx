@@ -74,7 +74,7 @@ export default function FeedComposer({ user, onSubmitPost }) {
           <button type="button" onClick={() => fileInputRef.current?.click()} style={linkButton()}>
             <IconUpload size={14} /> Attach file
           </button>
-          <button type="submit" disabled={composeState.saving} className="sh-btn sh-btn--primary" style={{ fontWeight: 800, cursor: composeState.saving ? 'wait' : 'pointer' }}>
+          <button type="submit" disabled={composeState.saving} style={{ ...linkButton(), cursor: composeState.saving ? 'wait' : 'pointer', opacity: composeState.saving ? 0.6 : 1 }}>
             {composeState.saving ? 'Posting...' : 'Post'}
           </button>
         </div>

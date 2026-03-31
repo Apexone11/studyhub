@@ -16,7 +16,8 @@ import { useResponsiveAppLayout } from '../../lib/ui'
 import { PageShell } from '../shared/pageScaffold'
 import { PAGE_FONT } from '../shared/pageUtils'
 import { usePageTitle } from '../../lib/usePageTitle'
-import { useState, useRef, useEffect, createPortal } from 'react'
+import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { formatRelativeTime, formatMessageTime, formatDateSeparator, groupMessagesByDate, truncateText } from './messagesHelpers'
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -377,7 +378,7 @@ function MessageThread({
             padding: '4px 8px',
           }}
         >
-          ellipsis
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
         </button>
       </div>
 

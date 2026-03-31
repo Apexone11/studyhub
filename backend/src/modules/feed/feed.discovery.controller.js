@@ -228,12 +228,15 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
     })
     const starredSet = new Set(starredIds.map((s) => s.sheetId))
 
-    // Get joined group IDs
-    const joinedGroups = await prisma.studyGroupMember.findMany({
-      where: { userId, status: 'active' },
-      select: { groupId: true },
-    })
-    const joinedGroupIds = new Set(joinedGroups.map((g) => g.groupId))
+    // Get joined group IDs (graceful if study group tables not yet migrated)
+    let joinedGroupIds = new Set()
+    try {
+      const joinedGroups = await prisma.studyGroupMember.findMany({
+        where: { userId, status: 'active' },
+        select: { groupId: true },
+      })
+      joinedGroupIds = new Set(joinedGroups.map((g) => g.groupId))
+    } catch { /* table may not exist yet */ }
 
     const results = {
       sheets: [],
@@ -311,7 +314,8 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
         : Promise.resolve([]),
 
       // Recommended groups: public groups in enrolled courses, not yet joined
-      courseIds.length > 0
+      // Wrapped in catch for graceful degradation if tables not yet migrated
+      (courseIds.length > 0
         ? prisma.studyGroup.findMany({
             where: {
               courseId: { in: courseIds },
@@ -331,7 +335,8 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
             orderBy: [{ updatedAt: 'desc' }],
             take: 50,
           })
-        : Promise.resolve([]),
+        : Promise.resolve([])
+      ).catch(() => []),
     ])
 
     // Score and rank sheets by weighted metrics: stars*3 + forks*5 + recencyBoost*10
@@ -451,34 +456,41 @@ router.get('/recommended-groups', discoveryLimiter, optionalAuth, async (req, re
       return res.json([])
     }
 
-    // Get joined group IDs
-    const joinedGroups = await prisma.studyGroupMember.findMany({
-      where: { userId, status: 'active' },
-      select: { groupId: true },
-    })
-    const joinedGroupIds = new Set(joinedGroups.map((g) => g.groupId))
+    // Get joined group IDs (graceful if study group tables not yet migrated)
+    let joinedGroupIds = new Set()
+    try {
+      const joinedGroups = await prisma.studyGroupMember.findMany({
+        where: { userId, status: 'active' },
+        select: { groupId: true },
+      })
+      joinedGroupIds = new Set(joinedGroups.map((g) => g.groupId))
+    } catch { /* table may not exist yet */ }
 
     // Fetch public groups in user's courses that user hasn't joined
-    const groups = await prisma.studyGroup.findMany({
-      where: {
-        courseId: { in: courseIds },
-        privacy: 'public',
-        id: { notIn: [...joinedGroupIds] },
-      },
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        avatarUrl: true,
-        courseId: true,
-        privacy: true,
-        createdBy: { select: { id: true, username: true, avatarUrl: true } },
-        course: { select: { id: true, code: true, name: true } },
-        _count: { select: { members: { where: { status: 'active' } } } },
-      },
-      orderBy: [{ updatedAt: 'desc' }],
-      take: 10,
-    })
+    // Wrapped in try-catch for graceful degradation if StudyGroup table not yet migrated
+    let groups = []
+    try {
+      groups = await prisma.studyGroup.findMany({
+        where: {
+          courseId: { in: courseIds },
+          privacy: 'public',
+          id: { notIn: [...joinedGroupIds] },
+        },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          avatarUrl: true,
+          courseId: true,
+          privacy: true,
+          createdBy: { select: { id: true, username: true, avatarUrl: true } },
+          course: { select: { id: true, code: true, name: true } },
+          _count: { select: { members: { where: { status: 'active' } } } },
+        },
+        orderBy: [{ updatedAt: 'desc' }],
+        take: 10,
+      })
+    } catch { /* StudyGroup table may not exist yet */ }
 
     const result = groups
       .map((g) => ({
