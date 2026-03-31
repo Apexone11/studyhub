@@ -32,6 +32,7 @@ const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
 const { readLimiter, writeLimiter } = require('../../lib/rateLimiters')
 const { getBlockedUserIds } = require('../../lib/social/blockFilter')
+const { createNotification } = require('../../lib/notify')
 
 const router = express.Router()
 
@@ -469,6 +470,22 @@ router.post('/:id/join', writeLimiter, requireAuth, async (req, res) => {
       },
     })
 
+    // Notify group creator if user joined (not pending)
+    if (status === 'active') {
+      try {
+        await createNotification(prisma, {
+          userId: group.creatorId,
+          type: 'group_join',
+          message: `${req.user.username} joined your study group ${group.name}`,
+          actorId: req.user.userId,
+          linkPath: `/study-groups/${groupId}`,
+        })
+      } catch (notifErr) {
+        // Fire-and-forget: don't fail the request
+        console.error('Failed to create notification:', notifErr.message)
+      }
+    }
+
     res.status(201).json({
       id: member.id,
       groupId: member.groupId,
@@ -665,6 +682,22 @@ router.patch('/:id/members/:userId', writeLimiter, requireAuth, async (req, res)
       data: updates,
     })
 
+    // Notify user if status changes to active (join request approved)
+    if (status === 'active' && targetMember.status !== 'active') {
+      try {
+        await createNotification(prisma, {
+          userId: userId,
+          type: 'group_approved',
+          message: `Your request to join ${group.name} was approved`,
+          actorId: req.user.userId,
+          linkPath: `/study-groups/${groupId}`,
+        })
+      } catch (notifErr) {
+        // Fire-and-forget: don't fail the request
+        console.error('Failed to create notification:', notifErr.message)
+      }
+    }
+
     res.json({
       id: updated.id,
       groupId: updated.groupId,
@@ -807,6 +840,20 @@ router.post('/:id/invite', writeLimiter, requireAuth, async (req, res) => {
         status: 'invited',
       },
     })
+
+    // Notify the invited user
+    try {
+      await createNotification(prisma, {
+        userId: targetUserId,
+        type: 'group_invite',
+        message: `${req.user.username} invited you to join ${group.name}`,
+        actorId: req.user.userId,
+        linkPath: `/study-groups/${groupId}`,
+      })
+    } catch (notifErr) {
+      // Fire-and-forget: don't fail the request
+      console.error('Failed to create notification:', notifErr.message)
+    }
 
     res.status(201).json({
       id: member.id,
@@ -1203,6 +1250,39 @@ router.post('/:id/sessions', writeLimiter, requireAuth, async (req, res) => {
       },
     })
 
+    // Notify all active group members (except creator) about the new session
+    try {
+      const groupData = await prisma.studyGroup.findUnique({
+        where: { id: groupId },
+        select: { name: true },
+      })
+
+      const members = await prisma.studyGroupMember.findMany({
+        where: {
+          groupId,
+          status: 'active',
+          userId: { not: req.user.userId }, // exclude the session creator
+        },
+        select: { userId: true },
+      })
+
+      if (members.length > 0 && groupData) {
+        await prisma.notification.createMany({
+          data: members.map(member => ({
+            userId: member.userId,
+            type: 'group_session',
+            message: `${req.user.username} scheduled a session in ${groupData.name}: ${validTitle}`,
+            actorId: req.user.userId,
+            linkPath: `/study-groups/${groupId}`,
+          })),
+          skipDuplicates: true,
+        })
+      }
+    } catch (notifErr) {
+      // Fire-and-forget: don't fail the request
+      console.error('Failed to create notifications:', notifErr.message)
+    }
+
     res.status(201).json({
       id: session.id,
       groupId: session.groupId,
@@ -1554,6 +1634,39 @@ router.post('/:id/discussions', writeLimiter, requireAuth, async (req, res) => {
         author: { select: { id: true, username: true, avatarUrl: true } },
       },
     })
+
+    // Notify all active group members (except author) about the new discussion post
+    try {
+      const groupData = await prisma.studyGroup.findUnique({
+        where: { id: groupId },
+        select: { name: true },
+      })
+
+      const members = await prisma.studyGroupMember.findMany({
+        where: {
+          groupId,
+          status: 'active',
+          userId: { not: req.user.userId }, // exclude the post author
+        },
+        select: { userId: true },
+      })
+
+      if (members.length > 0 && groupData) {
+        await prisma.notification.createMany({
+          data: members.map(member => ({
+            userId: member.userId,
+            type: 'group_post',
+            message: `${req.user.username} posted in ${groupData.name}: ${validTitle}`,
+            actorId: req.user.userId,
+            linkPath: `/study-groups/${groupId}`,
+          })),
+          skipDuplicates: true,
+        })
+      }
+    } catch (notifErr) {
+      // Fire-and-forget: don't fail the request
+      console.error('Failed to create notifications:', notifErr.message)
+    }
 
     res.status(201).json({
       id: post.id,

@@ -45,41 +45,41 @@ model User {
   feedPosts                  FeedPost[]
   feedPostComments           FeedPostComment[]
   feedPostReactions          FeedPostReaction[]
-  proposedContributions      SheetContribution[]     @relation("ContributionProposer")
-  reviewedContributions      SheetContribution[]     @relation("ContributionReviewer")
+  proposedContributions      SheetContribution[]       @relation("ContributionProposer")
+  reviewedContributions      SheetContribution[]       @relation("ContributionReviewer")
   verificationChallenges     VerificationChallenge[]
-  notificationsReceived      Notification[]          @relation("NotifRecipient")
-  notificationsSent          Notification[]          @relation("NotifActor")
-  following                  UserFollow[]            @relation("Following")
-  followers                  UserFollow[]            @relation("Followers")
+  notificationsReceived      Notification[]            @relation("NotifRecipient")
+  notificationsSent          Notification[]            @relation("NotifActor")
+  following                  UserFollow[]              @relation("Following")
+  followers                  UserFollow[]              @relation("Followers")
   htmlVersions               SheetHtmlVersion[]
-  suppressionAuditsPerformed EmailSuppressionAudit[] @relation("EmailSuppressionAuditActor")
+  suppressionAuditsPerformed EmailSuppressionAudit[]   @relation("EmailSuppressionAuditActor")
   preferences                UserPreferences?
   strikes                    Strike[]
   appeals                    Appeal[]
   restrictions               UserRestriction[]
-  moderationCases            ModerationCase[]        @relation("ModerationCaseAuthor")
-  moderationReviews          ModerationCase[]        @relation("ModerationReviewer")
-  moderationReports          ModerationCase[]        @relation("ModerationReporter")
-  moderationClaims           ModerationCase[]        @relation("ModerationClaimer")
-  appealReviews              Appeal[]                @relation("AppealReviewer")
-  moderationLogs             ModerationLog[]         @relation("ModerationLogUser")
+  moderationCases            ModerationCase[]          @relation("ModerationCaseAuthor")
+  moderationReviews          ModerationCase[]          @relation("ModerationReviewer")
+  moderationReports          ModerationCase[]          @relation("ModerationReporter")
+  moderationClaims           ModerationCase[]          @relation("ModerationClaimer")
+  appealReviews              Appeal[]                  @relation("AppealReviewer")
+  moderationLogs             ModerationLog[]           @relation("ModerationLogUser")
   sheetCommits               SheetCommit[]
   webauthnCredentials        WebAuthnCredential[]
-  reviewedSheets             StudySheet[]            @relation("SheetReviewer")
+  reviewedSheets             StudySheet[]              @relation("SheetReviewer")
   pinnedSheets               UserPinnedSheet[]
   dailyActivity              UserDailyActivity[]
   badges                     UserBadge[]
   sensitiveData              UserSensitive?
-  blockedUsers               UserBlock[]     @relation("BlockedByUser")
-  blockedByUsers             UserBlock[]     @relation("BlockedUser")
-  mutedUsers                 UserMute[]      @relation("MutedByUser")
-  mutedByUsers               UserMute[]      @relation("MutedUser")
-  conversationsCreated       Conversation[]  @relation("ConversationCreator")
+  blockedUsers               UserBlock[]               @relation("BlockedByUser")
+  blockedByUsers             UserBlock[]               @relation("BlockedUser")
+  mutedUsers                 UserMute[]                @relation("MutedByUser")
+  mutedByUsers               UserMute[]                @relation("MutedUser")
+  conversationsCreated       Conversation[]            @relation("ConversationCreator")
   conversationParticipants   ConversationParticipant[]
-  messagesSent               Message[]       @relation("MessageSender")
-  messageReactions           MessageReaction[] @relation("MessageReactionUser")
-  studyGroupsCreated         StudyGroup[]      @relation("StudyGroupCreator")
+  messagesSent               Message[]                 @relation("MessageSender")
+  messageReactions           MessageReaction[]         @relation("MessageReactionUser")
+  studyGroupsCreated         StudyGroup[]              @relation("StudyGroupCreator")
   studyGroupMemberships      StudyGroupMember[]
   groupResources             GroupResource[]
   groupSessionRsvps          GroupSessionRsvp[]
@@ -799,12 +799,12 @@ model WebAuthnCredential {
 }
 
 model UserBlock {
-  blockerId  Int
-  blockedId  Int
-  reason     String?
-  createdAt  DateTime @default(now())
-  blocker    User     @relation("BlockedByUser", fields: [blockerId], references: [id], onDelete: Cascade)
-  blocked    User     @relation("BlockedUser", fields: [blockedId], references: [id], onDelete: Cascade)
+  blockerId Int
+  blockedId Int
+  reason    String?
+  createdAt DateTime @default(now())
+  blocker   User     @relation("BlockedByUser", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked   User     @relation("BlockedUser", fields: [blockedId], references: [id], onDelete: Cascade)
 
   @@id([blockerId, blockedId])
   @@index([blockedId])
@@ -827,9 +827,9 @@ model UserMute {
 
 model Conversation {
   id          Int      @id @default(autoincrement())
-  type        String   @default("dm")   // "dm" or "group"
-  name        String?                    // display name for group chats
-  avatarUrl   String?                    // custom avatar for group chats
+  type        String   @default("dm") // "dm" or "group"
+  name        String? // display name for group chats
+  avatarUrl   String? // custom avatar for group chats
   createdById Int
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -846,9 +846,9 @@ model ConversationParticipant {
   userId         Int
   role           String   @default("member") // "member" or "admin" (group only)
   joinedAt       DateTime @default(now())
-  lastReadAt     DateTime @default(now())    // for read receipts
-  muted          Boolean  @default(false)    // mute notifications for this convo
-  archived       Boolean  @default(false)    // hide from main list
+  lastReadAt     DateTime @default(now()) // for read receipts
+  muted          Boolean  @default(false) // mute notifications for this convo
+  archived       Boolean  @default(false) // hide from main list
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -858,15 +858,15 @@ model ConversationParticipant {
 }
 
 model Message {
-  id             Int      @id @default(autoincrement())
+  id             Int       @id @default(autoincrement())
   conversationId Int
   senderId       Int
-  content        String   @db.Text
-  type           String   @default("text") // "text", "image", "system"
-  replyToId      Int?                       // thread replies
+  content        String    @db.Text
+  type           String    @default("text") // "text", "image", "system"
+  replyToId      Int? // thread replies
   editedAt       DateTime?
-  deletedAt      DateTime?                  // soft delete
-  createdAt      DateTime @default(now())
+  deletedAt      DateTime? // soft delete
+  createdAt      DateTime  @default(now())
 
   conversation Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender       User              @relation("MessageSender", fields: [senderId], references: [id])
@@ -901,19 +901,19 @@ model StudyGroup {
   name        String
   description String   @default("")
   avatarUrl   String?
-  courseId     Int?                          // null = freeform group
-  privacy     String   @default("public")   // "public", "private", "invite_only"
+  courseId    Int? // null = freeform group
+  privacy     String   @default("public") // "public", "private", "invite_only"
   maxMembers  Int      @default(50)
   createdById Int
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  course      Course?             @relation(fields: [courseId], references: [id], onDelete: SetNull)
-  createdBy   User                @relation("StudyGroupCreator", fields: [createdById], references: [id])
-  members     StudyGroupMember[]
-  resources   GroupResource[]
-  sessions    GroupSession[]
-  posts       GroupDiscussionPost[]
+  course    Course?               @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  createdBy User                  @relation("StudyGroupCreator", fields: [createdById], references: [id])
+  members   StudyGroupMember[]
+  resources GroupResource[]
+  sessions  GroupSession[]
+  posts     GroupDiscussionPost[]
 
   @@index([courseId])
   @@index([privacy, updatedAt(sort: Desc)])
@@ -921,12 +921,12 @@ model StudyGroup {
 }
 
 model StudyGroupMember {
-  id        Int      @id @default(autoincrement())
-  groupId   Int
-  userId    Int
-  role      String   @default("member")   // "admin", "moderator", "member"
-  status    String   @default("active")   // "active", "pending", "invited", "banned"
-  joinedAt  DateTime @default(now())
+  id       Int      @id @default(autoincrement())
+  groupId  Int
+  userId   Int
+  role     String   @default("member") // "admin", "moderator", "member"
+  status   String   @default("active") // "active", "pending", "invited", "banned"
+  joinedAt DateTime @default(now())
 
   group StudyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
   user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -937,17 +937,17 @@ model StudyGroupMember {
 }
 
 model GroupResource {
-  id          Int      @id @default(autoincrement())
-  groupId     Int
-  userId      Int                           // who added it
-  title       String
-  description String   @default("")
-  resourceType String  @default("link")     // "link", "sheet", "note", "file"
-  resourceUrl  String?                      // external link or file path
-  sheetId     Int?                          // linked StudySheet
-  noteId      Int?                          // linked Note
-  pinned      Boolean  @default(false)
-  createdAt   DateTime @default(now())
+  id           Int      @id @default(autoincrement())
+  groupId      Int
+  userId       Int // who added it
+  title        String
+  description  String   @default("")
+  resourceType String   @default("link") // "link", "sheet", "note", "file"
+  resourceUrl  String? // external link or file path
+  sheetId      Int? // linked StudySheet
+  noteId       Int? // linked Note
+  pinned       Boolean  @default(false)
+  createdAt    DateTime @default(now())
 
   group StudyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
   user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -960,10 +960,10 @@ model GroupSession {
   groupId      Int
   title        String
   description  String   @default("")
-  location     String   @default("")       // room, zoom link, etc.
+  location     String   @default("") // room, zoom link, etc.
   scheduledAt  DateTime
   durationMins Int      @default(60)
-  recurring    String?                      // "weekly", "biweekly", null
+  recurring    String? // "weekly", "biweekly", null
   status       String   @default("upcoming") // "upcoming", "in_progress", "completed", "cancelled"
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -979,7 +979,7 @@ model GroupSessionRsvp {
   id        Int      @id @default(autoincrement())
   sessionId Int
   userId    Int
-  status    String   @default("going")     // "going", "maybe", "not_going"
+  status    String   @default("going") // "going", "maybe", "not_going"
   createdAt DateTime @default(now())
 
   session GroupSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
@@ -997,7 +997,7 @@ model GroupDiscussionPost {
   content   String   @db.Text
   type      String   @default("discussion") // "discussion", "question", "announcement", "poll"
   pinned    Boolean  @default(false)
-  resolved  Boolean  @default(false)        // for Q&A threads
+  resolved  Boolean  @default(false) // for Q&A threads
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1014,7 +1014,7 @@ model GroupDiscussionReply {
   postId    Int
   userId    Int
   content   String   @db.Text
-  isAnswer  Boolean  @default(false)        // mark as accepted answer for Q&A
+  isAnswer  Boolean  @default(false) // mark as accepted answer for Q&A
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

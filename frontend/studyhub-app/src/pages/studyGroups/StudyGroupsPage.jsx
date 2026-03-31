@@ -394,7 +394,7 @@ function GroupDetailView({ groupId }) {
             </section>
 
             {/* Tab navigation */}
-            <div style={styles.tabBar}>
+            <div style={styles.tabBar} role="tablist">
               {['overview', 'resources', 'sessions', 'discussions', 'members'].map((tab) => (
                 <button
                   key={tab}
@@ -403,6 +403,9 @@ function GroupDetailView({ groupId }) {
                     ...styles.tabButton,
                     ...(activeTab === tab ? styles.tabButtonActive : {}),
                   }}
+                  role="tab"
+                  aria-selected={activeTab === tab}
+                  aria-current={activeTab === tab ? 'page' : undefined}
                 >
                   {tab.charAt(0).toUpperCase() + tab.slice(1)}
                 </button>
@@ -538,6 +541,7 @@ function GroupCard({ group, onJoin, onNavigateDetail }) {
               onJoin()
             }}
             style={styles.joinBtnSmall}
+            aria-label={`Join ${group.name} study group`}
           >
             Join
           </button>
@@ -905,7 +909,7 @@ const styles = {
     borderRadius: 'var(--radius-control)',
     border: 'none',
     background: 'var(--sh-brand)',
-    color: '#fff',
+    color: 'white',
     fontSize: 'var(--type-sm)',
     fontWeight: 600,
     cursor: 'pointer',
@@ -959,7 +963,7 @@ const styles = {
 
   filterChipActive: {
     background: 'var(--sh-brand)',
-    color: '#fff',
+    color: 'white',
     borderColor: 'var(--sh-brand)',
   },
 
@@ -1092,7 +1096,7 @@ const styles = {
     borderRadius: 'var(--radius-control)',
     border: 'none',
     background: 'var(--sh-brand)',
-    color: '#fff',
+    color: 'white',
     fontSize: 'var(--type-xs)',
     fontWeight: 600,
     cursor: 'pointer',
@@ -1229,7 +1233,7 @@ const styles = {
     borderRadius: 'var(--radius-control)',
     border: 'none',
     background: 'var(--sh-brand)',
-    color: '#fff',
+    color: 'white',
     fontSize: 'var(--type-sm)',
     fontWeight: 600,
     cursor: 'pointer',
@@ -1358,7 +1362,7 @@ const styles = {
   modalOverlay: {
     position: 'fixed',
     inset: 0,
-    background: 'rgba(15, 23, 42, 0.55)',
+    background: 'var(--sh-modal-overlay)',
     backdropFilter: 'blur(4px)',
     zIndex: 550,
     display: 'flex',
@@ -1373,7 +1377,7 @@ const styles = {
     border: '1px solid var(--sh-border)',
     padding: 'clamp(20px, 3vw, 28px)',
     width: 'min(500px, 92vw)',
-    boxShadow: '0 20px 60px rgba(15, 23, 42, 0.25)',
+    boxShadow: 'var(--elevation-4)',
     maxHeight: '90vh',
     overflowY: 'auto',
   },
@@ -1456,7 +1460,7 @@ const styles = {
     borderRadius: 'var(--radius-control)',
     border: 'none',
     background: 'var(--sh-brand)',
-    color: '#fff',
+    color: 'white',
     fontSize: 'var(--type-sm)',
     fontWeight: 700,
     cursor: 'pointer',

@@ -21,7 +21,7 @@ const searchLimiter = rateLimit({
 
 router.use(searchLimiter)
 
-const VALID_TYPES = ['all', 'sheets', 'courses', 'users', 'notes']
+const VALID_TYPES = ['all', 'sheets', 'courses', 'users', 'notes', 'groups']
 
 // Optional auth — attach user if token present, but don't require it
 function optionalAuth(req, _res, next) {
@@ -46,7 +46,7 @@ router.get('/', optionalAuth, async (req, res) => {
   const type = rawType || 'all'
 
   if (!query || query.length < 2) {
-    return res.json({ results: { sheets: [], courses: [], users: [], notes: [] }, query, type })
+    return res.json({ results: { sheets: [], courses: [], users: [], notes: [], groups: [] }, query, type })
   }
 
   if (query.length > 200) {
@@ -73,6 +73,7 @@ router.get('/', optionalAuth, async (req, res) => {
     const wantCourses = type === 'all' || type === 'courses'
     const wantUsers = type === 'all' || type === 'users'
     const wantNotes = type === 'all' || type === 'notes'
+    const wantGroups = type === 'all' || type === 'groups'
     const userSearchTake = Math.min(limit * 5, 50)
 
     if (wantSheets) {
@@ -219,6 +220,64 @@ router.get('/', optionalAuth, async (req, res) => {
       sections.push(timedSection('notes-skip', () => []))
     }
 
+    if (wantGroups) {
+      const groupWhere = {
+        OR: [
+          { name: { contains: query, mode: 'insensitive' } },
+          { description: { contains: query, mode: 'insensitive' } },
+        ],
+      }
+      // If user is authenticated, also include groups they're members of, regardless of privacy
+      if (req.user?.userId) {
+        groupWhere.OR.push({
+          members: {
+            some: {
+              userId: req.user.userId,
+              status: 'active',
+            },
+          },
+        })
+        // Make privacy filter match authenticated case
+        groupWhere.AND = [
+          {
+            OR: [
+              { privacy: 'public' },
+              {
+                members: {
+                  some: {
+                    userId: req.user.userId,
+                    status: 'active',
+                  },
+                },
+              },
+            ],
+          },
+        ]
+      } else {
+        // Unauthenticated users can only see public groups
+        groupWhere.privacy = 'public'
+      }
+      sections.push(timedSection('groups', () =>
+        prisma.studyGroup.findMany({
+          where: groupWhere,
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            privacy: true,
+            courseId: true,
+            course: { select: { id: true, code: true, name: true } },
+            createdAt: true,
+            _count: { select: { members: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: limit,
+        })
+      ))
+    } else {
+      sections.push(timedSection('groups-skip', () => []))
+    }
+
     const resolved = await Promise.all(sections)
     // Filter blocked users from all result sets
     const filterBlocked = (items, userIdField = 'author') =>
@@ -233,6 +292,7 @@ router.get('/', optionalAuth, async (req, res) => {
     const courses = resolved[1].data || []
     const matchedUsers = filterBlocked(resolved[2].data || [], (u) => u.id)
     const notes = filterBlocked(resolved[3].data || [])
+    const groups = resolved[4].data || []
     let users = matchedUsers
 
     if (wantUsers && matchedUsers.length) {
@@ -253,12 +313,12 @@ router.get('/', optionalAuth, async (req, res) => {
         query: query.slice(0, 50),
         type,
         useFTS,
-        counts: { sheets: sheets.length, courses: courses.length, users: users.length, notes: notes.length },
+        counts: { sheets: sheets.length, courses: courses.length, users: users.length, notes: notes.length, groups: groups.length },
       },
     })
 
     return res.json({
-      results: { sheets, courses, users, notes },
+      results: { sheets, courses, users, notes, groups },
       query,
       type,
     })

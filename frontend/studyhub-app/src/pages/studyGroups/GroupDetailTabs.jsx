@@ -203,7 +203,7 @@ const styles = {
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'var(--sh-modal-overlay)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -617,7 +617,7 @@ export function GroupResourcesTab({
     return (
       <div style={styles.tabContainer}>
         <div style={styles.emptyState}>
-          <div style={styles.emptyIcon}>📚</div>
+          <div style={styles.emptyIcon} aria-label="Books icon">Library</div>
           <div style={styles.emptyTitle}>No Resources Yet</div>
           <p style={styles.emptyText}>
             {isMember
@@ -639,8 +639,11 @@ export function GroupResourcesTab({
               <div
                 style={styles.modalContent}
                 onClick={(e) => e.stopPropagation()}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="add-resource-title"
               >
-                <h3 style={styles.sectionTitle}>Add Resource</h3>
+                <h3 style={styles.sectionTitle} id="add-resource-title">Add Resource</h3>
                 {error && <div style={styles.error}>{error}</div>}
                 <form onSubmit={handleSubmit}>
                   <div style={styles.formGroup}>
@@ -781,8 +784,11 @@ export function GroupResourcesTab({
             <div
               style={styles.modalContent}
               onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="add-resource-title-2"
             >
-              <h3 style={styles.sectionTitle}>Add Resource</h3>
+              <h3 style={styles.sectionTitle} id="add-resource-title-2">Add Resource</h3>
               {error && <div style={styles.error}>{error}</div>}
               <form onSubmit={handleSubmit}>
                 <div style={styles.formGroup}>
@@ -852,6 +858,7 @@ export function GroupResourcesTab({
                     type="button"
                     onClick={() => setAddModalOpen(false)}
                     style={{ ...styles.button, ...styles.buttonSecondary }}
+                    aria-label="Close Add Resource dialog"
                   >
                     Cancel
                   </button>
@@ -960,7 +967,7 @@ export function GroupSessionsTab({
     return (
       <div style={styles.tabContainer}>
         <div style={styles.emptyState}>
-          <div style={styles.emptyIcon}>Calendar</div>
+          <div style={styles.emptyIcon} aria-label="Calendar icon">Schedule</div>
           <div style={styles.emptyTitle}>No Sessions Scheduled</div>
           <p style={styles.emptyText}>
             {isAdminOrMod
@@ -982,8 +989,11 @@ export function GroupSessionsTab({
               <div
                 style={styles.modalContent}
                 onClick={(e) => e.stopPropagation()}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="schedule-session-title-1"
               >
-                <h3 style={styles.sectionTitle}>Schedule Session</h3>
+                <h3 style={styles.sectionTitle} id="schedule-session-title-1">Schedule Session</h3>
                 {error && <div style={styles.error}>{error}</div>}
                 <form onSubmit={handleSubmit}>
                   <div style={styles.formGroup}>
@@ -1097,6 +1107,7 @@ export function GroupSessionsTab({
                       type="button"
                       onClick={() => setAddModalOpen(false)}
                       style={{ ...styles.button, ...styles.buttonSecondary }}
+                      aria-label="Close Schedule Session dialog"
                     >
                       Cancel
                     </button>
@@ -1125,6 +1136,7 @@ export function GroupSessionsTab({
           <button
             onClick={handleAddClick}
             style={{ ...styles.button, ...styles.buttonPrimary }}
+            aria-label="Schedule a new session"
           >
             Schedule Session
           </button>
@@ -1214,8 +1226,11 @@ export function GroupSessionsTab({
             <div
               style={styles.modalContent}
               onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="schedule-session-title-2"
             >
-              <h3 style={styles.sectionTitle}>Schedule Session</h3>
+              <h3 style={styles.sectionTitle} id="schedule-session-title-2">Schedule Session</h3>
               {error && <div style={styles.error}>{error}</div>}
               <form onSubmit={handleSubmit}>
                 <div style={styles.formGroup}>
@@ -1440,7 +1455,7 @@ export function GroupDiscussionsTab({
     return (
       <div style={styles.tabContainer}>
         <div style={styles.emptyState}>
-          <div style={styles.emptyIcon}>Comment</div>
+          <div style={styles.emptyIcon} aria-label="Comments icon">Discussions</div>
           <div style={styles.emptyTitle}>No Discussions Yet</div>
           <p style={styles.emptyText}>
             {isMember
@@ -1462,8 +1477,11 @@ export function GroupDiscussionsTab({
               <div
                 style={styles.modalContent}
                 onClick={(e) => e.stopPropagation()}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="new-post-title"
               >
-                <h3 style={styles.sectionTitle}>New Discussion Post</h3>
+                <h3 style={styles.sectionTitle} id="new-post-title">New Discussion Post</h3>
                 {error && <div style={styles.error}>{error}</div>}
                 <form onSubmit={handleSubmit}>
                   <div style={styles.formGroup}>
@@ -1516,6 +1534,7 @@ export function GroupDiscussionsTab({
                       type="button"
                       onClick={() => setNewPostModalOpen(false)}
                       style={{ ...styles.button, ...styles.buttonSecondary }}
+                      aria-label="Close New Post dialog"
                     >
                       Cancel
                     </button>
@@ -1544,6 +1563,7 @@ export function GroupDiscussionsTab({
           <button
             onClick={handleCreateClick}
             style={{ ...styles.button, ...styles.buttonPrimary }}
+            aria-label="Create new discussion post"
           >
             New Post
           </button>
@@ -1873,7 +1893,7 @@ export function GroupMembersTab({
     return (
       <div style={styles.tabContainer}>
         <div style={styles.emptyState}>
-          <div style={styles.emptyIcon}>People</div>
+          <div style={styles.emptyIcon} aria-label="People icon">Members</div>
           <div style={styles.emptyTitle}>No Members</div>
           <p style={styles.emptyText}>
             {isAdmin ? 'Invite your first member!' : 'No members yet'}
@@ -1882,6 +1902,7 @@ export function GroupMembersTab({
             <button
               onClick={handleInviteClick}
               style={{ ...styles.button, ...styles.buttonPrimary, marginTop: 'var(--space-4)' }}
+              aria-label="Invite a new member to the group"
             >
               Invite Member
             </button>
@@ -1893,8 +1914,11 @@ export function GroupMembersTab({
               <div
                 style={styles.modalContent}
                 onClick={(e) => e.stopPropagation()}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="invite-member-title"
               >
-                <h3 style={styles.sectionTitle}>Invite Member</h3>
+                <h3 style={styles.sectionTitle} id="invite-member-title">Invite Member</h3>
                 {error && <div style={styles.error}>{error}</div>}
                 <form onSubmit={handleSubmit}>
                   <div style={styles.formGroup}>
@@ -1916,6 +1940,7 @@ export function GroupMembersTab({
                       type="button"
                       onClick={() => setInviteModalOpen(false)}
                       style={{ ...styles.button, ...styles.buttonSecondary }}
+                      aria-label="Close Invite Member dialog"
                     >
                       Cancel
                     </button>
@@ -1944,6 +1969,7 @@ export function GroupMembersTab({
           <button
             onClick={handleInviteClick}
             style={{ ...styles.button, ...styles.buttonPrimary }}
+            aria-label="Invite a new member to the group"
           >
             Invite Member
           </button>
@@ -2014,8 +2040,11 @@ export function GroupMembersTab({
             <div
               style={styles.modalContent}
               onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="invite-member-title-2"
             >
-              <h3 style={styles.sectionTitle}>Invite Member</h3>
+              <h3 style={styles.sectionTitle} id="invite-member-title-2">Invite Member</h3>
               {error && <div style={styles.error}>{error}</div>}
               <form onSubmit={handleSubmit}>
                 <div style={styles.formGroup}>
@@ -2037,6 +2066,7 @@ export function GroupMembersTab({
                     type="button"
                     onClick={() => setInviteModalOpen(false)}
                     style={{ ...styles.button, ...styles.buttonSecondary }}
+                    aria-label="Close Invite Member dialog"
                   >
                     Cancel
                   </button>
