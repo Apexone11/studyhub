@@ -77,7 +77,7 @@ const avatarUpload = multer({
 })
 
 // POST /api/upload/avatar
-router.post('/avatar', requireAuth, avatarUploadLimiter, (req, res) => {
+router.post('/avatar', requireAuth, uploadAvatarLimiter, (req, res) => {
   avatarUpload.single('avatar')(req, res, async (err) => {
     if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
       return sendError(res, 400, 'Avatar must be 5 MB or smaller.', ERROR_CODES.UPLOAD_INVALID)
@@ -144,7 +144,7 @@ const coverUpload = multer({
 })
 
 // POST /api/upload/cover
-router.post('/cover', requireAuth, coverUploadLimiter, (req, res) => {
+router.post('/cover', requireAuth, uploadCoverLimiter, (req, res) => {
   coverUpload.single('cover')(req, res, async (err) => {
     if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
       return sendError(res, 400, 'Cover image must be 8 MB or smaller.', ERROR_CODES.UPLOAD_INVALID)
@@ -235,7 +235,7 @@ const attachmentUpload = multer({
 })
 
 // POST /api/upload/attachment/:sheetId
-router.post('/attachment/:sheetId', requireAuth, attachmentUploadLimiter, (req, res) => {
+router.post('/attachment/:sheetId', requireAuth, uploadAttachmentLimiter, (req, res) => {
   attachmentUpload.single('attachment')(req, res, async (err) => {
     if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
       return sendError(res, 400, 'Attachment must be 10 MB or smaller.', ERROR_CODES.UPLOAD_INVALID)
@@ -300,7 +300,7 @@ router.post('/attachment/:sheetId', requireAuth, attachmentUploadLimiter, (req, 
 })
 
 // POST /api/upload/post-attachment/:postId
-router.post('/post-attachment/:postId', requireAuth, attachmentUploadLimiter, (req, res) => {
+router.post('/post-attachment/:postId', requireAuth, uploadAttachmentLimiter, (req, res) => {
   attachmentUpload.single('attachment')(req, res, async (err) => {
     if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
       return sendError(res, 400, 'Attachment must be 10 MB or smaller.', ERROR_CODES.UPLOAD_INVALID)
@@ -388,7 +388,7 @@ const contentImageUpload = multer({
 // POST /api/upload/content-image
 // Uploads an image for embedding in rich text sheet content.
 // Returns { url: '/uploads/content-images/...' } for the TipTap Image extension.
-router.post('/content-image', requireAuth, contentImageUploadLimiter, (req, res) => {
+router.post('/content-image', requireAuth, uploadContentImageLimiter, (req, res) => {
   contentImageUpload.single('image')(req, res, async (err) => {
     if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
       return sendError(res, 400, 'Image must be 5 MB or smaller.', ERROR_CODES.UPLOAD_INVALID)
