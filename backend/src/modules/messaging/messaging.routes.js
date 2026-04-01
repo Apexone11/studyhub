@@ -550,7 +550,7 @@ router.get('/conversations/:id/messages', requireAuth, async (req, res) => {
  * POST /api/messages/conversations/:id/messages
  * Send a message with optional attachments and poll
  */
-router.post('/conversations/:id/messages', requireAuth, messageWriteLimiter, async (req, res) => {
+router.post('/conversations/:id/messages', requireAuth, messagingWriteLimiter, async (req, res) => {
   try {
     const conversationId = parseInt(req.params.id, 10)
     const { content, type = 'text', replyToId, attachments = [], poll } = req.body
@@ -720,7 +720,7 @@ router.post('/conversations/:id/messages', requireAuth, messageWriteLimiter, asy
  * PATCH /api/messages/:messageId
  * Edit a message (owner only, within 15 min)
  */
-router.patch('/messages/:messageId', requireAuth, messageWriteLimiter, async (req, res) => {
+router.patch('/messages/:messageId', requireAuth, messagingWriteLimiter, async (req, res) => {
   try {
     const messageId = parseInt(req.params.messageId, 10)
     const { content } = req.body
@@ -872,7 +872,7 @@ router.delete('/messages/:messageId', requireAuth, async (req, res) => {
  * POST /api/messages/:messageId/poll/vote
  * Vote on a poll option
  */
-router.post('/messages/:messageId/poll/vote', requireAuth, messageWriteLimiter, async (req, res) => {
+router.post('/messages/:messageId/poll/vote', requireAuth, messagingWriteLimiter, async (req, res) => {
   try {
     const messageId = parseInt(req.params.messageId, 10)
     const { optionId } = req.body
