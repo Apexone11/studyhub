@@ -56,7 +56,16 @@ export default function AdminPage() {
     return map[activeTab] || null
   }, [activeTab, d.announcementsState, d.deletionsState, d.reviewState, d.sheetsState, d.suppressionsState, d.usersState])
 
-  if (!d.user) return null
+  if (!d.user) {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: FONT }}>
+        <Navbar />
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400, color: 'var(--sh-muted)', fontSize: 14 }}>
+          Loading admin panel...
+        </div>
+      </div>
+    )
+  }
 
   const navActions = (
     <Link to="/feed" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, border: '1px solid var(--sh-slate-700, #334155)', color: 'var(--sh-slate-400, #94a3b8)', textDecoration: 'none', fontSize: 12, fontWeight: 700 }}>

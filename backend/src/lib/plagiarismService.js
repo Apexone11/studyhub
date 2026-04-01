@@ -151,9 +151,11 @@ async function findSimilarContent({ contentType, contentId, limit = 10 }) {
     const [simSheets, simNotes] = await Promise.all([
       prisma.studySheet.findMany({
         where: {
-          contentSimhash: { not: null },
-          NOT: contentType === 'sheet' ? { id: contentId } : undefined,
-          status: 'published',
+          AND: [
+            ...(contentType === 'sheet' ? [{ NOT: { id: contentId } }] : []),
+            { status: 'published' },
+            { NOT: [{ contentSimhash: null }] },
+          ],
         },
         select: {
           id: true, title: true, userId: true, createdAt: true, contentSimhash: true, contentHash: true,
@@ -164,9 +166,11 @@ async function findSimilarContent({ contentType, contentId, limit = 10 }) {
       }),
       prisma.note.findMany({
         where: {
-          contentSimhash: { not: null },
-          private: false,
-          NOT: contentType === 'note' ? { id: contentId } : undefined,
+          AND: [
+            ...(contentType === 'note' ? [{ NOT: { id: contentId } }] : []),
+            { private: false },
+            { NOT: [{ contentSimhash: null }] },
+          ],
         },
         select: {
           id: true, title: true, userId: true, createdAt: true, contentSimhash: true, contentHash: true,

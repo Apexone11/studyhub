@@ -40,7 +40,21 @@ export default function AiPage() {
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (authStatus !== 'ready') return null
+  if (authStatus !== 'ready') {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: PAGE_FONT }}>
+        <Navbar />
+        <div style={pageShell('app')}>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
+            <div style={{ textAlign: 'center', color: 'var(--sh-muted)' }}>
+              <IconSpinner size={28} style={{ animation: 'spin 1s linear infinite', marginBottom: 12 }} />
+              <div style={{ fontSize: 14 }}>Loading Hub AI...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   const isCompact = layout.isCompact
 
