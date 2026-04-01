@@ -1,0 +1,356 @@
+/**
+ * ai.service.js -- Core business logic for Hub AI.
+ * Handles Claude API calls, streaming, rate-limit checks, and DB persistence.
+ */
+
+const Anthropic = require('@anthropic-ai/sdk')
+const prisma = require('../../lib/prisma')
+const { captureError } = require('../../monitoring/sentry')
+const { buildContext } = require('./ai.context')
+const {
+  DEFAULT_MODEL,
+  SYSTEM_PROMPT,
+  DAILY_LIMITS,
+  CONVERSATION_HISTORY_LIMIT,
+  MAX_OUTPUT_TOKENS_QA,
+  MAX_OUTPUT_TOKENS_SHEET,
+} = require('./ai.constants')
+
+// ── Anthropic client (lazy-initialized) ────────────────────────────
+
+let _client = null
+function getClient() {
+  if (!_client) {
+    const apiKey = process.env.ANTHROPIC_API_KEY
+    if (!apiKey) {
+      throw new Error('ANTHROPIC_API_KEY environment variable is not set.')
+    }
+    _client = new Anthropic.default({ apiKey })
+  }
+  return _client
+}
+
+// ── Rate-limit helpers ─────────────────────────────────────────────
+
+/**
+ * Get the daily message limit for a user.
+ */
+function getDailyLimit(user) {
+  if (user.role === 'admin') return DAILY_LIMITS.admin
+  if (user.isStaffVerified || user.emailVerified) return DAILY_LIMITS.verified
+  return DAILY_LIMITS.default
+}
+
+/**
+ * Check (and return) today's usage for a user.
+ * Creates the row if it does not exist yet.
+ */
+async function getOrCreateUsage(userId) {
+  const today = new Date()
+  today.setUTCHours(0, 0, 0, 0)
+
+  return prisma.aiUsageLog.upsert({
+    where: { userId_date: { userId, date: today } },
+    create: { userId, date: today, messageCount: 0, tokenCount: 0 },
+    update: {},
+  })
+}
+
+/**
+ * Increment today's usage counters after a successful response.
+ */
+async function incrementUsage(userId, tokens = 0) {
+  const today = new Date()
+  today.setUTCHours(0, 0, 0, 0)
+
+  return prisma.aiUsageLog.upsert({
+    where: { userId_date: { userId, date: today } },
+    create: { userId, date: today, messageCount: 1, tokenCount: tokens },
+    update: {
+      messageCount: { increment: 1 },
+      tokenCount: { increment: tokens },
+    },
+  })
+}
+
+// ── Conversation helpers ───────────────────────────────────────────
+
+async function listConversations(userId, { limit = 30, offset = 0 } = {}) {
+  const [conversations, total] = await Promise.all([
+    prisma.aiConversation.findMany({
+      where: { userId },
+      orderBy: { updatedAt: 'desc' },
+      skip: offset,
+      take: limit,
+      select: {
+        id: true,
+        title: true,
+        model: true,
+        createdAt: true,
+        updatedAt: true,
+        _count: { select: { messages: true } },
+      },
+    }),
+    prisma.aiConversation.count({ where: { userId } }),
+  ])
+  return { conversations, total }
+}
+
+async function getConversation(id, userId) {
+  return prisma.aiConversation.findFirst({
+    where: { id, userId },
+    include: {
+      messages: {
+        orderBy: { createdAt: 'asc' },
+        select: {
+          id: true,
+          role: true,
+          content: true,
+          hasImage: true,
+          imageDescription: true,
+          tokenCount: true,
+          metadata: true,
+          createdAt: true,
+        },
+      },
+    },
+  })
+}
+
+async function createConversation(userId, title = null) {
+  return prisma.aiConversation.create({
+    data: { userId, title },
+    select: { id: true, title: true, model: true, createdAt: true, updatedAt: true },
+  })
+}
+
+async function deleteConversation(id, userId) {
+  // Verify ownership first.
+  const conv = await prisma.aiConversation.findFirst({ where: { id, userId } })
+  if (!conv) return null
+  await prisma.aiConversation.delete({ where: { id } })
+  return conv
+}
+
+async function renameConversation(id, userId, title) {
+  const conv = await prisma.aiConversation.findFirst({ where: { id, userId } })
+  if (!conv) return null
+  return prisma.aiConversation.update({
+    where: { id },
+    data: { title },
+    select: { id: true, title: true },
+  })
+}
+
+// ── Auto-title generation ──────────────────────────────────────────
+
+function generateTitle(firstMessage) {
+  // Take the first ~60 characters, trim at word boundary.
+  const cleaned = firstMessage.replace(/\s+/g, ' ').trim()
+  if (cleaned.length <= 60) return cleaned
+  return cleaned.slice(0, 57).replace(/\s+\S*$/, '') + '...'
+}
+
+// ── Core: send message + stream response ───────────────────────────
+
+/**
+ * Process a user message and stream the AI response via SSE.
+ *
+ * @param {object} params
+ * @param {object} params.user        - Authenticated user record (id, role, etc.)
+ * @param {number} params.conversationId
+ * @param {string} params.content     - User message text.
+ * @param {string} [params.currentPage] - Current frontend URL path.
+ * @param {Array}  [params.images]    - Array of { base64, mediaType } image objects.
+ * @param {object} params.res         - Express response object (for SSE).
+ */
+async function streamMessage({ user, conversationId, content, currentPage, images, res }) {
+  const userId = user.id || user.userId
+
+  // 1. Verify conversation ownership.
+  const conversation = await prisma.aiConversation.findFirst({
+    where: { id: conversationId, userId },
+  })
+  if (!conversation) {
+    sendSSE(res, { type: 'error', message: 'Conversation not found.' })
+    res.end()
+    return
+  }
+
+  // 2. Check daily rate limit.
+  const usage = await getOrCreateUsage(userId)
+  const limit = getDailyLimit(user)
+  if (usage.messageCount >= limit) {
+    sendSSE(res, {
+      type: 'error',
+      message: `Daily limit reached (${limit} messages). Resets at midnight UTC.`,
+      code: 'RATE_LIMITED',
+    })
+    res.end()
+    return
+  }
+
+  // 3. Save user message to DB immediately.
+  const userMessage = await prisma.aiMessage.create({
+    data: {
+      conversationId,
+      userId,
+      role: 'user',
+      content,
+      hasImage: images && images.length > 0,
+      imageDescription: images && images.length > 0 ? `${images.length} image(s) uploaded` : null,
+    },
+  })
+
+  // 4. Auto-title the conversation if this is the first message.
+  const messageCount = await prisma.aiMessage.count({ where: { conversationId } })
+  if (messageCount === 1 && !conversation.title) {
+    const autoTitle = generateTitle(content)
+    await prisma.aiConversation.update({
+      where: { id: conversationId },
+      data: { title: autoTitle },
+    })
+    sendSSE(res, { type: 'title', title: autoTitle })
+  }
+
+  // 5. Build context and conversation history for Claude.
+  const contextBlock = await buildContext(userId, { currentPage })
+  const fullSystemPrompt = SYSTEM_PROMPT + contextBlock
+
+  // Fetch recent conversation history.
+  const history = await prisma.aiMessage.findMany({
+    where: { conversationId },
+    orderBy: { createdAt: 'asc' },
+    take: CONVERSATION_HISTORY_LIMIT,
+    select: { role: true, content: true },
+  })
+
+  // Build the messages array for Claude (exclude the just-saved user message;
+  // it is already in `history`).
+  const claudeMessages = history.map((msg) => ({
+    role: msg.role,
+    content: msg.content,
+  }))
+
+  // If images were uploaded, replace the last user message content with
+  // a multi-part content block (text + images).
+  if (images && images.length > 0) {
+    const lastIdx = claudeMessages.length - 1
+    const contentParts = [{ type: 'text', text: content }]
+    for (const img of images) {
+      contentParts.push({
+        type: 'image',
+        source: { type: 'base64', media_type: img.mediaType, data: img.base64 },
+      })
+    }
+    claudeMessages[lastIdx].content = contentParts
+  }
+
+  // Determine max output tokens based on whether the user is asking for a sheet.
+  const isSheetRequest = /\b(create|make|generate|build|write)\b.*\b(sheet|cheatsheet|cheat sheet|study guide)\b/i.test(content)
+  const maxTokens = isSheetRequest ? MAX_OUTPUT_TOKENS_SHEET : MAX_OUTPUT_TOKENS_QA
+
+  // 6. Stream from Claude.
+  let fullResponse = ''
+  let totalInputTokens = 0
+  let totalOutputTokens = 0
+
+  try {
+    const client = getClient()
+    const stream = await client.messages.stream({
+      model: conversation.model || DEFAULT_MODEL,
+      max_tokens: maxTokens,
+      system: fullSystemPrompt,
+      messages: claudeMessages,
+    })
+
+    for await (const event of stream) {
+      if (event.type === 'content_block_delta' && event.delta?.text) {
+        fullResponse += event.delta.text
+        sendSSE(res, { type: 'delta', text: event.delta.text })
+      }
+    }
+
+    // Collect usage from the final message.
+    const finalMessage = await stream.finalMessage()
+    totalInputTokens = finalMessage?.usage?.input_tokens || 0
+    totalOutputTokens = finalMessage?.usage?.output_tokens || 0
+  } catch (err) {
+    captureError(err, { tags: { module: 'ai' } })
+    sendSSE(res, { type: 'error', message: 'AI service temporarily unavailable. Please try again.' })
+    res.end()
+    return
+  }
+
+  // 7. Save assistant response.
+  const totalTokens = totalInputTokens + totalOutputTokens
+  const assistantMsg = await prisma.aiMessage.create({
+    data: {
+      conversationId,
+      role: 'assistant',
+      content: fullResponse,
+      tokenCount: totalTokens,
+      model: conversation.model || DEFAULT_MODEL,
+      metadata: isSheetRequest ? { sheetGeneration: true } : undefined,
+    },
+  })
+
+  // Update conversation timestamp.
+  await prisma.aiConversation.update({
+    where: { id: conversationId },
+    data: { updatedAt: new Date() },
+  })
+
+  // 8. Increment usage.
+  await incrementUsage(userId, totalTokens)
+
+  // 9. Send completion event.
+  sendSSE(res, {
+    type: 'done',
+    messageId: assistantMsg.id,
+    tokenCount: totalTokens,
+    usage: { used: usage.messageCount + 1, limit },
+  })
+  res.end()
+}
+
+// ── SSE helper ─────────────────────────────────────────────────────
+
+function sendSSE(res, data) {
+  res.write(`data: ${JSON.stringify(data)}\n\n`)
+}
+
+// ── Usage stats ────────────────────────────────────────────────────
+
+async function getUsageStats(user) {
+  const userId = user.id || user.userId
+  const usage = await getOrCreateUsage(userId)
+  const limit = getDailyLimit(user)
+  return {
+    messagesUsed: usage.messageCount,
+    messagesLimit: limit,
+    messagesRemaining: Math.max(0, limit - usage.messageCount),
+    tokensUsed: usage.tokenCount,
+    resetsAt: getNextMidnightUTC(),
+  }
+}
+
+function getNextMidnightUTC() {
+  const now = new Date()
+  const next = new Date(now)
+  next.setUTCDate(next.getUTCDate() + 1)
+  next.setUTCHours(0, 0, 0, 0)
+  return next.toISOString()
+}
+
+module.exports = {
+  listConversations,
+  getConversation,
+  createConversation,
+  deleteConversation,
+  renameConversation,
+  streamMessage,
+  getUsageStats,
+  getDailyLimit,
+  getOrCreateUsage,
+}

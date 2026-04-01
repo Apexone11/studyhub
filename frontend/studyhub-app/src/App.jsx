@@ -42,10 +42,12 @@ const MyCoursesPage = lazy(() => import('./pages/courses/MyCoursesPage'))
 const SheetLabPage = lazy(() => import('./pages/sheets/lab/SheetLabPage'))
 const MessagesPage = lazy(() => import('./pages/messages/MessagesPage'))
 const StudyGroupsPage = lazy(() => import('./pages/studyGroups/StudyGroupsPage'))
+const AiPage = lazy(() => import('./pages/ai/AiPage'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 
 import ScrollToTop from './components/ScrollToTop'
 import ToastContainer from './components/Toast'
+import AiBubble from './components/ai/AiBubble'
 
 const PerfOverlay = import.meta.env?.DEV ? lazy(() => import('./components/PerfOverlay')) : null
 
@@ -89,6 +91,7 @@ const ROUTE_TITLES = {
   '/notes': 'My Notes',
   '/messages': 'Messages',
   '/study-groups': 'Study Groups',
+  '/ai': 'Hub AI',
   '/announcements': 'Announcements',
   '/submit': 'Submit Request',
   '/my-courses': 'My Courses',
@@ -202,6 +205,12 @@ function RouteFallback() {
   )
 }
 
+function AuthenticatedBubble() {
+  const { isAuthenticated } = useSession()
+  if (!isAuthenticated) return null
+  return <AiBubble />
+}
+
 function AppRoutes() {
   return (
     <BrowserRouter>
@@ -238,6 +247,7 @@ function AppRoutes() {
             <Route path="/messages"      element={<PrivateRoute><MessagesPage /></PrivateRoute>} />
             <Route path="/study-groups"  element={<PrivateRoute><StudyGroupsPage /></PrivateRoute>} />
             <Route path="/study-groups/:id" element={<PrivateRoute><StudyGroupsPage /></PrivateRoute>} />
+            <Route path="/ai"           element={<PrivateRoute><AiPage /></PrivateRoute>} />
             <Route path="/notes/:id"    element={<NoteViewerPage />} />
             <Route path="/announcements" element={<PrivateRoute><AnnouncementsPage /></PrivateRoute>} />
             <Route path="/submit"        element={<PrivateRoute><SubmitPage /></PrivateRoute>} />
@@ -255,6 +265,7 @@ function AppRoutes() {
         </Suspense>
         <ScrollToTop />
         <ToastContainer />
+        <AuthenticatedBubble />
         {PerfOverlay && <Suspense fallback={null}><PerfOverlay /></Suspense>}
       </SessionProvider>
     </BrowserRouter>

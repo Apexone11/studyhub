@@ -123,6 +123,11 @@ async function deleteUserAccount(prisma, { userId, username, reason = null, deta
     // ── Notifications cleanup ──
     await tx.notification.deleteMany({ where: { userId } })
 
+    // ── Hub AI cleanup (messages cascade from conversations, but explicit for safety) ──
+    await tx.aiMessage.deleteMany({ where: { userId } })
+    await tx.aiUsageLog.deleteMany({ where: { userId } })
+    await tx.aiConversation.deleteMany({ where: { userId } })
+
     await tx.studySheet.deleteMany({ where: { userId } })
     await tx.user.delete({ where: { id: userId } })
 

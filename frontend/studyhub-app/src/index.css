@@ -3017,6 +3017,16 @@ textarea.sh-input {
   to { transform: translateX(0); }
 }
 
+@keyframes pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 /* ── Focus ring styles (keyboard accessibility) ──────────────────── */
 *:focus-visible {
   outline: 2px solid #3b82f6;

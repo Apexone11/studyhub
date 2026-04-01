@@ -49,6 +49,7 @@ const messagingRoutes = require('./modules/messaging')
 const studyGroupRoutes = require('./modules/studyGroups')
 const docsRoutes = require('./modules/docs')
 const sharingRoutes = require('./modules/sharing')
+const aiRoutes = require('./modules/ai')
 const { initSocketIO } = require('./lib/socketio')
 const { featureFlagMiddleware } = require('./lib/featureFlags')
 
@@ -359,6 +360,9 @@ app.use('/api/study-groups', studyGroupRoutes)
 
 // Mount sharing (privacy controls v2) endpoints under /api/sharing.
 app.use('/api/sharing', sharingRoutes)
+
+// Hub AI assistant endpoints under /api/ai.
+app.use('/api/ai', aiRoutes)
 
 // Public unauthenticated data endpoints (landing page stats, etc.).
 app.use('/api/public', publicRoutes)

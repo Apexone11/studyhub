@@ -28,6 +28,7 @@
 		"test:watch": "vitest"
 	},
 	"dependencies": {
+		"@anthropic-ai/sdk": "^0.39.0",
 		"@aws-sdk/client-kms": "^3.1016.0",
 		"@prisma/client": "^6.19.2",
 		"@sentry/node": "^10.43.0",
