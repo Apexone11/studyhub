@@ -90,7 +90,7 @@ Estimated effort: 2 sessions.
 Goal: Reduce risk from outdated dependencies and improve deploy pipeline.
 
 ### E-1: Upgrade Vite from 8.0.0-beta.13 to stable
-- Currently on a beta prerelease. Upgrade to stable 8.5.x (or latest stable).
+- Was on a beta prerelease. Upgraded to stable ^8.0.3 (latest Vite 8 stable).
 - Run full build + E2E suite after upgrade.
 
 ### E-2: Frontend Dockerfile multi-stage build
