@@ -55,7 +55,7 @@ export function clearStoredSession() {
 
 export async function logoutSession() {
   try {
-    await fetch(`${API}/api/auth/logout`, { method: 'POST' })
+    await fetch(`${API}/api/auth/logout`, { method: 'POST', credentials: 'include' })
   } catch {
     // Best effort only — always clear local cached user state.
   } finally {

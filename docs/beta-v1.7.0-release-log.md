@@ -3199,3 +3199,79 @@ All identified tech debt items from this audit cycle have been resolved or class
 ### Verification
 
 All 13 files modified in this phase pass acorn/JSX syntax validation (13/13).
+
+---
+
+## Production Debug + Tech Debt Sweep (2026-04-01)
+
+### Summary
+
+Railway deployment crashed on both backend and frontend after the rate limiter centralization deploy. Full debug audit found and fixed 6 distinct issues across backend and frontend.
+
+### Bug 1: Backend crash — Rate limiter name mismatches (CRITICAL)
+
+During centralization, imports were renamed but 8 usages in route handlers still referenced old names, causing `ReferenceError` at startup.
+
+| File | Old (broken) | Fixed |
+|------|-------------|-------|
+| `upload.routes.js` | `avatarUploadLimiter` | `uploadAvatarLimiter` |
+| `upload.routes.js` | `coverUploadLimiter` | `uploadCoverLimiter` |
+| `upload.routes.js` | `attachmentUploadLimiter` (x2) | `uploadAttachmentLimiter` |
+| `upload.routes.js` | `contentImageUploadLimiter` | `uploadContentImageLimiter` |
+| `messaging.routes.js` | `messageWriteLimiter` (x3) | `messagingWriteLimiter` |
+
+### Bug 2: Frontend build crash — Missing re-exports (CRITICAL)
+
+`StudyGroupsPage.jsx` imports 5 tab components from `GroupDetailTabs.jsx`, but the decomposition refactor removed the exports without adding re-exports.
+
+Fix: Added `export { GroupOverviewTab, GroupResourcesTab, GroupSessionsTab, GroupDiscussionsTab, GroupMembersTab }` to `GroupDetailTabs.jsx`.
+
+### Bug 3: Infinite fetch loop — useFetch transform dependency (CRITICAL)
+
+The `useFetch` hook included `transform` in its `useCallback` dependency array. Components passing inline arrow functions (like `FeedFollowSuggestions`) created a new reference every render, triggering an infinite fetch-render loop (2,520 requests observed in production).
+
+Fix: Moved `transform` to a `useRef` so it never triggers re-fetches while always using the latest function.
+
+### Bug 4: Missing `credentials: 'include'` on 3 authenticated fetch calls (HIGH)
+
+| File | Endpoint | Impact |
+|------|----------|--------|
+| `lib/protectedSession.js` | `GET /api/auth/me` | Session sync fails on app startup — user appears logged out |
+| `lib/session.js` | `POST /api/auth/logout` | Server-side session not cleared on logout |
+| `lib/useBootstrapPreferences.js` | `GET /api/settings/preferences` | User preferences (theme, etc.) fail to load |
+
+### Bug 5: 2 remaining inline rate limiters not centralized (MEDIUM)
+
+| File | Old | Centralized as |
+|------|-----|---------------|
+| `sheets.activity.controller.js` | Inline `rateLimiter` (120/min) | `sheetActivityLimiter` from `rateLimiters.js` |
+| `sheets.read.controller.js` | Inline `readmeLimiter` (120/min) | `sheetReadmeLimiter` from `rateLimiters.js` |
+
+### Full Audit Results
+
+Three parallel agents scanned the entire codebase. Beyond the fixes above:
+- All 49 rate limiter exports now match all imports (verified programmatically)
+- No broken `require()` paths found in any backend module
+- No Prisma `{ not: null }` violations (all use correct `NOT: [{ field: null }]`)
+- All `getBlockedUserIds`/`getMutedUserIds` calls are properly wrapped in try-catch
+- No infinite fetch loops remain in any `useFetch` consumer
+- ChatPanel and ModerationTab decompositions verified clean (no missing exports)
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `backend/src/modules/upload/upload.routes.js` | 5 rate limiter name fixes |
+| `backend/src/modules/messaging/messaging.routes.js` | 3 rate limiter name fixes |
+| `backend/src/lib/rateLimiters.js` | Added `sheetActivityLimiter`, `sheetReadmeLimiter` |
+| `backend/src/modules/sheets/sheets.activity.controller.js` | Replaced inline limiter with centralized import |
+| `backend/src/modules/sheets/sheets.read.controller.js` | Replaced inline limiter with centralized import |
+| `frontend/.../pages/studyGroups/GroupDetailTabs.jsx` | Added re-exports for 5 tab components |
+| `frontend/.../lib/useFetch.js` | Moved `transform` to ref to prevent infinite loop |
+| `frontend/.../lib/protectedSession.js` | Added `credentials: 'include'` |
+| `frontend/.../lib/session.js` | Added `credentials: 'include'` |
+| `frontend/.../lib/useBootstrapPreferences.js` | Added `credentials: 'include'` |
+
+### Verification
+
+All 10 modified files pass acorn/JSX syntax validation (10/10).

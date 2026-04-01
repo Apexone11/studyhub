@@ -42,6 +42,7 @@ export function useBootstrapPreferences() {
 
     fetch(`${API}/api/settings/preferences`, {
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
     })
       .then((response) => (response.ok ? response.json() : null))
       .then((data) => {

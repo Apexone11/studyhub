@@ -20,6 +20,12 @@ export default function useFetch(path, options = {}) {
   const [error, setError] = useState(null)
   const mountedRef = useRef(true)
 
+  // Use a ref for the transform function so it never triggers re-fetches.
+  // Inline arrow functions create a new reference every render; putting
+  // them in the useCallback deps caused an infinite fetch loop.
+  const transformRef = useRef(transform)
+  transformRef.current = transform
+
   const fetchData = useCallback(async () => {
     if (skip) return
     setLoading(true)
@@ -31,7 +37,7 @@ export default function useFetch(path, options = {}) {
         throw new Error(msg)
       }
       let result = await res.json()
-      if (transform) result = transform(result)
+      if (transformRef.current) result = transformRef.current(result)
       if (mountedRef.current) {
         setData(result)
         setError(null)
@@ -43,7 +49,7 @@ export default function useFetch(path, options = {}) {
     } finally {
       if (mountedRef.current) setLoading(false)
     }
-  }, [path, skip, transform])
+  }, [path, skip])
 
   useEffect(() => {
     mountedRef.current = true
