@@ -111,7 +111,7 @@ export default function NotesPage() {
       {/* Tutorial popup */}
       <SafeJoyride {...tutorial.joyrideProps} />
       {tutorial.seen && (
-        <button type="button" onClick={tutorial.restart} title="Show tutorial" style={{ position: 'fixed', bottom: 24, right: 24, width: 44, height: 44, borderRadius: '50%', border: 'none', background: 'var(--sh-brand)', color: 'var(--sh-surface)', fontSize: 18, fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 14px var(--sh-brand-shadow, rgba(59,130,246,0.4))', zIndex: 50, display: 'grid', placeItems: 'center' }}>?</button>
+        <button type="button" onClick={tutorial.restart} title="Show tutorial" style={{ position: 'fixed', bottom: 88, right: 24, width: 44, height: 44, borderRadius: '50%', border: 'none', background: 'var(--sh-brand)', color: 'var(--sh-surface)', fontSize: 18, fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 14px var(--sh-brand-shadow, rgba(59,130,246,0.4))', zIndex: 50, display: 'grid', placeItems: 'center' }}>?</button>
       )}
     </PageShell>
   )

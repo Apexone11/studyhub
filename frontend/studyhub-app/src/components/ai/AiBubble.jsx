@@ -2,16 +2,17 @@
  * AiBubble.jsx -- Floating Hub AI bubble widget.
  *
  * Renders a fixed-position circular button in the bottom-right corner.
- * Clicking it opens a compact chat window with its own independent useAiChat
- * instance (state is NOT shared with the /ai page).
+ * Clicking it opens a compact chat window. State is shared with the /ai page
+ * via AiChatProvider (useSharedAiChat).
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import { IconSpark, IconX, IconPlus } from '../Icons'
 import AiMarkdown from './AiMarkdown'
+import AiThinkingDots from './AiThinkingDots'
 import { SheetPreviewBar, extractHtmlFromMessage } from './AiSheetPreview'
-import { useAiChat } from '../../lib/useAiChat'
+import { useSharedAiChat } from '../../lib/AiChatProvider'
 import { useAiContext } from '../../lib/useAiContext'
 import { PAGE_FONT } from '../../pages/shared/pageUtils'
 
@@ -19,7 +20,7 @@ export default function AiBubble() {
   const [isOpen, setIsOpen] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
-  const chat = useAiChat()
+  const chat = useSharedAiChat()
   const contextChips = useAiContext()
   const inputRef = useRef(null)
   const messagesEndRef = useRef(null)
@@ -231,11 +232,8 @@ export default function AiBubble() {
                 </div>
                 <div style={{
                   background: 'var(--sh-soft)', borderRadius: '4px 12px 12px 12px',
-                  padding: '8px 12px', display: 'flex', gap: 4,
                 }}>
-                  <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--sh-muted)', animation: 'pulse 1.4s infinite' }} />
-                  <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--sh-muted)', animation: 'pulse 1.4s infinite', animationDelay: '0.2s' }} />
-                  <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--sh-muted)', animation: 'pulse 1.4s infinite', animationDelay: '0.4s' }} />
+                  <AiThinkingDots compact />
                 </div>
               </div>
             )}

@@ -206,7 +206,7 @@ export default function FeedPage() {
       </div>
       <SafeJoyride {...tutorial.joyrideProps} />
       {tutorial.seen && (
-        <button type="button" onClick={tutorial.restart} title="Show tutorial" style={{ position: 'fixed', bottom: 24, right: 24, width: 44, height: 44, borderRadius: '50%', border: 'none', background: 'var(--sh-brand)', color: '#fff', fontSize: 18, fontWeight: 800, cursor: 'pointer', boxShadow: 'var(--sh-btn-primary-shadow)', zIndex: 50, display: 'grid', placeItems: 'center', fontFamily: FONT }}>
+        <button type="button" onClick={tutorial.restart} title="Show tutorial" style={{ position: 'fixed', bottom: 88, right: 24, width: 44, height: 44, borderRadius: '50%', border: 'none', background: 'var(--sh-brand)', color: '#fff', fontSize: 18, fontWeight: 800, cursor: 'pointer', boxShadow: 'var(--sh-btn-primary-shadow)', zIndex: 50, display: 'grid', placeItems: 'center', fontFamily: FONT }}>
           ?
         </button>
       )}
