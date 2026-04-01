@@ -562,6 +562,30 @@ const createAiMessageLimiter = (rpmLimit) => rateLimit({
   message: { error: 'Too many AI requests. Please wait a moment.' },
 })
 
+// ── CATEGORY: Sheet Activity / Readme ─────────────────────────────────────
+
+/**
+ * Sheet activity feed — 120 requests per minute per IP.
+ */
+const sheetActivityLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please slow down.' },
+})
+
+/**
+ * Sheet readme extras — 120 requests per minute per IP.
+ */
+const sheetReadmeLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please slow down.' },
+})
+
 // ── Exports ────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -601,6 +625,8 @@ module.exports = {
   sheetLeaderboardLimiter,
   sheetDiffLimiter,
   sheetAnalyticsLimiter,
+  sheetActivityLimiter,
+  sheetReadmeLimiter,
 
   // Moderation module
   moderationAppealLimiter,

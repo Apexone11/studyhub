@@ -7,18 +7,11 @@ const prisma = require('../../core/db/prisma')
 const { captureError } = require('../../core/monitoring/sentry')
 const { optionalAuth, canReadSheet, parsePositiveInt } = require('../sheetLab/sheetLab.constants')
 const { AUTHOR_SELECT } = require('./sheets.constants')
-
-const rateLimiter = require('express-rate-limit')({
-  windowMs: 60 * 1000,
-  max: 120,
-  message: { error: 'Too many requests. Please slow down.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-})
+const { sheetActivityLimiter } = require('../../lib/rateLimiters')
 
 const router = express.Router()
 
-router.get('/:id/activity', rateLimiter, optionalAuth, async (req, res) => {
+router.get('/:id/activity', sheetActivityLimiter, optionalAuth, async (req, res) => {
   const sheetId = parsePositiveInt(req.params.id)
   const page = parsePositiveInt(req.query.page, 1)
   const limit = Math.min(parsePositiveInt(req.query.limit, 20), 50)

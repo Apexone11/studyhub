@@ -80,15 +80,9 @@ router.get('/:id', optionalAuth, async (req, res) => {
 })
 
 /* ── GET /:id/readme — lightweight readme extras (contributors + latest commit) ── */
-const readmeLimiter = require('express-rate-limit')({
-  windowMs: 60 * 1000,
-  max: 120,
-  message: { error: 'Too many requests. Please slow down.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-})
+const { sheetReadmeLimiter } = require('../../lib/rateLimiters')
 
-router.get('/:id/readme', readmeLimiter, optionalAuth, async (req, res) => {
+router.get('/:id/readme', sheetReadmeLimiter, optionalAuth, async (req, res) => {
   const sheetId = Number.parseInt(req.params.id, 10)
   if (!Number.isInteger(sheetId)) return res.status(400).json({ error: 'Invalid sheet id.' })
 
