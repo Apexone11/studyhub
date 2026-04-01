@@ -48,8 +48,9 @@ const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 
 import ScrollToTop from './components/ScrollToTop'
 import ToastContainer from './components/Toast'
-import AiBubble from './components/ai/AiBubble'
-import { AiChatProvider } from './lib/AiChatProvider'
+
+const AiBubble = lazy(() => import('./components/ai/AiBubble'))
+const AiChatProviderModule = lazy(() => import('./lib/AiChatProvider').then(m => ({ default: m.AiChatProvider })))
 
 const PerfOverlay = import.meta.env?.DEV ? lazy(() => import('./components/PerfOverlay')) : null
 
@@ -211,13 +212,17 @@ function RouteFallback() {
 function AuthenticatedAiProvider({ children }) {
   const { isAuthenticated } = useSession()
   if (!isAuthenticated) return children
-  return <AiChatProvider>{children}</AiChatProvider>
+  return (
+    <Suspense fallback={children}>
+      <AiChatProviderModule>{children}</AiChatProviderModule>
+    </Suspense>
+  )
 }
 
 function AuthenticatedBubble() {
   const { isAuthenticated } = useSession()
   if (!isAuthenticated) return null
-  return <AiBubble />
+  return <Suspense fallback={null}><AiBubble /></Suspense>
 }
 
 function AppRoutes() {

@@ -10,20 +10,21 @@
 // Refactored: constants/styles in navbarConstants.js,
 // user menu in NavbarUserMenu.jsx, notifications in NavbarNotifications.jsx.
 
-import { useState, useEffect, Fragment } from 'react'
+import { useState, useEffect, Fragment, lazy, Suspense } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import {
   LogoMark,
   IconSearch,
 } from '../Icons'
-import SearchModal from '../search/SearchModal'
+const SearchModal = lazy(() => import('../search/SearchModal'))
+const ChatPanel = lazy(() => import('../ChatPanel'))
 import KeyboardShortcuts from '../KeyboardShortcuts'
 import { pageWidths } from '../../lib/ui'
 import { useSession } from '../../lib/session-context'
 import EmailVerificationBanner from '../EmailVerificationBanner'
 import NavbarUserMenu from './NavbarUserMenu'
 import NavbarNotifications from './NavbarNotifications'
-import ChatPanel from '../ChatPanel'
+/* ChatPanel lazy-loaded above */
 import { IconMessages } from '../Icons'
 import { S, getConfig, handleIconHover } from './navbarConstants'
 import { API } from '../../config'
@@ -215,8 +216,8 @@ export default function Navbar({
             <kbd className="sh-kbd-hint" aria-hidden="true">{navigator.platform?.includes('Mac') ? '⌘' : 'Ctrl+'}K</kbd>
           </div>
         )}
-        <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
-        <ChatPanel open={chatOpen} onClose={() => {
+        {searchOpen && <Suspense fallback={null}><SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} /></Suspense>}
+        {chatOpen && <Suspense fallback={null}><ChatPanel open={chatOpen} onClose={() => {
           setChatOpen(false)
           // Re-fetch unread count after closing chat (user may have read messages)
           if (user) {
@@ -226,7 +227,7 @@ export default function Navbar({
               if (d) setUnreadMessages(d.total || 0)
             }).catch(() => {})
           }
-        }} />
+        }} /></Suspense>}
         <KeyboardShortcuts />
 
         {!user && isLanding && <div style={{ flex: 1 }} />}

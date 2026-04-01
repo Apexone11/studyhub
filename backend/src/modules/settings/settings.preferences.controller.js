@@ -1,5 +1,6 @@
 const express = require('express')
 const prisma = require('../../lib/prisma')
+const { cacheControl } = require('../../lib/cacheControl')
 const { PREF_BOOLEAN_KEYS, PREF_ENUM_KEYS } = require('./settings.constants')
 const {
   AppError,
@@ -14,7 +15,7 @@ const {
 
 const router = express.Router()
 
-router.get('/preferences', async (req, res) => {
+router.get('/preferences', cacheControl(60, { staleWhileRevalidate: 120 }), async (req, res) => {
   try {
     const { userId } = req.user
     let prefs = await prisma.userPreferences.findUnique({ where: { userId } })

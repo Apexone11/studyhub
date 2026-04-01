@@ -27,6 +27,7 @@ import { usePageTitle } from '../../lib/usePageTitle'
 import { useNotesData } from './useNotesData'
 import NotesList from './NotesList'
 import NoteEditor from './NoteEditor'
+import { SkeletonList, SkeletonCard } from '../../components/Skeleton'
 
 export default function NotesPage() {
   usePageTitle('My Notes')
@@ -46,9 +47,18 @@ export default function NotesPage() {
   /* ── Loading gate ────────────────────────────────────────────────────── */
   if (authStatus === 'loading') {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--sh-muted)', fontFamily: PAGE_FONT }}>
-        Loading…
-      </div>
+      <PageShell nav={<Navbar crumbs={[{ label: 'My Notes', to: '/notes' }]} hideTabs />} sidebar={<AppSidebar />}>
+        <div className="notes-split-panel">
+          <div style={{ minWidth: 0 }}>
+            <div style={{ background: 'var(--sh-surface)', borderRadius: 16, border: '1px solid var(--sh-border)', padding: '20px 22px' }}>
+              <SkeletonList count={4} />
+            </div>
+          </div>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <SkeletonCard />
+          </div>
+        </div>
+      </PageShell>
     )
   }
 

@@ -23,6 +23,7 @@ import { useSocket } from '../../lib/useSocket'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useMessagingData } from './useMessagingData'
+import { SkeletonList, SkeletonCard } from '../../components/Skeleton'
 
 // Sub-components from ./components/
 import { ConversationList } from './components/ConversationList'
@@ -125,16 +126,18 @@ export default function MessagesPage() {
 
   if (authStatus === 'loading') {
     return (
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: 'var(--sh-muted)',
-        fontFamily: PAGE_FONT,
-      }}>
-        Loading...
-      </div>
+      <PageShell nav={<Navbar crumbs={[{ label: 'Messages', to: '/messages' }]} hideTabs />} sidebar={<AppSidebar />}>
+        <div className="messages-split-panel">
+          <div data-tutorial="messages-conversations" style={{ minWidth: 0 }}>
+            <div style={{ background: 'var(--sh-surface)', borderRadius: 16, border: '1px solid var(--sh-border)', padding: '20px 22px' }}>
+              <SkeletonList count={5} />
+            </div>
+          </div>
+          <div data-tutorial="messages-compose" style={{ minWidth: 0, flex: 1 }}>
+            <SkeletonCard />
+          </div>
+        </div>
+      </PageShell>
     )
   }
 

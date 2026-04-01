@@ -14,7 +14,7 @@
 const express = require('express')
 const requireAuth = require('../../middleware/auth')
 const { captureError } = require('../../monitoring/sentry')
-const { readLimiter, createAiMessageLimiter } = require('../../lib/rateLimiters')
+const { readLimiter, writeLimiter, createAiMessageLimiter } = require('../../lib/rateLimiters')
 const aiService = require('./ai.service')
 const { MAX_MESSAGE_LENGTH, MAX_IMAGES_PER_MESSAGE, MAX_IMAGE_SIZE, ALLOWED_IMAGE_TYPES, AI_RATE_LIMIT_RPM } = require('./ai.constants')
 
@@ -40,7 +40,7 @@ router.get('/conversations', requireAuth, readLimiter, async (req, res) => {
 })
 
 // POST /api/ai/conversations
-router.post('/conversations', requireAuth, async (req, res) => {
+router.post('/conversations', requireAuth, writeLimiter, async (req, res) => {
   try {
     const conversation = await aiService.createConversation(req.user.userId, req.body.title || null)
     res.status(201).json(conversation)
@@ -67,7 +67,7 @@ router.get('/conversations/:id', requireAuth, readLimiter, async (req, res) => {
 })
 
 // DELETE /api/ai/conversations/:id
-router.delete('/conversations/:id', requireAuth, async (req, res) => {
+router.delete('/conversations/:id', requireAuth, writeLimiter, async (req, res) => {
   try {
     const id = parseInt(req.params.id)
     if (isNaN(id)) return res.status(400).json({ error: 'Invalid conversation ID.' })
@@ -83,7 +83,7 @@ router.delete('/conversations/:id', requireAuth, async (req, res) => {
 })
 
 // PATCH /api/ai/conversations/:id
-router.patch('/conversations/:id', requireAuth, async (req, res) => {
+router.patch('/conversations/:id', requireAuth, writeLimiter, async (req, res) => {
   try {
     const id = parseInt(req.params.id)
     if (isNaN(id)) return res.status(400).json({ error: 'Invalid conversation ID.' })

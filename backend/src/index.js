@@ -18,6 +18,7 @@ const checkRestrictions = require('./middleware/checkRestrictions')
 const auditMiddleware = require('./middleware/auditMiddleware')
 const { getAuthTokenFromRequest, validateSecrets, verifyAuthToken } = require('./lib/authTokens')
 const { ERROR_CODES, sendError } = require('./middleware/errorEnvelope')
+const prisma = require('./lib/prisma')
 
 const sentryEnabled = initSentry()
 
@@ -372,8 +373,17 @@ app.get('/', (req, res) => {
     res.json({ message: 'StudyHub API is running' })
 })
 
-app.get('/health', (req, res) => {
-    res.json({ status: 'ok' })
+app.get('/health', async (req, res) => {
+    const checks = { api: 'ok', database: 'ok' }
+    let httpStatus = 200
+    try {
+        await prisma.$queryRaw`SELECT 1`
+    } catch (e) {
+        checks.database = 'error'
+        httpStatus = 503
+    }
+    checks.status = httpStatus === 200 ? 'healthy' : 'degraded'
+    res.status(httpStatus).json(checks)
 })
 
 // Global error handler — catches unhandled route errors and prevents stack trace leakage.

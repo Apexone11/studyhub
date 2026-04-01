@@ -619,6 +619,165 @@ describe('messaging routes', () => {
   })
 
   /* =================================================================== */
+  /* POST /conversations/:id/read (mark read)                             */
+  /* =================================================================== */
+  describe('POST /conversations/:id/read', () => {
+    it('marks conversation as read and returns zero unread count', async () => {
+      mocks.prisma.conversationParticipant.findUnique.mockResolvedValue({
+        conversationId: 1,
+        userId: 42,
+        lastReadAt: new Date('2026-03-19'),
+      })
+      mocks.prisma.conversationParticipant.update.mockResolvedValue({
+        conversationId: 1,
+        userId: 42,
+        lastReadAt: new Date('2026-03-20T12:00:00Z'),
+      })
+
+      const res = await request(app).post('/conversations/1/read')
+
+      expect(res.status).toBe(200)
+      expect(res.body).toMatchObject({
+        conversationId: 1,
+        unreadCount: 0,
+      })
+      expect(mocks.prisma.conversationParticipant.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            conversationId_userId: {
+              conversationId: 1,
+              userId: 42,
+            },
+          }),
+          data: expect.objectContaining({
+            lastReadAt: expect.any(Date),
+          }),
+        })
+      )
+    })
+
+    it('rejects non-participants from marking read', async () => {
+      mocks.prisma.conversationParticipant.findUnique.mockResolvedValue(null)
+
+      const res = await request(app).post('/conversations/1/read')
+
+      expect(res.status).toBe(403)
+      expect(res.body.error).toMatch(/not a participant/i)
+    })
+
+    it('rejects invalid conversation ID', async () => {
+      const res = await request(app).post('/conversations/invalid/read')
+
+      expect(res.status).toBe(400)
+      expect(res.body.error).toMatch(/invalid.*id/i)
+    })
+  })
+
+  /* =================================================================== */
+  /* GET /unread-total                                                   */
+  /* =================================================================== */
+  describe('GET /unread-total', () => {
+    it('returns total unread message count across all conversations', async () => {
+      mocks.prisma.conversationParticipant.findMany.mockResolvedValue([
+        {
+          conversationId: 1,
+          lastReadAt: new Date('2026-03-19T00:00:00Z'),
+        },
+        {
+          conversationId: 2,
+          lastReadAt: new Date('2026-03-20T09:00:00Z'),
+        },
+      ])
+      mocks.prisma.message.count
+        .mockResolvedValueOnce(5) // 5 unread in conversation 1
+        .mockResolvedValueOnce(2) // 2 unread in conversation 2
+
+      const res = await request(app).get('/unread-total')
+
+      expect(res.status).toBe(200)
+      expect(res.body.total).toBe(7)
+      expect(mocks.prisma.message.count).toHaveBeenCalledTimes(2)
+    })
+
+    it('counts only messages newer than lastReadAt', async () => {
+      const lastReadTime = new Date('2026-03-20T10:00:00Z')
+      mocks.prisma.conversationParticipant.findMany.mockResolvedValue([
+        {
+          conversationId: 1,
+          lastReadAt: lastReadTime,
+        },
+      ])
+      mocks.prisma.message.count.mockResolvedValue(3)
+
+      await request(app).get('/unread-total')
+
+      const callArgs = mocks.prisma.message.count.mock.calls[0][0]
+      expect(callArgs.where.createdAt.gt).toEqual(lastReadTime)
+    })
+
+    it('excludes messages from current user in unread count', async () => {
+      mocks.prisma.conversationParticipant.findMany.mockResolvedValue([
+        {
+          conversationId: 1,
+          lastReadAt: new Date('2026-03-19T00:00:00Z'),
+        },
+      ])
+      mocks.prisma.message.count.mockResolvedValue(4)
+
+      await request(app).get('/unread-total')
+
+      const callArgs = mocks.prisma.message.count.mock.calls[0][0]
+      expect(callArgs.where.senderId.not).toBe(42) // req.user.userId
+    })
+
+    it('excludes deleted messages from unread count', async () => {
+      mocks.prisma.conversationParticipant.findMany.mockResolvedValue([
+        {
+          conversationId: 1,
+          lastReadAt: new Date('2026-03-19T00:00:00Z'),
+        },
+      ])
+      mocks.prisma.message.count.mockResolvedValue(2)
+
+      await request(app).get('/unread-total')
+
+      const callArgs = mocks.prisma.message.count.mock.calls[0][0]
+      expect(callArgs.where.deletedAt).toBe(null)
+    })
+
+    it('gracefully handles count errors with zero fallback', async () => {
+      mocks.prisma.conversationParticipant.findMany.mockResolvedValue([
+        {
+          conversationId: 1,
+          lastReadAt: new Date('2026-03-19T00:00:00Z'),
+        },
+      ])
+      mocks.prisma.message.count.mockRejectedValue(new Error('db error'))
+
+      const res = await request(app).get('/unread-total')
+
+      expect(res.status).toBe(200)
+      expect(res.body.total).toBe(0) // Graceful degradation
+    })
+
+    it('returns 0 when participant has no lastReadAt (treats as epoch)', async () => {
+      mocks.prisma.conversationParticipant.findMany.mockResolvedValue([
+        {
+          conversationId: 1,
+          lastReadAt: null,
+        },
+      ])
+      mocks.prisma.message.count.mockResolvedValue(10)
+
+      const res = await request(app).get('/unread-total')
+
+      expect(res.status).toBe(200)
+      const callArgs = mocks.prisma.message.count.mock.calls[0][0]
+      expect(callArgs.where.createdAt.gt).toEqual(new Date(0))
+    })
+  })
+
+  /* =================================================================== */
   /* GET /online                                                         */
   /* =================================================================== */
   describe('GET /online', () => {

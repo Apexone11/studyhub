@@ -8,6 +8,7 @@
 const express = require('express')
 const { publicLimiter } = require('../../lib/rateLimiters')
 const { captureError } = require('../../monitoring/sentry')
+const { cacheControl } = require('../../lib/cacheControl')
 const prisma = require('../../lib/prisma')
 
 const router = express.Router()
@@ -20,7 +21,7 @@ let cachedStats = null
 let cacheExpiresAt = 0
 const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
 
-router.get('/platform-stats', async (req, res) => {
+router.get('/platform-stats', cacheControl(300, { public: true, staleWhileRevalidate: 600 }), async (req, res) => {
   try {
     const now = Date.now()
     if (cachedStats && now < cacheExpiresAt) {
