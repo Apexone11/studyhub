@@ -146,7 +146,8 @@ export function useNotesData() {
         body: JSON.stringify({ title: 'Untitled Note', content: '' }),
       })
       if (!response.ok) {
-        showToast('Failed to create note', 'error')
+        const errData = await response.json().catch(() => ({}))
+        showToast(errData.error || 'Failed to create note', 'error')
         return
       }
       const note = await response.json()
