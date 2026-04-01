@@ -2910,3 +2910,67 @@ Fixed the core issue where message unread notification badges persisted indefini
 3. Run `npx prisma migrate deploy` on Railway to create the 4 new tables (note pinned/tags, note star/version, discussion upvotes, AI tables).
 4. Verify `ANTHROPIC_API_KEY` environment variable is set in Railway backend service.
 5. Test: visit /ai, send a message, verify streaming response.
+
+---
+
+## Production Hotfix -- Prisma 6.19 `{ not: null }` Crash (2026-04-01)
+
+### Summary
+
+Fixed a critical Prisma crash on `GET /api/courses/popular` (4030 Sentry events). Prisma 6.19+ rejects `null` as the value for the `not` filter operator. All 13 instances across 8 backend files were updated to use the correct `NOT: [{ field: null }]` array syntax.
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `backend/src/modules/courses/courses.schools.controller.js` | `courseId: { not: null }` -> `NOT: [{ courseId: null }]` |
+| `backend/src/modules/moderation/moderation.admin.cases.controller.js` | Fixed 2 instances (claimedByAdminId, groupBy) |
+| `backend/src/lib/badges.js` | `forkOf: { not: null }` -> `NOT: [{ forkOf: null }]` |
+| `backend/src/lib/plagiarism.js` | Fixed 2 instances (contentSimhash) |
+| `backend/src/lib/plagiarismService.js` | Fixed 2 instances (contentSimhash) |
+| `backend/src/lib/verification/verificationStorage.js` | Fixed verifiedAt in deleteMany |
+| `backend/src/modules/dashboard/dashboard.routes.js` | Fixed forkOf in count query |
+| `backend/src/modules/admin/admin.plagiarism.controller.js` | Fixed 3 instances (contentSimhash, contentHash) |
+| `CLAUDE.md` | Updated documentation to reflect correct Prisma null syntax |
+
+---
+
+## AI Page + Bubble UX Polish (2026-04-01)
+
+### Summary
+
+Polished the Hub AI chat experience (page and floating bubble) and improved feed/social pages with better error handling and UX.
+
+### Changes
+
+| Category | Detail |
+|----------|--------|
+| AI UX | Added loading state on AI page instead of blank screen during auth bootstrap |
+| AI UX | Replaced hardcoded AI gradient strings with `var(--sh-ai-gradient)` CSS token |
+| AI UX | Added `loadingConversations` state to useAiChat hook with spinner in sidebar |
+| AI UX | Added CodeBlock component to AiMarkdown with copy-to-clipboard and syntax header |
+| AI UX | Added `invertColors` param to AiMarkdown for readable inline code in user messages |
+| AI UX | Fixed mobile viewport overflow on bubble chat window |
+| AI UX | Added Escape key to close bubble (global listener + textarea keydown) |
+| Feed | Added debounced search input (350ms idle before URL param sync) |
+| Feed | Fixed gamification widgets (StreakWidget, WeeklyProgressWidget, LeaderboardWidget) to show error state instead of silent failure |
+| Feed | Added optimistic update with error rollback on follow button in FeedFollowSuggestions |
+| Layout | Moved tutorial `?` buttons from `bottom: 24` to `bottom: 88` to avoid AI bubble overlap (Feed, Notes, Dashboard pages) |
+| Blank pages | Added loading spinners to AdminPage and AiSheetSetupPage instead of returning null during auth |
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `frontend/.../pages/ai/AiPage.jsx` | Loading state, gradient token, sidebar loading prop |
+| `frontend/.../components/ai/AiBubble.jsx` | Escape handler, mobile fix, gradient token |
+| `frontend/.../components/ai/AiMarkdown.jsx` | CodeBlock, invertColors support |
+| `frontend/.../lib/useAiChat.js` | loadingConversations state, streaming error cleanup |
+| `frontend/.../pages/feed/FeedPage.jsx` | Debounced search, tutorial button repositioned |
+| `frontend/.../pages/feed/GamificationWidgets.jsx` | Error states for all 3 widgets |
+| `frontend/.../pages/feed/FeedFollowSuggestions.jsx` | Optimistic follow with rollback |
+| `frontend/.../pages/notes/NotesPage.jsx` | Tutorial button repositioned |
+| `frontend/.../pages/dashboard/DashboardPage.jsx` | Tutorial button repositioned |
+| `frontend/.../pages/admin/AdminPage.jsx` | Loading state instead of blank |
+| `frontend/.../pages/sheets/lab/AiSheetSetupPage.jsx` | Loading state instead of blank |
+| `frontend/.../index.css` | Added `--sh-ai-gradient` CSS custom property |

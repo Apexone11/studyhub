@@ -26,16 +26,22 @@ export default function FeedFollowSuggestions() {
   }, [])
 
   const handleFollow = useCallback(async (username) => {
+    // Optimistic: show "Following" immediately.
+    setFollowingSet((prev) => new Set([...prev, username]))
     try {
       const res = await fetch(`${API}/api/users/${encodeURIComponent(username)}/follow`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
       })
-      if (res.ok) {
-        setFollowingSet((prev) => new Set([...prev, username]))
+      if (!res.ok) {
+        // Rollback on server error.
+        setFollowingSet((prev) => { const next = new Set(prev); next.delete(username); return next })
       }
-    } catch { /* ignore */ }
+    } catch {
+      // Rollback on network error.
+      setFollowingSet((prev) => { const next = new Set(prev); next.delete(username); return next })
+    }
   }, [])
 
   if (loading || suggestions.length === 0) return null

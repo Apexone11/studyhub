@@ -50,7 +50,18 @@ export default function AiBubble() {
       e.preventDefault()
       handleSend()
     }
+    if (e.key === 'Escape') {
+      setIsOpen(false)
+    }
   }
+
+  // Close bubble on Escape key (global).
+  useEffect(() => {
+    if (!isOpen) return
+    const handleEsc = (e) => { if (e.key === 'Escape') setIsOpen(false) }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [isOpen])
 
   const openFullPage = () => {
     setIsOpen(false)
@@ -78,7 +89,7 @@ export default function AiBubble() {
           width: 52,
           height: 52,
           borderRadius: '50%',
-          background: 'linear-gradient(135deg, var(--sh-brand), #7c3aed)',
+          background: 'var(--sh-ai-gradient)',
           color: '#fff',
           border: 'none',
           cursor: 'pointer',
@@ -101,7 +112,7 @@ export default function AiBubble() {
           position: 'fixed',
           bottom: 88,
           right: 24,
-          width: 380,
+          width: 'min(380px, calc(100vw - 48px))',
           height: 520,
           maxHeight: 'calc(100vh - 120px)',
           background: 'var(--sh-surface)',
@@ -126,7 +137,7 @@ export default function AiBubble() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <div style={{
                 width: 26, height: 26, borderRadius: '50%',
-                background: 'linear-gradient(135deg, var(--sh-brand), #7c3aed)',
+                background: 'var(--sh-ai-gradient)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
                 <IconSpark size={14} style={{ color: '#fff' }} />
@@ -207,7 +218,7 @@ export default function AiBubble() {
               <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'flex-start' }}>
                 <div style={{
                   width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
-                  background: 'linear-gradient(135deg, var(--sh-brand), #7c3aed)',
+                  background: 'var(--sh-ai-gradient)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
                   <IconSpark size={11} style={{ color: '#fff' }} />
@@ -225,7 +236,7 @@ export default function AiBubble() {
               <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'center' }}>
                 <div style={{
                   width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
-                  background: 'linear-gradient(135deg, var(--sh-brand), #7c3aed)',
+                  background: 'var(--sh-ai-gradient)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
                   <IconSpark size={11} style={{ color: '#fff' }} />
@@ -328,7 +339,7 @@ function BubbleMessage({ message }) {
       {!isUser && (
         <div style={{
           width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
-          background: 'linear-gradient(135deg, var(--sh-brand), #7c3aed)',
+          background: 'var(--sh-ai-gradient)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
           <IconSpark size={11} style={{ color: '#fff' }} />

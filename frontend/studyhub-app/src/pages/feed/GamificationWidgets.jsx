@@ -25,6 +25,7 @@ const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 export function StreakWidget() {
   const [streak, setStreak] = useState({ currentStreak: 0, longestStreak: 0, lastActiveDate: null, todayActive: false })
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
 
   useEffect(() => {
     const loadStreak = async () => {
@@ -35,9 +36,11 @@ export function StreakWidget() {
         if (response.ok) {
           const data = await response.json()
           setStreak(data)
+        } else {
+          setError(true)
         }
       } catch {
-        // Handle error silently
+        setError(true)
       } finally {
         setLoading(false)
       }
@@ -50,6 +53,14 @@ export function StreakWidget() {
     return (
       <Panel title="Your Streak" helper="Stay consistent">
         <div style={{ color: 'var(--sh-muted)', fontSize: 13 }}>Loading...</div>
+      </Panel>
+    )
+  }
+
+  if (error) {
+    return (
+      <Panel title="Your Streak" helper="Stay consistent">
+        <div style={{ color: 'var(--sh-muted)', fontSize: 12 }}>Could not load streak data.</div>
       </Panel>
     )
   }
@@ -102,6 +113,7 @@ export function WeeklyProgressWidget() {
     dailyBreakdown: [],
   })
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
 
   useEffect(() => {
     const loadWeekly = async () => {
@@ -112,9 +124,11 @@ export function WeeklyProgressWidget() {
         if (response.ok) {
           const data = await response.json()
           setWeekly(data)
+        } else {
+          setError(true)
         }
       } catch {
-        // Handle error silently
+        setError(true)
       } finally {
         setLoading(false)
       }
@@ -127,6 +141,14 @@ export function WeeklyProgressWidget() {
     return (
       <Panel title="This Week" helper="Activity goal">
         <div style={{ color: 'var(--sh-muted)', fontSize: 13 }}>Loading...</div>
+      </Panel>
+    )
+  }
+
+  if (error) {
+    return (
+      <Panel title="This Week" helper="Activity goal">
+        <div style={{ color: 'var(--sh-muted)', fontSize: 12 }}>Could not load activity data.</div>
       </Panel>
     )
   }
@@ -210,6 +232,7 @@ export function WeeklyProgressWidget() {
 export function LeaderboardWidget() {
   const [leaderboard, setLeaderboard] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
   const [currentUserRank, setCurrentUserRank] = useState(null)
 
   useEffect(() => {
@@ -231,9 +254,11 @@ export function LeaderboardWidget() {
               setCurrentUserRank(userRank)
             }
           }
+        } else {
+          setError(true)
         }
       } catch {
-        // Handle error silently
+        setError(true)
       } finally {
         setLoading(false)
       }
@@ -246,6 +271,14 @@ export function LeaderboardWidget() {
     return (
       <Panel title="Weekly Leaderboard" helper="Top performers">
         <div style={{ color: 'var(--sh-muted)', fontSize: 13 }}>Loading...</div>
+      </Panel>
+    )
+  }
+
+  if (error) {
+    return (
+      <Panel title="Weekly Leaderboard" helper="Top performers">
+        <div style={{ color: 'var(--sh-muted)', fontSize: 12 }}>Could not load leaderboard.</div>
       </Panel>
     )
   }

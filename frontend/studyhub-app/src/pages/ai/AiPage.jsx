@@ -92,6 +92,7 @@ export default function AiPage() {
                   onRename={chat.editConversationTitle}
                   usage={chat.usage}
                   isCompact={isCompact}
+                  loading={chat.loadingConversations}
                 />
               )}
 
@@ -121,7 +122,7 @@ export default function AiPage() {
 /* ═══════════════════════════════════════════════════════════════════════════
  * Conversation Sidebar
  * ═══════════════════════════════════════════════════════════════════════════ */
-function ConversationSidebar({ conversations, activeId, onSelect, onNew, onDelete, onRename, usage, isCompact }) {
+function ConversationSidebar({ conversations, activeId, onSelect, onNew, onDelete, onRename, usage, isCompact, loading }) {
   const [editingId, setEditingId] = useState(null)
   const [editTitle, setEditTitle] = useState('')
 
@@ -172,7 +173,13 @@ function ConversationSidebar({ conversations, activeId, onSelect, onNew, onDelet
 
       {/* List */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
-        {conversations.length === 0 && (
+        {loading && conversations.length === 0 && (
+          <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--sh-muted)', fontSize: 13 }}>
+            <IconSpinner size={18} style={{ animation: 'spin 1s linear infinite', marginBottom: 8 }} />
+            <div>Loading conversations...</div>
+          </div>
+        )}
+        {!loading && conversations.length === 0 && (
           <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--sh-muted)', fontSize: 13 }}>
             No conversations yet. Start a new chat!
           </div>
@@ -316,7 +323,7 @@ function ChatArea({ messages, streaming, streamingText, loading, error, onSend, 
       }}>
         <div style={{
           width: 64, height: 64, borderRadius: '50%',
-          background: 'linear-gradient(135deg, var(--sh-brand), #7c3aed)',
+          background: 'var(--sh-ai-gradient)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           marginBottom: 20,
         }}>
@@ -404,7 +411,7 @@ function ChatArea({ messages, streaming, streamingText, loading, error, onSend, 
           }}>
             <div style={{
               width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-              background: 'linear-gradient(135deg, var(--sh-brand), #7c3aed)',
+              background: 'var(--sh-ai-gradient)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
               <IconSpark size={14} style={{ color: '#fff' }} />
@@ -424,7 +431,7 @@ function ChatArea({ messages, streaming, streamingText, loading, error, onSend, 
           }}>
             <div style={{
               width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-              background: 'linear-gradient(135deg, var(--sh-brand), #7c3aed)',
+              background: 'var(--sh-ai-gradient)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
               <IconSpark size={14} style={{ color: '#fff' }} />
@@ -549,7 +556,7 @@ function MessageBubble({ message }) {
       {!isUser && (
         <div style={{
           width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-          background: 'linear-gradient(135deg, var(--sh-brand), #7c3aed)',
+          background: 'var(--sh-ai-gradient)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
           <IconSpark size={14} style={{ color: '#fff' }} />
