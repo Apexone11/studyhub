@@ -2,12 +2,13 @@
  * AiBubble.jsx -- Floating Hub AI bubble widget.
  *
  * Renders a fixed-position circular button in the bottom-right corner.
- * Clicking it opens a chat window that shares state with the /ai page.
+ * Clicking it opens a compact chat window with its own independent useAiChat
+ * instance (state is NOT shared with the /ai page).
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { createPortal } from 'react-dom'
-import { IconSpark, IconX, IconPlus, IconSpinner } from '../Icons'
+import { IconSpark, IconX, IconPlus } from '../Icons'
 import AiMarkdown from './AiMarkdown'
 import { SheetPreviewBar, extractHtmlFromMessage } from './AiSheetPreview'
 import { useAiChat } from '../../lib/useAiChat'
@@ -35,8 +36,10 @@ export default function AiBubble() {
     }
   }
 
+  const MAX_MSG_LEN = 5000
+
   const handleSend = () => {
-    if (!input.trim() || chat.streaming) return
+    if (!input.trim() || chat.streaming || input.length > MAX_MSG_LEN) return
     chat.sendMessage(input)
     setInput('')
   }

@@ -57,15 +57,22 @@ ${courseList}
     sections.push(`<current_page>${opts.currentPage}</current_page>`)
 
     // If the user is viewing a specific sheet, include its content.
+    // Only inject sheets the user owns or that are publicly visible (status = 'published').
     const sheetMatch = opts.currentPage.match(/^\/sheets\/(\d+)/)
     if (sheetMatch) {
       try {
-        const sheet = await prisma.studySheet.findUnique({
-          where: { id: parseInt(sheetMatch[1], 10) },
-          select: { title: true, description: true, htmlContent: true, course: { select: { code: true } } },
+        const sheet = await prisma.studySheet.findFirst({
+          where: {
+            id: parseInt(sheetMatch[1], 10),
+            OR: [
+              { userId },
+              { status: 'published' },
+            ],
+          },
+          select: { title: true, description: true, content: true, contentFormat: true, course: { select: { code: true } } },
         })
         if (sheet) {
-          const content = (sheet.htmlContent || '').slice(0, 6000)
+          const content = (sheet.content || '').slice(0, 6000)
           sections.push(`<current_sheet>
 Title: ${sheet.title}
 Course: ${sheet.course?.code || 'N/A'}
@@ -80,11 +87,18 @@ ${content}
     }
 
     // If the user is viewing a specific note, include its content.
+    // Only inject notes the user owns or that are explicitly public (visibility = 'public').
     const noteMatch = opts.currentPage.match(/^\/notes\/(\d+)/)
     if (noteMatch) {
       try {
-        const note = await prisma.note.findUnique({
-          where: { id: parseInt(noteMatch[1], 10) },
+        const note = await prisma.note.findFirst({
+          where: {
+            id: parseInt(noteMatch[1], 10),
+            OR: [
+              { userId },
+              { visibility: 'public' },
+            ],
+          },
           select: { title: true, content: true, course: { select: { code: true } } },
         })
         if (note) {

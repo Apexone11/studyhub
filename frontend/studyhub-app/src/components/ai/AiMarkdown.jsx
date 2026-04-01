@@ -4,8 +4,6 @@
  * No external dependency -- just a lightweight parser for chat messages.
  */
 
-const escapeHtml = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-
 /** Render inline markdown (bold, italic, inline code, links). */
 function renderInline(text) {
   const parts = []
@@ -42,15 +40,22 @@ function renderInline(text) {
       continue
     }
 
-    // Link
+    // Link (only allow safe protocols to prevent javascript: XSS)
     const linkMatch = remaining.match(/^\[([^\]]+)\]\(([^)]+)\)/)
     if (linkMatch) {
-      parts.push(
-        <a key={key++} href={linkMatch[2]} target="_blank" rel="noopener noreferrer"
-          style={{ color: 'var(--sh-brand)', textDecoration: 'underline' }}>
-          {linkMatch[1]}
-        </a>
-      )
+      const href = linkMatch[2]
+      const isSafeHref = /^(https?:|mailto:|#|\/)/i.test(href.trim())
+      if (isSafeHref) {
+        parts.push(
+          <a key={key++} href={href} target="_blank" rel="noopener noreferrer"
+            style={{ color: 'var(--sh-brand)', textDecoration: 'underline' }}>
+            {linkMatch[1]}
+          </a>
+        )
+      } else {
+        // Render unsafe links as plain text
+        parts.push(<span key={key++}>{linkMatch[1]}</span>)
+      }
       remaining = remaining.slice(linkMatch[0].length)
       continue
     }

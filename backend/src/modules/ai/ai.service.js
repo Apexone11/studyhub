@@ -164,7 +164,7 @@ function generateTitle(firstMessage) {
  * @param {Array}  [params.images]    - Array of { base64, mediaType } image objects.
  * @param {object} params.res         - Express response object (for SSE).
  */
-async function streamMessage({ user, conversationId, content, currentPage, images, res }) {
+async function streamMessage({ user, conversationId, content, currentPage, images, res, signal }) {
   const userId = user.id || user.userId
 
   // 1. Verify conversation ownership.
@@ -191,7 +191,7 @@ async function streamMessage({ user, conversationId, content, currentPage, image
   }
 
   // 3. Save user message to DB immediately.
-  const userMessage = await prisma.aiMessage.create({
+  await prisma.aiMessage.create({
     data: {
       conversationId,
       userId,
@@ -217,16 +217,19 @@ async function streamMessage({ user, conversationId, content, currentPage, image
   const contextBlock = await buildContext(userId, { currentPage })
   const fullSystemPrompt = SYSTEM_PROMPT + contextBlock
 
-  // Fetch recent conversation history.
-  const history = await prisma.aiMessage.findMany({
+  // Fetch the most recent conversation history (descending, then reverse
+  // to chronological order). This ensures we always send the latest context
+  // window to Claude once a conversation exceeds the history limit.
+  const historyDesc = await prisma.aiMessage.findMany({
     where: { conversationId },
-    orderBy: { createdAt: 'asc' },
+    orderBy: { createdAt: 'desc' },
     take: CONVERSATION_HISTORY_LIMIT,
     select: { role: true, content: true },
   })
+  const history = historyDesc.reverse()
 
-  // Build the messages array for Claude (exclude the just-saved user message;
-  // it is already in `history`).
+  // Build the messages array for Claude (the just-saved user message
+  // is already included in `history`).
   const claudeMessages = history.map((msg) => ({
     role: msg.role,
     content: msg.content,
@@ -247,7 +250,7 @@ async function streamMessage({ user, conversationId, content, currentPage, image
   }
 
   // Determine max output tokens based on whether the user is asking for a sheet.
-  const isSheetRequest = /\b(create|make|generate|build|write)\b.*\b(sheet|cheatsheet|cheat sheet|study guide)\b/i.test(content)
+  const isSheetRequest = /\b(create|make|generate|build|write|design)\b.*\b(sheet|cheatsheet|cheat sheet|study guide|reference sheet|review sheet|formula sheet)\b/i.test(content)
   const maxTokens = isSheetRequest ? MAX_OUTPUT_TOKENS_SHEET : MAX_OUTPUT_TOKENS_QA
 
   // 6. Stream from Claude.
@@ -264,11 +267,37 @@ async function streamMessage({ user, conversationId, content, currentPage, image
       messages: claudeMessages,
     })
 
+    let aborted = false
+    if (signal) {
+      signal.addEventListener('abort', () => {
+        aborted = true
+        stream.abort()
+      }, { once: true })
+    }
+
     for await (const event of stream) {
+      if (aborted) break
       if (event.type === 'content_block_delta' && event.delta?.text) {
         fullResponse += event.delta.text
         sendSSE(res, { type: 'delta', text: event.delta.text })
       }
+    }
+
+    // If the client disconnected mid-stream, skip persistence and usage tracking.
+    if (aborted) {
+      // Still save whatever partial response we got so the conversation stays coherent.
+      if (fullResponse) {
+        await prisma.aiMessage.create({
+          data: {
+            conversationId,
+            role: 'assistant',
+            content: fullResponse,
+            model: conversation.model || DEFAULT_MODEL,
+            metadata: { partial: true },
+          },
+        })
+      }
+      return
     }
 
     // Collect usage from the final message.
@@ -276,6 +305,8 @@ async function streamMessage({ user, conversationId, content, currentPage, image
     totalInputTokens = finalMessage?.usage?.input_tokens || 0
     totalOutputTokens = finalMessage?.usage?.output_tokens || 0
   } catch (err) {
+    // Abort errors from client disconnect are expected; don't report them.
+    if (signal?.aborted) return
     captureError(err, { tags: { module: 'ai' } })
     sendSSE(res, { type: 'error', message: 'AI service temporarily unavailable. Please try again.' })
     res.end()

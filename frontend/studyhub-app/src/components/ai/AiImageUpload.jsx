@@ -3,7 +3,7 @@
  *
  * Handles file selection, validation, base64 conversion, and thumbnail preview.
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useRef } from 'react'
+import { useRef, useEffect, useCallback } from 'react'
 import { IconX } from '../Icons'
 
 const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif']
@@ -97,8 +97,27 @@ export function ImageUploadButton({ images, onImagesChange, disabled }) {
 
 /**
  * Thumbnail strip showing selected images with remove buttons.
+ * Revokes blob URLs on removal and on unmount to prevent memory leaks.
  */
 export function ImagePreviewStrip({ images, onRemove }) {
+  // Revoke all remaining blob URLs when the strip unmounts (e.g. message sent).
+  const imagesRef = useRef(images)
+  imagesRef.current = images
+
+  useEffect(() => {
+    return () => {
+      for (const img of imagesRef.current) {
+        if (img.previewUrl) URL.revokeObjectURL(img.previewUrl)
+      }
+    }
+  }, [])
+
+  const handleRemove = useCallback((idx) => {
+    const removed = images[idx]
+    if (removed?.previewUrl) URL.revokeObjectURL(removed.previewUrl)
+    onRemove(idx)
+  }, [images, onRemove])
+
   if (images.length === 0) return null
 
   return (
@@ -119,7 +138,7 @@ export function ImagePreviewStrip({ images, onRemove }) {
             }}
           />
           <button
-            onClick={() => onRemove(idx)}
+            onClick={() => handleRemove(idx)}
             style={{
               position: 'absolute', top: -4, right: -4,
               width: 16, height: 16, borderRadius: '50%',

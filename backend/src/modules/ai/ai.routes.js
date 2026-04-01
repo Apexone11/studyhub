@@ -154,6 +154,11 @@ router.post('/messages', requireAuth, aiMessageLimiter, async (req, res) => {
       'X-Accel-Buffering': 'no',
     })
 
+    // Track client disconnects so we can abort Claude mid-stream
+    // and avoid wasting tokens / persisting orphaned messages.
+    const abortController = new AbortController()
+    req.on('close', () => abortController.abort())
+
     // Fetch full user record for rate-limit evaluation.
     const prisma = require('../../lib/prisma')
     const user = await prisma.user.findUnique({
@@ -175,6 +180,7 @@ router.post('/messages', requireAuth, aiMessageLimiter, async (req, res) => {
       currentPage: currentPage || null,
       images: images || null,
       res,
+      signal: abortController.signal,
     })
   } catch (err) {
     captureError(err, { tags: { module: 'ai', action: 'streamMessage' } })

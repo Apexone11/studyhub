@@ -17,7 +17,7 @@ import { usePageTitle } from '../../lib/usePageTitle'
 import { useAiChat } from '../../lib/useAiChat'
 import { PAGE_FONT } from '../shared/pageUtils'
 import { pageShell } from '../../lib/ui'
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -28,7 +28,6 @@ export default function AiPage() {
   const { status: authStatus } = useProtectedPage()
   const layout = useResponsiveAppLayout()
   const [searchParams] = useSearchParams()
-  const [showSidebar, setShowSidebar] = useState(true)
 
   const chat = useAiChat()
 
@@ -276,8 +275,10 @@ function ChatArea({ messages, streaming, streamingText, loading, error, onSend, 
     }
   }, [activeConversationId])
 
+  const MAX_MESSAGE_LENGTH = 5000
+
   const handleSend = () => {
-    if (!input.trim() || streaming) return
+    if (!input.trim() || streaming || input.length > MAX_MESSAGE_LENGTH) return
     const opts = pendingImages.length > 0 ? { images: pendingImages } : {}
     onSend(input, opts)
     setInput('')
@@ -498,12 +499,12 @@ function ChatArea({ messages, streaming, streamingText, loading, error, onSend, 
           ) : (
             <button
               onClick={handleSend}
-              disabled={!input.trim()}
+              disabled={!input.trim() || input.length > MAX_MESSAGE_LENGTH}
               style={{
-                background: input.trim() ? 'var(--sh-brand)' : 'var(--sh-soft)',
-                color: input.trim() ? '#fff' : 'var(--sh-muted)',
+                background: input.trim() && input.length <= MAX_MESSAGE_LENGTH ? 'var(--sh-brand)' : 'var(--sh-soft)',
+                color: input.trim() && input.length <= MAX_MESSAGE_LENGTH ? '#fff' : 'var(--sh-muted)',
                 border: 'none', borderRadius: 10, padding: '10px 16px',
-                fontSize: 13, fontWeight: 600, cursor: input.trim() ? 'pointer' : 'not-allowed',
+                fontSize: 13, fontWeight: 600, cursor: input.trim() && input.length <= MAX_MESSAGE_LENGTH ? 'pointer' : 'not-allowed',
                 whiteSpace: 'nowrap', transition: 'all 0.15s',
               }}
             >
@@ -511,8 +512,8 @@ function ChatArea({ messages, streaming, streamingText, loading, error, onSend, 
             </button>
           )}
         </div>
-        <div style={{ fontSize: 11, color: 'var(--sh-muted)', marginTop: 6, textAlign: 'right' }}>
-          {input.length > 0 && `${input.length} / 5000`}
+        <div style={{ fontSize: 11, color: input.length > MAX_MESSAGE_LENGTH ? 'var(--sh-danger-text)' : 'var(--sh-muted)', marginTop: 6, textAlign: 'right' }}>
+          {input.length > 0 && `${input.length} / ${MAX_MESSAGE_LENGTH}`}
           {input.length === 0 && 'Shift+Enter for new line'}
         </div>
       </div>

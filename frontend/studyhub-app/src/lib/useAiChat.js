@@ -6,20 +6,40 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import * as aiService from './aiService'
 
-/** Parse an SSE stream chunk into individual events. */
-function parseSSEChunk(text) {
-  const events = []
-  const lines = text.split('\n')
-  for (const line of lines) {
-    if (line.startsWith('data: ')) {
-      try {
-        events.push(JSON.parse(line.slice(6)))
-      } catch {
-        // Skip malformed JSON
+/**
+ * Create an SSE parser that buffers partial chunks across reads.
+ * Returns a function: feed(chunk) => Event[] that safely handles
+ * data: lines split across network boundaries.
+ */
+function createSSEParser() {
+  let buffer = ''
+
+  return function feed(chunk) {
+    buffer += chunk
+    const events = []
+
+    // SSE frames are delimited by double newlines.
+    let boundary = buffer.indexOf('\n\n')
+    while (boundary !== -1) {
+      const frame = buffer.slice(0, boundary)
+      buffer = buffer.slice(boundary + 2)
+
+      // Each frame may contain multiple lines; we only care about data: lines.
+      for (const line of frame.split('\n')) {
+        if (line.startsWith('data: ')) {
+          try {
+            events.push(JSON.parse(line.slice(6)))
+          } catch {
+            // Skip malformed JSON (non-JSON SSE comments, etc.)
+          }
+        }
       }
+
+      boundary = buffer.indexOf('\n\n')
     }
+
+    return events
   }
-  return events
 }
 
 export function useAiChat() {
@@ -135,6 +155,7 @@ export function useAiChat() {
 
       abortRef.current = reader
       const decoder = new TextDecoder()
+      const feedSSE = createSSEParser()
       let fullText = ''
 
       while (true) {
@@ -142,7 +163,7 @@ export function useAiChat() {
         if (done) break
 
         const chunk = decoder.decode(value, { stream: true })
-        const events = parseSSEChunk(chunk)
+        const events = feedSSE(chunk)
 
         for (const event of events) {
           switch (event.type) {
