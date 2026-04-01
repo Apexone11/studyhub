@@ -90,6 +90,9 @@ model User {
   shareLinksCreated          ShareLink[]               @relation("ShareLinkCreator")
   contentSharedBy            ContentShare[]            @relation("ContentSharedBy")
   contentSharedWith          ContentShare[]            @relation("ContentSharedWith")
+  aiConversations            AiConversation[]
+  aiMessages                 AiMessage[]               @relation("AiMessageUser")
+  aiUsageLogs                AiUsageLog[]
 
   @@index([role])
 }
@@ -1140,4 +1143,52 @@ model DiscussionUpvote {
   @@unique([replyId, userId])
   @@index([postId])
   @@index([replyId])
+}
+
+// ── Hub AI ──────────────────────────────────────────────────────────
+
+model AiConversation {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  title     String?
+  model     String   @default("claude-sonnet-4-20250514")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages AiMessage[]
+
+  @@index([userId, updatedAt(sort: Desc)])
+}
+
+model AiMessage {
+  id               Int      @id @default(autoincrement())
+  conversationId   Int
+  role             String   // "user" or "assistant"
+  content          String
+  hasImage         Boolean  @default(false)
+  imageDescription String?
+  tokenCount       Int?
+  model            String?
+  metadata         Json?
+  createdAt        DateTime @default(now())
+
+  conversation AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User?          @relation("AiMessageUser", fields: [userId], references: [id], onDelete: Cascade)
+  userId       Int?
+
+  @@index([conversationId, createdAt])
+}
+
+model AiUsageLog {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  date         DateTime @db.Date
+  messageCount Int      @default(0)
+  tokenCount   Int      @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId])
 }

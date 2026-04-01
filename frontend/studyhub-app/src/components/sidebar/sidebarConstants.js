@@ -5,7 +5,7 @@
 
 import {
   IconFeed, IconSheets, IconTests, IconNotes, IconMessages,
-  IconAnnouncements, IconProfile, IconSchool, IconUsers,
+  IconAnnouncements, IconProfile, IconSchool, IconUsers, IconSpark,
 } from '../Icons'
 
 export const FOCUSABLE_DRAWER_SELECTORS = [
@@ -24,6 +24,7 @@ export const NAV_LINKS = [
   { icon: IconNotes,         label: 'My Notes',       to: '/notes' },
   { icon: IconMessages,      label: 'Messages',       to: '/messages' },
   { icon: IconUsers,         label: 'Study Groups',   to: '/study-groups' },
+  { icon: IconSpark,         label: 'Hub AI',          to: '/ai' },
   { icon: IconAnnouncements, label: 'Announcements',  to: '/announcements' },
   { icon: IconSchool,        label: 'My Courses',     to: '/my-courses' },
   { icon: IconProfile,       label: 'My Profile',     to: '__MY_PROFILE__' },

@@ -104,6 +104,29 @@ Backend:
 - Mute filtering is one-directional: only the muter's feed is affected.
 - Any endpoint calling `getBlockedUserIds` or `getMutedUserIds` MUST wrap the call in try-catch for graceful degradation, because these queries will fail if the block/mute tables are temporarily unavailable or not yet migrated.
 
+### Hub AI (AI Assistant)
+
+- Backend module: `backend/src/modules/ai/` with routes, service, constants, and context builder.
+- Backend routes mounted at `/api/ai` in `backend/src/index.js`.
+- Claude API integration: `@anthropic-ai/sdk` with streaming via SSE (Server-Sent Events).
+- API key: stored as `ANTHROPIC_API_KEY` environment variable in Railway (never in code).
+- Default model: `claude-sonnet-4-20250514`. Detailed system prompt defined in `ai.constants.js` (personality, capabilities, academic integrity rules, full HTML generation spec, context awareness instructions).
+- AI-generated sheets use full HTML documents (`<!DOCTYPE html>` with `<head>`, `<style>`, `<body>`) -- NOT fragments. The AI is instructed to include inline `<style>` blocks but NEVER `<script>` tags (scripts trigger Tier 1+ in the security scanner). Sheets flow through the same scan pipeline as user-uploaded HTML.
+- Max output tokens: 2048 for Q&A, 8192 for sheet generation.
+- Database tables: `AiConversation`, `AiMessage`, `AiUsageLog` (migration: `20260331000004_add_ai_assistant_tables`).
+- Frontend page: `frontend/studyhub-app/src/pages/ai/AiPage.jsx` at route `/ai`.
+- Floating bubble: `frontend/studyhub-app/src/components/ai/AiBubble.jsx` (rendered on all authenticated pages via `createPortal`).
+- Chat hook: `frontend/studyhub-app/src/lib/useAiChat.js` manages conversations, SSE streaming, and state.
+- API service: `frontend/studyhub-app/src/lib/aiService.js` wraps all `/api/ai` endpoints.
+- Context chips: `frontend/studyhub-app/src/lib/useAiContext.js` provides page-aware suggestion prompts.
+- Sheet preview: `frontend/studyhub-app/src/components/ai/AiSheetPreview.jsx` extracts HTML from AI responses and offers preview/publish.
+- Image upload: `frontend/studyhub-app/src/components/ai/AiImageUpload.jsx` handles file selection, validation, and base64 conversion.
+- Markdown renderer: `frontend/studyhub-app/src/components/ai/AiMarkdown.jsx` (lightweight, no external dependency).
+- Rate limits: 30 messages/day (regular), 60 (verified), 120 (admin). Tracked in `AiUsageLog` table.
+- Context injection: `ai.context.js` builds dynamic system prompt sections from user's courses, sheets, notes, and current page.
+- Streaming: POST `/api/ai/messages` returns SSE stream. Events: `delta` (token), `title` (auto-title), `done` (completion), `error`.
+- Sidebar nav link uses `IconSpark` icon. Bubble hidden on `/ai`, `/login`, `/register` pages.
+
 ### CSS and Styling
 
 - Inline style colors must use CSS custom property tokens from `index.css`. Semantic tokens (`--sh-danger`, `--sh-success`, `--sh-warning`, `--sh-info` with `-bg`, `-border`, `-text` variants), slate scale (`--sh-slate-50` through `--sh-slate-900`), and surface tokens (`--sh-surface`, `--sh-soft`, `--sh-border`). Exceptions: dark-mode-always editor panels, unique per-metric palette colors, white text on colored buttons.
@@ -144,6 +167,9 @@ Tables with migrations (safe to query):
 - ShareLink, ContentShare (migration: `20260330000002`)
 - UserBlock, UserMute (migration: `20260330000003`)
 - Conversation, ConversationParticipant, Message, MessageReaction (migration: `20260330000004`)
+- Note.pinned, Note.tags columns (migration: `20260331000002_add_note_pinned_and_tags`)
+- NoteStar, NoteVersion (migration: `20260331000003_add_note_star_and_note_version`)
+- AiConversation, AiMessage, AiUsageLog (migration: `20260331000004_add_ai_assistant_tables`)
 
 ## Repo Workflow Conventions
 

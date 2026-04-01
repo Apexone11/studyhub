@@ -2828,3 +2828,85 @@ Fixed the core issue where message unread notification badges persisted indefini
 
 - Frontend lint: 0 errors
 - Backend lint: 0 errors
+
+---
+
+## Cycle 20 -- Hub AI (AI Assistant)
+
+**Date:** 2026-03-31
+**Scope:** Full AI assistant feature powered by Anthropic Claude API. Includes dedicated /ai page, floating bubble chat widget, context-aware Q&A, HTML study sheet generation with live preview and publish, image understanding (textbook photos, handwritten notes), and daily rate limits.
+
+### Bug Fixes (Pre-cycle)
+
+1. **Missing NoteStar and NoteVersion migration** -- Prisma models existed but the migration SQL file was missing. Created `20260331000003_add_note_star_and_note_version/migration.sql`.
+2. **Missing Note.pinned and Note.tags migration** -- Added `20260331000002_add_note_pinned_and_tags/migration.sql`.
+3. **deleteUserAccount.js foreign key fix** -- Added cascading deletes for AiMessage, AiUsageLog, and AiConversation before User deletion to prevent FK constraint errors.
+
+### Changes
+
+**Backend (5 new files + 2 modified):**
+
+1. **`backend/src/modules/ai/ai.constants.js`** -- Default model (claude-sonnet-4-20250514), daily limits (30/60/120 by role), max message/image constraints, full system prompt with Hub AI persona.
+2. **`backend/src/modules/ai/ai.context.js`** -- Dynamic context builder. Injects user's courses, recent sheets/notes, and current page content into the system prompt so Claude has awareness of the student's materials.
+3. **`backend/src/modules/ai/ai.service.js`** -- Core service: lazy Anthropic client init, conversation CRUD, daily usage tracking with atomic upsert, SSE streaming pipeline (delta/title/done/error events), auto-title generation for conversations.
+4. **`backend/src/modules/ai/ai.routes.js`** -- 7 REST endpoints: conversation list/create/get/delete/rename, message streaming (SSE), usage stats. Custom rate limiter at 10 req/min.
+5. **`backend/src/modules/ai/index.js`** -- Module barrel export.
+6. **`backend/src/index.js`** -- Mounted AI routes at `/api/ai`.
+7. **`backend/package.json`** -- Added `@anthropic-ai/sdk` dependency.
+8. **`backend/prisma/schema.prisma`** -- Added AiConversation, AiMessage, AiUsageLog models with User relations.
+9. **`backend/prisma/migrations/20260331000004_add_ai_assistant_tables/migration.sql`** -- DDL for all three AI tables.
+
+**Frontend (7 new files + 3 modified):**
+
+1. **`frontend/.../lib/aiService.js`** -- API wrapper for all `/api/ai` endpoints. sendMessage returns SSE ReadableStream reader.
+2. **`frontend/.../lib/useAiChat.js`** -- Main chat hook: manages conversations, messages, SSE stream consumption, optimistic updates, stop/cancel streaming, usage stats.
+3. **`frontend/.../lib/useAiContext.js`** -- Page-aware context chips. Returns different suggestion prompts depending on current URL (sheet viewer, notes, feed, etc.).
+4. **`frontend/.../components/ai/AiMarkdown.jsx`** -- Lightweight markdown renderer (headings, code blocks, lists, inline formatting). No external dependency.
+5. **`frontend/.../components/ai/AiBubble.jsx`** -- Floating 52px circular button at bottom-right. Opens 380x520 chat window with full messaging UI. Uses createPortal. Hidden on /ai, /login, /register pages.
+6. **`frontend/.../components/ai/AiSheetPreview.jsx`** -- Detects HTML in AI responses (```html blocks), offers Preview (sandboxed iframe modal) and Edit in Sheet Lab (creates private draft sheet).
+7. **`frontend/.../components/ai/AiImageUpload.jsx`** -- File picker for images (PNG/JPG/WEBP/GIF, max 5MB, max 3), base64 conversion, thumbnail preview strip.
+8. **`frontend/.../pages/ai/AiPage.jsx`** -- Full-page AI chat: conversation sidebar (list, rename, delete, usage bar), chat area with message history, streaming indicator, image upload, context chips, and sheet preview integration.
+9. **`frontend/.../App.jsx`** -- Added /ai route (lazy loaded, PrivateRoute), AuthenticatedBubble wrapper for global AiBubble rendering.
+10. **`frontend/.../components/sidebar/sidebarConstants.js`** -- Added Hub AI nav link with IconSpark icon.
+11. **`frontend/.../index.css`** -- Added @keyframes pulse and spin for typing/loading animations.
+
+### Architecture Decisions
+
+- **SSE over Socket.io** for AI streaming: unidirectional data flow, simpler error handling, no need for bidirectional connection.
+- **Separate useAiChat instances** for bubble and /ai page: simpler architecture, no shared context provider needed. Both work independently.
+- **Daily rate limits tracked in DB** (AiUsageLog table with atomic upsert): survives server restarts, per-user accountability.
+- **Context injection via dynamic system prompt**: Claude receives the student's actual courses, sheets, and notes as XML-tagged context sections.
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `backend/src/modules/ai/ai.constants.js` | NEW -- model config, limits, system prompt |
+| `backend/src/modules/ai/ai.context.js` | NEW -- dynamic context builder |
+| `backend/src/modules/ai/ai.service.js` | NEW -- Anthropic client, CRUD, SSE streaming |
+| `backend/src/modules/ai/ai.routes.js` | NEW -- 7 REST endpoints with rate limiting |
+| `backend/src/modules/ai/index.js` | NEW -- module barrel |
+| `backend/src/index.js` | Added /api/ai route mount |
+| `backend/package.json` | Added @anthropic-ai/sdk dependency |
+| `backend/prisma/schema.prisma` | Added 3 AI models + User relations |
+| `backend/prisma/migrations/20260331000004_...` | NEW -- AI tables DDL |
+| `backend/src/lib/deleteUserAccount.js` | Added AI data cleanup |
+| `frontend/.../lib/aiService.js` | NEW -- API wrapper |
+| `frontend/.../lib/useAiChat.js` | NEW -- chat state hook |
+| `frontend/.../lib/useAiContext.js` | NEW -- page-aware context chips |
+| `frontend/.../components/ai/AiMarkdown.jsx` | NEW -- markdown renderer |
+| `frontend/.../components/ai/AiBubble.jsx` | NEW -- floating chat widget |
+| `frontend/.../components/ai/AiSheetPreview.jsx` | NEW -- HTML preview + publish |
+| `frontend/.../components/ai/AiImageUpload.jsx` | NEW -- image upload + preview |
+| `frontend/.../pages/ai/AiPage.jsx` | NEW -- full page AI chat |
+| `frontend/.../App.jsx` | Added /ai route + AiBubble |
+| `frontend/.../components/sidebar/sidebarConstants.js` | Added Hub AI nav link |
+| `frontend/.../index.css` | Added keyframe animations |
+
+### Deployment Steps (when ready)
+
+1. Push all changes to GitHub.
+2. Railway auto-deploys from push.
+3. Run `npx prisma migrate deploy` on Railway to create the 4 new tables (note pinned/tags, note star/version, discussion upvotes, AI tables).
+4. Verify `ANTHROPIC_API_KEY` environment variable is set in Railway backend service.
+5. Test: visit /ai, send a message, verify streaming response.
