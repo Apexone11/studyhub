@@ -1,17 +1,36 @@
 /**
  * Reusable anime.js v4 animation utilities for StudyHub.
  *
- * Design: Clean Academic Pro — subtle, purposeful motion.
+ * Design: Clean Academic Pro -- subtle, purposeful motion.
  * All helpers respect `prefers-reduced-motion`.
+ *
+ * anime.js is loaded dynamically on first animation call so it does not
+ * contribute to the initial bundle size.
  */
 
-import { animate, stagger, utils } from 'animejs'
+/* ── Lazy anime.js loader ───────────────────────────────── */
+
+let _anime = null
+
+async function getAnime() {
+  if (!_anime) {
+    _anime = await import('animejs')
+  }
+  return _anime
+}
 
 /* ── Reduced-motion gate ─────────────────────────────────── */
 
 const prefersReducedMotion = () =>
   typeof window !== 'undefined' &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+/* ── Sync fallback for reduced-motion ───────────────────── */
+
+async function setImmediate(targets, props) {
+  const { utils } = await getAnime()
+  utils.set(targets, props)
+}
 
 /* ── Entrance helpers ────────────────────────────────────── */
 
@@ -20,11 +39,12 @@ const prefersReducedMotion = () =>
  * @param {string|Element|NodeList} targets  CSS selector or elements
  * @param {{ delay?: number, duration?: number, y?: number }} opts
  */
-export function fadeInUp(targets, { delay = 0, duration = 500, y = 24 } = {}) {
+export async function fadeInUp(targets, { delay = 0, duration = 500, y = 24 } = {}) {
   if (prefersReducedMotion()) {
-    utils.set(targets, { opacity: 1, translateY: 0 })
+    await setImmediate(targets, { opacity: 1, translateY: 0 })
     return null
   }
+  const { animate } = await getAnime()
   return animate(targets, {
     opacity: [0, 1],
     translateY: [y, 0],
@@ -39,11 +59,12 @@ export function fadeInUp(targets, { delay = 0, duration = 500, y = 24 } = {}) {
  * @param {string|Element|NodeList} targets
  * @param {{ staggerMs?: number, duration?: number, y?: number }} opts
  */
-export function staggerEntrance(targets, { staggerMs = 80, duration = 500, y = 20 } = {}) {
+export async function staggerEntrance(targets, { staggerMs = 80, duration = 500, y = 20 } = {}) {
   if (prefersReducedMotion()) {
-    utils.set(targets, { opacity: 1, translateY: 0 })
+    await setImmediate(targets, { opacity: 1, translateY: 0 })
     return null
   }
+  const { animate, stagger } = await getAnime()
   return animate(targets, {
     opacity: [0, 1],
     translateY: [y, 0],
@@ -57,8 +78,9 @@ export function staggerEntrance(targets, { staggerMs = 80, duration = 500, y = 2
  * Subtle scale-pulse to draw attention (e.g. a freshly added item).
  * @param {string|Element} target
  */
-export function pulseHighlight(target) {
+export async function pulseHighlight(target) {
   if (prefersReducedMotion()) return null
+  const { animate } = await getAnime()
   return animate(target, {
     scale: [1, 1.04, 1],
     duration: 400,
@@ -72,8 +94,9 @@ export function pulseHighlight(target) {
  * Quick scale pop for like/star buttons.
  * @param {string|Element} target
  */
-export function popScale(target) {
+export async function popScale(target) {
   if (prefersReducedMotion()) return null
+  const { animate } = await getAnime()
   return animate(target, {
     scale: [1, 1.25, 1],
     duration: 300,
@@ -89,12 +112,13 @@ export function popScale(target) {
  * @param {number}  end       Final value
  * @param {{ duration?: number, prefix?: string, suffix?: string }} opts
  */
-export function countUp(el, end, { duration = 800, prefix = '', suffix = '' } = {}) {
+export async function countUp(el, end, { duration = 800, prefix = '', suffix = '' } = {}) {
   if (!el) return null
   if (prefersReducedMotion()) {
     el.textContent = `${prefix}${end}${suffix}`
     return null
   }
+  const { animate } = await getAnime()
   const obj = { val: 0 }
   return animate(obj, {
     val: end,
@@ -110,11 +134,12 @@ export function countUp(el, end, { duration = 800, prefix = '', suffix = '' } = 
 
 /**
  * Fade-in-up when the target scrolls into view (IntersectionObserver-based).
- * Uses IntersectionObserver to trigger the entrance animation.
  * @param {string|Element|NodeList} targets
  * @param {{ y?: number, duration?: number, staggerMs?: number }} opts
  */
-export function fadeInOnScroll(targets, { y = 24, duration = 500, staggerMs = 60 } = {}) {
+export async function fadeInOnScroll(targets, { y = 24, duration = 500, staggerMs = 60 } = {}) {
+  const { animate, utils } = await getAnime()
+
   if (prefersReducedMotion()) {
     utils.set(targets, { opacity: 1, translateY: 0 })
     return null
@@ -123,7 +148,7 @@ export function fadeInOnScroll(targets, { y = 24, duration = 500, staggerMs = 60
   // Set initial hidden state
   utils.set(targets, { opacity: 0, translateY: y })
 
-  // Use IntersectionObserver for scroll-triggered entrance (simpler and more reliable)
+  // Use IntersectionObserver for scroll-triggered entrance
   const elements = typeof targets === 'string'
     ? document.querySelectorAll(targets)
     : targets instanceof Element ? [targets] : Array.from(targets || [])
@@ -157,12 +182,13 @@ export function fadeInOnScroll(targets, { y = 24, duration = 500, staggerMs = 60
  * @param {Element} target
  * @param {{ duration?: number }} opts
  */
-export function slideDown(target, { duration = 400 } = {}) {
+export async function slideDown(target, { duration = 400 } = {}) {
   if (!target) return null
   if (prefersReducedMotion()) {
     target.style.opacity = '1'
     return null
   }
+  const { animate } = await getAnime()
   return animate(target, {
     opacity: [0, 1],
     translateY: [-16, 0],

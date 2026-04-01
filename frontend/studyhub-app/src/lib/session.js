@@ -1,4 +1,5 @@
 import { API } from '../config'
+import { clearFetchCache } from './useFetch'
 
 let inMemoryCsrfToken = ''
 
@@ -60,6 +61,7 @@ export async function logoutSession() {
     // Best effort only — always clear local cached user state.
   } finally {
     clearStoredSession()
+    clearFetchCache()
     try { sessionStorage.setItem(LOGGED_OUT_FLAG, '1') } catch { /* private mode */ }
   }
 }

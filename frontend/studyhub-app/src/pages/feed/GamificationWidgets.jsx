@@ -24,7 +24,8 @@ const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
  */
 export function StreakWidget() {
   const { data: streak, loading, error } = useFetch('/api/users/me/streak', {
-    initialData: { currentStreak: 0, longestStreak: 0, lastActiveDate: null, todayActive: false }
+    initialData: { currentStreak: 0, longestStreak: 0, lastActiveDate: null, todayActive: false },
+    swr: 5 * 60 * 1000,
   })
 
   if (loading) {
@@ -187,9 +188,10 @@ export function WeeklyProgressWidget() {
  */
 export function LeaderboardWidget() {
   const { data: leaderboard, loading, error } = useFetch('/api/feed/leaderboard?period=weekly&limit=5', {
-    initialData: []
+    initialData: [],
+    swr: 5 * 60 * 1000,
   })
-  const { data: currentUser } = useFetch('/api/users/me')
+  const { data: currentUser } = useFetch('/api/users/me', { swr: 2 * 60 * 1000 })
   const [currentUserRank, setCurrentUserRank] = useState(null)
 
   useEffect(() => {

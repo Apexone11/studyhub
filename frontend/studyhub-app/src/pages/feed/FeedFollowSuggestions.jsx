@@ -15,7 +15,8 @@ import { API } from '../../config'
 export default function FeedFollowSuggestions() {
   const { data: suggestions, loading } = useFetch('/api/users/me/follow-suggestions', {
     initialData: [],
-    transform: (data) => Array.isArray(data) ? data : []
+    transform: (data) => Array.isArray(data) ? data : [],
+    swr: 5 * 60 * 1000,
   })
   const [followingSet, setFollowingSet] = useState(new Set())
 

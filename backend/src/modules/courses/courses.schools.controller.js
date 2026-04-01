@@ -1,13 +1,14 @@
 const express = require('express')
 const requireAuth = require('../../middleware/auth')
 const { captureError } = require('../../monitoring/sentry')
+const { cacheControl } = require('../../lib/cacheControl')
 const prisma = require('../../lib/prisma')
 const { schoolsLimiter, POPULAR_COURSES_LIMIT } = require('./courses.constants')
 
 const router = express.Router()
 
 // Public endpoint for school + course dropdowns.
-router.get('/schools', schoolsLimiter, async (req, res) => {
+router.get('/schools', cacheControl(600, { public: true, staleWhileRevalidate: 1800 }), schoolsLimiter, async (req, res) => {
   try {
     const schools = await prisma.school.findMany({
       select: {
@@ -44,7 +45,7 @@ router.get('/schools', schoolsLimiter, async (req, res) => {
 })
 
 // Public endpoint for popular courses ranked by published sheet count.
-router.get('/popular', schoolsLimiter, async (req, res) => {
+router.get('/popular', cacheControl(300, { public: true, staleWhileRevalidate: 600 }), schoolsLimiter, async (req, res) => {
   try {
     const grouped = await prisma.studySheet.groupBy({
       by: ['courseId'],

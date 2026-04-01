@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { IconPlus, IconSettings } from '../Icons'
 import { useSession } from '../../lib/session-context'
+import { prefetchForRoute } from '../../lib/prefetch'
 import UserAvatar from '../UserAvatar'
 import {
   FOCUSABLE_DRAWER_SELECTORS,
@@ -87,6 +88,7 @@ export default function AppSidebar({ mode = 'fixed' }) {
               to={to}
               className={`sh-sidebar-nav-link${isActive ? ' sh-sidebar-nav-link--active' : ''}`}
               aria-current={isActive ? 'page' : undefined}
+              onMouseEnter={() => prefetchForRoute(link.to === '__MY_PROFILE__' ? '/users/:username' : link.to)}
             >
               <Icon size={15} />
               {link.label}

@@ -127,6 +127,15 @@ Backend:
 - Streaming: POST `/api/ai/messages` returns SSE stream. Events: `delta` (token), `title` (auto-title), `done` (completion), `error`.
 - Sidebar nav link uses `IconSpark` icon. Bubble hidden on `/ai`, `/login`, `/register` pages.
 
+### Performance Infrastructure
+
+- `useFetch` hook (`frontend/studyhub-app/src/lib/useFetch.js`) supports opt-in SWR caching via `swr` option (ms). Cached data is returned instantly while a background revalidation fetch runs. Cache is a module-level `Map` exported as `cache`.
+- `clearFetchCache(cacheKey?)` invalidates one or all cache entries. Called automatically on logout in `session.js`.
+- `prefetch.js` (`frontend/studyhub-app/src/lib/prefetch.js`) warms the SWR cache on sidebar link hover via `requestIdleCallback`. Maps 9 routes to API endpoints with 30-second debounce.
+- `cacheControl.js` (`backend/src/lib/cacheControl.js`) is an Express middleware for HTTP `Cache-Control` headers. Applied to stable public endpoints (platform-stats, schools, popular courses, preferences).
+- All pages use skeleton loading placeholders from `frontend/studyhub-app/src/components/Skeleton.jsx` instead of bare "Loading..." text.
+- Rate limiters are centralized in `backend/src/lib/rateLimiters.js` (49 limiters). Never define inline rate limiters in route files.
+
 ### CSS and Styling
 
 - Inline style colors must use CSS custom property tokens from `index.css`. Semantic tokens (`--sh-danger`, `--sh-success`, `--sh-warning`, `--sh-info` with `-bg`, `-border`, `-text` variants), slate scale (`--sh-slate-50` through `--sh-slate-900`), and surface tokens (`--sh-surface`, `--sh-soft`, `--sh-border`). Exceptions: dark-mode-always editor panels, unique per-metric palette colors, white text on colored buttons.
@@ -222,6 +231,10 @@ These have been encountered and fixed. Do not reintroduce them.
 7. **`createdAt` vs `timestamp` field names.** Backend API returns `createdAt`. Some frontend code may use `timestamp`. Always prefer `msg.createdAt || msg.timestamp` when grouping or sorting messages.
 
 8. **Modals broken inside animated containers.** Use `createPortal(jsx, document.body)` for any modal that might be rendered inside a component with CSS `transform`.
+
+9. **useFetch infinite loop from inline `transform`.** Never put `transform` in `useCallback` or `useEffect` dependencies. The hook stores it in a `useRef` to avoid re-fetch loops from inline arrow functions.
+
+10. **Rate limiter name mismatches after centralization.** When importing from `rateLimiters.js`, the export names follow `<context><Action>Limiter` (e.g., `uploadAvatarLimiter`). Verify the exact export name matches the import before deploying.
 
 ## Current Search Logic Map
 

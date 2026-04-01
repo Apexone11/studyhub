@@ -54,8 +54,20 @@ function initSentry() {
   return sentryEnabled
 }
 
+/**
+ * Status codes that represent expected client errors, not bugs.
+ * These are logged but not sent to Sentry to reduce noise.
+ */
+const IGNORED_STATUS_CODES = new Set([400, 401, 403, 404, 409, 422, 429])
+
 function captureError(error, context = {}) {
   if (!sentryEnabled || !error) {
+    return
+  }
+
+  // Skip expected client errors (4xx) — they are not bugs
+  const statusCode = error.statusCode || error.status || context.statusCode
+  if (statusCode && IGNORED_STATUS_CODES.has(statusCode)) {
     return
   }
 
