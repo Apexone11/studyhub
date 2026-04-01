@@ -3565,7 +3565,7 @@ Reduced dependency risk, improved production observability, and hardened deploym
 
 ### E-1: Vite Upgrade to Stable
 
-Upgraded Vite from `^8.0.0-beta.13` (prerelease) to `^8.5.0` (stable) in both `devDependencies` and `overrides` in `frontend/studyhub-app/package.json`. The beta prerelease carried risk of breaking changes; stable 8.5.x is production-ready.
+Upgraded Vite from `^8.0.0-beta.13` (prerelease) to `^8.0.3` (stable) in both `devDependencies` and `overrides` in `frontend/studyhub-app/package.json`. The beta prerelease carried risk of breaking changes; stable 8.5.x is production-ready.
 
 ### E-2: Frontend Dockerfile (No Changes)
 
@@ -3585,7 +3585,7 @@ Added `IGNORED_STATUS_CODES` set (400, 401, 403, 404, 409, 422, 429) to `capture
 
 ### Files Changed (3 total)
 
-- `frontend/studyhub-app/package.json` -- Vite ^8.0.0-beta.13 -> ^8.5.0 (devDependencies + overrides)
+- `frontend/studyhub-app/package.json` -- Vite ^8.0.0-beta.13 -> ^8.0.3 (devDependencies + overrides)
 - `backend/src/index.js` -- Health check with DB connectivity verification
 - `backend/src/monitoring/sentry.js` -- 4xx error filtering in captureError()
 
