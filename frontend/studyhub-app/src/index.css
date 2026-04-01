@@ -107,6 +107,8 @@
   --sh-brand: #2563eb;
   --sh-brand-hover: #1d4ed8;
   --sh-brand-soft: #dbeafe;
+  --sh-brand-soft-bg: #eef2ff;
+  --sh-brand-border: #93c5fd;
   --sh-brand-dark: #1e293b;
   --sh-ai-gradient: linear-gradient(135deg, var(--sh-brand), #7c3aed);
 
@@ -151,6 +153,14 @@
 
   --sh-link: #2563eb;
   --sh-focus-ring: 0 0 0 3px rgba(37, 99, 235, 0.12);
+
+  /* ── Overlay / modal ────────────────────────────────────────────── */
+  --sh-modal-overlay: rgba(0, 0, 0, 0.45);
+
+  /* ── Extended semantic variants ─────────────────────────────────── */
+  --sh-warning-light-bg: #fffbeb;
+  --sh-warning-dark-text: #78350f;
+  --sh-danger-light-bg: #fff1f2;
 
   /* ── Legacy Tailwind slate bridging (migrate to semantic tokens) ── */
   --sh-slate-50: #f8fafc;
@@ -239,6 +249,8 @@
   --sh-brand: #60a5fa;
   --sh-brand-hover: #93bbfd;
   --sh-brand-soft: #1e3a5f;
+  --sh-brand-soft-bg: #172554;
+  --sh-brand-border: #1e40af;
   --sh-brand-dark: #e0e0e0;
   --sh-ai-gradient: linear-gradient(135deg, var(--sh-brand), #7c3aed);
 
@@ -285,6 +297,14 @@
 
   --sh-link: #60a5fa;
   --sh-focus-ring: 0 0 0 3px rgba(96, 165, 250, 0.25);
+
+  /* ── Overlay / modal (dark) ─────────────────────────────────────── */
+  --sh-modal-overlay: rgba(0, 0, 0, 0.7);
+
+  /* ── Extended semantic variants (dark) ──────────────────────────── */
+  --sh-warning-light-bg: #2a2010;
+  --sh-warning-dark-text: #fde68a;
+  --sh-danger-light-bg: #2a1515;
 
   /* ── Legacy Tailwind slate bridging (dark) ───────────────────── */
   --sh-slate-50: #1c1c1c;

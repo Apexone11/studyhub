@@ -3,7 +3,10 @@
  * version browsing, compare mode, snapshot creation, and restore previews.
  * Extracted from SheetLabPage.jsx (Track 5.1).
  */
+import { useRef } from 'react'
 import { Link } from 'react-router-dom'
+import UserAvatar from '../../../components/UserAvatar'
+import { useFocusTrap } from '../../../lib/useFocusTrap'
 import { timeAgo, truncateChecksum } from './sheetLabConstants'
 import { DiffViewer } from './SheetLabPanels'
 
@@ -29,6 +32,21 @@ export default function SheetLabHistory({ lab }) {
     timelineRef, isOwner, loadCommits, toggleCommitContent,
     handleCreateCommit, handlePreviewRestore, handleRestore, toggleCompareSelection,
   } = lab
+
+  // Focus trap refs for modals
+  const createModalRef = useFocusTrap({
+    active: showCreateModal,
+    onClose: () => {
+      setShowCreateModal(false)
+      setAutoSummary('')
+      setCommitMessage('')
+    },
+  })
+
+  const restoreModalRef = useFocusTrap({
+    active: !!restorePreview,
+    onClose: () => setRestorePreview(null),
+  })
 
   return (
     <>
@@ -62,7 +80,7 @@ export default function SheetLabHistory({ lab }) {
       {/* Compare diff viewer */}
       {compareMode && diff ? <DiffViewer diff={diff} title="Diff" /> : null}
       {compareMode && loadingDiff ? (
-        <div style={{ textAlign: 'center', padding: 20, color: 'var(--sh-muted)', fontSize: 13 }}>
+        <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 20, color: 'var(--sh-muted)', fontSize: 13 }}>
           Computing diff...
         </div>
       ) : null}
@@ -77,13 +95,13 @@ export default function SheetLabHistory({ lab }) {
 
       {/* Timeline */}
       {loading ? (
-        <div style={{ textAlign: 'center', padding: 40, color: 'var(--sh-muted)', fontSize: 14 }}>
+        <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 40, color: 'var(--sh-muted)', fontSize: 14 }}>
           Loading version history...
         </div>
       ) : commits.length === 0 ? (
         <div className="sheet-lab__empty">
           <div className="sheet-lab__empty-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--sh-brand, #6366f1)" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
               <circle cx="12" cy="12" r="10" />
               <polyline points="12 6 12 12 16 14" />
             </svg>
@@ -110,22 +128,12 @@ export default function SheetLabHistory({ lab }) {
               >
                 {/* Timeline dot — author avatar or initial */}
                 <div className={`sheet-lab__commit-dot${isFirst ? ' sheet-lab__commit-dot--latest' : ''}`}>
-                  {commit.author?.avatarUrl ? (
-                    <img
-                      src={commit.author.avatarUrl}
-                      alt=""
-                      loading="lazy"
-                      style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
-                    />
-                  ) : (
-                    <span style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      width: '100%', height: '100%', fontSize: 9, fontWeight: 800,
-                      color: isFirst ? '#fff' : 'var(--sh-brand, #6366f1)',
-                    }}>
-                      {(commit.author?.username || '?')[0].toUpperCase()}
-                    </span>
-                  )}
+                  <UserAvatar
+                    username={commit.author?.username}
+                    avatarUrl={commit.author?.avatarUrl}
+                    size={22}
+                    style={{ background: isFirst ? 'var(--sh-brand)' : undefined, color: isFirst ? 'var(--sh-surface)' : undefined }}
+                  />
                 </div>
 
                 <div
@@ -159,19 +167,11 @@ export default function SheetLabHistory({ lab }) {
 
                   <div className="sheet-lab__commit-meta">
                     <span className="sheet-lab__commit-author">
-                      {commit.author?.avatarUrl ? (
-                        <img src={commit.author.avatarUrl} alt="" loading="lazy" className="sheet-lab__commit-avatar" />
-                      ) : (
-                        <span
-                          className="sheet-lab__commit-avatar"
-                          style={{
-                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                            fontSize: 10, fontWeight: 800, color: '#6366f1',
-                          }}
-                        >
-                          {(commit.author?.username || '?')[0].toUpperCase()}
-                        </span>
-                      )}
+                      <UserAvatar
+                        username={commit.author?.username}
+                        avatarUrl={commit.author?.avatarUrl}
+                        size={20}
+                      />
                       {commit.author?.username || 'Unknown'}
                     </span>
                     <span className="sheet-lab__commit-checksum">
@@ -203,12 +203,15 @@ export default function SheetLabHistory({ lab }) {
                     </div>
                   ) : (
                     <div className="sheet-lab__commit-actions">
-                      <span
+                      <button
+                        type="button"
                         className={`sheet-lab__compare-check${isSelected ? ' selected' : ''}`}
                         onClick={(e) => { e.stopPropagation(); toggleCompareSelection(commit.id) }}
+                        aria-pressed={isSelected}
+                        aria-label={isSelected ? 'Deselect snapshot for compare' : 'Select snapshot for compare'}
                       >
                         {isSelected ? 'Selected' : 'Select for compare'}
-                      </span>
+                      </button>
                     </div>
                   )}
 
@@ -246,7 +249,7 @@ export default function SheetLabHistory({ lab }) {
       {/* Create Snapshot Modal */}
       {showCreateModal ? (
         <div className="sheet-lab__modal-overlay" onClick={() => setShowCreateModal(false)} onKeyDown={(e) => { if (e.key === 'Escape') setShowCreateModal(false) }} role="presentation">
-          <div className="sheet-lab__modal" role="dialog" aria-modal="true" aria-label="Create snapshot" onClick={(e) => e.stopPropagation()}>
+          <div ref={createModalRef} className="sheet-lab__modal" role="dialog" aria-modal="true" aria-label="Create snapshot" onClick={(e) => e.stopPropagation()}>
             <h2>Create Snapshot</h2>
             <p>Save the current state of this sheet as a versioned snapshot. You can restore any snapshot later.</p>
             {autoSummary && !loadingSummary ? (
@@ -263,7 +266,10 @@ export default function SheetLabHistory({ lab }) {
             {loadingSummary ? (
               <div style={{ fontSize: 12, color: 'var(--sh-muted)', marginBottom: 10 }}>Analyzing changes...</div>
             ) : null}
+            <label htmlFor="sheet-lab-commit-msg" className="sr-only">Snapshot message</label>
             <textarea
+              id="sheet-lab-commit-msg"
+              aria-label="Snapshot message"
               value={commitMessage}
               onChange={(e) => setCommitMessage(e.target.value)}
               placeholder="Describe what changed (optional)..."
@@ -285,7 +291,7 @@ export default function SheetLabHistory({ lab }) {
       {/* Restore Preview Modal */}
       {restorePreview ? (
         <div className="sheet-lab__modal-overlay" onClick={() => setRestorePreview(null)} onKeyDown={(e) => { if (e.key === 'Escape') setRestorePreview(null) }} role="presentation">
-          <div className="sheet-lab__modal sheet-lab__modal--wide" role="dialog" aria-modal="true" aria-label="Restore preview" onClick={(e) => e.stopPropagation()}>
+          <div ref={restoreModalRef} className="sheet-lab__modal sheet-lab__modal--wide" role="dialog" aria-modal="true" aria-label="Restore preview" onClick={(e) => e.stopPropagation()}>
             <h2>Restore Preview</h2>
             <p>Review the changes that will be applied when restoring to snapshot{restorePreview.commit?.message ? ` "${restorePreview.commit.message}"` : ''}.</p>
             <div style={{ maxHeight: '50vh', overflowY: 'auto', marginBottom: 16 }}>
@@ -293,7 +299,7 @@ export default function SheetLabHistory({ lab }) {
             </div>
             <div className="sheet-lab__modal-actions">
               <button type="button" className="sheet-lab__btn sheet-lab__btn--cancel" onClick={() => setRestorePreview(null)}>Cancel</button>
-              <button type="button" className="sheet-lab__btn sheet-lab__btn--primary" disabled={restoring === restorePreview.commitId} onClick={() => handleRestore(restorePreview.commitId)} style={{ background: '#dc2626' }}>
+              <button type="button" className="sheet-lab__btn sheet-lab__btn--primary" disabled={restoring === restorePreview.commitId} onClick={() => handleRestore(restorePreview.commitId)} style={{ background: 'var(--sh-danger, #dc2626)' }}>
                 {restoring === restorePreview.commitId ? 'Restoring...' : 'Confirm Restore'}
               </button>
             </div>

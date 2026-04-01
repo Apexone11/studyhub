@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { IconFork } from '../../../components/Icons'
+import UserAvatar from '../../../components/UserAvatar'
 import { timeAgo } from './sheetLabConstants'
 
 /* ── Fork tree node (recursive) ──────────────────────────── */
@@ -37,13 +38,11 @@ function TreeNode({ node, depth = 0 }) {
           <div className="lineage-node__meta">
             {node.author ? (
               <span className="lineage-node__author">
-                {node.author.avatarUrl ? (
-                  <img src={node.author.avatarUrl} alt="" loading="lazy" className="lineage-node__avatar" />
-                ) : (
-                  <span className="lineage-node__avatar lineage-node__avatar--fallback">
-                    {(node.author.username || '?')[0].toUpperCase()}
-                  </span>
-                )}
+                <UserAvatar
+                  username={node.author.username}
+                  avatarUrl={node.author.avatarUrl}
+                  size={16}
+                />
                 {node.author.username}
               </span>
             ) : null}

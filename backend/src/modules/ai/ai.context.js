@@ -48,8 +48,8 @@ ${courseList}
 </enrolled_courses>`)
       }
     }
-  } catch {
-    // Graceful degradation: continue without profile context.
+  } catch (error) {
+    console.warn('[AI Context] Failed to load user profile:', error?.message || error)
   }
 
   // ── 2. Current page context ──────────────────────────────────────
@@ -81,8 +81,8 @@ Content (may be truncated):
 ${content}
 </current_sheet>`)
         }
-      } catch {
-        // Skip sheet context on error.
+      } catch (error) {
+        console.warn('[AI Context] Failed to load sheet context:', error?.message || error)
       }
     }
 
@@ -110,8 +110,8 @@ Content (may be truncated):
 ${content}
 </current_note>`)
         }
-      } catch {
-        // Skip note context on error.
+      } catch (error) {
+        console.warn('[AI Context] Failed to load note context:', error?.message || error)
       }
     }
   }
@@ -132,8 +132,8 @@ ${content}
 ${list}
 </user_recent_sheets>`)
     }
-  } catch {
-    // Skip recent sheets on error.
+  } catch (error) {
+    console.warn('[AI Context] Failed to load recent sheets:', error?.message || error)
   }
 
   try {
@@ -151,8 +151,8 @@ ${list}
 ${list}
 </user_recent_notes>`)
     }
-  } catch {
-    // Skip recent notes on error.
+  } catch (error) {
+    console.warn('[AI Context] Failed to load recent notes:', error?.message || error)
   }
 
   if (sections.length === 0) return ''

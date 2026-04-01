@@ -8,6 +8,7 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createPortal } from 'react-dom'
+import ComponentErrorBoundary from '../ComponentErrorBoundary'
 import { IconSheets, IconPen, IconX, IconEye } from '../Icons'
 
 /**
@@ -40,7 +41,7 @@ export function SheetPreviewBar({ html, conversationTitle }) {
   }
 
   return (
-    <>
+    <ComponentErrorBoundary name="Sheet Preview">
       <div style={{
         display: 'flex',
         gap: 8,
@@ -75,7 +76,7 @@ export function SheetPreviewBar({ html, conversationTitle }) {
         <SheetPreviewModal html={html} onClose={() => setShowPreview(false)} />,
         document.body,
       )}
-    </>
+    </ComponentErrorBoundary>
   )
 }
 
@@ -118,7 +119,7 @@ function SheetPreviewModal({ html, onClose }) {
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 10000,
-      background: 'rgba(0,0,0,0.6)', display: 'flex',
+      background: 'var(--sh-modal-overlay, rgba(0,0,0,0.6))', display: 'flex',
       alignItems: 'center', justifyContent: 'center',
       padding: 20,
     }}
@@ -126,13 +127,13 @@ function SheetPreviewModal({ html, onClose }) {
     >
       <div
         style={{
-          background: '#fff', borderRadius: 16, width: '100%', maxWidth: 900,
+          background: 'var(--sh-surface)', borderRadius: 16, width: '100%', maxWidth: 900,
           height: '85vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
         }}
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{
-          padding: '12px 20px', borderBottom: '1px solid #e5e7eb',
+          padding: '12px 20px', borderBottom: '1px solid var(--sh-border)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -142,7 +143,7 @@ function SheetPreviewModal({ html, onClose }) {
           <button onClick={onClose} style={{
             background: 'none', border: 'none', cursor: 'pointer', padding: 4,
           }}>
-            <IconX size={18} style={{ color: '#6b7280' }} />
+            <IconX size={18} style={{ color: 'var(--sh-muted)' }} />
           </button>
         </div>
         <iframe

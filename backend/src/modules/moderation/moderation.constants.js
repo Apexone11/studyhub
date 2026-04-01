@@ -1,4 +1,4 @@
-const rateLimit = require('express-rate-limit')
+const { moderationAppealLimiter, moderationReportLimiter } = require('../../lib/rateLimiters')
 
 const PAGE_SIZE = 20
 
@@ -7,17 +7,9 @@ function parsePage(value) {
   return Number.isFinite(page) && page > 0 && page <= 10000 ? page : 1
 }
 
-const appealLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5,
-  message: { error: 'Too many appeal submissions. Please try again later.' },
-})
-
-const reportLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  max: 10,
-  message: { error: 'Too many reports. Please try again later.' },
-})
+// Re-export rate limiters with original names for backward compatibility
+const appealLimiter = moderationAppealLimiter
+const reportLimiter = moderationReportLimiter
 
 const REASON_CATEGORIES = [
   'harassment',

@@ -42,9 +42,9 @@ export function RawHtmlView({ rawHtml, highlightedLines, scrollToLine }) {
     if (target) {
       target.scrollIntoView({ behavior: 'smooth', block: 'center' })
       target.style.transition = 'background 0.3s'
-      target.style.background = '#fef08a'
+      target.style.background = 'var(--sh-warning-bg)'
       const isHighlighted = highlightSet.has(scrollToLine)
-      setTimeout(() => { target.style.background = isHighlighted ? '#fef3c7' : '' }, 1500)
+      setTimeout(() => { target.style.background = isHighlighted ? 'var(--sh-warning-bg)' : '' }, 1500)
     }
   }, [scrollToLine, highlightSet])
 
@@ -77,8 +77,8 @@ export function RawHtmlView({ rawHtml, highlightedLines, scrollToLine }) {
               data-line={lineNum}
               style={{
                 display: 'flex',
-                background: isHighlighted ? '#fef3c7' : 'transparent',
-                borderLeft: isHighlighted ? '3px solid #f59e0b' : '3px solid transparent',
+                background: isHighlighted ? 'var(--sh-warning-bg)' : 'transparent',
+                borderLeft: isHighlighted ? '3px solid var(--sh-warning-border)' : '3px solid transparent',
               }}
             >
               <span style={{
@@ -267,7 +267,7 @@ export function ReviewActionBar({ reason, setReason, submitting, submitError, su
                     <button
                       type="button"
                       onClick={() => onJumpToLine(issue.line)}
-                      style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: '#2563eb', fontSize: 10, fontWeight: 700, fontFamily: 'monospace', textDecoration: 'underline', flexShrink: 0 }}
+                      style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--sh-brand)', fontSize: 10, fontWeight: 700, fontFamily: 'monospace', textDecoration: 'underline', flexShrink: 0 }}
                     >
                       Line {issue.line}
                     </button>

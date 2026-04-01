@@ -12,27 +12,17 @@
  */
 
 const express = require('express')
-const rateLimit = require('express-rate-limit')
 const requireAuth = require('../../middleware/auth')
 const { captureError } = require('../../monitoring/sentry')
-const { readLimiter } = require('../../lib/rateLimiters')
+const { readLimiter, createAiMessageLimiter } = require('../../lib/rateLimiters')
 const aiService = require('./ai.service')
 const { MAX_MESSAGE_LENGTH, MAX_IMAGES_PER_MESSAGE, MAX_IMAGE_SIZE, ALLOWED_IMAGE_TYPES, AI_RATE_LIMIT_RPM } = require('./ai.constants')
 
 const router = express.Router()
 
 // Per-user rate limit for AI message sending (stricter than general API).
-// Keys on userId only -- this route is always behind requireAuth so
-// req.user.userId is guaranteed. Avoids express-rate-limit IPv6 validation
-// errors from referencing req.ip in a custom keyGenerator.
-const aiMessageLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: AI_RATE_LIMIT_RPM,
-  keyGenerator: (req) => `ai_${req.user.userId}`,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Too many AI requests. Please wait a moment.' },
-})
+// Uses AI_RATE_LIMIT_RPM from ai.constants for the max value.
+const aiMessageLimiter = createAiMessageLimiter(AI_RATE_LIMIT_RPM)
 
 // ── Conversation CRUD ──────────────────────────────────────────────
 

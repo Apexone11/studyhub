@@ -1,5 +1,4 @@
 const express = require('express')
-const rateLimit = require('express-rate-limit')
 const { getAuthTokenFromRequest, verifyAuthToken } = require('../../lib/authTokens')
 const { getVisibleProfileIds } = require('../../lib/profileVisibility')
 const { buildSheetTextSearchClauses } = require('../../lib/sheetSearch')
@@ -9,16 +8,9 @@ const prisma = require('../../lib/prisma')
 const { timedSection, logTiming } = require('../../lib/requestTiming')
 const { getBlockedUserIds } = require('../../lib/social/blockFilter')
 const { summarizeText } = require('../feed/feed.service')
+const { searchLimiter } = require('../../lib/rateLimiters')
 
 const router = express.Router()
-
-const searchLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 120,
-  message: { error: 'Too many search requests. Please slow down.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-})
 
 router.use(searchLimiter)
 

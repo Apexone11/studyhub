@@ -8,21 +8,15 @@
  *   - Returns aggregate stats + time-series engagement data
  */
 const express = require('express')
-const rateLimit = require('express-rate-limit')
 const requireAuth = require('../../middleware/auth')
 const { assertOwnerOrAdmin } = require('../../lib/accessControl')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
+const { sheetAnalyticsLimiter } = require('../../lib/rateLimiters')
 
 const router = express.Router()
 
-const analyticsLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 120,
-  message: { error: 'Too many analytics requests. Please wait.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-})
+const analyticsLimiter = sheetAnalyticsLimiter
 
 /**
  * GET /:id/analytics

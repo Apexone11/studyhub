@@ -5,25 +5,19 @@
  * card that fits the FeedAside layout. Shows up to 4 suggestions with
  * a one-click follow button and a "See All" link to the user's profile.
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Panel } from './FeedWidgets'
 import UserAvatar from '../../components/UserAvatar'
-
-const API = import.meta.env.VITE_API_URL || ''
+import useFetch from '../../lib/useFetch'
+import { API } from '../../config'
 
 export default function FeedFollowSuggestions() {
-  const [suggestions, setSuggestions] = useState([])
-  const [loading, setLoading] = useState(true)
+  const { data: suggestions, loading } = useFetch('/api/users/me/follow-suggestions', {
+    initialData: [],
+    transform: (data) => Array.isArray(data) ? data : []
+  })
   const [followingSet, setFollowingSet] = useState(new Set())
-
-  useEffect(() => {
-    fetch(`${API}/api/users/me/follow-suggestions`, { credentials: 'include' })
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data) => setSuggestions(Array.isArray(data) ? data : []))
-      .catch(() => setSuggestions([]))
-      .finally(() => setLoading(false))
-  }, [])
 
   const handleFollow = useCallback(async (username) => {
     // Optimistic: show "Following" immediately.

@@ -11,21 +11,16 @@
  *   GET /courses/:courseId/discover — Course-specific discovery (top sheets for a course)
  */
 const express = require('express')
-const rateLimit = require('express-rate-limit')
 const prisma = require('../../lib/prisma')
 const { captureError } = require('../../monitoring/sentry')
 const { getAuthTokenFromRequest, verifyAuthToken } = require('../../lib/authTokens')
 const { getBlockedUserIds } = require('../../lib/social/blockFilter')
 const { cache } = require('../../lib/cache')
+const { feedDiscoveryLimiter } = require('../../lib/rateLimiters')
 
 const router = express.Router()
 
-const discoveryLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 120,
-  standardHeaders: true,
-  legacyHeaders: false,
-})
+const discoveryLimiter = feedDiscoveryLimiter
 
 function optionalAuth(req, _res, next) {
   const token = getAuthTokenFromRequest(req)

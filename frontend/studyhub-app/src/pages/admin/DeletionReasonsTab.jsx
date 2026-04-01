@@ -21,7 +21,7 @@ export default function DeletionReasonsTab({ deletionsState, loadPagedData }) {
               <tr><td colSpan={4} className="admin-empty">No deletion records.</td></tr>
             )}
             {deletionsState.items.map((record) => (
-              <tr key={record.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+              <tr key={record.id} style={{ borderBottom: '1px solid var(--sh-border)' }}>
                 <td style={tableCellStrong}>{record.username}</td>
                 <td style={tableCell}>{String(record.reason || '').replace(/_/g, ' ') || '—'}</td>
                 <td style={tableCell}>{record.details || '—'}</td>

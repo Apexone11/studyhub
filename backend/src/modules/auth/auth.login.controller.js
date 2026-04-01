@@ -2,20 +2,9 @@ const express = require('express')
 const bcrypt = require('bcryptjs')
 const prisma = require('../../lib/prisma')
 const { checkAndPromoteTrust } = require('../../lib/trustGate')
+const { loginLimiter } = require('./auth.constants')
 const {
-  VERIFICATION_PURPOSE,
-  consumeChallenge,
-  findChallengeByToken,
-  sendOrRefreshLoginChallenge,
-  verifyChallengeCode,
-} = require('../../lib/verification/verificationChallenges')
-const { loginLimiter, verificationLimiter } = require('./auth.constants')
-const {
-  AppError,
-  normalizeEmail,
-  sendVerificationCodeEmail,
   issueAuthenticatedSession,
-  loginVerificationResponse,
   handleAuthError,
 } = require('./auth.service')
 
@@ -79,126 +68,13 @@ router.post('/login', loginLimiter, async (req, res) => {
       data: { failedAttempts: 0, lockedUntil: null },
     })
 
-    /* Email verification gate removed in v1.5.0 — Google handles its own
-     * verification, and local accounts no longer require verified email to log in.
-     * The old verification challenge flow is preserved in the /login/verification/*
-     * endpoints for backwards compatibility but is no longer triggered. */
+    /* Login verification flow removed in v1.5.0. Email verification is no longer
+     * required to log in. See docs/beta-v1.7.0-release-log.md for details. */
 
     const authenticatedUser = await issueAuthenticatedSession(res, user.id)
     void checkAndPromoteTrust(user.id)
     return res.json({
       message: 'Login successful!',
-      user: authenticatedUser,
-    })
-  } catch (error) {
-    return handleAuthError(req, res, error)
-  }
-})
-
-router.post('/login/verification/send', verificationLimiter, async (req, res) => {
-  const body = req.body || {}
-  const providedEmail = typeof body.email === 'string' ? body.email : ''
-
-  try {
-    const challenge = await findChallengeByToken(
-      body.verificationToken,
-      VERIFICATION_PURPOSE.LOGIN_EMAIL,
-    )
-
-    const nextEmail = providedEmail ? normalizeEmail(providedEmail) : challenge.email
-    if (!nextEmail) {
-      throw new AppError(400, 'Enter your email address before requesting a verification code.')
-    }
-
-    const conflictingUser = await prisma.user.findFirst({
-      where: {
-        email: nextEmail,
-        id: { not: challenge.userId || undefined },
-      },
-      select: { id: true },
-    })
-    if (conflictingUser) {
-      return res.status(409).json({ error: 'That email is already in use by another account.' })
-    }
-
-    const refreshed = await sendOrRefreshLoginChallenge(
-      body.verificationToken,
-      nextEmail,
-    )
-
-    const refreshedChallenge = refreshed.challenge
-    const user = refreshedChallenge.userId
-      ? await prisma.user.findUnique({
-          where: { id: refreshedChallenge.userId },
-          select: { username: true },
-        })
-      : null
-
-    await sendVerificationCodeEmail(
-      refreshedChallenge.email,
-      user?.username || refreshedChallenge.username || 'student',
-      refreshed.code,
-      {
-        route: req.originalUrl,
-        method: req.method,
-        purpose: VERIFICATION_PURPOSE.LOGIN_EMAIL,
-      },
-    )
-
-    res.json(loginVerificationResponse(refreshedChallenge, { codeSent: true }))
-  } catch (error) {
-    return handleAuthError(req, res, error)
-  }
-})
-
-router.post('/login/verification/verify', verificationLimiter, async (req, res) => {
-  const body = req.body || {}
-
-  try {
-    const challenge = await verifyChallengeCode(
-      body.verificationToken,
-      VERIFICATION_PURPOSE.LOGIN_EMAIL,
-      body.code,
-    )
-
-    if (!challenge.userId) {
-      throw new AppError(400, 'Verification session is invalid or has expired.')
-    }
-    if (!challenge.email) {
-      throw new AppError(400, 'Enter your email address before verifying your code.')
-    }
-
-    const conflictingUser = await prisma.user.findFirst({
-      where: {
-        email: challenge.email,
-        id: { not: challenge.userId },
-      },
-      select: { id: true },
-    })
-    if (conflictingUser) {
-      return res.status(409).json({ error: 'That email is already in use by another account.' })
-    }
-
-    const updatedUser = await prisma.user.update({
-      where: { id: challenge.userId },
-      data: {
-        email: challenge.email,
-        emailVerified: true,
-        emailVerificationCode: null,
-        emailVerificationExpiry: null,
-      },
-      select: {
-        id: true,
-        username: true,
-        email: true,
-      },
-    })
-
-    await consumeChallenge(challenge.id)
-
-    const authenticatedUser = await issueAuthenticatedSession(res, updatedUser.id)
-    res.json({
-      message: 'Email verified successfully.',
       user: authenticatedUser,
     })
   } catch (error) {

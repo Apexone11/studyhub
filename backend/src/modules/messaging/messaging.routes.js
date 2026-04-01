@@ -24,12 +24,11 @@
  */
 
 const express = require('express')
-const rateLimit = require('express-rate-limit')
 const requireAuth = require('../../middleware/auth')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
 const { getIO, getOnlineUsers } = require('../../lib/socketio')
-const { readLimiter } = require('../../lib/rateLimiters')
+const { readLimiter, messagingWriteLimiter } = require('../../lib/rateLimiters')
 const { getBlockedUserIds } = require('../../lib/social/blockFilter')
 
 const router = express.Router()
@@ -79,13 +78,6 @@ function sanitizeMessageContent(content) {
   return sanitizeHtml(String(content), { allowedTags: [], allowedAttributes: {} }).trim()
 }
 
-const messageWriteLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 60,
-  message: { error: 'Too many messages. Please slow down.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-})
 
 router.use(readLimiter)
 
