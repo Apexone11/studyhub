@@ -34,10 +34,11 @@ router.get('/recommendations', requireAuth, async (req, res) => {
         include: { school: true }
       })
 
+      const popularMap = new Map(popular.map((entry) => [entry.courseId, entry._count?.courseId || 0]))
       const withScores = courses
         .map((course) => ({
           ...course,
-          score: popular.find((entry) => entry.courseId === course.id)?._count?.courseId || 0
+          score: popularMap.get(course.id) || 0
         }))
         .sort((a, b) => b.score - a.score)
 
@@ -76,12 +77,11 @@ router.get('/recommendations', requireAuth, async (req, res) => {
       include: { school: true }
     })
 
+    const enrollmentMap = new Map(theirEnrollments.map((enrollment) => [enrollment.courseId, enrollment._count?.courseId || 0]))
     const withScores = recommended
       .map((course) => ({
         ...course,
-        score:
-          theirEnrollments.find((enrollment) => enrollment.courseId === course.id)?._count
-            ?.courseId || 0
+        score: enrollmentMap.get(course.id) || 0
       }))
       .sort((a, b) => b.score - a.score)
 

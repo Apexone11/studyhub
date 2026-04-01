@@ -1,5 +1,4 @@
 const express = require('express')
-const rateLimit = require('express-rate-limit')
 const requireAuth = require('../../middleware/auth')
 const requireAdmin = require('../../middleware/requireAdmin')
 const { captureError } = require('../../monitoring/sentry')
@@ -11,16 +10,9 @@ const {
   verifyAuthentication,
 } = require('../../lib/webauthn/webauthn')
 const prisma = require('../../lib/prisma')
+const { webauthnLimiter } = require('../../lib/rateLimiters')
 
 const router = express.Router()
-
-const webauthnLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
-  message: { error: 'Too many WebAuthn requests. Please try again later.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-})
 
 // ── Registration (admin-only, requires auth) ────────────────────────────
 

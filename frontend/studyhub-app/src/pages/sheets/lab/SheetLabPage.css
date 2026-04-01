@@ -56,6 +56,7 @@
   align-items: center;
   gap: 6px;
   padding: 10px 18px;
+  min-height: 44px;
   border: none;
   background: none;
   font-size: 13px;
@@ -181,6 +182,7 @@
   border-radius: 10px;
   border: none;
   padding: 9px 16px;
+  min-height: 36px;
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
@@ -376,9 +378,9 @@
   gap: 4px;
   padding: 5px 10px;
   border-radius: 8px;
-  border: 1px solid #dbeafe;
-  background: #eff6ff;
-  color: #1d4ed8;
+  border: 1px solid var(--sh-info-border, #dbeafe);
+  background: var(--sh-info-bg, #eff6ff);
+  color: var(--sh-info-text, #1d4ed8);
   font-size: 11px;
   font-weight: 700;
   cursor: pointer;
@@ -401,9 +403,9 @@
 }
 
 .sheet-lab__compare-check.selected {
-  border-color: #bbf7d0;
-  background: #f0fdf4;
-  color: #16a34a;
+  border-color: var(--sh-success-border, #bbf7d0);
+  background: var(--sh-success-bg, #f0fdf4);
+  color: var(--sh-success-text, #16a34a);
 }
 
 /* ── Commit kind badges ───────────────────────────────────── */
@@ -422,18 +424,18 @@
 }
 
 .sheet-lab__commit-kind--fork_base {
-  background: #ede9fe;
-  color: #6d28d9;
+  background: var(--sh-brand-soft, #ede9fe);
+  color: var(--sh-brand, #6d28d9);
 }
 
 .sheet-lab__commit-kind--restore {
-  background: #fff7ed;
-  color: #c2410c;
+  background: var(--sh-warning-bg, #fff7ed);
+  color: var(--sh-warning-text, #c2410c);
 }
 
 .sheet-lab__commit-kind--merge {
-  background: #ecfdf5;
-  color: #059669;
+  background: var(--sh-success-bg, #ecfdf5);
+  color: var(--sh-success-text, #059669);
 }
 
 /* ── Content preview (expanded commit) ─────────────────────── */
@@ -489,11 +491,11 @@
 }
 
 .sheet-lab__diff-additions {
-  color: #16a34a;
+  color: var(--sh-success-text, #16a34a);
 }
 
 .sheet-lab__diff-deletions {
-  color: #dc2626;
+  color: var(--sh-danger-text, #dc2626);
 }
 
 /* ── Diff mode toggle ──────────────────────────────────────── */
@@ -522,8 +524,8 @@
 }
 
 .sheet-lab__diff-mode-btn.active {
-  background: #6366f1;
-  color: #fff;
+  background: var(--sh-brand, #6366f1);
+  color: var(--sh-surface, #fff);
 }
 
 /* ── Unified diff ──────────────────────────────────────────── */
@@ -536,8 +538,8 @@
 }
 
 .sheet-lab__diff-hunk-header {
-  background: #eff6ff;
-  color: #3b82f6;
+  background: var(--sh-info-bg, #eff6ff);
+  color: var(--sh-info-text, #3b82f6);
   padding: 4px 16px;
   font-size: 11px;
   font-weight: 600;
@@ -581,13 +583,13 @@
 }
 
 .sheet-lab__diff-line--add {
-  background: #f0fdf4;
-  color: #166534;
+  background: var(--sh-success-bg, #f0fdf4);
+  color: var(--sh-success-text, #166534);
 }
 
 .sheet-lab__diff-line--remove {
-  background: #fef2f2;
-  color: #991b1b;
+  background: var(--sh-danger-bg, #fef2f2);
+  color: var(--sh-danger-text, #991b1b);
 }
 
 .sheet-lab__diff-line--equal {
@@ -597,18 +599,18 @@
 /* ── Word-level highlight segments ─────────────────────────── */
 
 .sheet-lab__word-add {
-  background: #bbf7d0;
+  background: var(--sh-success-border, #bbf7d0);
   border-radius: 3px;
   padding: 1px 2px;
   font-weight: 600;
 }
 
 .sheet-lab__word-remove {
-  background: #fecaca;
+  background: var(--sh-danger-border, #fecaca);
   border-radius: 3px;
   padding: 1px 2px;
   text-decoration: line-through;
-  text-decoration-color: #991b1b;
+  text-decoration-color: var(--sh-danger-text, #991b1b);
   opacity: 0.85;
 }
 
@@ -643,8 +645,8 @@
 }
 
 .sheet-lab__split-hunk-header {
-  background: #eff6ff;
-  color: #3b82f6;
+  background: var(--sh-info-bg, #eff6ff);
+  color: var(--sh-info-text, #3b82f6);
   padding: 4px 12px;
   font-size: 11px;
   font-weight: 600;
@@ -675,13 +677,13 @@
 }
 
 .sheet-lab__split-cell--remove {
-  background: #fef2f2;
-  color: #991b1b;
+  background: var(--sh-danger-bg, #fef2f2);
+  color: var(--sh-danger-text, #991b1b);
 }
 
 .sheet-lab__split-cell--add {
-  background: #f0fdf4;
-  color: #166534;
+  background: var(--sh-success-bg, #f0fdf4);
+  color: var(--sh-success-text, #166534);
 }
 
 .sheet-lab__split-cell--empty {
@@ -696,8 +698,8 @@
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  background: #eff6ff;
-  border: 1px solid #dbeafe;
+  background: var(--sh-info-bg, #eff6ff);
+  border: 1px solid var(--sh-info-border, #dbeafe);
   border-radius: 10px;
   padding: 8px 12px;
   margin-bottom: 12px;
@@ -706,7 +708,7 @@
 
 .sheet-lab__auto-summary-label {
   font-weight: 700;
-  color: #1d4ed8;
+  color: var(--sh-info-text, #1d4ed8);
 }
 
 .sheet-lab__auto-summary-text {
@@ -719,9 +721,9 @@
   align-items: center;
   padding: 3px 8px;
   border-radius: 6px;
-  border: 1px solid #93c5fd;
+  border: 1px solid var(--sh-info-border, #93c5fd);
   background: var(--sh-surface, #fff);
-  color: #1d4ed8;
+  color: var(--sh-info-text, #1d4ed8);
   font-size: 11px;
   font-weight: 700;
   cursor: pointer;
@@ -901,13 +903,13 @@
 }
 
 .lineage-node__card:hover {
-  border-color: #c7d2fe;
+  border-color: var(--sh-brand-soft, #c7d2fe);
   box-shadow: 0 2px 10px rgba(99, 102, 241, 0.06);
 }
 
 .lineage-node--current .lineage-node__card {
-  border-color: #818cf8;
-  background: linear-gradient(135deg, #faf5ff 0%, #eef2ff 100%);
+  border-color: var(--sh-brand, #818cf8);
+  background: var(--sh-brand-soft-bg, var(--sh-brand-soft, #eef2ff));
   box-shadow: 0 2px 12px rgba(99, 102, 241, 0.1);
 }
 
@@ -927,7 +929,7 @@
 }
 
 .lineage-node__title:hover {
-  color: #6366f1;
+  color: var(--sh-brand, #6366f1);
   text-decoration: underline;
 }
 
@@ -938,8 +940,8 @@
   font-weight: 800;
   padding: 1px 7px;
   border-radius: 4px;
-  background: #6366f1;
-  color: #fff;
+  background: var(--sh-brand, #6366f1);
+  color: var(--sh-surface, #fff);
   text-transform: uppercase;
   letter-spacing: 0.3px;
 }
@@ -963,7 +965,7 @@
   height: 16px;
   border-radius: 50%;
   object-fit: cover;
-  background: #e0e7ff;
+  background: var(--sh-brand-soft, #e0e7ff);
 }
 
 .lineage-node__avatar--fallback {
@@ -972,7 +974,7 @@
   justify-content: center;
   font-size: 9px;
   font-weight: 800;
-  color: #6366f1;
+  color: var(--sh-brand, #6366f1);
 }
 
 .lineage-node__stat {
@@ -985,6 +987,31 @@
 .lineage-node__time {
   font-size: 11px;
   color: var(--sh-muted, #94a3b8);
+}
+
+/* ── Focus indicators (WCAG 2.4.7) ───────────────────────────── */
+
+.sheet-lab__tab:focus-visible,
+.sheet-lab__btn:focus-visible,
+.sheet-lab__back:focus-visible,
+.sheet-lab__restore-btn:focus-visible,
+.sheet-lab__browse-btn:focus-visible,
+.sheet-lab__compare-check:focus-visible,
+.sheet-lab__auto-summary-use:focus-visible,
+.sheet-lab__diff-mode-btn:focus-visible {
+  outline: 2px solid var(--sh-brand, #6366f1);
+  outline-offset: 2px;
+}
+
+.sheet-lab__commit-card:focus-visible {
+  outline: 2px solid var(--sh-brand, #6366f1);
+  outline-offset: 2px;
+  border-color: var(--sh-brand, #6366f1);
+}
+
+.lineage-node__title:focus-visible {
+  outline: 2px solid var(--sh-brand, #6366f1);
+  outline-offset: 2px;
 }
 
 /* ── Responsive ────────────────────────────────────────────── */

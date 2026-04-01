@@ -1,12 +1,7 @@
-const rateLimit = require('express-rate-limit')
+const { settingsTwoFaLimiter } = require('../../lib/rateLimiters')
 
-const twoFaLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  message: { error: 'Too many requests. Please try again later.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-})
+// Re-export rate limiter with original name for backward compatibility
+const twoFaLimiter = settingsTwoFaLimiter
 
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,20}$/
 const COURSE_CODE_REGEX = /^[A-Z0-9-]{2,20}$/

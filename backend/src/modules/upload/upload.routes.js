@@ -1,7 +1,6 @@
 const express = require('express')
 const multer = require('multer')
 const path = require('path')
-const rateLimit = require('express-rate-limit')
 const requireAuth = require('../../middleware/auth')
 const { ERROR_CODES, sendError } = require('../../middleware/errorEnvelope')
 const { assertOwnerOrAdmin } = require('../../lib/accessControl')
@@ -22,6 +21,12 @@ const {
   cleanupCoverIfUnused,
   safeUnlinkFile,
 } = require('../../lib/storage')
+const {
+  uploadAvatarLimiter,
+  uploadAttachmentLimiter,
+  uploadCoverLimiter,
+  uploadContentImageLimiter,
+} = require('../../lib/rateLimiters')
 
 const router = express.Router()
 
@@ -33,22 +38,6 @@ const AVATAR_MAX_BYTES    = 5 * 1024 * 1024   // 5 MB
 const ATTACHMENT_ALLOWED_MIME = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'image/webp'])
 const ATTACHMENT_ALLOWED_EXT  = new Set(['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.webp'])
 const ATTACHMENT_MAX_BYTES    = 10 * 1024 * 1024  // 10 MB
-
-const avatarUploadLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
-  message: { error: 'Too many avatar uploads. Please wait a bit.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-})
-
-const attachmentUploadLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 40,
-  message: { error: 'Too many attachment uploads. Please wait a bit.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-})
 
 // ── Safe filename: strip to alphanumeric + dash/dot ───────────
 function safeName(original) {
@@ -136,14 +125,6 @@ router.post('/avatar', requireAuth, avatarUploadLimiter, (req, res) => {
 const COVER_ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp'])
 const COVER_ALLOWED_EXT  = new Set(['.jpg', '.jpeg', '.png', '.webp'])
 const COVER_MAX_BYTES    = 8 * 1024 * 1024   // 8 MB
-
-const coverUploadLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  message: { error: 'Too many cover uploads. Please wait a bit.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-})
 
 const coverStorage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, COVERS_DIR),
@@ -386,14 +367,6 @@ router.post('/post-attachment/:postId', requireAuth, attachmentUploadLimiter, (r
 const CONTENT_IMAGE_ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
 const CONTENT_IMAGE_ALLOWED_EXT  = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif'])
 const CONTENT_IMAGE_MAX_BYTES    = 5 * 1024 * 1024   // 5 MB per image
-
-const contentImageUploadLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 60,
-  message: { error: 'Too many image uploads. Please wait a bit.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-})
 
 const contentImageStorage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, CONTENT_IMAGES_DIR),

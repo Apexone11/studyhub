@@ -285,6 +285,7 @@ export default function AiBubble() {
           }}>
             <textarea
               ref={inputRef}
+              aria-label="Ask Hub AI"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}

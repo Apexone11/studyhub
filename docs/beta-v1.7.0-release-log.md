@@ -2974,3 +2974,228 @@ Polished the Hub AI chat experience (page and floating bubble) and improved feed
 | `frontend/.../pages/admin/AdminPage.jsx` | Loading state instead of blank |
 | `frontend/.../pages/sheets/lab/AiSheetSetupPage.jsx` | Loading state instead of blank |
 | `frontend/.../index.css` | Added `--sh-ai-gradient` CSS custom property |
+
+---
+
+## Tech Debt Remediation -- Sheet Lab + Core Files (2026-04-01)
+
+### Summary
+
+Fixed broken avatars in Sheet Lab History and Lineage tabs, eliminated all hardcoded hex colors from SheetLabPage.css (30+ instances), replaced ad-hoc avatar rendering with the shared UserAvatar component, fixed N+1 query patterns in the courses controller, and added error logging to silent catch blocks in AI context builder.
+
+### Bug Fixes
+
+| Bug | Root Cause | Fix |
+|-----|-----------|-----|
+| Broken avatar in History tab | Raw `<img>` with relative `avatarUrl` not resolved to API origin | Replaced with `UserAvatar` component (handles URL resolution + fallback) |
+| Fork Tree card ignores dark mode | Hardcoded `#faf5ff`, `#eef2ff`, `#818cf8` background/border | Replaced with `var(--sh-brand-soft-bg)`, `var(--sh-brand)` tokens |
+| Lineage avatar broken for relative URLs | Same raw `<img>` pattern | Replaced with `UserAvatar` component |
+
+### Tech Debt Fixed
+
+| Category | Detail |
+|----------|--------|
+| Hardcoded colors | Replaced 30+ bare hex values in `SheetLabPage.css` with CSS custom property tokens (diff colors, badges, restore button, hunk headers, auto-summary, compare selection, word highlights) |
+| Hardcoded colors | Fixed 4 additional frontend files: `RouteErrorBoundary.jsx`, `ResetPasswordPage.jsx`, `DeletionReasonsTab.jsx`, `SheetReviewDetails.jsx` |
+| N+1 query | `courses.controller.js`: Converted 2 `array.find()` inside `.map()` (O(n^2)) to `Map` lookups (O(n)) for popular/recommended course scoring |
+| Silent catches | `ai.context.js`: Added `console.warn('[AI Context]...')` to 5 empty catch blocks for production observability |
+| Avatar consistency | `SheetLabHistory.jsx` and `SheetLabLineage.jsx` now use the shared `UserAvatar` component instead of ad-hoc `<img>` tags |
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `frontend/.../pages/sheets/lab/SheetLabHistory.jsx` | Import + use UserAvatar, remove hardcoded `#6366f1` and `#dc2626` |
+| `frontend/.../pages/sheets/lab/SheetLabLineage.jsx` | Import + use UserAvatar for fork tree nodes |
+| `frontend/.../pages/sheets/lab/SheetLabPage.css` | 30+ hardcoded hex values replaced with CSS tokens |
+| `frontend/.../components/RouteErrorBoundary.jsx` | `#3b82f6` replaced with `var(--sh-brand)` |
+| `frontend/.../pages/auth/ResetPasswordPage.jsx` | Focus/blur border + button colors tokenized |
+| `frontend/.../pages/admin/DeletionReasonsTab.jsx` | Border color tokenized |
+| `frontend/.../pages/admin/sheetReview/SheetReviewDetails.jsx` | Highlight colors tokenized |
+| `backend/src/modules/courses/courses.controller.js` | N+1 `.find()` converted to `Map` lookup (2 instances) |
+| `backend/src/modules/ai/ai.context.js` | 5 empty catch blocks now log warnings |
+
+### Remaining Tech Debt (documented for future cycles)
+
+| Category | Priority | Items |
+|----------|----------|-------|
+| Hardcoded colors | Medium | `EditorToolbar.jsx` (dark-mode editor exception), `AiSheetPreview.jsx` (embedded HTML), `NoteEditor.jsx` |
+| Missing error boundaries | Medium | No component-level boundaries around ChatPanel, GroupDetailTabs, AI preview |
+| Rate limiter duplication | Low | 15+ local rate limiter definitions across modules vs centralized `lib/rateLimiters.js` |
+| Dead backwards-compat code | Low | Login verification endpoints no longer triggered since v1.5.0 |
+
+---
+
+## Accessibility + Design System Audit (2026-04-01)
+
+### Summary
+
+Ran WCAG 2.1 AA accessibility audit and design system token audit. Fixed critical keyboard accessibility issues, added missing form labels, focus-visible indicators, and defined 6 missing CSS custom property tokens.
+
+### Accessibility Fixes Applied
+
+| WCAG | Severity | Fix |
+|------|----------|-----|
+| 2.1.1 (Keyboard) | Critical | Compare-check `<span>` converted to `<button>` with `aria-pressed` and `aria-label` |
+| 2.4.7 (Focus Visible) | Critical | Added `:focus-visible` rules for 10+ interactive element classes in SheetLabPage.css |
+| 3.3.2 (Labels) | Major | Added `<label>` for snapshot message textarea (SheetLabHistory.jsx) |
+| 3.3.2 (Labels) | Major | Added `<label>` for feed search input (FeedPage.jsx) |
+| 4.1.3 (Status Messages) | Moderate | Added `role="status"` and `aria-live="polite"` to loading indicators |
+
+### Design System Fixes Applied
+
+| Token | Light | Dark | Used By |
+|-------|-------|------|---------|
+| `--sh-brand-soft-bg` | `#eef2ff` | `#172554` | Lineage current-node background |
+| `--sh-brand-border` | `#93c5fd` | `#1e40af` | Brand-accented borders |
+| `--sh-modal-overlay` | `rgba(0,0,0,0.45)` | `rgba(0,0,0,0.7)` | Modal backdrops |
+| `--sh-warning-light-bg` | `#fffbeb` | `#2a2010` | Light warning backgrounds |
+| `--sh-warning-dark-text` | `#78350f` | `#fde68a` | Dark warning text |
+| `--sh-danger-light-bg` | `#fff1f2` | `#2a1515` | Light danger backgrounds |
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `frontend/.../index.css` | Added 6 missing tokens (both light and dark mode) |
+| `frontend/.../pages/sheets/lab/SheetLabPage.css` | Added `:focus-visible` rules for all interactive elements |
+| `frontend/.../pages/sheets/lab/SheetLabHistory.jsx` | Compare-check to `<button>`, textarea label, loading aria-live |
+| `frontend/.../pages/feed/FeedPage.jsx` | Search input label with sr-only |
+
+### Remaining Accessibility Issues (documented for future cycles)
+
+| WCAG | Severity | Item |
+|------|----------|------|
+| 1.3.1 | Moderate | AI bubble chat messages lack list semantics |
+
+---
+
+## Full Tech Debt Remediation (2026-04-01)
+
+### Summary
+
+Comprehensive tech debt cycle: decomposed 3 monolithic components (3,881 total lines) into 20+ focused sub-components, created shared useFetch hook to eliminate duplicated fetch patterns, added modal focus trapping, fixed touch targets, cleaned up obsolete documentation, and applied remaining accessibility fixes.
+
+### Document Cleanup
+
+Deleted 8 obsolete files: `beta-v1.0.0-release-log.md`, `cycle-sheet-experience.md`, `sheetlab-improvements.md`, `system-audit-2026-03-26.md`, `plans/cycle-40-plan.md`, `plans/cycle-41-plan.md`, `plans/cycle-42-plan.md`, `plans/v1.5-weekly-roadmap.md`, and 4 old dated screenshots.
+
+### Component Decomposition
+
+| Original File | Lines | New Components | Orchestrator |
+|---------------|-------|----------------|--------------|
+| `GroupDetailTabs.jsx` | 2214 | 6 tab components + shared styles module | 122 lines |
+| `ChatPanel.jsx` | 884 | 7 sub-components (ChatHeader, ConversationList, MessageThread, MessageBubble, MessageInput, GifSearchPanel, SocketWarning) | 456 lines |
+| `ModerationTab.jsx` | 783 | 7 sub-components (StatusPill, Card, AppealModal, StatusSection, CasesSection, AppealsSection, HistorySection) | 153 lines |
+
+### Shared Infrastructure Created
+
+| File | Purpose |
+|------|---------|
+| `lib/useFetch.js` | Shared data-fetching hook with loading/error/data, transform, skip, refetch |
+| `lib/useFocusTrap.js` | Reusable modal focus trap (Tab/Shift+Tab wrapping, focus restore, scroll lock) |
+
+### Duplicated Fetch Migrations
+
+| Component | Before | After |
+|-----------|--------|-------|
+| `StreakWidget` | 20 lines manual fetch | 1-line `useFetch('/api/users/me/streak')` |
+| `WeeklyProgressWidget` | 20 lines manual fetch | 1-line `useFetch('/api/users/me/weekly-activity')` |
+| `LeaderboardWidget` | 25 lines dual fetch | 2 `useFetch` calls + derived state |
+| `FeedFollowSuggestions` | 10 lines fetch chain | `useFetch` with transform |
+
+### Accessibility Fixes Applied (this cycle)
+
+| WCAG | Fix |
+|------|-----|
+| 2.1.2 (No Keyboard Trap) | Modal focus trapping via `useFocusTrap` on Sheet Lab create/restore modals |
+| 2.5.5 (Target Size) | `min-height: 44px` on tabs, `min-height: 36px` on secondary buttons |
+| 3.3.2 (Labels) | `aria-label` on AI bubble textarea |
+| 4.1.3 (Status Messages) | `role="alert"` on SheetLabPage error banner |
+
+### All New Files
+
+| File | Lines |
+|------|-------|
+| `lib/useFetch.js` | 56 |
+| `lib/useFocusTrap.js` | ~60 |
+| `pages/studyGroups/GroupDetailTabs.styles.js` | 493 |
+| `pages/studyGroups/GroupOverviewTab.jsx` | 140 |
+| `pages/studyGroups/GroupResourcesTab.jsx` | 264 |
+| `pages/studyGroups/GroupSessionsTab.jsx` | 338 |
+| `pages/studyGroups/GroupDiscussionsTab.jsx` | 436 |
+| `pages/studyGroups/GroupMembersTab.jsx` | 270 |
+| `components/ChatPanel/ChatHeader.jsx` | 53 |
+| `components/ChatPanel/ConversationList.jsx` | 103 |
+| `components/ChatPanel/MessageThread.jsx` | 40 |
+| `components/ChatPanel/MessageBubble.jsx` | 112 |
+| `components/ChatPanel/MessageInput.jsx` | 183 |
+| `components/ChatPanel/GifSearchPanel.jsx` | 83 |
+| `components/ChatPanel/SocketWarning.jsx` | 19 |
+| `pages/settings/components/ModerationStatusPill.jsx` | 24 |
+| `pages/settings/components/ModerationCard.jsx` | 15 |
+| `pages/settings/components/ModerationAppealModal.jsx` | 207 |
+| `pages/settings/components/ModerationStatusSection.jsx` | 69 |
+| `pages/settings/components/ModerationCasesSection.jsx` | 149 |
+| `pages/settings/components/ModerationAppealsSection.jsx` | 102 |
+| `pages/settings/components/ModerationHistorySection.jsx` | 113 |
+
+### Verification
+
+All 34 files (20 core + 14 sub-components) pass acorn/JSX syntax validation.
+
+---
+
+## Final Tech Debt Closure (2026-04-01)
+
+### Summary
+
+Closed out the remaining 4 tech debt items identified in the prior audit cycle: component-level error boundaries, rate limiter centralization, dead login verification endpoints, and hardcoded color audit in editor panels.
+
+### 1. Component Error Boundaries
+
+Added a reusable `ComponentErrorBoundary` (class-based React error boundary) and applied it to high-risk render subtrees:
+
+| Component | Wrap target |
+|-----------|-------------|
+| `ChatPanel.jsx` | Entire messaging panel content |
+| `GroupDetailTabs.jsx` | Each tab (Overview, Resources, Sessions, Discussions, Members) individually |
+| `AiSheetPreview.jsx` | Sheet preview bar |
+
+New file: `frontend/studyhub-app/src/components/ComponentErrorBoundary.jsx` (~40 lines). Renders an inline fallback with "Something went wrong" message and "Try again" button. Configurable `name` prop for identification.
+
+### 2. Rate Limiter Centralization
+
+Consolidated 47 rate limiters from 16+ scattered files into a single source of truth at `backend/src/lib/rateLimiters.js`. Organized into 15 named categories (auth, feed, sheets, search, messaging, AI, etc.). All module files updated to import from the central registry.
+
+Files updated (imports only, no behavioral change):
+- `auth.constants.js`, `feed.constants.js`, `sheets.constants.js`, `moderation.constants.js`, `settings.constants.js`, `courses.constants.js`
+- `sharing.routes.js`, `notes.routes.js`, `search.routes.js`, `upload.routes.js`, `users.routes.js`, `webauthn.routes.js`, `messaging.routes.js`, `ai.routes.js`
+- `feed.discovery.controller.js`, `sheets.analytics.controller.js`
+
+### 3. Dead Code Removal — Login Verification Endpoints
+
+Removed backwards-compatibility login verification endpoints unused since v1.5.0 (when login stopped being gated on email verification):
+
+| File | Change |
+|------|--------|
+| `backend/src/modules/auth/auth.login.controller.js` | Removed `POST /login/verification/send` and `/login/verification/verify` handlers + unused imports |
+| `backend/src/middleware/guardedMode.js` | Removed dead endpoints from `AUTH_WRITE_ALLOWLIST` |
+
+### 4. Hardcoded Color Audit — Editor Panels
+
+Audited all hardcoded hex colors in `EditorToolbar.jsx`, `AiSheetPreview.jsx`, and `NoteEditor.jsx`:
+
+| File | Fixes Applied | Classified Exceptions |
+|------|---------------|----------------------|
+| `AiSheetPreview.jsx` | 4: modal overlay -> `var(--sh-modal-overlay)`, modal bg -> `var(--sh-surface)`, header border -> `var(--sh-border)`, close icon -> `var(--sh-muted)` | 9: embedded iframe HTML (renders in sandboxed document, CSS vars unavailable) |
+| `EditorToolbar.jsx` | 2: active button + link submit `#6366f1` -> `var(--sh-brand)` | 12: dark-mode-always editor chrome (`#1e293b`, `#334155`, `#0f172a`, `#94a3b8`, `#475569`, `#e2e8f0`, `#fff` on brand bg) |
+| `NoteEditor.jsx` | 0 (already fully tokenized) | 6: print export HTML (separate `window.open()` document, CSS vars unavailable) |
+
+### Remaining Tech Debt
+
+All identified tech debt items from this audit cycle have been resolved or classified as intentional exceptions. Zero actionable items remain.
+
+### Verification
+
+All 13 files modified in this phase pass acorn/JSX syntax validation (13/13).

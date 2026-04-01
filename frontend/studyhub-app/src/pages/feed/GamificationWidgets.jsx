@@ -15,39 +15,17 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Panel } from './FeedWidgets'
 import UserAvatar from '../../components/UserAvatar'
+import useFetch from '../../lib/useFetch'
 
-const API = import.meta.env.VITE_API_URL || ''
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 
 /**
  * StreakWidget — Shows current streak, longest streak, and today's activity status.
  */
 export function StreakWidget() {
-  const [streak, setStreak] = useState({ currentStreak: 0, longestStreak: 0, lastActiveDate: null, todayActive: false })
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
-
-  useEffect(() => {
-    const loadStreak = async () => {
-      try {
-        const response = await fetch(`${API}/api/users/me/streak`, {
-          credentials: 'include',
-        })
-        if (response.ok) {
-          const data = await response.json()
-          setStreak(data)
-        } else {
-          setError(true)
-        }
-      } catch {
-        setError(true)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    loadStreak()
-  }, [])
+  const { data: streak, loading, error } = useFetch('/api/users/me/streak', {
+    initialData: { currentStreak: 0, longestStreak: 0, lastActiveDate: null, todayActive: false }
+  })
 
   if (loading) {
     return (
@@ -105,37 +83,15 @@ export function StreakWidget() {
  * WeeklyProgressWidget — 7-day bar chart showing activity progress.
  */
 export function WeeklyProgressWidget() {
-  const [weekly, setWeekly] = useState({
-    daysActive: 0,
-    totalActions: 0,
-    goal: 0,
-    goalMet: false,
-    dailyBreakdown: [],
-  })
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
-
-  useEffect(() => {
-    const loadWeekly = async () => {
-      try {
-        const response = await fetch(`${API}/api/users/me/weekly-activity`, {
-          credentials: 'include',
-        })
-        if (response.ok) {
-          const data = await response.json()
-          setWeekly(data)
-        } else {
-          setError(true)
-        }
-      } catch {
-        setError(true)
-      } finally {
-        setLoading(false)
-      }
+  const { data: weekly, loading, error } = useFetch('/api/users/me/weekly-activity', {
+    initialData: {
+      daysActive: 0,
+      totalActions: 0,
+      goal: 0,
+      goalMet: false,
+      dailyBreakdown: [],
     }
-
-    loadWeekly()
-  }, [])
+  })
 
   if (loading) {
     return (
@@ -230,42 +186,20 @@ export function WeeklyProgressWidget() {
  * LeaderboardWidget — Top 5 users with ranking and score.
  */
 export function LeaderboardWidget() {
-  const [leaderboard, setLeaderboard] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
+  const { data: leaderboard, loading, error } = useFetch('/api/feed/leaderboard?period=weekly&limit=5', {
+    initialData: []
+  })
+  const { data: currentUser } = useFetch('/api/users/me')
   const [currentUserRank, setCurrentUserRank] = useState(null)
 
   useEffect(() => {
-    const loadLeaderboard = async () => {
-      try {
-        const response = await fetch(`${API}/api/feed/leaderboard?period=weekly&limit=5`, {
-          credentials: 'include',
-        })
-        if (response.ok) {
-          const data = await response.json()
-          setLeaderboard(Array.isArray(data) ? data : [])
-
-          // Try to find current user in leaderboard
-          const meRes = await fetch(`${API}/api/users/me`, { credentials: 'include' })
-          if (meRes.ok) {
-            const meData = await meRes.json()
-            const userRank = Array.isArray(data) ? data.findIndex((u) => u.userId === meData.id) : -1
-            if (userRank >= 0) {
-              setCurrentUserRank(userRank)
-            }
-          }
-        } else {
-          setError(true)
-        }
-      } catch {
-        setError(true)
-      } finally {
-        setLoading(false)
+    if (leaderboard && Array.isArray(leaderboard) && currentUser && currentUser.id) {
+      const userRank = leaderboard.findIndex((u) => u.userId === currentUser.id)
+      if (userRank >= 0) {
+        setCurrentUserRank(userRank)
       }
     }
-
-    loadLeaderboard()
-  }, [])
+  }, [leaderboard, currentUser])
 
   if (loading) {
     return (

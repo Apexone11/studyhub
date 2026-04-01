@@ -166,7 +166,10 @@ export default function FeedPage() {
                   ))}
                 </div>
                 {activeFilter !== 'for-you' && (
-                  <input data-tutorial="feed-search" value={localSearch} onChange={(event) => handleSearchChange(event.target.value)} placeholder="Search the feed..." className="sh-input" style={{ maxWidth: 240 }} />
+                  <>
+                    <label htmlFor="feed-search" className="sr-only">Search the feed</label>
+                    <input id="feed-search" data-tutorial="feed-search" aria-label="Search the feed" value={localSearch} onChange={(event) => handleSearchChange(event.target.value)} placeholder="Search the feed..." className="sh-input" style={{ maxWidth: 240 }} />
+                  </>
                 )}
               </div>
 

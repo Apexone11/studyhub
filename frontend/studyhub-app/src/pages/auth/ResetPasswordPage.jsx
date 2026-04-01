@@ -87,8 +87,8 @@ function ResetPasswordPage() {
                     value={newPassword}
                     onChange={e => { setNewPassword(e.target.value); setError('') }}
                     style={{ ...styles.input, paddingRight: 44 }}
-                    onFocus={e => (e.target.style.borderColor = '#2563eb')}
-                    onBlur={e => (e.target.style.borderColor = '#e5e7eb')}
+                    onFocus={e => (e.target.style.borderColor = 'var(--sh-brand)')}
+                    onBlur={e => (e.target.style.borderColor = 'var(--sh-border)')}
                   />
                   <button type="button" onClick={() => setShowPassword(p => !p)} style={styles.toggleBtn}>
                     <i className={showPassword ? 'fas fa-eye-slash' : 'fas fa-eye'}></i>
@@ -107,8 +107,8 @@ function ResetPasswordPage() {
                     value={confirmPassword}
                     onChange={e => { setConfirmPassword(e.target.value); setError('') }}
                     style={styles.input}
-                    onFocus={e => (e.target.style.borderColor = '#2563eb')}
-                    onBlur={e => (e.target.style.borderColor = '#e5e7eb')}
+                    onFocus={e => (e.target.style.borderColor = 'var(--sh-brand)')}
+                    onBlur={e => (e.target.style.borderColor = 'var(--sh-border)')}
                   />
                 </div>
               </div>
@@ -117,8 +117,8 @@ function ResetPasswordPage() {
                 type="submit"
                 disabled={loading || !token}
                 style={{ ...styles.submitBtn, opacity: token ? 1 : 0.5 }}
-                onMouseEnter={e => { if (!loading && token) e.target.style.background = '#1d4ed8' }}
-                onMouseLeave={e => { if (!loading && token) e.target.style.background = '#2563eb' }}
+                onMouseEnter={e => { if (!loading && token) e.target.style.background = 'var(--sh-brand-hover)' }}
+                onMouseLeave={e => { if (!loading && token) e.target.style.background = 'var(--sh-brand)' }}
               >
                 {loading ? 'Saving…' : 'Set New Password'}
               </button>

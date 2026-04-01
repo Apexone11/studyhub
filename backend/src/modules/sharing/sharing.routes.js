@@ -1,5 +1,4 @@
 const express = require('express')
-const rateLimit = require('express-rate-limit')
 const crypto = require('crypto')
 const requireAuth = require('../../middleware/auth')
 const optionalAuth = require('../../core/auth/optionalAuth')
@@ -8,24 +7,12 @@ const { captureError } = require('../../monitoring/sentry')
 const { isBlockedEitherWay } = require('../../lib/social/blockFilter')
 const { watermarkHtml, watermarkText } = require('../../lib/watermark')
 const prisma = require('../../lib/prisma')
+const { sharingMutateLimiter, sharingReadLimiter } = require('../../lib/rateLimiters')
 
 const router = express.Router()
 
-const mutateLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 30,
-  message: { error: 'Too many requests. Please slow down.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-})
-
-const readLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 120,
-  message: { error: 'Too many requests. Please slow down.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-})
+const mutateLimiter = sharingMutateLimiter
+const readLimiter = sharingReadLimiter
 
 // ══════════════════════════════════════════════════════════════════════════
 // Share Links (Public URL-based sharing with optional expiry/view limits)

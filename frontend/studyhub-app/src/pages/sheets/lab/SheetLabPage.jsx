@@ -132,7 +132,7 @@ export default function SheetLabPage() {
 
           {/* ── Error banner ───────────────────────────── */}
           {error ? (
-            <div style={{
+            <div role="alert" style={{
               background: 'var(--sh-danger-bg, #fef2f2)', color: 'var(--sh-danger-text, #dc2626)',
               border: '1px solid var(--sh-danger-border, #fecaca)',
               borderRadius: 14, padding: '12px 14px', fontSize: 13, marginBottom: 16,

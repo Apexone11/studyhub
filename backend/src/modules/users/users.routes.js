@@ -1,5 +1,4 @@
 const express = require('express')
-const rateLimit = require('express-rate-limit')
 const requireAuth = require('../../middleware/auth')
 const { captureError } = require('../../monitoring/sentry')
 const { createNotification } = require('../../lib/notify')
@@ -8,7 +7,7 @@ const { getProfileAccessDecision, PROFILE_VISIBILITY } = require('../../lib/prof
 const prisma = require('../../lib/prisma')
 const { checkAndAwardBadges } = require('../../lib/badges')
 const { getUserStreak, getWeeklyActivity } = require('../../lib/streaks')
-const { readLimiter } = require('../../lib/rateLimiters')
+const { readLimiter, usersFollowLimiter } = require('../../lib/rateLimiters')
 
 const router = express.Router()
 
@@ -18,13 +17,7 @@ router.use((req, res, next) => {
   next()
 })
 
-const followLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 30,
-  message: { error: 'Too many requests. Please slow down.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-})
+const followLimiter = usersFollowLimiter
 
 // Optional auth middleware
 function optionalAuth(req, res, next) {

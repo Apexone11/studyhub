@@ -1,4 +1,13 @@
-const rateLimit = require('express-rate-limit')
+const {
+  sheetReactLimiter,
+  sheetWriteLimiter,
+  sheetCommentLimiter,
+  sheetContributionLimiter,
+  sheetContributionReviewLimiter,
+  sheetAttachmentDownloadLimiter,
+  sheetLeaderboardLimiter,
+  sheetDiffLimiter,
+} = require('../../lib/rateLimiters')
 
 const SHEET_STATUS = {
   DRAFT: 'draft',
@@ -11,69 +20,14 @@ const SHEET_STATUS = {
 /* emailVerified is private — only expose via /api/auth/me or admin routes */
 const AUTHOR_SELECT = { id: true, username: true, avatarUrl: true, isStaffVerified: true }
 
-const reactLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 30,
-  message: { error: 'Too many requests. Please slow down.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-})
-
-const sheetWriteLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 120,
-  message: { error: 'Too many sheet updates. Please slow down.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-})
-
-const commentLimiter = rateLimit({
-  windowMs: 5 * 60 * 1000,
-  max: 10,
-  message: { error: 'Too many comments. Please slow down.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-})
-
-const contributionRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 60,
-  message: { error: 'Too many contribution requests. Please slow down.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-})
-
-const contributionReviewLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 60,
-  message: { error: 'Too many contribution reviews. Please slow down.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-})
-
-const attachmentDownloadLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 120,
-  message: { error: 'Too many attachment downloads. Please slow down.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-})
-
-const leaderboardLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 120,
-  message: { error: 'Too many leaderboard requests. Please slow down.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-})
-
-const diffLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 60,
-  message: { error: 'Too many diff requests. Please slow down.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-})
+// Re-export rate limiters with original names for backward compatibility
+const reactLimiter = sheetReactLimiter
+const commentLimiter = sheetCommentLimiter
+const contributionRateLimiter = sheetContributionLimiter
+const contributionReviewLimiter = sheetContributionReviewLimiter
+const attachmentDownloadLimiter = sheetAttachmentDownloadLimiter
+const leaderboardLimiter = sheetLeaderboardLimiter
+const diffLimiter = sheetDiffLimiter
 
 module.exports = {
   SHEET_STATUS,

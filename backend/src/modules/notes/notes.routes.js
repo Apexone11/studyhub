@@ -1,7 +1,6 @@
 const express = require('express')
 const multer = require('multer')
 const path = require('path')
-const rateLimit = require('express-rate-limit')
 const { NOTE_IMAGES_DIR } = require('../../lib/storage')
 const { assertOwnerOrAdmin } = require('../../lib/accessControl')
 const { createNotification } = require('../../lib/notify')
@@ -17,32 +16,13 @@ const optionalAuth = require('../../core/auth/optionalAuth')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
 const { timedSection, logTiming } = require('../../lib/requestTiming')
+const { notesMutateLimiter, notesReadLimiter, notesCommentLimiter } = require('../../lib/rateLimiters')
 
 const router = express.Router()
 
-const mutateLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 30,
-  message: { error: 'Too many requests. Please slow down.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-})
-
-const readLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 120,
-  message: { error: 'Too many requests. Please slow down.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-})
-
-const commentLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 20,
-  message: { error: 'Too many comments. Please slow down.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-})
+const mutateLimiter = notesMutateLimiter
+const readLimiter = notesReadLimiter
+const commentLimiter = notesCommentLimiter
 
 const COMMENT_INCLUDE = {
   author: { select: { id: true, username: true } },
