@@ -40,6 +40,7 @@ const AnnouncementsPage = lazy(() => import('./pages/announcements/Announcements
 const SubmitPage = lazy(() => import('./pages/submit/SubmitPage'))
 const MyCoursesPage = lazy(() => import('./pages/courses/MyCoursesPage'))
 const SheetLabPage = lazy(() => import('./pages/sheets/lab/SheetLabPage'))
+const AiSheetSetupPage = lazy(() => import('./pages/sheets/lab/AiSheetSetupPage'))
 const MessagesPage = lazy(() => import('./pages/messages/MessagesPage'))
 const StudyGroupsPage = lazy(() => import('./pages/studyGroups/StudyGroupsPage'))
 const AiPage = lazy(() => import('./pages/ai/AiPage'))
@@ -92,6 +93,7 @@ const ROUTE_TITLES = {
   '/messages': 'Messages',
   '/study-groups': 'Study Groups',
   '/ai': 'Hub AI',
+  '/sheets/new/lab': 'Publish AI Sheet',
   '/announcements': 'Announcements',
   '/submit': 'Submit Request',
   '/my-courses': 'My Courses',
@@ -236,6 +238,7 @@ function AppRoutes() {
             <Route path="/feed"          element={<PrivateRoute><FeedPage /></PrivateRoute>} />
             <Route path="/sheets"        element={<PrivateRoute><SheetsPage /></PrivateRoute>} />
             <Route path="/sheets/upload" element={<PrivateRoute><UploadSheetPage /></PrivateRoute>} />
+            <Route path="/sheets/new/lab" element={<PrivateRoute><AiSheetSetupPage /></PrivateRoute>} />
             <Route path="/sheets/:id/edit" element={<PrivateRoute><EditRedirect /></PrivateRoute>} />
             <Route path="/sheets/:id/lab" element={<PrivateRoute><SheetLabPage /></PrivateRoute>} />
             <Route path="/sheets/:id"    element={<PrivateRoute><SheetViewerPage /></PrivateRoute>} />
