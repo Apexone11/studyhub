@@ -191,14 +191,15 @@ async function streamMessage({ user, conversationId, content, currentPage, image
   }
 
   // 3. Save user message to DB immediately.
+  const hasImg = !!(images && images.length > 0)
   await prisma.aiMessage.create({
     data: {
-      conversationId,
-      userId,
+      conversation: { connect: { id: conversationId } },
+      user: userId ? { connect: { id: userId } } : undefined,
       role: 'user',
       content,
-      hasImage: images && images.length > 0,
-      imageDescription: images && images.length > 0 ? `${images.length} image(s) uploaded` : null,
+      hasImage: hasImg,
+      imageDescription: hasImg ? `${images.length} image(s) uploaded` : null,
     },
   })
 
@@ -289,7 +290,7 @@ async function streamMessage({ user, conversationId, content, currentPage, image
       if (fullResponse) {
         await prisma.aiMessage.create({
           data: {
-            conversationId,
+            conversation: { connect: { id: conversationId } },
             role: 'assistant',
             content: fullResponse,
             model: conversation.model || DEFAULT_MODEL,
@@ -317,7 +318,7 @@ async function streamMessage({ user, conversationId, content, currentPage, image
   const totalTokens = totalInputTokens + totalOutputTokens
   const assistantMsg = await prisma.aiMessage.create({
     data: {
-      conversationId,
+      conversation: { connect: { id: conversationId } },
       role: 'assistant',
       content: fullResponse,
       tokenCount: totalTokens,

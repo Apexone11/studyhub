@@ -11,10 +11,11 @@ import AiMarkdown from '../../components/ai/AiMarkdown'
 import { SheetPreviewBar, extractHtmlFromMessage } from '../../components/ai/AiSheetPreview'
 import { ImageUploadButton, ImagePreviewStrip } from '../../components/ai/AiImageUpload'
 import { IconSpark, IconPlus, IconX, IconPen, IconSpinner } from '../../components/Icons'
+import AiThinkingDots from '../../components/ai/AiThinkingDots'
 import { useProtectedPage } from '../../lib/useProtectedPage'
 import { useResponsiveAppLayout } from '../../lib/ui'
 import { usePageTitle } from '../../lib/usePageTitle'
-import { useAiChat } from '../../lib/useAiChat'
+import { useSharedAiChat } from '../../lib/AiChatProvider'
 import { PAGE_FONT } from '../shared/pageUtils'
 import { pageShell } from '../../lib/ui'
 import { useState, useRef, useEffect } from 'react'
@@ -29,7 +30,7 @@ export default function AiPage() {
   const layout = useResponsiveAppLayout()
   const [searchParams] = useSearchParams()
 
-  const chat = useAiChat()
+  const chat = useSharedAiChat()
 
   // If URL has ?conversation=id, select it on mount.
   useEffect(() => {
@@ -416,13 +417,8 @@ function ChatArea({ messages, streaming, streamingText, loading, error, onSend, 
             </div>
             <div style={{
               background: 'var(--sh-soft)', borderRadius: '4px 14px 14px 14px',
-              padding: '10px 14px',
             }}>
-              <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--sh-muted)', animation: 'pulse 1.4s infinite', animationDelay: '0s' }} />
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--sh-muted)', animation: 'pulse 1.4s infinite', animationDelay: '0.2s' }} />
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--sh-muted)', animation: 'pulse 1.4s infinite', animationDelay: '0.4s' }} />
-              </div>
+              <AiThinkingDots />
             </div>
           </div>
         )}
