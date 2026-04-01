@@ -22,10 +22,15 @@ const { MAX_MESSAGE_LENGTH, MAX_IMAGES_PER_MESSAGE, MAX_IMAGE_SIZE, ALLOWED_IMAG
 const router = express.Router()
 
 // Per-user rate limit for AI message sending (stricter than general API).
+// Keys on userId only -- this route is always behind requireAuth so
+// req.user.userId is guaranteed. Avoids express-rate-limit IPv6 validation
+// errors from referencing req.ip in a custom keyGenerator.
 const aiMessageLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: AI_RATE_LIMIT_RPM,
-  keyGenerator: (req) => `ai_${req.user?.userId || req.ip}`,
+  keyGenerator: (req) => `ai_${req.user.userId}`,
+  standardHeaders: true,
+  legacyHeaders: false,
   message: { error: 'Too many AI requests. Please wait a moment.' },
 })
 
