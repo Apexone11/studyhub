@@ -99,7 +99,7 @@ router.get('/plagiarism/scan', async (req, res) => {
     const totalSheets = await prisma.studySheet.count({
       where: {
         status: 'published',
-        contentSimhash: { not: null },
+        NOT: [{ contentSimhash: null }],
       },
     })
 
@@ -143,7 +143,7 @@ router.get('/plagiarism/stats', async (req, res) => {
       prisma.studySheet.count({
         where: {
           status: 'published',
-          contentSimhash: { not: null },
+          NOT: [{ contentSimhash: null }],
         },
       }),
       prisma.studySheet.count({
@@ -159,8 +159,8 @@ router.get('/plagiarism/stats', async (req, res) => {
       by: ['contentHash'],
       where: {
         status: 'published',
-        contentHash: { not: null },
-        NOT: { contentHash: '' },
+        NOT: [{ contentHash: null }],
+        contentHash: { not: '' },
       },
       _count: true,
       having: { _count: { gt: 1 } },

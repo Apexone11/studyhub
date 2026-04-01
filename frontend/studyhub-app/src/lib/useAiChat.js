@@ -52,17 +52,21 @@ export function useAiChat() {
   const [streamingText, setStreamingText] = useState('')
   const [error, setError] = useState(null)
   const [usage, setUsage] = useState(null)
+  const [loadingConversations, setLoadingConversations] = useState(true)
 
   const abortRef = useRef(null)
   const location = useLocation()
 
   // ── Load conversations on mount ──────────────────────────────────
   const loadConversations = useCallback(async () => {
+    setLoadingConversations(true)
     try {
       const data = await aiService.listConversations({ limit: 50 })
       setConversations(data.conversations || [])
     } catch {
       // Silently fail -- the user may not have any conversations yet.
+    } finally {
+      setLoadingConversations(false)
     }
   }, [])
 
@@ -214,6 +218,7 @@ export function useAiChat() {
       if (err.name !== 'AbortError') {
         setError(err.message || 'Failed to get AI response.')
       }
+      setStreamingText('')
     } finally {
       setStreaming(false)
       abortRef.current = null
@@ -283,6 +288,7 @@ export function useAiChat() {
     activeConversationId,
     messages,
     loading,
+    loadingConversations,
     streaming,
     streamingText,
     error,

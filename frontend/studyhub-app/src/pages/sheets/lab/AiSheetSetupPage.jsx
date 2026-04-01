@@ -118,7 +118,19 @@ body { font-family: system-ui, sans-serif; padding: 24px; color: #1a1a2e; line-h
     }
   }
 
-  if (authStatus !== 'ready' || !aiHtml) return null
+  if (authStatus !== 'ready' || !aiHtml) {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: PAGE_FONT }}>
+        <Navbar />
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
+          <div style={{ textAlign: 'center', color: 'var(--sh-muted)' }}>
+            <IconSpinner size={24} style={{ animation: 'spin 1s linear infinite', marginBottom: 12 }} />
+            <div style={{ fontSize: 14 }}>Preparing AI sheet...</div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   const isCompact = layout.isCompact
 

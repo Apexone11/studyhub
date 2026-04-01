@@ -91,7 +91,7 @@ async function checkAndAwardBadges(prisma, userId) {
 
     const [totalStars, forkCount, contributionCount, reviewCount, streakData] = await Promise.all([
       prisma.studySheet.aggregate({ where: { userId }, _sum: { stars: true } }).then((r) => r._sum.stars || 0),
-      prisma.studySheet.count({ where: { userId, forkOf: { not: null } } }),
+      prisma.studySheet.count({ where: { userId, NOT: [{ forkOf: null }] } }),
       prisma.sheetContribution.count({ where: { proposerId: userId } }),
       prisma.sheetContribution.count({ where: { reviewerId: userId } }),
       getUserStreak(prisma, userId),

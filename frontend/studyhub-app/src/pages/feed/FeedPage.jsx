@@ -9,7 +9,7 @@
  * Components: FeedComposer, FeedCard, FeedAside, FeedWidgets
  * Data: useFeedData
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import Navbar from '../../components/navbar/Navbar'
 import AppSidebar from '../../components/sidebar/AppSidebar'
@@ -64,6 +64,19 @@ export default function FeedPage() {
     else next.delete(key)
     setSearchParams(next, { replace: true })
   }, [searchParams, setSearchParams])
+
+  // Debounced search: local input state syncs to URL param after 350ms idle.
+  const [localSearch, setLocalSearch] = useState(search)
+  const searchTimerRef = useRef(null)
+  const handleSearchChange = useCallback((value) => {
+    setLocalSearch(value)
+    clearTimeout(searchTimerRef.current)
+    searchTimerRef.current = setTimeout(() => {
+      setQueryParam('search', value)
+    }, 350)
+  }, [setQueryParam])
+  // Sync local search state if URL changes externally (e.g. filter reset).
+  useEffect(() => { setLocalSearch(search) }, [search])
 
   const visibleItems = useMemo(() => {
     if (activeFilter === 'all') return feedState.items
@@ -153,7 +166,7 @@ export default function FeedPage() {
                   ))}
                 </div>
                 {activeFilter !== 'for-you' && (
-                  <input data-tutorial="feed-search" value={search} onChange={(event) => setQueryParam('search', event.target.value)} placeholder="Search the feed..." className="sh-input" style={{ maxWidth: 240 }} />
+                  <input data-tutorial="feed-search" value={localSearch} onChange={(event) => handleSearchChange(event.target.value)} placeholder="Search the feed..." className="sh-input" style={{ maxWidth: 240 }} />
                 )}
               </div>
 

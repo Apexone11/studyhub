@@ -82,9 +82,11 @@ async function findSimilarSheets(sheetId, threshold = 10) {
     /* Fetch all other published sheets with non-null contentSimhash */
     const allSheets = await prisma.studySheet.findMany({
       where: {
-        NOT: { id: sheetId },
-        status: 'published',
-        contentSimhash: { not: null },
+        AND: [
+          { NOT: { id: sheetId } },
+          { status: 'published' },
+          { NOT: [{ contentSimhash: null }] },
+        ],
       },
       select: {
         id: true,
@@ -137,7 +139,7 @@ async function runPlagiarismScan(threshold = 10) {
     const sheets = await prisma.studySheet.findMany({
       where: {
         status: 'published',
-        contentSimhash: { not: null },
+        NOT: [{ contentSimhash: null }],
       },
       select: {
         id: true,

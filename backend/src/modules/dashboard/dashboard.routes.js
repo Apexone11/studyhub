@@ -78,7 +78,7 @@ router.get('/summary', async (req, res) => {
         },
       }),
       // Count sheets this user has forked (i.e., has a forkOf reference)
-      prisma.studySheet.count({ where: { userId: user.id, forkOf: { not: null } } }),
+      prisma.studySheet.count({ where: { userId: user.id, NOT: [{ forkOf: null }] } }),
       // Count feed posts made by this user
       prisma.feedPost.count({ where: { userId: user.id } }),
     ])

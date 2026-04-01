@@ -142,7 +142,7 @@ Backend:
 ### Prisma Conventions
 
 - Schema location: `backend/prisma/schema.prisma`.
-- Prisma version: 6.x. Use `courseId: { not: null }` instead of `NOT: { courseId: null }` for null-exclusion in `groupBy` and `where` clauses.
+- Prisma version: 6.x. Use `NOT: [{ courseId: null }]` (array form at the where level) for null-exclusion in `groupBy` and `where` clauses. Do NOT use `field: { not: null }` -- Prisma 6.19+ rejects `null` as the value for `not` with "Argument `not` must not be null."
 - All relation fields must use correct Prisma syntax. Test queries against the actual schema before committing.
 
 ### Migration Rules (CRITICAL)
@@ -211,7 +211,7 @@ These have been encountered and fixed. Do not reintroduce them.
 
 2. **Search response shape mismatch.** The `/api/search` endpoint returns `{ results: { sheets, courses, users, notes, groups } }`. Always access nested: `data.results.users`, not `data.users`.
 
-3. **Prisma 6.x null syntax.** Use `field: { not: null }` instead of `NOT: { field: null }` in `where` and `groupBy` clauses. The old syntax throws `PrismaClientValidationError`.
+3. **Prisma 6.x null syntax.** Use `NOT: [{ field: null }]` (array form at the where level) for null-exclusion. Do NOT use `field: { not: null }` -- Prisma 6.19+ rejects it with "Argument `not` must not be null."
 
 4. **Socket.io event name mismatches.** Frontend must use exact backend event names: `message:edit` (not `message:edited`), `message:delete` (not `message:deleted`), `typing:start`/`typing:stop` (not `typing:update`), `conversation:join` (not `message:room:join`).
 

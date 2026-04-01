@@ -22,7 +22,7 @@ router.get('/cases', async (req, res) => {
     if (source && source !== 'all') where.source = source
     if (claimed === 'mine') where.claimedByAdminId = req.user.userId
     else if (claimed === 'unclaimed') where.claimedByAdminId = null
-    else if (claimed === 'any') where.claimedByAdminId = { not: null }
+    else if (claimed === 'any') where.NOT = [{ claimedByAdminId: null }]
 
     if (req.query.trustLevel) {
       where.user = { ...where.user, trustLevel: req.query.trustLevel }
@@ -75,7 +75,7 @@ router.get('/cases/overview', async (req, res) => {
       prisma.moderationCase.groupBy({
         by: ['claimedByAdminId'],
         where: {
-          claimedByAdminId: { not: null },
+          NOT: [{ claimedByAdminId: null }],
           status: 'pending',
         },
         _count: true,

@@ -108,6 +108,7 @@
   --sh-brand-hover: #1d4ed8;
   --sh-brand-soft: #dbeafe;
   --sh-brand-dark: #1e293b;
+  --sh-ai-gradient: linear-gradient(135deg, var(--sh-brand), #7c3aed);
 
   /* ── Borders (warm) ──────────────────────────────────────────────── */
   --sh-border: #e5e2dd;
@@ -239,6 +240,7 @@
   --sh-brand-hover: #93bbfd;
   --sh-brand-soft: #1e3a5f;
   --sh-brand-dark: #e0e0e0;
+  --sh-ai-gradient: linear-gradient(135deg, var(--sh-brand), #7c3aed);
 
   /* ── Borders ─────────────────────────────────────────────────────── */
   --sh-border: #2a2a2a;
