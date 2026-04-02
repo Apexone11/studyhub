@@ -12,7 +12,7 @@ const { getAuthTokenFromRequest, verifyAuthToken } = require('../../lib/authToke
 const { libraryWriteLimiter } = require('../../lib/rateLimiters')
 
 const { searchBooks, getBookDetail, syncPopularBooksToDB } = require('./library.service')
-const { MAX_SHELVES_PER_USER, MAX_BOOKMARKS_PER_BOOK, MAX_HIGHLIGHTS_PER_BOOK } = require('./library.constants')
+const { MAX_SHELVES_PER_USER, MAX_BOOKMARKS_PER_BOOK, MAX_HIGHLIGHTS_PER_BOOK, MAX_EPUB_SIZE } = require('./library.constants')
 
 /**
  * Optional auth -- sets req.user if a valid token is present, otherwise
@@ -119,8 +119,7 @@ router.get('/books/:id/epub', async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="book-${gutenbergId}.epub"`)
     res.setHeader('Cache-Control', 'public, max-age=86400') // Cache for 1 day
 
-    // Stream the response body to the client with a 50 MB size limit
-    const MAX_EPUB_SIZE = 50 * 1024 * 1024
+    // Stream the response body to the client with size limit
     const reader = epubResponse.body.getReader()
     let totalBytes = 0
     const pump = async () => {
@@ -134,7 +133,7 @@ router.get('/books/:id/epub', async (req, res) => {
         if (totalBytes > MAX_EPUB_SIZE) {
           reader.cancel()
           if (!res.headersSent) {
-            res.status(413).json({ error: 'EPUB file too large.' })
+            res.status(413).json({ error: 'EPUB file exceeds maximum size of 50 MB.' })
           } else {
             res.end()
           }
