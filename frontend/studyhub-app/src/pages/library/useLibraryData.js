@@ -13,6 +13,7 @@ export default function useLibraryData() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [totalCount, setTotalCount] = useState(0)
+  const [usingCache, setUsingCache] = useState(false)
 
   // Extract query params
   const search = searchParams.get('search') || ''
@@ -84,6 +85,7 @@ export default function useLibraryData() {
         const data = await response.json()
         setBooks(data.books || [])
         setTotalCount(data.totalCount || 0)
+        setUsingCache(data.source === 'cache')
         setError('')
 
         // Update SWR cache
@@ -196,6 +198,7 @@ export default function useLibraryData() {
     books,
     loading,
     error,
+    usingCache,
     page,
     totalCount,
     search,

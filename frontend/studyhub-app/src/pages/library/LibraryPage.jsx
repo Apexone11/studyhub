@@ -28,6 +28,7 @@ export default function LibraryPage() {
     books,
     loading,
     error,
+    usingCache,
     page,
     totalCount,
     search,
@@ -159,6 +160,15 @@ export default function LibraryPage() {
 
         {/* Main Content */}
         <main className="library-main">
+          {/* Cache fallback notice */}
+          {usingCache && !error && (
+            <div className="library-notice">
+              <p className="library-notice__message">
+                The book catalog is temporarily showing cached results. Some books may not appear.
+              </p>
+            </div>
+          )}
+
           {/* Error State */}
           {error && (
             <div className="library-error">

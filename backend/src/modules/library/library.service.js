@@ -40,8 +40,12 @@ async function searchBooks(query, page = 1, filters = {}) {
     const response = await fetchWithTimeout(url)
 
     if (!response.ok) {
-      console.warn(`Gutendex search failed: ${response.status}`)
-      return null
+      console.warn(`Gutendex search failed: ${response.status}, falling back to cached books`)
+      // Fall back to cached books in database instead of returning null
+      const fallback = await searchCachedBooks(query, page, filters)
+      const result = fallback || { results: [], count: 0, next: null, previous: null }
+      result._source = 'cache'
+      return result
     }
 
     const data = await response.json()
@@ -50,7 +54,10 @@ async function searchBooks(query, page = 1, filters = {}) {
   } catch (err) {
     captureError(err, { context: 'searchBooks', query, page })
     // Fallback to cached books in database
-    return searchCachedBooks(query, page, filters)
+    const fallback = await searchCachedBooks(query, page, filters)
+    const result = fallback || { results: [], count: 0, next: null, previous: null }
+    result._source = 'cache'
+    return result
   }
 }
 

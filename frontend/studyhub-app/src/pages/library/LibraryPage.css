@@ -10,7 +10,7 @@
 /* ──────────────────────────────────────────────────────────────── */
 
 .library-hero {
-  background: linear-gradient(135deg, var(--sh-brand), #7c3aed);
+  background: linear-gradient(135deg, var(--sh-brand), var(--sh-brand-accent));
   padding: clamp(3rem, 5vw, 6rem) var(--page-gutter);
   text-align: center;
   color: white;
@@ -81,7 +81,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  background: white;
+  background: var(--sh-input-bg, var(--sh-surface));
   border-radius: 16px;
   padding: 12px 16px;
   height: 52px;
@@ -267,6 +267,22 @@
     grid-template-columns: repeat(2, 1fr);
     gap: 10px;
   }
+}
+
+/* Cache Notice */
+.library-notice {
+  background: var(--sh-warning-bg);
+  border: 1px solid var(--sh-warning-border);
+  border-radius: var(--radius-card);
+  padding: 16px 20px;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.library-notice__message {
+  margin: 0;
+  color: var(--sh-warning-text);
+  font-size: 14px;
 }
 
 /* Error State */
