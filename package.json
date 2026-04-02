@@ -33,6 +33,7 @@
     "ci:quality": "npm run lint && npm run build && npm run test"
   },
   "overrides": {
-    "effect": "~3.21.0"
+    "effect": "~3.21.0",
+    "@xmldom/xmldom": "0.9.5"
   }
 }
