@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { IconX } from '../../../components/Icons'
 import '../BookReaderPage.css'
 

@@ -12,7 +12,7 @@ const { getAuthTokenFromRequest, verifyAuthToken } = require('../../lib/authToke
 const { libraryWriteLimiter } = require('../../lib/rateLimiters')
 
 const { searchBooks, getBookDetail, syncPopularBooksToDB } = require('./library.service')
-const { MAX_SHELVES_PER_USER, MAX_BOOKMARKS_PER_BOOK, MAX_HIGHLIGHTS_PER_BOOK } = require('./library.constants')
+const { MAX_SHELVES_PER_USER, MAX_BOOKMARKS_PER_BOOK, MAX_HIGHLIGHTS_PER_BOOK, MAX_EPUB_SIZE } = require('./library.constants')
 
 /**
  * Optional auth -- sets req.user if a valid token is present, otherwise
@@ -116,15 +116,27 @@ router.get('/books/:id/epub', async (req, res) => {
     }
 
     res.setHeader('Content-Type', 'application/epub+zip')
+    res.setHeader('Content-Disposition', `attachment; filename="book-${gutenbergId}.epub"`)
     res.setHeader('Cache-Control', 'public, max-age=86400') // Cache for 1 day
 
-    // Stream the response body to the client
+    // Stream the response body to the client with size limit
     const reader = epubResponse.body.getReader()
+    let totalBytes = 0
     const pump = async () => {
       while (true) {
         const { done, value } = await reader.read()
         if (done) {
           res.end()
+          return
+        }
+        totalBytes += value.byteLength
+        if (totalBytes > MAX_EPUB_SIZE) {
+          reader.cancel()
+          if (!res.headersSent) {
+            res.status(413).json({ error: 'EPUB file exceeds maximum size of 50 MB.' })
+          } else {
+            res.end()
+          }
           return
         }
         res.write(value)
@@ -169,6 +181,8 @@ router.get('/search', optionalAuth, async (req, res) => {
     }
     // Signal to frontend when results came from local cache (Gutendex was unavailable)
     if (results._source === 'cache') response.source = 'cache'
+    // Signal when both Gutendex AND cache are unavailable
+    if (results._unavailable) response.unavailable = true
     res.json(response)
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })

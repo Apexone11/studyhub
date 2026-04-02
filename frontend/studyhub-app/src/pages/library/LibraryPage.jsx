@@ -30,6 +30,7 @@ export default function LibraryPage() {
     loading,
     error,
     usingCache,
+    unavailable,
     page,
     totalCount,
     search,
@@ -245,7 +246,7 @@ export default function LibraryPage() {
               <div className="library-empty__icon">
                 <IconBook size={64} />
               </div>
-              {usingCache ? (
+              {unavailable ? (
                 <>
                   <h2 className="library-empty__title">Book catalog temporarily unavailable</h2>
                   <p className="library-empty__text">
