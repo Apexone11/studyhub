@@ -4,7 +4,7 @@
  * Responsible for displaying the list of study groups with search, filters,
  * and group creation. Manages search params and filtering state.
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import { useSession } from '../../lib/session-context'
@@ -22,6 +22,7 @@ import GroupListFilters from './GroupListFilters'
 import GroupCard from './GroupCard'
 import GroupListEmptyState from './GroupListEmptyState'
 import CreateGroupModal from './GroupModals'
+import autoAnimate from '@formkit/auto-animate'
 import { styles } from './studyGroupsStyles'
 
 function GroupListSkeleton() {
@@ -117,6 +118,13 @@ export default function GroupListView() {
   const selectedCourse = allCourses?.find(c => c.id === parseInt(courseId, 10))
   const subtitle = mineOnly ? 'Groups you are a member of' : 'All study groups'
 
+  // Auto-animate the groups grid for smooth enter/exit transitions
+  const gridRef = useRef(null)
+  useEffect(() => {
+    if (gridRef.current) autoAnimate(gridRef.current, { duration: 250 })
+  }, [])
+
+
   return (
     <>
       <Navbar />
@@ -211,7 +219,7 @@ export default function GroupListView() {
                     )}
                   </div>
 
-                  <div style={styles.grid}>
+                  <div ref={gridRef} style={styles.grid}>
                     {groups.map((group) => (
                       <GroupCard
                         key={group.id}

@@ -11,7 +11,7 @@
  *   - Loading skeleton grid
  * ═══════════════════════════════════════════════════════════════════════════ */
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import Navbar from '../../components/navbar/Navbar'
 import { IconSearch, IconBook } from '../../components/Icons'
@@ -19,6 +19,7 @@ import { SkeletonCard } from '../../components/Skeleton'
 import { usePageTitle } from '../../lib/usePageTitle'
 import BookCard from './components/BookCard'
 import useLibraryData from './useLibraryData'
+import autoAnimate from '@formkit/auto-animate'
 import { SUBJECTS, SORT_OPTIONS, LANGUAGES } from './libraryConstants'
 import './LibraryPage.css'
 
@@ -43,6 +44,12 @@ export default function LibraryPage() {
   } = useLibraryData()
 
   const [searchInput, setSearchInput] = useState(search)
+
+  // Auto-animate the books grid for smooth transitions
+  const gridRef = useRef(null)
+  useEffect(() => {
+    if (gridRef.current) autoAnimate(gridRef.current, { duration: 250 })
+  }, [])
 
   const handleSearchSubmit = (e) => {
     e.preventDefault()
@@ -198,7 +205,7 @@ export default function LibraryPage() {
           {/* Books Grid */}
           {!loading && books.length > 0 && (
             <>
-              <div className="library-grid">
+              <div ref={gridRef} className="library-grid">
                 {books.map((book) => (
                   <BookCard
                     key={book.id}
@@ -238,19 +245,36 @@ export default function LibraryPage() {
               <div className="library-empty__icon">
                 <IconBook size={64} />
               </div>
-              <h2 className="library-empty__title">No books found</h2>
-              <p className="library-empty__text">
-                Try adjusting your search terms or filters to discover more books.
-              </p>
-              <button
-                onClick={() => {
-                  setSearch('')
-                  setTopic('')
-                }}
-                className="library-empty__reset-btn"
-              >
-                Clear Filters
-              </button>
+              {usingCache ? (
+                <>
+                  <h2 className="library-empty__title">Book catalog temporarily unavailable</h2>
+                  <p className="library-empty__text">
+                    Our book provider is currently unreachable. Please try again in a few minutes.
+                  </p>
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="library-empty__reset-btn"
+                  >
+                    Retry
+                  </button>
+                </>
+              ) : (
+                <>
+                  <h2 className="library-empty__title">No books found</h2>
+                  <p className="library-empty__text">
+                    Try adjusting your search terms or filters to discover more books.
+                  </p>
+                  <button
+                    onClick={() => {
+                      setSearch('')
+                      setTopic('')
+                    }}
+                    className="library-empty__reset-btn"
+                  >
+                    Clear Filters
+                  </button>
+                </>
+              )}
             </div>
           )}
         </main>
