@@ -1290,3 +1290,23 @@ model Waitlist {
   @@index([email])
   @@index([tier])
 }
+
+// ── Library Catalog Cache ────────────────────────────────────
+
+model CachedBook {
+  id            Int      @id @default(autoincrement())
+  gutenbergId   Int      @unique
+  title         String
+  authors       Json     @default("[]")
+  subjects      Json     @default("[]")
+  languages     Json     @default("[]")
+  downloadCount Int      @default(0)
+  coverUrl      String?
+  formats       Json     @default("{}")
+  description   String?
+  syncedAt      DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([downloadCount(sort: Desc)])
+  @@index([languages])
+}

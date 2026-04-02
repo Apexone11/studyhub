@@ -17,10 +17,16 @@ function isChunkLoadError(error) {
 
 const CHUNK_RELOAD_KEY = 'sh_chunk_reload'
 
+const AUTO_RETRY_DELAY = 3000
+const MAX_AUTO_RETRIES = 2
+const RETRY_COUNT_KEY = 'sh_error_retries'
+
 class RouteErrorBoundaryInner extends Component {
   constructor(props) {
     super(props)
-    this.state = { error: null, eventId: '' }
+    this.state = { error: null, eventId: '', countdown: 0 }
+    this._autoRetryTimer = null
+    this._countdownTimer = null
   }
 
   static getDerivedStateFromError(error) {
@@ -47,21 +53,56 @@ class RouteErrorBoundaryInner extends Component {
     })
 
     this.setState({ eventId })
+
+    // Auto-retry: if we haven't exceeded max retries, schedule an automatic recovery
+    const retries = parseInt(sessionStorage.getItem(RETRY_COUNT_KEY) || '0', 10)
+    if (retries < MAX_AUTO_RETRIES && !isChunkLoadError(error)) {
+      sessionStorage.setItem(RETRY_COUNT_KEY, String(retries + 1))
+      const seconds = Math.ceil(AUTO_RETRY_DELAY / 1000)
+      this.setState({ countdown: seconds })
+      this._countdownTimer = setInterval(() => {
+        this.setState(prev => {
+          if (prev.countdown <= 1) {
+            clearInterval(this._countdownTimer)
+            return { countdown: 0 }
+          }
+          return { countdown: prev.countdown - 1 }
+        })
+      }, 1000)
+      this._autoRetryTimer = setTimeout(() => {
+        this.setState({ error: null, eventId: '', countdown: 0 })
+      }, AUTO_RETRY_DELAY)
+    }
   }
 
   componentDidUpdate(prevProps) {
     if (prevProps.resetKey !== this.props.resetKey && this.state.error) {
       sessionStorage.removeItem(CHUNK_RELOAD_KEY)
-      this.setState({ error: null, eventId: '' })
+      sessionStorage.removeItem(RETRY_COUNT_KEY)
+      clearTimeout(this._autoRetryTimer)
+      clearInterval(this._countdownTimer)
+      this.setState({ error: null, eventId: '', countdown: 0 })
     }
   }
 
+  componentWillUnmount() {
+    clearTimeout(this._autoRetryTimer)
+    clearInterval(this._countdownTimer)
+  }
+
   handleRetry = () => {
-    this.setState({ error: null, eventId: '' })
+    clearTimeout(this._autoRetryTimer)
+    clearInterval(this._countdownTimer)
+    sessionStorage.removeItem(RETRY_COUNT_KEY)
+    this.setState({ error: null, eventId: '', countdown: 0 })
   }
 
   render() {
     if (!this.state.error) {
+      // Successful render — clear retry counter so it resets between crashes
+      if (sessionStorage.getItem(RETRY_COUNT_KEY)) {
+        sessionStorage.removeItem(RETRY_COUNT_KEY)
+      }
       return this.props.children
     }
 
@@ -92,7 +133,9 @@ class RouteErrorBoundaryInner extends Component {
           <p style={{ margin: '0 0 18px', fontSize: 14, color: 'var(--sh-slate-500, #64748b)', lineHeight: 1.7 }}>
             {isChunkLoadError(this.state.error)
               ? 'StudyHub was updated since you last loaded the page. A refresh should fix this.'
-              : 'StudyHub recovered the app shell, but this route hit a runtime error. You can retry the route or jump back to a stable page.'}
+              : this.state.countdown > 0
+                ? `Something went wrong. Automatically retrying in ${this.state.countdown} second${this.state.countdown !== 1 ? 's' : ''}...`
+                : 'StudyHub recovered the app shell, but this route hit a runtime error. You can retry the route or jump back to a stable page.'}
           </p>
           {this.state.eventId ? (
             <p style={{ margin: '0 0 18px', fontSize: 12, color: 'var(--sh-slate-600, #475569)', lineHeight: 1.7 }}>

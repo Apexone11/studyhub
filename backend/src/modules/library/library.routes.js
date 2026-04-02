@@ -10,10 +10,45 @@ const prisma = require('../../lib/prisma')
 const { getBlockedUserIds } = require('../../lib/social/blockFilter')
 const { libraryWriteLimiter } = require('../../lib/rateLimiters')
 
-const { searchBooks, getBookDetail } = require('./library.service')
+const { searchBooks, getBookDetail, syncPopularBooksToDB } = require('./library.service')
 const { MAX_SHELVES_PER_USER, MAX_BOOKMARKS_PER_BOOK, MAX_HIGHLIGHTS_PER_BOOK } = require('./library.constants')
 
 const router = express.Router()
+
+/**
+ * GET /api/library/covers/:id
+ * Proxy a book cover image from Gutendex with caching.
+ * No auth required. Serves images with long Cache-Control headers.
+ */
+router.get('/covers/:id', async (req, res) => {
+  const gutenbergId = parseInt(req.params.id, 10)
+  if (!Number.isInteger(gutenbergId) || gutenbergId < 1) {
+    return res.status(400).json({ error: 'Invalid book ID.' })
+  }
+
+  try {
+    const coverUrl = `https://www.gutenberg.org/cache/epub/${gutenbergId}/pg${gutenbergId}.cover.medium.jpg`
+    const response = await fetch(coverUrl, {
+      signal: AbortSignal.timeout(5000),
+    })
+
+    if (!response.ok) {
+      return res.status(404).json({ error: 'Cover not found.' })
+    }
+
+    // Forward the image with aggressive cache headers
+    res.set('Content-Type', response.headers.get('content-type') || 'image/jpeg')
+    res.set('Cache-Control', 'public, max-age=604800, immutable')
+    res.set('X-Cover-Source', 'gutenberg-proxy')
+
+    // Stream the response body
+    const arrayBuffer = await response.arrayBuffer()
+    res.send(Buffer.from(arrayBuffer))
+  } catch (err) {
+    captureError(err, { context: 'coverProxy', gutenbergId })
+    res.status(502).json({ error: 'Failed to fetch cover.' })
+  }
+})
 
 /**
  * GET /api/library/books/:id/epub
@@ -143,6 +178,28 @@ router.get('/books/:id', requireAuth, async (req, res) => {
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── ADMIN OPERATIONS ───────────────────────────────────────────────────────
+
+/**
+ * POST /api/library/admin/sync-catalog
+ * Trigger a sync of popular books to the CachedBook table.
+ * Admin only.
+ */
+router.post('/admin/sync-catalog', requireAuth, async (req, res) => {
+  // Check admin role
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required.' })
+  }
+
+  try {
+    const synced = await syncPopularBooksToDB()
+    res.json({ message: `Synced ${synced} books.`, synced })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Sync failed.' })
   }
 })
 

@@ -31,6 +31,7 @@ export default function BookCard({ book, progress }) {
             src={coverUrl}
             alt={book.title}
             className="book-card__image"
+            loading="lazy"
           />
         ) : (
           <div
