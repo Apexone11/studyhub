@@ -37,7 +37,7 @@ export function useReaderAiContext(book, rendition) {
           const textArray = contents.map((content) => {
             try {
               return content.innerText || ''
-            } catch (err) {
+            } catch {
               return ''
             }
           })

@@ -56,9 +56,12 @@ async function searchBooks(query, page = 1, filters = {}) {
       console.warn(`Gutendex search failed: ${response.status}, falling back to cached books`)
       // Fall back to cached books in database instead of returning null
       const fallback = await searchCachedBooks(query, page, filters)
-      const result = fallback || { results: [], count: 0, next: null, previous: null }
-      result._source = 'cache'
-      return result
+      if (fallback && fallback.results && fallback.results.length > 0) {
+        fallback._source = 'cache'
+        return fallback
+      }
+      // No cached data either -- return empty with _unavailable flag
+      return { results: [], count: 0, next: null, previous: null, _unavailable: true }
     }
 
     const data = await response.json()
@@ -68,9 +71,12 @@ async function searchBooks(query, page = 1, filters = {}) {
     captureError(err, { context: 'searchBooks', query, page })
     // Fallback to cached books in database
     const fallback = await searchCachedBooks(query, page, filters)
-    const result = fallback || { results: [], count: 0, next: null, previous: null }
-    result._source = 'cache'
-    return result
+    if (fallback && fallback.results && fallback.results.length > 0) {
+      fallback._source = 'cache'
+      return fallback
+    }
+    // No cached data either -- return empty with _unavailable flag
+    return { results: [], count: 0, next: null, previous: null, _unavailable: true }
   }
 }
 
@@ -91,8 +97,9 @@ async function getBookDetail(gutenbergId) {
     const gutendexResponse = await fetchWithRetry(gutendexUrl)
 
     if (!gutendexResponse.ok) {
-      console.warn(`Gutendex book fetch failed: ${gutendexResponse.status}`)
-      return null
+      console.warn(`Gutendex book fetch failed: ${gutendexResponse.status}, trying DB cache`)
+      const fallback = await getCachedBookDetail(gutenbergId)
+      return fallback
     }
 
     const bookData = await gutendexResponse.json()
@@ -109,6 +116,38 @@ async function getBookDetail(gutenbergId) {
     return enriched
   } catch (err) {
     captureError(err, { context: 'getBookDetail', gutenbergId })
+    // Fallback to cached book in database
+    const fallback = await getCachedBookDetail(gutenbergId)
+    return fallback
+  }
+}
+
+/**
+ * Get a single book from the CachedBook database table (fallback when Gutendex is down).
+ * @param {number} gutenbergId
+ * @returns {Promise<object|null>} Book in Gutendex-compatible format or null
+ */
+async function getCachedBookDetail(gutenbergId) {
+  const prismaClient = require('../../lib/prisma')
+  try {
+    const book = await prismaClient.cachedBook.findUnique({
+      where: { gutenbergId },
+    })
+    if (!book) return null
+    // Transform to Gutendex-compatible format
+    return {
+      id: book.gutenbergId,
+      title: book.title,
+      authors: book.authors,
+      subjects: book.subjects,
+      languages: book.languages,
+      download_count: book.downloadCount,
+      formats: book.formats,
+      description: book.description || undefined,
+      _source: 'cache',
+    }
+  } catch (err) {
+    captureError(err, { context: 'getCachedBookDetail', gutenbergId })
     return null
   }
 }
@@ -392,6 +431,7 @@ async function searchCachedBooks(query, page = 1, filters = {}) {
 module.exports = {
   searchBooks,
   getBookDetail,
+  getCachedBookDetail,
   getBookCoverUrl,
   preloadPopularBooks,
   syncPopularBooksToDB,

@@ -116,15 +116,28 @@ router.get('/books/:id/epub', async (req, res) => {
     }
 
     res.setHeader('Content-Type', 'application/epub+zip')
+    res.setHeader('Content-Disposition', `attachment; filename="book-${gutenbergId}.epub"`)
     res.setHeader('Cache-Control', 'public, max-age=86400') // Cache for 1 day
 
-    // Stream the response body to the client
+    // Stream the response body to the client with a 50 MB size limit
+    const MAX_EPUB_SIZE = 50 * 1024 * 1024
     const reader = epubResponse.body.getReader()
+    let totalBytes = 0
     const pump = async () => {
       while (true) {
         const { done, value } = await reader.read()
         if (done) {
           res.end()
+          return
+        }
+        totalBytes += value.byteLength
+        if (totalBytes > MAX_EPUB_SIZE) {
+          reader.cancel()
+          if (!res.headersSent) {
+            res.status(413).json({ error: 'EPUB file too large.' })
+          } else {
+            res.end()
+          }
           return
         }
         res.write(value)
@@ -169,6 +182,8 @@ router.get('/search', optionalAuth, async (req, res) => {
     }
     // Signal to frontend when results came from local cache (Gutendex was unavailable)
     if (results._source === 'cache') response.source = 'cache'
+    // Signal when both Gutendex AND cache are unavailable
+    if (results._unavailable) response.unavailable = true
     res.json(response)
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
