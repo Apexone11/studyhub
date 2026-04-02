@@ -29,6 +29,8 @@ export default function AiBubble() {
   // Don't show bubble on the /ai page itself or on auth pages.
   const hiddenPaths = ['/ai', '/login', '/register', '/forgot-password', '/reset-password']
   if (hiddenPaths.some((p) => location.pathname.startsWith(p))) return null
+  // Hide on reader page (full-screen, has its own AI button)
+  if (location.pathname.match(/^\/library\/\d+\/read/)) return null
 
   const toggle = () => {
     setIsOpen((prev) => !prev)

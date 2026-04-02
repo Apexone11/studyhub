@@ -586,6 +586,19 @@ const sheetReadmeLimiter = rateLimit({
   message: { error: 'Too many requests. Please slow down.' },
 })
 
+// ── CATEGORY: Library Module ──────────────────────────────────────────────
+
+/**
+ * Library write operations (shelves, bookmarks, highlights) — 60 requests per minute per IP.
+ */
+const libraryWriteLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many library requests. Please slow down.' },
+})
+
 // ── Exports ────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -667,4 +680,7 @@ module.exports = {
 
   // AI module
   createAiMessageLimiter,
+
+  // Library module
+  libraryWriteLimiter,
 }

@@ -3,6 +3,7 @@ export const PAGE_SIZE = 20
 
 export const TABS = [
   ['overview', 'Overview'],
+  ['analytics', 'Analytics'],
   ['users', 'Users'],
   ['sheets', 'Sheets'],
   ['sheet-reviews', 'Sheet Reviews'],

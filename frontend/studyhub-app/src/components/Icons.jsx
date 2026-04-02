@@ -580,3 +580,32 @@ export function IconMailCheck({ size, ...p }) {
     </Svg>
   )
 }
+
+export function IconBook({ size, ...p }) {
+  return (
+    <Svg size={size} {...p}>
+      <path d="M4 19.5A2.5 2.5 0 016.5 17H20" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M8 7h8M8 11h6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </Svg>
+  )
+}
+
+export function IconCode({ size, ...p }) {
+  return (
+    <Svg size={size} {...p}>
+      <polyline points="16 18 22 12 16 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <polyline points="8 6 2 12 8 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <line x1="14" y1="4" x2="10" y2="20" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </Svg>
+  )
+}
+
+export function IconTag({ size, ...p }) {
+  return (
+    <Svg size={size} {...p}>
+      <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="7" cy="7" r="1.5" fill="currentColor" />
+    </Svg>
+  )
+}

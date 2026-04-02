@@ -15,6 +15,7 @@ model User {
   trustLevel              String    @default("new")
   trustedAt               DateTime?
   email                   String?   @unique
+  emailHash               String?
   emailVerified           Boolean   @default(false)
   isStaffVerified         Boolean   @default(false)
   emailVerificationCode   String?
@@ -93,8 +94,13 @@ model User {
   aiConversations            AiConversation[]
   aiMessages                 AiMessage[]               @relation("AiMessageUser")
   aiUsageLogs                AiUsageLog[]
+  bookShelves                BookShelf[]
+  readingProgress            ReadingProgress[]
+  bookBookmarks              BookBookmark[]
+  bookHighlights             BookHighlight[]
 
   @@index([role])
+  @@index([emailHash])
 }
 
 model ShareLink {
@@ -1191,4 +1197,96 @@ model AiUsageLog {
 
   @@unique([userId, date])
   @@index([userId])
+}
+
+// ── Library / BookHub models ──────────────────────────────────
+
+model BookShelf {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  books ShelfBook[]
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+model ShelfBook {
+  id          Int      @id @default(autoincrement())
+  shelfId     Int
+  gutenbergId Int
+  title       String
+  author      String
+  coverUrl    String?
+  addedAt     DateTime @default(now())
+
+  shelf BookShelf @relation(fields: [shelfId], references: [id], onDelete: Cascade)
+
+  @@unique([shelfId, gutenbergId])
+  @@index([shelfId])
+}
+
+model ReadingProgress {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  gutenbergId Int
+  cfi         String?
+  percentage  Float    @default(0)
+  lastReadAt  DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, gutenbergId])
+  @@index([userId])
+}
+
+model BookBookmark {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  gutenbergId Int
+  cfi         String
+  label       String?
+  pageSnippet String?
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, gutenbergId])
+}
+
+model BookHighlight {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  gutenbergId Int
+  cfi         String
+  text        String
+  color       String   @default("#FFEB3B")
+  note        String?
+  shared      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, gutenbergId])
+  @@index([gutenbergId, shared])
+}
+
+// ── Waitlist ─────────────────────────────────────────────────
+
+model Waitlist {
+  id        Int      @id @default(autoincrement())
+  email     String
+  tier      String
+  createdAt DateTime @default(now())
+
+  @@unique([email, tier])
+  @@index([email])
+  @@index([tier])
 }

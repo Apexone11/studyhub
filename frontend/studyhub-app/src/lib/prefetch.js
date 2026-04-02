@@ -24,6 +24,7 @@ const ROUTE_TO_API = {
   '/my-courses': '/api/courses/enrolled',
   '/tests': '/api/tests',
   '/ai': '/api/ai/conversations',
+  '/library': '/api/library?sort=popular&languages=en',
   '/users/:username': null, // Profile routes are dynamic; not prefetched
 }
 

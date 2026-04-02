@@ -16,6 +16,19 @@ const CONTEXT_CHIPS = {
     { label: 'Generate flashcards', prompt: 'Create flashcards from the note I am currently viewing.' },
     { label: 'Summarize this note', prompt: 'Summarize the note I am currently viewing into key points.' },
   ],
+  '/library': [
+    { label: 'Recommend a classic book', prompt: 'Recommend a classic book for my course.' },
+    { label: 'Philosophy books to start with', prompt: 'What are the best philosophy books to start with?' },
+  ],
+  '/library/:id': [
+    { label: 'Summarize this book', prompt: 'Summarize the book I am currently viewing.' },
+    { label: 'Before reading tips', prompt: 'What should I know before reading this book?' },
+  ],
+  '/library/:id/read': [
+    { label: 'Explain this passage', prompt: 'Explain this passage I am currently reading.' },
+    { label: 'Quiz me', prompt: 'Quiz me on what I just read.' },
+    { label: 'Word definition', prompt: 'What does this word mean?' },
+  ],
   '/feed': [
     { label: 'Create a study sheet', prompt: 'Help me create a study sheet for ' },
     { label: 'What should I study?', prompt: 'Based on my enrolled courses, what topics should I focus on studying next?' },
@@ -64,6 +77,12 @@ export function useAiContext() {
     }
     if (path.match(/^\/notes\/\d+/)) {
       return CONTEXT_CHIPS['/notes/:id'] || []
+    }
+    if (path.match(/^\/library\/\d+\/read/)) {
+      return CONTEXT_CHIPS['/library/:id/read'] || []
+    }
+    if (path.match(/^\/library\/\d+/)) {
+      return CONTEXT_CHIPS['/library/:id'] || []
     }
 
     // Check exact path matches.

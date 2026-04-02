@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Navbar from '../../components/navbar/Navbar'
 import AppSidebar from '../../components/sidebar/AppSidebar'
@@ -19,6 +19,8 @@ import DeletionReasonsTab from './DeletionReasonsTab'
 import EmailSuppressionsTab from './EmailSuppressionsTab'
 import AdminSettingsTab from './AdminSettingsTab'
 import SchoolsTab from './SchoolsTab'
+
+const AnalyticsTab = lazy(() => import('./AnalyticsTab'))
 
 export default function AdminPage() {
   const layout = useResponsiveAppLayout()
@@ -96,6 +98,12 @@ export default function AdminPage() {
 
               {activeTab === 'overview' ? <OverviewTab overview={d.overview} loadOverview={d.loadOverview} /> : null}
 
+              {activeTab === 'analytics' ? (
+                <Suspense fallback={<div style={{ color: 'var(--sh-subtext)', fontSize: 13 }}>Loading analytics…</div>}>
+                  <AnalyticsTab />
+                </Suspense>
+              ) : null}
+
               {activeTab === 'moderation' ? (
                 <ModerationTab apiJson={d.apiJson} setConfirmAction={d.setConfirmAction} formatDateTime={formatDateTime} />
               ) : null}
@@ -104,7 +112,7 @@ export default function AdminPage() {
                 <SchoolsTab apiJson={d.apiJson} />
               ) : null}
 
-              {activeTab !== 'overview' && activeTab !== 'settings' && activeTab !== 'moderation' && activeTab !== 'schools' ? (
+              {activeTab !== 'overview' && activeTab !== 'analytics' && activeTab !== 'settings' && activeTab !== 'moderation' && activeTab !== 'schools' ? (
                 <section style={{ background: 'var(--sh-surface, #fff)', borderRadius: 18, border: '1px solid var(--sh-border, #e2e8f0)', padding: '22px' }}>
                   {tabState?.error ? (
                     <div style={{ color: 'var(--sh-danger-text, #b91c1c)', background: 'var(--sh-danger-bg, #fef2f2)', border: '1px solid var(--sh-danger-border, #fecaca)', borderRadius: 12, padding: '12px 14px', fontSize: 13, marginBottom: 14 }}>

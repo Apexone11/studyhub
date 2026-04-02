@@ -11,6 +11,7 @@ const kmsController = require('./admin.kms.controller')
 const auditController = require('./admin.audit.controller')
 const cacheController = require('./admin.cache.controller')
 const plagiarismController = require('./admin.plagiarism.controller')
+const analyticsController = require('./admin.analytics.controller')
 
 const router = express.Router()
 
@@ -28,5 +29,6 @@ router.use(kmsController)
 router.use(auditController)
 router.use(cacheController)
 router.use(plagiarismController)
+router.use(analyticsController)
 
 module.exports = router
