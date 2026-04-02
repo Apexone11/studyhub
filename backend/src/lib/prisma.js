@@ -1,12 +1,11 @@
 const { PrismaClient } = require('@prisma/client')
-const { attachEncryptionMiddleware } = require('./prismaEncryption')
+const { withEncryption } = require('./prismaEncryption')
 
 const globalForPrisma = globalThis
 
 function createPrismaClient() {
   const client = new PrismaClient()
-  attachEncryptionMiddleware(client)
-  return client
+  return withEncryption(client)
 }
 
 const prisma = globalForPrisma.__studyhubPrisma || createPrismaClient()
