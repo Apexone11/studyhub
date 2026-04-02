@@ -49,7 +49,8 @@ async function searchBooks(query, page = 1, filters = {}) {
     return data
   } catch (err) {
     captureError(err, { context: 'searchBooks', query, page })
-    return null
+    // Fallback to cached books in database
+    return searchCachedBooks(query, page, filters)
   }
 }
 
@@ -185,8 +186,151 @@ async function getBookCoverUrl(gutenbergId, size = 'medium') {
   }
 }
 
+/**
+ * Pre-warm the cache with popular books on server startup.
+ * Fetches the first 6 pages (192 books) from Gutendex sorted by download count.
+ * Runs silently in background -- errors do not crash the server.
+ */
+async function preloadPopularBooks() {
+  const languages = ['en']
+  for (const lang of languages) {
+    for (let page = 1; page <= 6; page++) {
+      try {
+        const params = new URLSearchParams()
+        params.append('languages', lang)
+        params.append('page', page)
+        const url = `${GUTENDEX_BASE}/books/?${params.toString()}`
+        const response = await fetchWithTimeout(url, 10000)
+        if (!response.ok) continue
+        const data = await response.json()
+        // Cache with the same key format searchBooks uses
+        const cacheKey = `search::${page}:${JSON.stringify({ languages: lang })}`
+        cache.set(cacheKey, data, CACHE_TTL.SEARCH * 24) // 24x longer TTL for preloaded data
+        // Small delay to avoid hammering Gutendex
+        await new Promise(r => setTimeout(r, 500))
+      } catch {
+        // Silent failure -- preloading is best-effort
+      }
+    }
+  }
+  console.log('[Library] Popular books cache pre-warmed')
+}
+
+/**
+ * Sync the top N popular books from Gutendex to the CachedBook table.
+ * Called periodically (e.g., daily) or on admin trigger.
+ */
+async function syncPopularBooksToDB(maxPages = 16) {
+  const prismaClient = require('../../lib/prisma')
+  let synced = 0
+
+  for (let page = 1; page <= maxPages; page++) {
+    try {
+      const params = new URLSearchParams()
+      params.append('languages', 'en')
+      params.append('page', page)
+      const url = `${GUTENDEX_BASE}/books/?${params.toString()}`
+      const response = await fetchWithTimeout(url, 10000)
+      if (!response.ok) continue
+      const data = await response.json()
+      if (!data.results || data.results.length === 0) break
+
+      for (const book of data.results) {
+        try {
+          await prismaClient.cachedBook.upsert({
+            where: { gutenbergId: book.id },
+            update: {
+              title: book.title,
+              authors: book.authors || [],
+              subjects: book.subjects || [],
+              languages: book.languages || [],
+              downloadCount: book.download_count || 0,
+              coverUrl: book.formats?.['image/jpeg'] || null,
+              formats: book.formats || {},
+              syncedAt: new Date(),
+            },
+            create: {
+              gutenbergId: book.id,
+              title: book.title,
+              authors: book.authors || [],
+              subjects: book.subjects || [],
+              languages: book.languages || [],
+              downloadCount: book.download_count || 0,
+              coverUrl: book.formats?.['image/jpeg'] || null,
+              formats: book.formats || {},
+            },
+          })
+          synced++
+        } catch {
+          // Skip individual book errors
+        }
+      }
+
+      // Delay between pages
+      await new Promise(r => setTimeout(r, 1000))
+    } catch {
+      // Continue on page fetch errors
+    }
+  }
+
+  console.log(`[Library] Synced ${synced} books to CachedBook table`)
+  return synced
+}
+
+/**
+ * Search cached books from the database (fallback when Gutendex is slow/down).
+ */
+async function searchCachedBooks(query, page = 1, filters = {}) {
+  const prismaClient = require('../../lib/prisma')
+  const pageSize = 32
+  const skip = (page - 1) * pageSize
+
+  const where = {}
+  if (query && query.trim()) {
+    where.title = { contains: query.trim(), mode: 'insensitive' }
+  }
+  if (filters.languages) {
+    where.languages = { has: filters.languages }
+  }
+
+  const orderBy = filters.sort === 'ascending'
+    ? { title: 'asc' }
+    : filters.sort === 'descending'
+      ? { title: 'desc' }
+      : { downloadCount: 'desc' }
+
+  try {
+    const [books, count] = await Promise.all([
+      prismaClient.cachedBook.findMany({ where, orderBy, skip, take: pageSize }),
+      prismaClient.cachedBook.count({ where }),
+    ])
+
+    // Transform to match Gutendex response format
+    return {
+      results: books.map(b => ({
+        id: b.gutenbergId,
+        title: b.title,
+        authors: b.authors,
+        subjects: b.subjects,
+        languages: b.languages,
+        download_count: b.downloadCount,
+        formats: b.formats,
+      })),
+      count,
+      next: skip + pageSize < count ? `page=${page + 1}` : null,
+      previous: page > 1 ? `page=${page - 1}` : null,
+    }
+  } catch (err) {
+    captureError(err, { context: 'searchCachedBooks' })
+    return null
+  }
+}
+
 module.exports = {
   searchBooks,
   getBookDetail,
   getBookCoverUrl,
+  preloadPopularBooks,
+  syncPopularBooksToDB,
+  searchCachedBooks,
 }

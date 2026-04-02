@@ -444,6 +444,9 @@ async function startServer() {
   return server.listen(PORT, () => {
     startHtmlArchiveScheduler()
     startModerationCleanupScheduler()
+    // Pre-warm library cache with popular books (non-blocking)
+    const { preloadPopularBooks } = require('./modules/library/library.service')
+    preloadPopularBooks().catch(() => {})
     console.log(`Server running on http://localhost:${PORT}`)
   })
 }

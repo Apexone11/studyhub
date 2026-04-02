@@ -3,6 +3,9 @@ import { useSearchParams } from 'react-router-dom'
 import { API } from '../../config'
 import { authHeaders } from '../shared/pageUtils'
 import { getApiErrorMessage, readJsonSafely } from '../../lib/http'
+import { cache as swrCache } from '../../lib/useFetch'
+
+const SWR_TTL = 5 * 60 * 1000 // 5 minutes
 
 export default function useLibraryData() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -18,19 +21,49 @@ export default function useLibraryData() {
   const page = parseInt(searchParams.get('page') || '1', 10)
   const languages = searchParams.get('languages') || 'en'
 
-  // Fetch books
+  // Fetch books with SWR caching
   useEffect(() => {
     async function fetchBooks() {
-      try {
-        setLoading(true)
+      const params = new URLSearchParams()
+      if (search) params.append('search', search)
+      if (topic) params.append('topic', topic)
+      if (sort) params.append('sort', sort)
+      if (page) params.append('page', page)
+      if (languages) params.append('languages', languages)
+
+      const cacheKey = `/api/library/search?${params.toString()}`
+
+      // Check SWR cache first
+      const cached = swrCache.get(cacheKey)
+      if (cached && cached.data) {
+        setBooks(cached.data.books || [])
+        setTotalCount(cached.data.totalCount || 0)
         setError('')
 
-        const params = new URLSearchParams()
-        if (search) params.append('search', search)
-        if (topic) params.append('topic', topic)
-        if (sort) params.append('sort', sort)
-        if (page) params.append('page', page)
-        if (languages) params.append('languages', languages)
+        // If cache is fresh, show cached data and fetch in background
+        const age = Date.now() - cached.timestamp
+        if (age < SWR_TTL) {
+          setLoading(false)
+          // Still fetch in background to keep fresh
+          fetchFromApi(params, cacheKey, true)
+          return
+        }
+
+        // Stale cache: show data, fetch to replace
+        setLoading(false)
+        fetchFromApi(params, cacheKey, true)
+        return
+      }
+
+      // No cache: fetch normally with loading state
+      setLoading(true)
+      setError('')
+      await fetchFromApi(params, cacheKey, false)
+    }
+
+    async function fetchFromApi(params, cacheKey, isBackground) {
+      try {
+        if (!isBackground) setLoading(true)
 
         const response = await fetch(`${API}/api/library/search?${params.toString()}`, {
           credentials: 'include',
@@ -45,17 +78,57 @@ export default function useLibraryData() {
         const data = await response.json()
         setBooks(data.books || [])
         setTotalCount(data.totalCount || 0)
+        setError('')
+
+        // Update SWR cache
+        swrCache.set(cacheKey, { data, timestamp: Date.now() })
       } catch (err) {
-        const msg = getApiErrorMessage(err)
-        setError(msg)
-        setBooks([])
-        setTotalCount(0)
+        // Only show error if this isn't a background refresh
+        if (!isBackground) {
+          const msg = getApiErrorMessage(err)
+          setError(msg)
+          setBooks([])
+          setTotalCount(0)
+        }
       } finally {
         setLoading(false)
       }
     }
 
     fetchBooks()
+  }, [search, topic, sort, page, languages])
+
+  // Prefetch next page for instant pagination
+  useEffect(() => {
+    const nextPage = page + 1
+    const params = new URLSearchParams()
+    if (search) params.append('search', search)
+    if (topic) params.append('topic', topic)
+    if (sort) params.append('sort', sort)
+    params.append('page', nextPage)
+    if (languages) params.append('languages', languages)
+
+    const cacheKey = `/api/library/search?${params.toString()}`
+    const cached = swrCache.get(cacheKey)
+
+    // Only prefetch if not already cached
+    if (!cached) {
+      const timer = setTimeout(() => {
+        fetch(`${API}/api/library/search?${params.toString()}`, {
+          credentials: 'include',
+          headers: authHeaders(),
+        })
+          .then(res => (res.ok ? res.json() : null))
+          .then(data => {
+            if (data) {
+              swrCache.set(cacheKey, { data, timestamp: Date.now() })
+            }
+          })
+          .catch(() => {}) // Silent failure
+      }, 1000) // 1 second delay to prioritize current page
+
+      return () => clearTimeout(timer)
+    }
   }, [search, topic, sort, page, languages])
 
   // Helper functions to update query params
