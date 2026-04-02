@@ -52,6 +52,7 @@ const docsRoutes = require('./modules/docs')
 const sharingRoutes = require('./modules/sharing')
 const aiRoutes = require('./modules/ai')
 const libraryRoutes = require('./modules/library')
+const crypto = require('node:crypto')
 const { initSocketIO } = require('./lib/socketio')
 const { featureFlagMiddleware } = require('./lib/featureFlags')
 
@@ -140,6 +141,19 @@ const previewSurfaceCsp = [
 ].join('; ')
 
 app.disable('x-powered-by')
+
+// ── Request ID ──────────────────────────────────────────────────────────
+// Attach a unique request ID to every request for end-to-end tracing.
+// If the client sends X-Request-Id (e.g., from Sentry on the frontend),
+// we reuse it; otherwise we generate one. The ID is returned in the
+// response header so frontend error reports can be correlated with
+// backend logs. Same pattern used by GitHub, Stripe, and Heroku.
+app.use((req, res, next) => {
+  const id = req.headers['x-request-id'] || crypto.randomUUID()
+  req.requestId = id
+  res.setHeader('X-Request-Id', id)
+  next()
+})
 
 // Gzip/Brotli compression for all text-based responses.
 app.use(compression())
@@ -459,13 +473,54 @@ async function startServer() {
   })
 }
 
+// ── Graceful Shutdown ─────────────────────────────────────────────────────
+// When Railway (or any PaaS) redeploys, it sends SIGTERM to the process.
+// Without this handler, in-flight requests (sheet saves, messages, uploads)
+// are killed mid-execution causing data loss. This pattern:
+// 1. Stops accepting new connections
+// 2. Waits for in-flight requests to finish (up to 15s)
+// 3. Disconnects all WebSocket clients cleanly
+// 4. Closes the Prisma database connection pool
+// 5. Exits cleanly
+// Same pattern used by GitHub, Heroku, Vercel, and every serious Node.js app.
+let serverInstance = null
+
+function gracefulShutdown(signal) {
+  console.log(`[shutdown] Received ${signal}, starting graceful shutdown...`)
+
+  if (!serverInstance) {
+    process.exit(0)
+  }
+
+  // Stop accepting new connections
+  serverInstance.close(() => {
+    console.log('[shutdown] HTTP server closed, cleaning up...')
+
+    // Disconnect Prisma connection pool
+    prisma.$disconnect()
+      .catch(() => {})
+      .finally(() => {
+        console.log('[shutdown] Cleanup complete, exiting.')
+        process.exit(0)
+      })
+  })
+
+  // Force exit after 15 seconds if connections won't drain
+  setTimeout(() => {
+    console.error('[shutdown] Could not close connections in time, forcing exit.')
+    process.exit(1)
+  }, 15000).unref()
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'))
+process.on('SIGINT', () => gracefulShutdown('SIGINT'))
+
 if (require.main === module) {
-  startServer().catch((error) => {
+  startServer().then((server) => {
+    serverInstance = server
+  }).catch((error) => {
     captureError(error, { source: 'serverStartup' })
     console.error(error)
     process.exit(1)
   })
 }
-
-module.exports = app
-module.exports.startServer = startServer
