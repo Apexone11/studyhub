@@ -56,9 +56,10 @@ export default function LibraryPage() {
     }
   }
 
-  const booksPerPage = 20
-  const hasNextPage = books.length === booksPerPage
+  const booksPerPage = 32
   const pageNumber = parseInt(page || '1', 10)
+  const totalPages = Math.ceil(totalCount / booksPerPage)
+  const hasNextPage = pageNumber < totalPages
 
   return (
     <>
@@ -207,7 +208,7 @@ export default function LibraryPage() {
                 </button>
 
                 <span className="library-pagination__info">
-                  Page {pageNumber} of {Math.ceil(totalCount / booksPerPage)}
+                  Page {pageNumber} of {totalPages || 1}
                 </span>
 
                 <button

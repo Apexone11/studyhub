@@ -6,6 +6,13 @@ const { GUTENDEX_BASE, OPENLIBRARY_BASE, OPENLIBRARY_COVERS, CACHE_TTL } = requi
 const cache = require('./library.cache')
 const { captureError } = require('../../monitoring/sentry')
 
+/** Fetch with a timeout. Rejects if the response takes longer than `ms`. */
+function fetchWithTimeout(url, ms = 8000) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), ms)
+  return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(timer))
+}
+
 /**
  * Search for books on Gutendex.
  * @param {string} query - Search term (title, author, etc.)
@@ -14,20 +21,23 @@ const { captureError } = require('../../monitoring/sentry')
  * @returns {Promise<object|null>} Search results or null on error
  */
 async function searchBooks(query, page = 1, filters = {}) {
-  const cacheKey = `search:${query}:${page}:${JSON.stringify(filters)}`
+  const cacheKey = `search:${query || ''}:${page}:${JSON.stringify(filters)}`
   const cached = cache.get(cacheKey)
   if (cached) return cached
 
   try {
     const params = new URLSearchParams()
-    params.append('search', query)
+    if (query && query.trim()) params.append('search', query.trim())
     if (filters.topic) params.append('topic', filters.topic)
-    if (filters.sort) params.append('sort', filters.sort)
+    // Gutendex only accepts 'ascending' or 'descending'; 'popular' = default (omit)
+    if (filters.sort && (filters.sort === 'ascending' || filters.sort === 'descending')) {
+      params.append('sort', filters.sort)
+    }
     if (filters.languages) params.append('languages', filters.languages)
     params.append('page', page)
 
     const url = `${GUTENDEX_BASE}/books/?${params.toString()}`
-    const response = await fetch(url)
+    const response = await fetchWithTimeout(url)
 
     if (!response.ok) {
       console.warn(`Gutendex search failed: ${response.status}`)
@@ -57,7 +67,7 @@ async function getBookDetail(gutenbergId) {
   try {
     // Get basic book info from Gutendex
     const gutendexUrl = `${GUTENDEX_BASE}/books/${gutenbergId}/`
-    const gutendexResponse = await fetch(gutendexUrl)
+    const gutendexResponse = await fetchWithTimeout(gutendexUrl)
 
     if (!gutendexResponse.ok) {
       console.warn(`Gutendex book fetch failed: ${gutendexResponse.status}`)
@@ -66,8 +76,13 @@ async function getBookDetail(gutenbergId) {
 
     const bookData = await gutendexResponse.json()
 
-    // Try to enrich with Open Library description
-    const enriched = await enrichBookWithOpenLibrary(bookData)
+    // Enrich with Open Library but don't let it block/fail the response
+    let enriched = bookData
+    try {
+      enriched = await enrichBookWithOpenLibrary(bookData)
+    } catch {
+      // Graceful degradation - return Gutendex data without enrichment
+    }
 
     cache.set(cacheKey, enriched, CACHE_TTL.BOOK_DETAIL)
     return enriched
@@ -92,7 +107,7 @@ async function enrichBookWithOpenLibrary(book) {
     const author = book.authors.length > 0 ? encodeURIComponent(book.authors[0].name) : ''
 
     const searchUrl = `${OPENLIBRARY_BASE}/search.json?q=${title}&author=${author}&limit=1`
-    const searchResponse = await fetch(searchUrl)
+    const searchResponse = await fetchWithTimeout(searchUrl, 3000)
 
     if (!searchResponse.ok) {
       return book
@@ -113,7 +128,7 @@ async function enrichBookWithOpenLibrary(book) {
 
     // Fetch the full work document for description
     const workUrl = `${OPENLIBRARY_BASE}${workKey}.json`
-    const workResponse = await fetch(workUrl)
+    const workResponse = await fetchWithTimeout(workUrl, 3000)
 
     if (workResponse.ok) {
       const workData = await workResponse.json()
@@ -150,7 +165,7 @@ async function getBookCoverUrl(gutenbergId, size = 'medium') {
       const author = encodeURIComponent(book.authors[0].name)
 
       const searchUrl = `${OPENLIBRARY_BASE}/search.json?q=${title}&author=${author}&limit=1`
-      const searchResponse = await fetch(searchUrl)
+      const searchResponse = await fetchWithTimeout(searchUrl, 3000)
 
       if (searchResponse.ok) {
         const searchData = await searchResponse.json()

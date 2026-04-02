@@ -1,52 +1,48 @@
 /**
- * library.cache.js -- Simple TTL-based in-memory cache for library API responses.
+ * library.cache.js -- TTL-based in-memory cache with LRU eviction for library API responses.
  */
 
+const MAX_ENTRIES = 500
+
 class MemoryCache {
-  constructor() {
+  constructor(maxEntries = MAX_ENTRIES) {
     this._store = new Map()
+    this._maxEntries = maxEntries
   }
 
-  /**
-   * Get a value from the cache.
-   * Returns null if the key does not exist or has expired.
-   */
   get(key) {
     const entry = this._store.get(key)
     if (!entry) return null
 
-    // Check expiration
     if (Date.now() > entry.expiresAt) {
       this._store.delete(key)
       return null
     }
 
+    // Move to end for LRU tracking (Map preserves insertion order)
+    this._store.delete(key)
+    this._store.set(key, entry)
+
     return entry.value
   }
 
-  /**
-   * Set a value in the cache with a TTL.
-   * @param {string} key - Cache key
-   * @param {any} value - Value to cache
-   * @param {number} ttlMs - Time to live in milliseconds
-   */
   set(key, value, ttlMs) {
+    // Evict oldest entry if at capacity
+    if (this._store.size >= this._maxEntries && !this._store.has(key)) {
+      const oldest = this._store.keys().next().value
+      this._store.delete(oldest)
+    }
+
     this._store.set(key, {
       value,
       expiresAt: Date.now() + ttlMs,
     })
   }
 
-  /**
-   * Clear all cached entries.
-   */
   clear() {
     this._store.clear()
   }
 
-  /**
-   * Get the number of entries currently in the cache.
-   */
   get size() {
     return this._store.size
   }

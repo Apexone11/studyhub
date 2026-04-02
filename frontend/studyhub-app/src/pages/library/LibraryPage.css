@@ -318,7 +318,7 @@
   padding: 10px 20px;
   border: 1px solid var(--sh-brand);
   border-radius: var(--radius-control);
-  background: white;
+  background: var(--sh-surface);
   color: var(--sh-brand);
   font-weight: 600;
   font-size: 13px;

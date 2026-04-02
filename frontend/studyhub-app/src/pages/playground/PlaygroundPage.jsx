@@ -1,8 +1,10 @@
+import React, { useState } from 'react'
 import Navbar from '../../components/navbar/Navbar'
 import AppSidebar from '../../components/sidebar/AppSidebar'
 import { usePageTitle } from '../../lib/usePageTitle'
 import { useResponsiveAppLayout } from '../../lib/ui'
 import { Link } from 'react-router-dom'
+import { LogoMark } from '../../components/Icons'
 
 const FEATURES = [
   {
@@ -59,6 +61,9 @@ export default function PlaygroundPage() {
         <main style={s.page}>
           {/* ── HERO ─────────────────────────────────────── */}
           <section style={s.hero}>
+            <div style={s.heroWatermark}>
+              <LogoMark size={280} />
+            </div>
             <div style={s.heroInner}>
               <div style={s.heroBadge}>Coming Soon</div>
               <h1 style={s.heroH1}>Code Playground</h1>
@@ -170,9 +175,22 @@ export default function PlaygroundPage() {
 }
 
 function FeatureCard({ icon, title, desc }) {
+  const [isHovered, setIsHovered] = useState(false)
   const iconSvg = getFeatureIcon(icon)
+
   return (
-    <div style={s.featureCard}>
+    <div
+      style={{
+        ...s.featureCard,
+        ...(isHovered && {
+          transform: 'translateY(-4px)',
+          borderColor: 'var(--sh-brand)',
+          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)',
+        })
+      }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
       <div style={s.featureIconWrap}>
         {iconSvg}
       </div>
@@ -290,43 +308,62 @@ const s = {
 
   /* HERO */
   hero: {
-    background: 'linear-gradient(135deg, var(--sh-slate-900) 0%, var(--sh-slate-800) 100%)',
-    padding: '100px 20px 60px',
+    background: 'linear-gradient(135deg, var(--sh-brand) 0%, #7c3aed 100%)',
+    padding: '100px 20px 80px',
     textAlign: 'center',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  heroWatermark: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    opacity: 0.05,
+    color: 'white',
+    pointerEvents: 'none',
+    zIndex: 0,
+    animation: 'float 8s ease-in-out infinite',
   },
   heroInner: {
     maxWidth: 720,
     margin: '0 auto',
+    position: 'relative',
+    zIndex: 1,
   },
   heroBadge: {
     display: 'inline-block',
-    background: 'var(--sh-brand)',
+    background: 'rgba(255, 255, 255, 0.15)',
+    border: '1px solid rgba(255, 255, 255, 0.3)',
     color: '#fff',
     fontSize: 12,
     fontWeight: 'bold',
-    padding: '6px 16px',
+    padding: '8px 16px',
     borderRadius: 20,
     marginBottom: 24,
     letterSpacing: 1,
+    backdropFilter: 'blur(10px)',
   },
   heroH1: {
-    fontSize: 'clamp(32px, 5vw, 54px)',
+    fontSize: 'clamp(36px, 6vw, 60px)',
     fontWeight: 'bold',
     color: '#fff',
     margin: '0 0 16px',
     lineHeight: 1.15,
+    letterSpacing: '-1px',
   },
   heroSub: {
     fontSize: 18,
-    color: 'var(--sh-slate-400)',
+    color: 'rgba(255, 255, 255, 0.95)',
     margin: 0,
     lineHeight: 1.6,
+    fontWeight: 400,
   },
 
   /* MOCK EDITOR */
   editorSection: {
     padding: '80px 20px',
-    background: 'var(--sh-bg)',
+    background: 'var(--sh-page-bg)',
   },
   editorContainer: {
     maxWidth: 1100,
@@ -340,7 +377,7 @@ const s = {
     borderRadius: 16,
     overflow: 'hidden',
     border: '1px solid var(--sh-border)',
-    boxShadow: '0 10px 40px rgba(0, 0, 0, 0.15)',
+    boxShadow: '0 20px 60px rgba(0, 0, 0, 0.2)',
     background: 'var(--sh-surface)',
   },
   editorWatermark: {
@@ -362,6 +399,7 @@ const s = {
     borderRight: '1px solid var(--sh-border)',
     display: 'flex',
     flexDirection: 'column',
+    background: 'var(--sh-surface)',
   },
   editorHeader: {
     background: 'var(--sh-soft)',
@@ -369,14 +407,16 @@ const s = {
     padding: '12px 16px',
     display: 'flex',
     gap: 8,
+    alignItems: 'center',
   },
   editorTab: {
     fontSize: 13,
-    color: 'var(--sh-muted)',
-    padding: '4px 12px',
+    color: 'var(--sh-text)',
+    padding: '6px 12px',
     borderRadius: 6,
     background: 'var(--sh-surface)',
     fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
+    fontWeight: 500,
   },
   codeBlock: {
     flex: 1,
@@ -395,16 +435,17 @@ const s = {
   editorRight: {
     display: 'flex',
     flexDirection: 'column',
-    background: 'var(--sh-surface)',
+    background: 'var(--sh-soft)',
   },
   outputTab: {
     fontSize: 13,
-    color: 'var(--sh-muted)',
-    padding: '4px 12px',
+    color: 'var(--sh-text)',
+    padding: '6px 12px',
     borderRadius: 6,
-    background: 'var(--sh-soft)',
+    background: 'var(--sh-surface)',
     fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
     display: 'inline-block',
+    fontWeight: 500,
   },
   outputPanel: {
     flex: 1,
@@ -413,6 +454,7 @@ const s = {
     fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
     fontSize: 13,
     lineHeight: 1.8,
+    background: 'var(--sh-soft)',
   },
   outputLine: {
     color: 'var(--sh-text)',
@@ -420,6 +462,7 @@ const s = {
   },
   outputLabel: {
     color: 'var(--sh-brand)',
+    fontWeight: 500,
   },
   outputValue: {
     color: 'var(--sh-success-text)',
@@ -452,6 +495,12 @@ const s = {
     borderRadius: 12,
     padding: '28px 24px',
     transition: 'all 0.3s ease',
+    cursor: 'default',
+  },
+  featureCard__hover: {
+    transform: 'translateY(-4px)',
+    borderColor: 'var(--sh-brand)',
+    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)',
   },
   featureIconWrap: {
     width: 48,
@@ -464,10 +513,11 @@ const s = {
     border: '1px solid var(--sh-brand-border)',
     marginBottom: 16,
     color: 'var(--sh-brand)',
+    transition: 'all 0.3s ease',
   },
   featureTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: 'var(--sh-heading)',
     margin: '0 0 12px',
   },
@@ -481,24 +531,24 @@ const s = {
   /* CTA SECTION */
   ctaSection: {
     padding: '80px 20px',
-    background: 'linear-gradient(135deg, var(--sh-brand-soft) 0%, var(--sh-page-bg) 100%)',
+    background: 'linear-gradient(135deg, var(--sh-brand) 0%, #7c3aed 100%)',
     textAlign: 'center',
     borderTop: '1px solid var(--sh-border)',
-    borderBottom: '1px solid var(--sh-border)',
   },
   ctaInner: {
     maxWidth: 600,
     margin: '0 auto',
   },
   ctaText: {
-    fontSize: 18,
-    color: 'var(--sh-heading)',
+    fontSize: 20,
+    color: '#fff',
     margin: '0 0 24px',
     fontWeight: 'bold',
   },
   ctaButton: {
     display: 'inline-block',
-    background: 'var(--sh-brand)',
+    background: 'rgba(255, 255, 255, 0.2)',
+    border: '2px solid rgba(255, 255, 255, 0.4)',
     color: 'white',
     textDecoration: 'none',
     padding: '14px 36px',
@@ -506,6 +556,7 @@ const s = {
     fontWeight: 'bold',
     fontSize: 15,
     transition: 'all 0.3s ease',
+    backdropFilter: 'blur(10px)',
   },
 
   /* FOOTER */
@@ -533,4 +584,23 @@ const s = {
     fontSize: 12,
     margin: 0,
   },
+}
+
+// Add keyframe animation to document
+if (typeof window !== 'undefined') {
+  const styleSheet = document.createElement('style')
+  styleSheet.textContent = `
+    @keyframes float {
+      0%, 100% {
+        transform: translate(-50%, -50%);
+      }
+      50% {
+        transform: translate(-50%, -55%);
+      }
+    }
+  `
+  if (!document.head.querySelector('style[data-playground]')) {
+    styleSheet.setAttribute('data-playground', 'true')
+    document.head.appendChild(styleSheet)
+  }
 }
