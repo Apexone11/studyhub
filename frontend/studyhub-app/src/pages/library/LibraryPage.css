@@ -14,11 +14,49 @@
   padding: clamp(3rem, 5vw, 6rem) var(--page-gutter);
   text-align: center;
   color: white;
+  position: relative;
+  overflow: hidden;
+}
+
+.library-hero__watermark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0.08;
+  color: white;
+  pointer-events: none;
+  z-index: 0;
+  animation: float 8s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translate(-50%, -50%);
+  }
+  50% {
+    transform: translate(-50%, -55%);
+  }
 }
 
 .library-hero__content {
   max-width: 680px;
   margin: 0 auto;
+  position: relative;
+  z-index: 1;
+}
+
+.library-hero__badge {
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 20px;
+  margin-bottom: 16px;
+  backdrop-filter: blur(10px);
 }
 
 .library-hero__title {
@@ -254,8 +292,11 @@
 }
 
 .library-empty__icon {
-  font-size: 64px;
+  display: flex;
+  justify-content: center;
   margin-bottom: 20px;
+  color: var(--sh-brand);
+  opacity: 0.8;
 }
 
 .library-empty__title {

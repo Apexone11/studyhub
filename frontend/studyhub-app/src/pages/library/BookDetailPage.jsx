@@ -11,7 +11,7 @@
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 import { useParams, useNavigate } from 'react-router-dom'
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import Navbar from '../../components/navbar/Navbar'
 import { IconArrowLeft, IconDownload } from '../../components/Icons'
 import { Skeleton, SkeletonCard } from '../../components/Skeleton'
@@ -33,6 +33,7 @@ export default function BookDetailPage() {
   const [shelfDropdownOpen, setShelfDropdownOpen] = useState(false)
   const [newShelfName, setNewShelfName] = useState('')
   const [showNewShelfInput, setShowNewShelfInput] = useState(false)
+  const shelfDropdownRef = useRef(null)
 
   const { book, loading, error, shelves, progress, addToShelf, removeFromShelf, createShelf } =
     useBookDetail(gutenbergId)
@@ -53,6 +54,44 @@ export default function BookDetailPage() {
       await handleAddToShelf(shelf.id)
     }
   }
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        shelfDropdownRef.current &&
+        !shelfDropdownRef.current.contains(event.target)
+      ) {
+        setShelfDropdownOpen(false)
+        setShowNewShelfInput(false)
+        setNewShelfName('')
+      }
+    }
+
+    if (shelfDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside)
+      }
+    }
+  }, [shelfDropdownOpen])
+
+  // Close "Create New Shelf" input on Escape
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape' && showNewShelfInput) {
+        setShowNewShelfInput(false)
+        setNewShelfName('')
+      }
+    }
+
+    if (showNewShelfInput) {
+      document.addEventListener('keydown', handleKeyDown)
+      return () => {
+        document.removeEventListener('keydown', handleKeyDown)
+      }
+    }
+  }, [showNewShelfInput])
 
   if (error && !loading) {
     return (
@@ -185,7 +224,10 @@ export default function BookDetailPage() {
                   </a>
 
                   {/* Save to Bookshelf Dropdown */}
-                  <div className="book-detail__shelf-dropdown">
+                  <div
+                    className="book-detail__shelf-dropdown"
+                    ref={shelfDropdownRef}
+                  >
                     <button
                       onClick={() => setShelfDropdownOpen(!shelfDropdownOpen)}
                       className="book-detail__action-btn book-detail__action-btn--secondary"
@@ -219,6 +261,10 @@ export default function BookDetailPage() {
                               onChange={(e) => setNewShelfName(e.target.value)}
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter') handleCreateShelf()
+                                if (e.key === 'Escape') {
+                                  setShowNewShelfInput(false)
+                                  setNewShelfName('')
+                                }
                               }}
                               placeholder="Shelf name..."
                               className="book-detail__shelf-input"

@@ -3717,3 +3717,52 @@ All 58 modified files pass syntax validation (23 backend node -c + 35 frontend a
 - `frontend/studyhub-app/src/components/Icons.jsx` -- Added IconBook, IconCode, IconTag.
 - `frontend/studyhub-app/src/lib/prefetch.js` -- Added /library to prefetch route map.
 - `frontend/studyhub-app/src/components/ai/AiBubble.jsx` -- Hidden on reader pages (full-screen experience has its own AI button).
+
+---
+
+## v2.0 Post-Deploy Fixes (2026-04-02)
+
+### Summary
+
+Fixed critical deployment issues, API response shape mismatches, CORS workarounds, and updated the Home page to showcase v2.0 features.
+
+### Fixes Applied
+
+| Category | Detail |
+|----------|--------|
+| Critical | Prisma 6.x removed `$use()` middleware; rewrote `prismaEncryption.js` to use `$extends()` query API |
+| Critical | Library frontend URLs did not match backend routes (missing `/search`, `/books` segments). Fixed 4 frontend files and 1 backend file |
+| Critical | Gutendex response shape mismatch: backend returned `{ results, count }` but frontend expected `{ books, totalCount }`. Normalized in route handler |
+| Fix | Library shelves/bookmarks/highlights endpoints returned raw arrays but frontend expected `{ shelves }`, `{ bookmarks }`, `{ highlights }` nested objects |
+| Fix | Gutendex URLs missing trailing slashes caused 301 redirects adding latency |
+| Fix | EPUB reader blank page due to CORS -- added backend proxy at `GET /api/library/books/:id/epub` |
+| Fix | BookDetailPage shelf dropdown did not close on click-outside or Escape key |
+| Enhancement | Home page updated with 3 new v2.0 feature cards (BookHub Library, Study Groups, StudyHub Connect) |
+| Enhancement | AI Tutor renamed to Hub AI and removed "Coming Soon" badge (now live) |
+| Enhancement | LibraryPage redesigned with SVG watermark and book count badge |
+| Enhancement | PlaygroundPage redesigned with inline SVG icons replacing broken font-awesome references |
+| Enhancement | Added CSS tone classes for indigo, cyan, pink feature cards |
+
+### Files Changed
+
+- `backend/src/lib/prismaEncryption.js` -- Rewritten from `$use()` to `$extends()` query API
+- `backend/src/lib/prisma.js` -- Updated to use `withEncryption()` return pattern
+- `backend/src/modules/library/library.routes.js` -- Normalized search response, added EPUB proxy, wrapped shelf/bookmark/highlight responses in objects
+- `backend/src/modules/library/library.service.js` -- Added trailing slashes to Gutendex URLs
+- `frontend/studyhub-app/src/pages/library/useLibraryData.js` -- Fixed API URL to `/api/library/search`
+- `frontend/studyhub-app/src/pages/library/useBookDetail.js` -- Fixed API URL to `/api/library/books/:id`
+- `frontend/studyhub-app/src/pages/library/useBookReader.js` -- Fixed API URL to `/api/library/books/:id`
+- `frontend/studyhub-app/src/pages/library/libraryHelpers.js` -- EPUB URL now uses backend proxy
+- `frontend/studyhub-app/src/pages/library/BookDetailPage.jsx` -- Added click-outside and Escape handlers for shelf dropdown
+- `frontend/studyhub-app/src/pages/library/LibraryPage.jsx` -- Redesigned with watermark and badge
+- `frontend/studyhub-app/src/pages/library/LibraryPage.css` -- New hero watermark and badge styles
+- `frontend/studyhub-app/src/pages/playground/PlaygroundPage.jsx` -- Replaced font-awesome with inline SVGs
+- `frontend/studyhub-app/src/pages/home/homeConstants.js` -- Added 3 new v2.0 feature cards, renamed AI Tutor to Hub AI
+- `frontend/studyhub-app/src/index.css` -- Added indigo, cyan, pink tone classes
+- `frontend/studyhub-app/src/lib/prefetch.js` -- Fixed library prefetch URL
+
+### Validation
+
+- All backend `.js` files pass `node -c` syntax check
+- Button/navigation audit: all buttons across 87 JSX files are functional (no empty handlers or broken links)
+- API response shapes verified to match frontend expectations

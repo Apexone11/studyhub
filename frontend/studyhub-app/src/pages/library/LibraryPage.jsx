@@ -14,7 +14,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import Navbar from '../../components/navbar/Navbar'
-import { IconSearch } from '../../components/Icons'
+import { IconSearch, IconBook } from '../../components/Icons'
 import { SkeletonCard } from '../../components/Skeleton'
 import { usePageTitle } from '../../lib/usePageTitle'
 import BookCard from './components/BookCard'
@@ -66,10 +66,14 @@ export default function LibraryPage() {
       <div className="library-page">
         {/* Hero Section */}
         <section className="library-hero">
+          <div className="library-hero__watermark">
+            <IconBook size={280} />
+          </div>
           <div className="library-hero__content">
+            <div className="library-hero__badge">70,000+ Books</div>
             <h1 className="library-hero__title">BookHub</h1>
             <p className="library-hero__subtitle">
-              70,000+ free classic books at your fingertips
+              Free classic books at your fingertips
             </p>
 
             <form
@@ -220,7 +224,9 @@ export default function LibraryPage() {
           {/* Empty State */}
           {!loading && books.length === 0 && !error && (
             <div className="library-empty">
-              <div className="library-empty__icon">📚</div>
+              <div className="library-empty__icon">
+                <IconBook size={64} />
+              </div>
               <h2 className="library-empty__title">No books found</h2>
               <p className="library-empty__text">
                 Try adjusting your search terms or filters to discover more books.

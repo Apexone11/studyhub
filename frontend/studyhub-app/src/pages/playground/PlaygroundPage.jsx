@@ -1,174 +1,266 @@
 import Navbar from '../../components/navbar/Navbar'
+import AppSidebar from '../../components/sidebar/AppSidebar'
+import { usePageTitle } from '../../lib/usePageTitle'
+import { useResponsiveAppLayout } from '../../lib/ui'
 import { Link } from 'react-router-dom'
 
 const FEATURES = [
   {
-    icon: 'fa-code',
     title: 'Browser-Based Editor',
     desc: 'Full-featured code editor with syntax highlighting, autocomplete, and error detection. No setup required.',
+    icon: 'editor',
   },
   {
-    icon: 'fa-language',
     title: 'Multiple Languages',
     desc: 'Write in JavaScript, Python, HTML/CSS, TypeScript, and SQL. More languages coming soon.',
+    icon: 'languages',
   },
   {
-    icon: 'fa-eye',
     title: 'Live Preview',
     desc: 'See your HTML/CSS/JS projects render in real-time as you type.',
+    icon: 'preview',
   },
   {
-    icon: 'fa-code-branch',
     title: 'Share and Fork',
     desc: 'Publish your projects with a unique URL. Fork other students\' work to learn and improve.',
+    icon: 'fork',
   },
   {
-    icon: 'fa-lock',
     title: 'Sandboxed Execution',
     desc: 'All code runs in a secure browser sandbox. No access to your computer or network.',
+    icon: 'sandbox',
   },
   {
-    icon: 'fa-sparkles',
     title: 'AI Code Review',
     desc: 'Get feedback from Hub AI on your code. Find bugs, optimize performance, and learn best practices.',
+    icon: 'ai',
   },
   {
-    icon: 'fa-clock',
     title: 'Version History',
     desc: 'Track every change with automatic versioning. Compare diffs and roll back anytime.',
+    icon: 'history',
   },
   {
-    icon: 'fa-graduation-cap',
     title: 'Course Exercises',
     desc: 'Practice coding with exercises linked to your CS courses. Get automated feedback.',
+    icon: 'exercises',
   },
 ]
 
 export default function PlaygroundPage() {
+  usePageTitle('Playground')
+  const layout = useResponsiveAppLayout()
+
   return (
-    <div style={s.page}>
+    <>
       <Navbar />
-
-      {/* ── HERO ─────────────────────────────────────── */}
-      <section style={s.hero}>
-        <div style={s.heroInner}>
-          <div style={s.heroBadge}>Coming Soon</div>
-          <h1 style={s.heroH1}>Code Playground</h1>
-          <p style={s.heroSub}>Write, run, and share code right in your browser</p>
-        </div>
-      </section>
-
-      {/* ── MOCK EDITOR ──────────────────────────────── */}
-      <section style={s.editorSection}>
-        <div style={s.editorContainer}>
-          <div style={s.editorMockup}>
-            <div style={s.editorWatermark}>Coming Soon</div>
-
-            {/* Left pane: Code editor */}
-            <div style={s.editorLeft}>
-              <div style={s.editorHeader}>
-                <div style={s.editorTab}>index.js</div>
-              </div>
-              <pre style={s.codeBlock}>{codeExample}</pre>
+      <div style={s.pageWrapper}>
+        <AppSidebar mode={layout.sidebarMode} />
+        <main style={s.page}>
+          {/* ── HERO ─────────────────────────────────────── */}
+          <section style={s.hero}>
+            <div style={s.heroInner}>
+              <div style={s.heroBadge}>Coming Soon</div>
+              <h1 style={s.heroH1}>Code Playground</h1>
+              <p style={s.heroSub}>Write, run, and share code right in your browser</p>
             </div>
+          </section>
 
-            {/* Right pane: Output */}
-            <div style={s.editorRight}>
-              <div style={s.editorHeader}>
-                <div style={s.outputTab}>Output</div>
-              </div>
-              <div style={s.outputPanel}>
-                <div style={s.outputLine}>
-                  <span style={s.outputLabel}>console.log</span>
-                  <span style={s.outputValue}> fib(0) = 0</span>
+          {/* ── MOCK EDITOR ──────────────────────────────── */}
+          <section style={s.editorSection}>
+            <div style={s.editorContainer}>
+              <div style={s.editorMockup}>
+                <div style={s.editorWatermark}>Coming Soon</div>
+
+                {/* Left pane: Code editor */}
+                <div style={s.editorLeft}>
+                  <div style={s.editorHeader}>
+                    <div style={s.editorTab}>index.js</div>
+                  </div>
+                  <pre style={s.codeBlock}>{codeExample}</pre>
                 </div>
-                <div style={s.outputLine}>
-                  <span style={s.outputLabel}>console.log</span>
-                  <span style={s.outputValue}> fib(1) = 1</span>
-                </div>
-                <div style={s.outputLine}>
-                  <span style={s.outputLabel}>console.log</span>
-                  <span style={s.outputValue}> fib(2) = 1</span>
-                </div>
-                <div style={s.outputLine}>
-                  <span style={s.outputLabel}>console.log</span>
-                  <span style={s.outputValue}> fib(3) = 2</span>
-                </div>
-                <div style={s.outputLine}>
-                  <span style={s.outputLabel}>console.log</span>
-                  <span style={s.outputValue}> fib(4) = 3</span>
-                </div>
-                <div style={s.outputLine}>
-                  <span style={s.outputLabel}>console.log</span>
-                  <span style={s.outputValue}> fib(5) = 5</span>
-                </div>
-                <div style={s.outputLine}>
-                  <span style={s.outputLabel}>console.log</span>
-                  <span style={s.outputValue}> fib(6) = 8</span>
-                </div>
-                <div style={s.outputLine}>
-                  <span style={s.outputLabel}>console.log</span>
-                  <span style={s.outputValue}> fib(7) = 13</span>
-                </div>
-                <div style={s.outputLine}>
-                  <span style={s.outputLabel}>console.log</span>
-                  <span style={s.outputValue}> fib(8) = 21</span>
-                </div>
-                <div style={s.outputLine}>
-                  <span style={s.outputLabel}>console.log</span>
-                  <span style={s.outputValue}> fib(9) = 34</span>
+
+                {/* Right pane: Output */}
+                <div style={s.editorRight}>
+                  <div style={s.editorHeader}>
+                    <div style={s.outputTab}>Output</div>
+                  </div>
+                  <div style={s.outputPanel}>
+                    <div style={s.outputLine}>
+                      <span style={s.outputLabel}>console.log</span>
+                      <span style={s.outputValue}> fib(0) = 0</span>
+                    </div>
+                    <div style={s.outputLine}>
+                      <span style={s.outputLabel}>console.log</span>
+                      <span style={s.outputValue}> fib(1) = 1</span>
+                    </div>
+                    <div style={s.outputLine}>
+                      <span style={s.outputLabel}>console.log</span>
+                      <span style={s.outputValue}> fib(2) = 1</span>
+                    </div>
+                    <div style={s.outputLine}>
+                      <span style={s.outputLabel}>console.log</span>
+                      <span style={s.outputValue}> fib(3) = 2</span>
+                    </div>
+                    <div style={s.outputLine}>
+                      <span style={s.outputLabel}>console.log</span>
+                      <span style={s.outputValue}> fib(4) = 3</span>
+                    </div>
+                    <div style={s.outputLine}>
+                      <span style={s.outputLabel}>console.log</span>
+                      <span style={s.outputValue}> fib(5) = 5</span>
+                    </div>
+                    <div style={s.outputLine}>
+                      <span style={s.outputLabel}>console.log</span>
+                      <span style={s.outputValue}> fib(6) = 8</span>
+                    </div>
+                    <div style={s.outputLine}>
+                      <span style={s.outputLabel}>console.log</span>
+                      <span style={s.outputValue}> fib(7) = 13</span>
+                    </div>
+                    <div style={s.outputLine}>
+                      <span style={s.outputLabel}>console.log</span>
+                      <span style={s.outputValue}> fib(8) = 21</span>
+                    </div>
+                    <div style={s.outputLine}>
+                      <span style={s.outputLabel}>console.log</span>
+                      <span style={s.outputValue}> fib(9) = 34</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
+          </section>
 
-      {/* ── FEATURES GRID ───────────────────────────── */}
-      <section style={s.featuresSection}>
-        <div style={s.sectionInner}>
-          <h2 style={s.sectionH2}>What You Can Do</h2>
-          <div style={s.featuresGrid}>
-            {FEATURES.map((feature, i) => (
-              <FeatureCard key={i} {...feature} />
-            ))}
-          </div>
-        </div>
-      </section>
+          {/* ── FEATURES GRID ───────────────────────────── */}
+          <section style={s.featuresSection}>
+            <div style={s.sectionInner}>
+              <h2 style={s.sectionH2}>What You Can Do</h2>
+              <div style={s.featuresGrid}>
+                {FEATURES.map((feature, i) => (
+                  <FeatureCard key={i} {...feature} />
+                ))}
+              </div>
+            </div>
+          </section>
 
-      {/* ── EARLY ACCESS CTA ────────────────────────── */}
-      <section style={s.ctaSection}>
-        <div style={s.ctaInner}>
-          <p style={s.ctaText}>Want to be the first to try it?</p>
-          <Link to="/pricing" style={s.ctaButton}>Notify Me</Link>
-        </div>
-      </section>
+          {/* ── EARLY ACCESS CTA ────────────────────────── */}
+          <section style={s.ctaSection}>
+            <div style={s.ctaInner}>
+              <p style={s.ctaText}>Want to be the first to try it?</p>
+              <Link to="/pricing" style={s.ctaButton}>Notify Me</Link>
+            </div>
+          </section>
 
-      {/* ── FOOTER ──────────────────────────────────── */}
-      <footer style={s.footer}>
-        <div style={s.footerLinks}>
-          <Link to="/" style={s.footerLink}>Home</Link>
-          <Link to="/feed" style={s.footerLink}>Browse</Link>
-          <Link to="/privacy" style={s.footerLink}>Privacy</Link>
-          <Link to="/terms" style={s.footerLink}>Terms</Link>
-          <Link to="/guidelines" style={s.footerLink}>Guidelines</Link>
-        </div>
-        <p style={s.footerCopy}>Code Playground · StudyHub · Open Source</p>
-      </footer>
-    </div>
+          {/* ── FOOTER ──────────────────────────────────── */}
+          <footer style={s.footer}>
+            <div style={s.footerLinks}>
+              <Link to="/" style={s.footerLink}>Home</Link>
+              <Link to="/feed" style={s.footerLink}>Browse</Link>
+              <Link to="/privacy" style={s.footerLink}>Privacy</Link>
+              <Link to="/terms" style={s.footerLink}>Terms</Link>
+              <Link to="/guidelines" style={s.footerLink}>Guidelines</Link>
+            </div>
+            <p style={s.footerCopy}>Code Playground · StudyHub · Open Source</p>
+          </footer>
+        </main>
+      </div>
+    </>
   )
 }
 
 function FeatureCard({ icon, title, desc }) {
+  const iconSvg = getFeatureIcon(icon)
   return (
     <div style={s.featureCard}>
       <div style={s.featureIconWrap}>
-        <i className={`fas ${icon}`} style={s.featureIcon}></i>
+        {iconSvg}
       </div>
       <h3 style={s.featureTitle}>{title}</h3>
       <p style={s.featureDesc}>{desc}</p>
     </div>
   )
+}
+
+function getFeatureIcon(name) {
+  const iconProps = { width: 24, height: 24, viewBox: '0 0 24 24', fill: 'none', xmlns: 'http://www.w3.org/2000/svg', style: { stroke: 'currentColor', strokeWidth: '1.8', strokeLinecap: 'round', strokeLinejoin: 'round' } }
+
+  switch (name) {
+    case 'editor':
+      return (
+        <svg {...iconProps}>
+          <path d="M5 3 L5 21 L19 21 L19 3 Z" />
+          <line x1="5" y1="8" x2="19" y2="8" />
+          <line x1="8" y1="12" x2="12" y2="12" />
+          <line x1="8" y1="15" x2="15" y2="15" />
+        </svg>
+      )
+    case 'languages':
+      return (
+        <svg {...iconProps}>
+          <path d="M5 3 Q5 2 6 2 L18 2 Q19 2 19 3 L19 21 Q19 22 18 22 L6 22 Q5 22 5 21 Z" />
+          <line x1="7" y1="6" x2="17" y2="6" />
+          <line x1="7" y1="10" x2="17" y2="10" />
+          <line x1="7" y1="14" x2="14" y2="14" />
+        </svg>
+      )
+    case 'preview':
+      return (
+        <svg {...iconProps}>
+          <circle cx="12" cy="12" r="8" />
+          <circle cx="12" cy="12" r="3" fill="currentColor" />
+        </svg>
+      )
+    case 'fork':
+      return (
+        <svg {...iconProps}>
+          <line x1="12" y1="19" x2="12" y2="14" />
+          <path d="M12 14 Q12 9 7 6" fill="none" />
+          <path d="M12 14 Q12 9 17 6" fill="none" />
+          <circle cx="12" cy="19" r="2" fill="currentColor" />
+          <circle cx="12" cy="14" r="2" fill="currentColor" />
+          <circle cx="7" cy="6" r="2" fill="currentColor" />
+          <circle cx="17" cy="6" r="2" fill="currentColor" />
+        </svg>
+      )
+    case 'sandbox':
+      return (
+        <svg {...iconProps}>
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <line x1="3" y1="9" x2="21" y2="9" />
+          <line x1="9" y1="3" x2="9" y2="21" />
+        </svg>
+      )
+    case 'ai':
+      return (
+        <svg {...iconProps}>
+          <path d="M12 3 L13.7 8.3 L19 10 L13.7 11.7 L12 17 L10.3 11.7 L5 10 L10.3 8.3 Z" fill="none" />
+          <path d="M18.5 3.5 L19.3 5.7 L21.5 6.5 L19.3 7.3 L18.5 9.5 L17.7 7.3 L15.5 6.5 L17.7 5.7 Z" fill="currentColor" />
+          <path d="M5.5 15.5 L6.2 17.1 L7.8 17.8 L6.2 18.5 L5.5 20.1 L4.8 18.5 L3.2 17.8 L4.8 17.1 Z" fill="currentColor" />
+        </svg>
+      )
+    case 'history':
+      return (
+        <svg {...iconProps}>
+          <path d="M12 2 L12 7 L16 5" />
+          <circle cx="12" cy="12" r="8" />
+          <line x1="12" y1="12" x2="12" y2="16" />
+          <line x1="12" y1="12" x2="15" y2="12" />
+        </svg>
+      )
+    case 'exercises':
+      return (
+        <svg {...iconProps}>
+          <path d="M5 3 Q5 2 6 2 L18 2 Q19 2 19 3 L19 21 Q19 22 18 22 L6 22 Q5 22 5 21 Z" />
+          <path d="M14 3 L14 7 L18 7" fill="none" />
+          <line x1="8" y1="8" x2="16" y2="8" />
+          <line x1="8" y1="12" x2="16" y2="12" />
+          <line x1="8" y1="16" x2="13" y2="16" />
+        </svg>
+      )
+    default:
+      return null
+  }
 }
 
 const codeExample = `// StudyHub Code Playground
@@ -182,10 +274,17 @@ for (let i = 0; i < 10; i++) {
 }`
 
 const s = {
+  pageWrapper: {
+    display: 'grid',
+    gridTemplateColumns: 'auto 1fr',
+    minHeight: '100vh',
+    background: 'var(--sh-page-bg)',
+  },
+
   page: {
     minHeight: '100vh',
     fontFamily: "'Plus Jakarta Sans', sans-serif",
-    background: 'var(--sh-surface)',
+    background: 'var(--sh-page-bg)',
     color: 'var(--sh-text)',
   },
 
@@ -240,11 +339,9 @@ const s = {
     gap: 0,
     borderRadius: 16,
     overflow: 'hidden',
-    border: '1px solid var(--sh-slate-700)',
-    boxShadow: '0 20px 50px rgba(0, 0, 0, 0.3)',
-    background: 'var(--sh-slate-800)',
-    transform: 'perspective(1000px) rotateX(5deg) rotateY(-2deg)',
-    transformStyle: 'preserve-3d',
+    border: '1px solid var(--sh-border)',
+    boxShadow: '0 10px 40px rgba(0, 0, 0, 0.15)',
+    background: 'var(--sh-surface)',
   },
   editorWatermark: {
     position: 'absolute',
@@ -262,23 +359,23 @@ const s = {
 
   /* Editor left pane */
   editorLeft: {
-    borderRight: '1px solid var(--sh-slate-700)',
+    borderRight: '1px solid var(--sh-border)',
     display: 'flex',
     flexDirection: 'column',
   },
   editorHeader: {
-    background: 'var(--sh-slate-900)',
-    borderBottom: '1px solid var(--sh-slate-700)',
+    background: 'var(--sh-soft)',
+    borderBottom: '1px solid var(--sh-border)',
     padding: '12px 16px',
     display: 'flex',
     gap: 8,
   },
   editorTab: {
     fontSize: 13,
-    color: 'var(--sh-slate-400)',
+    color: 'var(--sh-muted)',
     padding: '4px 12px',
     borderRadius: 6,
-    background: 'rgba(100, 116, 139, 0.2)',
+    background: 'var(--sh-surface)',
     fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
   },
   codeBlock: {
@@ -289,7 +386,7 @@ const s = {
     fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
     fontSize: 13,
     lineHeight: 1.6,
-    color: 'var(--sh-slate-300)',
+    color: 'var(--sh-text)',
     background: 'transparent',
     whiteSpace: 'pre',
   },
@@ -298,14 +395,14 @@ const s = {
   editorRight: {
     display: 'flex',
     flexDirection: 'column',
-    background: 'rgba(15, 23, 42, 0.5)',
+    background: 'var(--sh-surface)',
   },
   outputTab: {
     fontSize: 13,
-    color: 'var(--sh-slate-400)',
+    color: 'var(--sh-muted)',
     padding: '4px 12px',
     borderRadius: 6,
-    background: 'rgba(100, 116, 139, 0.2)',
+    background: 'var(--sh-soft)',
     fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
     display: 'inline-block',
   },
@@ -318,20 +415,20 @@ const s = {
     lineHeight: 1.8,
   },
   outputLine: {
-    color: 'var(--sh-slate-300)',
+    color: 'var(--sh-text)',
     marginBottom: 4,
   },
   outputLabel: {
-    color: '#818cf8',
+    color: 'var(--sh-brand)',
   },
   outputValue: {
-    color: '#86efac',
+    color: 'var(--sh-success-text)',
   },
 
   /* FEATURES SECTION */
   featuresSection: {
     padding: '80px 20px',
-    background: 'var(--sh-surface)',
+    background: 'var(--sh-page-bg)',
   },
   sectionInner: {
     maxWidth: 1100,
@@ -350,8 +447,8 @@ const s = {
     gap: 24,
   },
   featureCard: {
-    background: 'var(--sh-slate-800)',
-    border: '1px solid var(--sh-slate-700)',
+    background: 'var(--sh-surface)',
+    border: '1px solid var(--sh-border)',
     borderRadius: 12,
     padding: '28px 24px',
     transition: 'all 0.3s ease',
@@ -363,13 +460,10 @@ const s = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'rgba(59, 130, 246, 0.15)',
-    border: '1px solid rgba(59, 130, 246, 0.3)',
+    background: 'var(--sh-brand-soft)',
+    border: '1px solid var(--sh-brand-border)',
     marginBottom: 16,
-  },
-  featureIcon: {
-    color: '#3b82f6',
-    fontSize: 20,
+    color: 'var(--sh-brand)',
   },
   featureTitle: {
     fontSize: 16,
@@ -387,10 +481,10 @@ const s = {
   /* CTA SECTION */
   ctaSection: {
     padding: '80px 20px',
-    background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(59, 130, 246, 0.05) 100%)',
+    background: 'linear-gradient(135deg, var(--sh-brand-soft) 0%, var(--sh-page-bg) 100%)',
     textAlign: 'center',
-    borderTop: '1px solid var(--sh-slate-700)',
-    borderBottom: '1px solid var(--sh-slate-700)',
+    borderTop: '1px solid var(--sh-border)',
+    borderBottom: '1px solid var(--sh-border)',
   },
   ctaInner: {
     maxWidth: 600,
@@ -405,7 +499,7 @@ const s = {
   ctaButton: {
     display: 'inline-block',
     background: 'var(--sh-brand)',
-    color: '#fff',
+    color: 'white',
     textDecoration: 'none',
     padding: '14px 36px',
     borderRadius: 10,
@@ -416,9 +510,10 @@ const s = {
 
   /* FOOTER */
   footer: {
-    background: 'linear-gradient(135deg, var(--sh-slate-900) 0%, var(--sh-slate-800) 100%)',
+    background: 'var(--sh-surface)',
     padding: '40px 20px',
     textAlign: 'center',
+    borderTop: '1px solid var(--sh-border)',
   },
   footerLinks: {
     display: 'flex',
@@ -428,13 +523,13 @@ const s = {
     flexWrap: 'wrap',
   },
   footerLink: {
-    color: 'var(--sh-slate-400)',
+    color: 'var(--sh-muted)',
     textDecoration: 'none',
     fontSize: 14,
     transition: 'color 0.3s ease',
   },
   footerCopy: {
-    color: 'var(--sh-slate-500)',
+    color: 'var(--sh-muted)',
     fontSize: 12,
     margin: 0,
   },
