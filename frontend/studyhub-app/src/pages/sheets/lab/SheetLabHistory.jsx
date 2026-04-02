@@ -3,7 +3,6 @@
  * version browsing, compare mode, snapshot creation, and restore previews.
  * Extracted from SheetLabPage.jsx (Track 5.1).
  */
-import { useRef } from 'react'
 import { Link } from 'react-router-dom'
 import UserAvatar from '../../../components/UserAvatar'
 import { useFocusTrap } from '../../../lib/useFocusTrap'

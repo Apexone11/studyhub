@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { useSession } from '../../lib/session-context'
 import Navbar from '../../components/navbar/Navbar'
 import { API } from '../../config'
 
@@ -27,8 +26,6 @@ const FAQ_ITEMS = [
 ]
 
 export default function PricingPage() {
-  const { user } = useSession()
-
   return (
     <div style={s.page}>
       <Navbar />
@@ -44,9 +41,9 @@ export default function PricingPage() {
       {/* ── PRICING CARDS ────────────────────────────── */}
       <section style={s.cardsSection}>
         <div style={s.cardsContainer}>
-          <PricingCard tier="free" user={user} />
-          <PricingCard tier="pro" user={user} />
-          <PricingCard tier="institution" user={user} />
+          <PricingCard tier="free" />
+          <PricingCard tier="pro" />
+          <PricingCard tier="institution" />
         </div>
       </section>
 
@@ -70,7 +67,7 @@ export default function PricingPage() {
   )
 }
 
-function PricingCard({ tier, user }) {
+function PricingCard({ tier }) {
   const [waitlistEmail, setWaitlistEmail] = useState('')
   const [waitlistLoading, setWaitlistLoading] = useState(false)
   const [waitlistMessage, setWaitlistMessage] = useState('')

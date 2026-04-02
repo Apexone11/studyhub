@@ -1,6 +1,7 @@
+/* eslint-disable no-undef */
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest'
 import { prefetchForRoute } from './prefetch'
-import { cache, clearFetchCache } from './useFetch'
+import { cache } from './useFetch'
 
 // Mock the API config
 vi.mock('../config', () => ({

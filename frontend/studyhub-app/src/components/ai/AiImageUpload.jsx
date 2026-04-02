@@ -102,7 +102,7 @@ export function ImageUploadButton({ images, onImagesChange, disabled }) {
 export function ImagePreviewStrip({ images, onRemove }) {
   // Revoke all remaining blob URLs when the strip unmounts (e.g. message sent).
   const imagesRef = useRef(images)
-  imagesRef.current = images
+  useEffect(() => { imagesRef.current = images }, [images])
 
   useEffect(() => {
     return () => {

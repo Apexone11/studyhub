@@ -11,7 +11,7 @@
  *   - Telemetry integration (Sentry event ID)
  *   - Professional fallback UI with retry + navigation buttons
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { ErrorBoundary } from 'react-error-boundary'
 import { captureRouteCrash } from '../lib/telemetry'
@@ -44,11 +44,19 @@ const AUTO_RETRY_DELAY = 3000
 function ErrorFallback({ error, resetErrorBoundary }) {
   const navigate = useNavigate()
   const [countdown, setCountdown] = useState(0)
-  const [eventId, setEventId] = useState('')
   const countdownRef = useRef(null)
   const retryTimerRef = useRef(null)
 
-  // On mount: log to Sentry, handle chunk errors, schedule auto-retry
+  // Compute Sentry event ID once per error (no setState inside effect)
+  const eventId = useMemo(() => {
+    const id = captureRouteCrash(error, {
+      route: window.location.pathname + window.location.search,
+      componentStack: '',
+    })
+    return id || ''
+  }, [error])
+
+  // On mount: handle chunk errors, schedule auto-retry
   useEffect(() => {
     // Chunk load error: try a one-time full page reload
     if (isChunkLoadError(error)) {
@@ -60,13 +68,6 @@ function ErrorFallback({ error, resetErrorBoundary }) {
       }
       sessionStorage.removeItem(CHUNK_RELOAD_KEY)
     }
-
-    // Report to Sentry
-    const id = captureRouteCrash(error, {
-      route: window.location.pathname + window.location.search,
-      componentStack: '',
-    })
-    setEventId(id || '')
 
     // Auto-retry for non-chunk errors
     const retries = parseInt(sessionStorage.getItem(RETRY_COUNT_KEY) || '0', 10)

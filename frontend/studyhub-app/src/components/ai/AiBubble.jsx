@@ -74,6 +74,21 @@ function AiBubbleInner() {
   const messagesEndRef = useRef(null)
   const [input, setInput] = useState('')
 
+  // Close bubble on Escape key (global).
+  useEffect(() => {
+    if (!isOpen) return
+    const handleEsc = (e) => { if (e.key === 'Escape') setIsOpen(false) }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [isOpen])
+
+  // Auto-scroll messages.
+  useEffect(() => {
+    if (isOpen) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [chat.messages, chat.streamingText, isOpen])
+
   // Don't show bubble on the /ai page itself or on auth pages.
   const hiddenPaths = ['/ai', '/login', '/register', '/forgot-password', '/reset-password']
   if (hiddenPaths.some((p) => location.pathname.startsWith(p))) return null
@@ -105,26 +120,11 @@ function AiBubbleInner() {
     }
   }
 
-  // Close bubble on Escape key (global).
-  useEffect(() => {
-    if (!isOpen) return
-    const handleEsc = (e) => { if (e.key === 'Escape') setIsOpen(false) }
-    window.addEventListener('keydown', handleEsc)
-    return () => window.removeEventListener('keydown', handleEsc)
-  }, [isOpen])
-
   const openFullPage = () => {
     setIsOpen(false)
     const convParam = chat.activeConversationId ? `?conversation=${chat.activeConversationId}` : ''
     navigate(`/ai${convParam}`)
   }
-
-  // Auto-scroll messages.
-  useEffect(() => {
-    if (isOpen) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-    }
-  }, [chat.messages, chat.streamingText, isOpen])
 
   const bubble = (
     <>

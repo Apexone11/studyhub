@@ -448,13 +448,13 @@ async function startServer() {
     // Also syncs to CachedBook DB table so fallback works when Gutendex is down.
     const { preloadPopularBooks, syncPopularBooksToDB } = require('./modules/library/library.service')
     preloadPopularBooks().catch(() => {})
-    // If CachedBook table is empty, trigger a full sync (16 pages = 512 books)
-    prisma.cachedBook.count().then(count => {
-      if (count === 0) {
-        console.log('[Library] CachedBook table empty, triggering full sync...')
-        syncPopularBooksToDB(16).catch(() => {})
-      }
-    }).catch(() => {})
+    // Always trigger a background sync on startup regardless of existing data.
+    // The upsert logic is idempotent -- it just refreshes existing records.
+    syncPopularBooksToDB(16).catch(() => {})
+    // Re-sync every 24 hours to keep the cache fresh across long-running deploys.
+    setInterval(() => {
+      syncPopularBooksToDB(16).catch(() => {})
+    }, 24 * 60 * 60 * 1000)
     console.log(`Server running on http://localhost:${PORT}`)
   })
 }

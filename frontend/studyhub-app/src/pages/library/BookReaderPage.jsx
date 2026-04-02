@@ -56,6 +56,7 @@ export default function BookReaderPage() {
   const [toc, setToc] = useState([])
   const [currentPage, setCurrentPage] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
+  const [currentPageBookmarked, setCurrentPageBookmarked] = useState(false)
 
   // Refs
   const readerContainerRef = useRef(null)
@@ -282,6 +283,7 @@ export default function BookReaderPage() {
         epubInstanceRef.current = null
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- theme/font changes handled by dedicated effects below
   }, [book, progress, saveProgress])
 
   // Update theme
@@ -408,14 +410,13 @@ export default function BookReaderPage() {
     }
   }
 
-  // Check if current page is bookmarked
-  const isCurrentPageBookmarked = useCallback(() => {
-    if (!renditionRef.current) return false
+  // Track whether the current page is bookmarked (derived from state, not refs during render)
+  useEffect(() => {
+    if (!renditionRef.current) { setCurrentPageBookmarked(false); return }
     const currentLocation = renditionRef.current.currentLocation()
-    if (!currentLocation || !currentLocation.start) return false
-
-    return bookmarks.some((b) => b.cfi === currentLocation.start.cfi)
-  }, [bookmarks, renditionRef])
+    if (!currentLocation || !currentLocation.start) { setCurrentPageBookmarked(false); return }
+    setCurrentPageBookmarked(bookmarks.some((b) => b.cfi === currentLocation.start.cfi))
+  }, [bookmarks, currentPage])
 
   // Navigate to chapter/bookmark
   const handleNavigateTo = (target) => {
@@ -479,7 +480,7 @@ export default function BookReaderPage() {
               <button
                 onClick={handleBookmarkToggle}
                 className={`reader-toolbar__btn ${
-                  isCurrentPageBookmarked() ? 'active' : ''
+                  currentPageBookmarked ? 'active' : ''
                 }`}
                 aria-label="Add bookmark"
               >

@@ -11,7 +11,6 @@
  * - GET /api/users/me/weekly-activity
  * - GET /api/feed/leaderboard?period=weekly
  */
-import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Panel } from './FeedWidgets'
 import UserAvatar from '../../components/UserAvatar'
@@ -192,16 +191,10 @@ export function LeaderboardWidget() {
     swr: 5 * 60 * 1000,
   })
   const { data: currentUser } = useFetch('/api/users/me', { swr: 2 * 60 * 1000 })
-  const [currentUserRank, setCurrentUserRank] = useState(null)
 
-  useEffect(() => {
-    if (leaderboard && Array.isArray(leaderboard) && currentUser && currentUser.id) {
-      const userRank = leaderboard.findIndex((u) => u.userId === currentUser.id)
-      if (userRank >= 0) {
-        setCurrentUserRank(userRank)
-      }
-    }
-  }, [leaderboard, currentUser])
+  const currentUserRank = leaderboard && Array.isArray(leaderboard) && currentUser && currentUser.id
+    ? leaderboard.findIndex((u) => u.userId === currentUser.id)
+    : -1
 
   if (loading) {
     return (
