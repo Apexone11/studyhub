@@ -26,7 +26,7 @@ async function searchBooks(query, page = 1, filters = {}) {
     if (filters.languages) params.append('languages', filters.languages)
     params.append('page', page)
 
-    const url = `${GUTENDEX_BASE}/books?${params.toString()}`
+    const url = `${GUTENDEX_BASE}/books/?${params.toString()}`
     const response = await fetch(url)
 
     if (!response.ok) {
@@ -56,7 +56,7 @@ async function getBookDetail(gutenbergId) {
 
   try {
     // Get basic book info from Gutendex
-    const gutendexUrl = `${GUTENDEX_BASE}/books/${gutenbergId}`
+    const gutendexUrl = `${GUTENDEX_BASE}/books/${gutenbergId}/`
     const gutendexResponse = await fetch(gutendexUrl)
 
     if (!gutendexResponse.ok) {
