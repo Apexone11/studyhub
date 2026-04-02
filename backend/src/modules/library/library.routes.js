@@ -15,6 +15,75 @@ const { MAX_SHELVES_PER_USER, MAX_BOOKMARKS_PER_BOOK, MAX_HIGHLIGHTS_PER_BOOK } 
 
 const router = express.Router()
 
+/**
+ * GET /api/library/books/:id/epub
+ * Proxy an EPUB file from Project Gutenberg to avoid CORS issues.
+ * Streams the file directly to the client. No auth required (public domain books).
+ */
+router.get('/books/:id/epub', async (req, res) => {
+  const gutenbergId = parseInt(req.params.id, 10)
+  if (!Number.isInteger(gutenbergId) || gutenbergId < 1) {
+    return res.status(400).json({ error: 'Invalid book ID.' })
+  }
+
+  try {
+    // Try the most common Gutenberg EPUB URL patterns
+    const urls = [
+      `https://www.gutenberg.org/ebooks/${gutenbergId}.epub3.images`,
+      `https://www.gutenberg.org/ebooks/${gutenbergId}.epub.images`,
+      `https://www.gutenberg.org/ebooks/${gutenbergId}.epub.noimages`,
+      `https://www.gutenberg.org/ebooks/${gutenbergId}.epub3.noimages`,
+    ]
+
+    let epubResponse = null
+    for (const url of urls) {
+      try {
+        const resp = await fetch(url, { redirect: 'follow' })
+        if (resp.ok) {
+          const contentType = resp.headers.get('content-type') || ''
+          // Accept EPUB or octet-stream content types
+          if (
+            contentType.includes('epub') ||
+            contentType.includes('octet-stream') ||
+            contentType === ''
+          ) {
+            epubResponse = resp
+            break
+          }
+        }
+      } catch {
+        continue
+      }
+    }
+
+    if (!epubResponse) {
+      return res.status(404).json({ error: 'EPUB not available for this book.' })
+    }
+
+    res.setHeader('Content-Type', 'application/epub+zip')
+    res.setHeader('Cache-Control', 'public, max-age=86400') // Cache for 1 day
+
+    // Stream the response body to the client
+    const reader = epubResponse.body.getReader()
+    const pump = async () => {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) {
+          res.end()
+          return
+        }
+        res.write(value)
+      }
+    }
+    await pump()
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Failed to fetch EPUB.' })
+    }
+  }
+})
+
 // ── BOOK BROWSING & SEARCH ──────────────────────────────────────────────────
 
 /**
@@ -93,7 +162,7 @@ router.get('/shelves', requireAuth, async (req, res) => {
       orderBy: { createdAt: 'desc' },
     })
 
-    res.json(shelves)
+    res.json({ shelves })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
@@ -434,7 +503,7 @@ router.get('/bookmarks/:gutenbergId', requireAuth, async (req, res) => {
       orderBy: { createdAt: 'desc' },
     })
 
-    res.json(bookmarks)
+    res.json({ bookmarks })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
@@ -544,7 +613,7 @@ router.get('/highlights/:gutenbergId', requireAuth, async (req, res) => {
       orderBy: { createdAt: 'asc' },
     })
 
-    res.json(highlights)
+    res.json({ highlights })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })

@@ -4,6 +4,7 @@ import {
   IconCheck,
   IconDownload,
   IconFork,
+  IconMessages,
   IconPen,
   IconSchool,
   IconSheets,
@@ -34,10 +35,9 @@ export const FEATURES = [
   },
   {
     Icon: IconSpark,
-    title: 'AI Tutor',
-    desc: 'Stuck on a concept? Get instant explanations tailored to your exact course.',
-    toneClass: 'home-feature--purple',
-    badge: 'Coming Soon'
+    title: 'Hub AI',
+    desc: 'Stuck on a concept? Get instant explanations and AI-generated study sheets tailored to your courses.',
+    toneClass: 'home-feature--purple'
   },
   {
     Icon: IconPen,
@@ -68,6 +68,24 @@ export const FEATURES = [
     title: 'Free to Start',
     desc: 'Core study tools are free. Sign up, share, and collaborate with your classmates today.',
     toneClass: 'home-feature--green'
+  },
+  {
+    Icon: IconStar,
+    title: 'BookHub Library',
+    desc: 'Read free classic books with our integrated EPUB reader. Bookmark, highlight, and annotate while you study.',
+    toneClass: 'home-feature--indigo'
+  },
+  {
+    Icon: IconUsers,
+    title: 'Study Groups',
+    desc: 'Create groups, schedule study sessions, share resources, and discuss topics with classmates.',
+    toneClass: 'home-feature--cyan'
+  },
+  {
+    Icon: IconMessages,
+    title: 'StudyHub Connect',
+    desc: 'Real-time DMs and group chats with classmates. Connect instantly with built-in messaging.',
+    toneClass: 'home-feature--pink'
   }
 ]
 

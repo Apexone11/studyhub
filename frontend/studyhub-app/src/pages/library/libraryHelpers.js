@@ -1,4 +1,5 @@
 // Library helper functions for book data and formatting
+import { API } from '../../config'
 
 /**
  * Format download count to human-readable string
@@ -24,13 +25,14 @@ export function getBookCover(book) {
 }
 
 /**
- * Extract EPUB download URL from book formats
+ * Get EPUB URL from backend proxy to avoid CORS issues with Gutenberg
  * @param {object} book - Gutendex book object
- * @returns {string|null} EPUB URL or null
+ * @returns {string|null} Backend proxy EPUB URL or null if book has no ID
  */
 export function getEpubUrl(book) {
-  if (!book || !book.formats) return null
-  return book.formats['application/epub+zip'] || null
+  if (!book || !book.id) return null
+  // Use our backend proxy to avoid CORS issues with Gutenberg
+  return `${API}/api/library/books/${book.id}/epub`
 }
 
 /**

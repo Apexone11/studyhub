@@ -1755,6 +1755,33 @@ textarea.sh-input {
   color: var(--slate);
 }
 
+.home-feature--indigo .home-feature-icon-wrap {
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+}
+
+.home-feature--indigo .home-icon {
+  color: #4f46e5;
+}
+
+.home-feature--cyan .home-feature-icon-wrap {
+  background: #ecf9ff;
+  border: 1px solid #a5f3fc;
+}
+
+.home-feature--cyan .home-icon {
+  color: #0891b2;
+}
+
+.home-feature--pink .home-feature-icon-wrap {
+  background: #fdf2f8;
+  border: 1px solid #fbcfe8;
+}
+
+.home-feature--pink .home-icon {
+  color: #db2777;
+}
+
 .home-steps-section {
   position: relative;
   padding: clamp(84px, 8vw, 112px) clamp(18px, 4vw, 40px);
