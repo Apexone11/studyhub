@@ -1,16 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════════
- * usePageTitle.js — Sets document.title for the current page
+ * usePageTitle.js — Backward-compatible re-export from useSEO
  *
- * Usage:  usePageTitle('Feed')       →  "Feed — StudyHub"
- *         usePageTitle('Sheet Name') →  "Sheet Name — StudyHub"
+ * All existing imports of usePageTitle continue to work unchanged.
+ * New pages should import useSEO directly for full meta tag control.
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useEffect } from 'react'
-
-const SUFFIX = 'StudyHub'
-
-export function usePageTitle(title) {
-  useEffect(() => {
-    document.title = title ? `${title} — ${SUFFIX}` : SUFFIX
-    return () => { document.title = SUFFIX }
-  }, [title])
-}
+export { usePageTitle } from './useSEO'

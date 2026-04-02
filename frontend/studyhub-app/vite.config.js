@@ -41,10 +41,15 @@ export default defineConfig(async ({ mode }) => {
       },
     },
     build: {
+      // SECURITY: Never ship source maps to production.
+      // Source maps expose your entire unminified source code in browser DevTools.
+      // Every serious company (GitHub, Stripe, Netflix) disables this in production.
+      sourcemap: false,
       rollupOptions: {
         output: {
           manualChunks(id) {
             if (id.includes('node_modules')) {
+              // Core React runtime -- loaded on every page
               if (
                 id.includes('\\react\\')
                 || id.includes('/react/')
@@ -54,6 +59,7 @@ export default defineConfig(async ({ mode }) => {
                 return 'react-vendor'
               }
 
+              // Router -- loaded on every page
               if (
                 id.includes('\\react-router')
                 || id.includes('/react-router')
@@ -61,6 +67,7 @@ export default defineConfig(async ({ mode }) => {
                 return 'router-vendor'
               }
 
+              // Telemetry -- Sentry + PostHog (loaded async, non-blocking)
               if (
                 id.includes('\\@sentry\\')
                 || id.includes('/@sentry/')
@@ -68,6 +75,36 @@ export default defineConfig(async ({ mode }) => {
                 || id.includes('/posthog-js/')
               ) {
                 return 'telemetry'
+              }
+
+              // Rich text editor -- only needed on sheet creation/editing pages
+              if (id.includes('\\@tiptap') || id.includes('/@tiptap') || id.includes('/prosemirror')) {
+                return 'editor'
+              }
+
+              // EPUB reader -- only needed on BookReaderPage
+              if (id.includes('\\epubjs') || id.includes('/epubjs') || id.includes('/jszip')) {
+                return 'epub'
+              }
+
+              // Charts -- only needed on feed/analytics pages
+              if (id.includes('\\recharts') || id.includes('/recharts') || id.includes('/d3-')) {
+                return 'charts'
+              }
+
+              // Real-time messaging -- only needed when user is authenticated
+              if (id.includes('\\socket.io') || id.includes('/socket.io') || id.includes('/engine.io')) {
+                return 'realtime'
+              }
+
+              // Onboarding tour -- only on first visit
+              if (id.includes('\\react-joyride') || id.includes('/react-joyride')) {
+                return 'onboarding'
+              }
+
+              // Markdown parser -- only on pages that render markdown
+              if (id.includes('\\marked') || id.includes('/marked')) {
+                return 'markdown'
               }
 
               if (id.includes('\\dompurify\\') || id.includes('/dompurify/')) {
