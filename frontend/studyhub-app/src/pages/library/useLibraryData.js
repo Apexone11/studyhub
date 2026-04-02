@@ -32,7 +32,7 @@ export default function useLibraryData() {
         if (page) params.append('page', page)
         if (languages) params.append('languages', languages)
 
-        const response = await fetch(`${API}/api/library?${params.toString()}`, {
+        const response = await fetch(`${API}/api/library/search?${params.toString()}`, {
           credentials: 'include',
           headers: authHeaders(),
         })

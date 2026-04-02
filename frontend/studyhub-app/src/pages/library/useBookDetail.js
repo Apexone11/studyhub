@@ -24,7 +24,7 @@ export default function useBookDetail(gutenbergId) {
 
         // Fetch book details
         const bookResponse = await fetch(
-          `${API}/api/library/${gutenbergId}`,
+          `${API}/api/library/books/${gutenbergId}`,
           {
             credentials: 'include',
             headers: authHeaders(),

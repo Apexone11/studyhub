@@ -333,6 +333,35 @@ router.get('/reading-progress', requireAuth, async (req, res) => {
 })
 
 /**
+ * GET /api/library/reading-progress/:gutenbergId
+ * Get reading progress for a specific book.
+ */
+router.get('/reading-progress/:gutenbergId', requireAuth, async (req, res) => {
+  const gutenbergId = parseInt(req.params.gutenbergId, 10)
+
+  if (!Number.isInteger(gutenbergId) || gutenbergId < 1) {
+    return res.status(400).json({ error: 'Invalid book ID.' })
+  }
+
+  try {
+    const progress = await prisma.readingProgress.findUnique({
+      where: {
+        userId_gutenbergId: {
+          userId: req.user.userId,
+          gutenbergId,
+        },
+      },
+    })
+
+    if (!progress) return res.json(null)
+    res.json(progress)
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+/**
  * PUT /api/library/reading-progress/:gutenbergId
  * Create or update reading progress for a book.
  * Body: { cfi?, percentage }
