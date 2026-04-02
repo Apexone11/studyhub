@@ -43,7 +43,6 @@ const AUTO_RETRY_DELAY = 3000
  * ──────────────────────────────────────────────────────────────────────── */
 function ErrorFallback({ error, resetErrorBoundary }) {
   const navigate = useNavigate()
-  const [countdown, setCountdown] = useState(0)
   const countdownRef = useRef(null)
   const retryTimerRef = useRef(null)
 
@@ -55,6 +54,16 @@ function ErrorFallback({ error, resetErrorBoundary }) {
     })
     return id || ''
   }, [error])
+
+  // Compute retry state synchronously (avoids setState inside effect)
+  const retries = useMemo(
+    () => parseInt(sessionStorage.getItem(RETRY_COUNT_KEY) || '0', 10),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-evaluate on each new error
+    [error]
+  )
+  const shouldAutoRetry = retries < MAX_AUTO_RETRIES && !isChunkLoadError(error)
+  const initialCountdown = shouldAutoRetry ? Math.ceil(AUTO_RETRY_DELAY / 1000) : 0
+  const [countdown, setCountdown] = useState(initialCountdown)
 
   // On mount: handle chunk errors, schedule auto-retry
   useEffect(() => {
@@ -70,11 +79,8 @@ function ErrorFallback({ error, resetErrorBoundary }) {
     }
 
     // Auto-retry for non-chunk errors
-    const retries = parseInt(sessionStorage.getItem(RETRY_COUNT_KEY) || '0', 10)
-    if (retries < MAX_AUTO_RETRIES && !isChunkLoadError(error)) {
+    if (shouldAutoRetry) {
       sessionStorage.setItem(RETRY_COUNT_KEY, String(retries + 1))
-      const seconds = Math.ceil(AUTO_RETRY_DELAY / 1000)
-      setCountdown(seconds)
 
       countdownRef.current = setInterval(() => {
         setCountdown(prev => {
@@ -95,7 +101,7 @@ function ErrorFallback({ error, resetErrorBoundary }) {
       clearInterval(countdownRef.current)
       clearTimeout(retryTimerRef.current)
     }
-  }, [error, resetErrorBoundary])
+  }, [error, resetErrorBoundary, shouldAutoRetry, retries])
 
   const handleRetry = useCallback(() => {
     clearInterval(countdownRef.current)

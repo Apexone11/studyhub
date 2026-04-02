@@ -14,7 +14,7 @@
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 import { useParams, useNavigate } from 'react-router-dom'
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import ePub from 'epubjs'
 import { IconArrowLeft, IconSettings, IconMoreHorizontal } from '../../components/Icons'

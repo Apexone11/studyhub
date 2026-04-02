@@ -13,10 +13,7 @@
  *   </AiChatProvider>
  */
 import { useAiChat } from './useAiChat'
-import { AiChatContext, useSharedAiChat } from './aiChatContext'
-
-// Re-export hook for backward compatibility
-export { useSharedAiChat }
+import { AiChatContext } from './aiChatContext'
 
 export function AiChatProvider({ children }) {
   const chat = useAiChat()

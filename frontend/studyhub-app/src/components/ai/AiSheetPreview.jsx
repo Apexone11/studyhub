@@ -10,10 +10,6 @@ import { useNavigate } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import ComponentErrorBoundary from '../ComponentErrorBoundary'
 import { IconSheets, IconPen, IconX, IconEye } from '../Icons'
-import { extractHtmlFromMessage } from './aiSheetPreviewHelpers'
-
-// Re-export for backward compatibility
-export { extractHtmlFromMessage }
 
 /**
  * Inline preview bar that appears below an AI message containing HTML.
