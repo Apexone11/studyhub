@@ -1,13 +1,28 @@
-import { Component } from 'react'
+/* ═══════════════════════════════════════════════════════════════════════════
+ * RouteErrorBoundary.jsx -- Production-grade error boundary for route trees.
+ *
+ * Uses react-error-boundary (the industry standard used by Vercel, Shopify,
+ * Stripe, and every serious React app) instead of a manual class component.
+ *
+ * Features:
+ *   - Automatic reset on route change via resetKeys
+ *   - Chunk load error detection (stale deploy) with auto-reload
+ *   - Auto-retry with countdown for transient errors (max 2 retries)
+ *   - Telemetry integration (Sentry event ID)
+ *   - Professional fallback UI with retry + navigation buttons
+ * ═══════════════════════════════════════════════════════════════════════════ */
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { ErrorBoundary } from 'react-error-boundary'
 import { captureRouteCrash } from '../lib/telemetry'
+
+/* ── Helpers ────────────────────────────────────────────────────────────── */
 
 /** Detect chunk load / dynamic import failures caused by stale deploys. */
 function isChunkLoadError(error) {
   if (!error) return false
   const name = error.name || ''
   const msg = (error.message || '').toLowerCase()
-  // Vite/Webpack chunk failures and generic dynamic import errors
   return name === 'ChunkLoadError'
     || msg.includes('loading chunk')
     || msg.includes('dynamically imported module')
@@ -16,26 +31,26 @@ function isChunkLoadError(error) {
 }
 
 const CHUNK_RELOAD_KEY = 'sh_chunk_reload'
-
-const AUTO_RETRY_DELAY = 3000
-const MAX_AUTO_RETRIES = 2
 const RETRY_COUNT_KEY = 'sh_error_retries'
+const MAX_AUTO_RETRIES = 2
+const AUTO_RETRY_DELAY = 3000
 
-class RouteErrorBoundaryInner extends Component {
-  constructor(props) {
-    super(props)
-    this.state = { error: null, eventId: '', countdown: 0 }
-    this._autoRetryTimer = null
-    this._countdownTimer = null
-  }
+/* ── Fallback Component ─────────────────────────────────────────────────
+ * Rendered when a crash is caught. Handles:
+ *   1. Chunk errors -- prompt a full page reload
+ *   2. Transient errors -- auto-retry with countdown (max 2)
+ *   3. Persistent errors -- show retry button + "Go to Feed" escape hatch
+ * ──────────────────────────────────────────────────────────────────────── */
+function ErrorFallback({ error, resetErrorBoundary }) {
+  const navigate = useNavigate()
+  const [countdown, setCountdown] = useState(0)
+  const [eventId, setEventId] = useState('')
+  const countdownRef = useRef(null)
+  const retryTimerRef = useRef(null)
 
-  static getDerivedStateFromError(error) {
-    return { error }
-  }
-
-  componentDidCatch(error, errorInfo) {
-    // Auto-refresh once on chunk load failure (stale deploy).
-    // sessionStorage flag prevents infinite reload loops.
+  // On mount: log to Sentry, handle chunk errors, schedule auto-retry
+  useEffect(() => {
+    // Chunk load error: try a one-time full page reload
     if (isChunkLoadError(error)) {
       const alreadyReloaded = sessionStorage.getItem(CHUNK_RELOAD_KEY)
       if (!alreadyReloaded) {
@@ -43,178 +58,178 @@ class RouteErrorBoundaryInner extends Component {
         window.location.reload()
         return
       }
-      // Already reloaded once — clear flag and fall through to error UI
       sessionStorage.removeItem(CHUNK_RELOAD_KEY)
     }
 
-    const eventId = captureRouteCrash(error, {
-      route: this.props.routeKey,
-      componentStack: errorInfo?.componentStack || '',
+    // Report to Sentry
+    const id = captureRouteCrash(error, {
+      route: window.location.pathname + window.location.search,
+      componentStack: '',
     })
+    setEventId(id || '')
 
-    this.setState({ eventId })
-
-    // Auto-retry: if we haven't exceeded max retries, schedule an automatic recovery
+    // Auto-retry for non-chunk errors
     const retries = parseInt(sessionStorage.getItem(RETRY_COUNT_KEY) || '0', 10)
     if (retries < MAX_AUTO_RETRIES && !isChunkLoadError(error)) {
       sessionStorage.setItem(RETRY_COUNT_KEY, String(retries + 1))
       const seconds = Math.ceil(AUTO_RETRY_DELAY / 1000)
-      this.setState({ countdown: seconds })
-      this._countdownTimer = setInterval(() => {
-        this.setState(prev => {
-          if (prev.countdown <= 1) {
-            clearInterval(this._countdownTimer)
-            return { countdown: 0 }
+      setCountdown(seconds)
+
+      countdownRef.current = setInterval(() => {
+        setCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(countdownRef.current)
+            return 0
           }
-          return { countdown: prev.countdown - 1 }
+          return prev - 1
         })
       }, 1000)
-      this._autoRetryTimer = setTimeout(() => {
-        this.setState({ error: null, eventId: '', countdown: 0 })
+
+      retryTimerRef.current = setTimeout(() => {
+        resetErrorBoundary()
       }, AUTO_RETRY_DELAY)
     }
-  }
 
-  componentDidUpdate(prevProps) {
-    if (prevProps.resetKey !== this.props.resetKey && this.state.error) {
-      sessionStorage.removeItem(CHUNK_RELOAD_KEY)
-      sessionStorage.removeItem(RETRY_COUNT_KEY)
-      clearTimeout(this._autoRetryTimer)
-      clearInterval(this._countdownTimer)
-      this.setState({ error: null, eventId: '', countdown: 0 })
+    return () => {
+      clearInterval(countdownRef.current)
+      clearTimeout(retryTimerRef.current)
     }
-  }
+  }, [error, resetErrorBoundary])
 
-  componentWillUnmount() {
-    clearTimeout(this._autoRetryTimer)
-    clearInterval(this._countdownTimer)
-  }
-
-  handleRetry = () => {
-    clearTimeout(this._autoRetryTimer)
-    clearInterval(this._countdownTimer)
+  const handleRetry = useCallback(() => {
+    clearInterval(countdownRef.current)
+    clearTimeout(retryTimerRef.current)
     sessionStorage.removeItem(RETRY_COUNT_KEY)
-    this.setState({ error: null, eventId: '', countdown: 0 })
-  }
+    resetErrorBoundary()
+  }, [resetErrorBoundary])
 
-  render() {
-    if (!this.state.error) {
-      // Successful render — clear retry counter so it resets between crashes
-      if (sessionStorage.getItem(RETRY_COUNT_KEY)) {
-        sessionStorage.removeItem(RETRY_COUNT_KEY)
-      }
-      return this.props.children
-    }
+  const handleGoFeed = useCallback(() => {
+    sessionStorage.removeItem(RETRY_COUNT_KEY)
+    sessionStorage.removeItem(CHUNK_RELOAD_KEY)
+    navigate('/feed')
+  }, [navigate])
 
-    return (
+  const isChunk = isChunkLoadError(error)
+
+  return (
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'grid',
+        placeItems: 'center',
+        padding: '24px',
+        background: 'var(--sh-soft, #edf0f5)',
+        fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+      }}
+    >
       <div
         style={{
-          minHeight: '100vh',
-          display: 'grid',
-          placeItems: 'center',
-          padding: '24px',
-          background: 'var(--sh-soft, #edf0f5)',
-          fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+          width: 'min(92vw, 520px)',
+          background: 'var(--sh-surface, #fff)',
+          borderRadius: 16,
+          border: '1px solid var(--sh-border, #e2e8f0)',
+          boxShadow: '0 10px 40px rgba(15, 23, 42, 0.08)',
+          padding: '28px',
         }}
       >
-        <div
-          style={{
-            width: 'min(92vw, 520px)',
-            background: 'var(--sh-surface, #fff)',
-            borderRadius: 16,
-            border: '1px solid var(--sh-border, #e2e8f0)',
-            boxShadow: '0 10px 40px rgba(15, 23, 42, 0.08)',
-            padding: '28px',
-          }}
-        >
-          <h1 style={{ margin: '0 0 10px', fontSize: 24, color: 'var(--sh-slate-900, #0f172a)' }}>
-            {isChunkLoadError(this.state.error) ? 'Update available' : 'This page crashed.'}
-          </h1>
-          <p style={{ margin: '0 0 18px', fontSize: 14, color: 'var(--sh-slate-500, #64748b)', lineHeight: 1.7 }}>
-            {isChunkLoadError(this.state.error)
-              ? 'StudyHub was updated since you last loaded the page. A refresh should fix this.'
-              : this.state.countdown > 0
-                ? `Something went wrong. Automatically retrying in ${this.state.countdown} second${this.state.countdown !== 1 ? 's' : ''}...`
-                : 'StudyHub recovered the app shell, but this route hit a runtime error. You can retry the route or jump back to a stable page.'}
+        <h1 style={{ margin: '0 0 10px', fontSize: 24, color: 'var(--sh-slate-900, #0f172a)' }}>
+          {isChunk ? 'Update available' : 'This page crashed.'}
+        </h1>
+        <p style={{ margin: '0 0 18px', fontSize: 14, color: 'var(--sh-slate-500, #64748b)', lineHeight: 1.7 }}>
+          {isChunk
+            ? 'StudyHub was updated since you last loaded the page. A refresh should fix this.'
+            : countdown > 0
+              ? `Something went wrong. Automatically retrying in ${countdown} second${countdown !== 1 ? 's' : ''}...`
+              : 'StudyHub recovered the app shell, but this route hit a runtime error. You can retry the route or jump back to a stable page.'}
+        </p>
+        {eventId ? (
+          <p style={{ margin: '0 0 18px', fontSize: 12, color: 'var(--sh-slate-600, #475569)', lineHeight: 1.7 }}>
+            Reference ID: <strong>{eventId}</strong>
           </p>
-          {this.state.eventId ? (
-            <p style={{ margin: '0 0 18px', fontSize: 12, color: 'var(--sh-slate-600, #475569)', lineHeight: 1.7 }}>
-              Reference ID: <strong>{this.state.eventId}</strong>
-            </p>
-          ) : null}
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            {isChunkLoadError(this.state.error) ? (
-              <button
-                type="button"
-                onClick={() => { sessionStorage.removeItem(CHUNK_RELOAD_KEY); window.location.reload() }}
-                style={{
-                  padding: '10px 18px',
-                  borderRadius: 10,
-                  border: 'none',
-                  background: 'var(--sh-brand)',
-                  color: '#fff',
-                  fontSize: 14,
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  fontFamily: 'inherit',
-                }}
-              >
-                Refresh Page
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={this.handleRetry}
-                style={{
-                  padding: '10px 18px',
-                  borderRadius: 10,
-                  border: 'none',
-                  background: 'var(--sh-brand)',
-                  color: '#fff',
-                  fontSize: 14,
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  fontFamily: 'inherit',
-                }}
-              >
-                Retry Route
-              </button>
-            )}
+        ) : null}
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          {isChunk ? (
             <button
               type="button"
-              onClick={() => this.props.navigate('/feed')}
+              onClick={() => { sessionStorage.removeItem(CHUNK_RELOAD_KEY); window.location.reload() }}
               style={{
                 padding: '10px 18px',
                 borderRadius: 10,
-                border: '1px solid #cbd5e1',
-                background: 'var(--sh-surface, #fff)',
-                color: 'var(--sh-slate-600, #475569)',
+                border: 'none',
+                background: 'var(--sh-brand)',
+                color: '#fff',
                 fontSize: 14,
                 fontWeight: 700,
                 cursor: 'pointer',
                 fontFamily: 'inherit',
               }}
             >
-              Go To Feed
+              Refresh Page
             </button>
-          </div>
+          ) : (
+            <button
+              type="button"
+              onClick={handleRetry}
+              style={{
+                padding: '10px 18px',
+                borderRadius: 10,
+                border: 'none',
+                background: 'var(--sh-brand)',
+                color: '#fff',
+                fontSize: 14,
+                fontWeight: 700,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              Retry Route
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleGoFeed}
+            style={{
+              padding: '10px 18px',
+              borderRadius: 10,
+              border: '1px solid #cbd5e1',
+              background: 'var(--sh-surface, #fff)',
+              color: 'var(--sh-slate-600, #475569)',
+              fontSize: 14,
+              fontWeight: 700,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+            }}
+          >
+            Go To Feed
+          </button>
         </div>
       </div>
-    )
-  }
+    </div>
+  )
 }
 
+/* ── Main Export ─────────────────────────────────────────────────────────
+ * Wraps children in react-error-boundary's ErrorBoundary.
+ * resetKeys = [pathname + search] means the boundary auto-resets whenever
+ * the user navigates to a different route, which is the behavior major
+ * apps (Next.js, Remix) provide out of the box.
+ * ──────────────────────────────────────────────────────────────────────── */
 export default function RouteErrorBoundary({ children }) {
   const location = useLocation()
-  const navigate = useNavigate()
+
+  const handleReset = useCallback(() => {
+    // Clear retry counter on successful reset so it resets between crashes
+    sessionStorage.removeItem(RETRY_COUNT_KEY)
+    sessionStorage.removeItem(CHUNK_RELOAD_KEY)
+  }, [])
 
   return (
-    <RouteErrorBoundaryInner
-      resetKey={`${location.pathname}${location.search}`}
-      routeKey={`${location.pathname}${location.search}`}
-      navigate={navigate}
+    <ErrorBoundary
+      FallbackComponent={ErrorFallback}
+      onReset={handleReset}
+      resetKeys={[location.pathname, location.search]}
     >
       {children}
-    </RouteErrorBoundaryInner>
+    </ErrorBoundary>
   )
 }

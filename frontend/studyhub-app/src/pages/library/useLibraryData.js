@@ -27,7 +27,8 @@ export default function useLibraryData() {
       const params = new URLSearchParams()
       if (search) params.append('search', search)
       if (topic) params.append('topic', topic)
-      if (sort) params.append('sort', sort)
+      // Only send sort for values Gutendex understands; 'popular' = default (omit)
+      if (sort && sort !== 'popular') params.append('sort', sort)
       if (page) params.append('page', page)
       if (languages) params.append('languages', languages)
 
@@ -71,8 +72,13 @@ export default function useLibraryData() {
         })
 
         if (!response.ok) {
-          const data = readJsonSafely(await response.text())
-          throw new Error(data?.message || `HTTP ${response.status}`)
+          const text = await response.text()
+          const data = readJsonSafely(text)
+          // 401/403 with optionalAuth: Gutendex books are public, retry without auth
+          if (response.status === 401 || response.status === 403) {
+            throw new Error('Session expired. Books are still available -- try refreshing.')
+          }
+          throw new Error(data?.message || data?.error || `HTTP ${response.status}`)
         }
 
         const data = await response.json()
@@ -104,7 +110,7 @@ export default function useLibraryData() {
     const params = new URLSearchParams()
     if (search) params.append('search', search)
     if (topic) params.append('topic', topic)
-    if (sort) params.append('sort', sort)
+    if (sort && sort !== 'popular') params.append('sort', sort)
     params.append('page', nextPage)
     if (languages) params.append('languages', languages)
 
