@@ -18,7 +18,8 @@ import {
   GroupMembersTab,
 } from './GroupDetailTabs'
 import Navbar from '../../components/navbar/Navbar'
-import { useResponsiveAppLayout, pageShell } from '../../lib/ui'
+import AppSidebar from '../../components/sidebar/AppSidebar'
+import { PageShell } from '../shared/pageScaffold'
 import { EditGroupModal } from './GroupModals'
 import { styles } from './studyGroupsStyles'
 
@@ -63,46 +64,31 @@ export default function GroupDetailView({ groupId }) {
 
   if (activeGroupLoading) {
     return (
-      <>
-        <Navbar />
-        <div style={styles.page}>
-          <div style={pageShell('app', 26, 48)}>
-            <div style={styles.loadingPlaceholder}>Loading group...</div>
-          </div>
-        </div>
-      </>
+      <PageShell nav={<Navbar crumbs={[{ label: 'Study Groups', to: '/study-groups' }]} />} sidebar={<AppSidebar />}>
+        <div style={styles.loadingPlaceholder}>Loading group...</div>
+      </PageShell>
     )
   }
 
   if (activeGroupError) {
     return (
-      <>
-        <Navbar />
-        <div style={styles.page}>
-          <div style={pageShell('app', 26, 48)}>
-            <div style={styles.alert('danger')}>
-              {activeGroupError}
-            </div>
-            <Link to="/study-groups" style={styles.backLink}>Back to Study Groups</Link>
-          </div>
+      <PageShell nav={<Navbar crumbs={[{ label: 'Study Groups', to: '/study-groups' }]} />} sidebar={<AppSidebar />}>
+        <div style={styles.alert('danger')}>
+          {activeGroupError}
         </div>
-      </>
+        <Link to="/study-groups" style={styles.backLink}>Back to Study Groups</Link>
+      </PageShell>
     )
   }
 
   if (!activeGroup) {
     return (
-      <>
-        <Navbar />
-        <div style={styles.page}>
-          <div style={pageShell('app', 26, 48)}>
-            <div style={styles.alert('danger')}>
-              Group not found
-            </div>
-            <Link to="/study-groups" style={styles.backLink}>Back to Study Groups</Link>
-          </div>
+      <PageShell nav={<Navbar crumbs={[{ label: 'Study Groups', to: '/study-groups' }]} />} sidebar={<AppSidebar />}>
+        <div style={styles.alert('danger')}>
+          Group not found
         </div>
-      </>
+        <Link to="/study-groups" style={styles.backLink}>Back to Study Groups</Link>
+      </PageShell>
     )
   }
 
@@ -141,11 +127,8 @@ export default function GroupDetailView({ groupId }) {
   }
 
   return (
-    <>
-      <Navbar />
-      <div style={styles.page}>
-        <div style={pageShell('app', 26, 48)}>
-          <main id="main-content">
+    <PageShell nav={<Navbar crumbs={[{ label: 'Study Groups', to: '/study-groups' }]} />} sidebar={<AppSidebar />}>
+          <div>
             {/* Back link */}
             <Link to="/study-groups" style={styles.backLink}>
               Back to Study Groups
@@ -291,9 +274,7 @@ export default function GroupDetailView({ groupId }) {
                 />
               )}
             </div>
-          </main>
-        </div>
-      </div>
+          </div>
 
       {/* Edit Group Modal */}
       {editModalOpen && createPortal(
@@ -306,6 +287,6 @@ export default function GroupDetailView({ groupId }) {
         />,
         document.body
       )}
-    </>
+    </PageShell>
   )
 }

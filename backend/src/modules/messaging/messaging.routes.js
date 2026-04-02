@@ -37,9 +37,13 @@ const router = express.Router()
 router.use(readLimiter)
 
 // Mount sub-routers
+// Conversations router handles /conversations, /conversations/:id, /conversations/:id/read
 router.use('/conversations', conversationsRouter)
-router.use('/messages', messagesRouter)
-router.use('/messages', reactionsRouter)
+// Messages router handles /conversations/:id/messages (list/send) and /:messageId (edit/delete)
+// Mounted at root since its routes already include full path prefixes
+router.use('/', messagesRouter)
+// Reactions router handles /:messageId/reactions
+router.use('/', reactionsRouter)
 
 /**
  * GET /api/messages/unread-total

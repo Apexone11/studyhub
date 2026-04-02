@@ -7,10 +7,23 @@ const cache = require('./library.cache')
 const { captureError } = require('../../monitoring/sentry')
 
 /** Fetch with a timeout. Rejects if the response takes longer than `ms`. */
-function fetchWithTimeout(url, ms = 8000) {
+function fetchWithTimeout(url, ms = 32000) {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), ms)
   return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(timer))
+}
+
+/** Fetch with one automatic retry on network/timeout failure. */
+async function fetchWithRetry(url, ms = 32000) {
+  try {
+    return await fetchWithTimeout(url, ms)
+  } catch (err) {
+    // Retry once on abort (timeout) or network error
+    if (err.name === 'AbortError' || err.code === 'ECONNRESET' || err.code === 'ENOTFOUND') {
+      return fetchWithTimeout(url, ms)
+    }
+    throw err
+  }
 }
 
 /**
@@ -37,7 +50,7 @@ async function searchBooks(query, page = 1, filters = {}) {
     params.append('page', page)
 
     const url = `${GUTENDEX_BASE}/books/?${params.toString()}`
-    const response = await fetchWithTimeout(url)
+    const response = await fetchWithRetry(url)
 
     if (!response.ok) {
       console.warn(`Gutendex search failed: ${response.status}, falling back to cached books`)
@@ -75,7 +88,7 @@ async function getBookDetail(gutenbergId) {
   try {
     // Get basic book info from Gutendex
     const gutendexUrl = `${GUTENDEX_BASE}/books/${gutenbergId}/`
-    const gutendexResponse = await fetchWithTimeout(gutendexUrl)
+    const gutendexResponse = await fetchWithRetry(gutendexUrl)
 
     if (!gutendexResponse.ok) {
       console.warn(`Gutendex book fetch failed: ${gutendexResponse.status}`)
