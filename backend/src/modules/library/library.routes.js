@@ -39,7 +39,13 @@ router.get('/search', requireAuth, async (req, res) => {
       return res.status(503).json({ error: 'Book search service temporarily unavailable.' })
     }
 
-    res.json(results)
+    // Normalize Gutendex response shape for the frontend
+    res.json({
+      books: results.results || [],
+      totalCount: results.count || 0,
+      next: results.next || null,
+      previous: results.previous || null,
+    })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
