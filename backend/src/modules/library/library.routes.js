@@ -159,17 +159,17 @@ router.get('/search', optionalAuth, async (req, res) => {
 
     const results = await searchBooks(searchTerm, pageNum, filters)
 
-    if (!results) {
-      return res.status(503).json({ error: 'Book search service temporarily unavailable.' })
-    }
-
     // Normalize Gutendex response shape for the frontend
-    res.json({
+    // searchBooks always returns a valid object (never null) with graceful fallback
+    const response = {
       books: results.results || [],
       totalCount: results.count || 0,
       next: results.next || null,
       previous: results.previous || null,
-    })
+    }
+    // Signal to frontend when results came from local cache (Gutendex was unavailable)
+    if (results._source === 'cache') response.source = 'cache'
+    res.json(response)
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })

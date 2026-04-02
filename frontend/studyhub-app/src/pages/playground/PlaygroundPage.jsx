@@ -1,10 +1,17 @@
-import React, { useState } from 'react'
+/* ═══════════════════════════════════════════════════════════════════════════
+ * PlaygroundPage.jsx — Code Playground coming-soon landing page
+ *
+ * Uses PageShell for consistent sidebar layout and responsive behavior.
+ * All colors use CSS custom property tokens from index.css.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+import { Link } from 'react-router-dom'
 import Navbar from '../../components/navbar/Navbar'
 import AppSidebar from '../../components/sidebar/AppSidebar'
+import { PageShell } from '../shared/pageScaffold'
 import { usePageTitle } from '../../lib/usePageTitle'
-import { useResponsiveAppLayout } from '../../lib/ui'
-import { Link } from 'react-router-dom'
 import { LogoMark } from '../../components/Icons'
+import './PlaygroundPage.css'
 
 const FEATURES = [
   {
@@ -24,7 +31,7 @@ const FEATURES = [
   },
   {
     title: 'Share and Fork',
-    desc: 'Publish your projects with a unique URL. Fork other students\' work to learn and improve.',
+    desc: "Publish your projects with a unique URL. Fork other students' work to learn and improve.",
     icon: 'fork',
   },
   {
@@ -49,159 +56,125 @@ const FEATURES = [
   },
 ]
 
+const CODE_EXAMPLE = `// StudyHub Code Playground
+function fibonacci(n) {
+  if (n <= 1) return n;
+  return fibonacci(n - 1) + fibonacci(n - 2);
+}
+
+for (let i = 0; i < 10; i++) {
+  console.log(\`fib(\${i}) = \${fibonacci(i)}\`);
+}`
+
+const OUTPUT_LINES = Array.from({ length: 10 }, (_, i) => {
+  const fibs = [0, 1, 1, 2, 3, 5, 8, 13, 21, 34]
+  return { label: 'console.log', value: ` fib(${i}) = ${fibs[i]}` }
+})
+
 export default function PlaygroundPage() {
   usePageTitle('Playground')
-  const layout = useResponsiveAppLayout()
 
   return (
-    <>
-      <Navbar />
-      <div style={s.pageWrapper}>
-        <AppSidebar mode={layout.sidebarMode} />
-        <main style={s.page}>
-          {/* ── HERO ─────────────────────────────────────── */}
-          <section style={s.hero}>
-            <div style={s.heroWatermark}>
-              <LogoMark size={280} />
-            </div>
-            <div style={s.heroInner}>
-              <div style={s.heroBadge}>Coming Soon</div>
-              <h1 style={s.heroH1}>Code Playground</h1>
-              <p style={s.heroSub}>Write, run, and share code right in your browser</p>
-            </div>
-          </section>
+    <PageShell
+      nav={<Navbar />}
+      sidebar={<AppSidebar />}
+    >
+      {/* Hero */}
+      <section className="playground-hero">
+        <div className="playground-hero__watermark">
+          <LogoMark size={280} />
+        </div>
+        <div className="playground-hero__inner">
+          <div className="playground-hero__badge">Coming Soon</div>
+          <h1 className="playground-hero__title">Code Playground</h1>
+          <p className="playground-hero__subtitle">
+            Write, run, and share code right in your browser
+          </p>
+        </div>
+      </section>
 
-          {/* ── MOCK EDITOR ──────────────────────────────── */}
-          <section style={s.editorSection}>
-            <div style={s.editorContainer}>
-              <div style={s.editorMockup}>
-                <div style={s.editorWatermark}>Coming Soon</div>
+      {/* Mock Editor */}
+      <section className="playground-editor-section">
+        <div className="playground-editor-container">
+          <div className="playground-editor-mockup">
+            <div className="playground-editor-mockup__watermark">Coming Soon</div>
 
-                {/* Left pane: Code editor */}
-                <div style={s.editorLeft}>
-                  <div style={s.editorHeader}>
-                    <div style={s.editorTab}>index.js</div>
-                  </div>
-                  <pre style={s.codeBlock}>{codeExample}</pre>
-                </div>
-
-                {/* Right pane: Output */}
-                <div style={s.editorRight}>
-                  <div style={s.editorHeader}>
-                    <div style={s.outputTab}>Output</div>
-                  </div>
-                  <div style={s.outputPanel}>
-                    <div style={s.outputLine}>
-                      <span style={s.outputLabel}>console.log</span>
-                      <span style={s.outputValue}> fib(0) = 0</span>
-                    </div>
-                    <div style={s.outputLine}>
-                      <span style={s.outputLabel}>console.log</span>
-                      <span style={s.outputValue}> fib(1) = 1</span>
-                    </div>
-                    <div style={s.outputLine}>
-                      <span style={s.outputLabel}>console.log</span>
-                      <span style={s.outputValue}> fib(2) = 1</span>
-                    </div>
-                    <div style={s.outputLine}>
-                      <span style={s.outputLabel}>console.log</span>
-                      <span style={s.outputValue}> fib(3) = 2</span>
-                    </div>
-                    <div style={s.outputLine}>
-                      <span style={s.outputLabel}>console.log</span>
-                      <span style={s.outputValue}> fib(4) = 3</span>
-                    </div>
-                    <div style={s.outputLine}>
-                      <span style={s.outputLabel}>console.log</span>
-                      <span style={s.outputValue}> fib(5) = 5</span>
-                    </div>
-                    <div style={s.outputLine}>
-                      <span style={s.outputLabel}>console.log</span>
-                      <span style={s.outputValue}> fib(6) = 8</span>
-                    </div>
-                    <div style={s.outputLine}>
-                      <span style={s.outputLabel}>console.log</span>
-                      <span style={s.outputValue}> fib(7) = 13</span>
-                    </div>
-                    <div style={s.outputLine}>
-                      <span style={s.outputLabel}>console.log</span>
-                      <span style={s.outputValue}> fib(8) = 21</span>
-                    </div>
-                    <div style={s.outputLine}>
-                      <span style={s.outputLabel}>console.log</span>
-                      <span style={s.outputValue}> fib(9) = 34</span>
-                    </div>
-                  </div>
-                </div>
+            {/* Left pane: Code */}
+            <div className="playground-editor__pane">
+              <div className="playground-editor__header">
+                <div className="playground-editor__tab">index.js</div>
               </div>
+              <pre className="playground-editor__code">{CODE_EXAMPLE}</pre>
             </div>
-          </section>
 
-          {/* ── FEATURES GRID ───────────────────────────── */}
-          <section style={s.featuresSection}>
-            <div style={s.sectionInner}>
-              <h2 style={s.sectionH2}>What You Can Do</h2>
-              <div style={s.featuresGrid}>
-                {FEATURES.map((feature, i) => (
-                  <FeatureCard key={i} {...feature} />
+            {/* Right pane: Output */}
+            <div className="playground-editor__pane playground-editor__pane--right">
+              <div className="playground-editor__header">
+                <div className="playground-editor__tab">Output</div>
+              </div>
+              <div className="playground-editor__output">
+                {OUTPUT_LINES.map((line, i) => (
+                  <div key={i} className="playground-editor__output-line">
+                    <span className="playground-editor__output-label">{line.label}</span>
+                    <span className="playground-editor__output-value">{line.value}</span>
+                  </div>
                 ))}
               </div>
             </div>
-          </section>
+          </div>
+        </div>
+      </section>
 
-          {/* ── EARLY ACCESS CTA ────────────────────────── */}
-          <section style={s.ctaSection}>
-            <div style={s.ctaInner}>
-              <p style={s.ctaText}>Want to be the first to try it?</p>
-              <Link to="/pricing" style={s.ctaButton}>Notify Me</Link>
-            </div>
-          </section>
+      {/* Features Grid */}
+      <section className="playground-features">
+        <div className="playground-features__inner">
+          <h2 className="playground-features__title">What You Can Do</h2>
+          <div className="playground-features__grid">
+            {FEATURES.map((feature, i) => (
+              <div key={i} className="playground-feature-card">
+                <div className="playground-feature-card__icon">
+                  {getFeatureIcon(feature.icon)}
+                </div>
+                <h3 className="playground-feature-card__title">{feature.title}</h3>
+                <p className="playground-feature-card__desc">{feature.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
-          {/* ── FOOTER ──────────────────────────────────── */}
-          <footer style={s.footer}>
-            <div style={s.footerLinks}>
-              <Link to="/" style={s.footerLink}>Home</Link>
-              <Link to="/feed" style={s.footerLink}>Browse</Link>
-              <Link to="/privacy" style={s.footerLink}>Privacy</Link>
-              <Link to="/terms" style={s.footerLink}>Terms</Link>
-              <Link to="/guidelines" style={s.footerLink}>Guidelines</Link>
-            </div>
-            <p style={s.footerCopy}>Code Playground · StudyHub · Open Source</p>
-          </footer>
-        </main>
-      </div>
-    </>
-  )
-}
+      {/* Early Access CTA */}
+      <section className="playground-cta">
+        <div className="playground-cta__inner">
+          <p className="playground-cta__text">Want to be the first to try it?</p>
+          <Link to="/pricing" className="playground-cta__button">Notify Me</Link>
+        </div>
+      </section>
 
-function FeatureCard({ icon, title, desc }) {
-  const [isHovered, setIsHovered] = useState(false)
-  const iconSvg = getFeatureIcon(icon)
-
-  return (
-    <div
-      style={{
-        ...s.featureCard,
-        ...(isHovered && {
-          transform: 'translateY(-4px)',
-          borderColor: 'var(--sh-brand)',
-          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)',
-        })
-      }}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      <div style={s.featureIconWrap}>
-        {iconSvg}
-      </div>
-      <h3 style={s.featureTitle}>{title}</h3>
-      <p style={s.featureDesc}>{desc}</p>
-    </div>
+      {/* Footer */}
+      <footer className="playground-footer">
+        <div className="playground-footer__links">
+          <Link to="/" className="playground-footer__link">Home</Link>
+          <Link to="/feed" className="playground-footer__link">Browse</Link>
+          <Link to="/privacy" className="playground-footer__link">Privacy</Link>
+          <Link to="/terms" className="playground-footer__link">Terms</Link>
+          <Link to="/guidelines" className="playground-footer__link">Guidelines</Link>
+        </div>
+        <p className="playground-footer__copy">Code Playground -- StudyHub -- Open Source</p>
+      </footer>
+    </PageShell>
   )
 }
 
 function getFeatureIcon(name) {
-  const iconProps = { width: 24, height: 24, viewBox: '0 0 24 24', fill: 'none', xmlns: 'http://www.w3.org/2000/svg', style: { stroke: 'currentColor', strokeWidth: '1.8', strokeLinecap: 'round', strokeLinejoin: 'round' } }
+  const iconProps = {
+    width: 24,
+    height: 24,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    xmlns: 'http://www.w3.org/2000/svg',
+    style: { stroke: 'currentColor', strokeWidth: '1.8', strokeLinecap: 'round', strokeLinejoin: 'round' },
+  }
 
   switch (name) {
     case 'editor':
@@ -278,329 +251,5 @@ function getFeatureIcon(name) {
       )
     default:
       return null
-  }
-}
-
-const codeExample = `// StudyHub Code Playground
-function fibonacci(n) {
-  if (n <= 1) return n;
-  return fibonacci(n - 1) + fibonacci(n - 2);
-}
-
-for (let i = 0; i < 10; i++) {
-  console.log(\`fib(\${i}) = \${fibonacci(i)}\`);
-}`
-
-const s = {
-  pageWrapper: {
-    display: 'grid',
-    gridTemplateColumns: 'auto 1fr',
-    minHeight: '100vh',
-    background: 'var(--sh-page-bg)',
-  },
-
-  page: {
-    minHeight: '100vh',
-    fontFamily: "'Plus Jakarta Sans', sans-serif",
-    background: 'var(--sh-page-bg)',
-    color: 'var(--sh-text)',
-  },
-
-  /* HERO */
-  hero: {
-    background: 'linear-gradient(135deg, var(--sh-brand) 0%, #7c3aed 100%)',
-    padding: '100px 20px 80px',
-    textAlign: 'center',
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  heroWatermark: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: 'translate(-50%, -50%)',
-    opacity: 0.05,
-    color: 'white',
-    pointerEvents: 'none',
-    zIndex: 0,
-    animation: 'float 8s ease-in-out infinite',
-  },
-  heroInner: {
-    maxWidth: 720,
-    margin: '0 auto',
-    position: 'relative',
-    zIndex: 1,
-  },
-  heroBadge: {
-    display: 'inline-block',
-    background: 'rgba(255, 255, 255, 0.15)',
-    border: '1px solid rgba(255, 255, 255, 0.3)',
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: 'bold',
-    padding: '8px 16px',
-    borderRadius: 20,
-    marginBottom: 24,
-    letterSpacing: 1,
-    backdropFilter: 'blur(10px)',
-  },
-  heroH1: {
-    fontSize: 'clamp(36px, 6vw, 60px)',
-    fontWeight: 'bold',
-    color: '#fff',
-    margin: '0 0 16px',
-    lineHeight: 1.15,
-    letterSpacing: '-1px',
-  },
-  heroSub: {
-    fontSize: 18,
-    color: 'rgba(255, 255, 255, 0.95)',
-    margin: 0,
-    lineHeight: 1.6,
-    fontWeight: 400,
-  },
-
-  /* MOCK EDITOR */
-  editorSection: {
-    padding: '80px 20px',
-    background: 'var(--sh-page-bg)',
-  },
-  editorContainer: {
-    maxWidth: 1100,
-    margin: '0 auto',
-  },
-  editorMockup: {
-    position: 'relative',
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: 0,
-    borderRadius: 16,
-    overflow: 'hidden',
-    border: '1px solid var(--sh-border)',
-    boxShadow: '0 20px 60px rgba(0, 0, 0, 0.2)',
-    background: 'var(--sh-surface)',
-  },
-  editorWatermark: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: 'translate(-50%, -50%)',
-    fontSize: 48,
-    fontWeight: 'bold',
-    color: 'rgba(255, 255, 255, 0.08)',
-    pointerEvents: 'none',
-    zIndex: 10,
-    textAlign: 'center',
-    textShadow: '0 0 40px rgba(0, 0, 0, 0.5)',
-  },
-
-  /* Editor left pane */
-  editorLeft: {
-    borderRight: '1px solid var(--sh-border)',
-    display: 'flex',
-    flexDirection: 'column',
-    background: 'var(--sh-surface)',
-  },
-  editorHeader: {
-    background: 'var(--sh-soft)',
-    borderBottom: '1px solid var(--sh-border)',
-    padding: '12px 16px',
-    display: 'flex',
-    gap: 8,
-    alignItems: 'center',
-  },
-  editorTab: {
-    fontSize: 13,
-    color: 'var(--sh-text)',
-    padding: '6px 12px',
-    borderRadius: 6,
-    background: 'var(--sh-surface)',
-    fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
-    fontWeight: 500,
-  },
-  codeBlock: {
-    flex: 1,
-    margin: 0,
-    padding: 20,
-    overflow: 'auto',
-    fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
-    fontSize: 13,
-    lineHeight: 1.6,
-    color: 'var(--sh-text)',
-    background: 'transparent',
-    whiteSpace: 'pre',
-  },
-
-  /* Editor right pane */
-  editorRight: {
-    display: 'flex',
-    flexDirection: 'column',
-    background: 'var(--sh-soft)',
-  },
-  outputTab: {
-    fontSize: 13,
-    color: 'var(--sh-text)',
-    padding: '6px 12px',
-    borderRadius: 6,
-    background: 'var(--sh-surface)',
-    fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
-    display: 'inline-block',
-    fontWeight: 500,
-  },
-  outputPanel: {
-    flex: 1,
-    padding: 20,
-    overflow: 'auto',
-    fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
-    fontSize: 13,
-    lineHeight: 1.8,
-    background: 'var(--sh-soft)',
-  },
-  outputLine: {
-    color: 'var(--sh-text)',
-    marginBottom: 4,
-  },
-  outputLabel: {
-    color: 'var(--sh-brand)',
-    fontWeight: 500,
-  },
-  outputValue: {
-    color: 'var(--sh-success-text)',
-  },
-
-  /* FEATURES SECTION */
-  featuresSection: {
-    padding: '80px 20px',
-    background: 'var(--sh-page-bg)',
-  },
-  sectionInner: {
-    maxWidth: 1100,
-    margin: '0 auto',
-  },
-  sectionH2: {
-    fontSize: 'clamp(24px, 3vw, 36px)',
-    fontWeight: 'bold',
-    color: 'var(--sh-heading)',
-    margin: '0 0 48px',
-    textAlign: 'center',
-  },
-  featuresGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-    gap: 24,
-  },
-  featureCard: {
-    background: 'var(--sh-surface)',
-    border: '1px solid var(--sh-border)',
-    borderRadius: 12,
-    padding: '28px 24px',
-    transition: 'all 0.3s ease',
-    cursor: 'default',
-  },
-  featureCard__hover: {
-    transform: 'translateY(-4px)',
-    borderColor: 'var(--sh-brand)',
-    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)',
-  },
-  featureIconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 10,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: 'var(--sh-brand-soft)',
-    border: '1px solid var(--sh-brand-border)',
-    marginBottom: 16,
-    color: 'var(--sh-brand)',
-    transition: 'all 0.3s ease',
-  },
-  featureTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: 'var(--sh-heading)',
-    margin: '0 0 12px',
-  },
-  featureDesc: {
-    fontSize: 14,
-    color: 'var(--sh-muted)',
-    margin: 0,
-    lineHeight: 1.6,
-  },
-
-  /* CTA SECTION */
-  ctaSection: {
-    padding: '80px 20px',
-    background: 'linear-gradient(135deg, var(--sh-brand) 0%, #7c3aed 100%)',
-    textAlign: 'center',
-    borderTop: '1px solid var(--sh-border)',
-  },
-  ctaInner: {
-    maxWidth: 600,
-    margin: '0 auto',
-  },
-  ctaText: {
-    fontSize: 20,
-    color: '#fff',
-    margin: '0 0 24px',
-    fontWeight: 'bold',
-  },
-  ctaButton: {
-    display: 'inline-block',
-    background: 'rgba(255, 255, 255, 0.2)',
-    border: '2px solid rgba(255, 255, 255, 0.4)',
-    color: 'white',
-    textDecoration: 'none',
-    padding: '14px 36px',
-    borderRadius: 10,
-    fontWeight: 'bold',
-    fontSize: 15,
-    transition: 'all 0.3s ease',
-    backdropFilter: 'blur(10px)',
-  },
-
-  /* FOOTER */
-  footer: {
-    background: 'var(--sh-surface)',
-    padding: '40px 20px',
-    textAlign: 'center',
-    borderTop: '1px solid var(--sh-border)',
-  },
-  footerLinks: {
-    display: 'flex',
-    justifyContent: 'center',
-    gap: 24,
-    marginBottom: 16,
-    flexWrap: 'wrap',
-  },
-  footerLink: {
-    color: 'var(--sh-muted)',
-    textDecoration: 'none',
-    fontSize: 14,
-    transition: 'color 0.3s ease',
-  },
-  footerCopy: {
-    color: 'var(--sh-muted)',
-    fontSize: 12,
-    margin: 0,
-  },
-}
-
-// Add keyframe animation to document
-if (typeof window !== 'undefined') {
-  const styleSheet = document.createElement('style')
-  styleSheet.textContent = `
-    @keyframes float {
-      0%, 100% {
-        transform: translate(-50%, -50%);
-      }
-      50% {
-        transform: translate(-50%, -55%);
-      }
-    }
-  `
-  if (!document.head.querySelector('style[data-playground]')) {
-    styleSheet.setAttribute('data-playground', 'true')
-    document.head.appendChild(styleSheet)
   }
 }
