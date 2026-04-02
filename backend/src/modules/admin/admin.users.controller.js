@@ -5,6 +5,7 @@ const prisma = require('../../lib/prisma')
 const { isSuperAdmin } = require('../../lib/superAdmin')
 const { logModerationEvent } = require('../../lib/moderation/moderationLogger')
 const { auditFromRequest, AUDIT_EVENTS } = require('../../lib/auditLog')
+const { maskEmail } = require('../../lib/fieldEncryption')
 const { PAGE_SIZE, parsePage } = require('./admin.constants')
 
 const router = express.Router()
@@ -92,7 +93,11 @@ router.get('/users', async (req, res) => {
       }),
       prisma.user.count(),
     ])
-    res.json({ users, total, page, pages: Math.ceil(total / PAGE_SIZE) })
+    const maskedUsers = users.map(u => ({
+      ...u,
+      email: u.email ? maskEmail(u.email) : null,
+    }))
+    res.json({ users: maskedUsers, total, page, pages: Math.ceil(total / PAGE_SIZE) })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
@@ -119,7 +124,11 @@ router.get('/users/search', async (req, res) => {
       take: limit,
       orderBy: { username: 'asc' },
     })
-    res.json(users)
+    const maskedResults = users.map(u => ({
+      ...u,
+      email: u.email ? maskEmail(u.email) : null,
+    }))
+    res.json(maskedResults)
   } catch (err) {
     captureError(err)
     res.status(500).json({ error: 'Search failed.' })

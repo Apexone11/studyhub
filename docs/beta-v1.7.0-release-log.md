@@ -3623,3 +3623,97 @@ Comprehensive import/export audit of all 58 files modified during Cycles A-E. Fo
 ### Verification
 
 All 58 modified files pass syntax validation (23 backend node -c + 35 frontend acorn/JSX).
+
+---
+
+## StudyHub v2.0 Feature Expansion (2026-04-02)
+
+### Phase 1: Security Hardening -- Field-Level Encryption
+
+**Files created:**
+- `backend/src/lib/fieldEncryption.js` -- AES-256-GCM encrypt/decrypt utility with key rotation support, email masking, and SHA-256 hash-for-lookup.
+- `backend/src/lib/prismaEncryption.js` -- Prisma middleware for transparent field encryption on User.email, Message.content, AiMessage.content.
+- `backend/scripts/encryptExistingData.js` -- One-time migration script to encrypt existing plaintext data (idempotent, batch processing).
+- `backend/prisma/migrations/20260401000003_add_email_hash_column/migration.sql` -- Adds emailHash column to User for encrypted email lookup.
+
+**Files modified:**
+- `backend/src/lib/prisma.js` -- Attaches encryption middleware to Prisma client.
+- `backend/src/modules/admin/admin.users.controller.js` -- Admin user list and search now return masked emails (a***@gmail.com).
+- `backend/prisma/schema.prisma` -- Added emailHash field to User model with index.
+
+**Railway configuration required:** Add `FIELD_ENCRYPTION_KEY` (64-char hex) as environment variable.
+
+### Phase 2: AI Rate Limit Adjustment
+
+- `backend/src/modules/ai/ai.constants.js` -- Changed DAILY_LIMITS from 30/60/120 to 10/20/120 (default/verified/admin) to support subscription model.
+
+### Phase 3: Admin Analytics Charts
+
+**Files created:**
+- `backend/src/modules/admin/admin.analytics.controller.js` -- 5 analytics endpoints (users, content, AI, moderation, overview) with period filtering.
+- `frontend/studyhub-app/src/pages/admin/AnalyticsTab.jsx` -- Interactive analytics dashboard with 5 Recharts charts (User Growth area, Content Activity stacked bar, AI Usage line, Moderation funnel, Content Breakdown pie).
+
+**Files modified:**
+- `backend/src/modules/admin/admin.routes.js` -- Mounted analytics controller.
+- `frontend/studyhub-app/src/pages/admin/AdminPage.jsx` -- Added Analytics tab with lazy loading.
+- `frontend/studyhub-app/src/pages/admin/adminConstants.js` -- Added analytics to TABS.
+- `frontend/studyhub-app/package.json` -- Added recharts@^2.15.3 and epubjs@^0.3.93 dependencies.
+
+### Phase 4: Library Backend (BookHub)
+
+**New module:** `backend/src/modules/library/` (5 files, ~950 lines)
+- `library.constants.js` -- API URLs, cache TTLs, resource limits.
+- `library.cache.js` -- In-memory TTL cache for external API responses.
+- `library.service.js` -- Gutendex + Open Library API integration with caching and enrichment.
+- `library.routes.js` -- 18 REST endpoints: book search/browse, shelves CRUD, reading progress, bookmarks, highlights, social highlights.
+- `index.js` -- Module barrel.
+
+**Database migrations:**
+- `20260401000001_add_library_tables/migration.sql` -- BookShelf, ShelfBook, ReadingProgress, BookBookmark, BookHighlight tables.
+- `20260401000002_add_waitlist_table/migration.sql` -- Waitlist table for subscription signups.
+
+**Schema additions:** 7 new models (BookShelf, ShelfBook, ReadingProgress, BookBookmark, BookHighlight, Waitlist) + User relations.
+
+### Phase 5: Library Frontend -- Catalog and Book Detail
+
+**New pages:** `frontend/studyhub-app/src/pages/library/` (~11 files)
+- `LibraryPage.jsx` -- Premium catalog with gradient hero, search, subject chips, responsive book grid.
+- `BookDetailPage.jsx` -- Two-column detail page with cover, metadata, download options, shelf management.
+- `BookCard.jsx` -- Reusable book card component with cover fallback and progress bar.
+- `libraryConstants.js`, `libraryHelpers.js` -- Constants and formatting utilities.
+- `useLibraryData.js`, `useBookDetail.js` -- Data hooks.
+- CSS files for styling.
+
+### Phase 6: In-Browser EPUB Reader
+
+**New files:** `frontend/studyhub-app/src/pages/library/` (~6 files, ~2500 lines)
+- `BookReaderPage.jsx` -- Full-screen epub.js reader with 3 themes (Light/Dark/Sepia), font controls, keyboard navigation, auto-hiding toolbar.
+- `BookReaderPage.css` -- Comprehensive reader styles.
+- `useBookReader.js` -- Reader state management (progress, bookmarks, highlights).
+- `components/ReaderSettingsPanel.jsx` -- Theme, font size, font family controls.
+- `components/ReaderSidebar.jsx` -- TOC, bookmarks, and highlights panels.
+- `components/HighlightPopover.jsx` -- Color picker on text selection.
+
+### Phase 7: AI Reading Assistant
+
+- `backend/src/modules/ai/ai.context.js` -- Added book reading context injection (title, author, subjects, current visible text).
+- `frontend/studyhub-app/src/lib/useAiContext.js` -- Added library page context chips and URL pattern matching.
+- `frontend/studyhub-app/src/pages/library/useReaderAiContext.js` -- Hook to capture reader state for AI context.
+
+### Phase 8: Pricing Placeholder Page
+
+- `frontend/studyhub-app/src/pages/pricing/PricingPage.jsx` -- Three-tier pricing page (Free/Pro/Institution) with waitlist email collection and FAQ accordion.
+- `backend/src/index.js` -- Added POST /api/waitlist inline route.
+
+### Phase 9: Code Playground Placeholder
+
+- `frontend/studyhub-app/src/pages/playground/PlaygroundPage.jsx` -- Dark-themed coming-soon page with mock editor, syntax-highlighted code, feature grid, and early access CTA.
+
+### Phase 10: Navigation and Routing
+
+**Files modified:**
+- `frontend/studyhub-app/src/App.jsx` -- Added lazy imports and routes for Library (3 routes), Playground, and Pricing. Added ROUTE_TITLES entries.
+- `frontend/studyhub-app/src/components/sidebar/sidebarConstants.js` -- Added Library, Playground, and Pricing to NAV_LINKS with new icons (IconBook, IconCode, IconTag).
+- `frontend/studyhub-app/src/components/Icons.jsx` -- Added IconBook, IconCode, IconTag.
+- `frontend/studyhub-app/src/lib/prefetch.js` -- Added /library to prefetch route map.
+- `frontend/studyhub-app/src/components/ai/AiBubble.jsx` -- Hidden on reader pages (full-screen experience has its own AI button).

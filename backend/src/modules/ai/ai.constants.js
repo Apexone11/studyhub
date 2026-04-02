@@ -8,10 +8,10 @@ const DEFAULT_MODEL = 'claude-sonnet-4-20250514'
 /** Cheaper model for simple queries (future use). */
 const FAST_MODEL = 'claude-haiku-4-5-20251001'
 
-/** Daily message limits by user status. */
+/** Daily message limits by user status. Lower free-tier limits support the subscription model. */
 const DAILY_LIMITS = {
-  default: 30,
-  verified: 60,
+  default: 10,
+  verified: 20,
   admin: 120,
 }
 

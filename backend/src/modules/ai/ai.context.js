@@ -114,6 +114,24 @@ ${content}
         console.warn('[AI Context] Failed to load note context:', error?.message || error)
       }
     }
+
+    // If the user is reading a book in the library, include reading context.
+    // Book context is passed from the frontend and includes title, author, subjects, and current text.
+    if (opts.bookTitle) {
+      let bookContext = `<current_reading_context>
+Title: ${opts.bookTitle}
+Author: ${opts.bookAuthor || 'unknown author'}
+Subjects: ${opts.bookSubjects || 'not specified'}`
+
+      if (opts.currentText) {
+        const textSnippet = (opts.currentText || '').slice(0, 4000)
+        bookContext += `
+Current visible text:
+${textSnippet}`
+      }
+
+      sections.push(bookContext + '\n</current_reading_context>')
+    }
   }
 
   // ── 3. Recent materials (titles only, for awareness) ─────────────

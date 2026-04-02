@@ -29,6 +29,7 @@ const UploadSheetPage = lazy(() => import('./pages/sheets/upload/UploadSheetPage
 const SettingsPage = lazy(() => import('./pages/settings/SettingsPage'))
 const AdminPage = lazy(() => import('./pages/admin/AdminPage'))
 const AboutPage = lazy(() => import('./pages/legal/AboutPage'))
+const PricingPage = lazy(() => import('./pages/pricing/PricingPage'))
 const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPasswordPage'))
 const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPasswordPage'))
 const UserProfilePage = lazy(() => import('./pages/profile/UserProfilePage'))
@@ -44,6 +45,10 @@ const AiSheetSetupPage = lazy(() => import('./pages/sheets/lab/AiSheetSetupPage'
 const MessagesPage = lazy(() => import('./pages/messages/MessagesPage'))
 const StudyGroupsPage = lazy(() => import('./pages/studyGroups/StudyGroupsPage'))
 const AiPage = lazy(() => import('./pages/ai/AiPage'))
+const LibraryPage = lazy(() => import('./pages/library/LibraryPage'))
+const BookDetailPage = lazy(() => import('./pages/library/BookDetailPage'))
+const BookReaderPage = lazy(() => import('./pages/library/BookReaderPage'))
+const PlaygroundPage = lazy(() => import('./pages/playground/PlaygroundPage'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 
 import ScrollToTop from './components/ScrollToTop'
@@ -106,6 +111,9 @@ const ROUTE_TITLES = {
   '/privacy': 'Privacy Policy',
   '/guidelines': 'Community Guidelines',
   '/about': 'About',
+  '/pricing': 'Pricing',
+  '/library': 'Library',
+  '/playground': 'Code Playground',
   '/forgot-password': 'Forgot Password',
   '/reset-password': 'Reset Password',
 }
@@ -244,6 +252,7 @@ function AppRoutes() {
             <Route path="/privacy"          element={<PrivacyPage />} />
             <Route path="/guidelines"       element={<GuidelinesPage />} />
             <Route path="/about"            element={<AboutPage />} />
+            <Route path="/pricing"          element={<PricingPage />} />
             <Route path="/forgot-password"  element={<ForgotPasswordPage />} />
             <Route path="/reset-password"   element={<ResetPasswordPage />} />
 
@@ -264,6 +273,10 @@ function AppRoutes() {
             <Route path="/study-groups"  element={<PrivateRoute><StudyGroupsPage /></PrivateRoute>} />
             <Route path="/study-groups/:id" element={<PrivateRoute><StudyGroupsPage /></PrivateRoute>} />
             <Route path="/ai"           element={<PrivateRoute><AiPage /></PrivateRoute>} />
+            <Route path="/library"      element={<PrivateRoute><LibraryPage /></PrivateRoute>} />
+            <Route path="/library/:gutenbergId/read" element={<PrivateRoute><BookReaderPage /></PrivateRoute>} />
+            <Route path="/library/:gutenbergId" element={<PrivateRoute><BookDetailPage /></PrivateRoute>} />
+            <Route path="/playground"   element={<PrivateRoute><PlaygroundPage /></PrivateRoute>} />
             <Route path="/notes/:id"    element={<NoteViewerPage />} />
             <Route path="/announcements" element={<PrivateRoute><AnnouncementsPage /></PrivateRoute>} />
             <Route path="/submit"        element={<PrivateRoute><SubmitPage /></PrivateRoute>} />
