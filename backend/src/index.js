@@ -444,9 +444,17 @@ async function startServer() {
   return server.listen(PORT, () => {
     startHtmlArchiveScheduler()
     startModerationCleanupScheduler()
-    // Pre-warm library cache with popular books (non-blocking)
-    const { preloadPopularBooks } = require('./modules/library/library.service')
+    // Pre-warm library cache with popular books (non-blocking).
+    // Also syncs to CachedBook DB table so fallback works when Gutendex is down.
+    const { preloadPopularBooks, syncPopularBooksToDB } = require('./modules/library/library.service')
     preloadPopularBooks().catch(() => {})
+    // If CachedBook table is empty, trigger a full sync (16 pages = 512 books)
+    prisma.cachedBook.count().then(count => {
+      if (count === 0) {
+        console.log('[Library] CachedBook table empty, triggering full sync...')
+        syncPopularBooksToDB(16).catch(() => {})
+      }
+    }).catch(() => {})
     console.log(`Server running on http://localhost:${PORT}`)
   })
 }

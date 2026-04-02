@@ -7,7 +7,7 @@ const cache = require('./library.cache')
 const { captureError } = require('../../monitoring/sentry')
 
 /** Fetch with a timeout. Rejects if the response takes longer than `ms`. */
-function fetchWithTimeout(url, ms = 32000) {
+function fetchWithTimeout(url, ms = 45000) {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), ms)
   return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(timer))
@@ -209,10 +209,14 @@ async function getBookCoverUrl(gutenbergId, size = 'medium') {
 /**
  * Pre-warm the cache with popular books on server startup.
  * Fetches the first 6 pages (192 books) from Gutendex sorted by download count.
+ * Also persists to CachedBook table so the DB fallback has data.
  * Runs silently in background -- errors do not crash the server.
  */
 async function preloadPopularBooks() {
+  const prismaClient = require('../../lib/prisma')
   const languages = ['en']
+  let fetched = 0
+
   for (const lang of languages) {
     for (let page = 1; page <= 6; page++) {
       try {
@@ -220,12 +224,47 @@ async function preloadPopularBooks() {
         params.append('languages', lang)
         params.append('page', page)
         const url = `${GUTENDEX_BASE}/books/?${params.toString()}`
-        const response = await fetchWithTimeout(url, 10000)
+        const response = await fetchWithTimeout(url, 15000)
         if (!response.ok) continue
         const data = await response.json()
         // Cache with the same key format searchBooks uses
         const cacheKey = `search::${page}:${JSON.stringify({ languages: lang })}`
         cache.set(cacheKey, data, CACHE_TTL.SEARCH * 24) // 24x longer TTL for preloaded data
+
+        // Also persist each book to CachedBook table for DB fallback
+        if (data.results) {
+          for (const book of data.results) {
+            try {
+              await prismaClient.cachedBook.upsert({
+                where: { gutenbergId: book.id },
+                update: {
+                  title: book.title,
+                  authors: book.authors || [],
+                  subjects: book.subjects || [],
+                  languages: book.languages || [],
+                  downloadCount: book.download_count || 0,
+                  coverUrl: book.formats?.['image/jpeg'] || null,
+                  formats: book.formats || {},
+                  syncedAt: new Date(),
+                },
+                create: {
+                  gutenbergId: book.id,
+                  title: book.title,
+                  authors: book.authors || [],
+                  subjects: book.subjects || [],
+                  languages: book.languages || [],
+                  downloadCount: book.download_count || 0,
+                  coverUrl: book.formats?.['image/jpeg'] || null,
+                  formats: book.formats || {},
+                },
+              })
+              fetched++
+            } catch {
+              // Skip individual book upsert errors
+            }
+          }
+        }
+
         // Small delay to avoid hammering Gutendex
         await new Promise(r => setTimeout(r, 500))
       } catch {
@@ -233,7 +272,7 @@ async function preloadPopularBooks() {
       }
     }
   }
-  console.log('[Library] Popular books cache pre-warmed')
+  console.log(`[Library] Popular books cache pre-warmed (${fetched} books synced to DB)`)
 }
 
 /**
@@ -309,8 +348,12 @@ async function searchCachedBooks(query, page = 1, filters = {}) {
   if (query && query.trim()) {
     where.title = { contains: query.trim(), mode: 'insensitive' }
   }
+  // languages and subjects are Json array fields; use string_contains for best-effort match
   if (filters.languages) {
-    where.languages = { has: filters.languages }
+    where.languages = { string_contains: filters.languages }
+  }
+  if (filters.topic) {
+    where.subjects = { string_contains: filters.topic }
   }
 
   const orderBy = filters.sort === 'ascending'
