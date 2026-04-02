@@ -22,7 +22,6 @@ const {
   isGroupAdmin,
   stripHtmlTags,
   validateTitle,
-  validateDescription,
 } = require('./studyGroups.helpers')
 
 const router = express.Router({ mergeParams: true })

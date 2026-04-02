@@ -22,6 +22,10 @@ export function AppealModal({ open, caseData, onClose, onSubmit }) {
     error: '',
   })
 
+  const updateModalState = useCallback((updates) => {
+    setModalState((prev) => ({ ...prev, ...updates }))
+  }, [])
+
   useEffect(() => {
     if (!open) return
     const handler = (e) => { if (e.key === 'Escape') onClose() }
@@ -37,10 +41,6 @@ export function AppealModal({ open, caseData, onClose, onSubmit }) {
 
   const selectedCategory = APPEAL_CATEGORIES.find((c) => c.value === modalState.category)
   const canSubmit = modalState.category && modalState.reason.trim().length >= 20 && modalState.acknowledged && !modalState.submitting
-
-  const updateModalState = useCallback((updates) => {
-    setModalState((prev) => ({ ...prev, ...updates }))
-  }, [])
 
   async function handleSubmit(e) {
     e.preventDefault()

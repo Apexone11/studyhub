@@ -35,7 +35,7 @@ export default function BookDetailPage() {
   const [showNewShelfInput, setShowNewShelfInput] = useState(false)
   const shelfDropdownRef = useRef(null)
 
-  const { book, loading, error, shelves, progress, addToShelf, removeFromShelf, createShelf } =
+  const { book, loading, error, shelves, progress, addToShelf, createShelf } =
     useBookDetail(gutenbergId)
 
   const handleAddToShelf = async (shelfId) => {

@@ -12,16 +12,6 @@ import ComponentErrorBoundary from '../ComponentErrorBoundary'
 import { IconSheets, IconPen, IconX, IconEye } from '../Icons'
 
 /**
- * Extract HTML content from a markdown code block with language tag "html".
- * Returns the first match or null.
- */
-export function extractHtmlFromMessage(content) {
-  if (!content) return null
-  const match = content.match(/```html\s*\n([\s\S]*?)```/)
-  return match ? match[1].trim() : null
-}
-
-/**
  * Inline preview bar that appears below an AI message containing HTML.
  */
 export function SheetPreviewBar({ html, conversationTitle }) {

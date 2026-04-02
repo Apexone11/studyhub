@@ -13,7 +13,6 @@
  *
  * ═══════════════════════════════════════════════════════════════════════════ */
 
-import { useState } from 'react'
 import { PAGE_FONT } from '../shared/pageUtils'
 import ComponentErrorBoundary from '../../components/ComponentErrorBoundary'
 import { GroupOverviewTab } from './GroupOverviewTab'

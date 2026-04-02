@@ -46,10 +46,7 @@ async function encryptUserEmails() {
 
       // Backfill emailHash if missing
       if (user.email && !user.emailHash) {
-        // Use the plaintext email (before encryption) for the hash
-        const plainEmail = isEncrypted(user.email) ? user.email : user.email
         // If already encrypted, we cannot hash it -- skip
-        // (This case should not happen on first run)
         if (!isEncrypted(user.email)) {
           updates.emailHash = hashForLookup(user.email)
         }

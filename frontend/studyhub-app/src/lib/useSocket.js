@@ -68,14 +68,16 @@ export function useSocket() {
         }
       })
 
-      socketRef.current.on('user:online', (userId) => {
-        setOnlineUsers((prev) => new Set([...prev, userId]))
+      socketRef.current.on('user:online', (data) => {
+        const id = typeof data === 'object' ? data.userId : data
+        setOnlineUsers((prev) => new Set([...prev, id]))
       })
 
-      socketRef.current.on('user:offline', (userId) => {
+      socketRef.current.on('user:offline', (data) => {
+        const id = typeof data === 'object' ? data.userId : data
         setOnlineUsers((prev) => {
           const next = new Set(prev)
-          next.delete(userId)
+          next.delete(id)
           return next
         })
       })

@@ -94,6 +94,8 @@ export default function MessagesPage() {
     // Start or open existing DM
     startConversation([targetId], 'dm').then((conv) => {
       if (conv) selectConversation(conv.id)
+    }).catch(() => {
+      // Silent failure -- DM auto-start is best-effort
     })
   }, [searchParams, user, currentUserId, startConversation, selectConversation, setSearchParams])
 
