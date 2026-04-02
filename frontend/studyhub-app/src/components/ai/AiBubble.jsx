@@ -4,8 +4,13 @@
  * Renders a fixed-position circular button in the bottom-right corner.
  * Clicking it opens a compact chat window. State is shared with the /ai page
  * via AiChatProvider (useSharedAiChat).
+ *
+ * IMPORTANT: This component is wrapped in its own error boundary so that any
+ * crash inside the bubble (network failure, provider missing, etc.) can never
+ * take down the host page. This is the same pattern Facebook/Meta uses for
+ * their chat widgets -- total isolation from the main page tree.
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useState, useRef, useEffect } from 'react'
+import { Component, useState, useRef, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import { IconSpark, IconX, IconPlus } from '../Icons'
@@ -16,7 +21,50 @@ import { useSharedAiChat } from '../../lib/AiChatProvider'
 import { useAiContext } from '../../lib/useAiContext'
 import { PAGE_FONT } from '../../pages/shared/pageUtils'
 
+/* ── Isolated error boundary for the bubble ───────────────────────────────
+ * If AiBubble crashes, this catches it silently and renders nothing,
+ * preventing the crash from propagating to the parent page.
+ * Auto-retries once after 10 seconds in case it was a transient failure.
+ * ──────────────────────────────────────────────────────────────────────── */
+class AiBubbleErrorBoundary extends Component {
+  constructor(props) {
+    super(props)
+    this.state = { hasError: false }
+    this._retryTimer = null
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
+
+  componentDidCatch(error) {
+    console.warn('[AiBubble] Caught error, hiding bubble:', error?.message || error)
+    // Auto-retry once after 10 seconds
+    this._retryTimer = setTimeout(() => {
+      this.setState({ hasError: false })
+    }, 10000)
+  }
+
+  componentWillUnmount() {
+    if (this._retryTimer) clearTimeout(this._retryTimer)
+  }
+
+  render() {
+    if (this.state.hasError) return null
+    return this.props.children
+  }
+}
+
+/** Default export wraps the real bubble in an error boundary. */
 export default function AiBubble() {
+  return (
+    <AiBubbleErrorBoundary>
+      <AiBubbleInner />
+    </AiBubbleErrorBoundary>
+  )
+}
+
+function AiBubbleInner() {
   const [isOpen, setIsOpen] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()

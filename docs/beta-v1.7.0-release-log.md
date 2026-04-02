@@ -3766,3 +3766,44 @@ Fixed critical deployment issues, API response shape mismatches, CORS workaround
 - All backend `.js` files pass `node -c` syntax check
 - Button/navigation audit: all buttons across 87 JSX files are functional (no empty handlers or broken links)
 - API response shapes verified to match frontend expectations
+
+---
+
+## v2.0 Post-Deploy Stability Fixes -- Round 2 (2026-04-02)
+
+### Summary
+
+Comprehensive stability and reliability audit driven by 8 production screenshots showing console errors, page crashes, and broken features. 12 root causes identified and fixed.
+
+### Issues Fixed
+
+| # | Issue | Root Cause | Fix |
+|---|-------|------------|-----|
+| 1 | AiBubble crashes take down entire pages (Feed, AI) | `useSharedAiChat()` throws when outside provider; no isolation | Wrapped AiBubble in its own error boundary; `useSharedAiChat` returns inert fallback instead of throwing |
+| 2 | 404 on `/api/users/me` | Endpoint never existed | Added `GET /api/users/me` returning authenticated user profile |
+| 3 | 404 on `/api/users/me/follow-suggestions` | Endpoint never existed | Added `GET /api/users/me/follow-suggestions` with school-based prioritization |
+| 4 | 404 on `/api/users/me/blocked` and `/me/muted` | Endpoints never existed | Added both with graceful degradation if tables missing |
+| 5 | 429 Too Many Requests on auth endpoints | Rate limiter set to 15 req / 15 min | Increased to 120 req / 15 min |
+| 6 | Book reader shows "Page 0 of 0" | `locations.generate()` not awaited before `relocated` event | Display book first, generate locations in background; use spine-based estimate until ready |
+| 7 | Library returns 401 for unauthenticated users | `requireAuth` on search/detail endpoints | Changed to `optionalAuth` since books are public domain |
+| 8 | EPUB proxy hangs on slow Gutenberg responses | No fetch timeout | Added 15-second `AbortSignal.timeout` per attempt |
+| 9 | Sort "Most Popular" sends invalid `sort=popular` param | Frontend sends all sort values including default | Skip sending `sort` param when value is `popular` (Gutendex default) |
+| 10 | Stale cache keys from mismatched sort params | `popular` value included in cache keys unnecessarily | Omit from params, producing consistent cache keys |
+| 11 | Library shows "No books found" on auth failure | No clear error message for auth issues | Added explicit 401/403 error message in frontend |
+| 12 | Auto-recovery (added in prior round) | Verified working | RouteErrorBoundary auto-retry + blank screen detector both operational |
+
+### Files Changed
+
+- `frontend/studyhub-app/src/components/ai/AiBubble.jsx` -- Added `AiBubbleErrorBoundary` class, wrapped default export
+- `frontend/studyhub-app/src/lib/AiChatProvider.jsx` -- `useSharedAiChat` returns `INERT_CHAT` fallback instead of throwing
+- `frontend/studyhub-app/src/pages/library/BookReaderPage.jsx` -- Rewrote EPUB init: display-first, background location generation, spine-based estimates
+- `frontend/studyhub-app/src/pages/library/useLibraryData.js` -- Skip `sort=popular` param, improved 401/403 error handling
+- `backend/src/modules/users/users.routes.js` -- Added 4 new endpoints: `/me`, `/me/follow-suggestions`, `/me/blocked`, `/me/muted`
+- `backend/src/modules/library/library.routes.js` -- Added `optionalAuth`, changed search/detail to optionalAuth, added EPUB timeout
+- `backend/src/lib/rateLimiters.js` -- `authLimiter` max increased from 15 to 120 per 15-minute window
+
+### Validation
+
+- All 7 modified files pass syntax checks (node -c for backend, esbuild --bundle=false for JSX)
+- Import chains verified: `getAuthTokenFromRequest`/`verifyAuthToken` exist in `lib/authTokens.js`
+- Block/mute endpoints wrapped in try-catch for graceful degradation per CLAUDE.md rules

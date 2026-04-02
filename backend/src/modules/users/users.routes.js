@@ -497,4 +497,157 @@ router.get('/me/weekly-activity', requireAuth, async (req, res) => {
   }
 })
 
+// ── GET /api/users/me ─────────────────────────────────────────────
+// Returns the authenticated user's profile data. Used by gamification
+// widgets and any component that needs the current user's info.
+router.get('/me', requireAuth, async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: {
+        id: true,
+        username: true,
+        displayName: true,
+        email: true,
+        avatarUrl: true,
+        role: true,
+        verified: true,
+        bio: true,
+        createdAt: true,
+        schoolId: true,
+        school: { select: { id: true, name: true } },
+        _count: {
+          select: {
+            studySheets: true,
+            followers: true,
+            following: true,
+            notes: true,
+          },
+        },
+      },
+    })
+
+    if (!user) return res.status(404).json({ error: 'User not found.' })
+    res.json(user)
+  } catch (err) {
+    captureError(err, { route: req.originalUrl })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── GET /api/users/me/follow-suggestions ──────────────────────────
+// Returns up to 8 users the authenticated user may want to follow,
+// prioritizing users at the same school and users with popular content.
+router.get('/me/follow-suggestions', requireAuth, async (req, res) => {
+  try {
+    // Get IDs the user already follows
+    const following = await prisma.follow.findMany({
+      where: { followerId: req.user.userId },
+      select: { followingId: true },
+    })
+    const followingIds = following.map((f) => f.followingId)
+
+    // Get blocked user IDs (graceful degradation)
+    let blockedIds = []
+    try {
+      const { getBlockedUserIds } = require('../../lib/social/blockFilter')
+      blockedIds = await getBlockedUserIds(prisma, req.user.userId)
+    } catch {
+      blockedIds = []
+    }
+
+    const excludeIds = [...followingIds, ...blockedIds, req.user.userId]
+
+    // Get current user for school-based suggestions
+    const currentUser = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: { schoolId: true },
+    })
+
+    // Prefer users from the same school, then by sheet count
+    const suggestions = await prisma.user.findMany({
+      where: {
+        id: { notIn: excludeIds },
+        verified: true,
+      },
+      select: {
+        id: true,
+        username: true,
+        displayName: true,
+        avatarUrl: true,
+        bio: true,
+        schoolId: true,
+        _count: { select: { studySheets: true, followers: true } },
+      },
+      orderBy: [
+        { followers: { _count: 'desc' } },
+      ],
+      take: 20,
+    })
+
+    // Sort: same school first, then by follower count
+    const sorted = suggestions.sort((a, b) => {
+      const aSchool = currentUser?.schoolId && a.schoolId === currentUser.schoolId ? 1 : 0
+      const bSchool = currentUser?.schoolId && b.schoolId === currentUser.schoolId ? 1 : 0
+      if (bSchool !== aSchool) return bSchool - aSchool
+      return (b._count?.followers || 0) - (a._count?.followers || 0)
+    })
+
+    res.json(sorted.slice(0, 8))
+  } catch (err) {
+    captureError(err, { route: req.originalUrl })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── GET /api/users/me/blocked ─────────────────────────────────────
+// Returns the list of user IDs the authenticated user has blocked.
+router.get('/me/blocked', requireAuth, async (req, res) => {
+  try {
+    const blocks = await prisma.userBlock.findMany({
+      where: { blockerId: req.user.userId },
+      select: {
+        blocked: {
+          select: { id: true, username: true, displayName: true, avatarUrl: true },
+        },
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+    res.json(blocks.map((b) => ({ ...b.blocked, blockedAt: b.createdAt })))
+  } catch (err) {
+    // Graceful degradation if UserBlock table doesn't exist yet
+    if (err.code === 'P2021' || err.message?.includes('does not exist')) {
+      return res.json([])
+    }
+    captureError(err, { route: req.originalUrl })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── GET /api/users/me/muted ──────────────────────────────────────
+// Returns the list of user IDs the authenticated user has muted.
+router.get('/me/muted', requireAuth, async (req, res) => {
+  try {
+    const mutes = await prisma.userMute.findMany({
+      where: { muterId: req.user.userId },
+      select: {
+        muted: {
+          select: { id: true, username: true, displayName: true, avatarUrl: true },
+        },
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+    res.json(mutes.map((m) => ({ ...m.muted, mutedAt: m.createdAt })))
+  } catch (err) {
+    // Graceful degradation if UserMute table doesn't exist yet
+    if (err.code === 'P2021' || err.message?.includes('does not exist')) {
+      return res.json([])
+    }
+    captureError(err, { route: req.originalUrl })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
 module.exports = router

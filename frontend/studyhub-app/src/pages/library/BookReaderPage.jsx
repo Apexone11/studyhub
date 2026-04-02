@@ -99,9 +99,15 @@ export default function BookReaderPage() {
     localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify(prefs))
   }, [theme, fontSize, fontFamily])
 
+  // Track whether locations have been generated (async, can take seconds for large books)
+  const locationsReadyRef = useRef(false)
+
   // Initialize EPUB reader
   useEffect(() => {
     if (!book || !readerContainerRef.current) return
+
+    // Reset locations ready flag for new book
+    locationsReadyRef.current = false
 
     async function initializeReader() {
       try {
@@ -123,9 +129,8 @@ export default function BookReaderPage() {
         })
         renditionRef.current = rendition
 
-        // Initialize locations (for pagination)
+        // Wait for the book spine and metadata to be ready
         await epubBook.ready
-        await epubBook.locations.generate()
 
         // Register themes
         rendition.themes.register('light', {
@@ -185,25 +190,41 @@ export default function BookReaderPage() {
           setToc(epubBook.navigation.toc || [])
         }
 
-        // Set total pages
-        const totalLocs = epubBook.locations.total()
-        setTotalPages(totalLocs || 0)
-
-        // Display saved progress or start from beginning
+        // Display saved progress or start from beginning BEFORE generating locations.
+        // This lets the user start reading immediately while locations are computed
+        // in the background (can take several seconds for large books).
         if (progress && progress.cfi) {
-          rendition.display(progress.cfi)
+          await rendition.display(progress.cfi)
         } else {
-          rendition.display()
+          await rendition.display()
         }
 
-        // Listen for location changes to save progress
+        // Listen for location changes to save progress.
+        // Before locations are ready, we show a percentage estimate based on
+        // the spine position. Once locations finish generating, subsequent
+        // relocated events will use the precise location data.
         rendition.on('relocated', (location) => {
+          if (!location || !location.start) return
           const cfi = location.start.cfi
-          const percentage = epubBook.locations.percentageFromCfi(cfi)
-          const pageNum = epubBook.locations.locationFromCfi(cfi)
 
-          setCurrentPage(pageNum)
-          saveProgress(cfi, Math.round(percentage * 100))
+          if (locationsReadyRef.current) {
+            // Locations are ready -- use precise page numbers
+            const percentage = epubBook.locations.percentageFromCfi(cfi)
+            const pageNum = epubBook.locations.locationFromCfi(cfi)
+            setCurrentPage(pageNum || 1)
+            setTotalPages(epubBook.locations.total() || 1)
+            saveProgress(cfi, Math.round(percentage * 100))
+          } else {
+            // Locations still generating -- show spine-based estimate
+            const spineItem = location.start.index
+            const spineTotal = epubBook.spine?.length || epubBook.spine?.items?.length || 1
+            const estPage = Math.max(1, spineItem + 1)
+            const estTotal = Math.max(1, spineTotal)
+            setCurrentPage(estPage)
+            setTotalPages(estTotal)
+            const roughPct = Math.round((estPage / estTotal) * 100)
+            saveProgress(cfi, roughPct)
+          }
         })
 
         // Text selection for highlights
@@ -227,6 +248,26 @@ export default function BookReaderPage() {
             setShowHighlightPopover(true)
           }
         })
+
+        // Generate locations in the background AFTER the book is displayed.
+        // This is an expensive operation (can take 3-10+ seconds for large books).
+        // We do it post-display so the user sees content immediately.
+        try {
+          await epubBook.locations.generate(1024) // 1024 chars per "page"
+          locationsReadyRef.current = true
+          const totalLocs = epubBook.locations.total()
+          setTotalPages(totalLocs || 1)
+
+          // Update current page with precise location now that generation is done
+          const currentLoc = rendition.currentLocation()
+          if (currentLoc && currentLoc.start) {
+            const pageNum = epubBook.locations.locationFromCfi(currentLoc.start.cfi)
+            setCurrentPage(pageNum || 1)
+          }
+        } catch (locErr) {
+          console.warn('Location generation failed (using spine estimate):', locErr)
+          // Keep using spine-based estimate -- not a critical failure
+        }
       } catch (err) {
         console.error('Error initializing reader:', err)
       }
@@ -237,7 +278,7 @@ export default function BookReaderPage() {
     return () => {
       // Cleanup
       if (epubInstanceRef.current) {
-        epubInstanceRef.current.destroy()
+        try { epubInstanceRef.current.destroy() } catch { /* already destroyed */ }
         epubInstanceRef.current = null
       }
     }

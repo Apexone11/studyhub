@@ -8,10 +8,27 @@ const requireAuth = require('../../middleware/auth')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
 const { getBlockedUserIds } = require('../../lib/social/blockFilter')
+const { getAuthTokenFromRequest, verifyAuthToken } = require('../../lib/authTokens')
 const { libraryWriteLimiter } = require('../../lib/rateLimiters')
 
 const { searchBooks, getBookDetail, syncPopularBooksToDB } = require('./library.service')
 const { MAX_SHELVES_PER_USER, MAX_BOOKMARKS_PER_BOOK, MAX_HIGHLIGHTS_PER_BOOK } = require('./library.constants')
+
+/**
+ * Optional auth -- sets req.user if a valid token is present, otherwise
+ * proceeds as unauthenticated. Used for public-access endpoints like book
+ * search and detail where auth is optional but enriches the response.
+ */
+function optionalAuth(req, res, next) {
+  const token = getAuthTokenFromRequest(req)
+  if (!token) return next()
+  try {
+    req.user = verifyAuthToken(token)
+  } catch {
+    // Invalid/expired token -- proceed as unauthenticated
+  }
+  next()
+}
 
 const router = express.Router()
 
@@ -73,7 +90,10 @@ router.get('/books/:id/epub', async (req, res) => {
     let epubResponse = null
     for (const url of urls) {
       try {
-        const resp = await fetch(url, { redirect: 'follow' })
+        const resp = await fetch(url, {
+          redirect: 'follow',
+          signal: AbortSignal.timeout(15000), // 15-second timeout per attempt
+        })
         if (resp.ok) {
           const contentType = resp.headers.get('content-type') || ''
           // Accept EPUB or octet-stream content types
@@ -126,7 +146,7 @@ router.get('/books/:id/epub', async (req, res) => {
  * Search and browse books from Gutendex.
  * Query params: search, topic, page, sort, languages
  */
-router.get('/search', requireAuth, async (req, res) => {
+router.get('/search', optionalAuth, async (req, res) => {
   const { search, topic, page = 1, sort, languages } = req.query
 
   try {
@@ -160,7 +180,7 @@ router.get('/search', requireAuth, async (req, res) => {
  * GET /api/library/books/:id
  * Get detailed information about a specific book.
  */
-router.get('/books/:id', requireAuth, async (req, res) => {
+router.get('/books/:id', optionalAuth, async (req, res) => {
   const gutenbergId = parseInt(req.params.id, 10)
 
   if (!Number.isInteger(gutenbergId) || gutenbergId < 1) {
