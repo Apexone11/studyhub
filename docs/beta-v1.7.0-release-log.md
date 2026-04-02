@@ -3807,3 +3807,40 @@ Comprehensive stability and reliability audit driven by 8 production screenshots
 - All 7 modified files pass syntax checks (node -c for backend, esbuild --bundle=false for JSX)
 - Import chains verified: `getAuthTokenFromRequest`/`verifyAuthToken` exist in `lib/authTokens.js`
 - Block/mute endpoints wrapped in try-catch for graceful degradation per CLAUDE.md rules
+
+---
+
+## v2.0 Post-Deploy Stability Fixes -- Round 3 (2026-04-02)
+
+### Summary
+
+Production-grade infrastructure upgrades: industry-standard error boundaries, service worker rewrite fixing cache corruption, Prisma connection pooling, and SW update notification system.
+
+### Changes
+
+| # | Area | Issue | Fix |
+|---|------|-------|-----|
+| 1 | Error Boundaries | Manual class-based ErrorBoundary is fragile and lacks auto-reset | Replaced with `react-error-boundary` library (v6.1.1) -- used by Vercel, Shopify, Stripe. Added `resetKeys` for automatic recovery on navigation change. |
+| 2 | Error Boundaries | No automatic cleanup on route change | `onReset` callback clears retry counters from sessionStorage when boundary resets |
+| 3 | Service Worker | "Failed to convert value to Response" TypeError in production | `safeCachePut` now rejects opaque responses (status === 0) and non-ok responses before caching |
+| 4 | Service Worker | Unbounded cache growth consuming device storage | Added LRU-style `trimCache()` with bounded limits: 30 pages, 100 images |
+| 5 | Service Worker | No offline fallback for navigation requests | Added professional offline HTML page with retry button and auto-retry after 10 seconds |
+| 6 | Service Worker | Users stuck on old cached versions with no notification | Added `SW_UPDATED` message to clients on activation; main.jsx shows slide-up update banner |
+| 7 | Service Worker | No periodic update checks | Added 60-minute `registration.update()` interval in main.jsx SW registration |
+| 8 | Database | Prisma connection pool exhaustion on Railway (shared PostgreSQL) | Added `appendPoolParams()` to prisma.js: connection_limit=10, pool_timeout=20s, connect_timeout=10s |
+| 9 | Database | Verbose Prisma query logging in production | Production logging restricted to errors only; dev includes queries and warnings |
+
+### Files Changed
+
+- `frontend/studyhub-app/src/components/RouteErrorBoundary.jsx` -- Rewritten to use `react-error-boundary` library with `ErrorBoundary` wrapper, `FallbackComponent`, `resetKeys`, `onReset`
+- `frontend/studyhub-app/public/sw.js` -- Complete rewrite (v2.0): safe caching, bounded LRU, offline fallback, update notification
+- `frontend/studyhub-app/src/main.jsx` -- SW update detection with 60-minute polling, `updatefound`/`statechange` listeners, `showUpdateBanner()` function
+- `backend/src/lib/prisma.js` -- `appendPoolParams()` for connection pool tuning, environment-aware logging
+- `frontend/studyhub-app/package.json` -- Added `react-error-boundary@^6.1.1` dependency
+- `frontend/studyhub-app/package-lock.json` -- Lockfile updated
+
+### Validation
+
+- All modified JS files pass `node -c` syntax checks
+- `react-error-boundary` listed in package.json dependencies (install required: `npm install --legacy-peer-deps`)
+- Service worker cache name updated from `studyhub-v1.7.0` to `studyhub-v2.0`
