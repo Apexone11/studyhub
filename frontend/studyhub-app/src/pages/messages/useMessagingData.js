@@ -358,7 +358,7 @@ export function useMessagingData(socket, currentUserId) {
   /* ── Add reaction to message ─────────────────────────────────────────── */
   const addReaction = useCallback(async (messageId, emoji) => {
     try {
-      const response = await fetch(`${API}/api/messages/messages/${messageId}/reactions`, {
+      const response = await fetch(`${API}/api/messages/${messageId}/reactions`, {
         method: 'POST',
         headers: authHeaders(),
         credentials: 'include',
@@ -376,7 +376,7 @@ export function useMessagingData(socket, currentUserId) {
   const removeReaction = useCallback(async (messageId, emoji) => {
     try {
       const response = await fetch(
-        `${API}/api/messages/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`,
+        `${API}/api/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`,
         {
           method: 'DELETE',
           headers: authHeaders(),

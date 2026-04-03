@@ -53,11 +53,11 @@
     "react-router-dom": "^7.13.1",
     "recharts": "^2.15.3",
     "serve": "^14.2.5",
-    "socket.io-client": "^4.8.3"
+    "socket.io-client": "^4.8.3",
+    "video.js": "^8.23.7"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
-    "eslint-config-prettier": "^10.1.5",
     "@playwright/test": "^1.54.2",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
@@ -67,6 +67,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
     "eslint": "^9.39.1",
+    "eslint-config-prettier": "^10.1.5",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",

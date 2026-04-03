@@ -14,73 +14,94 @@ function getLastFeedVisit() {
   try {
     const raw = localStorage.getItem(LAST_FEED_VISIT_KEY)
     return raw ? new Date(raw).getTime() : 0
-  } catch { return 0 }
+  } catch {
+    return 0
+  }
 }
 
 function markFeedVisit() {
-  try { localStorage.setItem(LAST_FEED_VISIT_KEY, new Date().toISOString()) } catch { /* ignore */ }
+  try {
+    localStorage.setItem(LAST_FEED_VISIT_KEY, new Date().toISOString())
+  } catch {
+    /* ignore */
+  }
 }
 
 export function useFeedData({ user, search }) {
-  const [feedState, setFeedState] = useState({ items: [], total: 0, loading: true, error: '', partial: false, degradedSections: [] })
-  const [leaderboards, setLeaderboards] = useState({ stars: [], downloads: [], contributors: [], error: '' })
+  const [feedState, setFeedState] = useState({
+    items: [],
+    total: 0,
+    loading: true,
+    error: '',
+    partial: false,
+    degradedSections: [],
+  })
+  const [leaderboards, setLeaderboards] = useState({
+    stars: [],
+    downloads: [],
+    contributors: [],
+    error: '',
+  })
   const [starredUpdates, setStarredUpdates] = useState([])
   const [loadingMore, setLoadingMore] = useState(false)
   const [deletingPostIds, setDeletingPostIds] = useState({})
   const timing = usePageTiming('feed')
 
-  const loadFeed = useCallback(async ({ signal, startTransition } = {}) => {
-    const apply = startTransition || ((fn) => fn())
-    const params = new URLSearchParams({ limit: '24' })
-    if (search) params.set('search', search)
+  const loadFeed = useCallback(
+    async ({ signal, startTransition } = {}) => {
+      const apply = startTransition || ((fn) => fn())
+      const params = new URLSearchParams({ limit: '24' })
+      if (search) params.set('search', search)
 
-    timing.markFetchStart()
-    try {
-      const response = await fetch(`${API}/api/feed?${params.toString()}`, {
-        headers: authHeaders(),
-        credentials: 'include',
-        signal,
-      })
+      timing.markFetchStart()
+      try {
+        const response = await fetch(`${API}/api/feed?${params.toString()}`, {
+          headers: authHeaders(),
+          credentials: 'include',
+          signal,
+        })
 
-      const data = await readJsonSafely(response, {})
-      timing.markFetchEnd()
+        const data = await readJsonSafely(response, {})
+        timing.markFetchEnd()
 
-      if (response.status === 403) {
+        if (response.status === 403) {
+          apply(() => {
+            setFeedState((current) => ({
+              ...current,
+              loading: false,
+              error: getApiErrorMessage(data, 'Access to the feed is temporarily restricted.'),
+            }))
+          })
+          return
+        }
+
+        if (!response.ok) {
+          throw new Error(getApiErrorMessage(data, 'Could not load the feed.'))
+        }
+
+        apply(() => {
+          setFeedState({
+            items: Array.isArray(data.items) ? data.items : [],
+            total: data.total || 0,
+            loading: false,
+            error: '',
+            partial: Boolean(data.partial),
+            degradedSections: Array.isArray(data.degradedSections) ? data.degradedSections : [],
+          })
+        })
+      } catch (error) {
+        if (error?.name === 'AbortError') return
         apply(() => {
           setFeedState((current) => ({
             ...current,
             loading: false,
-            error: getApiErrorMessage(data, 'Access to the feed is temporarily restricted.'),
+            error: error.message || 'Could not load the feed.',
           }))
         })
-        return
       }
-
-      if (!response.ok) {
-        throw new Error(getApiErrorMessage(data, 'Could not load the feed.'))
-      }
-
-      apply(() => {
-        setFeedState({
-          items: Array.isArray(data.items) ? data.items : [],
-          total: data.total || 0,
-          loading: false,
-          error: '',
-          partial: Boolean(data.partial),
-          degradedSections: Array.isArray(data.degradedSections) ? data.degradedSections : [],
-        })
-      })
-    } catch (error) {
-      if (error?.name === 'AbortError') return
-      apply(() => {
-        setFeedState((current) => ({
-          ...current,
-          loading: false,
-          error: error.message || 'Could not load the feed.',
-        }))
-      })
-    }
-  }, [search, timing])
+    },
+    [search, timing],
+  )
 
   // Report timing when feed items first arrive
   useEffect(() => {
@@ -92,7 +113,10 @@ export function useFeedData({ user, search }) {
     const params = new URLSearchParams({ limit: '24', offset: String(feedState.items.length) })
     if (search) params.set('search', search)
     try {
-      const response = await fetch(`${API}/api/feed?${params.toString()}`, { headers: authHeaders(), credentials: 'include' })
+      const response = await fetch(`${API}/api/feed?${params.toString()}`, {
+        headers: authHeaders(),
+        credentials: 'include',
+      })
       const data = await readJsonSafely(response, {})
       if (response.ok && Array.isArray(data.items)) {
         setFeedState((current) => {
@@ -105,8 +129,11 @@ export function useFeedData({ user, search }) {
           }
         })
       }
-    } catch { /* silent */ }
-    finally { setLoadingMore(false) }
+    } catch {
+      /* silent */
+    } finally {
+      setLoadingMore(false)
+    }
   }
 
   const loadLeaderboards = useCallback(async ({ signal, startTransition } = {}) => {
@@ -114,9 +141,21 @@ export function useFeedData({ user, search }) {
 
     try {
       const [starsResponse, downloadsResponse, contributorsResponse] = await Promise.all([
-        fetch(`${API}/api/sheets/leaderboard?type=stars`, { headers: authHeaders(), credentials: 'include', signal }),
-        fetch(`${API}/api/sheets/leaderboard?type=downloads`, { headers: authHeaders(), credentials: 'include', signal }),
-        fetch(`${API}/api/sheets/leaderboard?type=contributors`, { headers: authHeaders(), credentials: 'include', signal }),
+        fetch(`${API}/api/sheets/leaderboard?type=stars`, {
+          headers: authHeaders(),
+          credentials: 'include',
+          signal,
+        }),
+        fetch(`${API}/api/sheets/leaderboard?type=downloads`, {
+          headers: authHeaders(),
+          credentials: 'include',
+          signal,
+        }),
+        fetch(`${API}/api/sheets/leaderboard?type=contributors`, {
+          headers: authHeaders(),
+          credentials: 'include',
+          signal,
+        }),
       ])
 
       const [stars, downloads, contributors] = await Promise.all([
@@ -136,7 +175,10 @@ export function useFeedData({ user, search }) {
     } catch (error) {
       if (error?.name === 'AbortError') return
       apply(() => {
-        setLeaderboards((current) => ({ ...current, error: 'Leaderboards are temporarily unavailable.' }))
+        setLeaderboards((current) => ({
+          ...current,
+          error: 'Leaderboards are temporarily unavailable.',
+        }))
       })
     }
   }, [])
@@ -176,7 +218,10 @@ export function useFeedData({ user, search }) {
   const toggleReaction = useCallback(async (item, type) => {
     const currentType = item.reactions?.userReaction || null
     const nextType = currentType === type ? null : type
-    const endpoint = item.type === 'post' ? `${API}/api/feed/posts/${item.id}/react` : `${API}/api/sheets/${item.id}/react`
+    const endpoint =
+      item.type === 'post'
+        ? `${API}/api/feed/posts/${item.id}/react`
+        : `${API}/api/sheets/${item.id}/react`
 
     try {
       const response = await fetch(endpoint, {
@@ -192,14 +237,15 @@ export function useFeedData({ user, search }) {
 
       setFeedState((current) => ({
         ...current,
-        items: current.items.map((entry) => (
-          entry.feedKey === item.feedKey
-            ? { ...entry, reactions: data }
-            : entry
-        )),
+        items: current.items.map((entry) =>
+          entry.feedKey === item.feedKey ? { ...entry, reactions: data } : entry,
+        ),
       }))
     } catch (error) {
-      setFeedState((current) => ({ ...current, error: error.message || 'Could not update the reaction.' }))
+      setFeedState((current) => ({
+        ...current,
+        error: error.message || 'Could not update the reaction.',
+      }))
     }
   }, [])
 
@@ -217,14 +263,17 @@ export function useFeedData({ user, search }) {
 
       setFeedState((current) => ({
         ...current,
-        items: current.items.map((entry) => (
+        items: current.items.map((entry) =>
           entry.feedKey === item.feedKey
             ? { ...entry, starred: data.starred, stars: data.stars }
-            : entry
-        )),
+            : entry,
+        ),
       }))
     } catch (error) {
-      setFeedState((current) => ({ ...current, error: error.message || 'Could not update the star.' }))
+      setFeedState((current) => ({
+        ...current,
+        error: error.message || 'Could not update the star.',
+      }))
     }
   }, [])
 
@@ -282,7 +331,7 @@ export function useFeedData({ user, search }) {
     }
   }
 
-  const submitPost = async ({ content, courseId, attachedFile }) => {
+  const submitPost = async ({ content, courseId, attachedFile, videoId }) => {
     const response = await fetch(`${API}/api/feed/posts`, {
       method: 'POST',
       headers: authHeaders(),
@@ -290,6 +339,7 @@ export function useFeedData({ user, search }) {
       body: JSON.stringify({
         content: content.trim(),
         courseId: courseId || null,
+        videoId: videoId || null,
       }),
     })
 
@@ -322,7 +372,11 @@ export function useFeedData({ user, search }) {
       items: [finalPost, ...current.items],
       total: current.total + 1,
     }))
-    trackEvent('feed_post_created', { hasCourse: Boolean(courseId), hasAttachment: Boolean(attachedFile) })
+    trackEvent('feed_post_created', {
+      hasCourse: Boolean(courseId),
+      hasAttachment: Boolean(attachedFile),
+      hasVideo: Boolean(videoId),
+    })
   }
 
   const retryFeed = () => {
@@ -334,11 +388,14 @@ export function useFeedData({ user, search }) {
   const [lastFeedVisit] = useState(getLastFeedVisit)
   const newSinceLastVisit = useMemo(() => {
     if (!lastFeedVisit || feedState.loading || feedState.items.length === 0) return 0
-    return feedState.items.filter((item) => new Date(item.createdAt).getTime() > lastFeedVisit).length
+    return feedState.items.filter((item) => new Date(item.createdAt).getTime() > lastFeedVisit)
+      .length
   }, [feedState.items, feedState.loading, lastFeedVisit])
 
   // Mark visit once feed loads
-  useEffect(() => { if (!feedState.loading && feedState.items.length > 0) markFeedVisit() }, [feedState.loading, feedState.items.length])
+  useEffect(() => {
+    if (!feedState.loading && feedState.items.length > 0) markFeedVisit()
+  }, [feedState.loading, feedState.items.length])
 
   return {
     feedState,
