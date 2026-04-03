@@ -7,6 +7,7 @@
  * Organized by feature/module for easy discovery and updates.
  */
 const rateLimit = require('express-rate-limit')
+const { WINDOW_1_MIN, WINDOW_5_MIN, WINDOW_15_MIN, WINDOW_1_HOUR, WINDOW_1_DAY } = require('./constants')
 
 // ── CATEGORY: Generic Base Limiters ────────────────────────────────────────
 
@@ -15,7 +16,7 @@ const rateLimit = require('express-rate-limit')
  * 15 requests per 15-minute window per IP.
  */
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: WINDOW_15_MIN,
   max: 120,
   standardHeaders: true,
   legacyHeaders: false,
@@ -27,7 +28,7 @@ const authLimiter = rateLimit({
  * 60 requests per minute per IP.
  */
 const writeLimiter = rateLimit({
-  windowMs: 60 * 1000,
+  windowMs: WINDOW_1_MIN,
   max: 60,
   standardHeaders: true,
   legacyHeaders: false,
@@ -39,7 +40,7 @@ const writeLimiter = rateLimit({
  * 200 requests per minute per IP.
  */
 const readLimiter = rateLimit({
-  windowMs: 60 * 1000,
+  windowMs: WINDOW_1_MIN,
   max: 200,
   standardHeaders: true,
   legacyHeaders: false,
@@ -51,7 +52,7 @@ const readLimiter = rateLimit({
  * 120 requests per minute per IP.
  */
 const adminLimiter = rateLimit({
-  windowMs: 60 * 1000,
+  windowMs: WINDOW_1_MIN,
   max: 120,
   standardHeaders: true,
   legacyHeaders: false,
@@ -63,7 +64,7 @@ const adminLimiter = rateLimit({
  * 60 requests per minute per IP.
  */
 const previewLimiter = rateLimit({
-  windowMs: 60 * 1000,
+  windowMs: WINDOW_1_MIN,
   max: 60,
   standardHeaders: true,
   legacyHeaders: false,
@@ -75,7 +76,7 @@ const previewLimiter = rateLimit({
  * 100 requests per 15-minute window per IP.
  */
 const publicLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: WINDOW_15_MIN,
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,
@@ -88,7 +89,7 @@ const publicLimiter = rateLimit({
  * Login endpoint — 10 requests per 15 minutes per IP.
  */
 const authLoginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: WINDOW_15_MIN,
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
@@ -99,7 +100,7 @@ const authLoginLimiter = rateLimit({
  * Registration endpoint — 8 requests per 60 minutes per IP.
  */
 const authRegisterLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
+  windowMs: WINDOW_1_HOUR,
   max: 8,
   standardHeaders: true,
   legacyHeaders: false,
@@ -110,7 +111,7 @@ const authRegisterLimiter = rateLimit({
  * Email verification endpoint — 25 requests per 15 minutes per IP.
  */
 const authVerificationLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: WINDOW_15_MIN,
   max: 25,
   standardHeaders: true,
   legacyHeaders: false,
@@ -121,7 +122,7 @@ const authVerificationLimiter = rateLimit({
  * Password reset request — 5 requests per 15 minutes per IP.
  */
 const authForgotLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: WINDOW_15_MIN,
   max: 5,
   standardHeaders: true,
   legacyHeaders: false,
@@ -132,7 +133,7 @@ const authForgotLimiter = rateLimit({
  * Logout endpoint — 100 requests per 15 minutes per IP.
  */
 const authLogoutLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: WINDOW_15_MIN,
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,
@@ -142,7 +143,7 @@ const authLogoutLimiter = rateLimit({
  * Google OAuth sign-in — 20 requests per 15 minutes per IP.
  */
 const authGoogleLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: WINDOW_15_MIN,
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
@@ -155,7 +156,7 @@ const authGoogleLimiter = rateLimit({
  * Feed reactions (like, star) — 30 requests per minute per IP.
  */
 const feedReactLimiter = rateLimit({
-  windowMs: 60 * 1000,
+  windowMs: WINDOW_1_MIN,
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
@@ -166,7 +167,7 @@ const feedReactLimiter = rateLimit({
  * Feed read operations — 600 requests per minute per IP.
  */
 const feedReadLimiter = rateLimit({
-  windowMs: 60 * 1000,
+  windowMs: WINDOW_1_MIN,
   max: 600,
   standardHeaders: true,
   legacyHeaders: false,
@@ -177,7 +178,7 @@ const feedReadLimiter = rateLimit({
  * Feed write operations — 120 requests per 15 minutes per IP.
  */
 const feedWriteLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: WINDOW_15_MIN,
   max: 120,
   standardHeaders: true,
   legacyHeaders: false,
@@ -188,7 +189,7 @@ const feedWriteLimiter = rateLimit({
  * Feed comments — 10 requests per 5 minutes per IP.
  */
 const feedCommentLimiter = rateLimit({
-  windowMs: 5 * 60 * 1000,
+  windowMs: WINDOW_5_MIN,
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
@@ -199,7 +200,7 @@ const feedCommentLimiter = rateLimit({
  * Feed attachment downloads — 120 requests per 15 minutes per IP.
  */
 const feedAttachmentDownloadLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: WINDOW_15_MIN,
   max: 120,
   standardHeaders: true,
   legacyHeaders: false,
@@ -210,7 +211,7 @@ const feedAttachmentDownloadLimiter = rateLimit({
  * Authenticated feed operations — 240 requests per minute per IP.
  */
 const feedAuthLimiter = rateLimit({
-  windowMs: 60 * 1000,
+  windowMs: WINDOW_1_MIN,
   max: 240,
   standardHeaders: true,
   legacyHeaders: false,
@@ -221,7 +222,7 @@ const feedAuthLimiter = rateLimit({
  * Leaderboard requests — 120 requests per minute per IP.
  */
 const feedLeaderboardLimiter = rateLimit({
-  windowMs: 60 * 1000,
+  windowMs: WINDOW_1_MIN,
   max: 120,
   standardHeaders: true,
   legacyHeaders: false,
@@ -232,7 +233,7 @@ const feedLeaderboardLimiter = rateLimit({
  * Feed discovery page — 120 requests per 15 minutes per IP.
  */
 const feedDiscoveryLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: WINDOW_15_MIN,
   max: 120,
   standardHeaders: true,
   legacyHeaders: false,
@@ -244,7 +245,7 @@ const feedDiscoveryLimiter = rateLimit({
  * Sheet reactions (like, star) — 30 requests per minute per IP.
  */
 const sheetReactLimiter = rateLimit({
-  windowMs: 60 * 1000,
+  windowMs: WINDOW_1_MIN,
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
@@ -255,7 +256,7 @@ const sheetReactLimiter = rateLimit({
  * Sheet write operations — 120 requests per 15 minutes per IP.
  */
 const sheetWriteLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: WINDOW_15_MIN,
   max: 120,
   standardHeaders: true,
   legacyHeaders: false,
@@ -266,7 +267,7 @@ const sheetWriteLimiter = rateLimit({
  * Sheet comments — 10 requests per 5 minutes per IP.
  */
 const sheetCommentLimiter = rateLimit({
-  windowMs: 5 * 60 * 1000,
+  windowMs: WINDOW_5_MIN,
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
@@ -277,7 +278,7 @@ const sheetCommentLimiter = rateLimit({
  * Contribution submissions — 60 requests per 15 minutes per IP.
  */
 const sheetContributionLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: WINDOW_15_MIN,
   max: 60,
   standardHeaders: true,
   legacyHeaders: false,
@@ -288,7 +289,7 @@ const sheetContributionLimiter = rateLimit({
  * Contribution reviews — 60 requests per 15 minutes per IP.
  */
 const sheetContributionReviewLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: WINDOW_15_MIN,
   max: 60,
   standardHeaders: true,
   legacyHeaders: false,
@@ -299,7 +300,7 @@ const sheetContributionReviewLimiter = rateLimit({
  * Sheet attachment downloads — 120 requests per 15 minutes per IP.
  */
 const sheetAttachmentDownloadLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: WINDOW_15_MIN,
   max: 120,
   standardHeaders: true,
   legacyHeaders: false,
@@ -310,7 +311,7 @@ const sheetAttachmentDownloadLimiter = rateLimit({
  * Sheet leaderboard — 120 requests per minute per IP.
  */
 const sheetLeaderboardLimiter = rateLimit({
-  windowMs: 60 * 1000,
+  windowMs: WINDOW_1_MIN,
   max: 120,
   standardHeaders: true,
   legacyHeaders: false,
@@ -321,7 +322,7 @@ const sheetLeaderboardLimiter = rateLimit({
  * Sheet diff requests — 60 requests per minute per IP.
  */
 const sheetDiffLimiter = rateLimit({
-  windowMs: 60 * 1000,
+  windowMs: WINDOW_1_MIN,
   max: 60,
   standardHeaders: true,
   legacyHeaders: false,
@@ -332,7 +333,7 @@ const sheetDiffLimiter = rateLimit({
  * Sheet analytics — 120 requests per 15 minutes per IP.
  */
 const sheetAnalyticsLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: WINDOW_15_MIN,
   max: 120,
   standardHeaders: true,
   legacyHeaders: false,
@@ -345,7 +346,7 @@ const sheetAnalyticsLimiter = rateLimit({
  * Content appeals — 5 requests per 15 minutes per IP.
  */
 const moderationAppealLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: WINDOW_15_MIN,
   max: 5,
   standardHeaders: true,
   legacyHeaders: false,
@@ -356,7 +357,7 @@ const moderationAppealLimiter = rateLimit({
  * Content reports — 10 requests per 60 minutes per IP.
  */
 const moderationReportLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
+  windowMs: WINDOW_1_HOUR,
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
@@ -369,7 +370,7 @@ const moderationReportLimiter = rateLimit({
  * Two-factor authentication setup — 10 requests per 15 minutes per IP.
  */
 const settingsTwoFaLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: WINDOW_15_MIN,
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
@@ -382,7 +383,7 @@ const settingsTwoFaLimiter = rateLimit({
  * School catalog requests — 120 requests per 15 minutes per IP.
  */
 const coursesSchoolsLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: WINDOW_15_MIN,
   max: 120,
   standardHeaders: true,
   legacyHeaders: false,
@@ -395,7 +396,7 @@ const coursesSchoolsLimiter = rateLimit({
  * Sharing mutations (create, update, delete) — 30 requests per minute per IP.
  */
 const sharingMutateLimiter = rateLimit({
-  windowMs: 60 * 1000,
+  windowMs: WINDOW_1_MIN,
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
@@ -406,7 +407,7 @@ const sharingMutateLimiter = rateLimit({
  * Sharing read operations — 120 requests per minute per IP.
  */
 const sharingReadLimiter = rateLimit({
-  windowMs: 60 * 1000,
+  windowMs: WINDOW_1_MIN,
   max: 120,
   standardHeaders: true,
   legacyHeaders: false,
@@ -419,7 +420,7 @@ const sharingReadLimiter = rateLimit({
  * Note mutations — 30 requests per minute per IP.
  */
 const notesMutateLimiter = rateLimit({
-  windowMs: 60 * 1000,
+  windowMs: WINDOW_1_MIN,
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
@@ -430,7 +431,7 @@ const notesMutateLimiter = rateLimit({
  * Note read operations — 120 requests per minute per IP.
  */
 const notesReadLimiter = rateLimit({
-  windowMs: 60 * 1000,
+  windowMs: WINDOW_1_MIN,
   max: 120,
   standardHeaders: true,
   legacyHeaders: false,
@@ -441,7 +442,7 @@ const notesReadLimiter = rateLimit({
  * Note comments — 20 requests per minute per IP.
  */
 const notesCommentLimiter = rateLimit({
-  windowMs: 60 * 1000,
+  windowMs: WINDOW_1_MIN,
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
@@ -454,7 +455,7 @@ const notesCommentLimiter = rateLimit({
  * Global search — 120 requests per minute per IP.
  */
 const searchLimiter = rateLimit({
-  windowMs: 60 * 1000,
+  windowMs: WINDOW_1_MIN,
   max: 120,
   standardHeaders: true,
   legacyHeaders: false,
@@ -467,7 +468,7 @@ const searchLimiter = rateLimit({
  * Avatar uploads — 20 requests per 15 minutes per IP.
  */
 const uploadAvatarLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: WINDOW_15_MIN,
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
@@ -478,7 +479,7 @@ const uploadAvatarLimiter = rateLimit({
  * Attachment uploads — 40 requests per 15 minutes per IP.
  */
 const uploadAttachmentLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: WINDOW_15_MIN,
   max: 40,
   standardHeaders: true,
   legacyHeaders: false,
@@ -489,7 +490,7 @@ const uploadAttachmentLimiter = rateLimit({
  * Sheet cover image uploads — 10 requests per 15 minutes per IP.
  */
 const uploadCoverLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: WINDOW_15_MIN,
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
@@ -500,7 +501,7 @@ const uploadCoverLimiter = rateLimit({
  * Content inline image uploads — 60 requests per 15 minutes per IP.
  */
 const uploadContentImageLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: WINDOW_15_MIN,
   max: 60,
   standardHeaders: true,
   legacyHeaders: false,
@@ -513,7 +514,7 @@ const uploadContentImageLimiter = rateLimit({
  * Follow/unfollow operations — 30 requests per minute per IP.
  */
 const usersFollowLimiter = rateLimit({
-  windowMs: 60 * 1000,
+  windowMs: WINDOW_1_MIN,
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
@@ -526,7 +527,7 @@ const usersFollowLimiter = rateLimit({
  * WebAuthn registration/authentication — 20 requests per 15 minutes per IP.
  */
 const webauthnLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: WINDOW_15_MIN,
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
@@ -539,7 +540,7 @@ const webauthnLimiter = rateLimit({
  * Message write operations — 60 requests per minute per IP.
  */
 const messagingWriteLimiter = rateLimit({
-  windowMs: 60 * 1000,
+  windowMs: WINDOW_1_MIN,
   max: 60,
   standardHeaders: true,
   legacyHeaders: false,
@@ -555,7 +556,7 @@ const messagingWriteLimiter = rateLimit({
  */
 const createAiMessageLimiter = (rpmLimit) =>
   rateLimit({
-    windowMs: 60 * 1000,
+    windowMs: WINDOW_1_MIN,
     max: rpmLimit,
     keyGenerator: (req) => `ai_${req.user.userId}`,
     standardHeaders: true,
@@ -569,7 +570,7 @@ const createAiMessageLimiter = (rpmLimit) =>
  * Sheet activity feed — 120 requests per minute per IP.
  */
 const sheetActivityLimiter = rateLimit({
-  windowMs: 60 * 1000,
+  windowMs: WINDOW_1_MIN,
   max: 120,
   standardHeaders: true,
   legacyHeaders: false,
@@ -580,7 +581,7 @@ const sheetActivityLimiter = rateLimit({
  * Sheet readme extras — 120 requests per minute per IP.
  */
 const sheetReadmeLimiter = rateLimit({
-  windowMs: 60 * 1000,
+  windowMs: WINDOW_1_MIN,
   max: 120,
   standardHeaders: true,
   legacyHeaders: false,
@@ -593,7 +594,7 @@ const sheetReadmeLimiter = rateLimit({
  * Library write operations (shelves, bookmarks, highlights) — 60 requests per minute per IP.
  */
 const libraryWriteLimiter = rateLimit({
-  windowMs: 60 * 1000,
+  windowMs: WINDOW_1_MIN,
   max: 60,
   standardHeaders: true,
   legacyHeaders: false,
@@ -601,7 +602,7 @@ const libraryWriteLimiter = rateLimit({
 })
 
 const exportDataLimiter = rateLimit({
-  windowMs: 24 * 60 * 60 * 1000, // 24 hours
+  windowMs: WINDOW_1_DAY,
   max: 3,
   standardHeaders: true,
   legacyHeaders: false,
@@ -612,7 +613,7 @@ const exportDataLimiter = rateLimit({
 // ── Video module ───────────────────────────────────────────────────────────
 
 const videoUploadInitLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: WINDOW_15_MIN, // 15 minutes
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
@@ -621,7 +622,7 @@ const videoUploadInitLimiter = rateLimit({
 })
 
 const videoUploadChunkLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
+  windowMs: WINDOW_1_MIN, // 1 minute
   max: 200, // 200 chunks per minute (supports fast uploads)
   standardHeaders: true,
   legacyHeaders: false,
@@ -632,7 +633,7 @@ const videoUploadChunkLimiter = rateLimit({
 // ── Payments module ───────────────────────────────────────────────────────
 
 const paymentCheckoutLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: WINDOW_15_MIN, // 15 minutes
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
@@ -641,7 +642,7 @@ const paymentCheckoutLimiter = rateLimit({
 })
 
 const paymentPortalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: WINDOW_15_MIN,
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
@@ -650,7 +651,7 @@ const paymentPortalLimiter = rateLimit({
 })
 
 const paymentReadLimiter = rateLimit({
-  windowMs: 60 * 1000,
+  windowMs: WINDOW_1_MIN,
   max: 60,
   standardHeaders: true,
   legacyHeaders: false,

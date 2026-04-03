@@ -19,6 +19,33 @@ import { API } from '../config'
 // Module-level in-memory cache: { data, timestamp }
 export const cache = new Map()
 
+// Cache expiry constants
+const MAX_CACHE_SIZE = 50
+const CACHE_MAX_AGE_MS = 10 * 60 * 1000 // 10 minutes
+const SWEEP_INTERVAL_MS = 60 * 1000 // 1 minute
+let sweepTimer = null
+
+/** Evict stale entries and enforce size cap. */
+export function sweepCache() {
+  const now = Date.now()
+  for (const [key, entry] of cache) {
+    if (now - entry.timestamp > CACHE_MAX_AGE_MS) cache.delete(key)
+  }
+  // Enforce size cap: evict oldest entries first
+  if (cache.size > MAX_CACHE_SIZE) {
+    const sorted = [...cache.entries()].sort((a, b) => a[1].timestamp - b[1].timestamp)
+    const excess = cache.size - MAX_CACHE_SIZE
+    for (let i = 0; i < excess; i++) cache.delete(sorted[i][0])
+  }
+}
+
+/** Start the sweep timer lazily on first SWR cache hit. */
+function ensureSweepRunning() {
+  if (!sweepTimer) {
+    sweepTimer = setInterval(sweepCache, SWEEP_INTERVAL_MS)
+  }
+}
+
 /**
  * Clear fetch cache entries.
  * @param {string|null} cacheKey - If provided, clear only this key. If null, clear all.
@@ -80,26 +107,15 @@ export default function useFetch(path, options = {}) {
     // Check cache on mount if SWR is enabled
     if (!skip && swr > 0) {
       const cached = cache.get(cacheKeyToUse)
-      const now = Date.now()
 
       if (cached) {
-        const ageMs = now - cached.timestamp
-        if (ageMs < swr) {
-          // Cache is fresh: return cached data with no loading state, but still fetch in background
-          setData(cached.data)
-          setError(null)
-          setLoading(false)
-          // Still fetch in background to keep it fresh for next time
-          fetchData()
-          return () => { mountedRef.current = false }
-        } else {
-          // Cache is stale: show cached data immediately, fetch in background to replace it
-          setData(cached.data)
-          setError(null)
-          setLoading(false)
-          fetchData()
-          return () => { mountedRef.current = false }
-        }
+        ensureSweepRunning()
+        // Return cached data immediately (fresh or stale), revalidate in background
+        setData(cached.data)
+        setError(null)
+        setLoading(false)
+        fetchData()
+        return () => { mountedRef.current = false }
       }
     }
 

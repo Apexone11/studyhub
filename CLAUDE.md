@@ -49,7 +49,8 @@ Backend:
 ### General
 
 - URL parameters are the source of truth for list/search/filter pages such as `SheetsPage` and `FeedPage`.
-- Backend is fully modularized under `backend/src/modules/<name>/` with `index.js`, `*.routes.js`, `*.controller.js`, `*.service.js`, `*.constants.js` pattern (21+ modules).
+- Backend is fully modularized under `backend/src/modules/<name>/` with `index.js`, `*.routes.js`, `*.controller.js`, `*.service.js`, `*.constants.js` pattern (21+ modules). The largest route files (studyGroups, library, notes, users) have been split into thin route files + controller files.
+- Type definitions: `backend/src/types/` and `frontend/studyhub-app/src/types/` contain `.d.ts` declaration files for core shared modules. Both projects have `jsconfig.json` with `checkJs: true` for IDE type checking.
 - Frontend uses feature barrels under `frontend/studyhub-app/src/features/<name>/index.js` that re-export from `pages/`. New feature logic goes in `features/`, pages import from barrels. Migration is incremental.
 - Files that mix React components with non-component exports must be split: constants/helpers in `.js`, components in `.jsx`. The `.js` file re-exports from `.jsx` for backward compatibility (satisfies `react-refresh/only-export-components`).
 - Large pages (>200 lines) should be decomposed into thin orchestrator shells. Extract composable child components (composers, asides, empty states, nav action bars) that own their rendering. Pages own layout, routing state, and hook wiring only.
@@ -104,6 +105,26 @@ Backend:
 - Mute filtering is one-directional: only the muter's feed is affected.
 - Any endpoint calling `getBlockedUserIds` or `getMutedUserIds` MUST wrap the call in try-catch for graceful degradation, because these queries will fail if the block/mute tables are temporarily unavailable or not yet migrated.
 
+### Payment System (Stripe)
+
+- Backend module: `backend/src/modules/payments/` with routes, service, constants, and barrel index.
+- Backend routes mounted at `/api/payments` in `backend/src/index.js`.
+- Stripe SDK: `stripe` v22.0.0 (lazy-initialized via `getStripe()` in service).
+- Environment variables (Railway): `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID_PRO` (monthly), `STRIPE_PRICE_ID_PRO_YEARLY`, `STRIPE_PRICE_ID_DONATION`, `FRONTEND_URL`.
+- Database tables: `Subscription`, `Payment`, `Donation` (migration: `20260403000001_add_payment_tables`).
+- Plans: `free`, `pro_monthly`, `pro_yearly`. Plan definitions and feature limits in `payments.constants.js`. `planFromPriceId()` maps Stripe price IDs back to plan names.
+- Checkout flow: Frontend calls `POST /api/payments/checkout/subscription` or `POST /api/payments/checkout/donation`, receives a Stripe Checkout Session URL, and redirects the user to Stripe's hosted page.
+- Webhook: `POST /api/payments/webhook` mounted BEFORE `express.json()` in `index.js` with `express.raw()` for signature verification via `stripe.webhooks.constructEvent()`. Handles 5 events: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_succeeded`, `invoice.payment_failed`.
+- Customer Portal: `POST /api/payments/portal` creates a Stripe Customer Portal session for self-service subscription management (card updates, plan changes, cancellation).
+- Donation checkout uses `price_data` with custom `unit_amount` (variable amounts), not a fixed price ID. Min $1, max $1000.
+- Security: CSRF origin check on all payment POST routes (checkout, portal). Webhook rate limited at 100/min by IP. Checkout rate limited at 10/15min per user. No Stripe keys in frontend code.
+- Frontend pages:
+  - Pricing: `frontend/studyhub-app/src/pages/pricing/PricingPage.jsx` at route `/pricing`.
+  - Supporters: `frontend/studyhub-app/src/pages/supporters/SupportersPage.jsx` at route `/supporters` (public leaderboard + Pro showcase).
+  - Settings Subscription tab: `frontend/studyhub-app/src/pages/settings/SubscriptionTab.jsx` (plan status, portal link, payment history).
+  - Admin Revenue tab: `frontend/studyhub-app/src/pages/admin/RevenueTab.jsx` (lazy-loaded, 4 metric cards + recent transactions).
+- Rate limiters: `paymentCheckoutLimiter` (10/15min), `paymentPortalLimiter` (10/15min), `paymentReadLimiter` (60/min), `paymentWebhookLimiter` (100/min by IP). All defined in `rateLimiters.js`.
+
 ### Hub AI (AI Assistant)
 
 - Backend module: `backend/src/modules/ai/` with routes, service, constants, and context builder.
@@ -122,7 +143,7 @@ Backend:
 - Sheet preview: `frontend/studyhub-app/src/components/ai/AiSheetPreview.jsx` extracts HTML from AI responses and offers preview/publish.
 - Image upload: `frontend/studyhub-app/src/components/ai/AiImageUpload.jsx` handles file selection, validation, and base64 conversion.
 - Markdown renderer: `frontend/studyhub-app/src/components/ai/AiMarkdown.jsx` (lightweight, no external dependency).
-- Rate limits: 30 messages/day (regular), 60 (verified), 120 (admin). Tracked in `AiUsageLog` table.
+- Rate limits: 30 messages/day (regular), 60 (verified), 120 (pro), 120 (admin). Tracked in `AiUsageLog` table. Plan resolved via `getUserPlan()` in `ai.service.js` with graceful degradation.
 - Context injection: `ai.context.js` builds dynamic system prompt sections from user's courses, sheets, notes, and current page.
 - Streaming: POST `/api/ai/messages` returns SSE stream. Events: `delta` (token), `title` (auto-title), `done` (completion), `error`.
 - Sidebar nav link uses `IconSpark` icon. Bubble hidden on `/ai`, `/login`, `/register` pages.
@@ -131,10 +152,14 @@ Backend:
 
 - `useFetch` hook (`frontend/studyhub-app/src/lib/useFetch.js`) supports opt-in SWR caching via `swr` option (ms). Cached data is returned instantly while a background revalidation fetch runs. Cache is a module-level `Map` exported as `cache`.
 - `clearFetchCache(cacheKey?)` invalidates one or all cache entries. Called automatically on logout in `session.js`.
+- Cache expiry: `sweepCache()` runs every 60 seconds, evicting entries older than 10 minutes (`CACHE_MAX_AGE_MS`) and enforcing a 50-entry cap (`MAX_CACHE_SIZE`). The sweep timer starts lazily on first SWR cache hit.
 - `prefetch.js` (`frontend/studyhub-app/src/lib/prefetch.js`) warms the SWR cache on sidebar link hover via `requestIdleCallback`. Maps 9 routes to API endpoints with 30-second debounce.
 - `cacheControl.js` (`backend/src/lib/cacheControl.js`) is an Express middleware for HTTP `Cache-Control` headers. Applied to stable public endpoints (platform-stats, schools, popular courses, preferences).
 - All pages use skeleton loading placeholders from `frontend/studyhub-app/src/components/Skeleton.jsx` instead of bare "Loading..." text.
-- Rate limiters are centralized in `backend/src/lib/rateLimiters.js` (49 limiters). Never define inline rate limiters in route files.
+- Rate limiters are centralized in `backend/src/lib/rateLimiters.js` (49+ limiters). All time windows use shared constants from `constants.js` (`WINDOW_1_MIN`, `WINDOW_5_MIN`, `WINDOW_15_MIN`, `WINDOW_1_HOUR`, `WINDOW_1_DAY`). Never define inline rate limiters in route files.
+- Shared constants: `backend/src/lib/constants.js` exports pagination helpers (`clampLimit`, `clampPage`, `DEFAULT_PAGE_SIZE`, `MAX_PAGE_SIZE`), time window constants, and content limit constants (`MAX_MESSAGE_LENGTH`, `MAX_ANNOUNCEMENT_LENGTH`, `MAX_DONATION_MESSAGE_LENGTH`).
+- Socket.io event constants: `backend/src/lib/socketEvents.js` and `frontend/studyhub-app/src/lib/socketEvents.js` define all Socket.io event names as constants. Always import from these files instead of hardcoding event strings.
+- Error codes: `backend/src/middleware/errorEnvelope.js` exports `sendError(res, status, message, code, extra)` and `ERROR_CODES` with common HTTP codes (`UNAUTHORIZED`, `VALIDATION`, `NOT_FOUND`, `INTERNAL`, `BAD_REQUEST`, `CONFLICT`, `RATE_LIMITED`) plus domain-specific codes. New routes should use `sendError` instead of raw `res.status().json({ error })`.
 
 ### CSS and Styling
 
@@ -180,6 +205,7 @@ Tables with migrations (safe to query):
 - Note.pinned, Note.tags columns (migration: `20260331000002_add_note_pinned_and_tags`)
 - NoteStar, NoteVersion (migration: `20260331000003_add_note_star_and_note_version`)
 - AiConversation, AiMessage, AiUsageLog (migration: `20260331000004_add_ai_assistant_tables`)
+- Subscription, Payment, Donation (migration: `20260403000001_add_payment_tables`)
 
 ## Repo Workflow Conventions
 
@@ -259,6 +285,8 @@ Search entry points:
 - Extend browser coverage for the auth-gated HomePage search flow to assert the post-login return behavior if StudyHub later preserves destination after redirecting public users to `/login`.
 - Add integration tests for messaging endpoints once the messaging tables are deployed.
 - Add E2E tests for the DM auto-start flow (profile -> `/messages?dm=userId` -> conversation creation).
+- Backend test coverage recently added for: payments module (45 tests), core utilities (70 tests: constants, cache, authTokens), validation middleware (60+ tests). Still untested: video module, SheetLab, WebAuthn, rateLimiters, r2Storage, socketio, storage, plagiarism.
+- Frontend E2E coverage recently added for: pricing page, settings page (subscription tab), AI page, user profile page. Still untested: library/books pages, dashboard page, courses page, legal pages, playground page.
 
 ## Working Agreement For AI Agents
 
@@ -274,3 +302,4 @@ When handling a new task:
 8. Do not use emojis in code, comments, or UI text.
 9. All inline style colors must use CSS custom property tokens (`var(--sh-*)`).
 10. Wrap any call to `getBlockedUserIds` or `getMutedUserIds` in try-catch for graceful degradation.
+                                                                                                                                                                                                                                                                                  

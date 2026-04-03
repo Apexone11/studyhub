@@ -3970,3 +3970,105 @@ Pre-existing endpoints (from earlier work):
 - Backend lint: clean
 - Frontend lint: clean
 - AdminPage.jsx already had lazy import and tab wiring for AnalyticsTab
+
+---
+
+## Stripe Payment System (2026-04-03)
+
+### Summary
+
+Full Stripe payment integration: subscription checkout, one-time donations, webhook processing, customer portal, and admin revenue analytics.
+
+### Backend Changes
+
+| Category | Detail |
+| -------- | ------ |
+| New module | `backend/src/modules/payments/` -- routes, service, constants, barrel index |
+| Prisma models | `Subscription`, `Payment`, `Donation` with full relations to `User` |
+| Migration | `20260403000001_add_payment_tables` -- deployed to Railway |
+| Webhook | `POST /api/payments/webhook` mounted before `express.json()` with `express.raw()` for Stripe signature verification |
+| Webhook events | `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_succeeded`, `invoice.payment_failed` |
+| Checkout | `POST /api/payments/checkout/subscription` (auth), `POST /api/payments/checkout/donation` (optional auth) |
+| Portal | `POST /api/payments/portal` creates Stripe Customer Portal session |
+| Queries | `GET /subscription`, `GET /history`, `GET /donations/leaderboard`, `GET /subscribers`, `GET /admin/revenue` |
+| Rate limiters | `paymentCheckoutLimiter` (10/15min), `paymentPortalLimiter` (10/15min), `paymentReadLimiter` (60/min), `paymentWebhookLimiter` (100/min by IP) |
+| Security | CSRF origin check on all payment POST routes (checkout, donation, portal). Webhook verified via Stripe signature. |
+| Dependency | `stripe` v22.0.0 added to `backend/package.json` |
+| Bug fix | `video.routes.js` -- Fixed Express 5 crash: `/media/:path(*)` changed to `/media/{*path}` with array join for path-to-regexp v8 |
+
+### Frontend Changes
+
+| Category | Detail |
+| -------- | ------ |
+| PricingPage | Rewritten: billing toggle (monthly/yearly), Pro subscribe button with Stripe Checkout redirect, donation section with presets + custom amount + message + anonymous toggle, payment success/canceled banners |
+| SupportersPage | New public page at `/supporters`: top donors leaderboard (ranked, medal colors), Pro members showcase grid |
+| SubscriptionTab | New settings tab: current plan with status badge, Stripe Customer Portal button, plan features grid, paginated payment history with receipt links |
+| RevenueTab | New lazy-loaded admin tab: 4 metric cards (total revenue, 30-day revenue, active subscribers, donations), recent transactions table |
+| Sidebar | Added Supporters nav link with `IconHeart` icon |
+| Navbar | Added breadcrumb config for `/supporters` |
+| App.jsx | Added lazy route for SupportersPage |
+| SettingsPage | Wired SubscriptionTab, auto-selects on `?payment=success/canceled` return from Stripe with toast |
+| AdminPage | Wired RevenueTab (lazy), added to TABS array and exclusion list |
+| Icons | Added `IconHeart` component |
+
+### Environment Variables (Railway)
+
+- `STRIPE_SECRET_KEY` -- Stripe secret key (live)
+- `STRIPE_WEBHOOK_SECRET` -- Webhook signing secret
+- `STRIPE_PRICE_ID_PRO` -- Monthly price ID
+- `STRIPE_PRICE_ID_PRO_YEARLY` -- Yearly price ID
+- `STRIPE_PRICE_ID_DONATION` -- Donation product ID
+- `FRONTEND_URL` -- Used for checkout success/cancel redirect URLs
+
+### Validation
+
+- Backend lint: pending
+- Frontend lint: clean
+- Migration deployed to Railway
+- Stripe webhook configured with 5 events
+- All Stripe keys set in Railway (live mode)
+
+---
+
+## Tech Debt Sweep (2026-04-03)
+
+### Summary
+
+Systematically addressed 16 of 20 tech debt items identified via the engineering:tech-debt audit. Items #4 (backend test coverage), #7 (frontend E2E tests), #10 (split large controllers), and #12 (TypeScript definitions) are deferred as large-effort items for a future cycle.
+
+### Items Completed
+
+| # | Item | Change |
+| --- | --- | --- |
+| 1 | Centralize pagination helpers | Created `backend/src/lib/constants.js` with `clampLimit()`, `clampPage()`, `DEFAULT_PAGE_SIZE`, `MAX_PAGE_SIZE` |
+| 2 | Replace console.log with structured logger | Replaced all `console.log/warn/error` across 35+ backend files with Pino logger |
+| 3 | Consolidate authHeaders helper | Migrated 60+ frontend files from inline `credentials: 'include'` to shared `authHeaders()` import |
+| 5 | Socket.io event name constants | Created `socketEvents.js` (backend + frontend), replaced 53 hardcoded strings across 8 files |
+| 6 | Rate limiter shared time constants | Replaced all hardcoded `N * 60 * 1000` expressions in `rateLimiters.js` with `WINDOW_*` constants from `constants.js` |
+| 8 | Fix createdAt/timestamp field inconsistency | Removed `|| msg.timestamp` fallback in `messagesHelpers.js`, standardized on `createdAt` |
+| 11 | Centralize error formatting | Added common HTTP error codes (`UNAUTHORIZED`, `VALIDATION`, `NOT_FOUND`, `INTERNAL`, `BAD_REQUEST`, `CONFLICT`, `RATE_LIMITED`) to `errorEnvelope.js` |
+| 13 | Pro badge and feature gating | Created `ProBadge.jsx` component, added `plan` field to auth payload and profile endpoint, gated AI daily limits by plan |
+| 14 | Subscription welcome email | Added `sendSubscriptionWelcome()` heartfelt email template from Abdul, triggered on checkout completion |
+| 15 | Donation thank-you email | Added `sendDonationThankYou()` email template, triggered on donation checkout completion |
+| 16 | Payment lifecycle notifications | Added in-app notifications for subscription welcome, donation confirmed, and failed invoice payment |
+| 17 | Database readiness check | Added startup DB connection verification with optional table accessibility warnings for graceful degradation |
+| 18 | Bootstrap logging | Structured startup log output with DB status, optional table checks, and server ready message |
+| 19 | useFetch cache expiry | Added `sweepCache()` with 10-minute max age, 50-entry cap, and 1-minute background sweep interval |
+| 20 | Block/mute try-catch wrapping | Wrapped all `getBlockedUserIds`/`getMutedUserIds` calls in try-catch with empty-array fallback |
+
+### Files Changed (Key)
+
+| File | Change |
+| --- | --- |
+| `backend/src/lib/constants.js` | New: shared pagination, time window, and content limit constants |
+| `backend/src/lib/rateLimiters.js` | All hardcoded time windows replaced with WINDOW_* imports |
+| `backend/src/middleware/errorEnvelope.js` | Added 7 common HTTP error codes to ERROR_CODES enum |
+| `backend/src/lib/socketEvents.js` | New: 16 Socket.io event name constants |
+| `frontend/studyhub-app/src/lib/socketEvents.js` | New: frontend mirror of Socket.io event constants |
+| `frontend/studyhub-app/src/lib/useFetch.js` | Added sweepCache(), MAX_CACHE_SIZE (50), CACHE_MAX_AGE_MS (10min), background sweep timer |
+| `frontend/studyhub-app/src/pages/messages/messagesHelpers.js` | Removed timestamp fallback, standardized on createdAt |
+| `frontend/studyhub-app/src/components/ProBadge.jsx` | New: purple gradient Pro badge with 3 sizes |
+| `backend/src/lib/email/emailTemplates.js` | Added sendSubscriptionWelcome and sendDonationThankYou templates |
+| `backend/src/modules/payments/payments.service.js` | Wired email + notification calls into checkout/invoice handlers |
+| `backend/src/modules/ai/ai.service.js` | Added getUserPlan() with graceful degradation, pro tier daily limit |
+| `backend/src/index.js` | Added DB readiness check at startup with optional t
