@@ -7,14 +7,14 @@ const cache = require('./library.cache')
 const { captureError } = require('../../monitoring/sentry')
 
 /** Fetch with a timeout. Rejects if the response takes longer than `ms`. */
-function fetchWithTimeout(url, ms = 45000) {
+function fetchWithTimeout(url, ms = 10000) {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), ms)
   return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(timer))
 }
 
 /** Fetch with one automatic retry on network/timeout failure. */
-async function fetchWithRetry(url, ms = 32000) {
+async function fetchWithRetry(url, ms = 10000) {
   try {
     return await fetchWithTimeout(url, ms)
   } catch (err) {
