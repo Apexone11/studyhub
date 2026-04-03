@@ -346,7 +346,7 @@ export default function UserProfilePage() {
               {/* Identity */}
               <div style={{ flex: 1, minWidth: 200 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
-                  <h1 style={{ margin: 0, fontSize: 'clamp(20px, 2.5vw, 26px)', fontWeight: 800, color: '#fff', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <h1 style={{ margin: 0, fontSize: 'clamp(20px, 2.5vw, 26px)', fontWeight: 800, color: 'var(--sh-nav-text)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                     {profile.username}
                     <VerificationBadge user={profile} size={18} />
                   </h1>
@@ -361,20 +361,20 @@ export default function UserProfilePage() {
 
                 {/* Follower / following stats */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 14, color: '#fff' }}>
+                  <span style={{ fontSize: 14, color: 'var(--sh-nav-text)' }}>
                     <strong>{profile.sheetCount || 0}</strong>{' '}
                     <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>sheets</span>
                   </span>
                   <button
                     onClick={() => loadFollowList('followers')}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit', fontSize: 14, color: '#fff' }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit', fontSize: 14, color: 'var(--sh-nav-text)' }}
                   >
                     <strong>{followers}</strong>{' '}
                     <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>followers</span>
                   </button>
                   <button
                     onClick={() => loadFollowList('following')}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit', fontSize: 14, color: '#fff' }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit', fontSize: 14, color: 'var(--sh-nav-text)' }}
                   >
                     <strong>{profile.followingCount || 0}</strong>{' '}
                     <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>following</span>
@@ -387,7 +387,7 @@ export default function UserProfilePage() {
                 {isOwnProfile ? (
                   <Link to="/settings" style={{
                     display: 'inline-flex', alignItems: 'center', padding: '8px 16px', borderRadius: 10,
-                    background: 'rgba(255,255,255,0.15)', color: '#fff', fontWeight: 700, fontSize: 13,
+                    background: 'rgba(255,255,255,0.15)', color: 'var(--sh-nav-text)', fontWeight: 700, fontSize: 13,
                     textDecoration: 'none', border: '1px solid rgba(255,255,255,0.25)',
                     backdropFilter: 'blur(6px)',
                   }}>
@@ -405,7 +405,7 @@ export default function UserProfilePage() {
                           fontWeight: 700, fontSize: 13, fontFamily: 'inherit',
                           border: following ? '1px solid rgba(16,185,129,0.5)' : '1px solid rgba(255,255,255,0.25)',
                           background: following ? 'rgba(16,185,129,0.2)' : 'var(--sh-brand)',
-                          color: following ? '#6ee7b7' : '#fff',
+                          color: following ? 'var(--sh-success)' : 'var(--sh-nav-text)',
                           cursor: toggling ? 'wait' : 'pointer',
                           backdropFilter: 'blur(6px)',
                         }}
@@ -423,7 +423,7 @@ export default function UserProfilePage() {
                           fontWeight: 600, fontSize: 12, fontFamily: 'inherit',
                           border: '1px solid rgba(255,255,255,0.25)',
                           background: 'rgba(255,255,255,0.12)',
-                          color: '#fff',
+                          color: 'var(--sh-nav-text)',
                           cursor: 'pointer',
                           backdropFilter: 'blur(6px)',
                         }}

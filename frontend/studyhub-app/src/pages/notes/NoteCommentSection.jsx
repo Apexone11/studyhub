@@ -48,7 +48,71 @@ function resolveAnchorStatus(comment, noteContent) {
   return 'orphaned'
 }
 
-export default function NoteCommentSection({ noteId, isOwner, user, noteContent }) {
+function CommentReactionsNote({ commentId, reactionCounts = {}, userReaction = null, onReact }) {
+  const likes = reactionCounts.like || 0
+  const dislikes = reactionCounts.dislike || 0
+
+  const thumbsUpSvg = (
+    <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" style={{ marginRight: 3 }}>
+      <path d="M2 10.5a1.5 1.5 0 1 1 3 0v6a1.5 1.5 0 0 1-3 0v-6zM6 10.333v5.43a2 2 0 0 0 .97 1.679V17.5a.5.5 0 1 0 1 0v-.04a2 2 0 0 0 .97-1.679v-.745a2 2 0 0 0 .211-.126c1.04-.678 1.946-.122 2.469.856.653 1.31 1.422 2.105 2.188 2.01.374-.056.695-.481 1.088-1.461.36-.896.748-2.144.948-2.979.179-.633.45-1.559.838-2.form.158-.34.355-.638.57-.88a3 3 0 0 0 .281-1.249A3 3 0 0 0 15.3 9h1.023a.75.75 0 0 0 .75-.75V3.75a.75.75 0 0 0-.75-.75H15.3a3 3 0 0 0-2.973 2.5H13a.75.75 0 0 0 0 1.5h-.227c.038.58.076 1.254.076 2v1.5a2 2 0 0 0 .053.477c-.038.58-.076 1.254-.076 2 0 .888.106 1.72.282 2.38.168.594.411 1.084.693 1.38" />
+    </svg>
+  )
+
+  const thumbsDownSvg = (
+    <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" style={{ marginRight: 3 }}>
+      <path d="M18 9.5a1.5 1.5 0 1 1-3 0v-6a1.5 1.5 0 0 1 3 0v6zM14 9.667v-5.43a2 2 0 0 1-.97-1.679V2.5a.5.5 0 1 1-1 0v.04a2 2 0 0 1-.97 1.679v.745a2 2 0 0 1-.211.126c-1.04.678-1.946.122-2.469-.856-.653-1.31-1.422-2.105-2.188-2.01-.374.056-.695.481-1.088 1.461-.36.896-.748 2.144-.948 2.979-.179.633-.45 1.559-.838 2.form-.158.34-.355.638-.57.88a3 3 0 0 1-.281 1.249A3 3 0 0 1 4.7 11H3.75a.75.75 0 0 1-.75-.75V7.25a.75.75 0 0 1 .75-.75H4.7a3 3 0 0 1 2.973-2.5h.227a.75.75 0 0 1 0 1.5H7a2 2 0 0 1-.053.477c.038.58.076 1.254.076 2v1.5a2 2 0 0 1-.053.477c-.038.58-.076 1.254-.076 2 0 .888-.106 1.72-.282 2.38-.168.594-.411 1.084-.693 1.38" />
+    </svg>
+  )
+
+  return (
+    <div style={{ display: 'flex', gap: '6px', marginTop: '8px', alignItems: 'center' }}>
+      <button
+        type="button"
+        onClick={() => onReact(commentId, 'like')}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '3px',
+          padding: '3px 6px',
+          border: 'none',
+          borderRadius: '4px',
+          background: 'transparent',
+          cursor: 'pointer',
+          fontSize: '11px',
+          color: userReaction === 'like' ? 'var(--sh-brand)' : 'var(--sh-muted)',
+          transition: 'color 0.2s',
+          fontFamily: PAGE_FONT,
+        }}
+      >
+        {thumbsUpSvg}
+        {likes > 0 ? likes : ''}
+      </button>
+      <button
+        type="button"
+        onClick={() => onReact(commentId, 'dislike')}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '3px',
+          padding: '3px 6px',
+          border: 'none',
+          borderRadius: '4px',
+          background: 'transparent',
+          cursor: 'pointer',
+          fontSize: '11px',
+          color: userReaction === 'dislike' ? 'var(--sh-brand)' : 'var(--sh-muted)',
+          transition: 'color 0.2s',
+          fontFamily: PAGE_FONT,
+        }}
+      >
+        {thumbsDownSvg}
+        {dislikes > 0 ? dislikes : ''}
+      </button>
+    </div>
+  )
+}
+
+export default function NoteCommentSection({ noteId, isOwner, user, noteContent, onReactToComment }) {
   const [expanded, setExpanded] = useState(false)
   const [draft, setDraft] = useState('')
   const {
@@ -154,8 +218,10 @@ export default function NoteCommentSection({ noteId, isOwner, user, noteContent 
                   user={user}
                   isNoteOwner={isOwner}
                   noteContent={noteContent}
+                  noteId={noteId}
                   onResolve={resolveComment}
                   onDelete={deleteComment}
+                  onReact={user && onReactToComment ? onReactToComment : null}
                 />
               ))}
             </div>
@@ -166,7 +232,7 @@ export default function NoteCommentSection({ noteId, isOwner, user, noteContent 
   )
 }
 
-function CommentItem({ comment, user, isNoteOwner, noteContent, onResolve, onDelete }) {
+function CommentItem({ comment, user, isNoteOwner, noteContent, onResolve, onDelete, onReact }) {
   const anchorStatus = resolveAnchorStatus(comment, noteContent)
   const canDelete = user && (
     user.id === comment.author?.id
@@ -286,6 +352,16 @@ function CommentItem({ comment, user, isNoteOwner, noteContent, onResolve, onDel
         <p style={{ margin: 0, fontSize: 13, lineHeight: 1.6, color: 'var(--sh-slate-700)' }}>
           <MentionText text={comment.content} />
         </p>
+
+        {/* Reactions */}
+        {onReact ? (
+          <CommentReactionsNote
+            commentId={comment.id}
+            reactionCounts={comment.reactionCounts}
+            userReaction={comment.userReaction}
+            onReact={onReact}
+          />
+        ) : null}
       </div>
     </div>
   )

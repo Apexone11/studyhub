@@ -103,6 +103,9 @@ model User {
   subscription               Subscription?
   payments                   Payment[]
   donations                  Donation[]
+  commentReactions           CommentReaction[]
+  feedPostCommentReactions   FeedPostCommentReaction[]
+  noteCommentReactions       NoteCommentReaction[]
 
   @@index([role])
   @@index([emailHash])
@@ -280,12 +283,30 @@ model Comment {
   content          String
   sheetId          Int
   userId           Int
+  parentId         Int?
   moderationStatus String     @default("clean")
   createdAt        DateTime   @default(now())
   sheet            StudySheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
   author           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent           Comment?   @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies          Comment[]  @relation("CommentReplies")
+  reactions        CommentReaction[]
+  attachments      CommentAttachment[]
 
   @@index([sheetId, createdAt(sort: Desc)])
+  @@index([parentId])
+}
+
+model CommentAttachment {
+  id        Int      @id @default(autoincrement())
+  commentId Int
+  url       String
+  type      String
+  name      String   @default("")
+  createdAt DateTime @default(now())
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@index([commentId])
 }
 
 model StarredSheet {
@@ -346,6 +367,7 @@ model NoteComment {
   content          String
   noteId           Int
   userId           Int
+  parentId         Int?
   anchorText       String?
   anchorOffset     Int?
   anchorContext    String?
@@ -354,8 +376,25 @@ model NoteComment {
   createdAt        DateTime @default(now())
   note             Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
   author           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent           NoteComment?  @relation("NoteCommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies          NoteComment[] @relation("NoteCommentReplies")
+  reactions        NoteCommentReaction[]
+  attachments      NoteCommentAttachment[]
 
   @@index([noteId, createdAt(sort: Desc)])
+  @@index([parentId])
+}
+
+model NoteCommentAttachment {
+  id        Int         @id @default(autoincrement())
+  commentId Int
+  url       String
+  type      String
+  name      String      @default("")
+  createdAt DateTime    @default(now())
+  comment   NoteComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@index([commentId])
 }
 
 model NoteStar {
@@ -457,12 +496,30 @@ model FeedPostComment {
   content          String
   postId           Int
   userId           Int
+  parentId         Int?
   moderationStatus String   @default("clean")
   createdAt        DateTime @default(now())
   post             FeedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
   author           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent           FeedPostComment?  @relation("FeedPostCommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies          FeedPostComment[] @relation("FeedPostCommentReplies")
+  reactions        FeedPostCommentReaction[]
+  attachments      FeedPostCommentAttachment[]
 
   @@index([postId, createdAt(sort: Desc)])
+  @@index([parentId])
+}
+
+model FeedPostCommentAttachment {
+  id        Int             @id @default(autoincrement())
+  commentId Int
+  url       String
+  type      String
+  name      String          @default("")
+  createdAt DateTime        @default(now())
+  comment   FeedPostComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@index([commentId])
 }
 
 model FeedPostReaction {
@@ -1475,4 +1532,41 @@ model Donation {
   @@index([userId])
   @@index([status, createdAt])
   @@index([createdAt])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Comment Reactions — Like/dislike system for sheet, feed post, and note comments
+// ═══════════════════════════════════════════════════════════════════════════
+
+model CommentReaction {
+  userId    Int
+  commentId Int
+  type      String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comment   Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@id([userId, commentId])
+  @@index([commentId, type])
+}
+
+model FeedPostCommentReaction {
+  userId    Int
+  commentId Int
+  type      String
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comment   FeedPostComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@id([userId, commentId])
+  @@index([commentId, type])
+}
+
+model NoteCommentReaction {
+  userId    Int
+  commentId Int
+  type      String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comment   NoteComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@id([userId, commentId])
+  @@index([commentId, type])
 }

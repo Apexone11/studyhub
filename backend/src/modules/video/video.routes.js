@@ -28,6 +28,7 @@ const {
   VIDEO_SIZE_LIMITS,
   MAX_CAPTION_SIZE,
   MIN_CHUNK_SIZE,
+  CHUNK_SIZE,
   ALLOWED_VIDEO_MIMES,
   ALLOWED_VIDEO_EXTENSIONS,
   ALLOWED_CAPTION_MIMES,
@@ -195,6 +196,11 @@ router.post(
 
       if (!uploadId || !r2Key || isNaN(partNumber) || isNaN(videoId)) {
         return res.status(400).json({ error: 'Missing required upload headers.' })
+      }
+
+      // Validate chunk size
+      if (req.headers['content-length'] && parseInt(req.headers['content-length']) > CHUNK_SIZE + 1024) {
+        return res.status(413).json({ error: 'Chunk exceeds maximum size.' })
       }
 
       // Verify ownership

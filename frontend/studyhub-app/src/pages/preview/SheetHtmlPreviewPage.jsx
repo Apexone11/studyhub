@@ -15,7 +15,7 @@ function panelStyle() {
   return {
     background: 'var(--sh-surface)',
     borderRadius: 16,
-    border: '1px solid #e2e8f0',
+    border: '1px solid var(--sh-border)',
     padding: 16,
   }
 }
@@ -165,7 +165,7 @@ export default function SheetHtmlPreviewPage() {
 
           {state.loading ? (
             <section style={panelStyle()}>
-              <div style={{ fontSize: 13, color: '#64748b' }}>Loading preview…</div>
+              <div style={{ fontSize: 13, color: 'var(--sh-muted)' }}>Loading preview…</div>
             </section>
           ) : null}
 
@@ -175,7 +175,7 @@ export default function SheetHtmlPreviewPage() {
                 <div
                   style={{
                     fontSize: 12,
-                    color: '#475569',
+                    color: 'var(--sh-subtext)',
                     display: 'flex',
                     gap: 16,
                     flexWrap: 'wrap',
@@ -219,7 +219,7 @@ export default function SheetHtmlPreviewPage() {
                         Interactive Preview
                       </button>
                     </div>
-                    <span style={{ fontSize: 11, color: '#64748b', lineHeight: 1.4 }}>
+                    <span style={{ fontSize: 11, color: 'var(--sh-muted)', lineHeight: 1.4 }}>
                       {interactive
                         ? 'Scripts enabled in a locked sandbox — no access to your account or network.'
                         : 'Scripts disabled for maximum security.'}
@@ -229,11 +229,11 @@ export default function SheetHtmlPreviewPage() {
               ) : null}
 
               {state.preview?.sanitized ? (
-                <section style={{ ...panelStyle(), borderColor: '#fde68a', background: '#fffbeb' }}>
-                  <div style={{ fontSize: 13, color: '#92400e', fontWeight: 800 }}>
+                <section style={{ ...panelStyle(), borderColor: 'var(--sh-warning-border)', background: 'var(--sh-warning-bg)' }}>
+                  <div style={{ fontSize: 13, color: 'var(--sh-warning-dark-text)', fontWeight: 800 }}>
                     Safe preview mode
                   </div>
-                  <div style={{ fontSize: 12, color: '#92400e', marginTop: 6, lineHeight: 1.6 }}>
+                  <div style={{ fontSize: 12, color: 'var(--sh-warning-dark-text)', marginTop: 6, lineHeight: 1.6 }}>
                     This preview has scripts and embeds disabled for safety. Review the scan
                     findings below if you want a clean report.
                   </div>
@@ -242,7 +242,7 @@ export default function SheetHtmlPreviewPage() {
                       style={{
                         marginTop: 10,
                         paddingLeft: 18,
-                        color: '#92400e',
+                        color: 'var(--sh-warning-dark-text)',
                         fontSize: 12,
                         lineHeight: 1.6,
                       }}
@@ -262,7 +262,7 @@ export default function SheetHtmlPreviewPage() {
                         position: 'fixed',
                         inset: 0,
                         zIndex: 9999,
-                        background: '#0b1220',
+                        background: 'var(--sh-slate-900)',
                         padding: 12,
                         display: 'grid',
                         gridTemplateRows: '48px 1fr',
@@ -277,14 +277,14 @@ export default function SheetHtmlPreviewPage() {
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
-                      color: '#fff',
+                      color: 'var(--sh-nav-text)',
                     }}
                   >
                     <div style={{ fontWeight: 800 }}>HTML Preview</div>
                     <button
                       type="button"
                       onClick={() => setIsFullscreen(false)}
-                      style={{ ...buttonStyle(), borderColor: '#334155' }}
+                      style={{ ...buttonStyle(), borderColor: 'var(--sh-slate-700)' }}
                     >
                       Exit fullscreen
                     </button>
@@ -292,7 +292,7 @@ export default function SheetHtmlPreviewPage() {
                 ) : null}
 
                 {runtimeLoading && interactive ? (
-                  <div style={{ padding: 24, textAlign: 'center', fontSize: 13, color: '#64748b' }}>
+                  <div style={{ padding: 24, textAlign: 'center', fontSize: 13, color: 'var(--sh-muted)' }}>
                     Loading interactive preview…
                   </div>
                 ) : (
@@ -341,7 +341,7 @@ function toggleBtnStyle(active) {
     padding: '6px 14px',
     border: 'none',
     background: active ? 'var(--sh-brand)' : 'var(--sh-soft)',
-    color: active ? '#fff' : 'var(--sh-subtext)',
+    color: active ? 'var(--sh-nav-text)' : 'var(--sh-subtext)',
     fontSize: 12,
     fontWeight: 700,
     cursor: 'pointer',

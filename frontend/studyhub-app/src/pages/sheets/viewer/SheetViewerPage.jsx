@@ -67,6 +67,7 @@ export default function SheetViewerPage() {
     handleReviewContribution,
     submitComment,
     deleteComment,
+    reactToComment,
     studyStatus,
     setStudyStatus,
     STUDY_STATUSES,
@@ -237,6 +238,7 @@ export default function SheetViewerPage() {
                   commentSaving={commentSaving}
                   submitComment={submitComment}
                   deleteComment={deleteComment}
+                  onReactToComment={reactToComment}
                 />
               </div>
 

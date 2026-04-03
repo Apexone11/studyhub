@@ -12,6 +12,7 @@ const { canReadSheet } = require('./sheets.service')
 const { getInitialModerationStatus } = require('../../lib/trustGate')
 const { trackActivity } = require('../../lib/activityTracker')
 const { timedSection, logTiming } = require('../../lib/requestTiming')
+const { commentReactLimiter } = require('../../lib/rateLimiters')
 
 const router = express.Router()
 
@@ -94,6 +95,7 @@ router.get('/:id/comments', async (req, res) => {
   if (!Number.isInteger(sheetId)) return res.status(400).json({ error: 'Invalid sheet id.' })
   const limit = parsePositiveInt(req.query.limit, 20)
   const offset = Math.max(0, Number.parseInt(req.query.offset, 10) || 0)
+  const sort = req.query.sort || 'newest' // 'newest', 'oldest', 'top'
 
   try {
     const sheetSection = await timedSection('sheet-lookup', () =>
@@ -103,25 +105,85 @@ router.get('/:id/comments', async (req, res) => {
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
     if (!canReadSheet(sheet, req.user || null)) return res.status(404).json({ error: 'Sheet not found.' })
 
+    let orderBy = { createdAt: 'desc' }
+    if (sort === 'oldest') {
+      orderBy = { createdAt: 'asc' }
+    } else if (sort === 'top') {
+      // Will handle custom sorting below
+      orderBy = { createdAt: 'desc' }
+    }
+
     const [commentsSection, countSection] = await Promise.all([
       timedSection('comments', () =>
         prisma.comment.findMany({
-          where: { sheetId },
-          include: { author: { select: AUTHOR_SELECT } },
-          orderBy: { createdAt: 'desc' },
+          where: { sheetId, parentId: null },
+          include: {
+            author: { select: AUTHOR_SELECT },
+            reactions: {
+              select: { userId: true, type: true },
+            },
+            attachments: {
+              select: { id: true, url: true, type: true, name: true, createdAt: true },
+            },
+            replies: {
+              include: {
+                author: { select: AUTHOR_SELECT },
+                reactions: {
+                  select: { userId: true, type: true },
+                },
+                attachments: {
+                  select: { id: true, url: true, type: true, name: true, createdAt: true },
+                },
+              },
+              orderBy: { createdAt: 'asc' },
+            },
+          },
+          orderBy,
           take: limit,
           skip: offset,
         })
       ),
-      timedSection('count', () => prisma.comment.count({ where: { sheetId } })),
+      timedSection('count', () => prisma.comment.count({ where: { sheetId, parentId: null } })),
     ])
+
+    const formatComment = (comment) => {
+      const likes = comment.reactions.filter((r) => r.type === 'like').length
+      const dislikes = comment.reactions.filter((r) => r.type === 'dislike').length
+      const userReaction = req.user
+        ? comment.reactions.find((r) => r.userId === req.user.userId)?.type || null
+        : null
+
+      const formattedReplies = (comment.replies || []).map(formatComment)
+
+      return {
+        ...comment,
+        reactions: undefined,
+        replies: formattedReplies,
+        _count: { reactions: likes + dislikes },
+        reactionCounts: { like: likes, dislike: dislikes },
+        userReaction,
+        replyCount: formattedReplies.length,
+      }
+    }
+
+    const comments = commentsSection.data.map(formatComment)
+
+    // For "top" sort, sort by net likes (likes - dislikes) descending
+    if (sort === 'top') {
+      comments.sort((a, b) => {
+        const netA = a.reactionCounts.like - a.reactionCounts.dislike
+        const netB = b.reactionCounts.like - b.reactionCounts.dislike
+        if (netB !== netA) return netB - netA
+        return b.createdAt - a.createdAt
+      })
+    }
 
     logTiming(req, {
       sections: [sheetSection, commentsSection, countSection],
       extra: { sheetId, commentCount: countSection.data },
     })
 
-    res.json({ comments: commentsSection.data, total: countSection.data, limit, offset })
+    res.json({ comments, total: countSection.data, limit, offset })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
@@ -132,6 +194,8 @@ router.post('/:id/comments', requireAuth, requireVerifiedEmail, commentLimiter, 
   const sheetId = Number.parseInt(req.params.id, 10)
   if (!Number.isInteger(sheetId)) return res.status(400).json({ error: 'Invalid sheet id.' })
   const content = typeof req.body.content === 'string' ? req.body.content.trim() : ''
+  const parentId = req.body.parentId ? Number.parseInt(req.body.parentId, 10) : null
+  const attachments = Array.isArray(req.body.attachments) ? req.body.attachments : []
 
   if (!content) return res.status(400).json({ error: 'Comment cannot be empty.' })
   if (content.length > 500) {
@@ -146,31 +210,76 @@ router.post('/:id/comments', requireAuth, requireVerifiedEmail, commentLimiter, 
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
     if (!canReadSheet(sheet, req.user || null)) return res.status(404).json({ error: 'Sheet not found.' })
 
+    // Validate parentId if provided (max 1 level deep)
+    if (parentId) {
+      const parentComment = await prisma.comment.findUnique({
+        where: { id: parentId },
+        select: { id: true, sheetId: true, parentId: true },
+      })
+      if (!parentComment) return res.status(400).json({ error: 'Parent comment not found.' })
+      if (parentComment.sheetId !== sheetId) return res.status(400).json({ error: 'Parent comment belongs to different sheet.' })
+      if (parentComment.parentId !== null) return res.status(400).json({ error: 'Cannot reply to replies (max 1 level deep).' })
+    }
+
     const moderationStatus = getInitialModerationStatus(req.user)
     const comment = await prisma.comment.create({
-      data: { content, sheetId, userId: req.user.userId, moderationStatus },
-      include: { author: { select: AUTHOR_SELECT } },
+      data: {
+        content,
+        sheetId,
+        userId: req.user.userId,
+        parentId: parentId || null,
+        moderationStatus,
+        attachments: attachments.length > 0 ? {
+          create: attachments.map((att) => ({
+            url: att.url,
+            type: att.type,
+            name: att.name || '',
+          })),
+        } : undefined,
+      },
+      include: {
+        author: { select: AUTHOR_SELECT },
+        attachments: { select: { id: true, url: true, type: true, name: true } },
+      },
     })
 
     trackActivity(prisma, req.user.userId, 'comments')
 
-    await createNotification(prisma, {
-      userId: sheet.userId,
-      type: 'comment',
-      message: `${req.user.username} commented on your sheet "${sheet.title}".`,
-      actorId: req.user.userId,
-      sheetId,
-      linkPath: `/sheets/${sheetId}`,
-    })
+    // Only notify sheet author if it's a top-level comment
+    if (!parentId) {
+      await createNotification(prisma, {
+        userId: sheet.userId,
+        type: 'comment',
+        message: `${req.user.username} commented on your sheet "${sheet.title}".`,
+        actorId: req.user.userId,
+        sheetId,
+        linkPath: `/sheets/${sheetId}`,
+      })
 
-    await notifyMentionedUsers(prisma, {
-      text: content,
-      actorId: req.user.userId,
-      actorUsername: req.user.username,
-      excludeUserIds: [sheet.userId],
-      message: `${req.user.username} mentioned you in a comment on "${sheet.title}".`,
-      linkPath: `/sheets/${sheetId}`,
-    })
+      await notifyMentionedUsers(prisma, {
+        text: content,
+        actorId: req.user.userId,
+        actorUsername: req.user.username,
+        excludeUserIds: [sheet.userId],
+        message: `${req.user.username} mentioned you in a comment on "${sheet.title}".`,
+        linkPath: `/sheets/${sheetId}`,
+      })
+    } else {
+      // Notify parent comment author if it's a reply
+      const parentCommentData = await prisma.comment.findUnique({
+        where: { id: parentId },
+        select: { userId: true },
+      })
+      if (parentCommentData && parentCommentData.userId !== req.user.userId) {
+        await createNotification(prisma, {
+          userId: parentCommentData.userId,
+          type: 'reply',
+          message: `${req.user.username} replied to your comment.`,
+          actorId: req.user.userId,
+          linkPath: `/sheets/${sheetId}`,
+        })
+      }
+    }
 
     res.status(201).json(comment)
   } catch (error) {
@@ -231,6 +340,70 @@ router.post('/:id/react', requireAuth, reactLimiter, async (req, res) => {
     ])
 
     res.json({ likes, dislikes, userReaction: current ? current.type : null })
+  } catch (error) {
+    captureError(error, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+router.post('/:id/comments/:commentId/react', requireAuth, commentReactLimiter, async (req, res) => {
+  const commentId = Number.parseInt(req.params.commentId, 10)
+  const userId = req.user.userId
+  const { type } = req.body || {}
+
+  if (!type || (type !== 'like' && type !== 'dislike')) {
+    return res.status(400).json({ error: 'Reaction type must be "like" or "dislike".' })
+  }
+
+  try {
+    const comment = await prisma.comment.findUnique({
+      where: { id: commentId },
+      select: { id: true, sheetId: true },
+    })
+    if (!comment) return res.status(404).json({ error: 'Comment not found.' })
+
+    // Verify sheet is readable
+    const sheet = await prisma.studySheet.findUnique({
+      where: { id: comment.sheetId },
+      select: { id: true, status: true, userId: true },
+    })
+    if (!sheet || !canReadSheet(sheet, req.user)) {
+      return res.status(404).json({ error: 'Comment not found.' })
+    }
+
+    const existing = await prisma.commentReaction.findUnique({
+      where: { userId_commentId: { userId, commentId } },
+    })
+
+    // Toggle logic: if same type, remove; if different, update; if none, create
+    if (existing && existing.type === type) {
+      await prisma.commentReaction.delete({
+        where: { userId_commentId: { userId, commentId } },
+      })
+    } else if (existing) {
+      await prisma.commentReaction.update({
+        where: { userId_commentId: { userId, commentId } },
+        data: { type },
+      })
+    } else {
+      await prisma.commentReaction.create({
+        data: { userId, commentId, type },
+      })
+    }
+
+    // Get updated counts
+    const [likes, dislikes, userReaction] = await Promise.all([
+      prisma.commentReaction.count({ where: { commentId, type: 'like' } }),
+      prisma.commentReaction.count({ where: { commentId, type: 'dislike' } }),
+      prisma.commentReaction.findUnique({
+        where: { userId_commentId: { userId, commentId } },
+      }),
+    ])
+
+    res.json({
+      reactionCounts: { like: likes, dislike: dislikes },
+      userReaction: userReaction ? userReaction.type : null,
+    })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })

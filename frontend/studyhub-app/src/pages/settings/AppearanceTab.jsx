@@ -61,7 +61,7 @@ export default function AppearanceTab() {
   }, [currentFontSize])
 
   if (loading) {
-    return <SectionCard title="Appearance"><div style={{ color: '#64748b', fontSize: 13 }}>Loading preferences...</div></SectionCard>
+    return <SectionCard title="Appearance"><div style={{ color: 'var(--sh-muted)', fontSize: 13 }}>Loading preferences...</div></SectionCard>
   }
 
   if (!prefs) {
@@ -89,9 +89,9 @@ export default function AppearanceTab() {
 
         <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
           {[
-            { value: 'light', label: 'Light', bg: '#ffffff', border: '#e2e8f0', text: '#0f172a' },
-            { value: 'dark', label: 'Dark', bg: '#0f172a', border: '#334155', text: '#f1f5f9' },
-            { value: 'system', label: 'System', bg: 'linear-gradient(135deg, #ffffff 50%, #0f172a 50%)', border: '#94a3b8', text: '#475569' },
+            { value: 'light', label: 'Light', bg: 'var(--sh-surface)', border: 'var(--sh-border)', text: 'var(--sh-heading)' },
+            { value: 'dark', label: 'Dark', bg: 'var(--sh-slate-900)', border: 'var(--sh-slate-700)', text: 'var(--sh-slate-50)' },
+            { value: 'system', label: 'System', bg: 'linear-gradient(135deg, var(--sh-surface) 50%, var(--sh-slate-900) 50%)', border: 'var(--sh-slate-400)', text: 'var(--sh-slate-600)' },
           ].map((opt) => (
             <button
               key={opt.value}
@@ -101,7 +101,7 @@ export default function AppearanceTab() {
                 flex: 1,
                 padding: '16px 12px',
                 borderRadius: 12,
-                border: `2px solid ${prefs.theme === opt.value ? '#3b82f6' : opt.border}`,
+                border: `2px solid ${prefs.theme === opt.value ? 'var(--sh-brand)' : opt.border}`,
                 background: opt.bg,
                 color: opt.text,
                 fontSize: 12,
@@ -129,7 +129,7 @@ export default function AppearanceTab() {
           </Select>
         </FormField>
 
-        <div style={{ padding: '14px 16px', borderRadius: 12, background: '#f8fafc', border: '1px solid #e2e8f0', fontSize: prefs.fontSize === 'small' ? 13 : prefs.fontSize === 'large' ? 17 : 15 }}>
+        <div style={{ padding: '14px 16px', borderRadius: 12, background: 'var(--sh-soft)', border: '1px solid var(--sh-border)', fontSize: prefs.fontSize === 'small' ? 13 : prefs.fontSize === 'large' ? 17 : 15 }}>
           This is a preview of your selected font size. Adjust to your preference.
         </div>
       </SectionCard>

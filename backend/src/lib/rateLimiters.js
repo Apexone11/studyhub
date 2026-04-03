@@ -449,6 +449,17 @@ const notesCommentLimiter = rateLimit({
   message: { error: 'Too many comments. Please slow down.' },
 })
 
+/**
+ * Comment reactions (likes/dislikes) — 60 requests per minute per IP.
+ */
+const commentReactLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many reactions. Please slow down.' },
+})
+
 // ── CATEGORY: Search Module ───────────────────────────────────────────────
 
 /**
@@ -718,6 +729,9 @@ module.exports = {
   notesMutateLimiter,
   notesReadLimiter,
   notesCommentLimiter,
+
+  // Comment reactions (all comment types)
+  commentReactLimiter,
 
   // Search module
   searchLimiter,

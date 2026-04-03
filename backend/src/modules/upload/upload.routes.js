@@ -464,4 +464,57 @@ router.post('/content-image', requireAuth, uploadContentImageLimiter, (req, res)
   })
 })
 
+// ── Comment image upload ──────────────────────────────────────
+const commentImageUpload = multer({
+  storage: contentImageStorage,
+  limits: { fileSize: CONTENT_IMAGE_MAX_BYTES },
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase()
+    if (!CONTENT_IMAGE_ALLOWED_MIME.has(file.mimetype) || !CONTENT_IMAGE_ALLOWED_EXT.has(ext)) {
+      return cb(new Error('Image must be a JPEG, PNG, WebP, or GIF image.'))
+    }
+    cb(null, true)
+  },
+})
+
+// POST /api/upload/comment-image
+// Uploads an image for embedding in comments (sheet, feed, or note comments).
+// Returns { url: '/uploads/content-images/...' } to be stored in comment attachments.
+const uploadCommentImageLimiter = require('../../lib/rateLimiters').uploadContentImageLimiter
+router.post('/comment-image', requireAuth, uploadCommentImageLimiter, (req, res) => {
+  commentImageUpload.single('image')(req, res, async (err) => {
+    if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+      return sendError(res, 400, 'Image must be 5 MB or smaller.', ERROR_CODES.UPLOAD_INVALID)
+    }
+    if (err) return sendError(res, 400, err.message, ERROR_CODES.UPLOAD_INVALID)
+    if (!req.file) return sendError(res, 400, 'No file uploaded.', ERROR_CODES.UPLOAD_MISSING_FILE)
+
+    // Magic byte validation
+    if (!signatureMatchesExpected(req.file.path, Array.from(CONTENT_IMAGE_ALLOWED_MIME)).ok) {
+      return rejectSignatureMismatch(
+        res,
+        req.file,
+        'Image contents do not match a supported image format.',
+      )
+    }
+    const magic = validateMagicBytes(req.file.path, req.file.mimetype)
+    if (!magic.valid) {
+      return rejectSignatureMismatch(
+        res,
+        req.file,
+        `Image file signature does not match declared type (detected: ${magic.detectedType || 'unknown'}, declared: ${magic.declaredType}).`,
+      )
+    }
+
+    try {
+      const url = buildContentImageUrl(req.file.filename)
+      res.json({ url })
+    } catch (uploadErr) {
+      safeUnlinkFile(req.file?.path)
+      captureError(uploadErr, { route: req.originalUrl })
+      return sendError(res, 500, 'Failed to save image.', ERROR_CODES.UPLOAD_SAVE_FAILED)
+    }
+  })
+})
+
 module.exports = router

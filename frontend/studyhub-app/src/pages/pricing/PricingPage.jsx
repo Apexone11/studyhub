@@ -281,7 +281,7 @@ function Feature({ text, included }) {
         height="20"
         viewBox="0 0 20 20"
         fill="none"
-        style={{ ...s.featureIcon, color: included ? '#059669' : 'var(--sh-border)' }}
+        style={{ ...s.featureIcon, color: included ? 'var(--sh-success)' : 'var(--sh-border)' }}
       >
         <path
           d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
@@ -349,7 +349,7 @@ const s = {
   heroH1: {
     fontSize: 'clamp(32px, 5vw, 52px)',
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: 'var(--sh-nav-text)',
     margin: '0 0 16px',
     lineHeight: 1.2,
   },
@@ -381,7 +381,7 @@ const s = {
   cardElevated: {
     boxShadow: '0 8px 24px rgba(0, 0, 0, 0.1)',
     borderTopWidth: 4,
-    borderTopColor: '#6d28d9',
+    borderTopColor: 'var(--sh-brand-accent)',
   },
   ribbonContainer: {
     position: 'absolute',
@@ -389,8 +389,8 @@ const s = {
     right: 20,
   },
   ribbon: {
-    background: '#6d28d9',
-    color: '#ffffff',
+    background: 'var(--sh-brand-accent)',
+    color: 'var(--sh-nav-text)',
     fontSize: 12,
     fontWeight: 'bold',
     padding: '6px 14px',
@@ -411,12 +411,12 @@ const s = {
     borderRadius: 8,
   },
   badgePro: {
-    background: '#ddd6fe',
-    color: '#6d28d9',
+    background: 'var(--sh-soft)',
+    color: 'var(--sh-brand-accent)',
   },
   badgeInstitution: {
-    background: '#dbeafe',
-    color: '#3b82f6',
+    background: 'var(--sh-brand-soft)',
+    color: 'var(--sh-brand)',
   },
   priceBlock: {
     marginBottom: 32,
@@ -451,8 +451,8 @@ const s = {
     lineHeight: 1.5,
   },
   ctaPrimary: {
-    background: '#6d28d9',
-    color: '#ffffff',
+    background: 'var(--sh-brand-accent)',
+    color: 'var(--sh-nav-text)',
     border: 'none',
     padding: '12px 24px',
     borderRadius: 10,
@@ -464,8 +464,8 @@ const s = {
   },
   ctaSecondary: {
     background: 'transparent',
-    color: '#6d28d9',
-    border: '2px solid #6d28d9',
+    color: 'var(--sh-brand-accent)',
+    border: '2px solid var(--sh-brand-accent)',
     padding: '10px 24px',
     borderRadius: 10,
     fontWeight: 'bold',
@@ -505,8 +505,8 @@ const s = {
     color: 'var(--sh-text)',
   },
   successMessage: {
-    background: '#dcfce7',
-    color: '#166534',
+    background: 'var(--sh-success-bg)',
+    color: 'var(--sh-success-text)',
     padding: '12px 14px',
     borderRadius: 8,
     fontSize: 14,
@@ -514,8 +514,8 @@ const s = {
     fontWeight: 500,
   },
   errorMessage: {
-    background: '#fee2e2',
-    color: '#991b1b',
+    background: 'var(--sh-danger-bg)',
+    color: 'var(--sh-danger-text)',
     padding: '8px 12px',
     borderRadius: 6,
     fontSize: 13,
@@ -571,12 +571,12 @@ const s = {
     lineHeight: 1.7,
   },
   footer: {
-    background: '#0f172a',
+    background: 'var(--sh-slate-900)',
     padding: '40px 20px',
     textAlign: 'center',
   },
   footerCopy: {
-    color: '#475569',
+    color: 'var(--sh-slate-600)',
     fontSize: 12,
     margin: 0,
   },

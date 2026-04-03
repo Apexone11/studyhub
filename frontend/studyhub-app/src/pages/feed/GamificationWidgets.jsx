@@ -115,33 +115,87 @@ export function WeeklyProgressWidget() {
     ? Math.max(...weekly.dailyBreakdown.map((d) => d.actions || 0))
     : 1
 
+  // Circle progress ring dimensions
+  const ringRadius = 32
+  const circumference = 2 * Math.PI * ringRadius
+  const strokeDashoffset = circumference - (Math.min(goalProgress, 100) / 100) * circumference
+  const ringColor = weekly.goalMet ? 'var(--sh-success)' : 'var(--sh-brand)'
+
   return (
     <Panel title="This Week" helper="Activity goal">
-      <div style={{ display: 'grid', gap: 14 }}>
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--sh-heading)', marginBottom: 6 }}>
-            {weekly.daysActive} of {weekly.goal} days
-          </div>
+      <div style={{ display: 'grid', gap: 16 }}>
+        {/* Circular progress ring */}
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 8,
+        }}>
+          <svg
+            width="80"
+            height="80"
+            viewBox="0 0 80 80"
+            style={{ transform: 'rotate(-90deg)' }}
+          >
+            {/* Background track */}
+            <circle
+              cx="40"
+              cy="40"
+              r={ringRadius}
+              fill="none"
+              stroke="var(--sh-soft)"
+              strokeWidth="4"
+            />
+            {/* Progress ring */}
+            <circle
+              cx="40"
+              cy="40"
+              r={ringRadius}
+              fill="none"
+              stroke={ringColor}
+              strokeWidth="4"
+              strokeDasharray={circumference}
+              strokeDashoffset={strokeDashoffset}
+              strokeLinecap="round"
+              style={{
+                transition: 'stroke-dashoffset 0.3s ease, stroke 0.3s ease',
+              }}
+            />
+          </svg>
+          {/* Center text */}
           <div style={{
-            width: '100%',
-            height: 6,
-            borderRadius: 999,
-            background: 'var(--sh-soft)',
-            overflow: 'hidden',
+            position: 'absolute',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 2,
+            marginTop: 8,
           }}>
             <div style={{
-              height: '100%',
-              width: `${Math.min(goalProgress, 100)}%`,
-              background: weekly.goalMet ? 'var(--sh-success)' : 'var(--sh-brand)',
-              transition: 'width 0.3s ease',
-            }} />
+              fontSize: 14,
+              fontWeight: 700,
+              color: 'var(--sh-heading)',
+              fontFamily: FONT,
+            }}>
+              {weekly.daysActive}/{weekly.goal}
+            </div>
+            <div style={{
+              fontSize: 10,
+              fontWeight: 600,
+              color: 'var(--sh-muted)',
+              fontFamily: FONT,
+            }}>
+              {weekly.goalMet ? 'Goal reached' : 'days'}
+            </div>
           </div>
         </div>
 
+        {/* Daily breakdown bars */}
         {weekly.dailyBreakdown.length > 0 && (
-          <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', height: 80 }}>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', height: 90 }}>
             {weekly.dailyBreakdown.map((day, idx) => {
               const dayHeight = maxDaily > 0 ? (day.actions / maxDaily) * 100 : 0
+              const isActive = day.actions > 0
               return (
                 <div
                   key={idx}
@@ -150,21 +204,26 @@ export function WeeklyProgressWidget() {
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
-                    gap: 4,
+                    gap: 6,
                   }}
                 >
-                  <div style={{
-                    width: '100%',
-                    height: `${dayHeight}%`,
-                    minHeight: day.actions > 0 ? 4 : 0,
-                    borderRadius: 4,
-                    background: day.actions > 0 ? 'var(--sh-brand)' : 'var(--sh-soft)',
-                    transition: 'background 0.15s',
-                  }} />
+                  <div
+                    title={`${day.actions} action${day.actions !== 1 ? 's' : ''}`}
+                    style={{
+                      width: '100%',
+                      height: `${dayHeight}%`,
+                      minHeight: isActive ? 4 : 2,
+                      borderRadius: '4px 4px 0 0',
+                      background: isActive ? 'var(--sh-brand)' : 'var(--sh-border)',
+                      transition: 'background 0.15s, height 0.15s',
+                      cursor: 'pointer',
+                    }}
+                  />
                   <div style={{
                     fontSize: 10,
                     fontWeight: 600,
                     color: 'var(--sh-muted)',
+                    fontFamily: FONT,
                   }}>
                     {dayLabels[idx]}
                   </div>
@@ -174,7 +233,16 @@ export function WeeklyProgressWidget() {
           </div>
         )}
 
-        <div style={{ fontSize: 12, color: 'var(--sh-subtext)', textAlign: 'center' }}>
+        {/* Total actions count */}
+        <div style={{
+          fontSize: 13,
+          fontWeight: 600,
+          color: 'var(--sh-subtext)',
+          textAlign: 'center',
+          paddingTop: 4,
+          borderTop: '1px solid var(--sh-border)',
+          fontFamily: FONT,
+        }}>
           {weekly.totalActions} action{weekly.totalActions !== 1 ? 's' : ''} this week
         </div>
       </div>

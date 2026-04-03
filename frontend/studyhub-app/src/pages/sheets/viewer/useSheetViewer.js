@@ -463,6 +463,55 @@ export default function useSheetViewer() {
     }
   }
 
+  const reactToComment = async (commentId, type) => {
+    try {
+      // Optimistic update
+      setCommentsState((current) => ({
+        ...current,
+        comments: current.comments.map((comment) => {
+          if (comment.id !== commentId) return comment
+
+          const oldType = comment.userReaction
+          const newType = oldType === type ? null : type
+
+          const oldLikes = comment.reactionCounts.like || 0
+          const oldDislikes = comment.reactionCounts.dislike || 0
+
+          let newLikes = oldLikes
+          let newDislikes = oldDislikes
+
+          // Remove old reaction
+          if (oldType === 'like') newLikes -= 1
+          else if (oldType === 'dislike') newDislikes -= 1
+
+          // Add new reaction
+          if (newType === 'like') newLikes += 1
+          else if (newType === 'dislike') newDislikes += 1
+
+          return {
+            ...comment,
+            userReaction: newType,
+            reactionCounts: { like: newLikes, dislike: newDislikes },
+          }
+        }),
+      }))
+
+      const response = await fetch(`${API}/api/sheets/${sheetId}/comments/${commentId}/react`, {
+        method: 'POST',
+        headers: authHeaders(),
+        credentials: 'include',
+        body: JSON.stringify({ type }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(getApiErrorMessage(data, 'Could not save reaction.'))
+      }
+    } catch (error) {
+      setCommentsState((current) => ({ ...current, error: error.message }))
+    }
+  }
+
   return {
     user,
     sheet,
@@ -503,6 +552,7 @@ export default function useSheetViewer() {
     handleReviewContribution,
     submitComment,
     deleteComment,
+    reactToComment,
     studyStatus,
     setStudyStatus,
     STUDY_STATUSES,
