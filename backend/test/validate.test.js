@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { createRequire } from 'node:module'
 
 const require = createRequire(import.meta.url)
@@ -10,7 +10,20 @@ const require = createRequire(import.meta.url)
  * ═════════════════════════════════════════════════════════════════════════════ */
 
 describe('validate', () => {
-  const { validate, z, trimmedString, uuidId, positiveInt, pageParam, pageSizeParam, sortOrder, safeEmail, username, strongPassword, paginationQuery } = require('../src/lib/validate')
+  const {
+    validate,
+    z,
+    trimmedString,
+    uuidId,
+    positiveInt,
+    pageParam,
+    pageSizeParam,
+    sortOrder,
+    safeEmail,
+    username,
+    strongPassword,
+    paginationQuery,
+  } = require('../src/lib/validate')
 
   describe('validate middleware', () => {
     it('calls next() on valid body', () => {
@@ -431,4 +444,16 @@ describe('validate', () => {
     })
 
     it('sort defaults to undefined when not provided', () => {
-      const result = paginatio
+      const result = paginationQuery.safeParse({})
+      expect(result.data.sort).toBeUndefined()
+    })
+
+    it('returns all fields with mixed provided and default values', () => {
+      const result = paginationQuery.safeParse({ page: '3' })
+      expect(result.success).toBe(true)
+      expect(result.data.page).toBe(3)
+      expect(result.data.limit).toBe(20) // default
+      expect(result.data.sort).toBeUndefined() // optional, not provided
+    })
+  })
+})

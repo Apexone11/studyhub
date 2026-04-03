@@ -2,13 +2,13 @@
   "compilerOptions": {
     "checkJs": false,
     "strict": false,
-    "module": "commonjs",
+    "module": "node16",
     "target": "ES2022",
     "moduleResolution": "node16",
     "paths": {
-      "@lib/*": ["src/lib/*"],
-      "@middleware/*": ["src/middleware/*"],
-      "@modules/*": ["src/modules/*"]
+      "@lib/*": ["./src/lib/*"],
+      "@middleware/*": ["./src/middleware/*"],
+      "@modules/*": ["./src/modules/*"]
     },
     "noEmit": true,
     "skipLibCheck": true

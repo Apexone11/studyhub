@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import crypto from 'node:crypto'
 import { createRequire } from 'node:module'
 
@@ -135,7 +135,6 @@ describe('constants', () => {
     })
   })
 })
-
 
 // ── cache.js tests ───────────────────────────────────────────────────────────
 
@@ -555,4 +554,26 @@ describe('authTokens', () => {
         },
       }
 
-      const token = authTokens.getAuthCookieTokenFro
+      const token = authTokens.getAuthCookieTokenFromRequest(req)
+      expect(token).toBe('token-value')
+    })
+
+    it('returns null when cookie not present', () => {
+      const req = { headers: {} }
+
+      const token = authTokens.getAuthCookieTokenFromRequest(req)
+      expect(token).toBeNull()
+    })
+
+    it('handles URL-encoded cookie values', () => {
+      const req = {
+        headers: {
+          cookie: 'studyhub_session=encoded%20value; other=data',
+        },
+      }
+
+      const token = authTokens.getAuthCookieTokenFromRequest(req)
+      expect(token).toBe('encoded value')
+    })
+  })
+})
