@@ -24,7 +24,7 @@ const ROUTE_TO_API = {
   '/my-courses': '/api/courses/enrolled',
   '/tests': '/api/tests',
   '/ai': '/api/ai/conversations',
-  '/library': '/api/library/search?sort=popular&languages=en',
+  '/library': '/api/library/search?language=en',
   '/users/:username': null, // Profile routes are dynamic; not prefetched
 }
 
@@ -48,11 +48,11 @@ export function prefetch(apiPath) {
   // Schedule fetch on idle callback with setTimeout fallback
   const fetchFn = () => {
     fetch(`${API}${apiPath}`, { credentials: 'include' })
-      .then(res => {
+      .then((res) => {
         if (res.ok) return res.json()
         return null
       })
-      .then(data => {
+      .then((data) => {
         if (data) {
           // Update the useFetch cache so the hook will use this data
           cache.set(apiPath, { data, timestamp: Date.now() })

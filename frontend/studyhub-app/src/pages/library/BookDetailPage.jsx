@@ -1,11 +1,11 @@
 /* ═══════════════════════════════════════════════════════════════════════════
- * BookDetailPage.jsx — Book detail view with metadata, preview, and actions
+ * BookDetailPage.jsx -- Book detail view with metadata, preview, and actions
  *
  * Features:
  *   - Large cover image with fallback
- *   - Book metadata (title, author, subjects)
- *   - Description from Gutendex API
- *   - Download button options (EPUB, PDF, Plain Text)
+ *   - Book metadata (title, author, categories, page count)
+ *   - Description from Google Books API
+ *   - Read Online button (Google Books embedded viewer)
  *   - Save to bookshelf functionality
  *   - Related books by author (via search link)
  * ═══════════════════════════════════════════════════════════════════════════ */
@@ -13,22 +13,16 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useState, useRef, useEffect } from 'react'
 import Navbar from '../../components/navbar/Navbar'
-import { IconArrowLeft, IconDownload } from '../../components/Icons'
-import { Skeleton, SkeletonCard } from '../../components/Skeleton'
+import { IconArrowLeft } from '../../components/Icons'
+import { SkeletonCard } from '../../components/Skeleton'
 import { usePageTitle } from '../../lib/usePageTitle'
 import useBookDetail from './useBookDetail'
-import {
-  getBookCover,
-  getAuthorNames,
-  formatDownloads,
-  getEpubUrl,
-  getPlainTextUrl,
-} from './libraryHelpers'
+import { getBookCover, getAuthorNames, formatPageCount, hasPreview } from './libraryHelpers'
 import './BookDetailPage.css'
 
 export default function BookDetailPage() {
   usePageTitle('Book Details')
-  const { gutenbergId } = useParams()
+  const { volumeId } = useParams()
   const navigate = useNavigate()
   const [shelfDropdownOpen, setShelfDropdownOpen] = useState(false)
   const [newShelfName, setNewShelfName] = useState('')
@@ -36,7 +30,7 @@ export default function BookDetailPage() {
   const shelfDropdownRef = useRef(null)
 
   const { book, loading, error, shelves, progress, addToShelf, createShelf } =
-    useBookDetail(gutenbergId)
+    useBookDetail(volumeId)
 
   const handleAddToShelf = async (shelfId) => {
     const success = await addToShelf(shelfId)
@@ -58,10 +52,7 @@ export default function BookDetailPage() {
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (
-        shelfDropdownRef.current &&
-        !shelfDropdownRef.current.contains(event.target)
-      ) {
+      if (shelfDropdownRef.current && !shelfDropdownRef.current.contains(event.target)) {
         setShelfDropdownOpen(false)
         setShowNewShelfInput(false)
         setNewShelfName('')
@@ -99,10 +90,7 @@ export default function BookDetailPage() {
         <Navbar />
         <main className="book-detail-page">
           <div className="book-detail__error">
-            <button
-              onClick={() => navigate('/library')}
-              className="book-detail__back-btn"
-            >
+            <button onClick={() => navigate('/library')} className="book-detail__back-btn">
               <IconArrowLeft size={18} />
               Back
             </button>
@@ -121,10 +109,7 @@ export default function BookDetailPage() {
       <Navbar />
       <main className="book-detail-page">
         {/* Back Button */}
-        <button
-          onClick={() => navigate('/library')}
-          className="book-detail__back-btn"
-        >
+        <button onClick={() => navigate('/library')} className="book-detail__back-btn">
           <IconArrowLeft size={18} />
           Back
         </button>
@@ -145,11 +130,7 @@ export default function BookDetailPage() {
               <div className="book-detail__left">
                 <div className="book-detail__cover-wrapper">
                   {getBookCover(book) ? (
-                    <img
-                      src={getBookCover(book)}
-                      alt={book.title}
-                      className="book-detail__cover"
-                    />
+                    <img src={getBookCover(book)} alt={book.title} className="book-detail__cover" />
                   ) : (
                     <div
                       className="book-detail__cover-fallback"
@@ -165,11 +146,19 @@ export default function BookDetailPage() {
                 {/* Stats */}
                 <div className="book-detail__stats">
                   <div className="book-detail__stat">
-                    <span className="book-detail__stat-label">Downloads</span>
+                    <span className="book-detail__stat-label">Length</span>
                     <span className="book-detail__stat-value">
-                      {formatDownloads(book.download_count || 0)}
+                      {formatPageCount(book.pageCount || 0)}
                     </span>
                   </div>
+                  {book.averageRating && (
+                    <div className="book-detail__stat">
+                      <span className="book-detail__stat-label">Rating</span>
+                      <span className="book-detail__stat-value">
+                        {book.averageRating}/5 ({book.ratingsCount || 0})
+                      </span>
+                    </div>
+                  )}
                   {progress && progress.percentage > 0 && (
                     <div className="book-detail__stat">
                       <span className="book-detail__stat-label">Your Progress</span>
@@ -186,19 +175,23 @@ export default function BookDetailPage() {
                 {/* Title and Author */}
                 <div className="book-detail__header">
                   <h1 className="book-detail__title">{book.title}</h1>
-                  <p className="book-detail__author">
-                    by {getAuthorNames(book)}
-                  </p>
+                  <p className="book-detail__author">by {getAuthorNames(book)}</p>
+                  {book.publisher && (
+                    <p className="book-detail__publisher">
+                      Published by {book.publisher}
+                      {book.publishedDate ? ` (${book.publishedDate})` : ''}
+                    </p>
+                  )}
                 </div>
 
-                {/* Subjects/Topics */}
-                {book.subjects && book.subjects.length > 0 && (
+                {/* Categories */}
+                {book.categories && book.categories.length > 0 && (
                   <div className="book-detail__section">
-                    <h3 className="book-detail__section-title">Subjects</h3>
+                    <h3 className="book-detail__section-title">Categories</h3>
                     <div className="book-detail__subjects">
-                      {book.subjects.slice(0, 6).map((subject, idx) => (
+                      {book.categories.slice(0, 6).map((cat, idx) => (
                         <span key={idx} className="book-detail__subject-chip">
-                          {subject}
+                          {cat}
                         </span>
                       ))}
                     </div>
@@ -208,26 +201,40 @@ export default function BookDetailPage() {
                 {/* Description */}
                 <div className="book-detail__section">
                   <h3 className="book-detail__section-title">About</h3>
-                  <p className="book-detail__description">
-                    {book.description || 'No description available for this book.'}
-                  </p>
+                  <p
+                    className="book-detail__description"
+                    dangerouslySetInnerHTML={{
+                      __html: book.description || 'No description available for this book.',
+                    }}
+                  />
                 </div>
 
                 {/* Action Buttons */}
                 <div className="book-detail__actions">
-                  {/* Read Online Button */}
-                  <a
-                    href={`/library/${gutenbergId}/read`}
-                    className="book-detail__action-btn book-detail__action-btn--primary"
-                  >
-                    Read Online
-                  </a>
+                  {/* Read Online Button -- only if preview is available */}
+                  {hasPreview(book) && (
+                    <a
+                      href={`/library/${volumeId}/read`}
+                      className="book-detail__action-btn book-detail__action-btn--primary"
+                    >
+                      Read Online
+                    </a>
+                  )}
+
+                  {/* Google Books link as fallback */}
+                  {book.previewLink && (
+                    <a
+                      href={book.previewLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="book-detail__action-btn book-detail__action-btn--secondary"
+                    >
+                      View on Google Books
+                    </a>
+                  )}
 
                   {/* Save to Bookshelf Dropdown */}
-                  <div
-                    className="book-detail__shelf-dropdown"
-                    ref={shelfDropdownRef}
-                  >
+                  <div className="book-detail__shelf-dropdown" ref={shelfDropdownRef}>
                     <button
                       onClick={() => setShelfDropdownOpen(!shelfDropdownOpen)}
                       className="book-detail__action-btn book-detail__action-btn--secondary"
@@ -279,38 +286,6 @@ export default function BookDetailPage() {
                           </div>
                         )}
                       </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Download Formats */}
-                <div className="book-detail__downloads">
-                  <h3 className="book-detail__section-title">Download Formats</h3>
-                  <div className="book-detail__format-list">
-                    {getEpubUrl(book) && (
-                      <a
-                        href={getEpubUrl(book)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="book-detail__format-btn"
-                      >
-                        <IconDownload size={16} />
-                        EPUB
-                      </a>
-                    )}
-                    {getPlainTextUrl(book) && (
-                      <a
-                        href={getPlainTextUrl(book)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="book-detail__format-btn"
-                      >
-                        <IconDownload size={16} />
-                        Plain Text
-                      </a>
-                    )}
-                    {!getEpubUrl(book) && !getPlainTextUrl(book) && (
-                      <p className="book-detail__format-none">No downloads available</p>
                     )}
                   </div>
                 </div>

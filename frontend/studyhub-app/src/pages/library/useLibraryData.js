@@ -18,21 +18,20 @@ export default function useLibraryData() {
 
   // Extract query params
   const search = searchParams.get('search') || ''
-  const topic = searchParams.get('topic') || ''
-  const sort = searchParams.get('sort') || 'popular'
+  const category = searchParams.get('category') || ''
+  const sort = searchParams.get('sort') || 'relevance'
   const page = parseInt(searchParams.get('page') || '1', 10)
-  const languages = searchParams.get('languages') || 'en'
+  const language = searchParams.get('language') || 'en'
 
   // Fetch books with SWR caching
   useEffect(() => {
     async function fetchBooks() {
       const params = new URLSearchParams()
       if (search) params.append('search', search)
-      if (topic) params.append('topic', topic)
-      // Only send sort for values Gutendex understands; 'popular' = default (omit)
-      if (sort && sort !== 'popular') params.append('sort', sort)
+      if (category) params.append('category', category)
+      if (sort && sort !== 'relevance') params.append('sort', sort)
       if (page) params.append('page', page)
-      if (languages) params.append('languages', languages)
+      if (language) params.append('language', language)
 
       const cacheKey = `/api/library/search?${params.toString()}`
 
@@ -43,16 +42,13 @@ export default function useLibraryData() {
         setTotalCount(cached.data.totalCount || 0)
         setError('')
 
-        // If cache is fresh, show cached data and fetch in background
         const age = Date.now() - cached.timestamp
         if (age < SWR_TTL) {
           setLoading(false)
-          // Still fetch in background to keep fresh
           fetchFromApi(params, cacheKey, true)
           return
         }
 
-        // Stale cache: show data, fetch to replace
         setLoading(false)
         fetchFromApi(params, cacheKey, true)
         return
@@ -76,7 +72,6 @@ export default function useLibraryData() {
         if (!response.ok) {
           const text = await response.text()
           const data = readJsonSafely(text)
-          // 401/403 with optionalAuth: Gutendex books are public, retry without auth
           if (response.status === 401 || response.status === 403) {
             throw new Error('Session expired. Books are still available -- try refreshing.')
           }
@@ -90,10 +85,8 @@ export default function useLibraryData() {
         setUnavailable(data.unavailable === true)
         setError('')
 
-        // Update SWR cache
         swrCache.set(cacheKey, { data, timestamp: Date.now() })
       } catch (err) {
-        // Only show error if this isn't a background refresh
         if (!isBackground) {
           const msg = getApiErrorMessage(err)
           setError(msg)
@@ -106,40 +99,39 @@ export default function useLibraryData() {
     }
 
     fetchBooks()
-  }, [search, topic, sort, page, languages])
+  }, [search, category, sort, page, language])
 
-  // Prefetch next page for instant pagination
+  // Prefetch next page
   useEffect(() => {
     const nextPage = page + 1
     const params = new URLSearchParams()
     if (search) params.append('search', search)
-    if (topic) params.append('topic', topic)
-    if (sort && sort !== 'popular') params.append('sort', sort)
+    if (category) params.append('category', category)
+    if (sort && sort !== 'relevance') params.append('sort', sort)
     params.append('page', nextPage)
-    if (languages) params.append('languages', languages)
+    if (language) params.append('language', language)
 
     const cacheKey = `/api/library/search?${params.toString()}`
     const cached = swrCache.get(cacheKey)
 
-    // Only prefetch if not already cached
     if (!cached) {
       const timer = setTimeout(() => {
         fetch(`${API}/api/library/search?${params.toString()}`, {
           credentials: 'include',
           headers: authHeaders(),
         })
-          .then(res => (res.ok ? res.json() : null))
-          .then(data => {
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data) => {
             if (data) {
               swrCache.set(cacheKey, { data, timestamp: Date.now() })
             }
           })
-          .catch(() => {}) // Silent failure
-      }, 1000) // 1 second delay to prioritize current page
+          .catch(() => {})
+      }, 1000)
 
       return () => clearTimeout(timer)
     }
-  }, [search, topic, sort, page, languages])
+  }, [search, category, sort, page, language])
 
   // Helper functions to update query params
   const setSearch = useCallback(
@@ -147,21 +139,21 @@ export default function useLibraryData() {
       const next = new URLSearchParams(searchParams)
       if (value) next.set('search', value)
       else next.delete('search')
-      next.set('page', '1') // Reset to page 1
-      setSearchParams(next, { replace: true })
-    },
-    [searchParams, setSearchParams]
-  )
-
-  const setTopic = useCallback(
-    (value) => {
-      const next = new URLSearchParams(searchParams)
-      if (value) next.set('topic', value)
-      else next.delete('topic')
       next.set('page', '1')
       setSearchParams(next, { replace: true })
     },
-    [searchParams, setSearchParams]
+    [searchParams, setSearchParams],
+  )
+
+  const setCategory = useCallback(
+    (value) => {
+      const next = new URLSearchParams(searchParams)
+      if (value) next.set('category', value)
+      else next.delete('category')
+      next.set('page', '1')
+      setSearchParams(next, { replace: true })
+    },
+    [searchParams, setSearchParams],
   )
 
   const setSort = useCallback(
@@ -172,7 +164,7 @@ export default function useLibraryData() {
       next.set('page', '1')
       setSearchParams(next, { replace: true })
     },
-    [searchParams, setSearchParams]
+    [searchParams, setSearchParams],
   )
 
   const setPage = useCallback(
@@ -182,18 +174,18 @@ export default function useLibraryData() {
       else next.delete('page')
       setSearchParams(next, { replace: true })
     },
-    [searchParams, setSearchParams]
+    [searchParams, setSearchParams],
   )
 
-  const setLanguages = useCallback(
+  const setLanguage = useCallback(
     (value) => {
       const next = new URLSearchParams(searchParams)
-      if (value) next.set('languages', value)
-      else next.delete('languages')
+      if (value) next.set('language', value)
+      else next.delete('language')
       next.set('page', '1')
       setSearchParams(next, { replace: true })
     },
-    [searchParams, setSearchParams]
+    [searchParams, setSearchParams],
   )
 
   return {
@@ -205,13 +197,13 @@ export default function useLibraryData() {
     page,
     totalCount,
     search,
-    topic,
+    category,
     sort,
-    languages,
+    language,
     setSearch,
-    setTopic,
+    setCategory,
     setSort,
     setPage,
-    setLanguages,
+    setLanguage,
   }
 }

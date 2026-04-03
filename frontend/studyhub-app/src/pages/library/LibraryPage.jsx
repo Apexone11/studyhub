@@ -1,9 +1,9 @@
 /* ═══════════════════════════════════════════════════════════════════════════
- * LibraryPage.jsx — Book catalog with search, filters, and grid display
+ * LibraryPage.jsx -- Book catalog with search, filters, and grid display
  *
  * Features:
  *   - Hero section with gradient background and centered search
- *   - Topic/subject filter chips (horizontal scroll)
+ *   - Category filter chips (horizontal scroll)
  *   - Sort dropdown and language filter
  *   - Responsive book grid with BookCard components
  *   - Pagination support
@@ -12,7 +12,6 @@
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 import { useState, useRef, useEffect } from 'react'
-import { Link } from 'react-router-dom'
 import Navbar from '../../components/navbar/Navbar'
 import { IconSearch, IconBook } from '../../components/Icons'
 import { SkeletonCard } from '../../components/Skeleton'
@@ -20,7 +19,7 @@ import { usePageTitle } from '../../lib/usePageTitle'
 import BookCard from './components/BookCard'
 import useLibraryData from './useLibraryData'
 import autoAnimate from '@formkit/auto-animate'
-import { SUBJECTS, SORT_OPTIONS, LANGUAGES } from './libraryConstants'
+import { CATEGORIES, SORT_OPTIONS, LANGUAGES } from './libraryConstants'
 import './LibraryPage.css'
 
 export default function LibraryPage() {
@@ -34,14 +33,14 @@ export default function LibraryPage() {
     page,
     totalCount,
     search,
-    topic,
+    category,
     sort,
-    languages,
+    language,
     setSearch,
-    setTopic,
+    setCategory,
     setSort,
     setPage,
-    setLanguages,
+    setLanguage,
   } = useLibraryData()
 
   const [searchInput, setSearchInput] = useState(search)
@@ -57,15 +56,15 @@ export default function LibraryPage() {
     setSearch(searchInput)
   }
 
-  const handleTopicClick = (subject) => {
-    if (topic === subject) {
-      setTopic('')
+  const handleCategoryClick = (cat) => {
+    if (category === cat) {
+      setCategory('')
     } else {
-      setTopic(subject)
+      setCategory(cat)
     }
   }
 
-  const booksPerPage = 32
+  const booksPerPage = 20 // Google Books returns up to 20 per page
   const pageNumber = parseInt(page || '1', 10)
   const totalPages = Math.ceil(totalCount / booksPerPage)
   const hasNextPage = pageNumber < totalPages
@@ -80,16 +79,13 @@ export default function LibraryPage() {
             <IconBook size={280} />
           </div>
           <div className="library-hero__content">
-            <div className="library-hero__badge">70,000+ Books</div>
+            <div className="library-hero__badge">Millions of Books</div>
             <h1 className="library-hero__title">BookHub</h1>
             <p className="library-hero__subtitle">
-              Free classic books at your fingertips
+              Discover and read books powered by Google Books
             </p>
 
-            <form
-              onSubmit={handleSearchSubmit}
-              className="library-hero__search-form"
-            >
+            <form onSubmit={handleSearchSubmit} className="library-hero__search-form">
               <div className="library-hero__search-box">
                 <IconSearch size={20} className="library-hero__search-icon" />
                 <input
@@ -107,19 +103,19 @@ export default function LibraryPage() {
         {/* Filter Bar */}
         <section className="library-filters">
           <div className="library-filters__container">
-            {/* Topic/Subject Chips */}
+            {/* Category Chips */}
             <div className="library-filters__group">
-              <h3 className="library-filters__label">Browse by Subject</h3>
+              <h3 className="library-filters__label">Browse by Category</h3>
               <div className="library-filters__chips">
-                {SUBJECTS.map((subject) => (
+                {CATEGORIES.map((cat) => (
                   <button
-                    key={subject}
-                    onClick={() => handleTopicClick(subject)}
+                    key={cat}
+                    onClick={() => handleCategoryClick(cat)}
                     className={`library-filters__chip ${
-                      topic === subject ? 'library-filters__chip--active' : ''
+                      category === cat ? 'library-filters__chip--active' : ''
                     }`}
                   >
-                    {subject}
+                    {cat}
                   </button>
                 ))}
               </div>
@@ -151,8 +147,8 @@ export default function LibraryPage() {
                 </label>
                 <select
                   id="language-select"
-                  value={languages}
-                  onChange={(e) => setLanguages(e.target.value)}
+                  value={language}
+                  onChange={(e) => setLanguage(e.target.value)}
                   className="library-filters__select"
                 >
                   {LANGUAGES.map((lang) => (
@@ -180,9 +176,7 @@ export default function LibraryPage() {
           {/* Error State */}
           {error && (
             <div className="library-error">
-              <p className="library-error__message">
-                Oops! Something went wrong: {error}
-              </p>
+              <p className="library-error__message">Oops! Something went wrong: {error}</p>
             </div>
           )}
 
@@ -208,10 +202,7 @@ export default function LibraryPage() {
             <>
               <div ref={gridRef} className="library-grid">
                 {books.map((book) => (
-                  <BookCard
-                    key={book.id}
-                    book={book}
-                  />
+                  <BookCard key={book.volumeId} book={book} />
                 ))}
               </div>
 
@@ -268,7 +259,7 @@ export default function LibraryPage() {
                   <button
                     onClick={() => {
                       setSearch('')
-                      setTopic('')
+                      setCategory('')
                     }}
                     className="library-empty__reset-btn"
                   >

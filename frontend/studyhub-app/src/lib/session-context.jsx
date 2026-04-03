@@ -17,19 +17,13 @@ import {
   isAuthSessionFailure,
   readJsonSafely,
 } from './http'
-import {
-  clearStoredSession,
-  getStoredUser,
-  logoutSession,
-  setStoredUser,
-} from './session'
+import { clearStoredSession, getStoredUser, logoutSession, setStoredUser } from './session'
 
 export const SESSION_EXPIRED_FLAG = 'studyhub:session-expired'
 
 const SessionContext = createContext(null)
-const runTransition = typeof startTransition === 'function'
-  ? startTransition
-  : (callback) => callback()
+const runTransition =
+  typeof startTransition === 'function' ? startTransition : (callback) => callback()
 
 async function fetchSessionUser() {
   const response = await fetch(`${API}/api/auth/me`, {
@@ -49,7 +43,10 @@ async function fetchSessionUser() {
     return {
       status: 'forbidden',
       user: null,
-      error: getApiErrorMessage(data, 'Access is temporarily restricted. Please refresh and try again.'),
+      error: getApiErrorMessage(
+        data,
+        'Access is temporarily restricted. Please refresh and try again.',
+      ),
     }
   }
 
@@ -60,85 +57,10 @@ async function fetchSessionUser() {
   return { status: 'authenticated', user: data, error: '' }
 }
 
-function SessionExpiredModal({ visible, onDismiss }) {
-  useEffect(() => {
-    if (!visible) return undefined
-    const handleKey = (e) => { if (e.key === 'Escape') onDismiss('/') }
-    window.addEventListener('keydown', handleKey)
-    return () => window.removeEventListener('keydown', handleKey)
-  }, [visible, onDismiss])
-
-  if (!visible) return null
-
-  return (
-    <div
-      style={{
-        position: 'fixed', inset: 0, zIndex: 99999,
-        background: 'rgba(15, 23, 42, 0.5)',
-        display: 'grid', placeItems: 'center', padding: 24,
-      }}
-      onClick={() => onDismiss('/')}
-      role="presentation"
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Session expired"
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: 'var(--sh-surface, #fff)',
-          border: '1px solid var(--sh-border, #e2e8f0)',
-          borderRadius: 18, padding: 28,
-          width: '100%', maxWidth: 400,
-          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.2)',
-          fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
-        }}
-      >
-        <h2 style={{ margin: '0 0 8px', fontSize: 18, color: 'var(--sh-heading, #0f172a)' }}>
-          Your session has expired
-        </h2>
-        <p style={{ margin: '0 0 20px', fontSize: 13, lineHeight: 1.6, color: 'var(--sh-muted, #64748b)' }}>
-          For your security, your session ended. Please sign in again to continue.
-        </p>
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-          <button
-            type="button"
-            onClick={() => onDismiss('/')}
-            style={{
-              padding: '9px 16px', borderRadius: 10,
-              border: '1px solid var(--sh-border, #e2e8f0)',
-              background: 'var(--sh-surface, #fff)',
-              color: 'var(--sh-muted, #64748b)',
-              fontSize: 13, fontWeight: 700, cursor: 'pointer',
-              fontFamily: 'inherit',
-            }}
-          >
-            Go to Home
-          </button>
-          <button
-            type="button"
-            onClick={() => onDismiss('/login')}
-            style={{
-              padding: '9px 16px', borderRadius: 10, border: 'none',
-              background: 'linear-gradient(135deg, #6366f1, #818cf8)',
-              color: '#fff',
-              fontSize: 13, fontWeight: 700, cursor: 'pointer',
-              fontFamily: 'inherit',
-            }}
-          >
-            Sign in again
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 export function SessionProvider({ children }) {
   const [user, setUser] = useState(() => getStoredUser())
   const [status, setStatus] = useState('bootstrapping')
   const [error, setError] = useState('')
-  const [sessionExpiredVisible, setSessionExpiredVisible] = useState(false)
   const bootstrappedRef = useRef(false)
   const navigate = useNavigate()
 
@@ -171,7 +93,9 @@ export function SessionProvider({ children }) {
         if (result.status === 'forbidden') {
           if (user) {
             setStatus('authenticated')
-            setError(result.error || 'Access is temporarily restricted. Some actions may be unavailable.')
+            setError(
+              result.error || 'Access is temporarily restricted. Some actions may be unavailable.',
+            )
           } else {
             setStatus('unauthenticated')
             setError(result.error || 'Access is temporarily restricted.')
@@ -217,58 +141,60 @@ export function SessionProvider({ children }) {
     if (typeof window === 'undefined') return undefined
 
     const handleAuthExpired = () => {
-      try { sessionStorage.setItem(SESSION_EXPIRED_FLAG, '1') } catch { /* private mode */ }
+      try {
+        sessionStorage.setItem(SESSION_EXPIRED_FLAG, '1')
+      } catch {
+        /* private mode */
+      }
       clearSession()
-      setSessionExpiredVisible(true)
+      // Redirect to login with a flag instead of showing a modal overlay.
+      // The login page reads this flag and displays the expired-session message.
+      navigate('/login?expired=1', { replace: true })
     }
 
     window.addEventListener(AUTH_SESSION_EXPIRED_EVENT, handleAuthExpired)
     return () => {
       window.removeEventListener(AUTH_SESSION_EXPIRED_EVENT, handleAuthExpired)
     }
-  }, [clearSession])
+  }, [clearSession, navigate])
 
-  const completeAuthentication = useCallback((nextUser) => {
-    /* Use flushSync so state is committed synchronously before the caller
+  const completeAuthentication = useCallback(
+    (nextUser) => {
+      /* Use flushSync so state is committed synchronously before the caller
        navigates — prevents a race where the target page renders before
        the session context is updated (crashes on mobile/tablet). */
-    flushSync(() => {
-      syncUser(nextUser)
-      setStatus('authenticated')
-      setError('')
-    })
-  }, [syncUser])
+      flushSync(() => {
+        syncUser(nextUser)
+        setStatus('authenticated')
+        setError('')
+      })
+    },
+    [syncUser],
+  )
 
   const signOut = useCallback(async () => {
     await logoutSession()
     clearSession()
   }, [clearSession])
 
-  const dismissSessionExpired = useCallback((path) => {
-    setSessionExpiredVisible(false)
-    navigate(path, { replace: true })
-  }, [navigate])
-
-  const value = useMemo(() => ({
-    user,
-    status,
-    error,
-    isBootstrapping: status === 'bootstrapping',
-    isAuthenticated: status === 'authenticated' && Boolean(user),
-    isUnauthenticated: status === 'unauthenticated' || (status !== 'bootstrapping' && !user),
-    refreshSession,
-    completeAuthentication,
-    clearSession,
-    setSessionUser: syncUser,
-    signOut,
-  }), [clearSession, completeAuthentication, error, refreshSession, signOut, status, syncUser, user])
-
-  return (
-    <SessionContext.Provider value={value}>
-      {children}
-      <SessionExpiredModal visible={sessionExpiredVisible} onDismiss={dismissSessionExpired} />
-    </SessionContext.Provider>
+  const value = useMemo(
+    () => ({
+      user,
+      status,
+      error,
+      isBootstrapping: status === 'bootstrapping',
+      isAuthenticated: status === 'authenticated' && Boolean(user),
+      isUnauthenticated: status === 'unauthenticated' || (status !== 'bootstrapping' && !user),
+      refreshSession,
+      completeAuthentication,
+      clearSession,
+      setSessionUser: syncUser,
+      signOut,
+    }),
+    [clearSession, completeAuthentication, error, refreshSession, signOut, status, syncUser, user],
   )
+
+  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
 }
 
 export function useSession() {

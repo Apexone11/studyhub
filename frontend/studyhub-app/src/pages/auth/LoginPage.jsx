@@ -45,7 +45,18 @@ export default function LoginPage() {
         setLoggedOut(true)
         sessionStorage.removeItem(LOGGED_OUT_FLAG)
       }
-    } catch { /* private mode */ }
+    } catch {
+      /* private mode */
+    }
+    // Also check URL param set by session-context redirect
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('expired') === '1') {
+      setSessionExpired(true)
+      // Clean the URL so a refresh does not re-show the banner
+      params.delete('expired')
+      const clean = params.toString()
+      window.history.replaceState({}, '', window.location.pathname + (clean ? `?${clean}` : ''))
+    }
   }, [])
 
   /* ── Card entrance animation ───────────────────────────────────────── */
@@ -140,7 +151,13 @@ export default function LoginPage() {
           <div className="login-header">
             <div className="login-logo-mark">
               <svg width="28" height="28" viewBox="0 0 36 36" fill="none">
-                <path d="M18 6 L18 30 M10 14 L18 6 L26 14 M10 22 L18 14 L26 22" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path
+                  d="M18 6 L18 30 M10 14 L18 6 L26 14 M10 22 L18 14 L26 22"
+                  stroke="#f59e0b"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
             </div>
             <h1 className="login-h1">Welcome back</h1>
@@ -150,7 +167,9 @@ export default function LoginPage() {
           {/* ── Session-expired banner ──────────────────────────────── */}
           {sessionExpired && (
             <div role="status" className="login-alert login-alert--warning">
-              <span className="login-alert-icon" aria-hidden="true">&#x1f512;</span>
+              <span className="login-alert-icon" aria-hidden="true">
+                &#x1f512;
+              </span>
               <span>Your session expired. Sign in again to pick up where you left off.</span>
             </div>
           )}
@@ -194,11 +213,17 @@ export default function LoginPage() {
           {/* ── Username + Password form ─────────────────────────────── */}
           <form onSubmit={handleLogin}>
             <div className="login-field">
-              <label htmlFor="login-username" className="login-label">Username</label>
+              <label htmlFor="login-username" className="login-label">
+                Username
+              </label>
               <input
                 id="login-username"
                 value={username}
-                onChange={(event) => { setUsername(event.target.value); setError(''); setShowForgot(false) }}
+                onChange={(event) => {
+                  setUsername(event.target.value)
+                  setError('')
+                  setShowForgot(false)
+                }}
                 autoComplete="username"
                 placeholder="Enter your username"
                 className="login-input"
@@ -206,12 +231,18 @@ export default function LoginPage() {
             </div>
 
             <div className="login-field login-field--last">
-              <label htmlFor="login-password" className="login-label">Password</label>
+              <label htmlFor="login-password" className="login-label">
+                Password
+              </label>
               <input
                 id="login-password"
                 type="password"
                 value={password}
-                onChange={(event) => { setPassword(event.target.value); setError(''); setShowForgot(false) }}
+                onChange={(event) => {
+                  setPassword(event.target.value)
+                  setError('')
+                  setShowForgot(false)
+                }}
                 autoComplete="current-password"
                 placeholder="Enter your password"
                 className="login-input"
@@ -227,9 +258,7 @@ export default function LoginPage() {
                 Forgot username or password?
               </Link>
               {showForgot && (
-                <div className="login-forgot-hint">
-                  Use the link above to reset your password.
-                </div>
+                <div className="login-forgot-hint">Use the link above to reset your password.</div>
               )}
             </div>
           </form>
