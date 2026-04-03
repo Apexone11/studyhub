@@ -16,9 +16,9 @@ function settleSection(label, loader) {
  */
 function stripHtml(html) {
   return String(html)
-    .replace(/<style[\s\S]*?<\/style>/gi, '')      // remove <style> blocks
-    .replace(/<script[\s\S]*?<\/script>/gi, '')     // remove <script> blocks
-    .replace(/<[^>]*>/g, ' ')                       // strip remaining tags
+    .replace(/<style[\s\S]*?<\/style>/gi, '') // remove <style> blocks
+    .replace(/<script[\s\S]*?<\/script>/gi, '') // remove <script> blocks
+    .replace(/<[^>]*>/g, ' ') // strip remaining tags
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
@@ -28,9 +28,7 @@ function stripHtml(html) {
 }
 
 function summarizeText(text = '', max = 180) {
-  const plain = stripHtml(text)
-    .replace(/\s+/g, ' ')
-    .trim()
+  const plain = stripHtml(text).replace(/\s+/g, ' ').trim()
 
   if (!plain) return ''
   if (plain.length <= max) return plain
@@ -39,17 +37,35 @@ function summarizeText(text = '', max = 180) {
 
 function safeDownloadName(name) {
   const ext = path.extname(String(name || 'attachment')) || '.bin'
-  const base = path.basename(String(name || 'attachment'), ext)
-    .replace(/[^a-zA-Z0-9._-]/g, '_')
-    .slice(0, 80) || 'attachment'
+  const base =
+    path
+      .basename(String(name || 'attachment'), ext)
+      .replace(/[^a-zA-Z0-9._-]/g, '_')
+      .slice(0, 80) || 'attachment'
   return `${base}${ext}`.toLowerCase()
 }
 
 function reactionSummary(rows, idKey, idValue, currentRows, currentKey) {
   const likes = rows.find((row) => row[idKey] === idValue && row.type === 'like')?._count?._all || 0
-  const dislikes = rows.find((row) => row[idKey] === idValue && row.type === 'dislike')?._count?._all || 0
+  const dislikes =
+    rows.find((row) => row[idKey] === idValue && row.type === 'dislike')?._count?._all || 0
   const userReaction = currentRows.find((row) => row[currentKey] === idValue)?.type || null
   return { likes, dislikes, userReaction }
+}
+
+function formatAnnouncementMedia(mediaItems) {
+  if (!Array.isArray(mediaItems) || mediaItems.length === 0) return []
+  return mediaItems.map((m) => ({
+    id: m.id,
+    type: m.type,
+    url: m.url,
+    position: m.position,
+    fileName: m.fileName || null,
+    fileSize: m.fileSize || null,
+    width: m.width || null,
+    height: m.height || null,
+    video: m.video ? formatVideoForFeed(m.video) : null,
+  }))
 }
 
 function formatAnnouncement(item) {
@@ -61,7 +77,14 @@ function formatAnnouncement(item) {
     createdAt: item.createdAt,
     title: item.title,
     body: item.body,
-    author: item.author ? { id: item.author.id, username: item.author.username, avatarUrl: item.author.avatarUrl || null } : null,
+    author: item.author
+      ? {
+          id: item.author.id,
+          username: item.author.username,
+          avatarUrl: item.author.avatarUrl || null,
+        }
+      : null,
+    media: formatAnnouncementMedia(item.media),
   }
 }
 
@@ -74,7 +97,13 @@ function formatSheet(item, starredIds, commentCounts, reactionRows, currentReact
     title: item.title,
     description: summarizeText(item.description || '', 190),
     preview: summarizeText(item.content, 190),
-    author: item.author ? { id: item.author.id, username: item.author.username, avatarUrl: item.author.avatarUrl || null } : null,
+    author: item.author
+      ? {
+          id: item.author.id,
+          username: item.author.username,
+          avatarUrl: item.author.avatarUrl || null,
+        }
+      : null,
     course: item.course ? { id: item.course.id, code: item.course.code } : null,
     stars: item.stars || 0,
     forks: item.forks || 0,
@@ -99,6 +128,22 @@ function formatSheet(item, starredIds, commentCounts, reactionRows, currentReact
   }
 }
 
+function formatVideoForFeed(video) {
+  if (!video) return null
+  return {
+    id: video.id,
+    title: video.title || null,
+    status: video.status,
+    duration: video.duration || null,
+    width: video.width || null,
+    height: video.height || null,
+    thumbnailR2Key: video.thumbnailR2Key || null,
+    variants: video.variants || null,
+    hlsManifestR2Key: video.hlsManifestR2Key || null,
+    r2Key: video.r2Key,
+  }
+}
+
 function formatPost(item, commentCounts, reactionRows, currentReactions) {
   return {
     id: item.id,
@@ -108,7 +153,13 @@ function formatPost(item, commentCounts, reactionRows, currentReactions) {
     updatedAt: item.updatedAt,
     content: item.content,
     preview: summarizeText(item.content, 220),
-    author: item.author ? { id: item.author.id, username: item.author.username, avatarUrl: item.author.avatarUrl || null } : null,
+    author: item.author
+      ? {
+          id: item.author.id,
+          username: item.author.username,
+          avatarUrl: item.author.avatarUrl || null,
+        }
+      : null,
     course: item.course ? { id: item.course.id, code: item.course.code } : null,
     commentCount: commentCounts.get(item.id) || 0,
     reactions: reactionSummary(reactionRows, 'postId', item.id, currentReactions, 'postId'),
@@ -117,6 +168,7 @@ function formatPost(item, commentCounts, reactionRows, currentReactions) {
     attachmentType: item.attachmentType || null,
     allowDownloads: item.allowDownloads !== false,
     moderationStatus: item.moderationStatus || 'clean',
+    video: formatVideoForFeed(item.video),
     linkPath: `/feed?post=${item.id}`,
   }
 }
@@ -129,7 +181,13 @@ function formatNote(item, commentCounts) {
     createdAt: item.createdAt,
     title: item.title,
     preview: summarizeText(item.content, 190),
-    author: item.author ? { id: item.author.id, username: item.author.username, avatarUrl: item.author.avatarUrl || null } : null,
+    author: item.author
+      ? {
+          id: item.author.id,
+          username: item.author.username,
+          avatarUrl: item.author.avatarUrl || null,
+        }
+      : null,
     course: item.course ? { id: item.course.id, code: item.course.code } : null,
     commentCount: commentCounts.get(item.id) || 0,
     moderationStatus: item.moderationStatus || 'clean',
@@ -144,7 +202,13 @@ function formatFeedPostDetail(item, commentCount, reactionRows, currentReactions
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
     content: item.content,
-    author: item.author ? { id: item.author.id, username: item.author.username, avatarUrl: item.author.avatarUrl || null } : null,
+    author: item.author
+      ? {
+          id: item.author.id,
+          username: item.author.username,
+          avatarUrl: item.author.avatarUrl || null,
+        }
+      : null,
     course: item.course ? { id: item.course.id, code: item.course.code } : null,
     commentCount,
     reactions: reactionSummary(reactionRows, 'postId', item.id, currentReactions, 'postId'),
@@ -153,6 +217,7 @@ function formatFeedPostDetail(item, commentCount, reactionRows, currentReactions
     attachmentType: item.attachmentType || null,
     allowDownloads: item.allowDownloads !== false,
     moderationStatus: item.moderationStatus || 'clean',
+    video: formatVideoForFeed(item.video),
   }
 }
 
@@ -163,8 +228,10 @@ module.exports = {
   safeDownloadName,
   reactionSummary,
   formatAnnouncement,
+  formatAnnouncementMedia,
   formatSheet,
   formatPost,
   formatNote,
   formatFeedPostDetail,
+  formatVideoForFeed,
 }

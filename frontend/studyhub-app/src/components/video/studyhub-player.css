@@ -1,0 +1,513 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+ * studyhub-player.css — Custom YouTube-like player styles
+ *
+ * All colors use CSS custom property tokens from index.css (--sh-*)
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Container ──────────────────────────────────────────────────────────── */
+
+.shp-container {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  outline: none;
+  user-select: none;
+  font-family: var(--font);
+  cursor: default;
+}
+
+.shp-container:focus-visible {
+  box-shadow: 0 0 0 3px var(--sh-brand);
+}
+
+/* Theater mode — full width, taller */
+.shp-theater {
+  max-width: 100%;
+  border-radius: 0;
+  aspect-ratio: 21 / 9;
+}
+
+/* Fullscreen — cover entire screen */
+.shp-fullscreen {
+  border-radius: 0;
+  aspect-ratio: auto;
+  width: 100%;
+  height: 100%;
+}
+
+/* ── Video wrapper ──────────────────────────────────────────────────────── */
+
+.shp-video-wrapper {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.shp-video-wrapper [data-vjs-player] {
+  width: 100%;
+  height: 100%;
+}
+
+.shp-video-wrapper .video-js {
+  width: 100%;
+  height: 100%;
+}
+
+/* Hide default Video.js controls and overlays since we use our own */
+.shp-container .vjs-control-bar,
+.shp-container .vjs-big-play-button,
+.shp-container .vjs-loading-spinner,
+.shp-container .vjs-poster {
+  display: none !important;
+}
+
+/* ── Loading spinner overlay ────────────────────────────────────────────── */
+
+.shp-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.shp-loading {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.shp-spinner {
+  width: 48px;
+  height: 48px;
+  border: 3px solid rgba(255, 255, 255, 0.25);
+  border-top-color: var(--sh-brand);
+  border-radius: 50%;
+  animation: shp-spin 0.8s linear infinite;
+}
+
+@keyframes shp-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── Skip indicator ─────────────────────────────────────────────────────── */
+
+.shp-skip-indicator {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 8px 18px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: var(--type-sm);
+  font-weight: 600;
+  border-radius: var(--radius-full);
+  pointer-events: none;
+  z-index: 6;
+  animation: shp-skip-fade 0.6s ease-out forwards;
+}
+
+.shp-skip-left {
+  left: 15%;
+}
+
+.shp-skip-right {
+  right: 15%;
+}
+
+@keyframes shp-skip-fade {
+  0% {
+    opacity: 1;
+    transform: translateY(-50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-50%) scale(1.3);
+  }
+}
+
+/* ── Big play button ────────────────────────────────────────────────────── */
+
+.shp-big-play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 6;
+  background: rgba(0, 0, 0, 0.55);
+  border: none;
+  border-radius: 50%;
+  width: 72px;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    transform 0.15s ease;
+}
+
+.shp-big-play:hover {
+  background: rgba(0, 0, 0, 0.7);
+  transform: translate(-50%, -50%) scale(1.08);
+}
+
+.shp-big-play:active {
+  transform: translate(-50%, -50%) scale(0.95);
+}
+
+.shp-big-play svg {
+  margin-left: 3px; /* optical center for play triangle */
+}
+
+/* ── Controls bar ───────────────────────────────────────────────────────── */
+
+.shp-controls {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  padding: 0 12px 10px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.75));
+  opacity: 0;
+  transform: translateY(4px);
+  transition:
+    opacity 0.25s ease,
+    transform 0.25s ease;
+  pointer-events: none;
+}
+
+.shp-controls-visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+/* ── Seek bar ───────────────────────────────────────────────────────────── */
+
+.shp-seek-bar {
+  position: relative;
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  cursor: pointer;
+  margin-bottom: 8px;
+  transition: height 0.12s ease;
+}
+
+.shp-seek-bar:hover {
+  height: 6px;
+}
+
+.shp-seek-buffered {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.35);
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+.shp-seek-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: var(--sh-brand);
+  border-radius: 2px;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.shp-seek-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--sh-brand);
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+  transform: translateX(50%) scale(0);
+  transition: transform 0.12s ease;
+  flex-shrink: 0;
+}
+
+.shp-seek-bar:hover .shp-seek-thumb {
+  transform: translateX(50%) scale(1);
+}
+
+/* ── Controls row ───────────────────────────────────────────────────────── */
+
+.shp-controls-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.shp-controls-left {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.shp-controls-right {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* ── Buttons ────────────────────────────────────────────────────────────── */
+
+.shp-btn {
+  background: none;
+  border: none;
+  color: #fff;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.12s ease;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.shp-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.shp-btn:active {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.shp-btn-text {
+  width: auto;
+  padding: 0 8px;
+  font-size: var(--type-xs);
+  font-weight: 600;
+  font-family: var(--font);
+  letter-spacing: 0.02em;
+}
+
+/* ── Volume slider ──────────────────────────────────────────────────────── */
+
+.shp-volume-slider {
+  width: 0;
+  overflow: hidden;
+  transition:
+    width 0.2s ease,
+    margin 0.2s ease;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+  margin: 0;
+}
+
+/* Show slider when hovering near volume button */
+.shp-controls-left:hover .shp-volume-slider,
+.shp-volume-slider:focus {
+  width: 64px;
+  margin-left: 4px;
+}
+
+.shp-volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  cursor: pointer;
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.3);
+}
+
+.shp-volume-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.3);
+}
+
+.shp-volume-slider::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.shp-volume-slider::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* ── Time display ───────────────────────────────────────────────────────── */
+
+.shp-time {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: var(--type-xs);
+  font-weight: 500;
+  font-family: var(--font);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  padding: 0 6px;
+  user-select: none;
+}
+
+/* ── Popup menus (speed, quality, captions) ─────────────────────────────── */
+
+.shp-menu-anchor {
+  position: relative;
+}
+
+.shp-popup-menu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  min-width: 130px;
+  background: var(--sh-slate-900, #1a1a1a);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius);
+  padding: 6px 0;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  z-index: 20;
+  animation: shp-menu-in 0.15s ease;
+}
+
+@keyframes shp-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.shp-menu-title {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: var(--type-xs);
+  font-weight: 600;
+  font-family: var(--font);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 6px 14px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 4px;
+}
+
+.shp-menu-item {
+  display: block;
+  width: 100%;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: var(--type-sm);
+  font-family: var(--font);
+  text-align: left;
+  padding: 7px 14px;
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+
+.shp-menu-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.shp-menu-active {
+  color: var(--sh-brand);
+  font-weight: 600;
+}
+
+.shp-menu-active::before {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--sh-brand);
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+/* ── Responsive adjustments ─────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .shp-container {
+    border-radius: 0;
+  }
+
+  .shp-controls {
+    padding: 0 8px 8px;
+  }
+
+  .shp-btn {
+    width: 32px;
+    height: 32px;
+  }
+
+  .shp-btn svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .shp-big-play {
+    width: 56px;
+    height: 56px;
+  }
+
+  .shp-big-play svg {
+    width: 36px;
+    height: 36px;
+  }
+
+  .shp-time {
+    font-size: 11px;
+  }
+
+  /* Always show volume slider on mobile (no hover) */
+  .shp-volume-slider {
+    width: 48px;
+    margin-left: 4px;
+  }
+
+  .shp-btn-text {
+    font-size: 11px;
+    padding: 0 5px;
+  }
+}
+
+/* ── Accessibility ──────────────────────────────────────────────────────── */
+
+.shp-container *:focus-visible {
+  outline: 2px solid var(--sh-brand);
+  outline-offset: 2px;
+}
+
+/* Remove focus outline for mouse users */
+.shp-container *:focus:not(:focus-visible) {
+  outline: none;
+}

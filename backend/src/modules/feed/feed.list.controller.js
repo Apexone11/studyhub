@@ -35,9 +35,7 @@ router.get('/', async (req, res) => {
         ],
       }
     : { status: 'published' }
-  const postWhere = search
-    ? { content: { contains: search, mode: 'insensitive' } }
-    : undefined
+  const postWhere = search ? { content: { contains: search, mode: 'insensitive' } } : undefined
   const announcementWhere = search
     ? {
         OR: [
@@ -76,58 +74,133 @@ router.get('/', async (req, res) => {
     const authorFilter = hideUserIds.length > 0 ? { authorId: { notIn: hideUserIds } } : {}
 
     const primarySections = await Promise.all([
-      settleSection('announcements', () => prisma.announcement.findMany({
-        where: { ...announcementWhere, ...authorFilter },
-        include: { author: { select: { id: true, username: true, avatarUrl: true } } },
-        orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
-        take: announcementTake,
-      })),
-      settleSection('sheets', () => prisma.studySheet.findMany({
-        where: { ...sheetWhere, ...userFilter },
-        select: {
-          id: true, title: true, description: true, content: true,
-          createdAt: true, stars: true, forks: true, downloads: true,
-          attachmentUrl: true, attachmentName: true, attachmentType: true, allowDownloads: true,
-          author: { select: { id: true, username: true, avatarUrl: true } },
-          course: { select: { id: true, code: true } },
-          forkSource: {
-            select: {
-              id: true,
-              title: true,
-              author: { select: { id: true, username: true, avatarUrl: true } },
+      settleSection('announcements', () =>
+        prisma.announcement.findMany({
+          where: { ...announcementWhere, ...authorFilter },
+          include: {
+            author: { select: { id: true, username: true, avatarUrl: true } },
+            media: {
+              select: {
+                id: true,
+                type: true,
+                url: true,
+                position: true,
+                videoId: true,
+                fileName: true,
+                fileSize: true,
+                width: true,
+                height: true,
+                video: {
+                  select: {
+                    id: true,
+                    title: true,
+                    status: true,
+                    duration: true,
+                    width: true,
+                    height: true,
+                    thumbnailR2Key: true,
+                    variants: true,
+                    r2Key: true,
+                  },
+                },
+              },
+              orderBy: { position: 'asc' },
             },
           },
-        },
-        orderBy: { createdAt: 'desc' },
-        take,
-      })),
-      settleSection('posts', () => prisma.feedPost.findMany({
-        where: { ...postWhere, ...userFilter },
-        select: {
-          id: true, content: true, createdAt: true, updatedAt: true, moderationStatus: true,
-          attachmentUrl: true, attachmentName: true, attachmentType: true, allowDownloads: true,
-          author: { select: { id: true, username: true, avatarUrl: true } },
-          course: { select: { id: true, code: true } },
-        },
-        orderBy: { createdAt: 'desc' },
-        take,
-      })),
-      settleSection('notes', () => prisma.note.findMany({
-        where: { ...noteWhere, ...userFilter },
-        select: {
-          id: true, title: true, content: true, createdAt: true, moderationStatus: true,
-          author: { select: { id: true, username: true, avatarUrl: true } },
-          course: { select: { id: true, code: true } },
-        },
-        orderBy: { createdAt: 'desc' },
-        take,
-      })),
+          orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
+          take: announcementTake,
+        }),
+      ),
+      settleSection('sheets', () =>
+        prisma.studySheet.findMany({
+          where: { ...sheetWhere, ...userFilter },
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            content: true,
+            createdAt: true,
+            stars: true,
+            forks: true,
+            downloads: true,
+            attachmentUrl: true,
+            attachmentName: true,
+            attachmentType: true,
+            allowDownloads: true,
+            author: { select: { id: true, username: true, avatarUrl: true } },
+            course: { select: { id: true, code: true } },
+            forkSource: {
+              select: {
+                id: true,
+                title: true,
+                author: { select: { id: true, username: true, avatarUrl: true } },
+              },
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+          take,
+        }),
+      ),
+      settleSection('posts', () =>
+        prisma.feedPost.findMany({
+          where: { ...postWhere, ...userFilter },
+          select: {
+            id: true,
+            content: true,
+            createdAt: true,
+            updatedAt: true,
+            moderationStatus: true,
+            attachmentUrl: true,
+            attachmentName: true,
+            attachmentType: true,
+            allowDownloads: true,
+            author: { select: { id: true, username: true, avatarUrl: true } },
+            course: { select: { id: true, code: true } },
+            video: {
+              select: {
+                id: true,
+                title: true,
+                status: true,
+                duration: true,
+                width: true,
+                height: true,
+                thumbnailR2Key: true,
+                variants: true,
+                hlsManifestR2Key: true,
+                r2Key: true,
+              },
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+          take,
+        }),
+      ),
+      settleSection('notes', () =>
+        prisma.note.findMany({
+          where: { ...noteWhere, ...userFilter },
+          select: {
+            id: true,
+            title: true,
+            content: true,
+            createdAt: true,
+            moderationStatus: true,
+            author: { select: { id: true, username: true, avatarUrl: true } },
+            course: { select: { id: true, code: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+          take,
+        }),
+      ),
     ])
 
-    const announcements = primarySections.find((section) => section.label === 'announcements' && section.ok)?.data || []
-    const sheets = primarySections.find((section) => section.label === 'sheets' && section.ok)?.data || []
-    const posts = primarySections.find((section) => section.label === 'posts' && section.ok)?.data || []
-    const notes = primarySections.find((section) => section.label === 'notes' && section.ok)?.data || []
+    const announcements =
+      primarySections.find((section) => section.label === 'announcements' && section.ok)?.data || []
+    const sheets =
+      primarySections.find((section) => section.label === 'sheets' && section.ok)?.data || []
+    const posts =
+      primarySections.find((section) => section.label === 'posts' && section.ok)?.data || []
+    const notes =
+      primarySections.find((section) => section.label === 'notes' && section.ok)?.data || []
 
     const degradedSections = primarySections
       .filter((section) => !section.ok)
@@ -135,7 +208,10 @@ router.get('/', async (req, res) => {
 
     primarySections.forEach((section) => {
       if (!section.ok) {
-        console.error(`[feed] section "${section.label}" failed:`, section.error?.message || section.error)
+        console.error(
+          `[feed] section "${section.label}" failed:`,
+          section.error?.message || section.error,
+        )
         captureError(section.error, {
           route: req.originalUrl,
           method: req.method,
@@ -165,75 +241,75 @@ router.get('/', async (req, res) => {
     const noteIds = notes.map((note) => note.id)
 
     const secondarySections = await Promise.all([
-      settleSection('starredRows', () => (
+      settleSection('starredRows', () =>
         sheetIds.length > 0
           ? prisma.starredSheet.findMany({
               where: { userId: req.user.userId, sheetId: { in: sheetIds } },
               select: { sheetId: true },
             })
-          : []
-      )),
-      settleSection('sheetCommentRows', () => (
+          : [],
+      ),
+      settleSection('sheetCommentRows', () =>
         sheetIds.length > 0
           ? prisma.comment.groupBy({
               by: ['sheetId'],
               where: { sheetId: { in: sheetIds } },
               _count: { _all: true },
             })
-          : []
-      )),
-      settleSection('postCommentRows', () => (
+          : [],
+      ),
+      settleSection('postCommentRows', () =>
         postIds.length > 0
           ? prisma.feedPostComment.groupBy({
               by: ['postId'],
               where: { postId: { in: postIds } },
               _count: { _all: true },
             })
-          : []
-      )),
-      settleSection('sheetReactionRows', () => (
+          : [],
+      ),
+      settleSection('sheetReactionRows', () =>
         sheetIds.length > 0
           ? prisma.reaction.groupBy({
               by: ['sheetId', 'type'],
               where: { sheetId: { in: sheetIds } },
               _count: { _all: true },
             })
-          : []
-      )),
-      settleSection('postReactionRows', () => (
+          : [],
+      ),
+      settleSection('postReactionRows', () =>
         postIds.length > 0
           ? prisma.feedPostReaction.groupBy({
               by: ['postId', 'type'],
               where: { postId: { in: postIds } },
               _count: { _all: true },
             })
-          : []
-      )),
-      settleSection('currentSheetReactions', () => (
+          : [],
+      ),
+      settleSection('currentSheetReactions', () =>
         sheetIds.length > 0
           ? prisma.reaction.findMany({
               where: { userId: req.user.userId, sheetId: { in: sheetIds } },
               select: { sheetId: true, type: true },
             })
-          : []
-      )),
-      settleSection('currentPostReactions', () => (
+          : [],
+      ),
+      settleSection('currentPostReactions', () =>
         postIds.length > 0
           ? prisma.feedPostReaction.findMany({
               where: { userId: req.user.userId, postId: { in: postIds } },
               select: { postId: true, type: true },
             })
-          : []
-      )),
-      settleSection('noteCommentRows', () => (
+          : [],
+      ),
+      settleSection('noteCommentRows', () =>
         noteIds.length > 0
           ? prisma.noteComment.groupBy({
               by: ['noteId'],
               where: { noteId: { in: noteIds } },
               _count: { _all: true },
             })
-          : []
-      )),
+          : [],
+      ),
     ])
 
     secondarySections
@@ -247,37 +323,63 @@ router.get('/', async (req, res) => {
         })
       })
 
-    const starredRows = secondarySections.find((section) => section.label === 'starredRows' && section.ok)?.data || []
-    const sheetCommentRows = secondarySections.find((section) => section.label === 'sheetCommentRows' && section.ok)?.data || []
-    const postCommentRows = secondarySections.find((section) => section.label === 'postCommentRows' && section.ok)?.data || []
-    const sheetReactionRows = secondarySections.find((section) => section.label === 'sheetReactionRows' && section.ok)?.data || []
-    const postReactionRows = secondarySections.find((section) => section.label === 'postReactionRows' && section.ok)?.data || []
-    const currentSheetReactions = secondarySections.find((section) => section.label === 'currentSheetReactions' && section.ok)?.data || []
-    const currentPostReactions = secondarySections.find((section) => section.label === 'currentPostReactions' && section.ok)?.data || []
-    const noteCommentRows = secondarySections.find((section) => section.label === 'noteCommentRows' && section.ok)?.data || []
+    const starredRows =
+      secondarySections.find((section) => section.label === 'starredRows' && section.ok)?.data || []
+    const sheetCommentRows =
+      secondarySections.find((section) => section.label === 'sheetCommentRows' && section.ok)
+        ?.data || []
+    const postCommentRows =
+      secondarySections.find((section) => section.label === 'postCommentRows' && section.ok)
+        ?.data || []
+    const sheetReactionRows =
+      secondarySections.find((section) => section.label === 'sheetReactionRows' && section.ok)
+        ?.data || []
+    const postReactionRows =
+      secondarySections.find((section) => section.label === 'postReactionRows' && section.ok)
+        ?.data || []
+    const currentSheetReactions =
+      secondarySections.find((section) => section.label === 'currentSheetReactions' && section.ok)
+        ?.data || []
+    const currentPostReactions =
+      secondarySections.find((section) => section.label === 'currentPostReactions' && section.ok)
+        ?.data || []
+    const noteCommentRows =
+      secondarySections.find((section) => section.label === 'noteCommentRows' && section.ok)
+        ?.data || []
 
     const starredIds = new Set(starredRows.map((row) => row.sheetId))
-    const sheetCommentCounts = new Map(sheetCommentRows.map((row) => [row.sheetId, row._count._all]))
+    const sheetCommentCounts = new Map(
+      sheetCommentRows.map((row) => [row.sheetId, row._count._all]),
+    )
     const postCommentCounts = new Map(postCommentRows.map((row) => [row.postId, row._count._all]))
     const noteCommentCounts = new Map(noteCommentRows.map((row) => [row.noteId, row._count._all]))
 
     const items = [
       ...announcements.map(formatAnnouncement),
-      ...posts.map((post) => formatPost(post, postCommentCounts, postReactionRows, currentPostReactions)),
-      ...sheets.map((sheet) => formatSheet(sheet, starredIds, sheetCommentCounts, sheetReactionRows, currentSheetReactions)),
+      ...posts.map((post) =>
+        formatPost(post, postCommentCounts, postReactionRows, currentPostReactions),
+      ),
+      ...sheets.map((sheet) =>
+        formatSheet(
+          sheet,
+          starredIds,
+          sheetCommentCounts,
+          sheetReactionRows,
+          currentSheetReactions,
+        ),
+      ),
       ...notes.map((note) => formatNote(note, noteCommentCounts)),
-    ]
-      .sort((left, right) => {
-        if (left.type === 'announcement' && right.type === 'announcement') {
-          if (left.pinned !== right.pinned) return left.pinned ? -1 : 1
-        } else if (left.type === 'announcement' && left.pinned) {
-          return -1
-        } else if (right.type === 'announcement' && right.pinned) {
-          return 1
-        }
+    ].sort((left, right) => {
+      if (left.type === 'announcement' && right.type === 'announcement') {
+        if (left.pinned !== right.pinned) return left.pinned ? -1 : 1
+      } else if (left.type === 'announcement' && left.pinned) {
+        return -1
+      } else if (right.type === 'announcement' && right.pinned) {
+        return 1
+      }
 
-        return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
-      })
+      return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
+    })
 
     const payload = {
       items: items.slice(offset, offset + limit),

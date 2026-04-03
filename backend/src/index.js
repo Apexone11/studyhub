@@ -11,7 +11,13 @@ const { bootstrapRuntime } = require('./lib/bootstrap/bootstrap')
 const { validateEmailTransport } = require('./lib/email/email')
 const { startHtmlArchiveScheduler } = require('./lib/html/htmlArchiveScheduler')
 const { startModerationCleanupScheduler } = require('./lib/moderation/moderationCleanupScheduler')
-const { AVATARS_DIR, CONTENT_IMAGES_DIR, COVERS_DIR, SCHOOL_LOGOS_DIR, validateUploadStorage } = require('./lib/storage')
+const {
+  AVATARS_DIR,
+  CONTENT_IMAGES_DIR,
+  COVERS_DIR,
+  SCHOOL_LOGOS_DIR,
+  validateUploadStorage,
+} = require('./lib/storage')
 const csrfProtection = require('./middleware/csrf')
 const { guardedMode, isGuardedModeEnabled } = require('./middleware/guardedMode')
 const checkRestrictions = require('./middleware/checkRestrictions')
@@ -41,7 +47,10 @@ const previewRoutes = require('./modules/preview')
 const searchRoutes = require('./modules/search')
 const sheetLabRoutes = require('./modules/sheetLab')
 const webhookRoutes = require('./modules/webhooks')
-const { adminRouter: moderationAdminRoutes, userRouter: moderationUserRoutes } = require('./modules/moderation')
+const {
+  adminRouter: moderationAdminRoutes,
+  userRouter: moderationUserRoutes,
+} = require('./modules/moderation')
 const provenanceRoutes = require('./modules/provenance')
 const featureFlagRoutes = require('./modules/featureFlags')
 const webauthnRoutes = require('./modules/webauthn')
@@ -52,6 +61,7 @@ const docsRoutes = require('./modules/docs')
 const sharingRoutes = require('./modules/sharing')
 const aiRoutes = require('./modules/ai')
 const libraryRoutes = require('./modules/library')
+const videoRoutes = require('./modules/video')
 const crypto = require('node:crypto')
 const log = require('./lib/logger')
 const { httpLogger } = require('./lib/httpLogger')
@@ -59,27 +69,24 @@ const { initSocketIO } = require('./lib/socketio')
 const { featureFlagMiddleware } = require('./lib/featureFlags')
 
 if (sentryEnabled) {
-    log.info('Sentry monitoring enabled for backend.')
+  log.info('Sentry monitoring enabled for backend.')
 }
 
 process.on('uncaughtException', (error) => {
-    captureError(error, { source: 'uncaughtException' })
-    log.fatal({ err: error }, 'Uncaught exception')
+  captureError(error, { source: 'uncaughtException' })
+  log.fatal({ err: error }, 'Uncaught exception')
 })
 
 process.on('unhandledRejection', (reason) => {
-    const error = reason instanceof Error ? reason : new Error(String(reason))
-    captureError(error, { source: 'unhandledRejection' })
-    log.error({ err: error }, 'Unhandled promise rejection')
+  const error = reason instanceof Error ? reason : new Error(String(reason))
+  captureError(error, { source: 'unhandledRejection' })
+  log.error({ err: error }, 'Unhandled promise rejection')
 })
 
 // Dynamic CORS: dev allows Vite dev/preview servers; production allows primary and alternate frontend URLs.
 const isProd = process.env.NODE_ENV === 'production'
 const allowedOrigins = isProd
-  ? [
-      process.env.FRONTEND_URL,
-      process.env.FRONTEND_URL_ALT,
-    ].filter(Boolean)
+  ? [process.env.FRONTEND_URL, process.env.FRONTEND_URL_ALT].filter(Boolean)
   : ['http://localhost:5173', 'http://localhost:4173']
 
 // In production, also allow www / non-www variants of each origin automatically.
@@ -90,9 +97,13 @@ if (isProd) {
       if (parsed.hostname.startsWith('www.')) {
         allowedOrigins.push(url.replace('www.', ''))
       } else {
-        allowedOrigins.push(`${parsed.protocol}//www.${parsed.hostname}${parsed.port ? ':' + parsed.port : ''}`)
+        allowedOrigins.push(
+          `${parsed.protocol}//www.${parsed.hostname}${parsed.port ? ':' + parsed.port : ''}`,
+        )
       }
-    } catch { /* skip malformed */ }
+    } catch {
+      /* skip malformed */
+    }
   }
 }
 
@@ -107,9 +118,7 @@ function normalizeOrigin(value) {
 }
 
 const trustedOrigins = new Set(
-  allowedOrigins
-    .map((origin) => normalizeOrigin(origin))
-    .filter(Boolean)
+  allowedOrigins.map((origin) => normalizeOrigin(origin)).filter(Boolean),
 )
 
 const appSurfaceCsp = [
@@ -133,9 +142,9 @@ const previewSurfaceCsp = [
   `frame-ancestors ${previewFrameAncestors.length > 0 ? previewFrameAncestors.join(' ') : "'none'"}`,
   "form-action 'none'",
   "connect-src 'none'",
-  "img-src data: blob: https:",
-  "font-src data: blob: https://fonts.gstatic.com",
-  "media-src data: blob:",
+  'img-src data: blob: https:',
+  'font-src data: blob: https://fonts.gstatic.com',
+  'media-src data: blob:',
   "object-src 'none'",
   "script-src 'none'",
   "style-src 'unsafe-inline' https://fonts.googleapis.com",
@@ -168,12 +177,14 @@ if (isProd) {
   app.set('trust proxy', 1)
 }
 
-app.use(helmet({
-  crossOriginEmbedderPolicy: false,
-  crossOriginResourcePolicy: false,
-  hsts: isProd,
-  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
-}))
+app.use(
+  helmet({
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: false,
+    hsts: isProd,
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  }),
+)
 
 app.use((req, res, next) => {
   const isPreviewSurface = req.path === '/preview' || req.path.startsWith('/preview/')
@@ -195,17 +206,19 @@ app.use((req, res, next) => {
   next()
 })
 
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin) return callback(null, true)
-    const normalizedOrigin = normalizeOrigin(origin)
-    if (normalizedOrigin && trustedOrigins.has(normalizedOrigin)) {
-      return callback(null, true)
-    }
-    callback(new Error(`CORS: origin ${origin} not allowed`))
-  },
-  credentials: true,
-}))
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true)
+      const normalizedOrigin = normalizeOrigin(origin)
+      if (normalizedOrigin && trustedOrigins.has(normalizedOrigin)) {
+        return callback(null, true)
+      }
+      callback(new Error(`CORS: origin ${origin} not allowed`))
+    },
+    credentials: true,
+  }),
+)
 
 // Lightweight CSRF protection for cookie-authenticated browser requests.
 app.use((req, res, next) => {
@@ -229,7 +242,8 @@ const globalLimiter = rateLimit({
   max: 1000,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req) => req.path === '/' || req.path === '/health' || req.path.startsWith('/uploads/avatars/'),
+  skip: (req) =>
+    req.path === '/' || req.path === '/health' || req.path.startsWith('/uploads/avatars/'),
 })
 
 app.use(globalLimiter)
@@ -256,7 +270,9 @@ app.use((req, _res, next) => {
   if (!token) return next()
   try {
     req.user = verifyAuthToken(token)
-  } catch { /* invalid/expired — proceed unauthenticated */ }
+  } catch {
+    /* invalid/expired — proceed unauthenticated */
+  }
   next()
 })
 
@@ -276,40 +292,52 @@ app.use(apiVersion)
 
 // Avatars and cover images are publicly retrievable. Study attachments stay
 // behind auth-checked preview/download handlers.
-app.use('/uploads/avatars', express.static(AVATARS_DIR, {
-  index: false,
-  setHeaders: (res) => {
-    res.setHeader('X-Content-Type-Options', 'nosniff')
-    res.setHeader('Cache-Control', 'public, max-age=300')
-  },
-}))
+app.use(
+  '/uploads/avatars',
+  express.static(AVATARS_DIR, {
+    index: false,
+    setHeaders: (res) => {
+      res.setHeader('X-Content-Type-Options', 'nosniff')
+      res.setHeader('Cache-Control', 'public, max-age=300')
+    },
+  }),
+)
 
-app.use('/uploads/covers', express.static(COVERS_DIR, {
-  index: false,
-  setHeaders: (res) => {
-    res.setHeader('X-Content-Type-Options', 'nosniff')
-    res.setHeader('Cache-Control', 'public, max-age=300')
-  },
-}))
+app.use(
+  '/uploads/covers',
+  express.static(COVERS_DIR, {
+    index: false,
+    setHeaders: (res) => {
+      res.setHeader('X-Content-Type-Options', 'nosniff')
+      res.setHeader('Cache-Control', 'public, max-age=300')
+    },
+  }),
+)
 
-app.use('/uploads/school-logos', express.static(SCHOOL_LOGOS_DIR, {
-  index: false,
-  setHeaders: (res) => {
-    res.setHeader('X-Content-Type-Options', 'nosniff')
-    res.setHeader('Cache-Control', 'public, max-age=3600')
-  },
-}))
+app.use(
+  '/uploads/school-logos',
+  express.static(SCHOOL_LOGOS_DIR, {
+    index: false,
+    setHeaders: (res) => {
+      res.setHeader('X-Content-Type-Options', 'nosniff')
+      res.setHeader('Cache-Control', 'public, max-age=3600')
+    },
+  }),
+)
 
 // Content images embedded in rich text sheets — publicly accessible.
-app.use('/uploads/content-images', express.static(CONTENT_IMAGES_DIR, {
-  index: false,
-  setHeaders: (res) => {
-    res.setHeader('X-Content-Type-Options', 'nosniff')
-    res.setHeader('Cache-Control', 'public, max-age=86400')
-    // Prevent content from being framed or used as script
-    res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self'")
-  },
-}))
+app.use(
+  '/uploads/content-images',
+  express.static(CONTENT_IMAGES_DIR, {
+    index: false,
+    setHeaders: (res) => {
+      res.setHeader('X-Content-Type-Options', 'nosniff')
+      res.setHeader('Cache-Control', 'public, max-age=86400')
+      // Prevent content from being framed or used as script
+      res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self'")
+    },
+  }),
+)
 
 // Isolated preview surface. Auth cookies are scoped to /api and never sent here.
 app.use('/preview', previewRoutes)
@@ -389,12 +417,16 @@ app.use('/api/ai', aiRoutes)
 // Library module endpoints under /api/library.
 app.use('/api/library', libraryRoutes)
 
+// Video module endpoints under /api/video.
+app.use('/api/video', videoRoutes)
+
 // Waitlist (simple inline route for pricing page)
 app.post('/api/waitlist', express.json(), async (req, res) => {
   try {
     const { email, tier } = req.body || {}
     if (!email || !tier) return res.status(400).json({ error: 'Email and tier are required.' })
-    if (!['pro', 'institution'].includes(tier)) return res.status(400).json({ error: 'Invalid tier.' })
+    if (!['pro', 'institution'].includes(tier))
+      return res.status(400).json({ error: 'Invalid tier.' })
     if (typeof email !== 'string' || !email.includes('@') || email.length > 320) {
       return res.status(400).json({ error: 'Invalid email address.' })
     }
@@ -412,31 +444,31 @@ app.use('/api/public', publicRoutes)
 
 // Basic API health check.
 app.get('/', (req, res) => {
-    res.json({ message: 'StudyHub API is running' })
+  res.json({ message: 'StudyHub API is running' })
 })
 
 app.get('/health', async (req, res) => {
-    const checks = { api: 'ok', database: 'ok' }
-    let httpStatus = 200
-    try {
-        await prisma.$queryRaw`SELECT 1`
-    } catch {
-        checks.database = 'error'
-        httpStatus = 503
-    }
-    checks.status = httpStatus === 200 ? 'healthy' : 'degraded'
-    res.status(httpStatus).json(checks)
+  const checks = { api: 'ok', database: 'ok' }
+  let httpStatus = 200
+  try {
+    await prisma.$queryRaw`SELECT 1`
+  } catch {
+    checks.database = 'error'
+    httpStatus = 503
+  }
+  checks.status = httpStatus === 200 ? 'healthy' : 'degraded'
+  res.status(httpStatus).json(checks)
 })
 
 // Global error handler — catches unhandled route errors and prevents stack trace leakage.
 // Express requires all 4 parameters to identify this as an error handler.
 app.use((err, req, res, _next) => {
-    captureError(err, { url: req.originalUrl, method: req.method })
-    const statusCode = err.statusCode || err.status || 500
-    res.status(statusCode).json({
-      error: statusCode >= 500 ? 'Internal server error' : (err.message || 'Something went wrong'),
-      ...(err.code ? { code: err.code } : {}),
-    })
+  captureError(err, { url: req.originalUrl, method: req.method })
+  const statusCode = err.statusCode || err.status || 500
+  res.status(statusCode).json({
+    error: statusCode >= 500 ? 'Internal server error' : err.message || 'Something went wrong',
+    ...(err.code ? { code: err.code } : {}),
+  })
 })
 
 async function startServer() {
@@ -449,7 +481,9 @@ async function startServer() {
 
   const clamAvDisabled = String(process.env.CLAMAV_DISABLED || '').toLowerCase() === 'true'
   if (process.env.NODE_ENV === 'production' && clamAvDisabled) {
-    throw new Error('[security] CLAMAV_DISABLED must not be true in production. Attachment malware scanning is required.')
+    throw new Error(
+      '[security] CLAMAV_DISABLED must not be true in production. Attachment malware scanning is required.',
+    )
   } else if (process.env.NODE_ENV !== 'test' && clamAvDisabled) {
     log.warn('CLAMAV_DISABLED=true; attachment malware scanning is bypassed.')
   }
@@ -466,15 +500,21 @@ async function startServer() {
     startModerationCleanupScheduler()
     // Pre-warm library cache with popular books (non-blocking).
     // Also syncs to CachedBook DB table so fallback works when Gutendex is down.
-    const { preloadPopularBooks, syncPopularBooksToDB } = require('./modules/library/library.service')
+    const {
+      preloadPopularBooks,
+      syncPopularBooksToDB,
+    } = require('./modules/library/library.service')
     preloadPopularBooks().catch(() => {})
     // Always trigger a background sync on startup regardless of existing data.
     // The upsert logic is idempotent -- it just refreshes existing records.
     syncPopularBooksToDB(16).catch(() => {})
     // Re-sync every 24 hours to keep the cache fresh across long-running deploys.
-    setInterval(() => {
-      syncPopularBooksToDB(16).catch(() => {})
-    }, 24 * 60 * 60 * 1000)
+    setInterval(
+      () => {
+        syncPopularBooksToDB(16).catch(() => {})
+      },
+      24 * 60 * 60 * 1000,
+    )
     log.info({ port: PORT }, `Server running on http://localhost:${PORT}`)
   })
 
@@ -507,7 +547,8 @@ function gracefulShutdown(signal) {
     log.info('HTTP server closed, cleaning up...')
 
     // Disconnect Prisma connection pool
-    prisma.$disconnect()
+    prisma
+      .$disconnect()
       .catch(() => {})
       .finally(() => {
         log.info('Cleanup complete, exiting.')
@@ -528,11 +569,13 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'))
 module.exports = { startServer }
 
 if (require.main === module) {
-  startServer().then((server) => {
-    serverInstance = server
-  }).catch((error) => {
-    captureError(error, { source: 'serverStartup' })
-    console.error(error)
-    process.exit(1)
-  })
+  startServer()
+    .then((server) => {
+      serverInstance = server
+    })
+    .catch((error) => {
+      captureError(error, { source: 'serverStartup' })
+      console.error(error)
+      process.exit(1)
+    })
 }

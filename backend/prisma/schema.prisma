@@ -98,6 +98,8 @@ model User {
   readingProgress            ReadingProgress[]
   bookBookmarks              BookBookmark[]
   bookHighlights             BookHighlight[]
+  videos                     Video[]                   @relation("UserVideos")
+  pageViews                  PageView[]
 
   @@index([role])
   @@index([emailHash])
@@ -302,13 +304,14 @@ model PasswordResetToken {
 }
 
 model Announcement {
-  id        Int      @id @default(autoincrement())
+  id        Int                 @id @default(autoincrement())
   title     String
   body      String
   authorId  Int
-  pinned    Boolean  @default(false)
-  createdAt DateTime @default(now())
-  author    User     @relation(fields: [authorId], references: [id])
+  pinned    Boolean             @default(false)
+  createdAt DateTime            @default(now())
+  author    User                @relation(fields: [authorId], references: [id])
+  media     AnnouncementMedia[]
 
   @@index([pinned, createdAt(sort: Desc)])
 }
@@ -431,11 +434,13 @@ model FeedPost {
   attachmentType   String?
   attachmentName   String?
   allowDownloads   Boolean            @default(true)
+  videoId          Int?
   moderationStatus String             @default("clean")
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
   author           User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   course           Course?            @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  video            Video?             @relation("FeedPostVideo", fields: [videoId], references: [id], onDelete: SetNull)
   comments         FeedPostComment[]
   reactions        FeedPostReaction[]
 
@@ -1310,4 +1315,92 @@ model CachedBook {
 
   @@index([pageCount(sort: Desc)])
   @@index([language])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Video — Upload, transcode, and stream user videos (feed posts, announcements)
+// ═══════════════════════════════════════════════════════════════════════════
+
+model Video {
+  id            Int       @id @default(autoincrement())
+  userId        Int
+  title         String?
+  description   String?
+  r2Key         String    @unique
+  status        String    @default("processing") // processing, ready, failed
+  duration      Float?
+  width         Int?
+  height        Int?
+  fileSize      Int?
+  mimeType      String?
+  thumbnailR2Key String?
+  variants      Json?     // { "360p": { key, width, height }, "720p": {...}, "1080p": {...} }
+  hlsManifestR2Key String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user              User                @relation("UserVideos", fields: [userId], references: [id], onDelete: Cascade)
+  captions          VideoCaption[]
+  feedPosts         FeedPost[]          @relation("FeedPostVideo")
+  announcementMedia AnnouncementMedia[]
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status])
+}
+
+model VideoCaption {
+  id        Int      @id @default(autoincrement())
+  videoId   Int
+  language  String   @db.VarChar(10)
+  label     String
+  vttR2Key  String
+  createdAt DateTime @default(now())
+
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@unique([videoId, language])
+  @@index([videoId])
+}
+
+model AnnouncementMedia {
+  id              Int      @id @default(autoincrement())
+  announcementId  Int
+  type            String   // "image" or "video"
+  url             String
+  position        Int      @default(0)
+  videoId         Int?
+  fileName        String?
+  fileSize        Int?
+  width           Int?
+  height          Int?
+  createdAt       DateTime @default(now())
+
+  announcement    Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  video           Video?       @relation(fields: [videoId], references: [id], onDelete: SetNull)
+
+  @@index([announcementId, position])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Analytics — Track page views and user activity for admin dashboard
+// ═══════════════════════════════════════════════════════════════════════════
+
+model PageView {
+  id        Int      @id @default(autoincrement())
+  userId    Int?
+  path      String
+  country   String?  @db.VarChar(2)
+  device    String?  @db.VarChar(20)
+  browser   String?  @db.VarChar(50)
+  os        String?  @db.VarChar(50)
+  sessionId String?  @db.VarChar(64)
+  duration  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@index([path])
+  @@index([sessionId])
 }

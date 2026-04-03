@@ -553,14 +553,15 @@ const messagingWriteLimiter = rateLimit({
  * windowMs and max should be overridden with AI_RATE_LIMIT_RPM from ai.constants.
  * Example: 60 requests per minute per authenticated user.
  */
-const createAiMessageLimiter = (rpmLimit) => rateLimit({
-  windowMs: 60 * 1000,
-  max: rpmLimit,
-  keyGenerator: (req) => `ai_${req.user.userId}`,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Too many AI requests. Please wait a moment.' },
-})
+const createAiMessageLimiter = (rpmLimit) =>
+  rateLimit({
+    windowMs: 60 * 1000,
+    max: rpmLimit,
+    keyGenerator: (req) => `ai_${req.user.userId}`,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many AI requests. Please wait a moment.' },
+  })
 
 // ── CATEGORY: Sheet Activity / Readme ─────────────────────────────────────
 
@@ -606,6 +607,26 @@ const exportDataLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Data export limit reached. You can export your data up to 3 times per day.' },
   keyGenerator: (req) => `export-${req.user?.userId || 'anon'}`,
+})
+
+// ── Video module ───────────────────────────────────────────────────────────
+
+const videoUploadInitLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many video uploads. Please wait before starting another.' },
+  keyGenerator: (req) => `vid-init-${req.user?.userId || req.ip}`,
+})
+
+const videoUploadChunkLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 200, // 200 chunks per minute (supports fast uploads)
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Upload speed limit reached. Please slow down.' },
+  keyGenerator: (req) => `vid-chunk-${req.user?.userId || req.ip}`,
 })
 
 // ── Exports ────────────────────────────────────────────────────────────────
@@ -692,6 +713,10 @@ module.exports = {
 
   // Library module
   libraryWriteLimiter,
+
+  // Video module
+  videoUploadInitLimiter,
+  videoUploadChunkLimiter,
 
   // Data export (expensive query -- 3 per day per user)
   exportDataLimiter,
