@@ -13,6 +13,7 @@ const socketIo = require('socket.io')
 const { verifyAuthToken } = require('./authTokens')
 const prisma = require('./prisma')
 const { captureError } = require('../monitoring/sentry')
+const SOCKET_EVENTS = require('./socketEvents')
 
 let io = null
 const onlineUsers = new Map() // userId -> Set<socketId>
@@ -38,20 +39,20 @@ function isSocketRateLimited(socketId, event, maxPerMinute = 30) {
 }
 
 // Clean up stale rate limit entries every 5 minutes
-setInterval(() => {
-  const now = Date.now()
-  for (const [key, entry] of socketRateLimits) {
-    if (now > entry.resetAt) socketRateLimits.delete(key)
-  }
-}, 5 * 60 * 1000)
+setInterval(
+  () => {
+    const now = Date.now()
+    for (const [key, entry] of socketRateLimits) {
+      if (now > entry.resetAt) socketRateLimits.delete(key)
+    }
+  },
+  5 * 60 * 1000,
+)
 
 function initSocketIO(httpServer) {
   const isProd = process.env.NODE_ENV === 'production'
   const allowedOrigins = isProd
-    ? [
-        process.env.FRONTEND_URL,
-        process.env.FRONTEND_URL_ALT,
-      ].filter(Boolean)
+    ? [process.env.FRONTEND_URL, process.env.FRONTEND_URL_ALT].filter(Boolean)
     : ['http://localhost:5173', 'http://localhost:4173']
 
   io = new socketIo.Server(httpServer, {
@@ -127,17 +128,22 @@ function initSocketIO(httpServer) {
         for (const { groupId } of groupMemberships) {
           socket.join(`studygroup:${groupId}`)
         }
-      } catch { /* graceful degradation if table missing */ }
+      } catch {
+        /* graceful degradation if table missing */
+      }
 
       // Notify only conversation and group participants that this user is online
       // (previously broadcast to all connected users — privacy leak)
       for (const { conversationId } of conversations) {
-        io.to(`conversation:${conversationId}`).emit('user:online', { userId: socket.userId, username: socket.username })
+        io.to(`conversation:${conversationId}`).emit(SOCKET_EVENTS.USER_ONLINE, {
+          userId: socket.userId,
+          username: socket.username,
+        })
       }
 
       // Handle typing indicators (rate limited: max 20 per minute)
       // Validates room membership before broadcasting to prevent unauthorized emission.
-      socket.on('typing:start', async (data) => {
+      socket.on(SOCKET_EVENTS.TYPING_START, async (data) => {
         const { conversationId } = data
         if (!conversationId) return
         if (isSocketRateLimited(socket.id, 'typing', 20)) return
@@ -148,16 +154,18 @@ function initSocketIO(httpServer) {
             where: { conversationId_userId: { conversationId, userId: socket.userId } },
           })
           if (!participant) return
-        } catch { return }
+        } catch {
+          return
+        }
 
-        io.to(`conversation:${conversationId}`).emit('typing:start', {
+        io.to(`conversation:${conversationId}`).emit(SOCKET_EVENTS.TYPING_START, {
           userId: socket.userId,
           username: socket.username,
           conversationId,
         })
       })
 
-      socket.on('typing:stop', async (data) => {
+      socket.on(SOCKET_EVENTS.TYPING_STOP, async (data) => {
         const { conversationId } = data
         if (!conversationId) return
         if (isSocketRateLimited(socket.id, 'typing', 20)) return
@@ -168,16 +176,18 @@ function initSocketIO(httpServer) {
             where: { conversationId_userId: { conversationId, userId: socket.userId } },
           })
           if (!participant) return
-        } catch { return }
+        } catch {
+          return
+        }
 
-        io.to(`conversation:${conversationId}`).emit('typing:stop', {
+        io.to(`conversation:${conversationId}`).emit(SOCKET_EVENTS.TYPING_STOP, {
           userId: socket.userId,
           conversationId,
         })
       })
 
       // Handle read receipts
-      socket.on('message:read', async (data) => {
+      socket.on(SOCKET_EVENTS.MESSAGE_READ, async (data) => {
         try {
           const { conversationId, messageId } = data
           if (!conversationId) return
@@ -194,7 +204,7 @@ function initSocketIO(httpServer) {
           })
 
           // Broadcast read receipt to conversation
-          io.to(`conversation:${conversationId}`).emit('message:read', {
+          io.to(`conversation:${conversationId}`).emit(SOCKET_EVENTS.MESSAGE_READ, {
             userId: socket.userId,
             conversationId,
             messageId,
@@ -206,7 +216,7 @@ function initSocketIO(httpServer) {
       })
 
       // Handle conversation join (rate limited: max 30 per minute)
-      socket.on('conversation:join', async (data) => {
+      socket.on(SOCKET_EVENTS.CONVERSATION_JOIN, async (data) => {
         try {
           const { conversationId } = data
           if (!conversationId) return
@@ -227,7 +237,7 @@ function initSocketIO(httpServer) {
           socket.join(`conversation:${conversationId}`)
 
           // Notify others in conversation
-          io.to(`conversation:${conversationId}`).emit('user:joined', {
+          io.to(`conversation:${conversationId}`).emit(SOCKET_EVENTS.USER_JOINED, {
             userId: socket.userId,
             conversationId,
           })
@@ -237,7 +247,7 @@ function initSocketIO(httpServer) {
       })
 
       // Handle conversation leave
-      socket.on('conversation:leave', async (data) => {
+      socket.on(SOCKET_EVENTS.CONVERSATION_LEAVE, async (data) => {
         try {
           const { conversationId } = data
           if (!conversationId) return
@@ -245,7 +255,7 @@ function initSocketIO(httpServer) {
           socket.leave(`conversation:${conversationId}`)
 
           // Notify others in conversation
-          io.to(`conversation:${conversationId}`).emit('user:left', {
+          io.to(`conversation:${conversationId}`).emit(SOCKET_EVENTS.USER_LEFT, {
             userId: socket.userId,
             conversationId,
           })
@@ -264,7 +274,7 @@ function initSocketIO(httpServer) {
             // Notify only rooms the user was in that they are offline
             for (const room of socket.rooms) {
               if (room !== socket.id) {
-                io.to(room).emit('user:offline', { userId: socket.userId })
+                io.to(room).emit(SOCKET_EVENTS.USER_OFFLINE, { userId: socket.userId })
               }
             }
           }

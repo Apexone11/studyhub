@@ -6,6 +6,7 @@
 
 const sanitizeHtml = require('sanitize-html')
 const prisma = require('../../lib/prisma')
+const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 
 const MAX_MESSAGE_LENGTH = 5000
 
@@ -29,7 +30,7 @@ async function verifyMessageParticipant(req, res, messageId) {
   })
 
   if (!message || message.deletedAt) {
-    res.status(404).json({ error: 'Message not found.' })
+    sendError(res, 404, 'Message not found.', ERROR_CODES.NOT_FOUND)
     return null
   }
 
@@ -44,7 +45,7 @@ async function verifyMessageParticipant(req, res, messageId) {
 
   if (!participant) {
     // Return 404 instead of 403 to avoid leaking message existence
-    res.status(404).json({ error: 'Message not found.' })
+    sendError(res, 404, 'Message not found.', ERROR_CODES.NOT_FOUND)
     return null
   }
 

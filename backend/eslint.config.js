@@ -19,7 +19,7 @@ module.exports = [
     },
     rules: {
       'no-empty': ['error', { allowEmptyCatch: true }],
-      'no-console': 'off',
+      'no-console': ['warn', { allow: ['error', 'warn'] }],
       'no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
     },
   },

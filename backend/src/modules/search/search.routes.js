@@ -3,6 +3,7 @@ const { getAuthTokenFromRequest, verifyAuthToken } = require('../../lib/authToke
 const { getVisibleProfileIds } = require('../../lib/profileVisibility')
 const { buildSheetTextSearchClauses } = require('../../lib/sheetSearch')
 const { searchSheetsFTS, searchCoursesFTS, searchUsersFTS } = require('../../lib/fullTextSearch')
+const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
 const { timedSection, logTiming } = require('../../lib/requestTiming')
@@ -39,15 +40,29 @@ router.get('/', optionalAuth, async (req, res) => {
   const type = rawType || 'all'
 
   if (!query || query.length < 2) {
-    return res.json({ results: { sheets: [], courses: [], users: [], notes: [], groups: [] }, query, type })
+    return res.json({
+      results: { sheets: [], courses: [], users: [], notes: [], groups: [] },
+      query,
+      type,
+    })
   }
 
   if (query.length > 200) {
-    return res.status(400).json({ error: 'Search query too long (max 200 characters).' })
+    return sendError(
+      res,
+      400,
+      'Search query too long (max 200 characters).',
+      ERROR_CODES.BAD_REQUEST,
+    )
   }
 
   if (!VALID_TYPES.includes(type)) {
-    return res.status(400).json({ error: `Invalid search type. Must be one of: ${VALID_TYPES.join(', ')}` })
+    return sendError(
+      res,
+      400,
+      `Invalid search type. Must be one of: ${VALID_TYPES.join(', ')}`,
+      ERROR_CODES.BAD_REQUEST,
+    )
   }
 
   const limit = Math.min(Math.max(parseInt(rawLimit, 10) || 8, 1), 20)
@@ -71,42 +86,50 @@ router.get('/', optionalAuth, async (req, res) => {
 
     if (wantSheets) {
       if (useFTS) {
-        sections.push(timedSection('sheets-fts', () =>
-          searchSheetsFTS(query, { status: 'published', limit }).then(async (result) => {
-            if (!result.sheets.length) return []
-            const ids = result.sheets.map((s) => Number(s.id))
-            return prisma.studySheet.findMany({
-              where: { id: { in: ids } },
+        sections.push(
+          timedSection('sheets-fts', () =>
+            searchSheetsFTS(query, { status: 'published', limit }).then(async (result) => {
+              if (!result.sheets.length) return []
+              const ids = result.sheets.map((s) => Number(s.id))
+              return prisma.studySheet.findMany({
+                where: { id: { in: ids } },
+                select: {
+                  id: true,
+                  title: true,
+                  description: true,
+                  stars: true,
+                  downloads: true,
+                  createdAt: true,
+                  course: { select: { id: true, code: true, name: true } },
+                  author: { select: { id: true, username: true } },
+                },
+              })
+            }),
+          ),
+        )
+      } else {
+        sections.push(
+          timedSection('sheets', () =>
+            prisma.studySheet.findMany({
+              where: {
+                status: 'published',
+                OR: sheetTextSearchClauses,
+              },
               select: {
-                id: true, title: true, description: true, stars: true,
-                downloads: true, createdAt: true,
+                id: true,
+                title: true,
+                description: true,
+                stars: true,
+                downloads: true,
+                createdAt: true,
                 course: { select: { id: true, code: true, name: true } },
                 author: { select: { id: true, username: true } },
               },
-            })
-          })
-        ))
-      } else {
-        sections.push(timedSection('sheets', () =>
-          prisma.studySheet.findMany({
-            where: {
-              status: 'published',
-              OR: sheetTextSearchClauses,
-            },
-            select: {
-              id: true,
-              title: true,
-              description: true,
-              stars: true,
-              downloads: true,
-              createdAt: true,
-              course: { select: { id: true, code: true, name: true } },
-              author: { select: { id: true, username: true } },
-            },
-            orderBy: { stars: 'desc' },
-            take: limit,
-          })
-        ))
+              orderBy: { stars: 'desc' },
+              take: limit,
+            }),
+          ),
+        )
       }
     } else {
       sections.push(timedSection('sheets-skip', () => []))
@@ -114,38 +137,44 @@ router.get('/', optionalAuth, async (req, res) => {
 
     if (wantCourses) {
       if (useFTS) {
-        sections.push(timedSection('courses-fts', () =>
-          searchCoursesFTS(query, { limit }).then(async (rows) => {
-            if (!rows.length) return []
-            const ids = rows.map((c) => Number(c.id))
-            return prisma.course.findMany({
-              where: { id: { in: ids } },
+        sections.push(
+          timedSection('courses-fts', () =>
+            searchCoursesFTS(query, { limit }).then(async (rows) => {
+              if (!rows.length) return []
+              const ids = rows.map((c) => Number(c.id))
+              return prisma.course.findMany({
+                where: { id: { in: ids } },
+                select: {
+                  id: true,
+                  code: true,
+                  name: true,
+                  school: { select: { id: true, name: true, short: true } },
+                },
+              })
+            }),
+          ),
+        )
+      } else {
+        sections.push(
+          timedSection('courses', () =>
+            prisma.course.findMany({
+              where: {
+                OR: [
+                  { code: { contains: query, mode: 'insensitive' } },
+                  { name: { contains: query, mode: 'insensitive' } },
+                ],
+              },
               select: {
-                id: true, code: true, name: true,
+                id: true,
+                code: true,
+                name: true,
                 school: { select: { id: true, name: true, short: true } },
               },
-            })
-          })
-        ))
-      } else {
-        sections.push(timedSection('courses', () =>
-          prisma.course.findMany({
-            where: {
-              OR: [
-                { code: { contains: query, mode: 'insensitive' } },
-                { name: { contains: query, mode: 'insensitive' } },
-              ],
-            },
-            select: {
-              id: true,
-              code: true,
-              name: true,
-              school: { select: { id: true, name: true, short: true } },
-            },
-            orderBy: { code: 'asc' },
-            take: limit,
-          })
-        ))
+              orderBy: { code: 'asc' },
+              take: limit,
+            }),
+          ),
+        )
       }
     } else {
       sections.push(timedSection('courses-skip', () => []))
@@ -153,62 +182,71 @@ router.get('/', optionalAuth, async (req, res) => {
 
     if (wantUsers) {
       if (useFTS) {
-        sections.push(timedSection('users-fts', () =>
-          searchUsersFTS(query, { limit: userSearchTake }).then(async (rows) => {
-            if (!rows.length) return []
-            const ids = rows.map((u) => Number(u.id))
-            return prisma.user.findMany({
-              where: { id: { in: ids } },
-              select: {
-                id: true, username: true, role: true,
-                avatarUrl: true, createdAt: true,
-              },
-            })
-          })
-        ))
+        sections.push(
+          timedSection('users-fts', () =>
+            searchUsersFTS(query, { limit: userSearchTake }).then(async (rows) => {
+              if (!rows.length) return []
+              const ids = rows.map((u) => Number(u.id))
+              return prisma.user.findMany({
+                where: { id: { in: ids } },
+                select: {
+                  id: true,
+                  username: true,
+                  role: true,
+                  avatarUrl: true,
+                  createdAt: true,
+                },
+              })
+            }),
+          ),
+        )
       } else {
-        sections.push(timedSection('users', () =>
-          prisma.user.findMany({
-            where: {
-              username: { contains: query, mode: 'insensitive' },
-            },
-            select: {
-              id: true,
-              username: true,
-              role: true,
-              avatarUrl: true,
-              createdAt: true,
-            },
-            orderBy: { username: 'asc' },
-            take: userSearchTake,
-          })
-        ))
+        sections.push(
+          timedSection('users', () =>
+            prisma.user.findMany({
+              where: {
+                username: { contains: query, mode: 'insensitive' },
+              },
+              select: {
+                id: true,
+                username: true,
+                role: true,
+                avatarUrl: true,
+                createdAt: true,
+              },
+              orderBy: { username: 'asc' },
+              take: userSearchTake,
+            }),
+          ),
+        )
       }
     } else {
       sections.push(timedSection('users-skip', () => []))
     }
 
     if (wantNotes) {
-      sections.push(timedSection('notes', () =>
-        prisma.note.findMany({
-          where: {
-            private: false,
-            OR: [
-              { title: { contains: query, mode: 'insensitive' } },
-              { content: { contains: query, mode: 'insensitive' } },
-            ],
-          },
-          select: {
-            id: true,
-            title: true,
-            createdAt: true,
-            course: { select: { id: true, code: true, name: true } },
-            author: { select: { id: true, username: true } },
-          },
-          orderBy: { createdAt: 'desc' },
-          take: limit,
-        })
-      ))
+      sections.push(
+        timedSection('notes', () =>
+          prisma.note.findMany({
+            where: {
+              private: false,
+              OR: [
+                { title: { contains: query, mode: 'insensitive' } },
+                { content: { contains: query, mode: 'insensitive' } },
+              ],
+            },
+            select: {
+              id: true,
+              title: true,
+              createdAt: true,
+              course: { select: { id: true, code: true, name: true } },
+              author: { select: { id: true, username: true } },
+            },
+            orderBy: { createdAt: 'desc' },
+            take: limit,
+          }),
+        ),
+      )
     } else {
       sections.push(timedSection('notes-skip', () => []))
     }
@@ -250,23 +288,25 @@ router.get('/', optionalAuth, async (req, res) => {
         // Unauthenticated users can only see public groups
         groupWhere.privacy = 'public'
       }
-      sections.push(timedSection('groups', () =>
-        prisma.studyGroup.findMany({
-          where: groupWhere,
-          select: {
-            id: true,
-            name: true,
-            description: true,
-            privacy: true,
-            courseId: true,
-            course: { select: { id: true, code: true, name: true } },
-            createdAt: true,
-            _count: { select: { members: true } },
-          },
-          orderBy: { createdAt: 'desc' },
-          take: limit,
-        })
-      ))
+      sections.push(
+        timedSection('groups', () =>
+          prisma.studyGroup.findMany({
+            where: groupWhere,
+            select: {
+              id: true,
+              name: true,
+              description: true,
+              privacy: true,
+              courseId: true,
+              course: { select: { id: true, code: true, name: true } },
+              createdAt: true,
+              _count: { select: { members: true } },
+            },
+            orderBy: { createdAt: 'desc' },
+            take: limit,
+          }),
+        ),
+      )
     } else {
       sections.push(timedSection('groups-skip', () => []))
     }
@@ -277,7 +317,8 @@ router.get('/', optionalAuth, async (req, res) => {
       blockedIds.length === 0
         ? items
         : items.filter((item) => {
-            const uid = typeof userIdField === 'function' ? userIdField(item) : item[userIdField]?.id
+            const uid =
+              typeof userIdField === 'function' ? userIdField(item) : item[userIdField]?.id
             return !uid || !blockedIdSet.has(uid)
           })
 
@@ -290,14 +331,16 @@ router.get('/', optionalAuth, async (req, res) => {
 
     if (wantUsers && matchedUsers.length) {
       const visibilitySection = await timedSection('visibility', () =>
-        getVisibleProfileIds(prisma, req.user, matchedUsers.map((user) => user.id))
+        getVisibleProfileIds(
+          prisma,
+          req.user,
+          matchedUsers.map((user) => user.id),
+        ),
       )
       resolved.push(visibilitySection)
 
       const visibleUserIds = visibilitySection.data
-      users = matchedUsers
-        .filter((user) => visibleUserIds.has(user.id))
-        .slice(0, limit)
+      users = matchedUsers.filter((user) => visibleUserIds.has(user.id)).slice(0, limit)
     }
 
     logTiming(req, {
@@ -306,7 +349,13 @@ router.get('/', optionalAuth, async (req, res) => {
         query: query.slice(0, 50),
         type,
         useFTS,
-        counts: { sheets: sheets.length, courses: courses.length, users: users.length, notes: notes.length, groups: groups.length },
+        counts: {
+          sheets: sheets.length,
+          courses: courses.length,
+          users: users.length,
+          notes: notes.length,
+          groups: groups.length,
+        },
       },
     })
 
@@ -327,7 +376,7 @@ router.get('/', optionalAuth, async (req, res) => {
     })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
-    return res.status(500).json({ error: 'Server error.' })
+    return sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 })
 

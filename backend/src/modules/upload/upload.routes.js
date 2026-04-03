@@ -27,27 +27,36 @@ const {
   uploadCoverLimiter,
   uploadContentImageLimiter,
 } = require('../../lib/rateLimiters')
+const { AVATAR_MAX_BYTES, ATTACHMENT_MAX_BYTES, COVER_MAX_BYTES } = require('../../lib/constants')
 
 const router = express.Router()
 
 // ── Allowed types ─────────────────────────────────────────────
 const AVATAR_ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
-const AVATAR_ALLOWED_EXT  = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif'])
-const AVATAR_MAX_BYTES    = 5 * 1024 * 1024   // 5 MB
+const AVATAR_ALLOWED_EXT = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif'])
 
-const ATTACHMENT_ALLOWED_MIME = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'image/webp'])
-const ATTACHMENT_ALLOWED_EXT  = new Set(['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.webp'])
-const ATTACHMENT_MAX_BYTES    = 10 * 1024 * 1024  // 10 MB
+const ATTACHMENT_ALLOWED_MIME = new Set([
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+])
+const ATTACHMENT_ALLOWED_EXT = new Set(['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.webp'])
 
 // ── Safe filename: strip to alphanumeric + dash/dot ───────────
 function safeName(original) {
   const ext = path.extname(original).toLowerCase()
-  const base = path.basename(original, ext).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 60)
+  const base = path
+    .basename(original, ext)
+    .replace(/[^a-zA-Z0-9_-]/g, '_')
+    .slice(0, 60)
   return `${base}-${Date.now()}${ext}`
 }
 
 function safeAttachmentLabel(original) {
-  return path.basename(String(original || 'attachment'))
+  return path
+    .basename(String(original || 'attachment'))
     .replace(/[^a-zA-Z0-9._() -]/g, '_')
     .replace(/\s+/g, ' ')
     .slice(0, 120)
@@ -85,12 +94,19 @@ router.post('/avatar', requireAuth, uploadAvatarLimiter, (req, res) => {
     if (err) return sendError(res, 400, err.message, ERROR_CODES.UPLOAD_INVALID)
     if (!req.file) return sendError(res, 400, 'No file uploaded.', ERROR_CODES.UPLOAD_MISSING_FILE)
     if (!signatureMatchesExpected(req.file.path, Array.from(AVATAR_ALLOWED_MIME)).ok) {
-      return rejectSignatureMismatch(res, req.file, 'Avatar contents do not match a supported image format.')
+      return rejectSignatureMismatch(
+        res,
+        req.file,
+        'Avatar contents do not match a supported image format.',
+      )
     }
     const avatarMagic = validateMagicBytes(req.file.path, req.file.mimetype)
     if (!avatarMagic.valid) {
-      return rejectSignatureMismatch(res, req.file,
-        `Avatar file signature does not match declared type (detected: ${avatarMagic.detectedType || 'unknown'}, declared: ${avatarMagic.declaredType}).`)
+      return rejectSignatureMismatch(
+        res,
+        req.file,
+        `Avatar file signature does not match declared type (detected: ${avatarMagic.detectedType || 'unknown'}, declared: ${avatarMagic.declaredType}).`,
+      )
     }
 
     try {
@@ -123,8 +139,7 @@ router.post('/avatar', requireAuth, uploadAvatarLimiter, (req, res) => {
 
 // ── Cover image upload ───────────────────────────────────────
 const COVER_ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp'])
-const COVER_ALLOWED_EXT  = new Set(['.jpg', '.jpeg', '.png', '.webp'])
-const COVER_MAX_BYTES    = 8 * 1024 * 1024   // 8 MB
+const COVER_ALLOWED_EXT = new Set(['.jpg', '.jpeg', '.png', '.webp'])
 
 const coverStorage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, COVERS_DIR),
@@ -152,12 +167,19 @@ router.post('/cover', requireAuth, uploadCoverLimiter, (req, res) => {
     if (err) return sendError(res, 400, err.message, ERROR_CODES.UPLOAD_INVALID)
     if (!req.file) return sendError(res, 400, 'No file uploaded.', ERROR_CODES.UPLOAD_MISSING_FILE)
     if (!signatureMatchesExpected(req.file.path, Array.from(COVER_ALLOWED_MIME)).ok) {
-      return rejectSignatureMismatch(res, req.file, 'Cover image contents do not match a supported image format.')
+      return rejectSignatureMismatch(
+        res,
+        req.file,
+        'Cover image contents do not match a supported image format.',
+      )
     }
     const coverMagic = validateMagicBytes(req.file.path, req.file.mimetype)
     if (!coverMagic.valid) {
-      return rejectSignatureMismatch(res, req.file,
-        `Cover file signature does not match declared type (detected: ${coverMagic.detectedType || 'unknown'}, declared: ${coverMagic.declaredType}).`)
+      return rejectSignatureMismatch(
+        res,
+        req.file,
+        `Cover file signature does not match declared type (detected: ${coverMagic.detectedType || 'unknown'}, declared: ${coverMagic.declaredType}).`,
+      )
     }
 
     try {
@@ -243,12 +265,19 @@ router.post('/attachment/:sheetId', requireAuth, uploadAttachmentLimiter, (req, 
     if (err) return sendError(res, 400, err.message, ERROR_CODES.UPLOAD_INVALID)
     if (!req.file) return sendError(res, 400, 'No file uploaded.', ERROR_CODES.UPLOAD_MISSING_FILE)
     if (!signatureMatchesExpected(req.file.path, Array.from(ATTACHMENT_ALLOWED_MIME)).ok) {
-      return rejectSignatureMismatch(res, req.file, 'Attachment contents do not match a supported PDF or image format.')
+      return rejectSignatureMismatch(
+        res,
+        req.file,
+        'Attachment contents do not match a supported PDF or image format.',
+      )
     }
     const sheetMagic = validateMagicBytes(req.file.path, req.file.mimetype)
     if (!sheetMagic.valid) {
-      return rejectSignatureMismatch(res, req.file,
-        `Attachment file signature does not match declared type (detected: ${sheetMagic.detectedType || 'unknown'}, declared: ${sheetMagic.declaredType}).`)
+      return rejectSignatureMismatch(
+        res,
+        req.file,
+        `Attachment file signature does not match declared type (detected: ${sheetMagic.detectedType || 'unknown'}, declared: ${sheetMagic.declaredType}).`,
+      )
     }
 
     const sheetId = Number.parseInt(req.params.sheetId, 10)
@@ -261,14 +290,16 @@ router.post('/attachment/:sheetId', requireAuth, uploadAttachmentLimiter, (req, 
         safeUnlinkFile(req.file.path)
         return res.status(404).json({ error: 'Sheet not found.' })
       }
-      if (!assertOwnerOrAdmin({
-        res,
-        user: req.user,
-        ownerId: sheet.userId,
-        message: 'Not your sheet.',
-        targetType: 'sheet',
-        targetId: sheetId,
-      })) {
+      if (
+        !assertOwnerOrAdmin({
+          res,
+          user: req.user,
+          ownerId: sheet.userId,
+          message: 'Not your sheet.',
+          targetType: 'sheet',
+          targetId: sheetId,
+        })
+      ) {
         // Delete the just-uploaded file to avoid orphaned files
         safeUnlinkFile(req.file.path)
         return
@@ -308,12 +339,19 @@ router.post('/post-attachment/:postId', requireAuth, uploadAttachmentLimiter, (r
     if (err) return sendError(res, 400, err.message, ERROR_CODES.UPLOAD_INVALID)
     if (!req.file) return sendError(res, 400, 'No file uploaded.', ERROR_CODES.UPLOAD_MISSING_FILE)
     if (!signatureMatchesExpected(req.file.path, Array.from(ATTACHMENT_ALLOWED_MIME)).ok) {
-      return rejectSignatureMismatch(res, req.file, 'Attachment contents do not match a supported PDF or image format.')
+      return rejectSignatureMismatch(
+        res,
+        req.file,
+        'Attachment contents do not match a supported PDF or image format.',
+      )
     }
     const postMagic = validateMagicBytes(req.file.path, req.file.mimetype)
     if (!postMagic.valid) {
-      return rejectSignatureMismatch(res, req.file,
-        `Attachment file signature does not match declared type (detected: ${postMagic.detectedType || 'unknown'}, declared: ${postMagic.declaredType}).`)
+      return rejectSignatureMismatch(
+        res,
+        req.file,
+        `Attachment file signature does not match declared type (detected: ${postMagic.detectedType || 'unknown'}, declared: ${postMagic.declaredType}).`,
+      )
     }
 
     const postId = Number.parseInt(req.params.postId, 10)
@@ -326,14 +364,16 @@ router.post('/post-attachment/:postId', requireAuth, uploadAttachmentLimiter, (r
         safeUnlinkFile(req.file.path)
         return res.status(404).json({ error: 'Post not found.' })
       }
-      if (!assertOwnerOrAdmin({
-        res,
-        user: req.user,
-        ownerId: post.userId,
-        message: 'Not your post.',
-        targetType: 'feed-post',
-        targetId: postId,
-      })) {
+      if (
+        !assertOwnerOrAdmin({
+          res,
+          user: req.user,
+          ownerId: post.userId,
+          message: 'Not your post.',
+          targetType: 'feed-post',
+          targetId: postId,
+        })
+      ) {
         safeUnlinkFile(req.file.path)
         return
       }
@@ -365,8 +405,8 @@ router.post('/post-attachment/:postId', requireAuth, uploadAttachmentLimiter, (r
 
 // ── Content image upload (inline images in rich text sheets) ──
 const CONTENT_IMAGE_ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
-const CONTENT_IMAGE_ALLOWED_EXT  = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif'])
-const CONTENT_IMAGE_MAX_BYTES    = 5 * 1024 * 1024   // 5 MB per image
+const CONTENT_IMAGE_ALLOWED_EXT = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif'])
+const CONTENT_IMAGE_MAX_BYTES = 5 * 1024 * 1024 // 5 MB per image
 
 const contentImageStorage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, CONTENT_IMAGES_DIR),
@@ -398,12 +438,19 @@ router.post('/content-image', requireAuth, uploadContentImageLimiter, (req, res)
 
     // Magic byte validation
     if (!signatureMatchesExpected(req.file.path, Array.from(CONTENT_IMAGE_ALLOWED_MIME)).ok) {
-      return rejectSignatureMismatch(res, req.file, 'Image contents do not match a supported image format.')
+      return rejectSignatureMismatch(
+        res,
+        req.file,
+        'Image contents do not match a supported image format.',
+      )
     }
     const magic = validateMagicBytes(req.file.path, req.file.mimetype)
     if (!magic.valid) {
-      return rejectSignatureMismatch(res, req.file,
-        `Image file signature does not match declared type (detected: ${magic.detectedType || 'unknown'}, declared: ${magic.declaredType}).`)
+      return rejectSignatureMismatch(
+        res,
+        req.file,
+        `Image file signature does not match declared type (detected: ${magic.detectedType || 'unknown'}, declared: ${magic.declaredType}).`,
+      )
     }
 
     try {

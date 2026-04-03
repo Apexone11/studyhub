@@ -10,10 +10,12 @@
 
 const express = require('express')
 const requireAuth = require('../../middleware/auth')
+const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
 const { readLimiter, messagingWriteLimiter } = require('../../lib/rateLimiters')
 const { getIO } = require('../../lib/socketio')
+const SOCKET_EVENTS = require('../../lib/socketEvents')
 const {
   MAX_MESSAGE_LENGTH,
   sanitizeMessageContent,
@@ -45,7 +47,7 @@ router.get('/conversations/:id/messages', requireAuth, async (req, res) => {
     })
 
     if (!participant) {
-      return res.status(404).json({ error: 'Conversation not found.' })
+      return sendError(res, 404, 'Conversation not found.', ERROR_CODES.NOT_FOUND)
     }
 
     const where = {
@@ -101,7 +103,7 @@ router.get('/conversations/:id/messages', requireAuth, async (req, res) => {
     res.json(messages.reverse()) // Return in chronological order
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 })
 
@@ -116,52 +118,62 @@ router.post('/conversations/:id/messages', requireAuth, messagingWriteLimiter, a
 
     // Allow empty content when attachments are present (e.g. GIF-only messages)
     const hasAttachments = Array.isArray(attachments) && attachments.length > 0
-    const rawContent = (typeof content === 'string') ? content.trim() : ''
+    const rawContent = typeof content === 'string' ? content.trim() : ''
 
     if (!rawContent && !hasAttachments && !poll) {
-      return res.status(400).json({ error: 'Message content required.' })
+      return sendError(res, 400, 'Message content required.', ERROR_CODES.BAD_REQUEST)
     }
 
     // Sanitize content to prevent stored XSS
     const cleanContent = rawContent ? sanitizeMessageContent(rawContent) : ''
 
     if (cleanContent.length > MAX_MESSAGE_LENGTH) {
-      return res.status(400).json({ error: `Message too long. Maximum ${MAX_MESSAGE_LENGTH} characters.` })
+      return sendError(
+        res,
+        400,
+        `Message too long. Maximum ${MAX_MESSAGE_LENGTH} characters.`,
+        ERROR_CODES.BAD_REQUEST,
+      )
     }
 
     // Validate poll if provided
     if (poll) {
       if (!poll.question || typeof poll.question !== 'string' || poll.question.trim() === '') {
-        return res.status(400).json({ error: 'Poll question required.' })
+        return sendError(res, 400, 'Poll question required.', ERROR_CODES.BAD_REQUEST)
       }
       if (!Array.isArray(poll.options) || poll.options.length < 2) {
-        return res.status(400).json({ error: 'Poll must have at least 2 options.' })
+        return sendError(res, 400, 'Poll must have at least 2 options.', ERROR_CODES.BAD_REQUEST)
       }
       if (poll.options.length > 10) {
-        return res.status(400).json({ error: 'Poll cannot have more than 10 options.' })
+        return sendError(
+          res,
+          400,
+          'Poll cannot have more than 10 options.',
+          ERROR_CODES.BAD_REQUEST,
+        )
       }
     }
 
     // Validate attachments
     if (attachments.length > 5) {
-      return res.status(400).json({ error: 'Maximum 5 attachments per message.' })
+      return sendError(res, 400, 'Maximum 5 attachments per message.', ERROR_CODES.BAD_REQUEST)
     }
 
     for (const att of attachments) {
       if (!att.url || typeof att.url !== 'string') {
-        return res.status(400).json({ error: 'Attachment URL required.' })
+        return sendError(res, 400, 'Attachment URL required.', ERROR_CODES.BAD_REQUEST)
       }
       // Only allow well-formed https URLs for attachments
       if (!att.url.startsWith('https://')) {
-        return res.status(400).json({ error: 'Attachment URL must use HTTPS.' })
+        return sendError(res, 400, 'Attachment URL must use HTTPS.', ERROR_CODES.BAD_REQUEST)
       }
       try {
         const parsed = new URL(att.url)
         if (parsed.protocol !== 'https:') {
-          return res.status(400).json({ error: 'Attachment URL must use HTTPS.' })
+          return sendError(res, 400, 'Attachment URL must use HTTPS.', ERROR_CODES.BAD_REQUEST)
         }
       } catch {
-        return res.status(400).json({ error: 'Attachment URL is not valid.' })
+        return sendError(res, 400, 'Attachment URL is not valid.', ERROR_CODES.BAD_REQUEST)
       }
       // Sanitize fileName to prevent path traversal or injection
       if (att.fileName && typeof att.fileName === 'string') {
@@ -180,7 +192,7 @@ router.post('/conversations/:id/messages', requireAuth, messagingWriteLimiter, a
     })
 
     if (!participant) {
-      return res.status(404).json({ error: 'Conversation not found.' })
+      return sendError(res, 404, 'Conversation not found.', ERROR_CODES.NOT_FOUND)
     }
 
     const message = await prisma.message.create({
@@ -263,7 +275,7 @@ router.post('/conversations/:id/messages', requireAuth, messagingWriteLimiter, a
     // Emit via Socket.io to conversation room
     try {
       const io = getIO()
-      io.to(`conversation:${conversationId}`).emit('message:new', message)
+      io.to(`conversation:${conversationId}`).emit(SOCKET_EVENTS.MESSAGE_NEW, message)
     } catch (err) {
       captureError(err, { source: 'socketio-message-send' })
     }
@@ -271,7 +283,7 @@ router.post('/conversations/:id/messages', requireAuth, messagingWriteLimiter, a
     res.status(201).json(message)
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 })
 
@@ -285,17 +297,22 @@ router.patch('/:messageId', requireAuth, messagingWriteLimiter, async (req, res)
     const { content } = req.body
 
     if (!content || typeof content !== 'string' || content.trim() === '') {
-      return res.status(400).json({ error: 'Message content required.' })
+      return sendError(res, 400, 'Message content required.', ERROR_CODES.BAD_REQUEST)
     }
 
     const cleanContent = sanitizeMessageContent(content)
 
     if (cleanContent.length === 0) {
-      return res.status(400).json({ error: 'Message content required.' })
+      return sendError(res, 400, 'Message content required.', ERROR_CODES.BAD_REQUEST)
     }
 
     if (cleanContent.length > MAX_MESSAGE_LENGTH) {
-      return res.status(400).json({ error: `Message too long. Maximum ${MAX_MESSAGE_LENGTH} characters.` })
+      return sendError(
+        res,
+        400,
+        `Message too long. Maximum ${MAX_MESSAGE_LENGTH} characters.`,
+        ERROR_CODES.BAD_REQUEST,
+      )
     }
 
     // Verify participant AND message owner
@@ -305,12 +322,12 @@ router.patch('/:messageId', requireAuth, messagingWriteLimiter, async (req, res)
     const { message } = verified
 
     if (message.senderId !== req.user.userId) {
-      return res.status(403).json({ error: 'Can only edit your own messages.' })
+      return sendError(res, 403, 'Can only edit your own messages.', ERROR_CODES.FORBIDDEN)
     }
 
     const fifteenMinAgo = new Date(Date.now() - 15 * 60 * 1000)
     if (message.createdAt < fifteenMinAgo) {
-      return res.status(403).json({ error: 'Can only edit messages within 15 minutes.' })
+      return sendError(res, 403, 'Can only edit messages within 15 minutes.', ERROR_CODES.FORBIDDEN)
     }
 
     const updated = await prisma.message.update({
@@ -353,7 +370,7 @@ router.patch('/:messageId', requireAuth, messagingWriteLimiter, async (req, res)
     // Emit via Socket.io
     try {
       const io = getIO()
-      io.to(`conversation:${message.conversationId}`).emit('message:edit', updated)
+      io.to(`conversation:${message.conversationId}`).emit(SOCKET_EVENTS.MESSAGE_EDIT, updated)
     } catch (err) {
       captureError(err, { source: 'socketio-message-edit' })
     }
@@ -361,7 +378,7 @@ router.patch('/:messageId', requireAuth, messagingWriteLimiter, async (req, res)
     res.json(updated)
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 })
 
@@ -387,14 +404,14 @@ router.delete('/:messageId', requireAuth, async (req, res) => {
     })
 
     if (!message) {
-      return res.status(404).json({ error: 'Message not found.' })
+      return sendError(res, 404, 'Message not found.', ERROR_CODES.NOT_FOUND)
     }
 
     const isOwner = message.senderId === req.user.userId
     const isAdmin = message.conversation.participants[0]?.role === 'admin'
 
     if (!isOwner && !isAdmin) {
-      return res.status(403).json({ error: 'Insufficient permissions.' })
+      return sendError(res, 403, 'Insufficient permissions.', ERROR_CODES.FORBIDDEN)
     }
 
     await prisma.message.update({
@@ -410,7 +427,7 @@ router.delete('/:messageId', requireAuth, async (req, res) => {
     // Emit via Socket.io
     try {
       const io = getIO()
-      io.to(`conversation:${message.conversationId}`).emit('message:delete', {
+      io.to(`conversation:${message.conversationId}`).emit(SOCKET_EVENTS.MESSAGE_DELETE, {
         messageId,
         conversationId: message.conversationId,
       })
@@ -421,7 +438,7 @@ router.delete('/:messageId', requireAuth, async (req, res) => {
     res.status(204).send()
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 })
 

@@ -23,6 +23,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { API } from '../../config'
 import { authHeaders } from '../shared/pageUtils'
 import { showToast } from '../../lib/toast'
+import { SOCKET_EVENTS } from '../../lib/socketEvents'
 
 export function useMessagingData(socket, currentUserId) {
   /* ── State ───────────────────────────────────────────────────────────── */
@@ -100,7 +101,7 @@ export function useMessagingData(socket, currentUserId) {
   const markConversationRead = useCallback(
     async (conversationId) => {
       if (socket && socket.connected) {
-        socket.emit('message:read', { conversationId })
+        socket.emit(SOCKET_EVENTS.MESSAGE_READ, { conversationId })
       } else {
         // HTTP fallback when socket is disconnected
         try {
@@ -150,7 +151,7 @@ export function useMessagingData(socket, currentUserId) {
 
         // Join the conversation room via socket
         if (socket && socket.connected) {
-          socket.emit('conversation:join', { conversationId: id })
+          socket.emit(SOCKET_EVENTS.CONVERSATION_JOIN, { conversationId: id })
         }
 
         await loadMessages(id)
@@ -230,7 +231,7 @@ export function useMessagingData(socket, currentUserId) {
 
         // Stop typing indicator
         if (socket) {
-          socket.emit('typing:stop', { conversationId: activeConversation.id })
+          socket.emit(SOCKET_EVENTS.TYPING_STOP, { conversationId: activeConversation.id })
         }
       } catch {
         showToast('Failed to send message', 'error')
@@ -455,20 +456,20 @@ export function useMessagingData(socket, currentUserId) {
   /* ── Typing indicator helpers ────────────────────────────────────────── */
   const emitTypingStart = useCallback(() => {
     if (!socket || !activeConversation) return
-    socket.emit('typing:start', { conversationId: activeConversation.id })
+    socket.emit(SOCKET_EVENTS.TYPING_START, { conversationId: activeConversation.id })
 
     // Auto-stop after 3 seconds of no input
     if (typingTimerRef.current) clearTimeout(typingTimerRef.current)
     typingTimerRef.current = setTimeout(() => {
       if (socket && activeConversation) {
-        socket.emit('typing:stop', { conversationId: activeConversation.id })
+        socket.emit(SOCKET_EVENTS.TYPING_STOP, { conversationId: activeConversation.id })
       }
     }, 3000)
   }, [socket, activeConversation])
 
   const emitTypingStop = useCallback(() => {
     if (!socket || !activeConversation) return
-    socket.emit('typing:stop', { conversationId: activeConversation.id })
+    socket.emit(SOCKET_EVENTS.TYPING_STOP, { conversationId: activeConversation.id })
     if (typingTimerRef.current) {
       clearTimeout(typingTimerRef.current)
       typingTimerRef.current = null
@@ -496,7 +497,7 @@ export function useMessagingData(socket, currentUserId) {
 
         // Auto-mark as read — prefer socket, fall back to HTTP
         if (socket && socket.connected) {
-          socket.emit('message:read', { conversationId: message.conversationId })
+          socket.emit(SOCKET_EVENTS.MESSAGE_READ, { conversationId: message.conversationId })
         } else {
           fetch(`${API}/api/messages/conversations/${message.conversationId}/read`, {
             method: 'POST',
@@ -606,24 +607,24 @@ export function useMessagingData(socket, currentUserId) {
     }
 
     // Listen with correct backend event names
-    socket.on('message:new', handleNewMessage)
-    socket.on('message:read', handleMessageRead)
-    socket.on('message:edit', handleEditMessage)
-    socket.on('message:delete', handleDeleteMessage)
-    socket.on('typing:start', handleTypingStart)
-    socket.on('typing:stop', handleTypingStop)
-    socket.on('reaction:add', handleReactionAdd)
-    socket.on('reaction:remove', handleReactionRemove)
+    socket.on(SOCKET_EVENTS.MESSAGE_NEW, handleNewMessage)
+    socket.on(SOCKET_EVENTS.MESSAGE_READ, handleMessageRead)
+    socket.on(SOCKET_EVENTS.MESSAGE_EDIT, handleEditMessage)
+    socket.on(SOCKET_EVENTS.MESSAGE_DELETE, handleDeleteMessage)
+    socket.on(SOCKET_EVENTS.TYPING_START, handleTypingStart)
+    socket.on(SOCKET_EVENTS.TYPING_STOP, handleTypingStop)
+    socket.on(SOCKET_EVENTS.REACTION_ADD, handleReactionAdd)
+    socket.on(SOCKET_EVENTS.REACTION_REMOVE, handleReactionRemove)
 
     return () => {
-      socket.off('message:new', handleNewMessage)
-      socket.off('message:read', handleMessageRead)
-      socket.off('message:edit', handleEditMessage)
-      socket.off('message:delete', handleDeleteMessage)
-      socket.off('typing:start', handleTypingStart)
-      socket.off('typing:stop', handleTypingStop)
-      socket.off('reaction:add', handleReactionAdd)
-      socket.off('reaction:remove', handleReactionRemove)
+      socket.off(SOCKET_EVENTS.MESSAGE_NEW, handleNewMessage)
+      socket.off(SOCKET_EVENTS.MESSAGE_READ, handleMessageRead)
+      socket.off(SOCKET_EVENTS.MESSAGE_EDIT, handleEditMessage)
+      socket.off(SOCKET_EVENTS.MESSAGE_DELETE, handleDeleteMessage)
+      socket.off(SOCKET_EVENTS.TYPING_START, handleTypingStart)
+      socket.off(SOCKET_EVENTS.TYPING_STOP, handleTypingStop)
+      socket.off(SOCKET_EVENTS.REACTION_ADD, handleReactionAdd)
+      socket.off(SOCKET_EVENTS.REACTION_REMOVE, handleReactionRemove)
     }
   }, [socket, currentUserId])
 

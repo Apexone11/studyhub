@@ -10,10 +10,12 @@
 
 const express = require('express')
 const requireAuth = require('../../middleware/auth')
+const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
 const { messagingWriteLimiter } = require('../../lib/rateLimiters')
 const { getIO } = require('../../lib/socketio')
+const SOCKET_EVENTS = require('../../lib/socketEvents')
 const { verifyMessageParticipant } = require('./messaging.helpers')
 
 const router = express.Router({ mergeParams: true })
@@ -28,12 +30,12 @@ router.post('/:messageId/reactions', requireAuth, messagingWriteLimiter, async (
     const { emoji } = req.body
 
     if (!emoji || typeof emoji !== 'string' || emoji.trim() === '') {
-      return res.status(400).json({ error: 'Reaction required.' })
+      return sendError(res, 400, 'Reaction required.', ERROR_CODES.BAD_REQUEST)
     }
 
     // Limit reaction length to prevent abuse
     if (emoji.trim().length > 32) {
-      return res.status(400).json({ error: 'Reaction too long.' })
+      return sendError(res, 400, 'Reaction too long.', ERROR_CODES.BAD_REQUEST)
     }
 
     // Verify the user is a participant in the conversation
@@ -65,7 +67,7 @@ router.post('/:messageId/reactions', requireAuth, messagingWriteLimiter, async (
     // Emit via Socket.io
     try {
       const io = getIO()
-      io.to(`conversation:${verified.message.conversationId}`).emit('reaction:add', {
+      io.to(`conversation:${verified.message.conversationId}`).emit(SOCKET_EVENTS.REACTION_ADD, {
         messageId,
         reaction,
       })
@@ -76,7 +78,7 @@ router.post('/:messageId/reactions', requireAuth, messagingWriteLimiter, async (
     res.status(201).json(reaction)
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 })
 
@@ -84,41 +86,49 @@ router.post('/:messageId/reactions', requireAuth, messagingWriteLimiter, async (
  * DELETE /messages/:messageId/reactions/:emoji
  * Remove a reaction
  */
-router.delete('/:messageId/reactions/:emoji', requireAuth, messagingWriteLimiter, async (req, res) => {
-  try {
-    const messageId = parseInt(req.params.messageId, 10)
-    const emoji = decodeURIComponent(req.params.emoji)
-
-    // Verify the user is a participant in the conversation
-    const verified = await verifyMessageParticipant(req, res, messageId)
-    if (!verified) return
-
-    await prisma.messageReaction.deleteMany({
-      where: {
-        messageId,
-        userId: req.user.userId,
-        emoji,
-      },
-    })
-
-    // Emit via Socket.io
+router.delete(
+  '/:messageId/reactions/:emoji',
+  requireAuth,
+  messagingWriteLimiter,
+  async (req, res) => {
     try {
-      const io = getIO()
-      io.to(`conversation:${verified.message.conversationId}`).emit('reaction:remove', {
-        messageId,
-        emoji,
-        userId: req.user.userId,
-      })
-    } catch (err) {
-      captureError(err, { source: 'socketio-reaction-remove' })
-    }
+      const messageId = parseInt(req.params.messageId, 10)
+      const emoji = decodeURIComponent(req.params.emoji)
 
-    res.status(204).send()
-  } catch (err) {
-    captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
-  }
-})
+      // Verify the user is a participant in the conversation
+      const verified = await verifyMessageParticipant(req, res, messageId)
+      if (!verified) return
+
+      await prisma.messageReaction.deleteMany({
+        where: {
+          messageId,
+          userId: req.user.userId,
+          emoji,
+        },
+      })
+
+      // Emit via Socket.io
+      try {
+        const io = getIO()
+        io.to(`conversation:${verified.message.conversationId}`).emit(
+          SOCKET_EVENTS.REACTION_REMOVE,
+          {
+            messageId,
+            emoji,
+            userId: req.user.userId,
+          },
+        )
+      } catch (err) {
+        captureError(err, { source: 'socketio-reaction-remove' })
+      }
+
+      res.status(204).send()
+    } catch (err) {
+      captureError(err, { route: req.originalUrl, method: req.method })
+      sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
+    }
+  },
+)
 
 /**
  * POST /messages/:messageId/poll/vote
@@ -130,7 +140,7 @@ router.post('/:messageId/poll/vote', requireAuth, messagingWriteLimiter, async (
     const { optionId } = req.body
 
     if (!optionId) {
-      return res.status(400).json({ error: 'Option ID required.' })
+      return sendError(res, 400, 'Option ID required.', ERROR_CODES.BAD_REQUEST)
     }
 
     const optionIdNum = parseInt(optionId, 10)
@@ -156,18 +166,18 @@ router.post('/:messageId/poll/vote', requireAuth, messagingWriteLimiter, async (
     })
 
     if (!messagePoll.poll) {
-      return res.status(400).json({ error: 'Message does not contain a poll.' })
+      return sendError(res, 400, 'Message does not contain a poll.', ERROR_CODES.BAD_REQUEST)
     }
 
     // Check if poll is closed
     if (messagePoll.poll.closedAt) {
-      return res.status(400).json({ error: 'Poll is closed.' })
+      return sendError(res, 400, 'Poll is closed.', ERROR_CODES.BAD_REQUEST)
     }
 
     // Find the option
     const option = messagePoll.poll.options.find((opt) => opt.id === optionIdNum)
     if (!option) {
-      return res.status(404).json({ error: 'Option not found.' })
+      return sendError(res, 404, 'Option not found.', ERROR_CODES.NOT_FOUND)
     }
 
     // Check if user already voted
@@ -239,7 +249,7 @@ router.post('/:messageId/poll/vote', requireAuth, messagingWriteLimiter, async (
     // Emit via Socket.io
     try {
       const io = getIO()
-      io.to(`conversation:${verified.message.conversationId}`).emit('poll:vote', {
+      io.to(`conversation:${verified.message.conversationId}`).emit(SOCKET_EVENTS.POLL_VOTE, {
         messageId,
         poll: updatedMessage.poll,
       })
@@ -250,7 +260,7 @@ router.post('/:messageId/poll/vote', requireAuth, messagingWriteLimiter, async (
     res.status(201).json(vote)
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 })
 
@@ -290,7 +300,7 @@ router.post('/:messageId/poll/close', requireAuth, messagingWriteLimiter, async 
     })
 
     if (!messagePollData.poll) {
-      return res.status(400).json({ error: 'Message does not contain a poll.' })
+      return sendError(res, 400, 'Message does not contain a poll.', ERROR_CODES.BAD_REQUEST)
     }
 
     // Check permissions: message sender or conversation admin only
@@ -298,7 +308,7 @@ router.post('/:messageId/poll/close', requireAuth, messagingWriteLimiter, async 
     const isConvoAdmin = userParticipant.role === 'admin'
 
     if (!isOwner && !isConvoAdmin) {
-      return res.status(403).json({ error: 'Insufficient permissions.' })
+      return sendError(res, 403, 'Insufficient permissions.', ERROR_CODES.FORBIDDEN)
     }
 
     // Close the poll
@@ -324,7 +334,7 @@ router.post('/:messageId/poll/close', requireAuth, messagingWriteLimiter, async 
     // Emit via Socket.io
     try {
       const io = getIO()
-      io.to(`conversation:${msgRecord.conversationId}`).emit('poll:close', {
+      io.to(`conversation:${msgRecord.conversationId}`).emit(SOCKET_EVENTS.POLL_CLOSE, {
         messageId,
         poll: closedPoll,
       })
@@ -335,7 +345,7 @@ router.post('/:messageId/poll/close', requireAuth, messagingWriteLimiter, async 
     res.json(closedPoll)
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 })
 

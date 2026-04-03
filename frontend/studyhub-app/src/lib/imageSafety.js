@@ -77,7 +77,10 @@ function getImageDimensions(file) {
       resolve({ width: img.width, height: img.height })
       URL.revokeObjectURL(img.src)
     }
-    img.onerror = () => { URL.revokeObjectURL(img.src); reject(new Error('Image load failed')) }
+    img.onerror = () => {
+      URL.revokeObjectURL(img.src)
+      reject(new Error('Image load failed'))
+    }
     img.src = URL.createObjectURL(file)
   })
 }
@@ -107,11 +110,7 @@ async function estimateSkinToneRatio(file) {
     const b = data[i + 2]
     totalPixels++
     // Basic skin-tone detection in RGB space (Peer, 2003 thresholds)
-    if (
-      r > 95 && g > 40 && b > 20 &&
-      r > g && r > b &&
-      Math.abs(r - g) > 15 && r - b > 15
-    ) {
+    if (r > 95 && g > 40 && b > 20 && r > g && r > b && Math.abs(r - g) > 15 && r - b > 15) {
       skinPixels++
     }
   }
@@ -130,7 +129,6 @@ export async function checkImageWithModel(file) {
   // const model = await nsfwjs.load()
   // const predictions = await model.classify(img)
   // return predictions
-  console.warn('TF.js NSFW model not loaded — using heuristic fallback')
   return checkImageSafety(file)
 }
 

@@ -34,7 +34,7 @@ const TD_STYLE = {
 
 /* -- Tiny inline bar chart (SVG) ---------------------------------------- */
 
-function BarChart({ data, color = '#2563eb', height = 120 }) {
+function BarChart({ data, color = 'var(--sh-info)', height = 120 }) {
   if (!data || data.length === 0) {
     return (
       <div

@@ -6,10 +6,11 @@
     "frontend/studyhub-app"
   ],
   "devDependencies": {
-    "prettier": "^3.5.3",
     "eslint-config-prettier": "^10.1.5",
     "husky": "^9.1.7",
-    "lint-staged": "^15.5.1"
+    "lint-staged": "^15.5.1",
+    "magic-string": "^0.30.21",
+    "prettier": "^3.8.1"
   },
   "lint-staged": {
     "*.{js,jsx}": [

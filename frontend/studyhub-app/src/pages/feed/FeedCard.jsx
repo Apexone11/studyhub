@@ -283,9 +283,9 @@ function FeedCardInner({
                     letterSpacing: '.08em',
                     color:
                       item.type === 'announcement'
-                        ? '#b45309'
+                        ? 'var(--sh-warning)'
                         : item.type === 'note'
-                          ? '#8b5cf6'
+                          ? 'var(--purple)'
                           : courseColor(item.course?.code),
                   }}
                 >

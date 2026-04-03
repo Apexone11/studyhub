@@ -61,7 +61,11 @@ export default function SheetHtmlPreviewPage() {
 
       setState({ loading: false, error: '', preview: data })
     } catch (error) {
-      setState({ loading: false, error: error.message || 'Could not load HTML preview.', preview: null })
+      setState({
+        loading: false,
+        error: error.message || 'Could not load HTML preview.',
+        preview: null,
+      })
     }
   }, [sheetId])
 
@@ -100,15 +104,31 @@ export default function SheetHtmlPreviewPage() {
   }, [interactive, runtimeUrl, loadRuntime])
 
   return (
-    <div style={{ minHeight: '100vh', background: '#edf0f5', fontFamily: FONT }}>
-      <Navbar crumbs={[{ label: 'Study Sheets', to: '/sheets' }, { label: 'HTML Preview', to: null }]} hideTabs hideSearch />
+    <div style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: FONT }}>
+      <Navbar
+        crumbs={[
+          { label: 'Study Sheets', to: '/sheets' },
+          { label: 'HTML Preview', to: null },
+        ]}
+        hideTabs
+        hideSearch
+      />
       <div style={pageShell('reading', 22, 40)}>
         <main id="main-content" style={{ display: 'grid', gap: 14 }}>
           <section style={panelStyle()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                gap: 12,
+                flexWrap: 'wrap',
+              }}
+            >
               <div>
-                <h1 style={{ margin: 0, fontSize: 22, color: '#0f172a' }}>Sandbox HTML Preview</h1>
-                <div style={{ marginTop: 4, fontSize: 12, color: '#64748b' }}>
+                <h1 style={{ margin: 0, fontSize: 22, color: 'var(--sh-slate-900)' }}>
+                  Sandbox HTML Preview
+                </h1>
+                <div style={{ marginTop: 4, fontSize: 12, color: 'var(--sh-slate-500)' }}>
                   Full-page preview in a secure sandboxed session.
                 </div>
               </div>
@@ -131,7 +151,14 @@ export default function SheetHtmlPreviewPage() {
           </section>
 
           {state.error ? (
-            <section style={{ ...panelStyle(), background: 'var(--sh-danger-bg)', borderColor: 'var(--sh-danger-border)', color: 'var(--sh-danger)' }}>
+            <section
+              style={{
+                ...panelStyle(),
+                background: 'var(--sh-danger-bg)',
+                borderColor: 'var(--sh-danger-border)',
+                color: 'var(--sh-danger)',
+              }}
+            >
               {state.error}
             </section>
           ) : null}
@@ -145,17 +172,38 @@ export default function SheetHtmlPreviewPage() {
           {state.preview ? (
             <>
               <section style={panelStyle()}>
-                <div style={{ fontSize: 12, color: '#475569', display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                  <span><strong>Title:</strong> {state.preview.title || 'Untitled'}</span>
-                  <span><strong>Status:</strong> {state.preview.status}</span>
-                  <span><strong>Updated:</strong> {new Date(state.preview.updatedAt).toLocaleString()}</span>
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: '#475569',
+                    display: 'flex',
+                    gap: 16,
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <span>
+                    <strong>Title:</strong> {state.preview.title || 'Untitled'}
+                  </span>
+                  <span>
+                    <strong>Status:</strong> {state.preview.status}
+                  </span>
+                  <span>
+                    <strong>Updated:</strong> {new Date(state.preview.updatedAt).toLocaleString()}
+                  </span>
                 </div>
               </section>
 
               {state.preview?.canInteract ? (
                 <section style={panelStyle()}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                    <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: '1px solid var(--sh-border)' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        borderRadius: 8,
+                        overflow: 'hidden',
+                        border: '1px solid var(--sh-border)',
+                      }}
+                    >
                       <button
                         type="button"
                         onClick={() => setInteractive(false)}
@@ -186,10 +234,19 @@ export default function SheetHtmlPreviewPage() {
                     Safe preview mode
                   </div>
                   <div style={{ fontSize: 12, color: '#92400e', marginTop: 6, lineHeight: 1.6 }}>
-                    This preview has scripts and embeds disabled for safety. Review the scan findings below if you want a clean report.
+                    This preview has scripts and embeds disabled for safety. Review the scan
+                    findings below if you want a clean report.
                   </div>
                   {Array.isArray(state.preview.issues) && state.preview.issues.length ? (
-                    <ul style={{ marginTop: 10, paddingLeft: 18, color: '#92400e', fontSize: 12, lineHeight: 1.6 }}>
+                    <ul
+                      style={{
+                        marginTop: 10,
+                        paddingLeft: 18,
+                        color: '#92400e',
+                        fontSize: 12,
+                        lineHeight: 1.6,
+                      }}
+                    >
                       {state.preview.issues.slice(0, 8).map((issue, idx) => (
                         <li key={idx}>{issue?.message || String(issue)}</li>
                       ))}
@@ -215,22 +272,35 @@ export default function SheetHtmlPreviewPage() {
                 }
               >
                 {isFullscreen ? (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#fff' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      color: '#fff',
+                    }}
+                  >
                     <div style={{ fontWeight: 800 }}>HTML Preview</div>
-                    <button type="button" onClick={() => setIsFullscreen(false)} style={{ ...buttonStyle(), borderColor: '#334155' }}>
+                    <button
+                      type="button"
+                      onClick={() => setIsFullscreen(false)}
+                      style={{ ...buttonStyle(), borderColor: '#334155' }}
+                    >
                       Exit fullscreen
                     </button>
                   </div>
                 ) : null}
 
                 {runtimeLoading && interactive ? (
-                  <div style={{ padding: 24, textAlign: 'center', fontSize: 13, color: '#64748b' }}>Loading interactive preview…</div>
+                  <div style={{ padding: 24, textAlign: 'center', fontSize: 13, color: '#64748b' }}>
+                    Loading interactive preview…
+                  </div>
                 ) : (
                   <iframe
                     title={`html-sheet-preview-${sheetId}`}
                     sandbox={interactive && runtimeUrl ? 'allow-scripts allow-forms' : ''}
                     referrerPolicy="no-referrer"
-                    src={interactive && runtimeUrl ? runtimeUrl : (state.preview.previewUrl || '')}
+                    src={interactive && runtimeUrl ? runtimeUrl : state.preview.previewUrl || ''}
                     style={{
                       width: '100%',
                       height: isFullscreen ? '100%' : 'calc(100vh - 260px)',
