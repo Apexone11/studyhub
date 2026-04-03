@@ -605,7 +605,7 @@ const exportDataLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Data export limit reached. You can export your data up to 3 times per day.' },
-  keyGenerator: (req) => req.user?.userId || req.ip,
+  keyGenerator: (req) => `export-${req.user?.userId || 'anon'}`,
 })
 
 // ── Exports ────────────────────────────────────────────────────────────────

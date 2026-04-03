@@ -461,7 +461,7 @@ async function startServer() {
   const server = http.createServer(app)
   initSocketIO(server)
 
-  return server.listen(PORT, () => {
+  const instance = server.listen(PORT, () => {
     startHtmlArchiveScheduler()
     startModerationCleanupScheduler()
     // Pre-warm library cache with popular books (non-blocking).
@@ -477,6 +477,10 @@ async function startServer() {
     }, 24 * 60 * 60 * 1000)
     log.info({ port: PORT }, `Server running on http://localhost:${PORT}`)
   })
+
+  // Store for graceful shutdown regardless of how startServer was invoked
+  serverInstance = instance
+  return instance
 }
 
 // ── Graceful Shutdown ─────────────────────────────────────────────────────
@@ -520,6 +524,8 @@ function gracefulShutdown(signal) {
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'))
 process.on('SIGINT', () => gracefulShutdown('SIGINT'))
+
+module.exports = { startServer }
 
 if (require.main === module) {
   startServer().then((server) => {
