@@ -1,27 +1,29 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Navbar from '../../components/navbar/Navbar'
 import { API } from '../../config'
+import { useSession } from '../../lib/session-context'
 
 const FAQ_ITEMS = [
   {
-    question: 'What happens when Pro launches?',
-    answer: 'You will be notified by email and get early access pricing.'
-  },
-  {
     question: 'Can I cancel anytime?',
-    answer: 'Yes, no long-term contracts.'
+    answer: 'Yes, you can cancel your subscription anytime from your account settings. No long-term contracts.'
   },
   {
     question: 'Is there a student discount?',
-    answer: 'The free tier is designed for students. Pro pricing is already student-friendly.'
+    answer: 'The free tier is designed for students. Pro pricing is already student-friendly at $4.99/month.'
   },
   {
-    question: 'What payment methods will you accept?',
-    answer: 'Credit/debit cards and PayPal at launch.'
+    question: 'What payment methods do you accept?',
+    answer: 'We accept all major credit and debit cards through Stripe. PayPal support coming soon.'
   },
   {
     question: 'Can my university get a bulk deal?',
-    answer: 'Yes, contact us about Institution pricing.'
+    answer: 'Yes, contact us about Institution pricing with volume discounts.'
+  },
+  {
+    question: 'Do I get a free trial?',
+    answer: 'We offer a 7-day free trial for new Pro subscribers. Cancel anytime before it renews.'
   },
 ]
 
@@ -68,10 +70,53 @@ export default function PricingPage() {
 }
 
 function PricingCard({ tier }) {
+  const navigate = useNavigate()
+  const { user } = useSession()
+  const [subscribing, setSubscribing] = useState(null)
+  const [subscribeError, setSubscribeError] = useState('')
   const [waitlistEmail, setWaitlistEmail] = useState('')
   const [waitlistLoading, setWaitlistLoading] = useState(false)
   const [waitlistMessage, setWaitlistMessage] = useState('')
   const [waitlistError, setWaitlistError] = useState('')
+
+  const handleSubscribe = async (plan) => {
+    setSubscribeError('')
+
+    if (!user) {
+      navigate('/login')
+      return
+    }
+
+    setSubscribing(plan)
+
+    try {
+      const res = await fetch(`${API}/api/payments/checkout/subscription`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ plan }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setSubscribeError(data.error || data.message || 'Failed to start checkout.')
+        setSubscribing(null)
+        return
+      }
+
+      if (data.url) {
+        window.location.href = data.url
+      } else {
+        setSubscribeError('No checkout URL received from server.')
+        setSubscribing(null)
+      }
+    } catch (err) {
+      console.error('[subscribe]', err)
+      setSubscribeError('Network error. Please try again.')
+      setSubscribing(null)
+    }
+  }
 
   const handleWaitlistSubmit = async (e, tierName) => {
     e.preventDefault()
@@ -134,9 +179,6 @@ function PricingCard({ tier }) {
   if (tier === 'pro') {
     return (
       <div style={{ ...s.card, ...s.cardElevated }}>
-        <div style={s.ribbonContainer}>
-          <div style={s.ribbon}>Coming Soon</div>
-        </div>
         <div style={s.badgeRow}>
           <span style={{ ...s.badge, ...s.badgePro }}>Pro</span>
         </div>
@@ -156,29 +198,24 @@ function PricingCard({ tier }) {
           <Feature text="Priority support" included />
         </div>
 
-        {waitlistMessage ? (
-          <div style={s.successMessage}>{waitlistMessage}</div>
-        ) : (
-          <form onSubmit={(e) => handleWaitlistSubmit(e, 'pro')} style={s.waitlistForm}>
-            <input
-              type="email"
-              placeholder="your@email.com"
-              value={waitlistEmail}
-              onChange={(e) => setWaitlistEmail(e.target.value)}
-              style={s.waitlistInput}
-              disabled={waitlistLoading}
-              required
-            />
-            <button
-              type="submit"
-              style={s.ctaPrimary}
-              disabled={waitlistLoading || !waitlistEmail.trim()}
-            >
-              {waitlistLoading ? 'Joining...' : 'Join Waitlist'}
-            </button>
-            {waitlistError && <div style={s.errorMessage}>{waitlistError}</div>}
-          </form>
-        )}
+        <div style={s.subscribeButtonGroup}>
+          <button
+            style={s.ctaPrimary}
+            disabled={subscribing !== null}
+            onClick={() => handleSubscribe('pro_monthly')}
+          >
+            {subscribing === 'pro_monthly' ? 'Redirecting...' : 'Subscribe Monthly'}
+          </button>
+          <button
+            style={s.ctaSecondary}
+            disabled={subscribing !== null}
+            onClick={() => handleSubscribe('pro_yearly')}
+          >
+            {subscribing === 'pro_yearly' ? 'Redirecting...' : 'Subscribe Yearly (Save 33%)'}
+          </button>
+        </div>
+
+        {subscribeError && <div style={s.errorMessage}>{subscribeError}</div>}
       </div>
     )
   }
@@ -425,6 +462,18 @@ const s = {
     width: '100%',
     transition: 'background 0.2s ease-out',
   },
+  ctaSecondary: {
+    background: 'transparent',
+    color: '#6d28d9',
+    border: '2px solid #6d28d9',
+    padding: '10px 24px',
+    borderRadius: 10,
+    fontWeight: 'bold',
+    fontSize: 15,
+    cursor: 'pointer',
+    width: '100%',
+    transition: 'all 0.2s ease-out',
+  },
   ctaDisabled: {
     background: 'var(--sh-soft)',
     color: 'var(--sh-muted)',
@@ -435,6 +484,11 @@ const s = {
     fontSize: 15,
     cursor: 'default',
     width: '100%',
+  },
+  subscribeButtonGroup: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 12,
   },
   waitlistForm: {
     display: 'flex',

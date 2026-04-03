@@ -24,6 +24,7 @@ import AccountTab from './AccountTab'
 import NotificationsTab from './NotificationsTab'
 import PrivacyTab from './PrivacyTab'
 import AppearanceTab from './AppearanceTab'
+import SubscriptionTab from './SubscriptionTab'
 import ModerationTab from './ModerationTab'
 
 const NAV_TABS = [
@@ -33,6 +34,7 @@ const NAV_TABS = [
   { id: 'privacy', label: 'Privacy' },
   { id: 'appearance', label: 'Appearance' },
   { id: 'account', label: 'Account' },
+  { id: 'subscription', label: 'Subscription' },
   { id: 'moderation', label: 'Moderation' },
 ]
 
@@ -229,6 +231,8 @@ export default function SettingsPage() {
             clearSession={clearSession}
           />
         )
+      case 'subscription':
+        return <SubscriptionTab />
       case 'moderation':
         return <ModerationTab />
       default:

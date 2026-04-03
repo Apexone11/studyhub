@@ -13,6 +13,7 @@ export const TABS = [
   ['moderation', 'Moderation'],
   ['schools', 'Schools'],
   ['settings', 'Admin Settings'],
+  ['revenue', 'Revenue'],
 ]
 
 export function authHeaders() {

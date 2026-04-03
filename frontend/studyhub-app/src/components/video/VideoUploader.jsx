@@ -259,6 +259,12 @@ export default function VideoUploader({
           </p>
           <p style={{ color: 'var(--sh-muted)', fontSize: 'var(--type-sm)' }}>
             or click to browse -- MP4, WebM, MOV up to {Math.round(maxSize / (1024 * 1024))} MB
+            {state.maxSize && (
+              <span>
+                {' '}
+                (Your limit: {(state.maxSize / (1024 * 1024 * 1024)).toFixed(1)} GB)
+              </span>
+            )}
           </p>
         </div>
       )}
@@ -322,6 +328,12 @@ export default function VideoUploader({
           {/* File info */}
           <p style={{ color: 'var(--sh-muted)', fontSize: 'var(--type-xs)' }}>
             {file.name} -- {(file.size / (1024 * 1024)).toFixed(1)} MB
+            {state.maxDuration && (
+              <span>
+                {' '}
+                | Duration limit: {Math.floor(state.maxDuration / 60)} minutes
+              </span>
+            )}
           </p>
 
           {/* Action buttons */}
