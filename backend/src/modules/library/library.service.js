@@ -119,7 +119,11 @@ async function searchBooks(query, page = 1, filters = {}) {
     const response = await fetchWithRetry(url)
 
     if (!response.ok) {
-      console.warn(`Google Books search failed: ${response.status}, falling back to cached books`)
+      captureError(new Error(`Google Books search failed: ${response.status}`), {
+        context: 'searchBooks',
+        query,
+        page,
+      })
       const fallback = await searchCachedBooks(query, page, filters)
       if (fallback && fallback.results && fallback.results.length > 0) {
         fallback._source = 'cache'
@@ -166,7 +170,10 @@ async function getBookDetail(volumeId) {
     const response = await fetchWithRetry(url)
 
     if (!response.ok) {
-      console.warn(`Google Books detail fetch failed: ${response.status}, trying DB cache`)
+      captureError(new Error(`Google Books detail fetch failed: ${response.status}`), {
+        context: 'getBookDetail',
+        volumeId,
+      })
       return await getCachedBookDetail(volumeId)
     }
 
@@ -344,7 +351,8 @@ async function syncPopularBooksToDB(maxPages = 3) {
     }
   }
 
-  console.log(`[Library] Synced ${synced} books to CachedBook table`)
+  // Operational log -- allowed by ESLint no-console rule
+  console.warn(`[Library] Synced ${synced} books to CachedBook table`)
   return synced
 }
 
@@ -421,7 +429,8 @@ async function preloadPopularBooks() {
       // Silent failure -- preloading is best-effort
     }
   }
-  console.log(`[Library] Popular books cache pre-warmed (${fetched} books synced to DB)`)
+  // Operational log -- allowed by ESLint no-console rule
+  console.warn(`[Library] Popular books cache pre-warmed (${fetched} books synced to DB)`)
 }
 
 module.exports = {

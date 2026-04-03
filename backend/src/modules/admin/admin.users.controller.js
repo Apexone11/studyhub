@@ -7,21 +7,31 @@ const { logModerationEvent } = require('../../lib/moderation/moderationLogger')
 const { auditFromRequest, AUDIT_EVENTS } = require('../../lib/auditLog')
 const { maskEmail } = require('../../lib/fieldEncryption')
 const { PAGE_SIZE, parsePage } = require('./admin.constants')
+const { DURATION_7D_MS } = require('../../lib/constants')
 
 const router = express.Router()
 
 // ── GET /api/admin/stats ──────────────────────────────────────
 router.get('/stats', async (req, res) => {
   try {
-    const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+    const oneWeekAgo = new Date(Date.now() - DURATION_7D_MS)
 
     const [
-      totalUsers, usersThisWeek,
-      totalSheets, publishedSheets, draftSheets,
-      totalComments, flaggedRequests, starAgg,
-      totalNotes, totalFollows, totalReactions,
+      totalUsers,
+      usersThisWeek,
+      totalSheets,
+      publishedSheets,
+      draftSheets,
+      totalComments,
+      flaggedRequests,
+      starAgg,
+      totalNotes,
+      totalFollows,
+      totalReactions,
       totalFeedPosts,
-      pendingCases, activeStrikes, pendingAppeals,
+      pendingCases,
+      activeStrikes,
+      pendingAppeals,
       recentModerationActions,
     ] = await Promise.all([
       prisma.user.count(),
@@ -37,17 +47,21 @@ router.get('/stats', async (req, res) => {
       prisma.reaction.count(),
       prisma.feedPost.count(),
       prisma.moderationCase.count({ where: { status: 'pending' } }).catch(() => 0),
-      prisma.strike.count({ where: { decayedAt: null, expiresAt: { gt: new Date() } } }).catch(() => 0),
+      prisma.strike
+        .count({ where: { decayedAt: null, expiresAt: { gt: new Date() } } })
+        .catch(() => 0),
       prisma.appeal.count({ where: { status: 'pending' } }).catch(() => 0),
-      prisma.moderationCase.findMany({
-        where: { status: { not: 'pending' } },
-        orderBy: { updatedAt: 'desc' },
-        take: 10,
-        include: {
-          user: { select: { id: true, username: true } },
-          reviewer: { select: { id: true, username: true } },
-        },
-      }).catch(() => []),
+      prisma.moderationCase
+        .findMany({
+          where: { status: { not: 'pending' } },
+          orderBy: { updatedAt: 'desc' },
+          take: 10,
+          include: {
+            user: { select: { id: true, username: true } },
+            reviewer: { select: { id: true, username: true } },
+          },
+        })
+        .catch(() => []),
     ])
 
     res.json({
@@ -85,7 +99,7 @@ router.get('/users', async (req, res) => {
           isStaffVerified: true,
           email: true,
           createdAt: true,
-          _count: { select: { studySheets: true } }
+          _count: { select: { studySheets: true } },
         },
         orderBy: { createdAt: 'desc' },
         take: PAGE_SIZE,
@@ -93,7 +107,7 @@ router.get('/users', async (req, res) => {
       }),
       prisma.user.count(),
     ])
-    const maskedUsers = users.map(u => ({
+    const maskedUsers = users.map((u) => ({
       ...u,
       email: u.email ? maskEmail(u.email) : null,
     }))
@@ -124,7 +138,7 @@ router.get('/users/search', async (req, res) => {
       take: limit,
       orderBy: { username: 'asc' },
     })
-    const maskedResults = users.map(u => ({
+    const maskedResults = users.map((u) => ({
       ...u,
       email: u.email ? maskEmail(u.email) : null,
     }))
@@ -148,13 +162,18 @@ router.patch('/users/:id/role', async (req, res) => {
   try {
     // Protect the super admin from being demoted by other admins
     const targetId = parseInt(req.params.id)
-    if (role !== 'admin' && await isSuperAdmin(targetId)) {
-      return res.status(403).json({ error: 'The super admin account cannot be demoted.', code: 'SUPER_ADMIN_PROTECTED' })
+    if (role !== 'admin' && (await isSuperAdmin(targetId))) {
+      return res
+        .status(403)
+        .json({
+          error: 'The super admin account cannot be demoted.',
+          code: 'SUPER_ADMIN_PROTECTED',
+        })
     }
     const user = await prisma.user.update({
       where: { id: targetId },
       data: { role },
-      select: { id: true, username: true, role: true }
+      select: { id: true, username: true, role: true },
     })
     auditFromRequest(req, AUDIT_EVENTS.AUTH_ROLE_CHANGE, { targetUserId: targetId })
     res.json(user)
@@ -177,8 +196,13 @@ router.patch('/users/:id/trust-level', async (req, res) => {
   }
 
   try {
-    if (trustLevel === 'restricted' && await isSuperAdmin(targetId)) {
-      return res.status(403).json({ error: 'The super admin account cannot be restricted.', code: 'SUPER_ADMIN_PROTECTED' })
+    if (trustLevel === 'restricted' && (await isSuperAdmin(targetId))) {
+      return res
+        .status(403)
+        .json({
+          error: 'The super admin account cannot be restricted.',
+          code: 'SUPER_ADMIN_PROTECTED',
+        })
     }
 
     const data = { trustLevel }
@@ -215,12 +239,19 @@ router.delete('/users/:id', async (req, res) => {
     return res.status(400).json({ error: 'User id must be an integer.' })
   }
   if (targetId === req.user.userId) {
-    return res.status(400).json({ error: 'You cannot delete your own account through this endpoint.' })
+    return res
+      .status(400)
+      .json({ error: 'You cannot delete your own account through this endpoint.' })
   }
   try {
     // Protect the super admin from being deleted by other admins
     if (await isSuperAdmin(targetId)) {
-      return res.status(403).json({ error: 'The super admin account cannot be deleted.', code: 'SUPER_ADMIN_PROTECTED' })
+      return res
+        .status(403)
+        .json({
+          error: 'The super admin account cannot be deleted.',
+          code: 'SUPER_ADMIN_PROTECTED',
+        })
     }
 
     const targetUser = await prisma.user.findUnique({
@@ -238,7 +269,10 @@ router.delete('/users/:id', async (req, res) => {
     res.json({ message: 'User deleted.' })
   } catch (err) {
     if (err.code === 'P2025') return res.status(404).json({ error: 'User not found.' })
-    if (err.code === 'P2003') return res.status(409).json({ error: 'Cannot delete user: dependent records still exist. Contact support.' })
+    if (err.code === 'P2003')
+      return res
+        .status(409)
+        .json({ error: 'Cannot delete user: dependent records still exist. Contact support.' })
     captureError(err, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Deletion failed. Please try again or contact support.' })
   }
@@ -254,7 +288,10 @@ router.patch('/users/:id/staff-verified', async (req, res) => {
   }
 
   try {
-    const target = await prisma.user.findUnique({ where: { id: targetId }, select: { id: true, role: true } })
+    const target = await prisma.user.findUnique({
+      where: { id: targetId },
+      select: { id: true, role: true },
+    })
     if (!target) return res.status(404).json({ error: 'User not found.' })
 
     await prisma.user.update({

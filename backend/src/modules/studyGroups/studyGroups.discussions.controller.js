@@ -7,6 +7,7 @@
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
 const { getIO } = require('../../lib/socketio')
+const SOCKET_EVENTS = require('../../lib/socketEvents')
 const {
   parseId,
   requireGroupMember,
@@ -159,7 +160,7 @@ async function createDiscussion(req, res) {
 
       if (members.length > 0 && groupData) {
         await prisma.notification.createMany({
-          data: members.map(member => ({
+          data: members.map((member) => ({
             userId: member.userId,
             type: 'group_post',
             message: `${req.user.username} posted in ${groupData.name}: ${validTitle}`,
@@ -192,8 +193,10 @@ async function createDiscussion(req, res) {
     // Emit real-time event to group members
     try {
       const io = getIO()
-      io.to(`studygroup:${groupId}`).emit('group:discussion:new', formattedPost)
-    } catch { /* fire-and-forget */ }
+      io.to(`studygroup:${groupId}`).emit(SOCKET_EVENTS.GROUP_DISCUSSION_NEW, formattedPost)
+    } catch {
+      /* fire-and-forget */
+    }
 
     res.status(201).json(formattedPost)
   } catch (err) {
@@ -432,7 +435,7 @@ async function createReply(req, res) {
     // Only post author can mark as answer
     let markAsAnswer = false
     if (isAnswer) {
-      if (req.user.userId === post.userId || await isGroupAdmin(groupId, req.user.userId)) {
+      if (req.user.userId === post.userId || (await isGroupAdmin(groupId, req.user.userId))) {
         markAsAnswer = true
       }
     }
@@ -464,8 +467,10 @@ async function createReply(req, res) {
     // Emit real-time event to group members
     try {
       const io = getIO()
-      io.to(`studygroup:${groupId}`).emit('group:discussion:reply', formattedReply)
-    } catch { /* fire-and-forget */ }
+      io.to(`studygroup:${groupId}`).emit(SOCKET_EVENTS.GROUP_DISCUSSION_REPLY, formattedReply)
+    } catch {
+      /* fire-and-forget */
+    }
 
     res.status(201).json(formattedReply)
   } catch (err) {

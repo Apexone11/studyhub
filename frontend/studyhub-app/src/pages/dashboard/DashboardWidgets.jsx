@@ -24,13 +24,53 @@ export function EmptyState({ title, body, actionLabel, actionTo }) {
         textAlign: 'center',
       }}
     >
-      <div style={{ width: 52, height: 52, borderRadius: 13, background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="2" y="3" width="20" height="14" rx="2" ry="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" />
+      <div
+        style={{
+          width: 52,
+          height: 52,
+          borderRadius: 13,
+          background: 'linear-gradient(135deg, var(--sh-info-bg), var(--sh-info-border))',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: 14,
+        }}
+      >
+        <svg
+          width="22"
+          height="22"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="var(--sh-info)"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+          <line x1="8" y1="21" x2="16" y2="21" />
+          <line x1="12" y1="17" x2="12" y2="21" />
         </svg>
       </div>
-      <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--sh-heading, #0f172a)', marginBottom: 8 }}>{title}</div>
-      <p style={{ margin: '0 0 16px', fontSize: 13, lineHeight: 1.7, color: 'var(--sh-muted, #64748b)' }}>{body}</p>
+      <div
+        style={{
+          fontSize: 15,
+          fontWeight: 800,
+          color: 'var(--sh-heading, #0f172a)',
+          marginBottom: 8,
+        }}
+      >
+        {title}
+      </div>
+      <p
+        style={{
+          margin: '0 0 16px',
+          fontSize: 13,
+          lineHeight: 1.7,
+          color: 'var(--sh-muted, #64748b)',
+        }}
+      >
+        {body}
+      </p>
       {actionLabel && actionTo ? (
         <Link
           to={actionTo}
@@ -58,13 +98,20 @@ export function EmptyState({ title, body, actionLabel, actionTo }) {
 export function DashboardSkeleton() {
   return (
     <div style={{ display: 'grid', gap: 16 }}>
-      <div style={{ height: 132, borderRadius: 18, background: 'var(--sh-border)', opacity: 0.6 }} />
+      <div
+        style={{ height: 132, borderRadius: 18, background: 'var(--sh-border)', opacity: 0.6 }}
+      />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
         {Array.from({ length: 3 }).map((_, index) => (
-          <div key={index} style={{ height: 112, borderRadius: 16, background: 'var(--sh-border)', opacity: 0.55 }} />
+          <div
+            key={index}
+            style={{ height: 112, borderRadius: 16, background: 'var(--sh-border)', opacity: 0.55 }}
+          />
         ))}
       </div>
-      <div style={{ height: 260, borderRadius: 18, background: 'var(--sh-border)', opacity: 0.45 }} />
+      <div
+        style={{ height: 260, borderRadius: 18, background: 'var(--sh-border)', opacity: 0.45 }}
+      />
     </div>
   )
 }
@@ -77,10 +124,7 @@ export function StatCards({ statsRef, cards }) {
         const Wrapper = card.to ? Link : 'div'
         const wrapperProps = card.to ? { to: card.to, style: { textDecoration: 'none' } } : {}
         return (
-          <Wrapper
-            key={card.label}
-            {...wrapperProps}
-          >
+          <Wrapper key={card.label} {...wrapperProps}>
             <div
               style={{
                 background: 'var(--sh-surface)',
@@ -91,10 +135,21 @@ export function StatCards({ statsRef, cards }) {
                 cursor: card.to ? 'pointer' : 'default',
               }}
             >
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--sh-muted)', letterSpacing: '.08em', marginBottom: 10 }}>
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: 'var(--sh-muted)',
+                  letterSpacing: '.08em',
+                  marginBottom: 10,
+                }}
+              >
                 {card.label.toUpperCase()}
               </div>
-              <div data-stat-value={card.value} style={{ fontSize: 32, fontWeight: 800, color: card.accent, marginBottom: 4 }}>
+              <div
+                data-stat-value={card.value}
+                style={{ fontSize: 32, fontWeight: 800, color: card.accent, marginBottom: 4 }}
+              >
                 {card.value}
               </div>
               <div style={{ fontSize: 13, color: 'var(--sh-subtext)' }}>{card.helper}</div>
@@ -139,7 +194,8 @@ export function StudyActivity({ activity }) {
         </div>
         <div>
           <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--sh-heading)' }}>
-            {activity.weeklyCount} {activity.weeklyCount === 1 ? 'sheet' : 'sheets'} studied this week
+            {activity.weeklyCount} {activity.weeklyCount === 1 ? 'sheet' : 'sheets'} studied this
+            week
           </div>
           {activity.lastStudied ? (
             <div style={{ fontSize: 12, color: 'var(--sh-muted)' }}>
@@ -148,7 +204,10 @@ export function StudyActivity({ activity }) {
           ) : null}
         </div>
       </div>
-      <Link to="/sheets" style={{ fontSize: 12, fontWeight: 700, color: 'var(--sh-brand)', textDecoration: 'none' }}>
+      <Link
+        to="/sheets"
+        style={{ fontSize: 12, fontWeight: 700, color: 'var(--sh-brand)', textDecoration: 'none' }}
+      >
         Find more →
       </Link>
     </div>
@@ -168,7 +227,14 @@ export function ActivationChecklist({ activation }) {
         boxShadow: '0 4px 20px rgba(15,23,42,0.04)',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 14,
+        }}
+      >
         <div>
           <h2 style={{ margin: 0, fontSize: 18, color: 'var(--sh-heading)' }}>Getting Started</h2>
           <div style={{ fontSize: 12, color: 'var(--sh-muted)', marginTop: 4 }}>
@@ -185,7 +251,19 @@ export function ActivationChecklist({ activation }) {
             placeItems: 'center',
           }}
         >
-          <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'var(--sh-surface)', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 800, color: 'var(--sh-brand)' }}>
+          <div
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: '50%',
+              background: 'var(--sh-surface)',
+              display: 'grid',
+              placeItems: 'center',
+              fontSize: 11,
+              fontWeight: 800,
+              color: 'var(--sh-brand)',
+            }}
+          >
             {activation.completedCount}/{activation.totalCount}
           </div>
         </div>
@@ -216,12 +294,37 @@ export function ActivationChecklist({ activation }) {
               }}
             >
               {item.done ? (
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#fff"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                >
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
               ) : null}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: item.done ? 'var(--sh-success-text)' : 'var(--sh-heading)' }}>{item.label}</div>
-              <div style={{ fontSize: 12, color: item.done ? 'var(--sh-success-text)' : 'var(--sh-subtext)' }}>{item.helper}</div>
+              <div
+                style={{
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: item.done ? 'var(--sh-success-text)' : 'var(--sh-heading)',
+                }}
+              >
+                {item.label}
+              </div>
+              <div
+                style={{
+                  fontSize: 12,
+                  color: item.done ? 'var(--sh-success-text)' : 'var(--sh-subtext)',
+                }}
+              >
+                {item.helper}
+              </div>
             </div>
             {!item.done && item.actionPath ? (
               <Link
@@ -258,7 +361,14 @@ export function RecentSheets({ recentSheets, newCount = 0 }) {
         padding: '20px 22px',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 14,
+        }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div>
             <h2 style={{ margin: 0, fontSize: 18, color: 'var(--sh-heading)' }}>Recent Sheets</h2>
@@ -284,7 +394,15 @@ export function RecentSheets({ recentSheets, newCount = 0 }) {
             </span>
           ) : null}
         </div>
-        <Link to="/sheets" style={{ fontSize: 12, fontWeight: 700, color: 'var(--sh-brand)', textDecoration: 'none' }}>
+        <Link
+          to="/sheets"
+          style={{
+            fontSize: 12,
+            fontWeight: 700,
+            color: 'var(--sh-brand)',
+            textDecoration: 'none',
+          }}
+        >
           Browse all
         </Link>
       </div>
@@ -328,7 +446,14 @@ export function RecentSheets({ recentSheets, newCount = 0 }) {
                 <IconSheets size={18} />
               </div>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--sh-heading)', marginBottom: 3 }}>
+                <div
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 700,
+                    color: 'var(--sh-heading)',
+                    marginBottom: 3,
+                  }}
+                >
                   {sheet.title}
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--sh-subtext)' }}>
@@ -336,7 +461,8 @@ export function RecentSheets({ recentSheets, newCount = 0 }) {
                 </div>
                 {sheet.forkSource ? (
                   <div style={{ fontSize: 11, color: 'var(--sh-muted)', marginTop: 2 }}>
-                    Forked from {sheet.forkSource.title}{sheet.forkSource.author ? ` by ${sheet.forkSource.author.username}` : ''}
+                    Forked from {sheet.forkSource.title}
+                    {sheet.forkSource.author ? ` by ${sheet.forkSource.author.username}` : ''}
                   </div>
                 ) : null}
               </div>
@@ -363,14 +489,29 @@ export function ResumeStudying({ entries }) {
         padding: '20px 22px',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 14,
+        }}
+      >
         <div>
           <h2 style={{ margin: 0, fontSize: 18, color: 'var(--sh-heading)' }}>Resume Studying</h2>
           <div style={{ fontSize: 12, color: 'var(--sh-muted)', marginTop: 4 }}>
             Pick up where you left off.
           </div>
         </div>
-        <Link to="/sheets" style={{ fontSize: 12, fontWeight: 700, color: 'var(--sh-brand)', textDecoration: 'none' }}>
+        <Link
+          to="/sheets"
+          style={{
+            fontSize: 12,
+            fontWeight: 700,
+            color: 'var(--sh-brand)',
+            textDecoration: 'none',
+          }}
+        >
           Browse sheets
         </Link>
       </div>
@@ -405,14 +546,31 @@ export function ResumeStudying({ entries }) {
               <IconClock size={18} />
             </div>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--sh-heading)', marginBottom: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div
+                style={{
+                  fontSize: 14,
+                  fontWeight: 700,
+                  color: 'var(--sh-heading)',
+                  marginBottom: 3,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
                 {entry.title}
               </div>
               <div style={{ fontSize: 12, color: 'var(--sh-subtext)' }}>
                 {entry.courseCode || 'General'} · by {entry.authorUsername || 'unknown'}
               </div>
             </div>
-            <div style={{ fontSize: 12, color: 'var(--sh-muted)', textAlign: 'right', whiteSpace: 'nowrap' }}>
+            <div
+              style={{
+                fontSize: 12,
+                color: 'var(--sh-muted)',
+                textAlign: 'right',
+                whiteSpace: 'nowrap',
+              }}
+            >
               {timeAgo(entry.viewedAt)}
             </div>
           </Link>
@@ -436,7 +594,14 @@ export function StudyQueue({ counts, toReview, studying }) {
       }}
     >
       <h2 style={{ margin: '0 0 10px', fontSize: 18, color: 'var(--sh-heading)' }}>Study Queue</h2>
-      <div style={{ display: 'flex', gap: 12, marginBottom: items.length > 0 ? 14 : 0, flexWrap: 'wrap' }}>
+      <div
+        style={{
+          display: 'flex',
+          gap: 12,
+          marginBottom: items.length > 0 ? 14 : 0,
+          flexWrap: 'wrap',
+        }}
+      >
         {counts.studying > 0 ? (
           <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--sh-brand)' }}>
             {counts.studying} studying
@@ -472,7 +637,16 @@ export function StudyQueue({ counts, toReview, studying }) {
               }}
             >
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--sh-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: 'var(--sh-heading)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
                   {entry.title}
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--sh-muted)' }}>
@@ -485,8 +659,12 @@ export function StudyQueue({ counts, toReview, studying }) {
                   fontWeight: 800,
                   padding: '2px 7px',
                   borderRadius: 999,
-                  background: entry.status === 'studying' ? 'var(--sh-info-bg)' : 'var(--sh-warning-bg)',
-                  color: entry.status === 'studying' ? 'var(--sh-brand)' : 'var(--sh-warning-text, #92400e)',
+                  background:
+                    entry.status === 'studying' ? 'var(--sh-info-bg)' : 'var(--sh-warning-bg)',
+                  color:
+                    entry.status === 'studying'
+                      ? 'var(--sh-brand)'
+                      : 'var(--sh-warning-text, #92400e)',
                   whiteSpace: 'nowrap',
                   flexShrink: 0,
                 }}
@@ -537,7 +715,9 @@ export function CourseFocus({ courses }) {
               }}
             >
               <div>
-                <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--sh-heading)' }}>{course.code}</div>
+                <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--sh-heading)' }}>
+                  {course.code}
+                </div>
                 <div style={{ fontSize: 12, color: 'var(--sh-subtext)' }}>{course.name}</div>
               </div>
               <div style={{ fontSize: 11, color: 'var(--sh-muted)' }}>
@@ -571,7 +751,9 @@ export function QuickActions() {
         padding: '20px 22px',
       }}
     >
-      <h2 style={{ margin: '0 0 12px', fontSize: 18, color: 'var(--sh-heading)' }}>Quick Actions</h2>
+      <h2 style={{ margin: '0 0 12px', fontSize: 18, color: 'var(--sh-heading)' }}>
+        Quick Actions
+      </h2>
       <div style={{ display: 'grid', gap: 10 }}>
         {QUICK_ACTIONS.map((action) => (
           <Link

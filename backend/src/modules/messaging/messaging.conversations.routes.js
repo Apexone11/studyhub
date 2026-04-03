@@ -12,6 +12,7 @@
 
 const express = require('express')
 const requireAuth = require('../../middleware/auth')
+const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
 const { readLimiter, messagingWriteLimiter } = require('../../lib/rateLimiters')
@@ -127,7 +128,7 @@ router.get('/', requireAuth, async (req, res) => {
     res.json(result)
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 })
 
@@ -140,11 +141,11 @@ router.post('/', requireAuth, messagingWriteLimiter, async (req, res) => {
     const { participantIds = [], type = 'dm', name } = req.body
 
     if (!Array.isArray(participantIds) || participantIds.length === 0) {
-      return res.status(400).json({ error: 'Participants required.' })
+      return sendError(res, 400, 'Participants required.', ERROR_CODES.BAD_REQUEST)
     }
 
     if (type !== 'dm' && type !== 'group') {
-      return res.status(400).json({ error: 'Invalid conversation type.' })
+      return sendError(res, 400, 'Invalid conversation type.', ERROR_CODES.BAD_REQUEST)
     }
 
     // Check for blocks with all participants (graceful if block table unavailable)
@@ -152,7 +153,7 @@ router.post('/', requireAuth, messagingWriteLimiter, async (req, res) => {
       const blockedIds = await getBlockedUserIds(prisma, req.user.userId)
       for (const participantId of participantIds) {
         if (blockedIds.includes(participantId)) {
-          return res.status(403).json({ error: 'Cannot message blocked user.' })
+          return sendError(res, 403, 'Cannot message blocked user.', ERROR_CODES.FORBIDDEN)
         }
       }
     } catch (blockErr) {
@@ -220,7 +221,7 @@ router.post('/', requireAuth, messagingWriteLimiter, async (req, res) => {
     res.status(201).json(conversation)
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 })
 
@@ -232,7 +233,7 @@ router.get('/:id', requireAuth, async (req, res) => {
   try {
     const conversationId = parseInt(req.params.id, 10)
     if (isNaN(conversationId)) {
-      return res.status(400).json({ error: 'Invalid conversation ID.' })
+      return sendError(res, 400, 'Invalid conversation ID.', ERROR_CODES.BAD_REQUEST)
     }
 
     // Verify user is a participant
@@ -246,7 +247,7 @@ router.get('/:id', requireAuth, async (req, res) => {
     })
 
     if (!participant) {
-      return res.status(404).json({ error: 'Conversation not found.' })
+      return sendError(res, 404, 'Conversation not found.', ERROR_CODES.NOT_FOUND)
     }
 
     const conversation = await prisma.conversation.findUnique({
@@ -265,7 +266,7 @@ router.get('/:id', requireAuth, async (req, res) => {
     res.json(conversation)
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 })
 
@@ -289,7 +290,7 @@ router.patch('/:id', requireAuth, messagingWriteLimiter, async (req, res) => {
     })
 
     if (!participant) {
-      return res.status(404).json({ error: 'Conversation not found.' })
+      return sendError(res, 404, 'Conversation not found.', ERROR_CODES.NOT_FOUND)
     }
 
     const conversation = await prisma.conversation.findUnique({
@@ -297,13 +298,13 @@ router.patch('/:id', requireAuth, messagingWriteLimiter, async (req, res) => {
     })
 
     if (!conversation) {
-      return res.status(404).json({ error: 'Conversation not found.' })
+      return sendError(res, 404, 'Conversation not found.', ERROR_CODES.NOT_FOUND)
     }
 
     // Update conversation properties (admin only for group)
     if (name !== undefined || avatarUrl !== undefined) {
       if (conversation.type === 'group' && participant.role !== 'admin') {
-        return res.status(403).json({ error: 'Admin access required.' })
+        return sendError(res, 403, 'Admin access required.', ERROR_CODES.FORBIDDEN)
       }
 
       await prisma.conversation.update({
@@ -348,7 +349,7 @@ router.patch('/:id', requireAuth, messagingWriteLimiter, async (req, res) => {
     res.json(updated)
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 })
 
@@ -370,7 +371,7 @@ router.delete('/:id', requireAuth, messagingWriteLimiter, async (req, res) => {
     })
 
     if (!participant) {
-      return res.status(404).json({ error: 'Conversation not found.' })
+      return sendError(res, 404, 'Conversation not found.', ERROR_CODES.NOT_FOUND)
     }
 
     const conversation = await prisma.conversation.findUnique({
@@ -403,7 +404,7 @@ router.delete('/:id', requireAuth, messagingWriteLimiter, async (req, res) => {
     res.status(204).send()
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 })
 
@@ -416,7 +417,7 @@ router.post('/:id/read', requireAuth, async (req, res) => {
   try {
     const conversationId = parseInt(req.params.id, 10)
     if (isNaN(conversationId)) {
-      return res.status(400).json({ error: 'Invalid conversation ID.' })
+      return sendError(res, 400, 'Invalid conversation ID.', ERROR_CODES.BAD_REQUEST)
     }
 
     // Verify user is a participant
@@ -430,7 +431,7 @@ router.post('/:id/read', requireAuth, async (req, res) => {
     })
 
     if (!participant) {
-      return res.status(403).json({ error: 'Not a participant.' })
+      return sendError(res, 403, 'Not a participant.', ERROR_CODES.FORBIDDEN)
     }
 
     // Update lastReadAt to now
@@ -447,7 +448,7 @@ router.post('/:id/read', requireAuth, async (req, res) => {
     res.json({ conversationId, unreadCount: 0 })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 })
 

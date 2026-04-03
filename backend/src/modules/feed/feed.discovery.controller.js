@@ -17,6 +17,13 @@ const { getAuthTokenFromRequest, verifyAuthToken } = require('../../lib/authToke
 const { getBlockedUserIds } = require('../../lib/social/blockFilter')
 const { cache } = require('../../lib/cache')
 const { feedDiscoveryLimiter } = require('../../lib/rateLimiters')
+const {
+  DURATION_24H_MS,
+  DURATION_7D_MS,
+  DURATION_30D_MS,
+  DISCOVERY_FETCH_MULTIPLIER,
+  DISCOVERY_RECENCY_DECAY_HOURS,
+} = require('../../lib/constants')
 
 const router = express.Router()
 
@@ -25,7 +32,11 @@ const discoveryLimiter = feedDiscoveryLimiter
 function optionalAuth(req, _res, next) {
   const token = getAuthTokenFromRequest(req)
   if (!token) return next()
-  try { req.user = verifyAuthToken(token) } catch { /* proceed unauthenticated */ }
+  try {
+    req.user = verifyAuthToken(token)
+  } catch {
+    /* proceed unauthenticated */
+  }
   next()
 }
 
@@ -51,10 +62,17 @@ router.get('/trending', discoveryLimiter, optionalAuth, async (req, res) => {
     // Determine date range
     let since
     switch (period) {
-      case '24h': since = new Date(Date.now() - 24 * 60 * 60 * 1000); break
-      case '7d': since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); break
-      case '30d': since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); break
-      default: since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+      case '24h':
+        since = new Date(Date.now() - DURATION_24H_MS)
+        break
+      case '7d':
+        since = new Date(Date.now() - DURATION_7D_MS)
+        break
+      case '30d':
+        since = new Date(Date.now() - DURATION_30D_MS)
+        break
+      default:
+        since = new Date(Date.now() - DURATION_7D_MS)
     }
 
     // Fetch candidate sheets with engagement data
@@ -72,18 +90,20 @@ router.get('/trending', discoveryLimiter, optionalAuth, async (req, res) => {
         createdAt: true,
         updatedAt: true,
         author: { select: { id: true, username: true, avatarUrl: true } },
-        course: { select: { id: true, code: true, name: true, school: { select: { short: true } } } },
+        course: {
+          select: { id: true, code: true, name: true, school: { select: { short: true } } },
+        },
         _count: { select: { comments: true, forks: true } },
       },
       orderBy: [{ stars: 'desc' }, { createdAt: 'desc' }],
-      take: limit * 3, // fetch extra for scoring
+      take: limit * DISCOVERY_FETCH_MULTIPLIER, // fetch extra for scoring
     })
 
     // Score and rank
     const now = Date.now()
     const scored = sheets.map((sheet) => {
       const ageHours = (now - new Date(sheet.createdAt).getTime()) / (1000 * 60 * 60)
-      const recencyBoost = Math.max(0, 1 - ageHours / (24 * 30)) // decays over 30 days
+      const recencyBoost = Math.max(0, 1 - ageHours / DISCOVERY_RECENCY_DECAY_HOURS) // decays over 30 days
       const score =
         (sheet.stars || 0) * 3 +
         (sheet._count.comments || 0) * 2 +
@@ -161,7 +181,7 @@ router.get('/recommended', discoveryLimiter, optionalAuth, async (req, res) => {
         _count: { select: { comments: true, forks: true } },
       },
       orderBy: [{ stars: 'desc' }, { createdAt: 'desc' }],
-      take: limit * 3,
+      take: limit * DISCOVERY_FETCH_MULTIPLIER,
     })
 
     // Filter out already-starred, then take top N
@@ -231,7 +251,9 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
         select: { groupId: true },
       })
       joinedGroupIds = new Set(joinedGroups.map((g) => g.groupId))
-    } catch { /* table may not exist yet */ }
+    } catch {
+      /* table may not exist yet */
+    }
 
     const results = {
       sheets: [],
@@ -268,7 +290,7 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
       prisma.studySheet.findMany({
         where: {
           status: 'published',
-          createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+          createdAt: { gte: new Date(Date.now() - DURATION_7D_MS) },
         },
         select: {
           id: true,
@@ -300,7 +322,9 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
                   username: true,
                   avatarUrl: true,
                   role: true,
-                  _count: { select: { studySheets: { where: { status: 'published' } }, followers: true } },
+                  _count: {
+                    select: { studySheets: { where: { status: 'published' } }, followers: true },
+                  },
                 },
               },
             },
@@ -340,11 +364,8 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
       .filter((s) => !starredSet.has(s.id))
       .map((sheet) => {
         const ageHours = (now - new Date(sheet.createdAt).getTime()) / (1000 * 60 * 60)
-        const recencyBoost = Math.max(0, 1 - ageHours / (24 * 30))
-        const score =
-          (sheet.stars || 0) * 3 +
-          (sheet._count.forks || 0) * 5 +
-          recencyBoost * 10
+        const recencyBoost = Math.max(0, 1 - ageHours / DISCOVERY_RECENCY_DECAY_HOURS)
+        const score = (sheet.stars || 0) * 3 + (sheet._count.forks || 0) * 5 + recencyBoost * 10
         return { ...sheet, _score: score }
       })
       .sort((a, b) => b._score - a._score)
@@ -459,7 +480,9 @@ router.get('/recommended-groups', discoveryLimiter, optionalAuth, async (req, re
         select: { groupId: true },
       })
       joinedGroupIds = new Set(joinedGroups.map((g) => g.groupId))
-    } catch { /* table may not exist yet */ }
+    } catch {
+      /* table may not exist yet */
+    }
 
     // Fetch public groups in user's courses that user hasn't joined
     // Wrapped in try-catch for graceful degradation if StudyGroup table not yet migrated
@@ -485,7 +508,9 @@ router.get('/recommended-groups', discoveryLimiter, optionalAuth, async (req, re
         orderBy: [{ updatedAt: 'desc' }],
         take: 10,
       })
-    } catch { /* StudyGroup table may not exist yet */ }
+    } catch {
+      /* StudyGroup table may not exist yet */
+    }
 
     const result = groups
       .map((g) => ({
@@ -520,7 +545,12 @@ router.get('/courses/:courseId/discover', discoveryLimiter, optionalAuth, async 
   try {
     const course = await prisma.course.findUnique({
       where: { id: courseId },
-      select: { id: true, code: true, name: true, school: { select: { id: true, name: true, short: true } } },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        school: { select: { id: true, name: true, short: true } },
+      },
     })
     if (!course) return res.status(404).json({ error: 'Course not found.' })
 
@@ -554,12 +584,13 @@ router.get('/courses/:courseId/discover', discoveryLimiter, optionalAuth, async 
 
     // Resolve contributor usernames
     const contributorIds = topContributors.map((c) => c.userId)
-    const contributors = contributorIds.length > 0
-      ? await prisma.user.findMany({
-          where: { id: { in: contributorIds } },
-          select: { id: true, username: true, avatarUrl: true },
-        })
-      : []
+    const contributors =
+      contributorIds.length > 0
+        ? await prisma.user.findMany({
+            where: { id: { in: contributorIds } },
+            select: { id: true, username: true, avatarUrl: true },
+          })
+        : []
     const contribMap = Object.fromEntries(contributors.map((u) => [u.id, u]))
 
     res.json({

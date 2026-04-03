@@ -18,6 +18,7 @@ import { API } from '../config'
 import { authHeaders } from '../pages/shared/pageUtils'
 import { showToast } from '../lib/toast'
 import { useSocket } from '../lib/useSocket'
+import { SOCKET_EVENTS } from '../lib/socketEvents'
 import { useSession } from '../lib/session-context'
 import { useFocusTrap } from '../lib/useFocusTrap'
 import ComponentErrorBoundary from './ComponentErrorBoundary'
@@ -60,12 +61,16 @@ export default function ChatPanel({ open, onClose }) {
   const panelTrapRef = useFocusTrap({ active: open, onClose, lockScroll: false })
 
   // Keep activeIdRef in sync
-  useEffect(() => { activeIdRef.current = activeId }, [activeId])
+  useEffect(() => {
+    activeIdRef.current = activeId
+  }, [activeId])
 
   // Clean up object URLs on unmount
   useEffect(() => {
     return () => {
-      attachmentPreviews.forEach((a) => { if (a.previewUrl) URL.revokeObjectURL(a.previewUrl) })
+      attachmentPreviews.forEach((a) => {
+        if (a.previewUrl) URL.revokeObjectURL(a.previewUrl)
+      })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -88,7 +93,7 @@ export default function ChatPanel({ open, onClose }) {
         }, 50)
         // Emit read receipt — prefer socket, fall back to HTTP
         if (socket.connected) {
-          socket.emit('message:read', { conversationId: currentActiveId })
+          socket.emit(SOCKET_EVENTS.MESSAGE_READ, { conversationId: currentActiveId })
         } else {
           fetch(`${API}/api/messages/conversations/${currentActiveId}/read`, {
             method: 'POST',
@@ -104,15 +109,17 @@ export default function ChatPanel({ open, onClose }) {
           return {
             ...c,
             lastMessage: { content: message.content, createdAt: message.createdAt },
-            unreadCount: (c.id === currentActiveId) ? 0 : (c.unreadCount || 0) + 1,
+            unreadCount: c.id === currentActiveId ? 0 : (c.unreadCount || 0) + 1,
           }
-        })
+        }),
       )
     }
 
     function handleMessageEdit(data) {
       setMessages((prev) =>
-        prev.map((m) => m.id === data.id ? { ...m, content: data.content, editedAt: data.editedAt } : m)
+        prev.map((m) =>
+          m.id === data.id ? { ...m, content: data.content, editedAt: data.editedAt } : m,
+        ),
       )
     }
 
@@ -120,7 +127,9 @@ export default function ChatPanel({ open, onClose }) {
       // Backend emits { messageId, conversationId } — use messageId, not id
       const deletedId = data.messageId || data.id
       setMessages((prev) =>
-        prev.map((m) => m.id === deletedId ? { ...m, deletedAt: data.deletedAt || new Date().toISOString() } : m)
+        prev.map((m) =>
+          m.id === deletedId ? { ...m, deletedAt: data.deletedAt || new Date().toISOString() } : m,
+        ),
       )
     }
 
@@ -139,18 +148,18 @@ export default function ChatPanel({ open, onClose }) {
       setTypingUsers((prev) => prev.filter((u) => u.userId !== data.userId))
     }
 
-    socket.on('message:new', handleNewMessage)
-    socket.on('message:edit', handleMessageEdit)
-    socket.on('message:delete', handleMessageDelete)
-    socket.on('typing:start', handleTypingStart)
-    socket.on('typing:stop', handleTypingStop)
+    socket.on(SOCKET_EVENTS.MESSAGE_NEW, handleNewMessage)
+    socket.on(SOCKET_EVENTS.MESSAGE_EDIT, handleMessageEdit)
+    socket.on(SOCKET_EVENTS.MESSAGE_DELETE, handleMessageDelete)
+    socket.on(SOCKET_EVENTS.TYPING_START, handleTypingStart)
+    socket.on(SOCKET_EVENTS.TYPING_STOP, handleTypingStop)
 
     return () => {
-      socket.off('message:new', handleNewMessage)
-      socket.off('message:edit', handleMessageEdit)
-      socket.off('message:delete', handleMessageDelete)
-      socket.off('typing:start', handleTypingStart)
-      socket.off('typing:stop', handleTypingStop)
+      socket.off(SOCKET_EVENTS.MESSAGE_NEW, handleNewMessage)
+      socket.off(SOCKET_EVENTS.MESSAGE_EDIT, handleMessageEdit)
+      socket.off(SOCKET_EVENTS.MESSAGE_DELETE, handleMessageDelete)
+      socket.off(SOCKET_EVENTS.TYPING_START, handleTypingStart)
+      socket.off(SOCKET_EVENTS.TYPING_STOP, handleTypingStop)
     }
   }, [socket, currentUserId])
 
@@ -158,11 +167,11 @@ export default function ChatPanel({ open, onClose }) {
   function emitTypingStart() {
     if (!socket || !activeId) return
     if (typingTimerRef.current) return // Already typing
-    socket.emit('typing:start', { conversationId: activeId })
+    socket.emit(SOCKET_EVENTS.TYPING_START, { conversationId: activeId })
     typingTimerRef.current = setTimeout(() => {
       // Emit typing:stop when the throttle window expires so other
       // participants do not see a permanent typing indicator.
-      if (socket && activeId) socket.emit('typing:stop', { conversationId: activeId })
+      if (socket && activeId) socket.emit(SOCKET_EVENTS.TYPING_STOP, { conversationId: activeId })
       typingTimerRef.current = null
     }, 3000)
   }
@@ -172,14 +181,14 @@ export default function ChatPanel({ open, onClose }) {
     // Clear typing for previous conversation
     setTypingUsers([])
     if (typingTimerRef.current) {
-      if (socket && activeId) socket.emit('typing:stop', { conversationId: activeId })
+      if (socket && activeId) socket.emit(SOCKET_EVENTS.TYPING_STOP, { conversationId: activeId })
       clearTimeout(typingTimerRef.current)
       typingTimerRef.current = null
     }
     setActiveId(id)
     if (socket && socket.connected) {
-      socket.emit('conversation:join', { conversationId: id })
-      socket.emit('message:read', { conversationId: id })
+      socket.emit(SOCKET_EVENTS.CONVERSATION_JOIN, { conversationId: id })
+      socket.emit(SOCKET_EVENTS.MESSAGE_READ, { conversationId: id })
     } else {
       // HTTP fallback when socket is disconnected
       fetch(`${API}/api/messages/conversations/${id}/read`, {
@@ -189,9 +198,7 @@ export default function ChatPanel({ open, onClose }) {
       }).catch(() => {})
     }
     // Clear unread badge immediately
-    setConversations((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, unreadCount: 0 } : c))
-    )
+    setConversations((prev) => prev.map((c) => (c.id === id ? { ...c, unreadCount: 0 } : c)))
   }
 
   /* -- Load conversations ------------------------------------------------ */
@@ -199,16 +206,23 @@ export default function ChatPanel({ open, onClose }) {
     setLoading(true)
     try {
       const res = await fetch(`${API}/api/messages/conversations?limit=20`, {
-        credentials: 'include', headers: authHeaders(),
+        credentials: 'include',
+        headers: authHeaders(),
       })
       if (res.ok) {
         const data = await res.json()
-        setConversations(Array.isArray(data) ? data : (data.conversations || []))
+        setConversations(Array.isArray(data) ? data : data.conversations || [])
       }
-    } catch { /* silent */ } finally { setLoading(false) }
+    } catch {
+      /* silent */
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
-  useEffect(() => { if (open) loadConversations() }, [open, loadConversations])
+  useEffect(() => {
+    if (open) loadConversations()
+  }, [open, loadConversations])
 
   /* -- Load messages for active conversation ----------------------------- */
   useEffect(() => {
@@ -217,20 +231,25 @@ export default function ChatPanel({ open, onClose }) {
     ;(async () => {
       try {
         const res = await fetch(`${API}/api/messages/conversations/${activeId}/messages?limit=30`, {
-          credentials: 'include', headers: authHeaders(),
+          credentials: 'include',
+          headers: authHeaders(),
         })
         if (res.ok && !cancelled) {
           const data = await res.json()
-          const msgs = Array.isArray(data) ? data : (data.messages || [])
+          const msgs = Array.isArray(data) ? data : data.messages || []
           setMessages(msgs)
           setTimeout(() => {
             const elem = document.querySelector('[data-chat-panel-messages-end]')
             elem?.scrollIntoView({ behavior: 'smooth' })
           }, 100)
         }
-      } catch { /* silent */ }
+      } catch {
+        /* silent */
+      }
     })()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [activeId])
 
   /* -- File selection handler -------------------------------------------- */
@@ -280,7 +299,8 @@ export default function ChatPanel({ open, onClose }) {
     const text = (content || '').trim()
     const hasFiles = attachmentPreviews.length > 0
     const hasImage = showImageInput && imageUrl.trim()
-    const hasOptionAttachments = Array.isArray(options.attachments) && options.attachments.length > 0
+    const hasOptionAttachments =
+      Array.isArray(options.attachments) && options.attachments.length > 0
 
     if (!text && !hasFiles && !hasImage && !hasOptionAttachments) return
     if (!activeId || sending) return
@@ -294,7 +314,12 @@ export default function ChatPanel({ open, onClose }) {
     if (hasFiles) {
       for (const ap of attachmentPreviews) {
         if (ap.previewUrl) {
-          allAttachments.push({ type: ap.type, url: ap.previewUrl, fileName: ap.name, fileSize: ap.size })
+          allAttachments.push({
+            type: ap.type,
+            url: ap.previewUrl,
+            fileName: ap.name,
+            fileSize: ap.size,
+          })
         }
       }
     }
@@ -317,7 +342,7 @@ export default function ChatPanel({ open, onClose }) {
       })
       if (res.ok) {
         const msg = await res.json()
-        setMessages(prev => [...prev, msg])
+        setMessages((prev) => [...prev, msg])
         setInput('')
         setReplyTo(null)
         setAttachmentPreviews([])
@@ -331,7 +356,9 @@ export default function ChatPanel({ open, onClose }) {
       }
     } catch {
       showToast('Failed to send message', 'error')
-    } finally { setSending(false) }
+    } finally {
+      setSending(false)
+    }
   }
 
   function handleSend(e) {
@@ -357,7 +384,7 @@ export default function ChatPanel({ open, onClose }) {
 
   if (!open) return null
 
-  const activeConvo = conversations.find(c => c.id === activeId)
+  const activeConvo = conversations.find((c) => c.id === activeId)
 
   const panel = (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1200, pointerEvents: 'none' }}>
@@ -365,18 +392,31 @@ export default function ChatPanel({ open, onClose }) {
       <div
         onClick={onClose}
         style={{
-          position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.15)',
+          position: 'absolute',
+          inset: 0,
+          background: 'rgba(0,0,0,0.15)',
           pointerEvents: 'auto',
         }}
       />
       {/* Panel */}
-      <div ref={panelTrapRef} style={{
-        position: 'absolute', top: 0, right: 0, bottom: 0, width: 'min(380px, 100vw)',
-        background: 'var(--sh-surface)', borderLeft: '1px solid var(--sh-border)',
-        boxShadow: '-4px 0 24px rgba(0,0,0,0.1)',
-        display: 'flex', flexDirection: 'column', pointerEvents: 'auto',
-        fontFamily: PAGE_FONT, animation: 'slideInRight .2s ease',
-      }}>
+      <div
+        ref={panelTrapRef}
+        style={{
+          position: 'absolute',
+          top: 0,
+          right: 0,
+          bottom: 0,
+          width: 'min(380px, 100vw)',
+          background: 'var(--sh-surface)',
+          borderLeft: '1px solid var(--sh-border)',
+          boxShadow: '-4px 0 24px rgba(0,0,0,0.1)',
+          display: 'flex',
+          flexDirection: 'column',
+          pointerEvents: 'auto',
+          fontFamily: PAGE_FONT,
+          animation: 'slideInRight .2s ease',
+        }}
+      >
         <ComponentErrorBoundary name="Chat">
           <ChatHeader
             activeId={activeId}

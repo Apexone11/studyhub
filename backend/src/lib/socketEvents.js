@@ -33,6 +33,10 @@ const SOCKET_EVENTS = {
   USER_OFFLINE: 'user:offline',
   USER_JOINED: 'user:joined',
   USER_LEFT: 'user:left',
+
+  // Study group discussion events
+  GROUP_DISCUSSION_NEW: 'group:discussion:new',
+  GROUP_DISCUSSION_REPLY: 'group:discussion:reply',
 }
 
 module.exports = SOCKET_EVENTS
