@@ -125,19 +125,19 @@ export default function SubscriptionTab() {
             <div style={s.planBadge}>
               <span style={{
                 ...s.badge,
-                background: isFree ? 'var(--sh-soft)' : '#ddd6fe',
-                color: isFree ? 'var(--sh-text)' : '#6d28d9',
+                background: isFree ? 'var(--sh-soft)' : 'var(--sh-soft)',
+                color: isFree ? 'var(--sh-text)' : 'var(--sh-brand-accent)',
               }}>
                 {PLAN_LABELS[sub?.plan] || 'Free'}
               </span>
               {isActive && !isFree && (
-                <span style={{ ...s.statusDot, background: '#059669' }}>Active</span>
+                <span style={{ ...s.statusDot, background: 'var(--sh-success)' }}>Active</span>
               )}
               {isPastDue && (
-                <span style={{ ...s.statusDot, background: '#dc2626' }}>Past Due</span>
+                <span style={{ ...s.statusDot, background: 'var(--sh-danger)' }}>Past Due</span>
               )}
               {sub?.cancelAtPeriodEnd && (
-                <span style={{ ...s.statusDot, background: '#f59e0b' }}>Canceling</span>
+                <span style={{ ...s.statusDot, background: 'var(--sh-warning)' }}>Canceling</span>
               )}
             </div>
 
@@ -327,7 +327,7 @@ const s = {
     display: 'inline-block',
     fontSize: 12,
     fontWeight: 600,
-    color: '#ffffff',
+    color: 'var(--sh-nav-text)',
     padding: '3px 10px',
     borderRadius: 6,
   },
@@ -343,8 +343,8 @@ const s = {
   },
   upgradeLink: {
     display: 'inline-block',
-    background: '#6d28d9',
-    color: '#ffffff',
+    background: 'var(--sh-brand-accent)',
+    color: 'var(--sh-nav-text)',
     padding: '10px 24px',
     borderRadius: 10,
     fontWeight: 700,

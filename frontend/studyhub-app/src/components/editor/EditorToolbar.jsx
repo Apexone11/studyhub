@@ -23,7 +23,7 @@ function ToolbarButton({ onClick, active, disabled, title, children, style: extr
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         width: 30, height: 28, borderRadius: 6, border: 'none',
         background: active ? 'var(--sh-brand)' : 'transparent',
-        color: active ? '#fff' : '#94a3b8',
+        color: active ? 'var(--sh-nav-text)' : 'var(--sh-muted)',
         fontSize: 13, fontWeight: 700, cursor: disabled ? 'default' : 'pointer',
         opacity: disabled ? 0.4 : 1,
         transition: 'background 0.12s, color 0.12s',
@@ -97,7 +97,7 @@ function LinkPopover({ onSubmit, onCancel, initialUrl }) {
         type="submit"
         style={{
           padding: '5px 10px', borderRadius: 6, border: 'none',
-          background: 'var(--sh-brand)', color: '#fff', fontSize: 11,
+          background: 'var(--sh-brand)', color: 'var(--sh-nav-text)', fontSize: 11,
           fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
         }}
       >

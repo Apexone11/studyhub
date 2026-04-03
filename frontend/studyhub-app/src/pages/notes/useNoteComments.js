@@ -102,8 +102,57 @@ export function useNoteComments(noteId) {
     } catch { /* silent */ }
   }, [noteId])
 
+  const reactToComment = useCallback(async (commentId, type) => {
+    try {
+      // Optimistic update
+      setComments((prev) =>
+        prev.map((comment) => {
+          if (comment.id !== commentId) return comment
+
+          const oldType = comment.userReaction
+          const newType = oldType === type ? null : type
+
+          const oldLikes = comment.reactionCounts?.like || 0
+          const oldDislikes = comment.reactionCounts?.dislike || 0
+
+          let newLikes = oldLikes
+          let newDislikes = oldDislikes
+
+          // Remove old reaction
+          if (oldType === 'like') newLikes -= 1
+          else if (oldType === 'dislike') newDislikes -= 1
+
+          // Add new reaction
+          if (newType === 'like') newLikes += 1
+          else if (newType === 'dislike') newDislikes += 1
+
+          return {
+            ...comment,
+            userReaction: newType,
+            reactionCounts: { like: newLikes, dislike: newDislikes },
+          }
+        })
+      )
+
+      const res = await fetch(`${API}/api/notes/${noteId}/comments/${commentId}/react`, {
+        method: 'POST',
+        headers: authHeaders(),
+        credentials: 'include',
+        body: JSON.stringify({ type }),
+      })
+
+      if (!res.ok) {
+        // Revert on error
+        await loadComments()
+      }
+    } catch {
+      // Revert on error
+      await loadComments()
+    }
+  }, [noteId, loadComments])
+
   return {
     comments, total, loading, posting, error, setError,
-    loadComments, postComment, resolveComment, deleteComment,
+    loadComments, postComment, resolveComment, deleteComment, reactToComment,
   }
 }

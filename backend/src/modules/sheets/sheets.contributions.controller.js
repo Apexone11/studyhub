@@ -16,10 +16,18 @@ const { checkAndAwardBadges } = require('../../lib/badges')
 
 const router = express.Router()
 
+/**
+ * Sanitize text by removing HTML tags and trimming
+ */
+function sanitizeText(text) {
+  if (typeof text !== 'string') return ''
+  return text.replace(/<[^>]*>/g, '').trim()
+}
+
 router.patch('/contributions/:contributionId', contributionReviewLimiter, requireAuth, requireVerifiedEmail, async (req, res) => {
   const contributionId = Number.parseInt(req.params.contributionId, 10)
   const action = typeof req.body.action === 'string' ? req.body.action.trim().toLowerCase() : ''
-  const reviewComment = typeof req.body.reviewComment === 'string' ? req.body.reviewComment.trim().slice(0, 1000) : ''
+  const reviewComment = sanitizeText(typeof req.body.reviewComment === 'string' ? req.body.reviewComment.slice(0, 1000) : '')
 
   if (!Number.isInteger(contributionId)) {
     return res.status(400).json({ error: 'Contribution id must be an integer.' })
@@ -111,7 +119,7 @@ router.patch('/contributions/:contributionId', contributionReviewLimiter, requir
           sheetId: contribution.targetSheetId,
           userId: req.user.userId,
           kind: 'merge',
-          message: `Merged contribution from ${contribution.proposer.username}`,
+          message: `Merged contribution from ${contribution.proposer.username} (reviewed by ${req.user.username})`,
           content: contribution.forkSheet.content,
           contentFormat: contribution.forkSheet.contentFormat || 'markdown',
           checksum: computeChecksum(contribution.forkSheet.content),
@@ -172,7 +180,7 @@ router.patch('/contributions/:contributionId', contributionReviewLimiter, requir
 
 router.post('/:id/contributions', requireAuth, requireVerifiedEmail, contributionRateLimiter, async (req, res) => {
   const forkSheetId = Number.parseInt(req.params.id, 10)
-  const message = typeof req.body.message === 'string' ? req.body.message.trim().slice(0, 500) : ''
+  const message = sanitizeText(typeof req.body.message === 'string' ? req.body.message.slice(0, 500) : '')
 
   try {
     const forkSheet = await prisma.studySheet.findUnique({

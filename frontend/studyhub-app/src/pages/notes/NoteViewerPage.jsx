@@ -12,6 +12,7 @@ import { PAGE_FONT } from '../shared/pageUtils'
 import { MarkdownPreview, wordCount } from './notesConstants'
 import NoteCommentSection from './NoteCommentSection'
 import { useNoteViewer } from './useNoteViewer'
+import { useNoteComments } from './useNoteComments'
 
 function formatDate(dateStr) {
   if (!dateStr) return ''
@@ -33,6 +34,7 @@ function downloadMarkdown(title, content) {
 export default function NoteViewerPage() {
   const { user } = useSession()
   const { note, loading, error } = useNoteViewer()
+  const { reactToComment: handleReactToComment } = useNoteComments(note?.id)
   const [reportOpen, setReportOpen] = useState(false)
 
   if (loading) {
@@ -201,7 +203,7 @@ export default function NoteViewerPage() {
 
       {/* Comments (visible on shared notes) */}
       {!note.private && (
-        <NoteCommentSection noteId={note.id} isOwner={note.isOwner} user={user} noteContent={note.content} />
+        <NoteCommentSection noteId={note.id} isOwner={note.isOwner} user={user} noteContent={note.content} onReactToComment={handleReactToComment} />
       )}
 
       <ReportModal open={reportOpen} targetType="note" targetId={note.id} onClose={() => setReportOpen(false)} />

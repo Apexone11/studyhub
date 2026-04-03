@@ -21,6 +21,7 @@ import AdminSettingsTab from './AdminSettingsTab'
 import SchoolsTab from './SchoolsTab'
 
 const AnalyticsTab = lazy(() => import('./AnalyticsTab'))
+const RevenueTab = lazy(() => import('./RevenueTab'))
 
 export default function AdminPage() {
   const layout = useResponsiveAppLayout()
@@ -216,6 +217,18 @@ export default function AdminPage() {
                     }
                   >
                     <AnalyticsTab />
+                  </Suspense>
+                ) : null}
+
+                {activeTab === 'revenue' ? (
+                  <Suspense
+                    fallback={
+                      <div style={{ color: 'var(--sh-subtext)', fontSize: 13 }}>
+                        Loading revenue…
+                      </div>
+                    }
+                  >
+                    <RevenueTab />
                   </Suspense>
                 ) : null}
 

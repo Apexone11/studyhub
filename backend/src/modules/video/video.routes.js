@@ -24,8 +24,11 @@ const { processVideo, deleteVideoAssets } = require('./video.service')
 const { scanBufferWithClamAv } = require('../../lib/clamav')
 const {
   MAX_VIDEO_SIZE,
+  VIDEO_DURATION_LIMITS,
+  VIDEO_SIZE_LIMITS,
   MAX_CAPTION_SIZE,
   MIN_CHUNK_SIZE,
+  CHUNK_SIZE,
   ALLOWED_VIDEO_MIMES,
   ALLOWED_VIDEO_EXTENSIONS,
   ALLOWED_CAPTION_MIMES,
@@ -88,10 +91,48 @@ router.post('/upload/init', requireAuth, videoUploadInitLimiter, async (req, res
       return res.status(400).json({ error: 'Unsupported file extension.' })
     }
 
-    if (fileSize > MAX_VIDEO_SIZE) {
-      return res
-        .status(400)
-        .json({ error: `Video must be under ${MAX_VIDEO_SIZE / (1024 * 1024)} MB.` })
+    // Determine user's subscription plan and get tier-based limits
+    let userPlan = 'free'
+
+    // Check active subscription
+    try {
+      const sub = await prisma.subscription.findUnique({
+        where: { userId: req.user.userId },
+        select: { plan: true, status: true },
+      })
+      if (sub && sub.status === 'active') {
+        userPlan = sub.plan
+      }
+    } catch (e) {
+      // Graceful degradation: treat as free on error
+    }
+
+    // Check if user has made a donation (upgrade free to donor)
+    if (userPlan === 'free') {
+      try {
+        const donation = await prisma.donation.findFirst({
+          where: { userId: req.user.userId },
+        })
+        if (donation) {
+          userPlan = 'donor'
+        }
+      } catch (e) {
+        // Graceful degradation
+      }
+    }
+
+    // Admin override
+    if (req.user.role === 'admin') {
+      userPlan = 'admin'
+    }
+
+    const maxDuration = VIDEO_DURATION_LIMITS[userPlan] || VIDEO_DURATION_LIMITS.free
+    const maxSize = VIDEO_SIZE_LIMITS[userPlan] || VIDEO_SIZE_LIMITS.free
+
+    if (fileSize > maxSize) {
+      return res.status(400).json({
+        error: `Video must be under ${(maxSize / (1024 * 1024 * 1024)).toFixed(1)} GB for your plan.`,
+      })
     }
 
     if (!r2.isR2Configured()) {
@@ -118,6 +159,8 @@ router.post('/upload/init', requireAuth, videoUploadInitLimiter, async (req, res
       uploadId,
       r2Key,
       chunkSize: MIN_CHUNK_SIZE,
+      maxDuration,
+      maxSize,
     })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
@@ -153,6 +196,11 @@ router.post(
 
       if (!uploadId || !r2Key || isNaN(partNumber) || isNaN(videoId)) {
         return res.status(400).json({ error: 'Missing required upload headers.' })
+      }
+
+      // Validate chunk size
+      if (req.headers['content-length'] && parseInt(req.headers['content-length']) > CHUNK_SIZE + 1024) {
+        return res.status(413).json({ error: 'Chunk exceeds maximum size.' })
       }
 
       // Verify ownership

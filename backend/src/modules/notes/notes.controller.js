@@ -275,13 +275,27 @@ async function listNoteComments(req, res) {
     if (!note) return res.status(404).json({ error: 'Note not found.' })
     if (!canReadNote(note, req.user || null)) return res.status(404).json({ error: 'Note not found.' })
 
-    const commentWhere = { noteId }
+    const commentWhere = { noteId, parentId: null }
 
     const [commentsSection, countSection] = await Promise.all([
       timedSection('comments', () =>
         prisma.noteComment.findMany({
           where: commentWhere,
-          include: COMMENT_INCLUDE,
+          include: {
+            ...COMMENT_INCLUDE,
+            attachments: {
+              select: { id: true, url: true, type: true, name: true, createdAt: true },
+            },
+            replies: {
+              include: {
+                ...COMMENT_INCLUDE,
+                attachments: {
+                  select: { id: true, url: true, type: true, name: true, createdAt: true },
+                },
+              },
+              orderBy: { createdAt: 'asc' },
+            },
+          },
           orderBy: { createdAt: 'desc' },
           take: limit,
           skip: offset,
@@ -290,12 +304,17 @@ async function listNoteComments(req, res) {
       timedSection('count', () => prisma.noteComment.count({ where: commentWhere })),
     ])
 
+    const comments = commentsSection.data.map((comment) => ({
+      ...comment,
+      replyCount: (comment.replies || []).length,
+    }))
+
     logTiming(req, {
       sections: [noteSection, commentsSection, countSection],
       extra: { noteId, commentCount: countSection.data },
     })
 
-    res.json({ comments: commentsSection.data, total: countSection.data, limit, offset })
+    res.json({ comments, total: countSection.data, limit, offset })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
@@ -315,8 +334,11 @@ async function createNoteComment(req, res) {
   if (!content) return res.status(400).json({ error: 'Comment cannot be empty.' })
   if (content.length > 500) return res.status(400).json({ error: 'Comment must be 500 characters or fewer.' })
 
-  // Optional inline anchor fields — validated and context-enriched
-  const anchor = validateAnchorInput(req.body)
+  const parentId = req.body.parentId ? Number.parseInt(req.body.parentId, 10) : null
+  const attachments = Array.isArray(req.body.attachments) ? req.body.attachments : []
+
+  // Optional inline anchor fields — validated and context-enriched (only for top-level comments)
+  const anchor = !parentId ? validateAnchorInput(req.body) : null
 
   try {
     const note = await prisma.note.findUnique({
@@ -326,7 +348,18 @@ async function createNoteComment(req, res) {
     if (!note) return res.status(404).json({ error: 'Note not found.' })
     if (!canReadNote(note, req.user)) return res.status(404).json({ error: 'Note not found.' })
 
-    // Build surrounding context for anchor re-matching after edits
+    // Validate parentId if provided (max 1 level deep)
+    if (parentId) {
+      const parentComment = await prisma.noteComment.findUnique({
+        where: { id: parentId },
+        select: { id: true, noteId: true, parentId: true },
+      })
+      if (!parentComment) return res.status(400).json({ error: 'Parent comment not found.' })
+      if (parentComment.noteId !== noteId) return res.status(400).json({ error: 'Parent comment belongs to different note.' })
+      if (parentComment.parentId !== null) return res.status(400).json({ error: 'Cannot reply to replies (max 1 level deep).' })
+    }
+
+    // Build surrounding context for anchor re-matching after edits (only for top-level comments)
     const anchorContext = anchor
       ? buildAnchorContext(note.content, anchor.anchorText, anchor.anchorOffset)
       : null
@@ -337,12 +370,23 @@ async function createNoteComment(req, res) {
         content,
         noteId,
         userId: req.user.userId,
+        parentId: parentId || null,
         anchorText: anchor?.anchorText || null,
         anchorOffset: anchor ? anchor.anchorOffset : null,
         anchorContext,
         moderationStatus,
+        attachments: attachments.length > 0 ? {
+          create: attachments.map((att) => ({
+            url: att.url,
+            type: att.type,
+            name: att.name || '',
+          })),
+        } : undefined,
       },
-      include: COMMENT_INCLUDE,
+      include: {
+        ...COMMENT_INCLUDE,
+        attachments: { select: { id: true, url: true, type: true, name: true } },
+      },
     })
 
     // Async content moderation on comment — fire-and-forget
@@ -352,8 +396,8 @@ async function createNoteComment(req, res) {
 
     trackActivity(prisma, req.user.userId, 'comments')
 
-    // Notify note owner (skip if commenter is the owner)
-    if (note.userId !== req.user.userId) {
+    // Only notify note owner if it's a top-level comment
+    if (!parentId && note.userId !== req.user.userId) {
       await createNotification(prisma, {
         userId: note.userId,
         type: 'comment',
@@ -363,14 +407,33 @@ async function createNoteComment(req, res) {
       })
     }
 
-    await notifyMentionedUsers(prisma, {
-      text: content,
-      actorId: req.user.userId,
-      actorUsername: req.user.username,
-      excludeUserIds: [note.userId],
-      message: `${req.user.username} mentioned you in a comment on "${note.title}".`,
-      linkPath: `/notes/${noteId}`,
-    })
+    // Notify parent comment author if it's a reply
+    if (parentId) {
+      const parentCommentData = await prisma.noteComment.findUnique({
+        where: { id: parentId },
+        select: { userId: true },
+      })
+      if (parentCommentData && parentCommentData.userId !== req.user.userId) {
+        await createNotification(prisma, {
+          userId: parentCommentData.userId,
+          type: 'reply',
+          message: `${req.user.username} replied to your comment.`,
+          actorId: req.user.userId,
+          linkPath: `/notes/${noteId}`,
+        })
+      }
+    }
+
+    if (!parentId) {
+      await notifyMentionedUsers(prisma, {
+        text: content,
+        actorId: req.user.userId,
+        actorUsername: req.user.username,
+        excludeUserIds: [note.userId],
+        message: `${req.user.username} mentioned you in a comment on "${note.title}".`,
+        linkPath: `/notes/${noteId}`,
+      })
+    }
 
     res.status(201).json(comment)
   } catch (err) {

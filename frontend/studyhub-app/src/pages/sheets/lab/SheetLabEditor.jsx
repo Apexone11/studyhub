@@ -239,8 +239,8 @@ export default function SheetLabEditor({ sheet, onContentSaved }) {
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <span style={{
             padding: '2px 8px', borderRadius: 6, fontWeight: 700, fontSize: 10,
-            background: isRichText ? '#ede9fe' : isHtml ? '#dbeafe' : '#e0e7ff',
-            color: isRichText ? '#7c3aed' : isHtml ? '#1e40af' : '#4338ca',
+            background: isRichText ? 'var(--sh-soft)' : isHtml ? 'var(--sh-brand-soft)' : 'var(--sh-soft)',
+            color: isRichText ? 'var(--sh-brand-accent)' : isHtml ? 'var(--sh-brand)' : 'var(--sh-brand)',
             textTransform: 'uppercase',
           }}>
             {activeFormat}
@@ -252,8 +252,8 @@ export default function SheetLabEditor({ sheet, onContentSaved }) {
               onClick={handleUpgradeToRichText}
               title="Switch to the rich text WYSIWYG editor"
               style={{
-                border: '1px solid #7c3aed', borderRadius: 6, padding: '2px 8px',
-                background: 'transparent', color: '#7c3aed',
+                border: '1px solid var(--sh-brand-accent)', borderRadius: 6, padding: '2px 8px',
+                background: 'transparent', color: 'var(--sh-brand-accent)',
                 fontWeight: 700, fontSize: 10, cursor: 'pointer',
                 fontFamily: 'inherit', textTransform: 'uppercase',
               }}
@@ -267,8 +267,8 @@ export default function SheetLabEditor({ sheet, onContentSaved }) {
             disabled={!dirty || saving}
             style={{
               border: 'none', borderRadius: 8, padding: '6px 14px',
-              background: dirty ? '#6366f1' : 'var(--sh-border)',
-              color: dirty ? '#fff' : 'var(--sh-muted)',
+              background: dirty ? 'var(--sh-brand-accent)' : 'var(--sh-border)',
+              color: dirty ? 'var(--sh-nav-text)' : 'var(--sh-muted)',
               fontWeight: 700, fontSize: 11, cursor: dirty ? 'pointer' : 'default', minHeight: 32,
               fontFamily: 'inherit',
             }}
@@ -283,7 +283,7 @@ export default function SheetLabEditor({ sheet, onContentSaved }) {
             style={{
               borderRadius: 8, padding: '6px 14px',
               background: isDraft ? 'var(--sh-success, #16a34a)' : 'var(--sh-warning-bg, #fffbeb)',
-              color: isDraft ? '#fff' : 'var(--sh-warning-text, #92400e)',
+              color: isDraft ? 'var(--sh-nav-text)' : 'var(--sh-warning-dark-text)',
               fontWeight: 700, fontSize: 11, minHeight: 32,
               cursor: publishing ? 'wait' : 'pointer',
               fontFamily: 'inherit',

@@ -20,7 +20,7 @@ const os = require('os')
 const { captureError } = require('../../monitoring/sentry')
 const r2 = require('../../lib/r2Storage')
 const prisma = require('../../lib/prisma')
-const { TRANSCODE_PRESETS, VIDEO_STATUS, MAX_VIDEO_DURATION } = require('./video.constants')
+const { TRANSCODE_PRESETS, VIDEO_STATUS, VIDEO_DURATION_LIMITS, MAX_VIDEO_DURATION } = require('./video.constants')
 
 // ── Temp directory for processing ────────────────────────────────────────
 const TEMP_DIR = path.join(os.tmpdir(), 'studyhub-video')
@@ -269,8 +269,51 @@ async function processVideo(videoId) {
     // 2. Probe metadata
     const metadata = await probeVideo(rawPath)
 
-    // 3. Validate duration
-    if (metadata.duration > MAX_VIDEO_DURATION) {
+    // 3. Validate duration based on user's subscription plan
+    let userPlan = 'free'
+
+    // Determine user plan (mirror of logic in routes)
+    try {
+      const sub = await prisma.subscription.findUnique({
+        where: { userId: video.userId },
+        select: { plan: true, status: true },
+      })
+      if (sub && sub.status === 'active') {
+        userPlan = sub.plan
+      }
+    } catch (e) {
+      // Graceful degradation
+    }
+
+    if (userPlan === 'free') {
+      try {
+        const donation = await prisma.donation.findFirst({
+          where: { userId: video.userId },
+        })
+        if (donation) {
+          userPlan = 'donor'
+        }
+      } catch (e) {
+        // Graceful degradation
+      }
+    }
+
+    // Check if user is admin
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: video.userId },
+        select: { role: true },
+      })
+      if (user && user.role === 'admin') {
+        userPlan = 'admin'
+      }
+    } catch (e) {
+      // Graceful degradation
+    }
+
+    const maxDuration = VIDEO_DURATION_LIMITS[userPlan] || MAX_VIDEO_DURATION
+
+    if (metadata.duration > maxDuration) {
       await prisma.video.update({
         where: { id: videoId },
         data: { status: VIDEO_STATUS.FAILED },

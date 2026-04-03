@@ -3,10 +3,30 @@
  */
 
 // ── Upload limits ────────────────────────────────────────────────────────
-const MAX_VIDEO_SIZE = 500 * 1024 * 1024 // 500 MB
-const MAX_VIDEO_DURATION = 15 * 60 // 15 minutes (seconds)
+// Duration limits by subscription tier (seconds)
+const VIDEO_DURATION_LIMITS = {
+  free: 30 * 60,        // 30 minutes
+  pro_monthly: 60 * 60, // 1 hour
+  pro_yearly: 60 * 60,  // 1 hour
+  donor: 45 * 60,       // 45 minutes
+  admin: 2 * 60 * 60,   // 2 hours
+}
+
+// Default fallback (for unknown plans)
+const MAX_VIDEO_DURATION = VIDEO_DURATION_LIMITS.free
+
+// File size limits by subscription tier (bytes)
+const VIDEO_SIZE_LIMITS = {
+  free: 500 * 1024 * 1024,       // 500 MB
+  pro_monthly: 1.5 * 1024 * 1024 * 1024, // 1.5 GB
+  pro_yearly: 1.5 * 1024 * 1024 * 1024,  // 1.5 GB
+  donor: 1 * 1024 * 1024 * 1024, // 1 GB
+  admin: 2 * 1024 * 1024 * 1024, // 2 GB
+}
+
+const MAX_VIDEO_SIZE = VIDEO_SIZE_LIMITS.free
 const MAX_CAPTION_SIZE = 1 * 1024 * 1024 // 1 MB (VTT files)
-const CHUNK_SIZE = 10 * 1024 * 1024 // 10 MB per upload chunk
+const CHUNK_SIZE = 5 * 1024 * 1024 // 5 MB per upload chunk (reduced to avoid Railway HTTP/2 proxy body size limits)
 const MIN_CHUNK_SIZE = 5 * 1024 * 1024 // 5 MB minimum (S3/R2 requirement)
 
 // ── Allowed MIME types and magic bytes ───────────────────────────────────
@@ -62,6 +82,8 @@ const MAX_CAPTION_LANGUAGES = 10
 module.exports = {
   MAX_VIDEO_SIZE,
   MAX_VIDEO_DURATION,
+  VIDEO_DURATION_LIMITS,
+  VIDEO_SIZE_LIMITS,
   MAX_CAPTION_SIZE,
   CHUNK_SIZE,
   MIN_CHUNK_SIZE,

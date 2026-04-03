@@ -1,27 +1,29 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Navbar from '../../components/navbar/Navbar'
 import { API } from '../../config'
+import { useSession } from '../../lib/session-context'
 
 const FAQ_ITEMS = [
   {
-    question: 'What happens when Pro launches?',
-    answer: 'You will be notified by email and get early access pricing.'
-  },
-  {
     question: 'Can I cancel anytime?',
-    answer: 'Yes, no long-term contracts.'
+    answer: 'Yes, you can cancel your subscription anytime from your account settings. No long-term contracts.'
   },
   {
     question: 'Is there a student discount?',
-    answer: 'The free tier is designed for students. Pro pricing is already student-friendly.'
+    answer: 'The free tier is designed for students. Pro pricing is already student-friendly at $4.99/month.'
   },
   {
-    question: 'What payment methods will you accept?',
-    answer: 'Credit/debit cards and PayPal at launch.'
+    question: 'What payment methods do you accept?',
+    answer: 'We accept all major credit and debit cards through Stripe. PayPal support coming soon.'
   },
   {
     question: 'Can my university get a bulk deal?',
-    answer: 'Yes, contact us about Institution pricing.'
+    answer: 'Yes, contact us about Institution pricing with volume discounts.'
+  },
+  {
+    question: 'Do I get a free trial?',
+    answer: 'We offer a 7-day free trial for new Pro subscribers. Cancel anytime before it renews.'
   },
 ]
 
@@ -68,10 +70,53 @@ export default function PricingPage() {
 }
 
 function PricingCard({ tier }) {
+  const navigate = useNavigate()
+  const { user } = useSession()
+  const [subscribing, setSubscribing] = useState(null)
+  const [subscribeError, setSubscribeError] = useState('')
   const [waitlistEmail, setWaitlistEmail] = useState('')
   const [waitlistLoading, setWaitlistLoading] = useState(false)
   const [waitlistMessage, setWaitlistMessage] = useState('')
   const [waitlistError, setWaitlistError] = useState('')
+
+  const handleSubscribe = async (plan) => {
+    setSubscribeError('')
+
+    if (!user) {
+      navigate('/login')
+      return
+    }
+
+    setSubscribing(plan)
+
+    try {
+      const res = await fetch(`${API}/api/payments/checkout/subscription`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ plan }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setSubscribeError(data.error || data.message || 'Failed to start checkout.')
+        setSubscribing(null)
+        return
+      }
+
+      if (data.url) {
+        window.location.href = data.url
+      } else {
+        setSubscribeError('No checkout URL received from server.')
+        setSubscribing(null)
+      }
+    } catch (err) {
+      console.error('[subscribe]', err)
+      setSubscribeError('Network error. Please try again.')
+      setSubscribing(null)
+    }
+  }
 
   const handleWaitlistSubmit = async (e, tierName) => {
     e.preventDefault()
@@ -134,9 +179,6 @@ function PricingCard({ tier }) {
   if (tier === 'pro') {
     return (
       <div style={{ ...s.card, ...s.cardElevated }}>
-        <div style={s.ribbonContainer}>
-          <div style={s.ribbon}>Coming Soon</div>
-        </div>
         <div style={s.badgeRow}>
           <span style={{ ...s.badge, ...s.badgePro }}>Pro</span>
         </div>
@@ -156,29 +198,24 @@ function PricingCard({ tier }) {
           <Feature text="Priority support" included />
         </div>
 
-        {waitlistMessage ? (
-          <div style={s.successMessage}>{waitlistMessage}</div>
-        ) : (
-          <form onSubmit={(e) => handleWaitlistSubmit(e, 'pro')} style={s.waitlistForm}>
-            <input
-              type="email"
-              placeholder="your@email.com"
-              value={waitlistEmail}
-              onChange={(e) => setWaitlistEmail(e.target.value)}
-              style={s.waitlistInput}
-              disabled={waitlistLoading}
-              required
-            />
-            <button
-              type="submit"
-              style={s.ctaPrimary}
-              disabled={waitlistLoading || !waitlistEmail.trim()}
-            >
-              {waitlistLoading ? 'Joining...' : 'Join Waitlist'}
-            </button>
-            {waitlistError && <div style={s.errorMessage}>{waitlistError}</div>}
-          </form>
-        )}
+        <div style={s.subscribeButtonGroup}>
+          <button
+            style={s.ctaPrimary}
+            disabled={subscribing !== null}
+            onClick={() => handleSubscribe('pro_monthly')}
+          >
+            {subscribing === 'pro_monthly' ? 'Redirecting...' : 'Subscribe Monthly'}
+          </button>
+          <button
+            style={s.ctaSecondary}
+            disabled={subscribing !== null}
+            onClick={() => handleSubscribe('pro_yearly')}
+          >
+            {subscribing === 'pro_yearly' ? 'Redirecting...' : 'Subscribe Yearly (Save 33%)'}
+          </button>
+        </div>
+
+        {subscribeError && <div style={s.errorMessage}>{subscribeError}</div>}
       </div>
     )
   }
@@ -244,7 +281,7 @@ function Feature({ text, included }) {
         height="20"
         viewBox="0 0 20 20"
         fill="none"
-        style={{ ...s.featureIcon, color: included ? '#059669' : 'var(--sh-border)' }}
+        style={{ ...s.featureIcon, color: included ? 'var(--sh-success)' : 'var(--sh-border)' }}
       >
         <path
           d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
@@ -312,7 +349,7 @@ const s = {
   heroH1: {
     fontSize: 'clamp(32px, 5vw, 52px)',
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: 'var(--sh-nav-text)',
     margin: '0 0 16px',
     lineHeight: 1.2,
   },
@@ -344,7 +381,7 @@ const s = {
   cardElevated: {
     boxShadow: '0 8px 24px rgba(0, 0, 0, 0.1)',
     borderTopWidth: 4,
-    borderTopColor: '#6d28d9',
+    borderTopColor: 'var(--sh-brand-accent)',
   },
   ribbonContainer: {
     position: 'absolute',
@@ -352,8 +389,8 @@ const s = {
     right: 20,
   },
   ribbon: {
-    background: '#6d28d9',
-    color: '#ffffff',
+    background: 'var(--sh-brand-accent)',
+    color: 'var(--sh-nav-text)',
     fontSize: 12,
     fontWeight: 'bold',
     padding: '6px 14px',
@@ -374,12 +411,12 @@ const s = {
     borderRadius: 8,
   },
   badgePro: {
-    background: '#ddd6fe',
-    color: '#6d28d9',
+    background: 'var(--sh-soft)',
+    color: 'var(--sh-brand-accent)',
   },
   badgeInstitution: {
-    background: '#dbeafe',
-    color: '#3b82f6',
+    background: 'var(--sh-brand-soft)',
+    color: 'var(--sh-brand)',
   },
   priceBlock: {
     marginBottom: 32,
@@ -414,8 +451,8 @@ const s = {
     lineHeight: 1.5,
   },
   ctaPrimary: {
-    background: '#6d28d9',
-    color: '#ffffff',
+    background: 'var(--sh-brand-accent)',
+    color: 'var(--sh-nav-text)',
     border: 'none',
     padding: '12px 24px',
     borderRadius: 10,
@@ -424,6 +461,18 @@ const s = {
     cursor: 'pointer',
     width: '100%',
     transition: 'background 0.2s ease-out',
+  },
+  ctaSecondary: {
+    background: 'transparent',
+    color: 'var(--sh-brand-accent)',
+    border: '2px solid var(--sh-brand-accent)',
+    padding: '10px 24px',
+    borderRadius: 10,
+    fontWeight: 'bold',
+    fontSize: 15,
+    cursor: 'pointer',
+    width: '100%',
+    transition: 'all 0.2s ease-out',
   },
   ctaDisabled: {
     background: 'var(--sh-soft)',
@@ -435,6 +484,11 @@ const s = {
     fontSize: 15,
     cursor: 'default',
     width: '100%',
+  },
+  subscribeButtonGroup: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 12,
   },
   waitlistForm: {
     display: 'flex',
@@ -451,8 +505,8 @@ const s = {
     color: 'var(--sh-text)',
   },
   successMessage: {
-    background: '#dcfce7',
-    color: '#166534',
+    background: 'var(--sh-success-bg)',
+    color: 'var(--sh-success-text)',
     padding: '12px 14px',
     borderRadius: 8,
     fontSize: 14,
@@ -460,8 +514,8 @@ const s = {
     fontWeight: 500,
   },
   errorMessage: {
-    background: '#fee2e2',
-    color: '#991b1b',
+    background: 'var(--sh-danger-bg)',
+    color: 'var(--sh-danger-text)',
     padding: '8px 12px',
     borderRadius: 6,
     fontSize: 13,
@@ -517,12 +571,12 @@ const s = {
     lineHeight: 1.7,
   },
   footer: {
-    background: '#0f172a',
+    background: 'var(--sh-slate-900)',
     padding: '40px 20px',
     textAlign: 'center',
   },
   footerCopy: {
-    color: '#475569',
+    color: 'var(--sh-slate-600)',
     fontSize: 12,
     margin: 0,
   },

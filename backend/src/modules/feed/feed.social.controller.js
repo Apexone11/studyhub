@@ -11,6 +11,8 @@ const { reactionSummary } = require('./feed.service')
 const { getInitialModerationStatus } = require('../../lib/trustGate')
 const { timedSection, logTiming } = require('../../lib/requestTiming')
 const { runAbuseChecks } = require('../../lib/abuseDetection')
+const { commentReactLimiter } = require('../../lib/rateLimiters')
+const requireAuth = require('../../core/auth/requireAuth')
 
 const router = express.Router()
 
@@ -20,39 +22,102 @@ router.get('/posts/:id/comments', async (req, res) => {
   if (!Number.isInteger(postId)) return res.status(400).json({ error: 'Invalid post id.' })
   const limit = parsePositiveInt(req.query.limit, 20)
   const offset = Math.max(0, Number.parseInt(req.query.offset, 10) || 0)
+  const sort = req.query.sort || 'newest' // 'newest', 'oldest', 'top'
 
   try {
+    let orderBy = { createdAt: 'desc' }
+    if (sort === 'oldest') {
+      orderBy = { createdAt: 'asc' }
+    } else if (sort === 'top') {
+      // Will handle custom sorting below
+      orderBy = { createdAt: 'desc' }
+    }
+
     const [commentsSection, countSection] = await Promise.all([
       timedSection('comments', () =>
         prisma.feedPostComment.findMany({
-          where: { postId },
-          include: { author: { select: { id: true, username: true } } },
-          orderBy: { createdAt: 'desc' },
+          where: { postId, parentId: null },
+          include: {
+            author: { select: { id: true, username: true } },
+            reactions: {
+              select: { userId: true, type: true },
+            },
+            attachments: {
+              select: { id: true, url: true, type: true, name: true, createdAt: true },
+            },
+            replies: {
+              include: {
+                author: { select: { id: true, username: true } },
+                reactions: {
+                  select: { userId: true, type: true },
+                },
+                attachments: {
+                  select: { id: true, url: true, type: true, name: true, createdAt: true },
+                },
+              },
+              orderBy: { createdAt: 'asc' },
+            },
+          },
+          orderBy,
           take: limit,
           skip: offset,
         })
       ),
       timedSection('count', () =>
-        prisma.feedPostComment.count({ where: { postId } })
+        prisma.feedPostComment.count({ where: { postId, parentId: null } })
       ),
     ])
+
+    const formatComment = (comment) => {
+      const likes = comment.reactions.filter((r) => r.type === 'like').length
+      const dislikes = comment.reactions.filter((r) => r.type === 'dislike').length
+      const userReaction = req.user
+        ? comment.reactions.find((r) => r.userId === req.user.userId)?.type || null
+        : null
+
+      const formattedReplies = (comment.replies || []).map(formatComment)
+
+      return {
+        ...comment,
+        reactions: undefined,
+        replies: formattedReplies,
+        _count: { reactions: likes + dislikes },
+        reactionCounts: { like: likes, dislike: dislikes },
+        userReaction,
+        replyCount: formattedReplies.length,
+      }
+    }
+
+    const comments = commentsSection.data.map(formatComment)
+
+    // For "top" sort, sort by net likes (likes - dislikes) descending
+    if (sort === 'top') {
+      comments.sort((a, b) => {
+        const netA = a.reactionCounts.like - a.reactionCounts.dislike
+        const netB = b.reactionCounts.like - b.reactionCounts.dislike
+        if (netB !== netA) return netB - netA
+        return b.createdAt - a.createdAt
+      })
+    }
 
     logTiming(req, {
       sections: [commentsSection, countSection],
       extra: { postId, commentCount: countSection.data },
     })
 
-    res.json({ comments: commentsSection.data, total: countSection.data, limit, offset })
+    res.json({ comments, total: countSection.data, limit, offset })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
   }
 })
 
-router.post('/posts/:id/comments', commentLimiter, async (req, res) => {
+router.post('/posts/:id/comments', requireAuth, commentLimiter, async (req, res) => {
   const postId = Number.parseInt(req.params.id, 10)
   if (!Number.isInteger(postId)) return res.status(400).json({ error: 'Invalid post id.' })
   const content = typeof req.body.content === 'string' ? req.body.content.trim() : ''
+  const parentId = req.body.parentId ? Number.parseInt(req.body.parentId, 10) : null
+  const attachments = Array.isArray(req.body.attachments) ? req.body.attachments : []
 
   if (!content) return res.status(400).json({ error: 'Comment cannot be empty.' })
   if (content.length > 500) {
@@ -66,28 +131,73 @@ router.post('/posts/:id/comments', commentLimiter, async (req, res) => {
     })
     if (!post) return res.status(404).json({ error: 'Post not found.' })
 
+    // Validate parentId if provided (max 1 level deep)
+    if (parentId) {
+      const parentComment = await prisma.feedPostComment.findUnique({
+        where: { id: parentId },
+        select: { id: true, postId: true, parentId: true },
+      })
+      if (!parentComment) return res.status(400).json({ error: 'Parent comment not found.' })
+      if (parentComment.postId !== postId) return res.status(400).json({ error: 'Parent comment belongs to different post.' })
+      if (parentComment.parentId !== null) return res.status(400).json({ error: 'Cannot reply to replies (max 1 level deep).' })
+    }
+
     const moderationStatus = getInitialModerationStatus(req.user)
     const comment = await prisma.feedPostComment.create({
-      data: { content, postId, userId: req.user.userId, moderationStatus },
-      include: { author: { select: { id: true, username: true } } },
+      data: {
+        content,
+        postId,
+        userId: req.user.userId,
+        parentId: parentId || null,
+        moderationStatus,
+        attachments: attachments.length > 0 ? {
+          create: attachments.map((att) => ({
+            url: att.url,
+            type: att.type,
+            name: att.name || '',
+          })),
+        } : undefined,
+      },
+      include: {
+        author: { select: { id: true, username: true } },
+        attachments: { select: { id: true, url: true, type: true, name: true } },
+      },
     })
 
-    await createNotification(prisma, {
-      userId: post.userId,
-      type: 'comment',
-      message: `${req.user.username} commented on your post.`,
-      actorId: req.user.userId,
-      linkPath: `/feed?post=${postId}`,
-    })
+    // Only notify post author if it's a top-level comment
+    if (!parentId) {
+      await createNotification(prisma, {
+        userId: post.userId,
+        type: 'comment',
+        message: `${req.user.username} commented on your post.`,
+        actorId: req.user.userId,
+        linkPath: `/feed?post=${postId}`,
+      })
 
-    await notifyMentionedUsers(prisma, {
-      text: content,
-      actorId: req.user.userId,
-      actorUsername: req.user.username,
-      excludeUserIds: [post.userId],
-      message: `${req.user.username} mentioned you in a comment on a post.`,
-      linkPath: `/feed?post=${postId}`,
-    })
+      await notifyMentionedUsers(prisma, {
+        text: content,
+        actorId: req.user.userId,
+        actorUsername: req.user.username,
+        excludeUserIds: [post.userId],
+        message: `${req.user.username} mentioned you in a comment on a post.`,
+        linkPath: `/feed?post=${postId}`,
+      })
+    } else {
+      // Notify parent comment author if it's a reply
+      const parentCommentData = await prisma.feedPostComment.findUnique({
+        where: { id: parentId },
+        select: { userId: true },
+      })
+      if (parentCommentData && parentCommentData.userId !== req.user.userId) {
+        await createNotification(prisma, {
+          userId: parentCommentData.userId,
+          type: 'reply',
+          message: `${req.user.username} replied to your comment.`,
+          actorId: req.user.userId,
+          linkPath: `/feed?post=${postId}`,
+        })
+      }
+    }
 
     res.status(201).json(comment)
 
@@ -164,6 +274,61 @@ router.post('/posts/:id/react', reactLimiter, async (req, res) => {
     ])
 
     res.json(reactionSummary(reactionRows, 'postId', postId, currentReactions, 'postId'))
+  } catch (error) {
+    captureError(error, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+router.post('/posts/:id/comments/:commentId/react', requireAuth, commentReactLimiter, async (req, res) => {
+  const commentId = Number.parseInt(req.params.commentId, 10)
+  const userId = req.user.userId
+  const { type } = req.body || {}
+
+  if (!type || (type !== 'like' && type !== 'dislike')) {
+    return res.status(400).json({ error: 'Reaction type must be "like" or "dislike".' })
+  }
+
+  try {
+    const comment = await prisma.feedPostComment.findUnique({
+      where: { id: commentId },
+      select: { id: true, postId: true },
+    })
+    if (!comment) return res.status(404).json({ error: 'Comment not found.' })
+
+    const existing = await prisma.feedPostCommentReaction.findUnique({
+      where: { userId_commentId: { userId, commentId } },
+    })
+
+    // Toggle logic: if same type, remove; if different, update; if none, create
+    if (existing && existing.type === type) {
+      await prisma.feedPostCommentReaction.delete({
+        where: { userId_commentId: { userId, commentId } },
+      })
+    } else if (existing) {
+      await prisma.feedPostCommentReaction.update({
+        where: { userId_commentId: { userId, commentId } },
+        data: { type },
+      })
+    } else {
+      await prisma.feedPostCommentReaction.create({
+        data: { userId, commentId, type },
+      })
+    }
+
+    // Get updated counts
+    const [likes, dislikes, userReaction] = await Promise.all([
+      prisma.feedPostCommentReaction.count({ where: { commentId, type: 'like' } }),
+      prisma.feedPostCommentReaction.count({ where: { commentId, type: 'dislike' } }),
+      prisma.feedPostCommentReaction.findUnique({
+        where: { userId_commentId: { userId, commentId } },
+      }),
+    ])
+
+    res.json({
+      reactionCounts: { like: likes, dislike: dislikes },
+      userReaction: userReaction ? userReaction.type : null,
+    })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })

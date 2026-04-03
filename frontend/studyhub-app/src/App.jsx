@@ -26,6 +26,7 @@ const SettingsPage = lazy(() => import('./pages/settings/SettingsPage'))
 const AdminPage = lazy(() => import('./pages/admin/AdminPage'))
 const AboutPage = lazy(() => import('./pages/legal/AboutPage'))
 const PricingPage = lazy(() => import('./pages/pricing/PricingPage'))
+const SupportersPage = lazy(() => import('./pages/supporters/SupportersPage'))
 const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPasswordPage'))
 const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPasswordPage'))
 const UserProfilePage = lazy(() => import('./pages/profile/UserProfilePage'))
@@ -328,6 +329,7 @@ function AppRoutes() {
               <Route path="/guidelines" element={<GuidelinesPage />} />
               <Route path="/about" element={<AboutPage />} />
               <Route path="/pricing" element={<PricingPage />} />
+              <Route path="/supporters" element={<SupportersPage />} />
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
               <Route path="/reset-password" element={<ResetPasswordPage />} />
 

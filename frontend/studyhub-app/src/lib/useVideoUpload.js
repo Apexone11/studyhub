@@ -12,7 +12,7 @@
 import { useState, useRef, useCallback } from 'react'
 import { API } from '../config'
 
-const CHUNK_SIZE = 10 * 1024 * 1024 // 10 MB — matches backend constant
+const CHUNK_SIZE = 5 * 1024 * 1024 // 5 MB — reduced to avoid Railway HTTP/2 proxy body size limits
 const MAX_VIDEO_SIZE = 500 * 1024 * 1024 // 500 MB
 const ALLOWED_TYPES = new Set(['video/mp4', 'video/webm', 'video/quicktime'])
 const ALLOWED_EXTENSIONS = new Set(['.mp4', '.webm', '.mov'])
@@ -35,6 +35,8 @@ export default function useVideoUpload() {
   const [progress, setProgress] = useState(0)
   const [videoId, setVideoId] = useState(null)
   const [error, setError] = useState(null)
+  const [maxDuration, setMaxDuration] = useState(null)
+  const [maxSize, setMaxSize] = useState(null)
 
   // Refs for abort support
   const abortRef = useRef(false)
@@ -47,6 +49,8 @@ export default function useVideoUpload() {
     setProgress(0)
     setVideoId(null)
     setError(null)
+    setMaxDuration(null)
+    setMaxSize(null)
     abortRef.current = false
     uploadIdRef.current = null
     r2KeyRef.current = null
@@ -84,6 +88,8 @@ export default function useVideoUpload() {
       setError(null)
       setProgress(0)
       setVideoId(null)
+      setMaxDuration(null)
+      setMaxSize(null)
 
       // ── Client-side validation ────────────────────────────────────────
       setStatus(STATUS.VALIDATING)
@@ -143,11 +149,13 @@ export default function useVideoUpload() {
         return null
       }
 
-      const { videoId: vid, uploadId, r2Key } = initData
+      const { videoId: vid, uploadId, r2Key, maxDuration: dur, maxSize: size } = initData
       uploadIdRef.current = uploadId
       r2KeyRef.current = r2Key
       videoIdRef.current = vid
       setVideoId(vid)
+      setMaxDuration(dur)
+      setMaxSize(size)
 
       // ── Step 2: Upload chunks ────────────────────────────────────────
       const totalChunks = Math.ceil(file.size / CHUNK_SIZE)
@@ -258,6 +266,8 @@ export default function useVideoUpload() {
       progress,
       videoId,
       error,
+      maxDuration,
+      maxSize,
       isUploading: status === STATUS.UPLOADING || status === STATUS.COMPLETING,
       isProcessing: status === STATUS.PROCESSING,
       isDone: status === STATUS.DONE,

@@ -151,7 +151,12 @@ export default function FeedPage() {
               ) : null}
               {activeFilter !== 'for-you' && (
                 <div data-tutorial="feed-composer">
-                  <Panel title="Share with your classmates" helper="Post class notes, course questions, or links to your latest sheet.">
+                  <Panel
+                    title={user?.role === 'student' ? 'Share with your classmates' : 'Share with the community'}
+                    helper={user?.role === 'student'
+                      ? 'Post class notes, course questions, or links to your latest sheet.'
+                      : 'Post resources, updates, or links to your latest sheet.'}
+                  >
                     <FeedComposer user={user} onSubmitPost={submitPost} />
                   </Panel>
                 </div>

@@ -153,17 +153,17 @@ export default function AttachmentPreviewPage() {
   return (
     <>
       <Navbar />
-      <div style={{ background: '#edf0f5', minHeight: '100vh', fontFamily: FONT }}>
+      <div style={{ background: 'var(--sh-bg)', minHeight: '100vh', fontFamily: FONT }}>
         <div style={pageShell('reading', 26, 48)}>
           <main id="main-content" style={{ display: 'grid', gap: 16 }}>
             <section style={panelStyle()}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                 <div>
-                  <h1 style={{ margin: 0, fontSize: 24, color: '#0f172a', display: 'flex', gap: 10, alignItems: 'center' }}>
+                  <h1 style={{ margin: 0, fontSize: 24, color: 'var(--sh-heading)', display: 'flex', gap: 10, alignItems: 'center' }}>
                     <IconEye size={20} />
                     Attachment Preview
                   </h1>
-                  <div style={{ marginTop: 6, color: '#64748b', fontSize: 13 }}>
+                  <div style={{ marginTop: 6, color: 'var(--sh-muted)', fontSize: 13 }}>
                     {config.label}
                   </div>
                 </div>
@@ -180,23 +180,23 @@ export default function AttachmentPreviewPage() {
             </section>
 
             {state.error ? (
-              <section style={{ ...panelStyle(), background: '#fef2f2', borderColor: '#fecaca', color: '#dc2626', fontSize: 14 }}>
+              <section style={{ ...panelStyle(), background: 'var(--sh-danger-bg)', borderColor: 'var(--sh-danger-border)', color: 'var(--sh-danger)', fontSize: 14 }}>
                 {state.error}
               </section>
             ) : null}
 
             {state.loading ? (
               <section style={panelStyle()}>
-                <div style={{ color: '#64748b', fontSize: 14 }}>Loading preview...</div>
+                <div style={{ color: 'var(--sh-muted)', fontSize: 14 }}>Loading preview...</div>
               </section>
             ) : state.detail ? (
               <section style={panelStyle()}>
-                <div style={{ fontSize: 12, color: '#64748b', marginBottom: 12 }}>
+                <div style={{ fontSize: 12, color: 'var(--sh-muted)', marginBottom: 12 }}>
                   {state.detail.attachmentName || 'Attachment'}
                 </div>
                 <div
                   style={{
-                    border: '1px solid #dbe2ef',
+                    border: '1px solid var(--sh-border)',
                     borderRadius: 14,
                     background: 'var(--sh-surface)',
                     overflow: 'hidden',

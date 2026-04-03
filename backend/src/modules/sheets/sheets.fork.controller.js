@@ -114,7 +114,11 @@ router.post('/:id/fork', requireAuth, requireVerifiedEmail, sheetWriteLimiter, a
           },
         },
       }),
-      // Increment fork count on original is deferred until after we have the fork id
+      // Increment fork count on original within the transaction
+      prisma.studySheet.update({
+        where: { id: original.id },
+        data: { forks: { increment: 1 } },
+      }),
     ])
 
     // Create fork_base commit (initial snapshot of forked content)
@@ -128,12 +132,6 @@ router.post('/:id/fork', requireAuth, requireVerifiedEmail, sheetWriteLimiter, a
         contentFormat: original.contentFormat || 'markdown',
         checksum,
       },
-    })
-
-    // Increment fork count on original
-    await prisma.studySheet.update({
-      where: { id: original.id },
-      data: { forks: { increment: 1 } },
     })
 
     await createNotification(prisma, {
