@@ -617,7 +617,7 @@ const videoUploadInitLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many video uploads. Please wait before starting another.' },
-  keyGenerator: (req) => `vid-init-${req.user?.userId || req.ip}`,
+  keyGenerator: (req) => `vid-init-${req.user?.userId || 'anon'}`,
 })
 
 const videoUploadChunkLimiter = rateLimit({
@@ -626,7 +626,35 @@ const videoUploadChunkLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Upload speed limit reached. Please slow down.' },
-  keyGenerator: (req) => `vid-chunk-${req.user?.userId || req.ip}`,
+  keyGenerator: (req) => `vid-chunk-${req.user?.userId || 'anon'}`,
+})
+
+// ── Payments module ───────────────────────────────────────────────────────
+
+const paymentCheckoutLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many checkout attempts. Please wait before trying again.' },
+  keyGenerator: (req) => `pay-checkout-${req.user?.userId || 'anon'}`,
+})
+
+const paymentPortalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many portal requests. Please wait before trying again.' },
+  keyGenerator: (req) => `pay-portal-${req.user?.userId || 'anon'}`,
+})
+
+const paymentReadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many payment requests. Please slow down.' },
 })
 
 // ── Exports ────────────────────────────────────────────────────────────────
@@ -720,4 +748,9 @@ module.exports = {
 
   // Data export (expensive query -- 3 per day per user)
   exportDataLimiter,
+
+  // Payments module
+  paymentCheckoutLimiter,
+  paymentPortalLimiter,
+  paymentReadLimiter,
 }

@@ -365,14 +365,14 @@ router.get('/:id/stream', readLimiter, async (req, res) => {
 })
 
 /**
- * GET /api/video/media/:key(*)
+ * GET /api/video/media/:path(*)
  * Proxy route for serving R2 media when no public URL is configured.
  * Streams the object from R2 directly to the client.
+ * Note: Express 5 / path-to-regexp v8 requires named wildcard params.
  */
-router.get('/media/*', readLimiter, async (req, res) => {
+router.get('/media/:path(*)', readLimiter, async (req, res) => {
   try {
-    // req.params[0] captures the wildcard portion after /media/
-    const key = decodeURIComponent(req.params[0] || '')
+    const key = decodeURIComponent(req.params.path || '')
     if (!key) return res.status(400).json({ error: 'Missing media key.' })
 
     const { body, contentType, contentLength } = await r2.getObject(key)

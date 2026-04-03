@@ -27,17 +27,39 @@ export default function SheetsPage() {
   const tutorial = useTutorial('sheets', SHEETS_STEPS, { version: TUTORIAL_VERSIONS.sheets })
 
   const {
-    user, navigate,
-    search, schoolId, courseId, mine, starred, statusFilter,
-    sortValue, formatValue,
-    catalog, catalogError, sheetsState, loadingMore,
-    mobileFiltersOpen, setMobileFiltersOpen,
-    forkingSheetId, cardsRef,
-    activeSchool, availableCourses, selectedCourse,
-    popularCourses, recentCourses,
-    subtitle, hasActiveFilters,
-    setQueryParam, handleSchoolChange, handleCourseFilter, toggleMine, clearAllFilters,
-    toggleStar, handleFork, loadMoreSheets,
+    user,
+    navigate,
+    search,
+    schoolId,
+    courseId,
+    mine,
+    starred,
+    statusFilter,
+    sortValue,
+    formatValue,
+    catalog,
+    catalogError,
+    sheetsState,
+    loadingMore,
+    mobileFiltersOpen,
+    setMobileFiltersOpen,
+    forkingSheetId,
+    cardsRef,
+    activeSchool,
+    availableCourses,
+    selectedCourse,
+    popularCourses,
+    recentCourses,
+    subtitle,
+    hasActiveFilters,
+    setQueryParam,
+    handleSchoolChange,
+    handleCourseFilter,
+    toggleMine,
+    clearAllFilters,
+    toggleStar,
+    handleFork,
+    loadMoreSheets,
   } = useSheetsData()
 
   return (
@@ -55,7 +77,11 @@ export default function SheetsPage() {
                     <h1 className="sheets-page__title">Study Sheets</h1>
                     <p className="sheets-page__subtitle">{subtitle}</p>
                   </div>
-                  <Link data-tutorial="sheets-upload" to="/sheets/upload" className="sh-btn sh-btn--primary sheets-page__upload-cta">
+                  <Link
+                    data-tutorial="sheets-upload"
+                    to="/sheets/upload"
+                    className="sh-btn sh-btn--primary sheets-page__upload-cta"
+                  >
                     <IconUpload size={14} />
                     Upload a sheet
                   </Link>
@@ -63,31 +89,55 @@ export default function SheetsPage() {
               </section>
 
               <SheetsFilters
-                search={search} schoolId={schoolId} courseId={courseId}
-                sortValue={sortValue} formatValue={formatValue}
-                mine={mine} starred={starred} statusFilter={statusFilter}
-                mobileFiltersOpen={mobileFiltersOpen} setMobileFiltersOpen={setMobileFiltersOpen}
-                catalog={catalog} activeSchool={activeSchool} availableCourses={availableCourses}
-                setQueryParam={setQueryParam} handleSchoolChange={handleSchoolChange} toggleMine={toggleMine}
+                search={search}
+                schoolId={schoolId}
+                courseId={courseId}
+                sortValue={sortValue}
+                formatValue={formatValue}
+                mine={mine}
+                starred={starred}
+                statusFilter={statusFilter}
+                mobileFiltersOpen={mobileFiltersOpen}
+                setMobileFiltersOpen={setMobileFiltersOpen}
+                catalog={catalog}
+                activeSchool={activeSchool}
+                availableCourses={availableCourses}
+                setQueryParam={setQueryParam}
+                handleSchoolChange={handleSchoolChange}
+                toggleMine={toggleMine}
+                accountType={user?.accountType}
               />
 
-              {catalogError ? <div className="sh-alert sh-alert--danger">{catalogError}</div> : null}
-              {sheetsState.error ? <div className="sh-alert sh-alert--danger">{sheetsState.error}</div> : null}
+              {catalogError ? (
+                <div className="sh-alert sh-alert--danger">{catalogError}</div>
+              ) : null}
+              {sheetsState.error ? (
+                <div className="sh-alert sh-alert--danger">{sheetsState.error}</div>
+              ) : null}
 
               {sheetsState.loading ? (
                 <SkeletonSheetGrid count={4} />
               ) : sheetsState.sheets.length === 0 ? (
                 <SheetsEmptyState
-                  search={search} hasActiveFilters={hasActiveFilters}
-                  mine={mine} statusFilter={statusFilter} clearAllFilters={clearAllFilters}
+                  search={search}
+                  hasActiveFilters={hasActiveFilters}
+                  mine={mine}
+                  statusFilter={statusFilter}
+                  clearAllFilters={clearAllFilters}
                   selectedCourse={selectedCourse}
                 />
               ) : (
                 <section className="sh-card sh-card--flat sh-card--flush sheets-page__list-shell">
                   <div className="sheets-page__list-head">
-                    <span>{sheetsState.total} sheet{sheetsState.total === 1 ? '' : 's'}</span>
+                    <span>
+                      {sheetsState.total} sheet{sheetsState.total === 1 ? '' : 's'}
+                    </span>
                     {hasActiveFilters ? (
-                      <button type="button" className="sh-btn sh-btn--ghost sh-btn--sm" onClick={clearAllFilters}>
+                      <button
+                        type="button"
+                        className="sh-btn sh-btn--ghost sh-btn--sm"
+                        onClick={clearAllFilters}
+                      >
                         Clear filters
                       </button>
                     ) : null}
@@ -115,7 +165,11 @@ export default function SheetsPage() {
 
                   {sheetsState.sheets.length < sheetsState.total ? (
                     <div className="sheets-page__load-more-wrap">
-                      <button onClick={loadMoreSheets} disabled={loadingMore} className="sh-load-more-btn">
+                      <button
+                        onClick={loadMoreSheets}
+                        disabled={loadingMore}
+                        className="sh-load-more-btn"
+                      >
                         {loadingMore
                           ? 'Loading...'
                           : `Load More (${sheetsState.sheets.length} of ${sheetsState.total})`}
@@ -141,7 +195,12 @@ export default function SheetsPage() {
 
       <SafeJoyride {...tutorial.joyrideProps} />
       {tutorial.seen ? (
-        <button type="button" onClick={tutorial.restart} title="Show tutorial" className="sheets-page__tutorial-btn">
+        <button
+          type="button"
+          onClick={tutorial.restart}
+          title="Show tutorial"
+          className="sheets-page__tutorial-btn"
+        >
           ?
         </button>
       ) : null}

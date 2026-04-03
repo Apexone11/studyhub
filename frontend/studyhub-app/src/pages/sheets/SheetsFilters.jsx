@@ -18,7 +18,9 @@ export default function SheetsFilters({
   setQueryParam,
   handleSchoolChange,
   toggleMine,
+  accountType,
 }) {
+  const hideSchoolCourse = accountType === 'other'
   return (
     <section className="sh-card sheets-page__filters-card">
       <div className="sheets-page__mobile-search-row">
@@ -47,7 +49,10 @@ export default function SheetsFilters({
         className={`sheets-page__filter-grid ${mobileFiltersOpen ? 'is-open' : ''}`}
         data-tutorial="sheets-filters"
       >
-        <label data-tutorial="sheets-search" className="sheets-page__search-wrap sheets-page__desktop-search">
+        <label
+          data-tutorial="sheets-search"
+          className="sheets-page__search-wrap sheets-page__desktop-search"
+        >
           <IconSearch size={15} className="sheets-page__search-icon" />
           <input
             className="sh-input sheets-page__search-input"
@@ -57,34 +62,40 @@ export default function SheetsFilters({
           />
         </label>
 
-        <select
-          className="sh-input sheets-page__filter-select"
-          value={schoolId}
-          onChange={(event) => handleSchoolChange(event.target.value)}
-        >
-          <option value="">All schools</option>
-          {catalog.map((school) => (
-            <option key={school.id} value={school.id}>
-              {school.short || school.name}
-            </option>
-          ))}
-        </select>
-
-        <select
-          className="sh-input sheets-page__filter-select"
-          value={courseId}
-          onChange={(event) => setQueryParam('courseId', event.target.value)}
-        >
-          <option value="">All courses</option>
-          {availableCourses.map((course) => {
-            const schoolLabel = course.school?.short || course.school?.name
-            return (
-              <option key={course.id} value={course.id}>
-                {activeSchool ? course.code : `${course.code}${schoolLabel ? ` · ${schoolLabel}` : ''}`}
+        {hideSchoolCourse ? null : (
+          <select
+            className="sh-input sheets-page__filter-select"
+            value={schoolId}
+            onChange={(event) => handleSchoolChange(event.target.value)}
+          >
+            <option value="">All schools</option>
+            {catalog.map((school) => (
+              <option key={school.id} value={school.id}>
+                {school.short || school.name}
               </option>
-            )
-          })}
-        </select>
+            ))}
+          </select>
+        )}
+
+        {hideSchoolCourse ? null : (
+          <select
+            className="sh-input sheets-page__filter-select"
+            value={courseId}
+            onChange={(event) => setQueryParam('courseId', event.target.value)}
+          >
+            <option value="">All courses</option>
+            {availableCourses.map((course) => {
+              const schoolLabel = course.school?.short || course.school?.name
+              return (
+                <option key={course.id} value={course.id}>
+                  {activeSchool
+                    ? course.code
+                    : `${course.code}${schoolLabel ? ` · ${schoolLabel}` : ''}`}
+                </option>
+              )
+            })}
+          </select>
+        )}
 
         <select
           className="sh-input sheets-page__filter-select"
@@ -101,7 +112,9 @@ export default function SheetsFilters({
         <select
           className="sh-input sheets-page__filter-select"
           value={formatValue}
-          onChange={(event) => setQueryParam('format', event.target.value === 'all' ? '' : event.target.value)}
+          onChange={(event) =>
+            setQueryParam('format', event.target.value === 'all' ? '' : event.target.value)
+          }
         >
           {FORMAT_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>
@@ -134,7 +147,9 @@ export default function SheetsFilters({
                 key={option.value}
                 type="button"
                 className={`sh-chip sh-chip--status ${statusFilter === option.value ? 'sh-chip--active' : ''}`}
-                onClick={() => setQueryParam('status', statusFilter === option.value ? '' : option.value)}
+                onClick={() =>
+                  setQueryParam('status', statusFilter === option.value ? '' : option.value)
+                }
               >
                 {option.icon ? <span className="sh-chip__icon">{option.icon}</span> : null}
                 {option.label}
