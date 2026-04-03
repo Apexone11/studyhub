@@ -1,16 +1,20 @@
 /* ═══════════════════════════════════════════════════════════════════════════
  * BookReaderPage.jsx -- Google Books embedded viewer for reading books
  *
+ * Uses the Google Books iframe embed for maximum compatibility. The embed
+ * URL format renders Google's own book viewer directly inside an iframe,
+ * which is the most reliable way to display book content.
+ *
  * Features:
- *   - Google Books Embedded Viewer API integration
+ *   - Full-height iframe Google Books viewer
  *   - Toolbar with back button and book title
- *   - Reading progress tracking (percentage based on viewer page)
+ *   - "Open in Google Books" link for full reading experience
  *   - Fallback for books without preview
- *   - Responsive full-height layout
+ *   - Responsive layout
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 import { useParams, useNavigate } from 'react-router-dom'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { IconArrowLeft } from '../../components/Icons'
 import { Skeleton } from '../../components/Skeleton'
 import { usePageTitle } from '../../lib/usePageTitle'
@@ -18,113 +22,56 @@ import useBookReader from './useBookReader'
 import { hasPreview, getPreviewLink } from './libraryHelpers'
 import './BookReaderPage.css'
 
-// Google Books Embedded Viewer API script URL
-const GOOGLE_BOOKS_VIEWER_SCRIPT = 'https://www.google.com/books/jsapi.js'
+/**
+ * Build the Google Books embed URL for the iframe viewer.
+ * Format: https://books.google.com/books?id=VOLUME_ID&lpg=PP1&pg=PP1&output=embed
+ */
+function getEmbedUrl(volumeId) {
+  return `https://books.google.com/books?id=${encodeURIComponent(volumeId)}&lpg=PP1&pg=PP1&output=embed`
+}
 
 export default function BookReaderPage() {
   usePageTitle('Reading')
   const { volumeId } = useParams()
   const navigate = useNavigate()
 
-  const [viewerReady, setViewerReady] = useState(false)
-  const [viewerError, setViewerError] = useState(false)
-  const [scriptLoaded, setScriptLoaded] = useState(false)
-
-  const viewerContainerRef = useRef(null)
-  const viewerInstanceRef = useRef(null)
+  const [iframeLoaded, setIframeLoaded] = useState(false)
+  const [iframeError, setIframeError] = useState(false)
 
   const { book, loading, error, progress, saveProgress } = useBookReader(volumeId)
 
-  // Load the Google Books Viewer API script
+  // Save reading progress when the page is visited
   useEffect(() => {
-    // Check if already loaded
-    if (window.google && window.google.books) {
-      // Use microtask to avoid synchronous setState in effect body
-      queueMicrotask(() => setScriptLoaded(true))
-      return
+    if (!book || !volumeId) return
+    // Mark that the user opened the reader
+    const startPct = progress?.percentage || 0
+    if (startPct < 5) {
+      saveProgress('viewer', 5)
     }
-
-    const existingScript = document.querySelector(`script[src="${GOOGLE_BOOKS_VIEWER_SCRIPT}"]`)
-    if (existingScript) {
-      existingScript.addEventListener('load', () => setScriptLoaded(true))
-      existingScript.addEventListener('error', () => setViewerError(true))
-      return
-    }
-
-    const script = document.createElement('script')
-    script.src = GOOGLE_BOOKS_VIEWER_SCRIPT
-    script.async = true
-    script.onload = () => {
-      if (window.google && window.google.books) {
-        window.google.books.load()
-        window.google.books.setOnLoadCallback(() => {
-          setScriptLoaded(true)
-        })
-      }
-    }
-    script.onerror = () => {
-      setViewerError(true)
-    }
-    document.head.appendChild(script)
-  }, [])
-
-  // Initialize the embedded viewer once script is loaded and book data is available
-  useEffect(() => {
-    if (!scriptLoaded || !book || !viewerContainerRef.current) return
-    if (!hasPreview(book)) {
-      queueMicrotask(() => setViewerError(true))
-      return
-    }
-
-    try {
-      viewerContainerRef.current.innerHTML = ''
-
-      const viewer = new window.google.books.DefaultViewer(viewerContainerRef.current)
-      viewerInstanceRef.current = viewer
-
-      viewer.load(
-        `ISBN:${volumeId}`,
-        function onError() {
-          viewer.load(
-            volumeId,
-            function onSecondError() {
-              setViewerError(true)
-            },
-            function onSecondSuccess() {
-              setViewerReady(true)
-              saveProgress('viewer', progress?.percentage || 0)
-            },
-          )
-        },
-        function onSuccess() {
-          setViewerReady(true)
-          saveProgress('viewer', progress?.percentage || 0)
-        },
-      )
-    } catch (err) {
-      console.error('Error initializing Google Books viewer:', err)
-      setViewerError(true)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- progress ref used only for initial value
-  }, [scriptLoaded, book, volumeId, saveProgress])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount with book data
+  }, [book, volumeId])
 
   // Save progress periodically while reading
   useEffect(() => {
-    if (!viewerReady || !book) return
+    if (!iframeLoaded || !book) return
 
-    // Since the Google Books embedded viewer does not expose page change events,
-    // we save progress periodically as a heartbeat while the user is reading.
     const interval = setInterval(() => {
-      // We use a rough estimate based on time spent reading
-      // The viewer handles its own pagination internally
-      if (progress) {
-        const newPct = Math.min((progress.percentage || 0) + 1, 100)
-        saveProgress('viewer', newPct)
+      const currentPct = progress?.percentage || 0
+      if (currentPct < 100) {
+        saveProgress('viewer', Math.min(currentPct + 2, 100))
       }
-    }, 60000) // Every 60 seconds
+    }, 60000) // Every 60 seconds, increment by 2%
 
     return () => clearInterval(interval)
-  }, [viewerReady, book, progress, saveProgress])
+  }, [iframeLoaded, book, progress, saveProgress])
+
+  const handleIframeLoad = useCallback(() => {
+    setIframeLoaded(true)
+  }, [])
+
+  const handleIframeError = useCallback(() => {
+    setIframeError(true)
+  }, [])
 
   // Error state from data fetch
   if (error && !loading) {
@@ -145,7 +92,7 @@ export default function BookReaderPage() {
   }
 
   // No preview available
-  if (!loading && book && (viewerError || !hasPreview(book))) {
+  if (!loading && book && !hasPreview(book)) {
     return (
       <main className="book-reader-error">
         <div className="book-reader-error__content">
@@ -181,7 +128,7 @@ export default function BookReaderPage() {
   return (
     <div className="book-reader-container">
       {/* Loading State */}
-      {(loading || (!viewerReady && !viewerError)) && (
+      {loading && (
         <div className="book-reader-loading">
           <Skeleton height={40} width="50%" className="mb-4" />
           <div style={{ width: '100%', height: '400px' }}>
@@ -220,12 +167,72 @@ export default function BookReaderPage() {
             </div>
           </div>
 
-          {/* Google Books Viewer Container */}
-          <div
+          {/* Iframe loading indicator */}
+          {!iframeLoaded && !iframeError && (
+            <div
+              className="book-reader-loading"
+              style={{ position: 'absolute', inset: 0, top: 56, zIndex: 1 }}
+            >
+              <div style={{ width: '100%', height: '100%', padding: 24 }}>
+                <Skeleton height="100%" width="100%" />
+              </div>
+            </div>
+          )}
+
+          {/* Google Books Iframe Embed */}
+          <iframe
+            src={getEmbedUrl(volumeId)}
+            title={`Read ${book.title || 'book'}`}
             className="reader-content"
-            ref={viewerContainerRef}
-            style={{ flex: 1, minHeight: '500px' }}
+            style={{
+              flex: 1,
+              width: '100%',
+              minHeight: '500px',
+              border: 'none',
+              opacity: iframeLoaded ? 1 : 0,
+              transition: 'opacity 0.3s ease',
+            }}
+            allow="fullscreen"
+            sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+            onLoad={handleIframeLoad}
+            onError={handleIframeError}
           />
+
+          {/* Error fallback if iframe fails */}
+          {iframeError && (
+            <div className="book-reader-error" style={{ flex: 1 }}>
+              <div className="book-reader-error__content">
+                <h2>Could not load the reader</h2>
+                <p>The book viewer failed to load. Try opening it directly on Google Books.</p>
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: '12px',
+                    justifyContent: 'center',
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <button
+                    onClick={() => navigate(`/library/${volumeId}`)}
+                    className="book-reader-error__button"
+                  >
+                    Back to Book
+                  </button>
+                  {getPreviewLink(book) && (
+                    <a
+                      href={getPreviewLink(book)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="book-reader-error__button"
+                      style={{ textDecoration: 'none' }}
+                    >
+                      Open on Google Books
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Bottom Bar with Progress */}
           {progress && progress.percentage > 0 && (

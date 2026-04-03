@@ -159,16 +159,19 @@ router.post('/', requireAuth, messagingWriteLimiter, async (req, res) => {
       captureError(blockErr, { route: req.originalUrl, context: 'block-filter' })
     }
 
-    // For DMs, check if conversation already exists
+    // For DMs, check if conversation already exists between both users.
+    // Use explicit `some` checks for both users instead of `every` — the
+    // `every` clause suffers from Prisma's vacuous-truth behavior (matches
+    // conversations with 0 participants) and also matches conversations
+    // where only ONE of the two intended users is a participant.
     if (type === 'dm' && participantIds.length === 1) {
       const existingDm = await prisma.conversation.findFirst({
         where: {
           type: 'dm',
-          participants: {
-            every: {
-              userId: { in: [req.user.userId, participantIds[0]] },
-            },
-          },
+          AND: [
+            { participants: { some: { userId: req.user.userId } } },
+            { participants: { some: { userId: participantIds[0] } } },
+          ],
         },
       })
 
@@ -228,6 +231,9 @@ router.post('/', requireAuth, messagingWriteLimiter, async (req, res) => {
 router.get('/:id', requireAuth, async (req, res) => {
   try {
     const conversationId = parseInt(req.params.id, 10)
+    if (isNaN(conversationId)) {
+      return res.status(400).json({ error: 'Invalid conversation ID.' })
+    }
 
     // Verify user is a participant
     const participant = await prisma.conversationParticipant.findUnique({

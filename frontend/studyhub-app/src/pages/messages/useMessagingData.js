@@ -51,7 +51,7 @@ export function useMessagingData(socket, currentUserId) {
         return
       }
       const data = await response.json()
-      setConversations(Array.isArray(data) ? data : (data?.conversations || []))
+      setConversations(Array.isArray(data) ? data : data?.conversations || [])
     } catch {
       showToast('Failed to load conversations', 'error')
     } finally {
@@ -78,7 +78,7 @@ export function useMessagingData(socket, currentUserId) {
         return
       }
       const data = await response.json()
-      const newMessages = Array.isArray(data) ? data : (data?.messages || [])
+      const newMessages = Array.isArray(data) ? data : data?.messages || []
 
       if (beforeMessageId) {
         setMessages((prev) => [...newMessages, ...prev])
@@ -86,7 +86,7 @@ export function useMessagingData(socket, currentUserId) {
         setMessages(newMessages)
       }
 
-      if (newMessages.length === 0 || (data?.hasMore === false)) {
+      if (newMessages.length === 0 || data?.hasMore === false) {
         setHasMoreMessages(false)
       }
     } catch {
@@ -97,66 +97,72 @@ export function useMessagingData(socket, currentUserId) {
   }, [])
 
   /* ── Mark conversation as read — socket preferred, HTTP fallback ──────── */
-  const markConversationRead = useCallback(async (conversationId) => {
-    if (socket && socket.connected) {
-      socket.emit('message:read', { conversationId })
-    } else {
-      // HTTP fallback when socket is disconnected
+  const markConversationRead = useCallback(
+    async (conversationId) => {
+      if (socket && socket.connected) {
+        socket.emit('message:read', { conversationId })
+      } else {
+        // HTTP fallback when socket is disconnected
+        try {
+          await fetch(`${API}/api/messages/conversations/${conversationId}/read`, {
+            method: 'POST',
+            headers: authHeaders(),
+            credentials: 'include',
+          })
+        } catch {
+          // Silent failure — unread will recalculate on next load
+        }
+      }
+      // Always clear the local badge immediately
+      setConversations((prev) =>
+        prev.map((c) => (c.id === conversationId ? { ...c, unreadCount: 0 } : c)),
+      )
+    },
+    [socket],
+  )
+
+  /* ── Select conversation and load messages ────────────────────────────– */
+  const selectConversation = useCallback(
+    async (id) => {
       try {
-        await fetch(`${API}/api/messages/conversations/${conversationId}/read`, {
-          method: 'POST',
+        const response = await fetch(`${API}/api/messages/conversations/${id}`, {
           headers: authHeaders(),
           credentials: 'include',
         })
+        if (!response.ok) {
+          showToast('Failed to load conversation', 'error')
+          return
+        }
+        const conversation = await response.json()
+        // Normalize participants to flat shape { id, username, avatarUrl }
+        // GET /conversations/:id returns nested { user: { id, username, avatarUrl } }
+        // but GET /conversations (list) returns flat { id, username, avatarUrl }
+        if (conversation.participants) {
+          conversation.participants = conversation.participants.map((p) =>
+            p.user ? { id: p.user.id, username: p.user.username, avatarUrl: p.user.avatarUrl } : p,
+          )
+        }
+        setActiveConversation(conversation)
+        activeConversationIdRef.current = conversation.id
+        setMessages([])
+        setHasMoreMessages(true)
+        setTypingUsers(new Map())
+
+        // Join the conversation room via socket
+        if (socket && socket.connected) {
+          socket.emit('conversation:join', { conversationId: id })
+        }
+
+        await loadMessages(id)
+
+        // Mark as read on backend (clears unread badge + updates lastReadAt)
+        markConversationRead(id)
       } catch {
-        // Silent failure — unread will recalculate on next load
+        showToast('Failed to select conversation', 'error')
       }
-    }
-    // Always clear the local badge immediately
-    setConversations((prev) =>
-      prev.map((c) => (c.id === conversationId ? { ...c, unreadCount: 0 } : c))
-    )
-  }, [socket])
-
-  /* ── Select conversation and load messages ────────────────────────────– */
-  const selectConversation = useCallback(async (id) => {
-    try {
-      const response = await fetch(`${API}/api/messages/conversations/${id}`, {
-        headers: authHeaders(),
-        credentials: 'include',
-      })
-      if (!response.ok) {
-        showToast('Failed to load conversation', 'error')
-        return
-      }
-      const conversation = await response.json()
-      // Normalize participants to flat shape { id, username, avatarUrl }
-      // GET /conversations/:id returns nested { user: { id, username, avatarUrl } }
-      // but GET /conversations (list) returns flat { id, username, avatarUrl }
-      if (conversation.participants) {
-        conversation.participants = conversation.participants.map((p) =>
-          p.user ? { id: p.user.id, username: p.user.username, avatarUrl: p.user.avatarUrl } : p
-        )
-      }
-      setActiveConversation(conversation)
-      activeConversationIdRef.current = conversation.id
-      setMessages([])
-      setHasMoreMessages(true)
-      setTypingUsers(new Map())
-
-      // Join the conversation room via socket
-      if (socket && socket.connected) {
-        socket.emit('conversation:join', { conversationId: id })
-      }
-
-      await loadMessages(id)
-
-      // Mark as read on backend (clears unread badge + updates lastReadAt)
-      markConversationRead(id)
-    } catch {
-      showToast('Failed to select conversation', 'error')
-    }
-  }, [socket, loadMessages, markConversationRead])
+    },
+    [socket, loadMessages, markConversationRead],
+  )
 
   /* ── Load more messages (pagination) ──────────────────────────────────– */
   const loadMoreMessages = useCallback(async () => {
@@ -166,70 +172,73 @@ export function useMessagingData(socket, currentUserId) {
   }, [activeConversation, hasMoreMessages, loadingMessages, messages, loadMessages])
 
   /* ── Send message — POST /api/messages/conversations/:id/messages ────── */
-  const sendMessage = useCallback(async (content, replyToId = null, options = {}) => {
-    const hasAttachments = Array.isArray(options.attachments) && options.attachments.length > 0
-    if (!activeConversation || (!content.trim() && !hasAttachments && !options.poll)) return
+  const sendMessage = useCallback(
+    async (content, replyToId = null, options = {}) => {
+      const hasAttachments = Array.isArray(options.attachments) && options.attachments.length > 0
+      if (!activeConversation || (!content.trim() && !hasAttachments && !options.poll)) return
 
-    const optimisticMessage = {
-      id: `temp_${Date.now()}`,
-      conversationId: activeConversation.id,
-      content: content.trim(),
-      replyToId,
-      sender: { id: currentUserId, username: null },
-      createdAt: new Date().toISOString(),
-      pending: true,
-      attachments: options.attachments || [],
-      poll: options.poll || null,
-    }
-    setMessages((prev) => [...prev, optimisticMessage])
-
-    try {
-      const body = {
+      const optimisticMessage = {
+        id: `temp_${Date.now()}`,
+        conversationId: activeConversation.id,
         content: content.trim(),
-        replyToId: replyToId || null,
+        replyToId,
+        sender: { id: currentUserId, username: null },
+        createdAt: new Date().toISOString(),
+        pending: true,
+        attachments: options.attachments || [],
+        poll: options.poll || null,
       }
-      if (options.attachments && options.attachments.length > 0) {
-        body.attachments = options.attachments
-      }
-      if (options.poll) {
-        body.poll = options.poll
-      }
+      setMessages((prev) => [...prev, optimisticMessage])
 
-      const response = await fetch(
-        `${API}/api/messages/conversations/${activeConversation.id}/messages`,
-        {
-          method: 'POST',
-          headers: authHeaders(),
-          credentials: 'include',
-          body: JSON.stringify(body),
-        },
-      )
-      if (!response.ok) {
+      try {
+        const body = {
+          content: content.trim(),
+          replyToId: replyToId || null,
+        }
+        if (options.attachments && options.attachments.length > 0) {
+          body.attachments = options.attachments
+        }
+        if (options.poll) {
+          body.poll = options.poll
+        }
+
+        const response = await fetch(
+          `${API}/api/messages/conversations/${activeConversation.id}/messages`,
+          {
+            method: 'POST',
+            headers: authHeaders(),
+            credentials: 'include',
+            body: JSON.stringify(body),
+          },
+        )
+        if (!response.ok) {
+          showToast('Failed to send message', 'error')
+          setMessages((prev) => prev.filter((m) => m.id !== optimisticMessage.id))
+          return
+        }
+        const sentMessage = await response.json()
+        setMessages((prev) => prev.map((m) => (m.id === optimisticMessage.id ? sentMessage : m)))
+
+        // Update conversation list with latest message
+        setConversations((prev) =>
+          prev.map((conv) =>
+            conv.id === activeConversation.id
+              ? { ...conv, lastMessage: sentMessage, updatedAt: sentMessage.createdAt }
+              : conv,
+          ),
+        )
+
+        // Stop typing indicator
+        if (socket) {
+          socket.emit('typing:stop', { conversationId: activeConversation.id })
+        }
+      } catch {
         showToast('Failed to send message', 'error')
         setMessages((prev) => prev.filter((m) => m.id !== optimisticMessage.id))
-        return
       }
-      const sentMessage = await response.json()
-      setMessages((prev) => prev.map((m) => (m.id === optimisticMessage.id ? sentMessage : m)))
-
-      // Update conversation list with latest message
-      setConversations((prev) =>
-        prev.map((conv) =>
-          conv.id === activeConversation.id
-            ? { ...conv, lastMessage: sentMessage, updatedAt: sentMessage.createdAt }
-            : conv,
-        ),
-      )
-
-      // Stop typing indicator
-      if (socket) {
-        socket.emit('typing:stop', { conversationId: activeConversation.id })
-      }
-    } catch {
-      showToast('Failed to send message', 'error')
-      setMessages((prev) => prev.filter((m) => m.id !== optimisticMessage.id))
-    }
-  }, [activeConversation, currentUserId, socket])
+    },
+    [activeConversation, currentUserId, socket],
+  )
 
   /* ── Start conversation ──────────────────────────────────────────────── */
   const startConversation = useCallback(async (participantIds, type, name = null) => {
@@ -253,7 +262,7 @@ export function useMessagingData(socket, currentUserId) {
       // Normalize participants to flat shape
       if (conversation.participants) {
         conversation.participants = conversation.participants.map((p) =>
-          p.user ? { id: p.user.id, username: p.user.username, avatarUrl: p.user.avatarUrl } : p
+          p.user ? { id: p.user.id, username: p.user.username, avatarUrl: p.user.avatarUrl } : p,
         )
       }
       setConversations((prev) => [conversation, ...prev.filter((c) => c.id !== conversation.id)])
@@ -265,39 +274,46 @@ export function useMessagingData(socket, currentUserId) {
   }, [])
 
   /* ── Edit message ────────────────────────────────────────────────────── */
-  const editMessage = useCallback(async (messageId, content) => {
-    if (!content.trim()) return
+  const editMessage = useCallback(
+    async (messageId, content) => {
+      if (!content.trim()) return
 
-    const originalMessage = messages.find((m) => m.id === messageId)
-    setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, content, editing: true } : m)))
+      const originalMessage = messages.find((m) => m.id === messageId)
+      setMessages((prev) =>
+        prev.map((m) => (m.id === messageId ? { ...m, content, editing: true } : m)),
+      )
 
-    try {
-      const response = await fetch(`${API}/api/messages/messages/${messageId}`, {
-        method: 'PATCH',
-        headers: authHeaders(),
-        credentials: 'include',
-        body: JSON.stringify({ content: content.trim() }),
-      })
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}))
-        showToast(errData.error || 'Failed to edit message', 'error')
+      try {
+        const response = await fetch(`${API}/api/messages/${messageId}`, {
+          method: 'PATCH',
+          headers: authHeaders(),
+          credentials: 'include',
+          body: JSON.stringify({ content: content.trim() }),
+        })
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}))
+          showToast(errData.error || 'Failed to edit message', 'error')
+          setMessages((prev) => prev.map((m) => (m.id === messageId ? originalMessage : m)))
+          return
+        }
+        const updatedMessage = await response.json()
+        setMessages((prev) => prev.map((m) => (m.id === messageId ? updatedMessage : m)))
+      } catch {
+        showToast('Failed to edit message', 'error')
         setMessages((prev) => prev.map((m) => (m.id === messageId ? originalMessage : m)))
-        return
       }
-      const updatedMessage = await response.json()
-      setMessages((prev) => prev.map((m) => (m.id === messageId ? updatedMessage : m)))
-    } catch {
-      showToast('Failed to edit message', 'error')
-      setMessages((prev) => prev.map((m) => (m.id === messageId ? originalMessage : m)))
-    }
-  }, [messages])
+    },
+    [messages],
+  )
 
   /* ── Delete message ──────────────────────────────────────────────────── */
   const deleteMessage = useCallback(async (messageId) => {
-    setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, deletedAt: new Date().toISOString() } : m)))
+    setMessages((prev) =>
+      prev.map((m) => (m.id === messageId ? { ...m, deletedAt: new Date().toISOString() } : m)),
+    )
 
     try {
-      const response = await fetch(`${API}/api/messages/messages/${messageId}`, {
+      const response = await fetch(`${API}/api/messages/${messageId}`, {
         method: 'DELETE',
         headers: authHeaders(),
         credentials: 'include',
@@ -313,28 +329,31 @@ export function useMessagingData(socket, currentUserId) {
   }, [])
 
   /* ── Delete / leave conversation ────────────────────────────────────── */
-  const deleteConversation = useCallback(async (id) => {
-    try {
-      const response = await fetch(`${API}/api/messages/conversations/${id}`, {
-        method: 'DELETE',
-        headers: authHeaders(),
-        credentials: 'include',
-      })
-      if (!response.ok) {
+  const deleteConversation = useCallback(
+    async (id) => {
+      try {
+        const response = await fetch(`${API}/api/messages/conversations/${id}`, {
+          method: 'DELETE',
+          headers: authHeaders(),
+          credentials: 'include',
+        })
+        if (!response.ok) {
+          showToast('Failed to delete conversation', 'error')
+          return
+        }
+        setConversations((prev) => prev.filter((conv) => conv.id !== id))
+        if (activeConversation?.id === id) {
+          setActiveConversation(null)
+          activeConversationIdRef.current = null
+          setMessages([])
+        }
+        showToast('Conversation deleted', 'success')
+      } catch {
         showToast('Failed to delete conversation', 'error')
-        return
       }
-      setConversations((prev) => prev.filter((conv) => conv.id !== id))
-      if (activeConversation?.id === id) {
-        setActiveConversation(null)
-        activeConversationIdRef.current = null
-        setMessages([])
-      }
-      showToast('Conversation deleted', 'success')
-    } catch {
-      showToast('Failed to delete conversation', 'error')
-    }
-  }, [activeConversation])
+    },
+    [activeConversation],
+  )
 
   /* ── Add reaction to message ─────────────────────────────────────────── */
   const addReaction = useCallback(async (messageId, emoji) => {
@@ -356,11 +375,14 @@ export function useMessagingData(socket, currentUserId) {
   /* ── Remove reaction from message ────────────────────────────────────── */
   const removeReaction = useCallback(async (messageId, emoji) => {
     try {
-      const response = await fetch(`${API}/api/messages/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`, {
-        method: 'DELETE',
-        headers: authHeaders(),
-        credentials: 'include',
-      })
+      const response = await fetch(
+        `${API}/api/messages/messages/${messageId}/reactions/${encodeURIComponent(emoji)}`,
+        {
+          method: 'DELETE',
+          headers: authHeaders(),
+          credentials: 'include',
+        },
+      )
       if (!response.ok) {
         showToast('Failed to remove reaction', 'error')
       }
@@ -370,56 +392,65 @@ export function useMessagingData(socket, currentUserId) {
   }, [])
 
   /* ── Mark conversation as read ───────────────────────────────────────── */
-  const markAsRead = useCallback((conversationId) => {
-    markConversationRead(conversationId)
-  }, [markConversationRead])
+  const markAsRead = useCallback(
+    (conversationId) => {
+      markConversationRead(conversationId)
+    },
+    [markConversationRead],
+  )
 
   /* ── Archive conversation ────────────────────────────────────────────── */
-  const archiveConversation = useCallback(async (id) => {
-    try {
-      const response = await fetch(`${API}/api/messages/conversations/${id}`, {
-        method: 'PATCH',
-        headers: authHeaders(),
-        credentials: 'include',
-        body: JSON.stringify({ archived: true }),
-      })
-      if (!response.ok) {
+  const archiveConversation = useCallback(
+    async (id) => {
+      try {
+        const response = await fetch(`${API}/api/messages/conversations/${id}`, {
+          method: 'PATCH',
+          headers: authHeaders(),
+          credentials: 'include',
+          body: JSON.stringify({ archived: true }),
+        })
+        if (!response.ok) {
+          showToast('Failed to archive conversation', 'error')
+          return
+        }
+        setConversations((prev) => prev.filter((conv) => conv.id !== id))
+        if (activeConversation?.id === id) {
+          setActiveConversation(null)
+          activeConversationIdRef.current = null
+          setMessages([])
+        }
+        showToast('Conversation archived', 'success')
+      } catch {
         showToast('Failed to archive conversation', 'error')
-        return
       }
-      setConversations((prev) => prev.filter((conv) => conv.id !== id))
-      if (activeConversation?.id === id) {
-        setActiveConversation(null)
-        activeConversationIdRef.current = null
-        setMessages([])
-      }
-      showToast('Conversation archived', 'success')
-    } catch {
-      showToast('Failed to archive conversation', 'error')
-    }
-  }, [activeConversation])
+    },
+    [activeConversation],
+  )
 
   /* ── Toggle mute on conversation ────────────────────────────────────── */
-  const muteConversation = useCallback(async (id, muted) => {
-    try {
-      const response = await fetch(`${API}/api/messages/conversations/${id}`, {
-        method: 'PATCH',
-        headers: authHeaders(),
-        credentials: 'include',
-        body: JSON.stringify({ muted }),
-      })
-      if (!response.ok) {
+  const muteConversation = useCallback(
+    async (id, muted) => {
+      try {
+        const response = await fetch(`${API}/api/messages/conversations/${id}`, {
+          method: 'PATCH',
+          headers: authHeaders(),
+          credentials: 'include',
+          body: JSON.stringify({ muted }),
+        })
+        if (!response.ok) {
+          showToast('Failed to update mute status', 'error')
+          return
+        }
+        setConversations((prev) => prev.map((conv) => (conv.id === id ? { ...conv, muted } : conv)))
+        if (activeConversation?.id === id) {
+          setActiveConversation((prev) => (prev ? { ...prev, muted } : prev))
+        }
+      } catch {
         showToast('Failed to update mute status', 'error')
-        return
       }
-      setConversations((prev) => prev.map((conv) => (conv.id === id ? { ...conv, muted } : conv)))
-      if (activeConversation?.id === id) {
-        setActiveConversation((prev) => prev ? { ...prev, muted } : prev)
-      }
-    } catch {
-      showToast('Failed to update mute status', 'error')
-    }
-  }, [activeConversation])
+    },
+    [activeConversation],
+  )
 
   /* ── Typing indicator helpers ────────────────────────────────────────── */
   const emitTypingStart = useCallback(() => {
@@ -483,7 +514,9 @@ export function useMessagingData(socket, currentUserId) {
                 lastMessage: message,
                 updatedAt: message.createdAt,
                 // Clear unread if we're viewing this conversation; increment otherwise
-                unreadCount: isActive ? 0 : ((conv.unreadCount || 0) + (message.sender?.id !== currentUserId ? 1 : 0)),
+                unreadCount: isActive
+                  ? 0
+                  : (conv.unreadCount || 0) + (message.sender?.id !== currentUserId ? 1 : 0),
               }
             : conv,
         ),
@@ -496,7 +529,9 @@ export function useMessagingData(socket, currentUserId) {
 
     const handleDeleteMessage = (data) => {
       const messageId = typeof data === 'object' ? data.messageId : data
-      setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, deletedAt: new Date().toISOString() } : m)))
+      setMessages((prev) =>
+        prev.map((m) => (m.id === messageId ? { ...m, deletedAt: new Date().toISOString() } : m)),
+      )
     }
 
     const handleTypingStart = (data) => {
@@ -533,33 +568,39 @@ export function useMessagingData(socket, currentUserId) {
 
     const handleReactionAdd = (data) => {
       if (!data.messageId || !data.reaction) return
-      setMessages((prev) => prev.map((m) => {
-        if (m.id === data.messageId) {
-          const reactions = Array.isArray(m.reactions) ? [...m.reactions, data.reaction] : [data.reaction]
-          return { ...m, reactions }
-        }
-        return m
-      }))
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id === data.messageId) {
+            const reactions = Array.isArray(m.reactions)
+              ? [...m.reactions, data.reaction]
+              : [data.reaction]
+            return { ...m, reactions }
+          }
+          return m
+        }),
+      )
     }
 
     const handleReactionRemove = (data) => {
       if (!data.messageId || !data.emoji) return
-      setMessages((prev) => prev.map((m) => {
-        if (m.id === data.messageId) {
-          const reactions = Array.isArray(m.reactions)
-            ? m.reactions.filter((r) => !(r.emoji === data.emoji && r.user?.id === data.userId))
-            : []
-          return { ...m, reactions }
-        }
-        return m
-      }))
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id === data.messageId) {
+            const reactions = Array.isArray(m.reactions)
+              ? m.reactions.filter((r) => !(r.emoji === data.emoji && r.user?.id === data.userId))
+              : []
+            return { ...m, reactions }
+          }
+          return m
+        }),
+      )
     }
 
     // When the server confirms a read receipt from this user, ensure unread is cleared
     const handleMessageRead = (data) => {
       if (data.userId === currentUserId && data.conversationId) {
         setConversations((prev) =>
-          prev.map((c) => (c.id === data.conversationId ? { ...c, unreadCount: 0 } : c))
+          prev.map((c) => (c.id === data.conversationId ? { ...c, unreadCount: 0 } : c)),
         )
       }
     }
