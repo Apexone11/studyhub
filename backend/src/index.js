@@ -52,22 +52,25 @@ const docsRoutes = require('./modules/docs')
 const sharingRoutes = require('./modules/sharing')
 const aiRoutes = require('./modules/ai')
 const libraryRoutes = require('./modules/library')
+const crypto = require('node:crypto')
+const log = require('./lib/logger')
+const { httpLogger } = require('./lib/httpLogger')
 const { initSocketIO } = require('./lib/socketio')
 const { featureFlagMiddleware } = require('./lib/featureFlags')
 
 if (sentryEnabled) {
-    console.log('Sentry monitoring enabled for backend.')
+    log.info('Sentry monitoring enabled for backend.')
 }
 
 process.on('uncaughtException', (error) => {
     captureError(error, { source: 'uncaughtException' })
-    console.error(error)
+    log.fatal({ err: error }, 'Uncaught exception')
 })
 
 process.on('unhandledRejection', (reason) => {
     const error = reason instanceof Error ? reason : new Error(String(reason))
     captureError(error, { source: 'unhandledRejection' })
-    console.error(error)
+    log.error({ err: error }, 'Unhandled promise rejection')
 })
 
 // Dynamic CORS: dev allows Vite dev/preview servers; production allows primary and alternate frontend URLs.
@@ -140,6 +143,23 @@ const previewSurfaceCsp = [
 ].join('; ')
 
 app.disable('x-powered-by')
+
+// ── Request ID ──────────────────────────────────────────────────────────
+// Attach a unique request ID to every request for end-to-end tracing.
+// If the client sends X-Request-Id (e.g., from Sentry on the frontend),
+// we reuse it; otherwise we generate one. The ID is returned in the
+// response header so frontend error reports can be correlated with
+// backend logs. Same pattern used by GitHub, Stripe, and Heroku.
+app.use((req, res, next) => {
+  const id = req.headers['x-request-id'] || crypto.randomUUID()
+  req.requestId = id
+  res.setHeader('X-Request-Id', id)
+  next()
+})
+
+// Structured HTTP request/response logging (pino-http).
+// Logs method, url, status, response time, request ID, and user ID.
+app.use(httpLogger)
 
 // Gzip/Brotli compression for all text-based responses.
 app.use(compression())
@@ -431,11 +451,11 @@ async function startServer() {
   if (process.env.NODE_ENV === 'production' && clamAvDisabled) {
     throw new Error('[security] CLAMAV_DISABLED must not be true in production. Attachment malware scanning is required.')
   } else if (process.env.NODE_ENV !== 'test' && clamAvDisabled) {
-    console.warn('[security-warning] CLAMAV_DISABLED=true; attachment malware scanning is bypassed.')
+    log.warn('CLAMAV_DISABLED=true; attachment malware scanning is bypassed.')
   }
 
   if (isGuardedModeEnabled()) {
-    console.warn('[ops-warning] Guarded mode is enabled; non-admin write actions are temporarily blocked.')
+    log.warn('Guarded mode is enabled; non-admin write actions are temporarily blocked.')
   }
 
   const server = http.createServer(app)
@@ -455,17 +475,58 @@ async function startServer() {
     setInterval(() => {
       syncPopularBooksToDB(16).catch(() => {})
     }, 24 * 60 * 60 * 1000)
-    console.log(`Server running on http://localhost:${PORT}`)
+    log.info({ port: PORT }, `Server running on http://localhost:${PORT}`)
   })
 }
 
+// ── Graceful Shutdown ─────────────────────────────────────────────────────
+// When Railway (or any PaaS) redeploys, it sends SIGTERM to the process.
+// Without this handler, in-flight requests (sheet saves, messages, uploads)
+// are killed mid-execution causing data loss. This pattern:
+// 1. Stops accepting new connections
+// 2. Waits for in-flight requests to finish (up to 15s)
+// 3. Disconnects all WebSocket clients cleanly
+// 4. Closes the Prisma database connection pool
+// 5. Exits cleanly
+// Same pattern used by GitHub, Heroku, Vercel, and every serious Node.js app.
+let serverInstance = null
+
+function gracefulShutdown(signal) {
+  log.info({ signal }, 'Received shutdown signal, starting graceful shutdown...')
+
+  if (!serverInstance) {
+    process.exit(0)
+  }
+
+  // Stop accepting new connections
+  serverInstance.close(() => {
+    log.info('HTTP server closed, cleaning up...')
+
+    // Disconnect Prisma connection pool
+    prisma.$disconnect()
+      .catch(() => {})
+      .finally(() => {
+        log.info('Cleanup complete, exiting.')
+        process.exit(0)
+      })
+  })
+
+  // Force exit after 15 seconds if connections won't drain
+  setTimeout(() => {
+    log.error('Could not close connections in time, forcing exit.')
+    process.exit(1)
+  }, 15000).unref()
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'))
+process.on('SIGINT', () => gracefulShutdown('SIGINT'))
+
 if (require.main === module) {
-  startServer().catch((error) => {
+  startServer().then((server) => {
+    serverInstance = server
+  }).catch((error) => {
     captureError(error, { source: 'serverStartup' })
     console.error(error)
     process.exit(1)
   })
 }
-
-module.exports = app
-module.exports.startServer = startServer

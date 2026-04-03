@@ -45,14 +45,21 @@ export default function NavbarNotifications() {
     intervalMs: 30000,
   })
 
-  // close dropdown on outside click
+  // close dropdown on outside click or Escape key
   useEffect(() => {
     if (!showBell) return
     function onClickOutside(e) {
       if (bellRef.current && !bellRef.current.contains(e.target)) setShowBell(false)
     }
+    function onEscapeKey(e) {
+      if (e.key === 'Escape') setShowBell(false)
+    }
     document.addEventListener('mousedown', onClickOutside)
-    return () => document.removeEventListener('mousedown', onClickOutside)
+    document.addEventListener('keydown', onEscapeKey)
+    return () => {
+      document.removeEventListener('mousedown', onClickOutside)
+      document.removeEventListener('keydown', onEscapeKey)
+    }
   }, [showBell])
 
   async function markAllRead() {
@@ -191,7 +198,11 @@ export default function NavbarNotifications() {
               : notifications.map(notif => (
                 <div
                   key={notif.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`${notif.read ? '' : 'Unread: '}${notif.actor?.username || 'Someone'} ${notif.message}`}
                   onClick={() => markOneRead(notif)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); markOneRead(notif) } }}
                   style={{
                     padding: '12px 16px',
                     paddingRight: 36,
@@ -216,6 +227,7 @@ export default function NavbarNotifications() {
                   <button
                     onClick={(e) => deleteOne(e, notif.id)}
                     title="Delete notification"
+                    aria-label="Delete notification"
                     style={{
                       position: 'absolute', top: 10, right: 10,
                       background: 'none', border: 'none', cursor: 'pointer',

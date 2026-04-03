@@ -599,6 +599,15 @@ const libraryWriteLimiter = rateLimit({
   message: { error: 'Too many library requests. Please slow down.' },
 })
 
+const exportDataLimiter = rateLimit({
+  windowMs: 24 * 60 * 60 * 1000, // 24 hours
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Data export limit reached. You can export your data up to 3 times per day.' },
+  keyGenerator: (req) => req.user?.userId || req.ip,
+})
+
 // ── Exports ────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -683,4 +692,7 @@ module.exports = {
 
   // Library module
   libraryWriteLimiter,
+
+  // Data export (expensive query -- 3 per day per user)
+  exportDataLimiter,
 }

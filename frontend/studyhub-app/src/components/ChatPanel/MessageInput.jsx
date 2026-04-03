@@ -50,7 +50,7 @@ export default function MessageInput({
               {truncate(replyTo.content, 50)}
             </div>
           </div>
-          <button onClick={onCancelReply} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sh-muted)', fontSize: 13, padding: '0 3px', fontFamily: PAGE_FONT }}>x</button>
+          <button onClick={onCancelReply} aria-label="Cancel reply" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sh-muted)', fontSize: 13, padding: '0 3px', fontFamily: PAGE_FONT }}>x</button>
         </div>
       )}
 
@@ -68,6 +68,7 @@ export default function MessageInput({
               )}
               <button
                 onClick={() => onRemoveAttachment(i)}
+                aria-label={`Remove attachment ${ap.name || ''}`}
                 style={{
                   position: 'absolute', top: 1, right: 1,
                   width: 14, height: 14, borderRadius: '50%',
@@ -87,6 +88,7 @@ export default function MessageInput({
           <input
             type="text"
             placeholder="Paste image URL..."
+            aria-label="Image URL"
             value={imageUrl}
             onChange={(e) => onImageUrlChange(e.target.value)}
             autoFocus
@@ -123,24 +125,27 @@ export default function MessageInput({
           type="button"
           onClick={() => fileInputRef.current?.click()}
           title="Attach file"
+          aria-label="Attach file"
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: attachmentPreviews.length > 0 ? 'var(--sh-brand)' : 'var(--sh-muted)', padding: '5px 2px', flexShrink: 0 }}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" /></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" /></svg>
         </button>
         {/* Image URL button */}
         <button
           type="button"
           onClick={() => onToggleImageInput(!showImageInput)}
           title="Share image URL"
+          aria-label="Share image URL"
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: showImageInput ? 'var(--sh-brand)' : 'var(--sh-muted)', padding: '5px 2px', flexShrink: 0 }}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg>
         </button>
         {/* GIF button */}
         <button
           type="button"
           onClick={() => onToggleGifPicker(!showGifPicker)}
           title="Send GIF"
+          aria-label="Send GIF"
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: showGifPicker ? 'var(--sh-brand)' : 'var(--sh-muted)', padding: '5px 2px', flexShrink: 0, fontWeight: 800, fontSize: 11, fontFamily: PAGE_FONT }}
         >
           GIF

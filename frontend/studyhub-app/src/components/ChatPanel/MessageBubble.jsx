@@ -75,7 +75,7 @@ export default function MessageBubble({ msg, currentUserId, onReply, isHovered, 
                       borderRadius: 4, color: 'inherit', textDecoration: 'none', fontSize: 11,
                     }}
                   >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
                     {att.fileName || 'Download'}
                     {att.fileSize ? ` (${Math.round(att.fileSize / 1024)}KB)` : ''}
                   </a>
@@ -95,6 +95,7 @@ export default function MessageBubble({ msg, currentUserId, onReply, isHovered, 
           <button
             onClick={() => onReply(msg)}
             title="Reply"
+            aria-label="Reply to message"
             style={{
               position: 'absolute', top: -8, right: isOwn ? 0 : undefined, left: isOwn ? undefined : 0,
               width: 22, height: 22, borderRadius: 4,
@@ -103,7 +104,7 @@ export default function MessageBubble({ msg, currentUserId, onReply, isHovered, 
               boxShadow: '0 1px 4px rgba(0,0,0,0.1)', color: 'var(--sh-muted)',
             }}
           >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 17 4 12 9 7" /><path d="M20 18v-2a4 4 0 0 0-4-4H4" /></svg>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="9 17 4 12 9 7" /><path d="M20 18v-2a4 4 0 0 0-4-4H4" /></svg>
           </button>
         )}
       </div>

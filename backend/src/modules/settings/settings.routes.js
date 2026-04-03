@@ -5,6 +5,7 @@ const accountController = require('./settings.account.controller')
 const emailController = require('./settings.email.controller')
 const preferencesController = require('./settings.preferences.controller')
 const googleController = require('./settings.google.controller')
+const exportController = require('./settings.export.controller')
 
 const router = express.Router()
 
@@ -14,5 +15,6 @@ router.use('/', accountController)
 router.use('/', emailController)
 router.use('/', preferencesController)
 router.use('/', googleController)
+router.use('/', exportController)
 
 module.exports = router
