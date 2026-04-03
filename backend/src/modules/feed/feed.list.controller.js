@@ -77,7 +77,36 @@ router.get('/', async (req, res) => {
       settleSection('announcements', () =>
         prisma.announcement.findMany({
           where: { ...announcementWhere, ...authorFilter },
-          include: { author: { select: { id: true, username: true, avatarUrl: true } } },
+          include: {
+            author: { select: { id: true, username: true, avatarUrl: true } },
+            media: {
+              select: {
+                id: true,
+                type: true,
+                url: true,
+                position: true,
+                videoId: true,
+                fileName: true,
+                fileSize: true,
+                width: true,
+                height: true,
+                video: {
+                  select: {
+                    id: true,
+                    title: true,
+                    status: true,
+                    duration: true,
+                    width: true,
+                    height: true,
+                    thumbnailR2Key: true,
+                    variants: true,
+                    r2Key: true,
+                  },
+                },
+              },
+              orderBy: { position: 'asc' },
+            },
+          },
           orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
           take: announcementTake,
         }),

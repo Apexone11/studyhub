@@ -65,7 +65,7 @@ router.get('/analytics/users', async (req, res) => {
     `
 
     // Transform to expected format
-    const formattedData = dailyData.map(row => ({
+    const formattedData = dailyData.map((row) => ({
       date: formatDate(row.date),
       count: parseInt(row.count, 10),
     }))
@@ -122,7 +122,7 @@ router.get('/analytics/content', async (req, res) => {
 
     // Transform to expected format
     const formatDataArray = (arr) =>
-      arr.map(row => ({
+      arr.map((row) => ({
         date: formatDate(row.date),
         count: parseInt(row.count, 10),
       }))
@@ -159,7 +159,7 @@ router.get('/analytics/ai', async (req, res) => {
     `
 
     // Transform to expected format
-    const formattedData = aiData.map(row => ({
+    const formattedData = aiData.map((row) => ({
       date: formatDate(row.date),
       messageCount: parseInt(row.total_messages || 0, 10),
       uniqueUsers: parseInt(row.unique_users || 0, 10),
@@ -186,10 +186,8 @@ router.get('/analytics/moderation', async (req, res) => {
 
       await Promise.all(
         statuses.map(async (status) => {
-          counts[status] = await prisma.moderationCase
-            .count({ where: { status } })
-            .catch(() => 0)
-        })
+          counts[status] = await prisma.moderationCase.count({ where: { status } }).catch(() => 0)
+        }),
       )
 
       return counts
@@ -209,19 +207,14 @@ router.get('/analytics/moderation', async (req, res) => {
 router.get('/analytics/overview', async (req, res) => {
   try {
     // Get total counts for content overview with graceful degradation
-    const [
-      sheetsCount,
-      notesCount,
-      feedPostsCount,
-      messagesCount,
-      aiMessagesCount,
-    ] = await Promise.all([
-      prisma.studySheet.count().catch(() => 0),
-      prisma.note.count().catch(() => 0),
-      prisma.feedPost.count().catch(() => 0),
-      prisma.message.count().catch(() => 0),
-      prisma.aiMessage.count().catch(() => 0),
-    ])
+    const [sheetsCount, notesCount, feedPostsCount, messagesCount, aiMessagesCount] =
+      await Promise.all([
+        prisma.studySheet.count().catch(() => 0),
+        prisma.note.count().catch(() => 0),
+        prisma.feedPost.count().catch(() => 0),
+        prisma.message.count().catch(() => 0),
+        prisma.aiMessage.count().catch(() => 0),
+      ])
 
     res.json({
       sheets: sheetsCount,
@@ -229,6 +222,205 @@ router.get('/analytics/overview', async (req, res) => {
       feedPosts: feedPostsCount,
       messages: messagesCount,
       aiMessages: aiMessagesCount,
+    })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── GET /api/admin/analytics/active-users ──────────────────────
+// DAU / WAU / MAU computed from UserDailyActivity table
+router.get('/analytics/active-users', async (req, res) => {
+  try {
+    const now = new Date()
+    const dayAgo = new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000)
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+    const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+
+    // Count distinct users who had any activity in each window
+    const [dauResult, wauResult, mauResult, totalUsers] = await Promise.all([
+      prisma.$queryRaw`
+        SELECT COUNT(DISTINCT "userId")::int as count
+        FROM "UserDailyActivity"
+        WHERE date >= ${dayAgo}
+      `.catch(() => [{ count: 0 }]),
+      prisma.$queryRaw`
+        SELECT COUNT(DISTINCT "userId")::int as count
+        FROM "UserDailyActivity"
+        WHERE date >= ${weekAgo}
+      `.catch(() => [{ count: 0 }]),
+      prisma.$queryRaw`
+        SELECT COUNT(DISTINCT "userId")::int as count
+        FROM "UserDailyActivity"
+        WHERE date >= ${monthAgo}
+      `.catch(() => [{ count: 0 }]),
+      prisma.user.count().catch(() => 0),
+    ])
+
+    const dau = dauResult[0]?.count ?? 0
+    const wau = wauResult[0]?.count ?? 0
+    const mau = mauResult[0]?.count ?? 0
+
+    // DAU trend over the past 14 days
+    const dauTrend = await prisma.$queryRaw`
+      SELECT
+        date::date as date,
+        COUNT(DISTINCT "userId")::int as count
+      FROM "UserDailyActivity"
+      WHERE date >= ${new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000)}
+      GROUP BY date
+      ORDER BY date ASC
+    `.catch(() => [])
+
+    res.json({
+      dau,
+      wau,
+      mau,
+      totalUsers,
+      dauTrend: dauTrend.map((row) => ({
+        date: formatDate(row.date),
+        count: Number(row.count),
+      })),
+    })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── GET /api/admin/analytics/engagement ────────────────────────
+// Engagement rate metrics over a period (posts, comments, stars, reactions per day)
+router.get('/analytics/engagement', async (req, res) => {
+  const period = req.query.period || '30d'
+  const startDate = periodStartDate(period)
+
+  try {
+    const [postData, commentData, starData, reactionData] = await Promise.all([
+      prisma.$queryRaw`
+        SELECT DATE_TRUNC('day', "createdAt")::date as date, COUNT(*) as count
+        FROM "FeedPost"
+        WHERE "createdAt" >= ${startDate}
+        GROUP BY DATE_TRUNC('day', "createdAt")
+        ORDER BY date ASC
+      `.catch(() => []),
+      prisma.$queryRaw`
+        SELECT DATE_TRUNC('day', "createdAt")::date as date, COUNT(*) as count
+        FROM "Comment"
+        WHERE "createdAt" >= ${startDate}
+        GROUP BY DATE_TRUNC('day', "createdAt")
+        ORDER BY date ASC
+      `.catch(() => []),
+      prisma.$queryRaw`
+        SELECT DATE_TRUNC('day', "createdAt")::date as date, COUNT(*) as count
+        FROM "StarredSheet"
+        WHERE "createdAt" >= ${startDate}
+        GROUP BY DATE_TRUNC('day', "createdAt")
+        ORDER BY date ASC
+      `.catch(() => []),
+      prisma.$queryRaw`
+        SELECT DATE_TRUNC('day', "createdAt")::date as date, COUNT(*) as count
+        FROM "Reaction"
+        WHERE "createdAt" >= ${startDate}
+        GROUP BY DATE_TRUNC('day', "createdAt")
+        ORDER BY date ASC
+      `.catch(() => []),
+    ])
+
+    const fmt = (arr) => arr.map((r) => ({ date: formatDate(r.date), count: Number(r.count) }))
+
+    res.json({
+      posts: fmt(postData),
+      comments: fmt(commentData),
+      stars: fmt(starData),
+      reactions: fmt(reactionData),
+      period,
+    })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── GET /api/admin/analytics/top-content ───────────────────────
+// Top 10 sheets by stars, top 10 posts by reactions, top 10 contributors
+router.get('/analytics/top-content', async (req, res) => {
+  try {
+    const [topSheets, topContributors] = await Promise.all([
+      prisma.studySheet.findMany({
+        where: { status: 'published' },
+        select: {
+          id: true,
+          title: true,
+          stars: true,
+          forks: true,
+          downloads: true,
+          createdAt: true,
+          author: { select: { id: true, username: true, avatarUrl: true } },
+          course: { select: { id: true, code: true } },
+        },
+        orderBy: { stars: 'desc' },
+        take: 10,
+      }),
+      prisma.$queryRaw`
+        SELECT
+          u.id,
+          u.username,
+          u."avatarUrl",
+          COUNT(DISTINCT s.id)::int as sheet_count,
+          COALESCE(SUM(s.stars), 0)::int as total_stars,
+          COALESCE(SUM(s.forks), 0)::int as total_forks
+        FROM "User" u
+        JOIN "StudySheet" s ON s."userId" = u.id AND s.status = 'published'
+        GROUP BY u.id, u.username, u."avatarUrl"
+        ORDER BY sheet_count DESC
+        LIMIT 10
+      `.catch(() => []),
+    ])
+
+    // Top posts by total reactions (likes + dislikes)
+    const topPostReactions = await prisma.$queryRaw`
+      SELECT
+        fp.id,
+        fp.content,
+        fp."createdAt",
+        u.id as author_id,
+        u.username as author_username,
+        COUNT(r.id)::int as reaction_count
+      FROM "FeedPost" fp
+      LEFT JOIN "FeedPostReaction" r ON r."postId" = fp.id
+      LEFT JOIN "User" u ON u.id = fp."userId"
+      GROUP BY fp.id, fp.content, fp."createdAt", u.id, u.username
+      ORDER BY reaction_count DESC
+      LIMIT 10
+    `.catch(() => [])
+
+    res.json({
+      topSheets: topSheets.map((s) => ({
+        id: s.id,
+        title: s.title,
+        stars: s.stars,
+        forks: s.forks,
+        downloads: s.downloads,
+        createdAt: s.createdAt,
+        author: s.author,
+        course: s.course,
+      })),
+      topPosts: topPostReactions.map((p) => ({
+        id: p.id,
+        preview: String(p.content || '').slice(0, 120),
+        createdAt: p.createdAt,
+        reactionCount: p.reaction_count,
+        author: { id: p.author_id, username: p.author_username },
+      })),
+      topContributors: topContributors.map((c) => ({
+        id: c.id,
+        username: c.username,
+        avatarUrl: c.avatarUrl,
+        sheetCount: c.sheet_count,
+        totalStars: c.total_stars,
+        totalForks: c.total_forks,
+      })),
     })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })

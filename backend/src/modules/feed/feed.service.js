@@ -53,6 +53,21 @@ function reactionSummary(rows, idKey, idValue, currentRows, currentKey) {
   return { likes, dislikes, userReaction }
 }
 
+function formatAnnouncementMedia(mediaItems) {
+  if (!Array.isArray(mediaItems) || mediaItems.length === 0) return []
+  return mediaItems.map((m) => ({
+    id: m.id,
+    type: m.type,
+    url: m.url,
+    position: m.position,
+    fileName: m.fileName || null,
+    fileSize: m.fileSize || null,
+    width: m.width || null,
+    height: m.height || null,
+    video: m.video ? formatVideoForFeed(m.video) : null,
+  }))
+}
+
 function formatAnnouncement(item) {
   return {
     id: item.id,
@@ -69,6 +84,7 @@ function formatAnnouncement(item) {
           avatarUrl: item.author.avatarUrl || null,
         }
       : null,
+    media: formatAnnouncementMedia(item.media),
   }
 }
 
@@ -212,8 +228,10 @@ module.exports = {
   safeDownloadName,
   reactionSummary,
   formatAnnouncement,
+  formatAnnouncementMedia,
   formatSheet,
   formatPost,
   formatNote,
   formatFeedPostDetail,
+  formatVideoForFeed,
 }
