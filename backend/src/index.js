@@ -62,6 +62,7 @@ const sharingRoutes = require('./modules/sharing')
 const aiRoutes = require('./modules/ai')
 const libraryRoutes = require('./modules/library')
 const videoRoutes = require('./modules/video')
+const paymentsRoutes = require('./modules/payments')
 const crypto = require('node:crypto')
 const log = require('./lib/logger')
 const { httpLogger } = require('./lib/httpLogger')
@@ -252,6 +253,18 @@ app.use(globalLimiter)
 // signature verification depends on the raw request body.
 app.use('/api/webhooks', webhookRoutes)
 
+// Stripe payment webhook also needs raw body for signature verification.
+// Mount only the webhook sub-path here; the rest of payments mounts below.
+app.post(
+  '/api/payments/webhook',
+  express.raw({ type: 'application/json', limit: '1mb' }),
+  (req, res, next) => {
+    // Forward to the payments router's webhook handler
+    req.url = '/webhook'
+    paymentsRoutes(req, res, next)
+  },
+)
+
 // Parse JSON request bodies for auth and future API routes.
 app.use(express.json())
 
@@ -419,6 +432,9 @@ app.use('/api/library', libraryRoutes)
 
 // Video module endpoints under /api/video.
 app.use('/api/video', videoRoutes)
+
+// Payments module endpoints under /api/payments (webhook handled above).
+app.use('/api/payments', paymentsRoutes)
 
 // Waitlist (simple inline route for pricing page)
 app.post('/api/waitlist', express.json(), async (req, res) => {

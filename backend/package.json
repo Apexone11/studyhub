@@ -1,6 +1,6 @@
 {
   "name": "studyhub-backend",
-  "version": "1.7.0",
+  "version": "2.0.0",
   "private": true,
   "main": "src/index.js",
   "scripts": {
@@ -51,6 +51,7 @@
     "sanitize-html": "^2.17.1",
     "sharp": "^0.34.5",
     "socket.io": "^4.8.3",
+    "stripe": "^22.0.0",
     "svix": "^1.88.0",
     "zod": "^3.25.3"
   },

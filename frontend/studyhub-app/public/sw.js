@@ -8,7 +8,7 @@
  *   - Fonts / images:     Stale-while-revalidate with size-bounded cache
  *   - Everything else:    Network-first with cache fallback
  *
- * Fixes from v1.7.0:
+ * Fixes from v2.0.0:
  *   - Opaque response handling (prevents "Failed to convert value to Response")
  *   - Size-bounded caches prevent unbounded storage growth
  *   - Update notification: posts message to clients when new SW activates

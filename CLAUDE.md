@@ -166,6 +166,7 @@ Backend:
 ### Current Migration Inventory
 
 Tables with migrations (safe to query):
+
 - User, StudySheet, Course, School, Announcement, Note, FeedPost, Contribution, and all v1.0 tables (migration: `20260315000000_v1_complete`)
 - Email-related tables (multiple migrations from `20260316` - `20260317`)
 - Google OAuth, Preferences, Moderation tables (migration: `20260318040000`)
@@ -185,7 +186,7 @@ Tables with migrations (safe to query):
 - Scan existing implementation patterns before editing. Follow the established style unless correctness requires a change.
 - Keep changes incremental and pattern-aligned.
 - Prefer fixing root causes over local patches.
-- After each beta implementation cycle, document changes and validation results in `docs/beta-v1.7.0-release-log.md`.
+- After each beta implementation cycle, document changes and validation results in `docs/beta-v2.0.0-release-log.md`.
 - For frontend validation in this repo, `npm --prefix frontend/studyhub-app run lint` is the reliable full-lint command.
 - Use quoted paths in PowerShell because the workspace path contains spaces.
 
