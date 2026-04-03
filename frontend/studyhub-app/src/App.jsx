@@ -53,6 +53,7 @@ const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 
 import ScrollToTop from './components/ScrollToTop'
 import ToastContainer from './components/Toast'
+import OfflineIndicator from './components/OfflineIndicator'
 
 const AiBubble = lazy(() => import('./components/ai/AiBubble'))
 const AiChatProviderModule = lazy(() => import('./lib/AiChatProvider').then(m => ({ default: m.AiChatProvider })))
@@ -294,6 +295,7 @@ function AppRoutes() {
         </Suspense>
         <ScrollToTop />
         <ToastContainer />
+        <OfflineIndicator />
         <AuthenticatedBubble />
         </AuthenticatedAiProvider>
         {PerfOverlay && <Suspense fallback={null}><PerfOverlay /></Suspense>}

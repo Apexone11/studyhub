@@ -53,22 +53,24 @@ const sharingRoutes = require('./modules/sharing')
 const aiRoutes = require('./modules/ai')
 const libraryRoutes = require('./modules/library')
 const crypto = require('node:crypto')
+const log = require('./lib/logger')
+const { httpLogger } = require('./lib/httpLogger')
 const { initSocketIO } = require('./lib/socketio')
 const { featureFlagMiddleware } = require('./lib/featureFlags')
 
 if (sentryEnabled) {
-    console.log('Sentry monitoring enabled for backend.')
+    log.info('Sentry monitoring enabled for backend.')
 }
 
 process.on('uncaughtException', (error) => {
     captureError(error, { source: 'uncaughtException' })
-    console.error(error)
+    log.fatal({ err: error }, 'Uncaught exception')
 })
 
 process.on('unhandledRejection', (reason) => {
     const error = reason instanceof Error ? reason : new Error(String(reason))
     captureError(error, { source: 'unhandledRejection' })
-    console.error(error)
+    log.error({ err: error }, 'Unhandled promise rejection')
 })
 
 // Dynamic CORS: dev allows Vite dev/preview servers; production allows primary and alternate frontend URLs.
@@ -154,6 +156,10 @@ app.use((req, res, next) => {
   res.setHeader('X-Request-Id', id)
   next()
 })
+
+// Structured HTTP request/response logging (pino-http).
+// Logs method, url, status, response time, request ID, and user ID.
+app.use(httpLogger)
 
 // Gzip/Brotli compression for all text-based responses.
 app.use(compression())
@@ -445,11 +451,11 @@ async function startServer() {
   if (process.env.NODE_ENV === 'production' && clamAvDisabled) {
     throw new Error('[security] CLAMAV_DISABLED must not be true in production. Attachment malware scanning is required.')
   } else if (process.env.NODE_ENV !== 'test' && clamAvDisabled) {
-    console.warn('[security-warning] CLAMAV_DISABLED=true; attachment malware scanning is bypassed.')
+    log.warn('CLAMAV_DISABLED=true; attachment malware scanning is bypassed.')
   }
 
   if (isGuardedModeEnabled()) {
-    console.warn('[ops-warning] Guarded mode is enabled; non-admin write actions are temporarily blocked.')
+    log.warn('Guarded mode is enabled; non-admin write actions are temporarily blocked.')
   }
 
   const server = http.createServer(app)
@@ -469,7 +475,7 @@ async function startServer() {
     setInterval(() => {
       syncPopularBooksToDB(16).catch(() => {})
     }, 24 * 60 * 60 * 1000)
-    console.log(`Server running on http://localhost:${PORT}`)
+    log.info({ port: PORT }, `Server running on http://localhost:${PORT}`)
   })
 }
 
@@ -486,7 +492,7 @@ async function startServer() {
 let serverInstance = null
 
 function gracefulShutdown(signal) {
-  console.log(`[shutdown] Received ${signal}, starting graceful shutdown...`)
+  log.info({ signal }, 'Received shutdown signal, starting graceful shutdown...')
 
   if (!serverInstance) {
     process.exit(0)
@@ -494,20 +500,20 @@ function gracefulShutdown(signal) {
 
   // Stop accepting new connections
   serverInstance.close(() => {
-    console.log('[shutdown] HTTP server closed, cleaning up...')
+    log.info('HTTP server closed, cleaning up...')
 
     // Disconnect Prisma connection pool
     prisma.$disconnect()
       .catch(() => {})
       .finally(() => {
-        console.log('[shutdown] Cleanup complete, exiting.')
+        log.info('Cleanup complete, exiting.')
         process.exit(0)
       })
   })
 
   // Force exit after 15 seconds if connections won't drain
   setTimeout(() => {
-    console.error('[shutdown] Could not close connections in time, forcing exit.')
+    log.error('Could not close connections in time, forcing exit.')
     process.exit(1)
   }, 15000).unref()
 }

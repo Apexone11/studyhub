@@ -3078,6 +3078,11 @@ textarea.sh-input {
   to { transform: rotate(360deg); }
 }
 
+@keyframes sh-offline-slide-up {
+  from { opacity: 0; transform: translateX(-50%) translateY(1rem); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
 /* ── Focus ring styles (keyboard accessibility) ──────────────────── */
 *:focus-visible {
   outline: 2px solid #3b82f6;
