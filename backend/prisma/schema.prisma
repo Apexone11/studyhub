@@ -1217,39 +1217,39 @@ model BookShelf {
 }
 
 model ShelfBook {
-  id          Int      @id @default(autoincrement())
-  shelfId     Int
-  gutenbergId Int
-  title       String
-  author      String
-  coverUrl    String?
-  addedAt     DateTime @default(now())
+  id       Int      @id @default(autoincrement())
+  shelfId  Int
+  volumeId String
+  title    String
+  author   String
+  coverUrl String?
+  addedAt  DateTime @default(now())
 
   shelf BookShelf @relation(fields: [shelfId], references: [id], onDelete: Cascade)
 
-  @@unique([shelfId, gutenbergId])
+  @@unique([shelfId, volumeId])
   @@index([shelfId])
 }
 
 model ReadingProgress {
-  id          Int      @id @default(autoincrement())
-  userId      Int
-  gutenbergId Int
-  cfi         String?
-  percentage  Float    @default(0)
-  lastReadAt  DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  volumeId   String
+  cfi        String?
+  percentage Float    @default(0)
+  lastReadAt DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, gutenbergId])
+  @@unique([userId, volumeId])
   @@index([userId])
 }
 
 model BookBookmark {
   id          Int      @id @default(autoincrement())
   userId      Int
-  gutenbergId Int
+  volumeId    String
   cfi         String
   label       String?
   pageSnippet String?
@@ -1257,25 +1257,25 @@ model BookBookmark {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId, gutenbergId])
+  @@index([userId, volumeId])
 }
 
 model BookHighlight {
-  id          Int      @id @default(autoincrement())
-  userId      Int
-  gutenbergId Int
-  cfi         String
-  text        String
-  color       String   @default("#FFEB3B")
-  note        String?
-  shared      Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  volumeId  String
+  cfi       String
+  text      String
+  color     String   @default("#FFEB3B")
+  note      String?
+  shared    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId, gutenbergId])
-  @@index([gutenbergId, shared])
+  @@index([userId, volumeId])
+  @@index([volumeId, shared])
 }
 
 // ── Waitlist ─────────────────────────────────────────────────
@@ -1294,19 +1294,20 @@ model Waitlist {
 // ── Library Catalog Cache ────────────────────────────────────
 
 model CachedBook {
-  id            Int      @id @default(autoincrement())
-  gutenbergId   Int      @unique
-  title         String
-  authors       Json     @default("[]")
-  subjects      Json     @default("[]")
-  languages     Json     @default("[]")
-  downloadCount Int      @default(0)
-  coverUrl      String?
-  formats       Json     @default("{}")
-  description   String?
-  syncedAt      DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id          Int      @id @default(autoincrement())
+  volumeId    String   @unique
+  title       String
+  authors     Json     @default("[]")
+  categories  Json     @default("[]")
+  language    String   @default("en")
+  pageCount   Int      @default(0)
+  coverUrl    String?
+  previewLink String?
+  description String?
+  publishedDate String?
+  syncedAt    DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  @@index([downloadCount(sort: Desc)])
-  @@index([languages])
+  @@index([pageCount(sort: Desc)])
+  @@index([language])
 }

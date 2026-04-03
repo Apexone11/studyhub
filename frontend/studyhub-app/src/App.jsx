@@ -1,11 +1,7 @@
 import { Suspense, lazy, useEffect, useRef } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom'
 import { GoogleOAuthProvider } from '@react-oauth/google'
-import {
-  trackPageView,
-  identifyAuthenticatedUser,
-  clearAuthenticatedUser
-} from './lib/telemetry'
+import { trackPageView, identifyAuthenticatedUser, clearAuthenticatedUser } from './lib/telemetry'
 import { useBootstrapPreferences } from './lib/useBootstrapPreferences'
 import { useIdleTimeout } from './lib/useIdleTimeout'
 import RouteErrorBoundary from './components/RouteErrorBoundary'
@@ -56,7 +52,9 @@ import ToastContainer from './components/Toast'
 import OfflineIndicator from './components/OfflineIndicator'
 
 const AiBubble = lazy(() => import('./components/ai/AiBubble'))
-const AiChatProviderModule = lazy(() => import('./lib/AiChatProvider').then(m => ({ default: m.AiChatProvider })))
+const AiChatProviderModule = lazy(() =>
+  import('./lib/AiChatProvider').then((m) => ({ default: m.AiChatProvider })),
+)
 
 const PerfOverlay = import.meta.env?.DEV ? lazy(() => import('./components/PerfOverlay')) : null
 
@@ -169,7 +167,12 @@ function PreferencesBootstrap() {
   useBootstrapPreferences()
 
   const { isAuthenticated, signOut } = useSession()
-  useIdleTimeout(() => { void signOut() }, { enabled: isAuthenticated, timeoutMs: 30 * 60 * 1000 })
+  useIdleTimeout(
+    () => {
+      void signOut()
+    },
+    { enabled: isAuthenticated, timeoutMs: 30 * 60 * 1000 },
+  )
 
   return null
 }
@@ -178,11 +181,17 @@ function RouteFallback() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--sh-bg, #f8fafc)' }}>
       {/* Navbar skeleton */}
-      <div style={{
-        height: 56, background: 'var(--sh-surface, #fff)',
-        borderBottom: '1px solid var(--sh-border, #e2e8f0)',
-        display: 'flex', alignItems: 'center', padding: '0 24px', gap: 16,
-      }}>
+      <div
+        style={{
+          height: 56,
+          background: 'var(--sh-surface, #fff)',
+          borderBottom: '1px solid var(--sh-border, #e2e8f0)',
+          display: 'flex',
+          alignItems: 'center',
+          padding: '0 24px',
+          gap: 16,
+        }}
+      >
         <div className="sh-skeleton" style={{ width: 28, height: 28, borderRadius: 6 }} />
         <div className="sh-skeleton" style={{ width: 120, height: 14, borderRadius: 6 }} />
         <div style={{ flex: 1 }} />
@@ -190,25 +199,63 @@ function RouteFallback() {
       </div>
       {/* Content skeleton */}
       <div style={{ maxWidth: 800, margin: '32px auto', padding: '0 20px' }}>
-        <div className="sh-skeleton" style={{ width: '45%', height: 22, borderRadius: 8, marginBottom: 20 }} />
-        <div className="sh-skeleton" style={{ width: '100%', height: 14, borderRadius: 6, marginBottom: 12 }} />
-        <div className="sh-skeleton" style={{ width: '80%', height: 14, borderRadius: 6, marginBottom: 12 }} />
-        <div className="sh-skeleton" style={{ width: '60%', height: 14, borderRadius: 6, marginBottom: 24 }} />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 16 }}>
+        <div
+          className="sh-skeleton"
+          style={{ width: '45%', height: 22, borderRadius: 8, marginBottom: 20 }}
+        />
+        <div
+          className="sh-skeleton"
+          style={{ width: '100%', height: 14, borderRadius: 6, marginBottom: 12 }}
+        />
+        <div
+          className="sh-skeleton"
+          style={{ width: '80%', height: 14, borderRadius: 6, marginBottom: 12 }}
+        />
+        <div
+          className="sh-skeleton"
+          style={{ width: '60%', height: 14, borderRadius: 6, marginBottom: 24 }}
+        />
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+            gap: 16,
+          }}
+        >
           {[1, 2, 3].map((i) => (
-            <div key={i} style={{
-              background: 'var(--sh-surface, #fff)', borderRadius: 16,
-              border: '1px solid var(--sh-border, #e2e8f0)', padding: '20px 22px',
-            }}>
+            <div
+              key={i}
+              style={{
+                background: 'var(--sh-surface, #fff)',
+                borderRadius: 16,
+                border: '1px solid var(--sh-border, #e2e8f0)',
+                padding: '20px 22px',
+              }}
+            >
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-                <div className="sh-skeleton" style={{ width: 36, height: 36, borderRadius: '50%' }} />
+                <div
+                  className="sh-skeleton"
+                  style={{ width: 36, height: 36, borderRadius: '50%' }}
+                />
                 <div style={{ flex: 1 }}>
-                  <div className="sh-skeleton" style={{ width: '60%', height: 12, borderRadius: 6, marginBottom: 6 }} />
-                  <div className="sh-skeleton" style={{ width: '40%', height: 10, borderRadius: 6 }} />
+                  <div
+                    className="sh-skeleton"
+                    style={{ width: '60%', height: 12, borderRadius: 6, marginBottom: 6 }}
+                  />
+                  <div
+                    className="sh-skeleton"
+                    style={{ width: '40%', height: 10, borderRadius: 6 }}
+                  />
                 </div>
               </div>
-              <div className="sh-skeleton" style={{ width: '75%', height: 14, borderRadius: 6, marginBottom: 8 }} />
-              <div className="sh-skeleton" style={{ width: '100%', height: 10, borderRadius: 6, marginBottom: 6 }} />
+              <div
+                className="sh-skeleton"
+                style={{ width: '75%', height: 14, borderRadius: 6, marginBottom: 8 }}
+              />
+              <div
+                className="sh-skeleton"
+                style={{ width: '100%', height: 10, borderRadius: 6, marginBottom: 6 }}
+              />
               <div className="sh-skeleton" style={{ width: '85%', height: 10, borderRadius: 6 }} />
             </div>
           ))}
@@ -231,74 +278,287 @@ function AuthenticatedAiProvider({ children }) {
 function AuthenticatedBubble() {
   const { isAuthenticated } = useSession()
   if (!isAuthenticated) return null
-  return <Suspense fallback={null}><AiBubble /></Suspense>
+  return (
+    <Suspense fallback={null}>
+      <AiBubble />
+    </Suspense>
+  )
 }
 
 function AppRoutes() {
   return (
     <BrowserRouter>
       <SessionProvider>
-        <a href="#main-content" className="skip-to-content">Skip to main content</a>
+        <a href="#main-content" className="skip-to-content">
+          Skip to main content
+        </a>
         <RouteAnnouncer />
         <RouteTelemetry />
         <PreferencesBootstrap />
         <AuthenticatedAiProvider>
-        <Suspense fallback={<RouteFallback />}>
-          <Routes>
-            {/* ── public (unauthenticated) ─────────────────────────── */}
-            <Route path="/"         element={<PublicRoute><HomePage /></PublicRoute>} />
-            <Route path="/login"    element={<PublicRoute><LoginPage /></PublicRoute>} />
-            <Route path="/register" element={<PublicRoute><RegisterScreen /></PublicRoute>} />
-            <Route path="/terms"            element={<TermsPage />} />
-            <Route path="/privacy"          element={<PrivacyPage />} />
-            <Route path="/guidelines"       element={<GuidelinesPage />} />
-            <Route path="/about"            element={<AboutPage />} />
-            <Route path="/pricing"          element={<PricingPage />} />
-            <Route path="/forgot-password"  element={<ForgotPasswordPage />} />
-            <Route path="/reset-password"   element={<ResetPasswordPage />} />
+          <Suspense fallback={<RouteFallback />}>
+            <Routes>
+              {/* ── public (unauthenticated) ─────────────────────────── */}
+              <Route
+                path="/"
+                element={
+                  <PublicRoute>
+                    <HomePage />
+                  </PublicRoute>
+                }
+              />
+              <Route
+                path="/login"
+                element={
+                  <PublicRoute>
+                    <LoginPage />
+                  </PublicRoute>
+                }
+              />
+              <Route
+                path="/register"
+                element={
+                  <PublicRoute>
+                    <RegisterScreen />
+                  </PublicRoute>
+                }
+              />
+              <Route path="/terms" element={<TermsPage />} />
+              <Route path="/privacy" element={<PrivacyPage />} />
+              <Route path="/guidelines" element={<GuidelinesPage />} />
+              <Route path="/about" element={<AboutPage />} />
+              <Route path="/pricing" element={<PricingPage />} />
+              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+              <Route path="/reset-password" element={<ResetPasswordPage />} />
 
-            {/* ── authenticated ────────────────────────────────────── */}
-            <Route path="/feed"          element={<PrivateRoute><FeedPage /></PrivateRoute>} />
-            <Route path="/sheets"        element={<PrivateRoute><SheetsPage /></PrivateRoute>} />
-            <Route path="/sheets/upload" element={<PrivateRoute><UploadSheetPage /></PrivateRoute>} />
-            <Route path="/sheets/new/lab" element={<PrivateRoute><AiSheetSetupPage /></PrivateRoute>} />
-            <Route path="/sheets/:id/edit" element={<PrivateRoute><EditRedirect /></PrivateRoute>} />
-            <Route path="/sheets/:id/lab" element={<PrivateRoute><SheetLabPage /></PrivateRoute>} />
-            <Route path="/sheets/:id"    element={<PrivateRoute><SheetViewerPage /></PrivateRoute>} />
-            <Route path="/sheets/preview/html/:id" element={<PrivateRoute><SheetHtmlPreviewPage /></PrivateRoute>} />
-            <Route path="/preview/:scope/:id" element={<PrivateRoute><AttachmentPreviewPage /></PrivateRoute>} />
-            <Route path="/tests"         element={<PrivateRoute><TestsPage /></PrivateRoute>} />
-            <Route path="/tests/:id"     element={<PrivateRoute><TestTakerPage /></PrivateRoute>} />
-            <Route path="/notes"         element={<PrivateRoute><NotesPage /></PrivateRoute>} />
-            <Route path="/messages"      element={<PrivateRoute><MessagesPage /></PrivateRoute>} />
-            <Route path="/study-groups"  element={<PrivateRoute><StudyGroupsPage /></PrivateRoute>} />
-            <Route path="/study-groups/:id" element={<PrivateRoute><StudyGroupsPage /></PrivateRoute>} />
-            <Route path="/ai"           element={<PrivateRoute><AiPage /></PrivateRoute>} />
-            <Route path="/library"      element={<PrivateRoute><LibraryPage /></PrivateRoute>} />
-            <Route path="/library/:gutenbergId/read" element={<PrivateRoute><BookReaderPage /></PrivateRoute>} />
-            <Route path="/library/:gutenbergId" element={<PrivateRoute><BookDetailPage /></PrivateRoute>} />
-            <Route path="/playground"   element={<PrivateRoute><PlaygroundPage /></PrivateRoute>} />
-            <Route path="/notes/:id"    element={<NoteViewerPage />} />
-            <Route path="/announcements" element={<PrivateRoute><AnnouncementsPage /></PrivateRoute>} />
-            <Route path="/submit"        element={<PrivateRoute><SubmitPage /></PrivateRoute>} />
-            <Route path="/my-courses"   element={<PrivateRoute><MyCoursesPage /></PrivateRoute>} />
-            <Route path="/admin"         element={<PrivateRoute><AdminPage /></PrivateRoute>} />
-            <Route path="/dashboard"     element={<PrivateRoute><DashboardRedirect /></PrivateRoute>} />
-            <Route path="/settings"      element={<PrivateRoute><SettingsPage /></PrivateRoute>} />
+              {/* ── authenticated ────────────────────────────────────── */}
+              <Route
+                path="/feed"
+                element={
+                  <PrivateRoute>
+                    <FeedPage />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/sheets"
+                element={
+                  <PrivateRoute>
+                    <SheetsPage />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/sheets/upload"
+                element={
+                  <PrivateRoute>
+                    <UploadSheetPage />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/sheets/new/lab"
+                element={
+                  <PrivateRoute>
+                    <AiSheetSetupPage />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/sheets/:id/edit"
+                element={
+                  <PrivateRoute>
+                    <EditRedirect />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/sheets/:id/lab"
+                element={
+                  <PrivateRoute>
+                    <SheetLabPage />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/sheets/:id"
+                element={
+                  <PrivateRoute>
+                    <SheetViewerPage />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/sheets/preview/html/:id"
+                element={
+                  <PrivateRoute>
+                    <SheetHtmlPreviewPage />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/preview/:scope/:id"
+                element={
+                  <PrivateRoute>
+                    <AttachmentPreviewPage />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/tests"
+                element={
+                  <PrivateRoute>
+                    <TestsPage />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/tests/:id"
+                element={
+                  <PrivateRoute>
+                    <TestTakerPage />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/notes"
+                element={
+                  <PrivateRoute>
+                    <NotesPage />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/messages"
+                element={
+                  <PrivateRoute>
+                    <MessagesPage />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/study-groups"
+                element={
+                  <PrivateRoute>
+                    <StudyGroupsPage />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/study-groups/:id"
+                element={
+                  <PrivateRoute>
+                    <StudyGroupsPage />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/ai"
+                element={
+                  <PrivateRoute>
+                    <AiPage />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/library"
+                element={
+                  <PrivateRoute>
+                    <LibraryPage />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/library/:volumeId/read"
+                element={
+                  <PrivateRoute>
+                    <BookReaderPage />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/library/:volumeId"
+                element={
+                  <PrivateRoute>
+                    <BookDetailPage />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/playground"
+                element={
+                  <PrivateRoute>
+                    <PlaygroundPage />
+                  </PrivateRoute>
+                }
+              />
+              <Route path="/notes/:id" element={<NoteViewerPage />} />
+              <Route
+                path="/announcements"
+                element={
+                  <PrivateRoute>
+                    <AnnouncementsPage />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/submit"
+                element={
+                  <PrivateRoute>
+                    <SubmitPage />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/my-courses"
+                element={
+                  <PrivateRoute>
+                    <MyCoursesPage />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/admin"
+                element={
+                  <PrivateRoute>
+                    <AdminPage />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/dashboard"
+                element={
+                  <PrivateRoute>
+                    <DashboardRedirect />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/settings"
+                element={
+                  <PrivateRoute>
+                    <SettingsPage />
+                  </PrivateRoute>
+                }
+              />
 
-            {/* ── public user profiles ─────────────────────────────── */}
-            <Route path="/users/:username" element={<UserProfilePage />} />
+              {/* ── public user profiles ─────────────────────────────── */}
+              <Route path="/users/:username" element={<UserProfilePage />} />
 
-            {/* ── catch-all ────────────────────────────────────────── */}
-            <Route path="*" element={<NotFoundPage />} />
-          </Routes>
-        </Suspense>
-        <ScrollToTop />
-        <ToastContainer />
-        <OfflineIndicator />
-        <AuthenticatedBubble />
+              {/* ── catch-all ────────────────────────────────────────── */}
+              <Route path="*" element={<NotFoundPage />} />
+            </Routes>
+          </Suspense>
+          <ScrollToTop />
+          <ToastContainer />
+          <OfflineIndicator />
+          <AuthenticatedBubble />
         </AuthenticatedAiProvider>
-        {PerfOverlay && <Suspense fallback={null}><PerfOverlay /></Suspense>}
+        {PerfOverlay && (
+          <Suspense fallback={null}>
+            <PerfOverlay />
+          </Suspense>
+        )}
       </SessionProvider>
     </BrowserRouter>
   )

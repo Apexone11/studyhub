@@ -24,6 +24,7 @@ const mocks = vi.hoisted(() => {
       findMany: vi.fn(),
       create: vi.fn(),
       delete: vi.fn(),
+      deleteMany: vi.fn(),
       count: vi.fn(),
     },
     readingProgress: {
@@ -48,6 +49,7 @@ const mocks = vi.hoisted(() => {
     },
     cachedBook: {
       findMany: vi.fn(),
+      findUnique: vi.fn(),
       count: vi.fn(),
       upsert: vi.fn(),
     },
@@ -86,15 +88,14 @@ const mocks = vi.hoisted(() => {
       syncPopularBooksToDB: vi.fn(),
     },
     libraryConstants: {
-      GUTENDEX_BASE: 'https://gutendex.com',
-      OPENLIBRARY_BASE: 'https://openlibrary.org',
-      OPENLIBRARY_COVERS: 'https://covers.openlibrary.org',
+      GOOGLE_BOOKS_BASE: 'https://www.googleapis.com/books/v1',
+      GOOGLE_BOOKS_API_KEY: 'test-key',
       CACHE_TTL: { SEARCH: 3600000, BOOK_DETAIL: 86400000, COVER: 604800000 },
-      DEFAULT_PAGE_SIZE: 32,
+      DEFAULT_PAGE_SIZE: 20,
       MAX_SHELVES_PER_USER: 20,
       MAX_BOOKMARKS_PER_BOOK: 50,
       MAX_HIGHLIGHTS_PER_BOOK: 200,
-      MAX_EPUB_SIZE: 52428800,
+      CATEGORIES: ['Fiction', 'Science'],
     },
   }
 })
@@ -173,28 +174,25 @@ describe('POST /shelves', () => {
   it('creates a new shelf', async () => {
     mocks.prisma.bookShelf.count.mockResolvedValue(0)
     mocks.prisma.bookShelf.create.mockResolvedValue({
-      id: 1, name: 'My Shelf', userId: 42, createdAt: new Date(),
+      id: 1,
+      name: 'My Shelf',
+      userId: 42,
+      createdAt: new Date(),
     })
 
-    const res = await request(app)
-      .post('/shelves')
-      .send({ name: 'My Shelf' })
+    const res = await request(app).post('/shelves').send({ name: 'My Shelf' })
     expect(res.status).toBe(201)
     expect(res.body.name).toBe('My Shelf')
   })
 
   it('rejects empty shelf name', async () => {
-    const res = await request(app)
-      .post('/shelves')
-      .send({ name: '' })
+    const res = await request(app).post('/shelves').send({ name: '' })
     expect(res.status).toBe(400)
     expect(res.body.error).toMatch(/name/i)
   })
 
   it('rejects missing shelf name', async () => {
-    const res = await request(app)
-      .post('/shelves')
-      .send({})
+    const res = await request(app).post('/shelves').send({})
     expect(res.status).toBe(400)
   })
 })
@@ -220,48 +218,49 @@ describe('DELETE /shelves/:id', () => {
 describe('GET /reading-progress', () => {
   it('returns all reading progress for user', async () => {
     const progress = [
-      { id: 1, userId: 42, gutenbergId: 1342, percentage: 45, cfi: 'epubcfi(/6/10)' },
+      { id: 1, userId: 42, volumeId: 'zyTCAlFPjgYC', percentage: 45, cfi: 'viewer' },
     ]
     mocks.prisma.readingProgress.findMany.mockResolvedValue(progress)
 
     const res = await request(app).get('/reading-progress')
     expect(res.status).toBe(200)
-    // Returns raw array, not wrapped
     expect(res.body).toHaveLength(1)
     expect(res.body[0].percentage).toBe(45)
   })
 })
 
-describe('PUT /reading-progress/:gutenbergId', () => {
+describe('PUT /reading-progress/:volumeId', () => {
   it('upserts reading progress', async () => {
     mocks.prisma.readingProgress.upsert.mockResolvedValue({
-      id: 1, userId: 42, gutenbergId: 1342, percentage: 75, cfi: 'epubcfi(/6/20)',
+      id: 1,
+      userId: 42,
+      volumeId: 'zyTCAlFPjgYC',
+      percentage: 75,
+      cfi: 'viewer',
     })
 
     const res = await request(app)
-      .put('/reading-progress/1342')
-      .send({ percentage: 75, cfi: 'epubcfi(/6/20)' })
+      .put('/reading-progress/zyTCAlFPjgYC')
+      .send({ percentage: 75, cfi: 'viewer' })
     expect(res.status).toBe(200)
     expect(res.body.percentage).toBe(75)
   })
 
   it('rejects invalid percentage', async () => {
-    const res = await request(app)
-      .put('/reading-progress/1342')
-      .send({ percentage: 150 })
+    const res = await request(app).put('/reading-progress/zyTCAlFPjgYC').send({ percentage: 150 })
     expect(res.status).toBe(400)
   })
 })
 
 /* ── Bookmarks ─────────────────────────────────────────────────────────── */
 
-describe('GET /bookmarks/:gutenbergId', () => {
+describe('GET /bookmarks/:volumeId', () => {
   it('returns bookmarks for a book', async () => {
     mocks.prisma.bookBookmark.findMany.mockResolvedValue([
-      { id: 1, gutenbergId: 1342, cfi: 'epubcfi(/6/10)', label: 'Chapter 1' },
+      { id: 1, volumeId: 'zyTCAlFPjgYC', cfi: 'page-5', label: 'Chapter 1' },
     ])
 
-    const res = await request(app).get('/bookmarks/1342')
+    const res = await request(app).get('/bookmarks/zyTCAlFPjgYC')
     expect(res.status).toBe(200)
     expect(res.body.bookmarks).toHaveLength(1)
   })
@@ -271,19 +270,21 @@ describe('POST /bookmarks', () => {
   it('creates a bookmark', async () => {
     mocks.prisma.bookBookmark.count.mockResolvedValue(0)
     mocks.prisma.bookBookmark.create.mockResolvedValue({
-      id: 1, userId: 42, gutenbergId: 1342, cfi: 'epubcfi(/6/10)', label: 'Chapter 1',
+      id: 1,
+      userId: 42,
+      volumeId: 'zyTCAlFPjgYC',
+      cfi: 'page-5',
+      label: 'Chapter 1',
     })
 
     const res = await request(app)
       .post('/bookmarks')
-      .send({ gutenbergId: 1342, cfi: 'epubcfi(/6/10)', label: 'Chapter 1' })
+      .send({ volumeId: 'zyTCAlFPjgYC', cfi: 'page-5', label: 'Chapter 1' })
     expect(res.status).toBe(201)
   })
 
   it('rejects missing cfi', async () => {
-    const res = await request(app)
-      .post('/bookmarks')
-      .send({ gutenbergId: 1342 })
+    const res = await request(app).post('/bookmarks').send({ volumeId: 'zyTCAlFPjgYC' })
     expect(res.status).toBe(400)
   })
 })
@@ -310,25 +311,25 @@ describe('POST /highlights', () => {
   it('creates a highlight', async () => {
     mocks.prisma.bookHighlight.count.mockResolvedValue(0)
     mocks.prisma.bookHighlight.create.mockResolvedValue({
-      id: 1, userId: 42, gutenbergId: 1342, cfi: 'epubcfi(/6/10-/6/12)',
-      text: 'It is a truth universally acknowledged', color: '#FFEB3B',
+      id: 1,
+      userId: 42,
+      volumeId: 'zyTCAlFPjgYC',
+      cfi: 'page-5',
+      text: 'It is a truth universally acknowledged',
+      color: '#FFEB3B',
     })
 
-    const res = await request(app)
-      .post('/highlights')
-      .send({
-        gutenbergId: 1342,
-        cfi: 'epubcfi(/6/10-/6/12)',
-        text: 'It is a truth universally acknowledged',
-        color: '#ffeb3b',
-      })
+    const res = await request(app).post('/highlights').send({
+      volumeId: 'zyTCAlFPjgYC',
+      cfi: 'page-5',
+      text: 'It is a truth universally acknowledged',
+      color: '#ffeb3b',
+    })
     expect(res.status).toBe(201)
   })
 
   it('rejects missing text or cfi', async () => {
-    const res = await request(app)
-      .post('/highlights')
-      .send({ gutenbergId: 1342 })
+    const res = await request(app).post('/highlights').send({ volumeId: 'zyTCAlFPjgYC' })
     expect(res.status).toBe(400)
   })
 })

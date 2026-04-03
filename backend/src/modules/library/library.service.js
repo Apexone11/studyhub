@@ -1,8 +1,13 @@
 /**
- * library.service.js -- Service layer for book search, detail enrichment, and cover retrieval.
+ * library.service.js -- Service layer for Google Books API search, detail, and caching.
  */
 
-const { GUTENDEX_BASE, OPENLIBRARY_BASE, OPENLIBRARY_COVERS, CACHE_TTL } = require('./library.constants')
+const {
+  GOOGLE_BOOKS_BASE,
+  GOOGLE_BOOKS_API_KEY,
+  CACHE_TTL,
+  DEFAULT_PAGE_SIZE,
+} = require('./library.constants')
 const cache = require('./library.cache')
 const { captureError } = require('../../monitoring/sentry')
 
@@ -18,7 +23,6 @@ async function fetchWithRetry(url, ms = 10000) {
   try {
     return await fetchWithTimeout(url, ms)
   } catch (err) {
-    // Retry once on abort (timeout) or network error
     if (err.name === 'AbortError' || err.code === 'ECONNRESET' || err.code === 'ENOTFOUND') {
       return fetchWithTimeout(url, ms)
     }
@@ -27,11 +31,43 @@ async function fetchWithRetry(url, ms = 10000) {
 }
 
 /**
- * Search for books on Gutendex.
+ * Transform a Google Books volume item into our normalized book format.
+ * @param {object} item - Google Books API volume item
+ * @returns {object} Normalized book object
+ */
+function normalizeVolume(item) {
+  if (!item) return null
+  const info = item.volumeInfo || {}
+  const accessInfo = item.accessInfo || {}
+  return {
+    volumeId: item.id,
+    title: info.title || 'Untitled',
+    authors: info.authors || [],
+    categories: info.categories || [],
+    language: info.language || 'en',
+    pageCount: info.pageCount || 0,
+    coverUrl: info.imageLinks
+      ? info.imageLinks.thumbnail || info.imageLinks.smallThumbnail || null
+      : null,
+    previewLink: info.previewLink || null,
+    description: info.description || null,
+    publishedDate: info.publishedDate || null,
+    averageRating: info.averageRating || null,
+    ratingsCount: info.ratingsCount || 0,
+    publisher: info.publisher || null,
+    // Access info for the embedded viewer
+    viewability: accessInfo.viewability || 'NO_PAGES',
+    embeddable: accessInfo.embeddable || false,
+    webReaderLink: accessInfo.webReaderLink || null,
+  }
+}
+
+/**
+ * Search for books on Google Books API.
  * @param {string} query - Search term (title, author, etc.)
  * @param {number} page - Page number (1-indexed)
- * @param {object} filters - Optional filters (topic, sort, languages, etc.)
- * @returns {Promise<object|null>} Search results or null on error
+ * @param {object} filters - Optional filters (category, sort, language)
+ * @returns {Promise<object>} Search results
  */
 async function searchBooks(query, page = 1, filters = {}) {
   const cacheKey = `search:${query || ''}:${page}:${JSON.stringify(filters)}`
@@ -40,334 +76,271 @@ async function searchBooks(query, page = 1, filters = {}) {
 
   try {
     const params = new URLSearchParams()
-    if (query && query.trim()) params.append('search', query.trim())
-    if (filters.topic) params.append('topic', filters.topic)
-    // Gutendex only accepts 'ascending' or 'descending'; 'popular' = default (omit)
-    if (filters.sort && (filters.sort === 'ascending' || filters.sort === 'descending')) {
-      params.append('sort', filters.sort)
-    }
-    if (filters.languages) params.append('languages', filters.languages)
-    params.append('page', page)
 
-    const url = `${GUTENDEX_BASE}/books/?${params.toString()}`
+    // Build the query string
+    let q = query && query.trim() ? query.trim() : ''
+    if (filters.category) {
+      q = q ? `${q}+subject:${filters.category}` : `subject:${filters.category}`
+    }
+    // If no query and no category, search for general popular books
+    if (!q) q = 'subject:fiction'
+    params.append('q', q)
+
+    // Pagination: Google Books uses startIndex (0-indexed) and maxResults
+    const startIndex = (page - 1) * DEFAULT_PAGE_SIZE
+    params.append('startIndex', startIndex)
+    params.append('maxResults', DEFAULT_PAGE_SIZE)
+
+    // Sort: Google Books supports 'relevance' (default) or 'newest'
+    if (filters.sort === 'newest') {
+      params.append('orderBy', 'newest')
+    } else {
+      params.append('orderBy', 'relevance')
+    }
+
+    // Language restriction
+    if (filters.language && filters.language !== 'all') {
+      params.append('langRestrict', filters.language)
+    }
+
+    // Filter to only show books (not magazines)
+    params.append('printType', 'books')
+
+    // Prefer books with preview available
+    if (filters.previewOnly) {
+      params.append('filter', 'partial')
+    }
+
+    if (GOOGLE_BOOKS_API_KEY) {
+      params.append('key', GOOGLE_BOOKS_API_KEY)
+    }
+
+    const url = `${GOOGLE_BOOKS_BASE}/volumes?${params.toString()}`
     const response = await fetchWithRetry(url)
 
     if (!response.ok) {
-      console.warn(`Gutendex search failed: ${response.status}, falling back to cached books`)
-      // Fall back to cached books in database instead of returning null
+      console.warn(`Google Books search failed: ${response.status}, falling back to cached books`)
       const fallback = await searchCachedBooks(query, page, filters)
       if (fallback && fallback.results && fallback.results.length > 0) {
         fallback._source = 'cache'
         return fallback
       }
-      // No cached data either -- return empty with _unavailable flag
-      return { results: [], count: 0, next: null, previous: null, _unavailable: true }
+      return { results: [], count: 0, _unavailable: true }
     }
 
     const data = await response.json()
-    cache.set(cacheKey, data, CACHE_TTL.SEARCH)
-    return data
+    const results = (data.items || []).map(normalizeVolume)
+    const totalCount = data.totalItems || 0
+
+    const result = { results, count: totalCount }
+    cache.set(cacheKey, result, CACHE_TTL.SEARCH)
+    return result
   } catch (err) {
     captureError(err, { context: 'searchBooks', query, page })
-    // Fallback to cached books in database
     const fallback = await searchCachedBooks(query, page, filters)
     if (fallback && fallback.results && fallback.results.length > 0) {
       fallback._source = 'cache'
       return fallback
     }
-    // No cached data either -- return empty with _unavailable flag
-    return { results: [], count: 0, next: null, previous: null, _unavailable: true }
+    return { results: [], count: 0, _unavailable: true }
   }
 }
 
 /**
- * Get detailed information about a single book from Gutendex.
- * Enriches with Open Library description if available.
- * @param {number} gutenbergId - Project Gutenberg book ID
+ * Get detailed information about a single book from Google Books API.
+ * @param {string} volumeId - Google Books volume ID
  * @returns {Promise<object|null>} Book details or null on error
  */
-async function getBookDetail(gutenbergId) {
-  const cacheKey = `book:${gutenbergId}`
+async function getBookDetail(volumeId) {
+  const cacheKey = `book:${volumeId}`
   const cached = cache.get(cacheKey)
   if (cached) return cached
 
   try {
-    // Get basic book info from Gutendex
-    const gutendexUrl = `${GUTENDEX_BASE}/books/${gutenbergId}/`
-    const gutendexResponse = await fetchWithRetry(gutendexUrl)
-
-    if (!gutendexResponse.ok) {
-      console.warn(`Gutendex book fetch failed: ${gutendexResponse.status}, trying DB cache`)
-      const fallback = await getCachedBookDetail(gutenbergId)
-      return fallback
+    const params = new URLSearchParams()
+    if (GOOGLE_BOOKS_API_KEY) {
+      params.append('key', GOOGLE_BOOKS_API_KEY)
     }
 
-    const bookData = await gutendexResponse.json()
+    const url = `${GOOGLE_BOOKS_BASE}/volumes/${volumeId}?${params.toString()}`
+    const response = await fetchWithRetry(url)
 
-    // Enrich with Open Library but don't let it block/fail the response
-    let enriched = bookData
-    try {
-      enriched = await enrichBookWithOpenLibrary(bookData)
-    } catch {
-      // Graceful degradation - return Gutendex data without enrichment
+    if (!response.ok) {
+      console.warn(`Google Books detail fetch failed: ${response.status}, trying DB cache`)
+      return await getCachedBookDetail(volumeId)
     }
 
-    cache.set(cacheKey, enriched, CACHE_TTL.BOOK_DETAIL)
-    return enriched
+    const data = await response.json()
+    const book = normalizeVolume(data)
+
+    cache.set(cacheKey, book, CACHE_TTL.BOOK_DETAIL)
+    return book
   } catch (err) {
-    captureError(err, { context: 'getBookDetail', gutenbergId })
-    // Fallback to cached book in database
-    const fallback = await getCachedBookDetail(gutenbergId)
-    return fallback
+    captureError(err, { context: 'getBookDetail', volumeId })
+    return await getCachedBookDetail(volumeId)
   }
 }
 
 /**
- * Get a single book from the CachedBook database table (fallback when Gutendex is down).
- * @param {number} gutenbergId
- * @returns {Promise<object|null>} Book in Gutendex-compatible format or null
+ * Get a single book from the CachedBook database table (fallback when Google Books is down).
+ * @param {string} volumeId
+ * @returns {Promise<object|null>}
  */
-async function getCachedBookDetail(gutenbergId) {
+async function getCachedBookDetail(volumeId) {
   const prismaClient = require('../../lib/prisma')
   try {
     const book = await prismaClient.cachedBook.findUnique({
-      where: { gutenbergId },
+      where: { volumeId },
     })
     if (!book) return null
-    // Transform to Gutendex-compatible format
     return {
-      id: book.gutenbergId,
+      volumeId: book.volumeId,
       title: book.title,
       authors: book.authors,
-      subjects: book.subjects,
-      languages: book.languages,
-      download_count: book.downloadCount,
-      formats: book.formats,
-      description: book.description || undefined,
+      categories: book.categories,
+      language: book.language,
+      pageCount: book.pageCount,
+      coverUrl: book.coverUrl,
+      previewLink: book.previewLink,
+      description: book.description,
+      publishedDate: book.publishedDate,
       _source: 'cache',
     }
   } catch (err) {
-    captureError(err, { context: 'getCachedBookDetail', gutenbergId })
+    captureError(err, { context: 'getCachedBookDetail', volumeId })
     return null
   }
 }
 
 /**
- * Enrich a book with Open Library metadata (description, cover, etc.).
- * @param {object} book - Gutendex book object
- * @returns {Promise<object>} Enriched book object
+ * Search cached books from the database (fallback when Google Books is slow/down).
  */
-async function enrichBookWithOpenLibrary(book) {
-  try {
-    if (!book.title || !book.authors || book.authors.length === 0) {
-      return book
-    }
-
-    const title = encodeURIComponent(book.title)
-    const author = book.authors.length > 0 ? encodeURIComponent(book.authors[0].name) : ''
-
-    const searchUrl = `${OPENLIBRARY_BASE}/search.json?q=${title}&author=${author}&limit=1`
-    const searchResponse = await fetchWithTimeout(searchUrl, 3000)
-
-    if (!searchResponse.ok) {
-      return book
-    }
-
-    const searchData = await searchResponse.json()
-
-    if (!searchData.docs || searchData.docs.length === 0) {
-      return book
-    }
-
-    const firstDoc = searchData.docs[0]
-    const workKey = firstDoc.key
-
-    if (!workKey) {
-      return book
-    }
-
-    // Fetch the full work document for description
-    const workUrl = `${OPENLIBRARY_BASE}${workKey}.json`
-    const workResponse = await fetchWithTimeout(workUrl, 3000)
-
-    if (workResponse.ok) {
-      const workData = await workResponse.json()
-      if (workData.description) {
-        book.description = typeof workData.description === 'string' ? workData.description : workData.description.value
-      }
-    }
-
-    return book
-  } catch {
-    // Graceful degradation: just return the original book if enrichment fails
-    return book
-  }
-}
-
-/**
- * Get the cover URL for a book.
- * Tries Gutendex first, then falls back to Open Library.
- * @param {number} gutenbergId - Project Gutenberg book ID
- * @param {string} size - Cover size for Open Library (small, medium, large)
- * @returns {Promise<string|null>} Cover URL or null
- */
-async function getBookCoverUrl(gutenbergId, size = 'medium') {
-  try {
-    // Try Gutendex first
-    const book = await getBookDetail(gutenbergId)
-    if (book && book.formats && book.formats['image/jpeg']) {
-      return book.formats['image/jpeg']
-    }
-
-    // Fall back to Open Library
-    if (book && book.title && book.authors && book.authors.length > 0) {
-      const title = encodeURIComponent(book.title)
-      const author = encodeURIComponent(book.authors[0].name)
-
-      const searchUrl = `${OPENLIBRARY_BASE}/search.json?q=${title}&author=${author}&limit=1`
-      const searchResponse = await fetchWithTimeout(searchUrl, 3000)
-
-      if (searchResponse.ok) {
-        const searchData = await searchResponse.json()
-        if (searchData.docs && searchData.docs.length > 0) {
-          const firstDoc = searchData.docs[0]
-          if (firstDoc.cover_id) {
-            return `${OPENLIBRARY_COVERS}/b/id/${firstDoc.cover_id}-${size}.jpg`
-          }
-        }
-      }
-    }
-
-    return null
-  } catch (err) {
-    captureError(err, { context: 'getBookCoverUrl', gutenbergId, size })
-    return null
-  }
-}
-
-/**
- * Pre-warm the cache with popular books on server startup.
- * Fetches the first 6 pages (192 books) from Gutendex sorted by download count.
- * Also persists to CachedBook table so the DB fallback has data.
- * Runs silently in background -- errors do not crash the server.
- */
-async function preloadPopularBooks() {
+async function searchCachedBooks(query, page = 1, filters = {}) {
   const prismaClient = require('../../lib/prisma')
-  const languages = ['en']
-  let fetched = 0
+  const pageSize = DEFAULT_PAGE_SIZE
+  const skip = (page - 1) * pageSize
 
-  for (const lang of languages) {
-    for (let page = 1; page <= 6; page++) {
-      try {
-        const params = new URLSearchParams()
-        params.append('languages', lang)
-        params.append('page', page)
-        const url = `${GUTENDEX_BASE}/books/?${params.toString()}`
-        const response = await fetchWithTimeout(url, 15000)
-        if (!response.ok) continue
-        const data = await response.json()
-        // Cache with the same key format searchBooks uses
-        const cacheKey = `search::${page}:${JSON.stringify({ languages: lang })}`
-        cache.set(cacheKey, data, CACHE_TTL.SEARCH * 24) // 24x longer TTL for preloaded data
-
-        // Also persist each book to CachedBook table for DB fallback
-        if (data.results) {
-          for (const book of data.results) {
-            try {
-              await prismaClient.cachedBook.upsert({
-                where: { gutenbergId: book.id },
-                update: {
-                  title: book.title,
-                  authors: book.authors || [],
-                  subjects: book.subjects || [],
-                  languages: book.languages || [],
-                  downloadCount: book.download_count || 0,
-                  coverUrl: book.formats?.['image/jpeg'] || null,
-                  formats: book.formats || {},
-                  syncedAt: new Date(),
-                },
-                create: {
-                  gutenbergId: book.id,
-                  title: book.title,
-                  authors: book.authors || [],
-                  subjects: book.subjects || [],
-                  languages: book.languages || [],
-                  downloadCount: book.download_count || 0,
-                  coverUrl: book.formats?.['image/jpeg'] || null,
-                  formats: book.formats || {},
-                },
-              })
-              fetched++
-            } catch {
-              // Skip individual book upsert errors
-            }
-          }
-        }
-
-        // Small delay to avoid hammering Gutendex
-        await new Promise(r => setTimeout(r, 500))
-      } catch {
-        // Silent failure -- preloading is best-effort
-      }
-    }
+  const where = {}
+  if (query && query.trim()) {
+    where.title = { contains: query.trim(), mode: 'insensitive' }
   }
-  console.log(`[Library] Popular books cache pre-warmed (${fetched} books synced to DB)`)
+  if (filters.language && filters.language !== 'all') {
+    where.language = filters.language
+  }
+  if (filters.category) {
+    where.categories = { string_contains: filters.category }
+  }
+
+  const orderBy = filters.sort === 'newest' ? { publishedDate: 'desc' } : { pageCount: 'desc' }
+
+  try {
+    const [books, count] = await Promise.all([
+      prismaClient.cachedBook.findMany({ where, orderBy, skip, take: pageSize }),
+      prismaClient.cachedBook.count({ where }),
+    ])
+
+    return {
+      results: books.map((b) => ({
+        volumeId: b.volumeId,
+        title: b.title,
+        authors: b.authors,
+        categories: b.categories,
+        language: b.language,
+        pageCount: b.pageCount,
+        coverUrl: b.coverUrl,
+        previewLink: b.previewLink,
+        description: b.description,
+        publishedDate: b.publishedDate,
+      })),
+      count,
+    }
+  } catch (err) {
+    captureError(err, { context: 'searchCachedBooks' })
+    return null
+  }
 }
 
 /**
- * Sync the top N popular books from Gutendex to the CachedBook table.
- * Called periodically (e.g., daily) or on admin trigger.
+ * Sync popular books from Google Books to the CachedBook table.
+ * Called periodically or on admin trigger.
+ * Fetches books across popular categories to build a local cache.
  */
-async function syncPopularBooksToDB(maxPages = 16) {
+async function syncPopularBooksToDB(maxPages = 3) {
   const prismaClient = require('../../lib/prisma')
   let synced = 0
 
-  for (let page = 1; page <= maxPages; page++) {
-    try {
-      const params = new URLSearchParams()
-      params.append('languages', 'en')
-      params.append('page', page)
-      const url = `${GUTENDEX_BASE}/books/?${params.toString()}`
-      const response = await fetchWithTimeout(url, 10000)
-      if (!response.ok) continue
-      const data = await response.json()
-      if (!data.results || data.results.length === 0) break
+  const categoriesToSync = [
+    'Fiction',
+    'Science',
+    'History',
+    'Biography & Autobiography',
+    'Mathematics',
+    'Philosophy',
+  ]
 
-      for (const book of data.results) {
-        try {
-          await prismaClient.cachedBook.upsert({
-            where: { gutenbergId: book.id },
-            update: {
-              title: book.title,
-              authors: book.authors || [],
-              subjects: book.subjects || [],
-              languages: book.languages || [],
-              downloadCount: book.download_count || 0,
-              coverUrl: book.formats?.['image/jpeg'] || null,
-              formats: book.formats || {},
-              syncedAt: new Date(),
-            },
-            create: {
-              gutenbergId: book.id,
-              title: book.title,
-              authors: book.authors || [],
-              subjects: book.subjects || [],
-              languages: book.languages || [],
-              downloadCount: book.download_count || 0,
-              coverUrl: book.formats?.['image/jpeg'] || null,
-              formats: book.formats || {},
-            },
-          })
-          synced++
-        } catch {
-          // Skip individual book errors
+  for (const category of categoriesToSync) {
+    for (let page = 0; page < maxPages; page++) {
+      try {
+        const params = new URLSearchParams()
+        params.append('q', `subject:${category}`)
+        params.append('startIndex', page * DEFAULT_PAGE_SIZE)
+        params.append('maxResults', DEFAULT_PAGE_SIZE)
+        params.append('orderBy', 'relevance')
+        params.append('langRestrict', 'en')
+        params.append('printType', 'books')
+        if (GOOGLE_BOOKS_API_KEY) {
+          params.append('key', GOOGLE_BOOKS_API_KEY)
         }
-      }
 
-      // Delay between pages
-      await new Promise(r => setTimeout(r, 1000))
-    } catch {
-      // Continue on page fetch errors
+        const url = `${GOOGLE_BOOKS_BASE}/volumes?${params.toString()}`
+        const response = await fetchWithTimeout(url, 10000)
+        if (!response.ok) continue
+        const data = await response.json()
+        if (!data.items || data.items.length === 0) break
+
+        for (const item of data.items) {
+          try {
+            const book = normalizeVolume(item)
+            if (!book || !book.volumeId) continue
+
+            await prismaClient.cachedBook.upsert({
+              where: { volumeId: book.volumeId },
+              update: {
+                title: book.title,
+                authors: book.authors || [],
+                categories: book.categories || [],
+                language: book.language || 'en',
+                pageCount: book.pageCount || 0,
+                coverUrl: book.coverUrl,
+                previewLink: book.previewLink,
+                description: book.description,
+                publishedDate: book.publishedDate,
+                syncedAt: new Date(),
+              },
+              create: {
+                volumeId: book.volumeId,
+                title: book.title,
+                authors: book.authors || [],
+                categories: book.categories || [],
+                language: book.language || 'en',
+                pageCount: book.pageCount || 0,
+                coverUrl: book.coverUrl,
+                previewLink: book.previewLink,
+                description: book.description,
+                publishedDate: book.publishedDate,
+              },
+            })
+            synced++
+          } catch {
+            // Skip individual book upsert errors
+          }
+        }
+
+        // Delay between pages to respect rate limits
+        await new Promise((r) => setTimeout(r, 500))
+      } catch {
+        // Continue on page fetch errors
+      }
     }
   }
 
@@ -376,64 +349,87 @@ async function syncPopularBooksToDB(maxPages = 16) {
 }
 
 /**
- * Search cached books from the database (fallback when Gutendex is slow/down).
+ * Pre-warm the cache with popular books on server startup.
+ * Lighter version of syncPopularBooksToDB -- just fills the in-memory cache.
  */
-async function searchCachedBooks(query, page = 1, filters = {}) {
+async function preloadPopularBooks() {
   const prismaClient = require('../../lib/prisma')
-  const pageSize = 32
-  const skip = (page - 1) * pageSize
+  let fetched = 0
 
-  const where = {}
-  if (query && query.trim()) {
-    where.title = { contains: query.trim(), mode: 'insensitive' }
-  }
-  // languages and subjects are Json array fields; use string_contains for best-effort match
-  if (filters.languages) {
-    where.languages = { string_contains: filters.languages }
-  }
-  if (filters.topic) {
-    where.subjects = { string_contains: filters.topic }
-  }
+  const categoriesToPreload = ['Fiction', 'Science', 'History']
+  for (const category of categoriesToPreload) {
+    try {
+      const params = new URLSearchParams()
+      params.append('q', `subject:${category}`)
+      params.append('startIndex', 0)
+      params.append('maxResults', DEFAULT_PAGE_SIZE)
+      params.append('orderBy', 'relevance')
+      params.append('langRestrict', 'en')
+      params.append('printType', 'books')
+      if (GOOGLE_BOOKS_API_KEY) {
+        params.append('key', GOOGLE_BOOKS_API_KEY)
+      }
 
-  const orderBy = filters.sort === 'ascending'
-    ? { title: 'asc' }
-    : filters.sort === 'descending'
-      ? { title: 'desc' }
-      : { downloadCount: 'desc' }
+      const url = `${GOOGLE_BOOKS_BASE}/volumes?${params.toString()}`
+      const response = await fetchWithTimeout(url, 15000)
+      if (!response.ok) continue
+      const data = await response.json()
 
-  try {
-    const [books, count] = await Promise.all([
-      prismaClient.cachedBook.findMany({ where, orderBy, skip, take: pageSize }),
-      prismaClient.cachedBook.count({ where }),
-    ])
+      const results = (data.items || []).map(normalizeVolume)
+      const cacheKey = `search:subject:${category}:1:${JSON.stringify({ category })}`
+      cache.set(cacheKey, { results, count: data.totalItems || 0 }, CACHE_TTL.SEARCH * 24)
 
-    // Transform to match Gutendex response format
-    return {
-      results: books.map(b => ({
-        id: b.gutenbergId,
-        title: b.title,
-        authors: b.authors,
-        subjects: b.subjects,
-        languages: b.languages,
-        download_count: b.downloadCount,
-        formats: b.formats,
-      })),
-      count,
-      next: skip + pageSize < count ? `page=${page + 1}` : null,
-      previous: page > 1 ? `page=${page - 1}` : null,
+      // Also persist to CachedBook table
+      for (const book of results) {
+        try {
+          if (!book || !book.volumeId) continue
+          await prismaClient.cachedBook.upsert({
+            where: { volumeId: book.volumeId },
+            update: {
+              title: book.title,
+              authors: book.authors || [],
+              categories: book.categories || [],
+              language: book.language || 'en',
+              pageCount: book.pageCount || 0,
+              coverUrl: book.coverUrl,
+              previewLink: book.previewLink,
+              description: book.description,
+              publishedDate: book.publishedDate,
+              syncedAt: new Date(),
+            },
+            create: {
+              volumeId: book.volumeId,
+              title: book.title,
+              authors: book.authors || [],
+              categories: book.categories || [],
+              language: book.language || 'en',
+              pageCount: book.pageCount || 0,
+              coverUrl: book.coverUrl,
+              previewLink: book.previewLink,
+              description: book.description,
+              publishedDate: book.publishedDate,
+            },
+          })
+          fetched++
+        } catch {
+          // Skip individual book errors
+        }
+      }
+
+      await new Promise((r) => setTimeout(r, 500))
+    } catch {
+      // Silent failure -- preloading is best-effort
     }
-  } catch (err) {
-    captureError(err, { context: 'searchCachedBooks' })
-    return null
   }
+  console.log(`[Library] Popular books cache pre-warmed (${fetched} books synced to DB)`)
 }
 
 module.exports = {
   searchBooks,
   getBookDetail,
   getCachedBookDetail,
-  getBookCoverUrl,
   preloadPopularBooks,
   syncPopularBooksToDB,
   searchCachedBooks,
+  normalizeVolume,
 }

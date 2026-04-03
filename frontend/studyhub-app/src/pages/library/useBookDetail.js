@@ -3,7 +3,7 @@ import { API } from '../../config'
 import { authHeaders } from '../shared/pageUtils'
 import { getApiErrorMessage, readJsonSafely } from '../../lib/http'
 
-export default function useBookDetail(gutenbergId) {
+export default function useBookDetail(volumeId) {
   const [book, setBook] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -12,7 +12,7 @@ export default function useBookDetail(gutenbergId) {
 
   // Fetch book details and related data
   useEffect(() => {
-    if (!gutenbergId) {
+    if (!volumeId) {
       setLoading(false)
       return
     }
@@ -22,14 +22,11 @@ export default function useBookDetail(gutenbergId) {
         setLoading(true)
         setError('')
 
-        // Fetch book details
-        const bookResponse = await fetch(
-          `${API}/api/library/books/${gutenbergId}`,
-          {
-            credentials: 'include',
-            headers: authHeaders(),
-          }
-        )
+        // Fetch book details from Google Books via our backend
+        const bookResponse = await fetch(`${API}/api/library/books/${volumeId}`, {
+          credentials: 'include',
+          headers: authHeaders(),
+        })
 
         if (!bookResponse.ok) {
           const data = readJsonSafely(await bookResponse.text())
@@ -51,26 +48,21 @@ export default function useBookDetail(gutenbergId) {
             setShelves(shelvesData.shelves || [])
           }
         } catch (err) {
-          // Gracefully handle shelf fetching errors
           console.error('Error fetching shelves:', err)
         }
 
         // Fetch reading progress
         try {
-          const progressResponse = await fetch(
-            `${API}/api/library/reading-progress/${gutenbergId}`,
-            {
-              credentials: 'include',
-              headers: authHeaders(),
-            }
-          )
+          const progressResponse = await fetch(`${API}/api/library/reading-progress/${volumeId}`, {
+            credentials: 'include',
+            headers: authHeaders(),
+          })
 
           if (progressResponse.ok) {
             const progressData = await progressResponse.json()
             setProgress(progressData)
           }
         } catch (err) {
-          // Gracefully handle progress fetching errors
           console.error('Error fetching progress:', err)
         }
       } catch (err) {
@@ -83,22 +75,24 @@ export default function useBookDetail(gutenbergId) {
     }
 
     fetchData()
-  }, [gutenbergId])
+  }, [volumeId])
 
   const addToShelf = useCallback(
     async (shelfId) => {
-      if (!gutenbergId) return
+      if (!volumeId || !book) return false
 
       try {
-        const response = await fetch(
-          `${API}/api/library/shelves/${shelfId}/books`,
-          {
-            method: 'POST',
-            credentials: 'include',
-            headers: authHeaders(),
-            body: JSON.stringify({ gutenbergId }),
-          }
-        )
+        const response = await fetch(`${API}/api/library/shelves/${shelfId}/books`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: authHeaders(),
+          body: JSON.stringify({
+            volumeId,
+            title: book.title || 'Untitled',
+            author: book.authors && book.authors.length > 0 ? book.authors.join(', ') : 'Unknown',
+            coverUrl: book.coverUrl || null,
+          }),
+        })
 
         if (!response.ok) {
           const data = readJsonSafely(await response.text())
@@ -111,22 +105,19 @@ export default function useBookDetail(gutenbergId) {
         return false
       }
     },
-    [gutenbergId]
+    [volumeId, book],
   )
 
   const removeFromShelf = useCallback(
     async (shelfId) => {
-      if (!gutenbergId) return
+      if (!volumeId) return false
 
       try {
-        const response = await fetch(
-          `${API}/api/library/shelves/${shelfId}/books/${gutenbergId}`,
-          {
-            method: 'DELETE',
-            credentials: 'include',
-            headers: authHeaders(),
-          }
-        )
+        const response = await fetch(`${API}/api/library/shelves/${shelfId}/books/${volumeId}`, {
+          method: 'DELETE',
+          credentials: 'include',
+          headers: authHeaders(),
+        })
 
         if (!response.ok) {
           const data = readJsonSafely(await response.text())
@@ -139,7 +130,7 @@ export default function useBookDetail(gutenbergId) {
         return false
       }
     },
-    [gutenbergId]
+    [volumeId],
   )
 
   const createShelf = useCallback(async (name) => {

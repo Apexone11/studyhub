@@ -1,6 +1,6 @@
-// Library catalog constants
+// Library catalog constants (Google Books API)
 
-export const SUBJECTS = [
+export const CATEGORIES = [
   'Fiction',
   'Science',
   'History',
@@ -11,17 +11,16 @@ export const SUBJECTS = [
   'Art',
   'Music',
   'Religion',
-  'Biography',
+  'Biography & Autobiography',
   'Adventure',
-  'Children',
+  'Juvenile Fiction',
   'Law',
-  'Medicine',
+  'Medical',
 ]
 
 export const SORT_OPTIONS = [
-  { value: 'popular', label: 'Most Popular' },
-  { value: 'ascending', label: 'Title A-Z' },
-  { value: 'descending', label: 'Title Z-A' },
+  { value: 'relevance', label: 'Most Relevant' },
+  { value: 'newest', label: 'Newest First' },
 ]
 
 export const READER_THEMES = {

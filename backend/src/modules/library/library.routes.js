@@ -1,6 +1,7 @@
 /**
  * library.routes.js -- Express router for the library module.
- * Handles book search, shelves CRUD, reading progress, bookmarks, and highlights.
+ * Handles book search (Google Books API), shelves CRUD, reading progress,
+ * bookmarks, and highlights. Volume IDs are Google Books string IDs.
  */
 
 const express = require('express')
@@ -12,12 +13,15 @@ const { getAuthTokenFromRequest, verifyAuthToken } = require('../../lib/authToke
 const { libraryWriteLimiter } = require('../../lib/rateLimiters')
 
 const { searchBooks, getBookDetail, syncPopularBooksToDB } = require('./library.service')
-const { MAX_SHELVES_PER_USER, MAX_BOOKMARKS_PER_BOOK, MAX_HIGHLIGHTS_PER_BOOK, MAX_EPUB_SIZE } = require('./library.constants')
+const {
+  MAX_SHELVES_PER_USER,
+  MAX_BOOKMARKS_PER_BOOK,
+  MAX_HIGHLIGHTS_PER_BOOK,
+} = require('./library.constants')
 
 /**
  * Optional auth -- sets req.user if a valid token is present, otherwise
- * proceeds as unauthenticated. Used for public-access endpoints like book
- * search and detail where auth is optional but enriches the response.
+ * proceeds as unauthenticated.
  */
 function optionalAuth(req, res, next) {
   const token = getAuthTokenFromRequest(req)
@@ -32,156 +36,31 @@ function optionalAuth(req, res, next) {
 
 const router = express.Router()
 
-/**
- * GET /api/library/covers/:id
- * Proxy a book cover image from Gutendex with caching.
- * No auth required. Serves images with long Cache-Control headers.
- */
-router.get('/covers/:id', async (req, res) => {
-  const gutenbergId = parseInt(req.params.id, 10)
-  if (!Number.isInteger(gutenbergId) || gutenbergId < 1) {
-    return res.status(400).json({ error: 'Invalid book ID.' })
-  }
-
-  try {
-    const coverUrl = `https://www.gutenberg.org/cache/epub/${gutenbergId}/pg${gutenbergId}.cover.medium.jpg`
-    const response = await fetch(coverUrl, {
-      signal: AbortSignal.timeout(5000),
-    })
-
-    if (!response.ok) {
-      return res.status(404).json({ error: 'Cover not found.' })
-    }
-
-    // Forward the image with aggressive cache headers
-    res.set('Content-Type', response.headers.get('content-type') || 'image/jpeg')
-    res.set('Cache-Control', 'public, max-age=604800, immutable')
-    res.set('X-Cover-Source', 'gutenberg-proxy')
-
-    // Stream the response body
-    const arrayBuffer = await response.arrayBuffer()
-    res.send(Buffer.from(arrayBuffer))
-  } catch (err) {
-    captureError(err, { context: 'coverProxy', gutenbergId })
-    res.status(502).json({ error: 'Failed to fetch cover.' })
-  }
-})
-
-/**
- * GET /api/library/books/:id/epub
- * Proxy an EPUB file from Project Gutenberg to avoid CORS issues.
- * Streams the file directly to the client. No auth required (public domain books).
- */
-router.get('/books/:id/epub', async (req, res) => {
-  const gutenbergId = parseInt(req.params.id, 10)
-  if (!Number.isInteger(gutenbergId) || gutenbergId < 1) {
-    return res.status(400).json({ error: 'Invalid book ID.' })
-  }
-
-  try {
-    // Try the most common Gutenberg EPUB URL patterns
-    const urls = [
-      `https://www.gutenberg.org/ebooks/${gutenbergId}.epub3.images`,
-      `https://www.gutenberg.org/ebooks/${gutenbergId}.epub.images`,
-      `https://www.gutenberg.org/ebooks/${gutenbergId}.epub.noimages`,
-      `https://www.gutenberg.org/ebooks/${gutenbergId}.epub3.noimages`,
-    ]
-
-    let epubResponse = null
-    for (const url of urls) {
-      try {
-        const resp = await fetch(url, {
-          redirect: 'follow',
-          signal: AbortSignal.timeout(15000), // 15-second timeout per attempt
-        })
-        if (resp.ok) {
-          const contentType = resp.headers.get('content-type') || ''
-          // Accept EPUB or octet-stream content types
-          if (
-            contentType.includes('epub') ||
-            contentType.includes('octet-stream') ||
-            contentType === ''
-          ) {
-            epubResponse = resp
-            break
-          }
-        }
-      } catch {
-        continue
-      }
-    }
-
-    if (!epubResponse) {
-      return res.status(404).json({ error: 'EPUB not available for this book.' })
-    }
-
-    res.setHeader('Content-Type', 'application/epub+zip')
-    res.setHeader('Content-Disposition', `attachment; filename="book-${gutenbergId}.epub"`)
-    res.setHeader('Cache-Control', 'public, max-age=86400') // Cache for 1 day
-
-    // Stream the response body to the client with size limit
-    const reader = epubResponse.body.getReader()
-    let totalBytes = 0
-    const pump = async () => {
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) {
-          res.end()
-          return
-        }
-        totalBytes += value.byteLength
-        if (totalBytes > MAX_EPUB_SIZE) {
-          reader.cancel()
-          if (!res.headersSent) {
-            res.status(413).json({ error: 'EPUB file exceeds maximum size of 50 MB.' })
-          } else {
-            res.end()
-          }
-          return
-        }
-        res.write(value)
-      }
-    }
-    await pump()
-  } catch (err) {
-    captureError(err, { route: req.originalUrl, method: req.method })
-    if (!res.headersSent) {
-      res.status(500).json({ error: 'Failed to fetch EPUB.' })
-    }
-  }
-})
-
 // ── BOOK BROWSING & SEARCH ──────────────────────────────────────────────────
 
 /**
  * GET /api/library/search
- * Search and browse books from Gutendex.
- * Query params: search, topic, page, sort, languages
+ * Search and browse books from Google Books API.
+ * Query params: search, category, page, sort, language
  */
 router.get('/search', optionalAuth, async (req, res) => {
-  const { search, topic, page = 1, sort, languages } = req.query
+  const { search, category, page = 1, sort, language } = req.query
 
   try {
     const searchTerm = search || ''
     const pageNum = Math.max(1, parseInt(page, 10) || 1)
     const filters = {}
-    if (topic) filters.topic = topic
+    if (category) filters.category = category
     if (sort) filters.sort = sort
-    if (languages) filters.languages = languages
+    if (language) filters.language = language
 
     const results = await searchBooks(searchTerm, pageNum, filters)
 
-    // Normalize Gutendex response shape for the frontend
-    // searchBooks always returns a valid object (never null) with graceful fallback
     const response = {
       books: results.results || [],
       totalCount: results.count || 0,
-      next: results.next || null,
-      previous: results.previous || null,
     }
-    // Signal to frontend when results came from local cache (Gutendex was unavailable)
     if (results._source === 'cache') response.source = 'cache'
-    // Signal when both Gutendex AND cache are unavailable
     if (results._unavailable) response.unavailable = true
     res.json(response)
   } catch (err) {
@@ -191,18 +70,18 @@ router.get('/search', optionalAuth, async (req, res) => {
 })
 
 /**
- * GET /api/library/books/:id
- * Get detailed information about a specific book.
+ * GET /api/library/books/:volumeId
+ * Get detailed information about a specific book from Google Books.
  */
-router.get('/books/:id', optionalAuth, async (req, res) => {
-  const gutenbergId = parseInt(req.params.id, 10)
+router.get('/books/:volumeId', optionalAuth, async (req, res) => {
+  const { volumeId } = req.params
 
-  if (!Number.isInteger(gutenbergId) || gutenbergId < 1) {
-    return res.status(400).json({ error: 'Invalid book ID.' })
+  if (!volumeId || typeof volumeId !== 'string' || volumeId.length < 1) {
+    return res.status(400).json({ error: 'Invalid volume ID.' })
   }
 
   try {
-    const book = await getBookDetail(gutenbergId)
+    const book = await getBookDetail(volumeId)
 
     if (!book) {
       return res.status(404).json({ error: 'Book not found.' })
@@ -223,7 +102,6 @@ router.get('/books/:id', optionalAuth, async (req, res) => {
  * Admin only.
  */
 router.post('/admin/sync-catalog', requireAuth, async (req, res) => {
-  // Check admin role
   if (req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Admin access required.' })
   }
@@ -273,7 +151,6 @@ router.post('/shelves', requireAuth, libraryWriteLimiter, async (req, res) => {
   }
 
   try {
-    // Check shelf count limit
     const count = await prisma.bookShelf.count({
       where: { userId: req.user.userId },
     })
@@ -293,10 +170,8 @@ router.post('/shelves', requireAuth, libraryWriteLimiter, async (req, res) => {
     res.status(201).json(shelf)
   } catch (err) {
     if (err.code === 'P2002') {
-      // Unique constraint violation: shelf name already exists for this user
       return res.status(409).json({ error: 'A shelf with this name already exists.' })
     }
-
     captureError(err, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
   }
@@ -305,7 +180,6 @@ router.post('/shelves', requireAuth, libraryWriteLimiter, async (req, res) => {
 /**
  * PATCH /api/library/shelves/:id
  * Update a shelf's name or description.
- * Body: { name?, description? }
  */
 router.patch('/shelves/:id', requireAuth, libraryWriteLimiter, async (req, res) => {
   const shelfId = parseInt(req.params.id, 10)
@@ -316,7 +190,6 @@ router.patch('/shelves/:id', requireAuth, libraryWriteLimiter, async (req, res) 
   }
 
   try {
-    // Verify ownership
     const shelf = await prisma.bookShelf.findUnique({
       where: { id: shelfId },
     })
@@ -342,7 +215,6 @@ router.patch('/shelves/:id', requireAuth, libraryWriteLimiter, async (req, res) 
     if (err.code === 'P2002') {
       return res.status(409).json({ error: 'A shelf with this name already exists.' })
     }
-
     captureError(err, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
   }
@@ -386,18 +258,18 @@ router.delete('/shelves/:id', requireAuth, libraryWriteLimiter, async (req, res)
 /**
  * POST /api/library/shelves/:shelfId/books
  * Add a book to a shelf.
- * Body: { gutenbergId, title, author, coverUrl? }
+ * Body: { volumeId, title, author, coverUrl? }
  */
 router.post('/shelves/:shelfId/books', requireAuth, libraryWriteLimiter, async (req, res) => {
   const shelfId = parseInt(req.params.shelfId, 10)
-  const { gutenbergId, title, author, coverUrl } = req.body
+  const { volumeId, title, author, coverUrl } = req.body
 
   if (!Number.isInteger(shelfId) || shelfId < 1) {
     return res.status(400).json({ error: 'Invalid shelf ID.' })
   }
 
-  if (!Number.isInteger(gutenbergId) || gutenbergId < 1) {
-    return res.status(400).json({ error: 'Invalid book ID.' })
+  if (!volumeId || typeof volumeId !== 'string') {
+    return res.status(400).json({ error: 'Invalid volume ID.' })
   }
 
   if (!title || typeof title !== 'string' || !author || typeof author !== 'string') {
@@ -405,7 +277,6 @@ router.post('/shelves/:shelfId/books', requireAuth, libraryWriteLimiter, async (
   }
 
   try {
-    // Verify shelf ownership
     const shelf = await prisma.bookShelf.findUnique({
       where: { id: shelfId },
     })
@@ -421,7 +292,7 @@ router.post('/shelves/:shelfId/books', requireAuth, libraryWriteLimiter, async (
     const shelfBook = await prisma.shelfBook.create({
       data: {
         shelfId,
-        gutenbergId,
+        volumeId,
         title: title.trim(),
         author: author.trim(),
         coverUrl: coverUrl || null,
@@ -433,50 +304,54 @@ router.post('/shelves/:shelfId/books', requireAuth, libraryWriteLimiter, async (
     if (err.code === 'P2002') {
       return res.status(409).json({ error: 'This book is already in the shelf.' })
     }
-
     captureError(err, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
   }
 })
 
 /**
- * DELETE /api/library/shelves/:shelfId/books/:gutenbergId
+ * DELETE /api/library/shelves/:shelfId/books/:volumeId
  * Remove a book from a shelf.
  */
-router.delete('/shelves/:shelfId/books/:gutenbergId', requireAuth, libraryWriteLimiter, async (req, res) => {
-  const shelfId = parseInt(req.params.shelfId, 10)
-  const gutenbergId = parseInt(req.params.gutenbergId, 10)
+router.delete(
+  '/shelves/:shelfId/books/:volumeId',
+  requireAuth,
+  libraryWriteLimiter,
+  async (req, res) => {
+    const shelfId = parseInt(req.params.shelfId, 10)
+    const { volumeId } = req.params
 
-  if (!Number.isInteger(shelfId) || shelfId < 1 || !Number.isInteger(gutenbergId) || gutenbergId < 1) {
-    return res.status(400).json({ error: 'Invalid shelf or book ID.' })
-  }
-
-  try {
-    const shelf = await prisma.bookShelf.findUnique({
-      where: { id: shelfId },
-    })
-
-    if (!shelf) {
-      return res.status(404).json({ error: 'Shelf not found.' })
+    if (!Number.isInteger(shelfId) || shelfId < 1 || !volumeId) {
+      return res.status(400).json({ error: 'Invalid shelf or volume ID.' })
     }
 
-    if (shelf.userId !== req.user.userId && req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Unauthorized.' })
+    try {
+      const shelf = await prisma.bookShelf.findUnique({
+        where: { id: shelfId },
+      })
+
+      if (!shelf) {
+        return res.status(404).json({ error: 'Shelf not found.' })
+      }
+
+      if (shelf.userId !== req.user.userId && req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Unauthorized.' })
+      }
+
+      await prisma.shelfBook.deleteMany({
+        where: {
+          shelfId,
+          volumeId,
+        },
+      })
+
+      res.status(204).send()
+    } catch (err) {
+      captureError(err, { route: req.originalUrl, method: req.method })
+      res.status(500).json({ error: 'Server error.' })
     }
-
-    await prisma.shelfBook.deleteMany({
-      where: {
-        shelfId,
-        gutenbergId,
-      },
-    })
-
-    res.status(204).send()
-  } catch (err) {
-    captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
-  }
-})
+  },
+)
 
 // ── READING PROGRESS ────────────────────────────────────────────────────────
 
@@ -499,22 +374,22 @@ router.get('/reading-progress', requireAuth, async (req, res) => {
 })
 
 /**
- * GET /api/library/reading-progress/:gutenbergId
+ * GET /api/library/reading-progress/:volumeId
  * Get reading progress for a specific book.
  */
-router.get('/reading-progress/:gutenbergId', requireAuth, async (req, res) => {
-  const gutenbergId = parseInt(req.params.gutenbergId, 10)
+router.get('/reading-progress/:volumeId', requireAuth, async (req, res) => {
+  const { volumeId } = req.params
 
-  if (!Number.isInteger(gutenbergId) || gutenbergId < 1) {
-    return res.status(400).json({ error: 'Invalid book ID.' })
+  if (!volumeId || typeof volumeId !== 'string') {
+    return res.status(400).json({ error: 'Invalid volume ID.' })
   }
 
   try {
     const progress = await prisma.readingProgress.findUnique({
       where: {
-        userId_gutenbergId: {
+        userId_volumeId: {
           userId: req.user.userId,
-          gutenbergId,
+          volumeId,
         },
       },
     })
@@ -528,16 +403,16 @@ router.get('/reading-progress/:gutenbergId', requireAuth, async (req, res) => {
 })
 
 /**
- * PUT /api/library/reading-progress/:gutenbergId
+ * PUT /api/library/reading-progress/:volumeId
  * Create or update reading progress for a book.
  * Body: { cfi?, percentage }
  */
-router.put('/reading-progress/:gutenbergId', requireAuth, libraryWriteLimiter, async (req, res) => {
-  const gutenbergId = parseInt(req.params.gutenbergId, 10)
+router.put('/reading-progress/:volumeId', requireAuth, libraryWriteLimiter, async (req, res) => {
+  const { volumeId } = req.params
   const { cfi, percentage } = req.body
 
-  if (!Number.isInteger(gutenbergId) || gutenbergId < 1) {
-    return res.status(400).json({ error: 'Invalid book ID.' })
+  if (!volumeId || typeof volumeId !== 'string') {
+    return res.status(400).json({ error: 'Invalid volume ID.' })
   }
 
   if (typeof percentage !== 'number' || percentage < 0 || percentage > 100) {
@@ -547,9 +422,9 @@ router.put('/reading-progress/:gutenbergId', requireAuth, libraryWriteLimiter, a
   try {
     const progress = await prisma.readingProgress.upsert({
       where: {
-        userId_gutenbergId: {
+        userId_volumeId: {
           userId: req.user.userId,
-          gutenbergId,
+          volumeId,
         },
       },
       update: {
@@ -559,7 +434,7 @@ router.put('/reading-progress/:gutenbergId', requireAuth, libraryWriteLimiter, a
       },
       create: {
         userId: req.user.userId,
-        gutenbergId,
+        volumeId,
         cfi: cfi || null,
         percentage,
       },
@@ -575,21 +450,21 @@ router.put('/reading-progress/:gutenbergId', requireAuth, libraryWriteLimiter, a
 // ── BOOKMARKS ───────────────────────────────────────────────────────────────
 
 /**
- * GET /api/library/bookmarks/:gutenbergId
+ * GET /api/library/bookmarks/:volumeId
  * Get bookmarks for a book (user's own).
  */
-router.get('/bookmarks/:gutenbergId', requireAuth, async (req, res) => {
-  const gutenbergId = parseInt(req.params.gutenbergId, 10)
+router.get('/bookmarks/:volumeId', requireAuth, async (req, res) => {
+  const { volumeId } = req.params
 
-  if (!Number.isInteger(gutenbergId) || gutenbergId < 1) {
-    return res.status(400).json({ error: 'Invalid book ID.' })
+  if (!volumeId || typeof volumeId !== 'string') {
+    return res.status(400).json({ error: 'Invalid volume ID.' })
   }
 
   try {
     const bookmarks = await prisma.bookBookmark.findMany({
       where: {
         userId: req.user.userId,
-        gutenbergId,
+        volumeId,
       },
       orderBy: { createdAt: 'desc' },
     })
@@ -604,13 +479,13 @@ router.get('/bookmarks/:gutenbergId', requireAuth, async (req, res) => {
 /**
  * POST /api/library/bookmarks
  * Create a bookmark.
- * Body: { gutenbergId, cfi, label?, pageSnippet? }
+ * Body: { volumeId, cfi, label?, pageSnippet? }
  */
 router.post('/bookmarks', requireAuth, libraryWriteLimiter, async (req, res) => {
-  const { gutenbergId, cfi, label, pageSnippet } = req.body
+  const { volumeId, cfi, label, pageSnippet } = req.body
 
-  if (!Number.isInteger(gutenbergId) || gutenbergId < 1) {
-    return res.status(400).json({ error: 'Invalid book ID.' })
+  if (!volumeId || typeof volumeId !== 'string') {
+    return res.status(400).json({ error: 'Invalid volume ID.' })
   }
 
   if (!cfi || typeof cfi !== 'string') {
@@ -618,22 +493,23 @@ router.post('/bookmarks', requireAuth, libraryWriteLimiter, async (req, res) => 
   }
 
   try {
-    // Check bookmark count limit
     const count = await prisma.bookBookmark.count({
       where: {
         userId: req.user.userId,
-        gutenbergId,
+        volumeId,
       },
     })
 
     if (count >= MAX_BOOKMARKS_PER_BOOK) {
-      return res.status(403).json({ error: `Maximum of ${MAX_BOOKMARKS_PER_BOOK} bookmarks per book allowed.` })
+      return res
+        .status(403)
+        .json({ error: `Maximum of ${MAX_BOOKMARKS_PER_BOOK} bookmarks per book allowed.` })
     }
 
     const bookmark = await prisma.bookBookmark.create({
       data: {
         userId: req.user.userId,
-        gutenbergId,
+        volumeId,
         cfi,
         label: label ? label.trim() : null,
         pageSnippet: pageSnippet ? pageSnippet.trim() : null,
@@ -685,21 +561,21 @@ router.delete('/bookmarks/:id', requireAuth, libraryWriteLimiter, async (req, re
 // ── HIGHLIGHTS ──────────────────────────────────────────────────────────────
 
 /**
- * GET /api/library/highlights/:gutenbergId
+ * GET /api/library/highlights/:volumeId
  * Get user's highlights for a book.
  */
-router.get('/highlights/:gutenbergId', requireAuth, async (req, res) => {
-  const gutenbergId = parseInt(req.params.gutenbergId, 10)
+router.get('/highlights/:volumeId', requireAuth, async (req, res) => {
+  const { volumeId } = req.params
 
-  if (!Number.isInteger(gutenbergId) || gutenbergId < 1) {
-    return res.status(400).json({ error: 'Invalid book ID.' })
+  if (!volumeId || typeof volumeId !== 'string') {
+    return res.status(400).json({ error: 'Invalid volume ID.' })
   }
 
   try {
     const highlights = await prisma.bookHighlight.findMany({
       where: {
         userId: req.user.userId,
-        gutenbergId,
+        volumeId,
       },
       orderBy: { createdAt: 'asc' },
     })
@@ -714,13 +590,13 @@ router.get('/highlights/:gutenbergId', requireAuth, async (req, res) => {
 /**
  * POST /api/library/highlights
  * Create a highlight.
- * Body: { gutenbergId, cfi, text, color?, note?, shared? }
+ * Body: { volumeId, cfi, text, color?, note?, shared? }
  */
 router.post('/highlights', requireAuth, libraryWriteLimiter, async (req, res) => {
-  const { gutenbergId, cfi, text, color, note, shared } = req.body
+  const { volumeId, cfi, text, color, note, shared } = req.body
 
-  if (!Number.isInteger(gutenbergId) || gutenbergId < 1) {
-    return res.status(400).json({ error: 'Invalid book ID.' })
+  if (!volumeId || typeof volumeId !== 'string') {
+    return res.status(400).json({ error: 'Invalid volume ID.' })
   }
 
   if (!cfi || typeof cfi !== 'string' || !text || typeof text !== 'string') {
@@ -728,22 +604,23 @@ router.post('/highlights', requireAuth, libraryWriteLimiter, async (req, res) =>
   }
 
   try {
-    // Check highlight count limit
     const count = await prisma.bookHighlight.count({
       where: {
         userId: req.user.userId,
-        gutenbergId,
+        volumeId,
       },
     })
 
     if (count >= MAX_HIGHLIGHTS_PER_BOOK) {
-      return res.status(403).json({ error: `Maximum of ${MAX_HIGHLIGHTS_PER_BOOK} highlights per book allowed.` })
+      return res
+        .status(403)
+        .json({ error: `Maximum of ${MAX_HIGHLIGHTS_PER_BOOK} highlights per book allowed.` })
     }
 
     const highlight = await prisma.bookHighlight.create({
       data: {
         userId: req.user.userId,
-        gutenbergId,
+        volumeId,
         cfi,
         text: text.trim(),
         color: color || '#FFEB3B',
@@ -762,7 +639,6 @@ router.post('/highlights', requireAuth, libraryWriteLimiter, async (req, res) =>
 /**
  * PATCH /api/library/highlights/:id
  * Update a highlight (note, color, shared).
- * Body: { note?, color?, shared? }
  */
 router.patch('/highlights/:id', requireAuth, libraryWriteLimiter, async (req, res) => {
   const highlightId = parseInt(req.params.id, 10)
@@ -837,32 +713,30 @@ router.delete('/highlights/:id', requireAuth, libraryWriteLimiter, async (req, r
 })
 
 /**
- * GET /api/library/highlights/:gutenbergId/social
+ * GET /api/library/highlights/:volumeId/social
  * Get shared highlights from other users (excluding blocked users).
  */
-router.get('/highlights/:gutenbergId/social', requireAuth, async (req, res) => {
-  const gutenbergId = parseInt(req.params.gutenbergId, 10)
+router.get('/highlights/:volumeId/social', requireAuth, async (req, res) => {
+  const { volumeId } = req.params
 
-  if (!Number.isInteger(gutenbergId) || gutenbergId < 1) {
-    return res.status(400).json({ error: 'Invalid book ID.' })
+  if (!volumeId || typeof volumeId !== 'string') {
+    return res.status(400).json({ error: 'Invalid volume ID.' })
   }
 
   try {
-    // Get blocked user IDs
     let blockedIds = []
     try {
       blockedIds = await getBlockedUserIds(prisma, req.user.userId)
     } catch {
-      // Graceful degradation: proceed without block filtering
       blockedIds = []
     }
 
     const highlights = await prisma.bookHighlight.findMany({
       where: {
-        gutenbergId,
+        volumeId,
         shared: true,
         userId: {
-          notIn: [...blockedIds, req.user.userId], // Exclude blocked users and self
+          notIn: [...blockedIds, req.user.userId],
         },
       },
       include: {
@@ -871,7 +745,7 @@ router.get('/highlights/:gutenbergId/social', requireAuth, async (req, res) => {
         },
       },
       orderBy: { createdAt: 'desc' },
-      take: 50, // Limit results for performance
+      take: 50,
     })
 
     res.json(highlights)

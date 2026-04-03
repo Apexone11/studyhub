@@ -3,7 +3,12 @@ import { API } from '../../config'
 import { authHeaders } from '../shared/pageUtils'
 import { getApiErrorMessage, readJsonSafely } from '../../lib/http'
 
-export default function useBookReader(gutenbergId) {
+/**
+ * useBookReader -- Manages reading state for the Google Books embedded viewer.
+ * Bookmarks and highlights still use CFI-style identifiers stored in the DB,
+ * but the viewer itself is Google's embedded viewer (no EPUB loading needed).
+ */
+export default function useBookReader(volumeId) {
   const [book, setBook] = useState(null)
   const [bookmarks, setBookmarks] = useState([])
   const [highlights, setHighlights] = useState([])
@@ -15,7 +20,7 @@ export default function useBookReader(gutenbergId) {
 
   // Fetch initial data on mount
   useEffect(() => {
-    if (!gutenbergId) {
+    if (!volumeId) {
       setLoading(false)
       return
     }
@@ -26,13 +31,10 @@ export default function useBookReader(gutenbergId) {
         setError('')
 
         // Fetch book details
-        const bookResponse = await fetch(
-          `${API}/api/library/books/${gutenbergId}`,
-          {
-            credentials: 'include',
-            headers: authHeaders(),
-          }
-        )
+        const bookResponse = await fetch(`${API}/api/library/books/${volumeId}`, {
+          credentials: 'include',
+          headers: authHeaders(),
+        })
 
         if (!bookResponse.ok) {
           const data = readJsonSafely(await bookResponse.text())
@@ -44,13 +46,10 @@ export default function useBookReader(gutenbergId) {
 
         // Fetch bookmarks
         try {
-          const bookmarksResponse = await fetch(
-            `${API}/api/library/bookmarks/${gutenbergId}`,
-            {
-              credentials: 'include',
-              headers: authHeaders(),
-            }
-          )
+          const bookmarksResponse = await fetch(`${API}/api/library/bookmarks/${volumeId}`, {
+            credentials: 'include',
+            headers: authHeaders(),
+          })
 
           if (bookmarksResponse.ok) {
             const bookmarksData = await bookmarksResponse.json()
@@ -62,13 +61,10 @@ export default function useBookReader(gutenbergId) {
 
         // Fetch highlights
         try {
-          const highlightsResponse = await fetch(
-            `${API}/api/library/highlights/${gutenbergId}`,
-            {
-              credentials: 'include',
-              headers: authHeaders(),
-            }
-          )
+          const highlightsResponse = await fetch(`${API}/api/library/highlights/${volumeId}`, {
+            credentials: 'include',
+            headers: authHeaders(),
+          })
 
           if (highlightsResponse.ok) {
             const highlightsData = await highlightsResponse.json()
@@ -80,13 +76,10 @@ export default function useBookReader(gutenbergId) {
 
         // Fetch reading progress
         try {
-          const progressResponse = await fetch(
-            `${API}/api/library/reading-progress/${gutenbergId}`,
-            {
-              credentials: 'include',
-              headers: authHeaders(),
-            }
-          )
+          const progressResponse = await fetch(`${API}/api/library/reading-progress/${volumeId}`, {
+            credentials: 'include',
+            headers: authHeaders(),
+          })
 
           if (progressResponse.ok) {
             const progressData = await progressResponse.json()
@@ -105,30 +98,25 @@ export default function useBookReader(gutenbergId) {
     }
 
     fetchData()
-  }, [gutenbergId])
+  }, [volumeId])
 
   // Save progress with debounce
   const saveProgress = useCallback(
     async (cfi, percentage) => {
-      if (!gutenbergId || !cfi) return
+      if (!volumeId) return
 
-      // Clear existing timer
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current)
       }
 
-      // Set new debounce timer
       debounceTimerRef.current = setTimeout(async () => {
         try {
-          const response = await fetch(
-            `${API}/api/library/reading-progress/${gutenbergId}`,
-            {
-              method: 'PUT',
-              credentials: 'include',
-              headers: authHeaders(),
-              body: JSON.stringify({ cfi, percentage }),
-            }
-          )
+          const response = await fetch(`${API}/api/library/reading-progress/${volumeId}`, {
+            method: 'PUT',
+            credentials: 'include',
+            headers: authHeaders(),
+            body: JSON.stringify({ cfi: cfi || 'page', percentage }),
+          })
 
           if (response.ok) {
             const progressData = await response.json()
@@ -137,15 +125,15 @@ export default function useBookReader(gutenbergId) {
         } catch (err) {
           console.error('Error saving progress:', err)
         }
-      }, 5000) // 5 second debounce
+      }, 5000)
     },
-    [gutenbergId]
+    [volumeId],
   )
 
   // Add bookmark
   const addBookmark = useCallback(
     async (cfi, label, pageSnippet) => {
-      if (!gutenbergId || !cfi) return null
+      if (!volumeId || !cfi) return null
 
       try {
         const response = await fetch(`${API}/api/library/bookmarks`, {
@@ -153,7 +141,7 @@ export default function useBookReader(gutenbergId) {
           credentials: 'include',
           headers: authHeaders(),
           body: JSON.stringify({
-            gutenbergId,
+            volumeId,
             cfi,
             label,
             pageSnippet,
@@ -173,20 +161,17 @@ export default function useBookReader(gutenbergId) {
         return null
       }
     },
-    [gutenbergId]
+    [volumeId],
   )
 
   // Remove bookmark
   const removeBookmark = useCallback(async (bookmarkId) => {
     try {
-      const response = await fetch(
-        `${API}/api/library/bookmarks/${bookmarkId}`,
-        {
-          method: 'DELETE',
-          credentials: 'include',
-          headers: authHeaders(),
-        }
-      )
+      const response = await fetch(`${API}/api/library/bookmarks/${bookmarkId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: authHeaders(),
+      })
 
       if (!response.ok) {
         const data = readJsonSafely(await response.text())
@@ -204,7 +189,7 @@ export default function useBookReader(gutenbergId) {
   // Add highlight
   const addHighlight = useCallback(
     async (cfi, text, color) => {
-      if (!gutenbergId || !cfi || !text) return null
+      if (!volumeId || !cfi || !text) return null
 
       try {
         const response = await fetch(`${API}/api/library/highlights`, {
@@ -212,7 +197,7 @@ export default function useBookReader(gutenbergId) {
           credentials: 'include',
           headers: authHeaders(),
           body: JSON.stringify({
-            gutenbergId,
+            volumeId,
             cfi,
             text,
             color,
@@ -232,21 +217,18 @@ export default function useBookReader(gutenbergId) {
         return null
       }
     },
-    [gutenbergId]
+    [volumeId],
   )
 
   // Update highlight
   const updateHighlight = useCallback(async (highlightId, updates) => {
     try {
-      const response = await fetch(
-        `${API}/api/library/highlights/${highlightId}`,
-        {
-          method: 'PATCH',
-          credentials: 'include',
-          headers: authHeaders(),
-          body: JSON.stringify(updates),
-        }
-      )
+      const response = await fetch(`${API}/api/library/highlights/${highlightId}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: authHeaders(),
+        body: JSON.stringify(updates),
+      })
 
       if (!response.ok) {
         const data = readJsonSafely(await response.text())
@@ -254,9 +236,7 @@ export default function useBookReader(gutenbergId) {
       }
 
       const updatedHighlight = await response.json()
-      setHighlights((prev) =>
-        prev.map((h) => (h.id === highlightId ? updatedHighlight : h))
-      )
+      setHighlights((prev) => prev.map((h) => (h.id === highlightId ? updatedHighlight : h)))
       return updatedHighlight
     } catch (err) {
       console.error('Error updating highlight:', err)
@@ -267,14 +247,11 @@ export default function useBookReader(gutenbergId) {
   // Remove highlight
   const removeHighlight = useCallback(async (highlightId) => {
     try {
-      const response = await fetch(
-        `${API}/api/library/highlights/${highlightId}`,
-        {
-          method: 'DELETE',
-          credentials: 'include',
-          headers: authHeaders(),
-        }
-      )
+      const response = await fetch(`${API}/api/library/highlights/${highlightId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: authHeaders(),
+      })
 
       if (!response.ok) {
         const data = readJsonSafely(await response.text())
