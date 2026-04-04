@@ -10,6 +10,8 @@ const { findSimilarSheets } = require('../../lib/plagiarism')
 const { createProvenanceToken } = require('../../lib/provenance')
 const { isHtmlUploadsEnabled } = require('../../lib/html/htmlKillSwitch')
 const { SHEET_STATUS, AUTHOR_SELECT, sheetWriteLimiter } = require('./sheets.constants')
+const { getUserPlan, isPro } = require('../../lib/getUserPlan')
+const { PLANS } = require('../payments/payments.constants')
 const { trackActivity } = require('../../lib/activityTracker')
 const { runAbuseChecks } = require('../../lib/abuseDetection')
 const { checkAndAwardBadges } = require('../../lib/badges')
@@ -36,6 +38,33 @@ router.post('/', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (re
   if (!courseId) return res.status(400).json({ error: 'Course is required.' })
 
   try {
+    /* Check upload quota for free users */
+    const userPlan = await getUserPlan(req.user.userId)
+    if (!isPro(userPlan)) {
+      const startOfMonth = new Date()
+      startOfMonth.setDate(1)
+      startOfMonth.setHours(0, 0, 0, 0)
+
+      try {
+        const monthlyCount = await prisma.studySheet.count({
+          where: {
+            userId: req.user.userId,
+            createdAt: { gte: startOfMonth },
+          },
+        })
+
+        const limit = PLANS.free.uploadsPerMonth
+        if (monthlyCount >= limit) {
+          return res.status(403).json({
+            error: `Monthly upload limit reached (${limit}). Upgrade to Pro for unlimited uploads.`,
+            code: 'UPLOAD_LIMIT',
+          })
+        }
+      } catch {
+        // If quota check fails, gracefully degrade and allow the upload
+      }
+    }
+
     if (contentFormat === 'html') {
       const killSwitch = await isHtmlUploadsEnabled()
       if (!killSwitch.enabled) {

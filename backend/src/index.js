@@ -265,6 +265,18 @@ app.post(
   },
 )
 
+// Video chunk upload must also bypass JSON parsing to receive raw binary data.
+// This route uses express.raw() internally to handle 3MB binary chunks.
+const videoUploadChunkHandler = (req, res, next) => {
+  req.url = '/upload/chunk'
+  videoRoutes(req, res, next)
+}
+app.post(
+  '/api/video/upload/chunk',
+  express.raw({ type: '*/*', limit: '3mb' }),
+  videoUploadChunkHandler,
+)
+
 // Parse JSON request bodies for auth and future API routes.
 app.use(express.json())
 

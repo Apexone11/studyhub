@@ -19,6 +19,7 @@ const prisma = require('../../lib/prisma')
 const { captureError } = require('../../monitoring/sentry')
 const { getBlockedUserIds } = require('../../lib/social/blockFilter')
 const { createNotification } = require('../../lib/notify')
+const { getUserPlan, isPro } = require('../../lib/getUserPlan')
 
 const {
   parseId,
@@ -126,6 +127,28 @@ async function createGroup(req, res) {
       const course = await prisma.course.findUnique({ where: { id: courseIdNum } })
       if (!course) {
         return res.status(404).json({ error: 'Course not found.' })
+      }
+    }
+
+    /* Check private study group limits based on plan */
+    if (privacy === 'private' || privacy === 'invite_only') {
+      const userPlan = await getUserPlan(req.user.userId)
+      try {
+        const groupCount = await prisma.studyGroup.count({
+          where: { createdById: req.user.userId, privacy: { in: ['private', 'invite_only'] } },
+        })
+
+        const maxGroups = isPro(userPlan) ? 10 : 2
+        if (groupCount >= maxGroups) {
+          return res.status(403).json({
+            error: isPro(userPlan)
+              ? 'You have reached the maximum of 10 private study groups.'
+              : 'Free plan allows up to 2 private study groups. Upgrade to Pro for more.',
+            code: 'GROUP_LIMIT',
+          })
+        }
+      } catch {
+        // If quota check fails, gracefully degrade and allow the creation
       }
     }
 

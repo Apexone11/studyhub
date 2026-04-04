@@ -1,9 +1,18 @@
 import Navbar from '../../components/navbar/Navbar'
 import { Link } from 'react-router-dom'
 
+const ROADMAP_V20 = [
+  'Hub AI assistant with streaming chat and context awareness',
+  'Video uploads with chunked upload to R2',
+  'Stripe subscriptions and donations',
+  'Real-time messaging (DMs and group chats)',
+  'Study groups with sessions and discussions',
+  'Comment reactions and nested replies',
+  'Fork, contribute, and merge workflow',
+  'Block and mute system for user safety',
+]
+
 const ROADMAP_V25 = [
-  'Subscription tiers (Free and Pro) powered by Stripe',
-  'Donation system with public leaderboard',
   'Flashcard mode -- auto-generate from study sheets',
   'Study session timer with Pomodoro integration',
   'Sheet templates library for common formats',
@@ -150,8 +159,14 @@ export default function AboutPage() {
       <section style={{ ...s.section, background: 'var(--sh-bg)' }}>
         <div style={s.sectionInner}>
           <h2 style={s.sectionH2}>Roadmap</h2>
-          <div className="about-roadmap-grid">
-            <RoadmapColumn title="V2.5 — Next Up" color="#16a34a" items={ROADMAP_V25} />
+          <div style={{ textAlign: 'center', marginBottom: 8 }}>
+            <span style={{ fontSize: 13, color: 'var(--sh-muted)', fontWeight: 'bold' }}>
+              Current Release: V2.0.0
+            </span>
+          </div>
+          <div style={{ ...s.roadmapGrid, gridTemplateColumns: 'repeat(3, 1fr)' }}>
+            <RoadmapColumn title="V2.0.0 — Current" color="#16a34a" items={ROADMAP_V20} />
+            <RoadmapColumn title="V2.5 — Next Up" color="#f59e0b" items={ROADMAP_V25} />
             <RoadmapColumn title="V3.0 — Future" color="#2563eb" items={ROADMAP_V30} />
           </div>
         </div>
@@ -365,7 +380,7 @@ const s = {
   stepNum: { fontSize: 40, fontWeight: 'bold', color: 'var(--sh-border)', marginBottom: 16 },
   stepTitle: { fontSize: 18, fontWeight: 'bold', color: 'var(--sh-heading)', margin: '0 0 12px' },
   stepDesc: { fontSize: 14, color: 'var(--sh-muted)', margin: 0, lineHeight: 1.7 },
-  roadmapGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32 },
+  roadmapGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 32 },
   roadmapCol: {
     background: 'var(--sh-surface)',
     border: '1px solid var(--sh-border)',

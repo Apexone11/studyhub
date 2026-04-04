@@ -10,9 +10,10 @@ const { getBlockedUserIds } = require('../../lib/social/blockFilter')
 const { searchBooks, getBookDetail, syncPopularBooksToDB } = require('./library.service')
 const {
   MAX_SHELVES_PER_USER,
-  MAX_BOOKMARKS_PER_BOOK,
+  MAX_BOOKMARKS_PER_USER_FREE,
   MAX_HIGHLIGHTS_PER_BOOK,
 } = require('./library.constants')
+const { getUserPlan, isPro } = require('../../lib/getUserPlan')
 
 /**
  * GET /api/library/search
@@ -451,17 +452,25 @@ async function createBookmarkHandler(req, res) {
   }
 
   try {
-    const count = await prisma.bookBookmark.count({
-      where: {
-        userId: req.user.userId,
-        volumeId,
-      },
-    })
+    /* Check bookmark limit for free users (total across all books) */
+    const userPlan = await getUserPlan(req.user.userId)
+    if (!isPro(userPlan)) {
+      try {
+        const totalCount = await prisma.bookBookmark.count({
+          where: {
+            userId: req.user.userId,
+          },
+        })
 
-    if (count >= MAX_BOOKMARKS_PER_BOOK) {
-      return res
-        .status(403)
-        .json({ error: `Maximum of ${MAX_BOOKMARKS_PER_BOOK} bookmarks per book allowed.` })
+        if (totalCount >= MAX_BOOKMARKS_PER_USER_FREE) {
+          return res.status(403).json({
+            error: `Maximum of ${MAX_BOOKMARKS_PER_USER_FREE} bookmarks total allowed on free plan. Upgrade to Pro for unlimited bookmarks.`,
+            code: 'BOOKMARK_LIMIT',
+          })
+        }
+      } catch {
+        // If quota check fails, gracefully degrade and allow the bookmark
+      }
     }
 
     const bookmark = await prisma.bookBookmark.create({

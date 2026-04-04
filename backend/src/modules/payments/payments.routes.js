@@ -28,8 +28,11 @@ const {
   DONATION_MIN_CENTS,
   DONATION_MAX_CENTS,
   DONATION_MESSAGE_MAX_LENGTH,
+  PLANS,
 } = require('./payments.constants')
 const service = require('./payments.service')
+const prisma = require('../../lib/prisma')
+const { getUserPlan, isPro } = require('../../lib/getUserPlan')
 
 const router = express.Router()
 
@@ -294,6 +297,46 @@ router.get('/admin/revenue', paymentReadLimiter, requireAuth, requireAdmin, asyn
     captureError(error, { context: 'payments.admin.revenue' })
     log.error({ err: error }, 'Failed to get revenue analytics')
     sendError(res, 500, 'Failed to retrieve revenue analytics.', ERROR_CODES.INTERNAL)
+  }
+})
+
+// ── GET /usage ───────────────────────────────────────────────────────────
+
+router.get('/usage', requireAuth, paymentReadLimiter, async (req, res) => {
+  try {
+    const plan = await getUserPlan(req.user.userId)
+    const planDef = PLANS[plan] || PLANS.free
+    const pro = isPro(plan)
+
+    // Count sheets this month
+    const startOfMonth = new Date()
+    startOfMonth.setDate(1)
+    startOfMonth.setHours(0, 0, 0, 0)
+
+    const sheetsThisMonth = await prisma.studySheet.count({
+      where: { userId: req.user.userId, createdAt: { gte: startOfMonth } },
+    })
+
+    // Count private study groups
+    const privateGroups = await prisma.studyGroup.count({
+      where: { createdById: req.user.userId, privacy: { in: ['private', 'invite_only'] } },
+    })
+
+    res.json({
+      plan,
+      usage: {
+        uploadsThisMonth: sheetsThisMonth,
+        uploadsLimit: pro ? -1 : planDef.uploadsPerMonth,
+        privateGroups,
+        privateGroupsLimit: pro ? 10 : 2,
+        aiMessagesPerDay: pro ? 120 : (planDef.aiMessagesPerDay || 30),
+        storageMb: planDef.storageMb,
+      },
+    })
+  } catch (err) {
+    captureError(err, { context: 'payments.usage' })
+    log.error({ err }, 'Failed to load usage data')
+    res.status(500).json({ error: 'Failed to load usage data.' })
   }
 })
 
