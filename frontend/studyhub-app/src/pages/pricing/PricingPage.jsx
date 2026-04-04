@@ -7,23 +7,26 @@ import { useSession } from '../../lib/session-context'
 const FAQ_ITEMS = [
   {
     question: 'Can I cancel anytime?',
-    answer: 'Yes, you can cancel your subscription anytime from your account settings. No long-term contracts.'
+    answer:
+      'Yes, you can cancel your subscription anytime from your account settings. No long-term contracts.',
   },
   {
     question: 'Is there a student discount?',
-    answer: 'The free tier is designed for students. Pro pricing is already student-friendly at $4.99/month.'
+    answer:
+      'The free tier is designed for students. Pro pricing is already student-friendly at $4.99/month.',
   },
   {
     question: 'What payment methods do you accept?',
-    answer: 'We accept all major credit and debit cards through Stripe. PayPal support coming soon.'
+    answer:
+      'We accept all major credit and debit cards through Stripe. PayPal support coming soon.',
   },
   {
     question: 'Can my university get a bulk deal?',
-    answer: 'Yes, contact us about Institution pricing with volume discounts.'
+    answer: 'Yes, contact us about Institution pricing with volume discounts.',
   },
   {
     question: 'Do I get a free trial?',
-    answer: 'We offer a 7-day free trial for new Pro subscribers. Cancel anytime before it renews.'
+    answer: 'We offer a 7-day free trial for new Pro subscribers. Cancel anytime before it renews.',
   },
 ]
 
@@ -64,7 +67,9 @@ export default function PricingPage() {
       {/* ── SUCCESS BANNER ────────────────────────────– */}
       {successFromUrl && (
         <div style={s.successBanner}>
-          <p style={s.successBannerText}>Success! Your subscription is now active. Thank you for supporting StudyHub.</p>
+          <p style={s.successBannerText}>
+            Success! Your subscription is now active. Thank you for supporting StudyHub.
+          </p>
         </div>
       )}
 
@@ -119,7 +124,8 @@ function PricingCard({ tier, subscription }) {
   const [waitlistError, setWaitlistError] = useState('')
 
   // Check if user has active pro subscription
-  const hasActivePro = subscription &&
+  const hasActivePro =
+    subscription &&
     (subscription.plan === 'pro_monthly' || subscription.plan === 'pro_yearly') &&
     subscription.status === 'active'
 
@@ -226,6 +232,9 @@ function PricingCard({ tier, subscription }) {
   if (tier === 'pro') {
     return (
       <div style={{ ...s.card, ...s.cardElevated }}>
+        <div style={s.planImageWrap}>
+          <img src="/images/plan-pro-monthly.png" alt="StudyHub Pro" style={s.planImage} />
+        </div>
         <div style={s.badgeRow}>
           <span style={{ ...s.badge, ...s.badgePro }}>Pro</span>
         </div>
@@ -252,10 +261,7 @@ function PricingCard({ tier, subscription }) {
             <button style={s.ctaDisabled} disabled>
               Current Plan
             </button>
-            <a
-              href="/settings?tab=subscription"
-              style={s.manageSubLink}
-            >
+            <a href="/settings?tab=subscription" style={s.manageSubLink}>
               Manage Subscription
             </a>
           </div>
@@ -457,9 +463,15 @@ function DonationSection() {
   return (
     <section style={ds.section}>
       <div style={ds.inner}>
+        <img
+          src="/images/plan-donation.png"
+          alt="StudyHub Donate"
+          style={{ width: 100, height: 'auto', borderRadius: 16, marginBottom: 16 }}
+        />
         <h2 style={ds.title}>Support StudyHub</h2>
         <p style={ds.subtitle}>
-          StudyHub is built by students, for students. Your donation helps us keep the platform free and accessible.
+          StudyHub is built by students, for students. Your donation helps us keep the platform free
+          and accessible.
         </p>
 
         {/* Preset amount buttons */}
@@ -539,18 +551,15 @@ function DonationSection() {
         </label>
 
         {/* Donate button */}
-        <button
-          style={ds.donateBtn}
-          onClick={handleDonate}
-          disabled={loading || amount < 1}
-        >
+        <button style={ds.donateBtn} onClick={handleDonate} disabled={loading || amount < 1}>
           {loading ? 'Redirecting to checkout...' : `Donate $${amount}`}
         </button>
 
         {error && <div style={ds.error}>{error}</div>}
 
         <p style={ds.footnote}>
-          Donations are processed securely through Stripe. All donors are featured on our supporters page.
+          Donations are processed securely through Stripe. All donors are featured on our supporters
+          page.
         </p>
       </div>
     </section>
@@ -811,6 +820,17 @@ const s = {
     borderRadius: 6,
     transform: 'rotate(0deg)',
     whiteSpace: 'nowrap',
+  },
+  planImageWrap: {
+    display: 'flex',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  planImage: {
+    width: 120,
+    height: 'auto',
+    borderRadius: 16,
+    objectFit: 'cover',
   },
   badgeRow: {
     marginBottom: 20,
