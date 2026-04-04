@@ -46,7 +46,8 @@ export default function PricingPage() {
         })
         if (res.ok) {
           const data = await res.json()
-          setSubscription(data.subscription || null)
+          // API returns { plan, status, ... } directly (not wrapped in .subscription)
+          setSubscription(data && data.plan ? data : null)
         }
       } catch (err) {
         console.error('[fetchSubscription]', err)

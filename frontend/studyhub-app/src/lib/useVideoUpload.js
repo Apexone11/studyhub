@@ -181,6 +181,7 @@ export default function useVideoUpload() {
               method: 'POST',
               credentials: 'include',
               headers: {
+                'Content-Type': 'application/octet-stream',
                 'x-upload-id': uploadId,
                 'x-r2-key': r2Key,
                 'x-part-number': String(partNumber),

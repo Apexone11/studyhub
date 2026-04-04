@@ -252,8 +252,9 @@ router.post(
       }
 
       const chunkBuffer = req.body
-      if (!chunkBuffer || chunkBuffer.length === 0) {
-        return res.status(400).json({ error: 'Empty chunk.' })
+      if (!chunkBuffer || !Buffer.isBuffer(chunkBuffer) || chunkBuffer.length === 0) {
+        console.error('[video:chunk] Empty or unparsed body. Content-Type:', req.headers['content-type'], 'Body type:', typeof chunkBuffer, 'Is Buffer:', Buffer.isBuffer(chunkBuffer))
+        return res.status(400).json({ error: 'Empty chunk. Ensure Content-Type: application/octet-stream is set.' })
       }
 
       // For the first chunk, validate magic bytes
