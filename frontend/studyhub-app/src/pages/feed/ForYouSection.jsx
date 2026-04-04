@@ -340,10 +340,9 @@ function PersonCard({ person }) {
       if (response.ok) {
         setIsFollowing(true)
       }
-    } catch {
-      // Handle error silently
-    } finally {
-      setIsFollowing(true)
+    } catch (err) {
+      setIsFollowing(false)
+      console.error('[ForYou] follow error:', err)
     }
   }
 

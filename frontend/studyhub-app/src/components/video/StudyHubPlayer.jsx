@@ -46,19 +46,28 @@ export default function StudyHubPlayer({
   const controlsTimerRef = useRef(null)
   const doubleTapRef = useRef({ side: null, timer: null })
 
+  // ── Restore persisted preferences from localStorage ───────────────
+  function readStorage(key, fallback) {
+    try { const v = localStorage.getItem(key); return v !== null ? JSON.parse(v) : fallback }
+    catch { return fallback }
+  }
+  function writeStorage(key, value) {
+    try { localStorage.setItem(key, JSON.stringify(value)) } catch { /* quota or private mode */ }
+  }
+
   // UI state
   const [playing, setPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
   const [buffered, setBuffered] = useState(0)
-  const [volume, setVolume] = useState(muted ? 0 : 1)
-  const [isMuted, setIsMuted] = useState(muted)
+  const [volume, setVolume] = useState(() => muted ? 0 : readStorage('studyhub_player_volume', 1))
+  const [isMuted, setIsMuted] = useState(() => muted || readStorage('studyhub_player_muted', false))
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [showControls, setShowControls] = useState(true)
   const [loading, setLoading] = useState(true)
   const [theaterMode, setTheaterMode] = useState(false)
   const [loopEnabled, setLoopEnabled] = useState(false)
-  const [playbackSpeed, setPlaybackSpeed] = useState(1)
+  const [playbackSpeed, setPlaybackSpeed] = useState(() => readStorage('studyhub_player_speed', 1))
   const [showSpeedMenu, setShowSpeedMenu] = useState(false)
   const [showQualityMenu, setShowQualityMenu] = useState(false)
   const [showCaptionMenu, setShowCaptionMenu] = useState(false)
@@ -105,9 +114,21 @@ export default function StudyHubPlayer({
       }
     })
     player.on('volumechange', () => {
-      setVolume(player.volume())
-      setIsMuted(player.muted())
+      const v = player.volume()
+      const m = player.muted()
+      setVolume(v)
+      setIsMuted(m)
+      writeStorage('studyhub_player_volume', v)
+      writeStorage('studyhub_player_muted', m)
     })
+
+    // Apply persisted preferences
+    const savedVol = readStorage('studyhub_player_volume', 1)
+    const savedMuted = muted || readStorage('studyhub_player_muted', false)
+    const savedSpeed = readStorage('studyhub_player_speed', 1)
+    player.volume(savedVol)
+    player.muted(savedMuted)
+    player.playbackRate(savedSpeed)
 
     // Add caption tracks
     captions.forEach((cap) => {
@@ -207,6 +228,7 @@ export default function StudyHubPlayer({
     player.playbackRate(speed)
     setPlaybackSpeed(speed)
     setShowSpeedMenu(false)
+    writeStorage('studyhub_player_speed', speed)
   }, [])
 
   const changeQuality = useCallback(
