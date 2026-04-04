@@ -201,9 +201,13 @@ function PricingCard({ tier, subscription }) {
     }
   }
 
+  // Distinguish monthly vs yearly for display
+  const isYearly = subscription?.plan === 'pro_yearly'
+  const isFreeUser = !hasActivePro
+
   if (tier === 'free') {
     return (
-      <div style={s.card}>
+      <div style={{ ...s.card, ...(isFreeUser ? {} : { opacity: 0.7 }) }}>
         <div style={s.badgeRow}>
           <span style={s.badge}>Free</span>
         </div>
@@ -220,10 +224,12 @@ function PricingCard({ tier, subscription }) {
           <Feature text="2 private study groups" included />
           <Feature text="3 playground projects" included />
         </div>
-        {!hasActivePro && (
+        {isFreeUser ? (
           <button style={s.ctaDisabled} disabled>
             Current Plan
           </button>
+        ) : (
+          <p style={s.includedNote}>Included with your Pro subscription</p>
         )}
       </div>
     )
@@ -258,9 +264,24 @@ function PricingCard({ tier, subscription }) {
 
         {hasActivePro ? (
           <div style={s.currentPlanGroup}>
-            <button style={s.ctaDisabled} disabled>
-              Current Plan
-            </button>
+            <div style={s.subscribedBanner}>
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ flexShrink: 0 }}>
+                <path
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                  fill="var(--sh-success)"
+                />
+              </svg>
+              <span style={s.subscribedText}>
+                You are subscribed to Pro {isYearly ? '(Yearly)' : '(Monthly)'}
+              </span>
+            </div>
+            {subscription?.currentPeriodEnd && (
+              <p style={s.renewsText}>
+                {subscription.cancelAtPeriodEnd
+                  ? `Access until ${new Date(subscription.currentPeriodEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+                  : `Renews ${new Date(subscription.currentPeriodEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
+              </p>
+            )}
             <a href="/settings?tab=subscription" style={s.manageSubLink}>
               Manage Subscription
             </a>
@@ -927,7 +948,27 @@ const s = {
   currentPlanGroup: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 12,
+    gap: 8,
+  },
+  subscribedBanner: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    padding: '12px 16px',
+    background: 'var(--sh-success-bg)',
+    border: '1px solid var(--sh-success-border)',
+    borderRadius: 10,
+  },
+  subscribedText: {
+    fontSize: 14,
+    fontWeight: 700,
+    color: 'var(--sh-success-text)',
+  },
+  renewsText: {
+    fontSize: 13,
+    color: 'var(--sh-subtext)',
+    margin: 0,
+    textAlign: 'center',
   },
   manageSubLink: {
     color: 'var(--sh-brand-accent)',
@@ -937,6 +978,13 @@ const s = {
     textAlign: 'center',
     padding: '10px 0',
     transition: 'color 0.2s ease-out',
+  },
+  includedNote: {
+    fontSize: 13,
+    color: 'var(--sh-muted)',
+    textAlign: 'center',
+    margin: 0,
+    fontStyle: 'italic',
   },
   waitlistForm: {
     display: 'flex',

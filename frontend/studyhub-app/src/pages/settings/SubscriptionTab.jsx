@@ -125,6 +125,12 @@ export default function SubscriptionTab() {
   const isFree = !sub || sub.plan === 'free'
   const isActive = sub?.status === 'active' || sub?.status === 'trialing'
   const isPastDue = sub?.status === 'past_due'
+  const planImage =
+    sub?.plan === 'pro_yearly'
+      ? '/images/plan-pro-yearly.png'
+      : sub?.plan === 'pro_monthly'
+        ? '/images/plan-pro-monthly.png'
+        : null
 
   return (
     <>
@@ -136,19 +142,38 @@ export default function SubscriptionTab() {
       {/* ── Current Plan ──────────────────────────────── */}
       <SectionCard title="Current Plan" subtitle="Your active subscription and billing details.">
         <div style={s.planRow}>
+          {/* Plan image card for Pro subscribers */}
+          {!isFree && planImage && (
+            <div style={s.planImageCard}>
+              <img src={planImage} alt={PLAN_LABELS[sub?.plan] || 'Pro'} style={s.planImageThumb} />
+            </div>
+          )}
           <div style={s.planInfo}>
             <div style={s.planBadge}>
               <span
                 style={{
                   ...s.badge,
-                  background: isFree ? 'var(--sh-soft)' : 'var(--sh-soft)',
-                  color: isFree ? 'var(--sh-text)' : 'var(--sh-brand-accent)',
+                  background: isFree
+                    ? 'var(--sh-soft)'
+                    : 'linear-gradient(135deg, #7c3aed, #3b82f6)',
+                  color: isFree ? 'var(--sh-text)' : '#ffffff',
                 }}
               >
                 {PLAN_LABELS[sub?.plan] || 'Free'}
               </span>
               {isActive && !isFree && (
                 <span style={{ ...s.statusDot, background: 'var(--sh-success)' }}>Active</span>
+              )}
+              {sub?.status === 'trialing' && (
+                <span
+                  style={{
+                    ...s.statusDot,
+                    background: 'var(--sh-info-bg)',
+                    color: 'var(--sh-info-text)',
+                  }}
+                >
+                  Trial
+                </span>
               )}
               {isPastDue && (
                 <span style={{ ...s.statusDot, background: 'var(--sh-danger)' }}>Past Due</span>
@@ -168,6 +193,12 @@ export default function SubscriptionTab() {
 
             {!isFree && sub?.createdAt && (
               <p style={s.periodText}>Member since {formatDate(sub.createdAt)}</p>
+            )}
+
+            {isFree && (
+              <p style={s.periodText}>
+                Upgrade to Pro to unlock unlimited uploads, 120 AI messages/day, and more.
+              </p>
             )}
 
             {isPastDue && (
@@ -961,9 +992,29 @@ const se = {
 
 const s = {
   planRow: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: 20,
     marginBottom: 16,
   },
-  planInfo: {},
+  planImageCard: {
+    flexShrink: 0,
+    width: 80,
+    height: 80,
+    borderRadius: 14,
+    overflow: 'hidden',
+    border: '2px solid var(--sh-border)',
+    background: 'var(--sh-bg)',
+  },
+  planImageThumb: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+  },
+  planInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
   planBadge: {
     display: 'flex',
     alignItems: 'center',
