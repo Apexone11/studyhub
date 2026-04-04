@@ -478,9 +478,13 @@ async function getUserSubscription(userId) {
     },
   })
 
-  const inactiveStatuses = ['canceled', 'incomplete', 'incomplete_expired']
-  if (!sub || inactiveStatuses.includes(sub.status)) {
+  // No subscription or fully inactive
+  if (!sub || sub.status === 'canceled' || sub.status === 'incomplete_expired') {
     return { plan: 'free', status: 'active', features: PLANS.free }
+  }
+  // Incomplete (payment pending) - treat as free until confirmed
+  if (sub.status === 'incomplete') {
+    return { plan: 'free', status: 'incomplete', features: PLANS.free }
   }
 
   return {

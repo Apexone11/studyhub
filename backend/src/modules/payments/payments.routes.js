@@ -239,6 +239,20 @@ router.get('/subscription', paymentReadLimiter, requireAuth, async (req, res) =>
   }
 })
 
+// ── GET /subscription/debug — Raw DB record for debugging ────────────────
+router.get('/subscription/debug', paymentReadLimiter, requireAuth, async (req, res) => {
+  try {
+    const raw = await prisma.subscription.findUnique({ where: { userId: req.user.userId } })
+    const planFromEnv = {
+      STRIPE_PRICE_ID_PRO: process.env.STRIPE_PRICE_ID_PRO ? 'set' : 'MISSING',
+      STRIPE_PRICE_ID_PRO_YEARLY: process.env.STRIPE_PRICE_ID_PRO_YEARLY ? 'set' : 'MISSING',
+    }
+    res.json({ raw: raw || null, envStatus: planFromEnv, userId: req.user.userId })
+  } catch (error) {
+    res.status(500).json({ error: error.message })
+  }
+})
+
 // ── POST /portal ─────────────────────────────────────────────────────────
 
 router.post('/portal', paymentPortalLimiter, requireAuth, async (req, res) => {

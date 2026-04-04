@@ -19,7 +19,7 @@ const PLAN_LABELS = {
 }
 
 export default function SubscriptionTab() {
-  const { refreshSession } = useSession()
+  const { user, refreshSession } = useSession()
   const [sub, setSub] = useState(null)
   const [history, setHistory] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -216,13 +216,18 @@ export default function SubscriptionTab() {
     )
   }
 
-  const isFree = !sub || sub.plan === 'free'
-  const isActive = sub?.status === 'active' || sub?.status === 'trialing'
+  // Use both the API response AND session user plan for maximum reliability
+  const apiPlan = sub?.plan || 'free'
+  const sessionPlan = user?.plan || 'free'
+  const effectivePlan = apiPlan !== 'free' ? apiPlan : sessionPlan
+  const isFree = effectivePlan === 'free'
+  const isActive =
+    sub?.status === 'active' || sub?.status === 'trialing' || sub?.status === 'past_due'
   const isPastDue = sub?.status === 'past_due'
   const planImage =
-    sub?.plan === 'pro_yearly'
+    effectivePlan === 'pro_yearly'
       ? '/images/plan-pro-yearly.png'
-      : sub?.plan === 'pro_monthly'
+      : effectivePlan === 'pro_monthly'
         ? '/images/plan-pro-monthly.png'
         : null
 
@@ -253,7 +258,7 @@ export default function SubscriptionTab() {
                   color: isFree ? 'var(--sh-text)' : '#ffffff',
                 }}
               >
-                {PLAN_LABELS[sub?.plan] || 'Free'}
+                {PLAN_LABELS[effectivePlan] || 'Free'}
               </span>
               {isActive && !isFree && (
                 <span style={{ ...s.statusDot, background: 'var(--sh-success)' }}>Active</span>
@@ -360,7 +365,7 @@ export default function SubscriptionTab() {
           />
           <FeatureItem
             label="Video Uploads"
-            value={isFree ? '5 min max' : '60 min max'}
+            value={isFree ? '30 min max' : '60 min max'}
             highlight={!isFree}
           />
           <FeatureItem label="Storage" value={isFree ? '500 MB' : '5 GB'} highlight={!isFree} />

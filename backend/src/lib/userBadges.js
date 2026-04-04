@@ -19,9 +19,9 @@ const prisma = require('./prisma')
  *   Gold:   $100+
  */
 const DONOR_THRESHOLDS = {
-  gold: 10000,   // $100
-  silver: 2500,  // $25
-  bronze: 100,   // $1
+  gold: 10000, // $100
+  silver: 2500, // $25
+  bronze: 100, // $1
 }
 
 function donorLevel(totalCents) {
@@ -50,7 +50,7 @@ async function enrichUsersWithBadges(users) {
     const subs = await prisma.subscription.findMany({
       where: {
         userId: { in: userIds },
-        status: { in: ['active', 'trialing'] },
+        status: { in: ['active', 'trialing', 'past_due'] },
       },
       select: { userId: true, plan: true },
     })
@@ -70,9 +70,7 @@ async function enrichUsersWithBadges(users) {
       },
       _sum: { amount: true },
     })
-    donorMap = new Map(
-      donations.map((d) => [d.userId, d._sum.amount || 0]),
-    )
+    donorMap = new Map(donations.map((d) => [d.userId, d._sum.amount || 0]))
   } catch {
     // Donation table may not exist — graceful degradation
   }

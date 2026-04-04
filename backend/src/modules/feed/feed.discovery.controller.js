@@ -93,7 +93,7 @@ router.get('/trending', discoveryLimiter, optionalAuth, async (req, res) => {
         course: {
           select: { id: true, code: true, name: true, school: { select: { short: true } } },
         },
-        _count: { select: { comments: true, forks: true } },
+        _count: { select: { comments: true, forkChildren: true } },
       },
       orderBy: [{ stars: 'desc' }, { createdAt: 'desc' }],
       take: limit * DISCOVERY_FETCH_MULTIPLIER, // fetch extra for scoring
@@ -107,7 +107,7 @@ router.get('/trending', discoveryLimiter, optionalAuth, async (req, res) => {
       const score =
         (sheet.stars || 0) * 3 +
         (sheet._count.comments || 0) * 2 +
-        (sheet._count.forks || 0) * 5 +
+        (sheet._count.forkChildren || 0) * 5 +
         recencyBoost * 10
       return { ...sheet, _score: score }
     })
@@ -178,7 +178,7 @@ router.get('/recommended', discoveryLimiter, optionalAuth, async (req, res) => {
         createdAt: true,
         author: { select: { id: true, username: true, avatarUrl: true } },
         course: { select: { id: true, code: true, name: true } },
-        _count: { select: { comments: true, forks: true } },
+        _count: { select: { comments: true, forkChildren: true } },
       },
       orderBy: [{ stars: 'desc' }, { createdAt: 'desc' }],
       take: limit * DISCOVERY_FETCH_MULTIPLIER,
@@ -232,8 +232,13 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
     })
     const courseIds = enrollments.map((e) => e.courseId)
 
-    // Get blocked user IDs
-    const blockedIds = await getBlockedUserIds(prisma, userId)
+    // Get blocked user IDs (wrapped in try-catch for graceful degradation)
+    let blockedIds = []
+    try {
+      blockedIds = await getBlockedUserIds(prisma, userId)
+    } catch {
+      blockedIds = []
+    }
     const excludeUserIds = new Set([userId, ...blockedIds])
 
     // Get starred sheets
@@ -280,7 +285,7 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
           createdAt: true,
           author: { select: { id: true, username: true, avatarUrl: true } },
           course: { select: { id: true, code: true, name: true } },
-          _count: { select: { comments: true, forks: true } },
+          _count: { select: { comments: true, forkChildren: true } },
         },
         orderBy: [{ stars: 'desc' }, { createdAt: 'desc' }],
         take: 50,
@@ -301,7 +306,7 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
           createdAt: true,
           author: { select: { id: true, username: true, avatarUrl: true } },
           course: { select: { id: true, code: true, name: true } },
-          _count: { select: { comments: true, forks: true } },
+          _count: { select: { comments: true, forkChildren: true } },
         },
         orderBy: [{ stars: 'desc' }, { createdAt: 'desc' }],
         take: 100,
@@ -365,7 +370,8 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
       .map((sheet) => {
         const ageHours = (now - new Date(sheet.createdAt).getTime()) / (1000 * 60 * 60)
         const recencyBoost = Math.max(0, 1 - ageHours / DISCOVERY_RECENCY_DECAY_HOURS)
-        const score = (sheet.stars || 0) * 3 + (sheet._count.forks || 0) * 5 + recencyBoost * 10
+        const score =
+          (sheet.stars || 0) * 3 + (sheet._count.forkChildren || 0) * 5 + recencyBoost * 10
         return { ...sheet, _score: score }
       })
       .sort((a, b) => b._score - a._score)
@@ -384,7 +390,7 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
         const score =
           (sheet.stars || 0) * 3 +
           (sheet._count.comments || 0) * 2 +
-          (sheet._count.forks || 0) * 5 +
+          (sheet._count.forkChildren || 0) * 5 +
           recencyBoost * 10
         return { ...sheet, _score: score }
       })
@@ -567,7 +573,7 @@ router.get('/courses/:courseId/discover', discoveryLimiter, optionalAuth, async 
           contentFormat: true,
           createdAt: true,
           author: { select: { id: true, username: true, avatarUrl: true } },
-          _count: { select: { comments: true, forks: true } },
+          _count: { select: { comments: true, forkChildren: true } },
         },
         orderBy: [{ stars: 'desc' }, { createdAt: 'desc' }],
         take: limit,

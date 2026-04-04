@@ -5,16 +5,18 @@
  */
 const prisma = require('./prisma')
 
+const ACTIVE_STATUSES = ['active', 'trialing', 'past_due']
+
 async function getUserPlan(userId) {
   try {
     const sub = await prisma.subscription.findUnique({
       where: { userId },
       select: { plan: true, status: true },
     })
-    if (sub && (sub.status === 'active' || sub.status === 'trialing')) {
+    if (sub && ACTIVE_STATUSES.includes(sub.status)) {
       return sub.plan || 'free'
     }
-  } catch (_err) {
+  } catch {
     // Subscription table may not exist yet -- graceful degradation
   }
   return 'free'

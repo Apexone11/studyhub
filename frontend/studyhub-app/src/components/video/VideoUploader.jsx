@@ -16,8 +16,9 @@
  *   maxSize                  — Optional max file size in bytes (default 500 MB)
  *   compact                  — Boolean, show a smaller inline variant
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useRef, useState, useCallback } from 'react'
+import { useRef, useState, useCallback, useEffect } from 'react'
 import useVideoUpload, { UPLOAD_STATUS } from '../../lib/useVideoUpload'
+import { API } from '../../config'
 
 const MAX_SIZE_DEFAULT = 500 * 1024 * 1024
 const ACCEPT = '.mp4,.webm,.mov,video/mp4,video/webm,video/quicktime'
@@ -260,10 +261,7 @@ export default function VideoUploader({
           <p style={{ color: 'var(--sh-muted)', fontSize: 'var(--type-sm)' }}>
             or click to browse -- MP4, WebM, MOV up to {Math.round(maxSize / (1024 * 1024))} MB
             {state.maxSize && (
-              <span>
-                {' '}
-                (Your limit: {(state.maxSize / (1024 * 1024 * 1024)).toFixed(1)} GB)
-              </span>
+              <span> (Your limit: {(state.maxSize / (1024 * 1024 * 1024)).toFixed(1)} GB)</span>
             )}
           </p>
         </div>
@@ -329,10 +327,7 @@ export default function VideoUploader({
           <p style={{ color: 'var(--sh-muted)', fontSize: 'var(--type-xs)' }}>
             {file.name} -- {(file.size / (1024 * 1024)).toFixed(1)} MB
             {state.maxDuration && (
-              <span>
-                {' '}
-                | Duration limit: {Math.floor(state.maxDuration / 60)} minutes
-              </span>
+              <span> | Duration limit: {Math.floor(state.maxDuration / 60)} minutes</span>
             )}
           </p>
 
@@ -376,37 +371,10 @@ export default function VideoUploader({
         </div>
       )}
 
-      {/* ── Processing state ───────────────────────────────────────── */}
-      {showProcessing && (
-        <div style={{ textAlign: 'center', padding: '24px 16px' }}>
-          <div
-            style={{
-              width: '36px',
-              height: '36px',
-              margin: '0 auto 12px',
-              border: '3px solid var(--sh-border)',
-              borderTopColor: 'var(--sh-brand)',
-              borderRadius: '50%',
-              animation: 'shp-spin 0.8s linear infinite',
-            }}
-          />
-          <p
-            style={{
-              color: 'var(--sh-text)',
-              fontWeight: 600,
-              fontSize: 'var(--type-sm)',
-              marginBottom: '4px',
-            }}
-          >
-            Processing video...
-          </p>
-          <p style={{ color: 'var(--sh-muted)', fontSize: 'var(--type-xs)' }}>
-            Your video is being transcoded. This may take a few minutes.
-          </p>
-        </div>
-      )}
+      {/* ── Processing state with progress polling ─────────────────── */}
+      {showProcessing && <VideoProcessingProgress videoId={state.videoId} />}
 
-      {/* ── Error state ────────────────────────────────────────────── */}
+      {/* ── Error state ──────────────────────────────────────────── */}
       {showError && (
         <div
           style={{
@@ -438,6 +406,220 @@ export default function VideoUploader({
               Cancel
             </button>
           </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Processing Progress Poller ──────────────────────────────────────────
+
+const STEP_LABELS = {
+  downloading: 'Downloading from storage...',
+  analyzing: 'Analyzing video metadata...',
+  thumbnail: 'Generating thumbnail...',
+  transcoding: 'Transcoding video...',
+  'transcoding 360p': 'Transcoding 360p quality...',
+  'transcoding 720p': 'Transcoding 720p quality...',
+  'transcoding 1080p': 'Transcoding 1080p quality...',
+  finalizing: 'Finalizing and saving...',
+}
+
+function VideoProcessingProgress({ videoId }) {
+  const [step, setStep] = useState(null)
+  const [pct, setPct] = useState(0)
+  const [done, setDone] = useState(false)
+  const [previewUrl, setPreviewUrl] = useState(null)
+  const [downloadable, setDownloadable] = useState(true)
+  const [toggling, setToggling] = useState(false)
+
+  useEffect(() => {
+    if (!videoId) return
+    let active = true
+
+    const poll = setInterval(async () => {
+      try {
+        const res = await fetch(`${API}/api/video/${videoId}`, { credentials: 'include' })
+        if (!res.ok || !active) return
+        const data = await res.json()
+        if (data.status === 'ready') {
+          setPct(100)
+          setStep('finalizing')
+          setDone(true)
+          setDownloadable(data.downloadable !== false)
+          clearInterval(poll)
+          // Fetch stream URL for preview
+          try {
+            const streamRes = await fetch(`${API}/api/video/${videoId}/stream`, {
+              credentials: 'include',
+            })
+            if (streamRes.ok) {
+              const streamData = await streamRes.json()
+              if (active) setPreviewUrl(streamData.url)
+            }
+          } catch {
+            /* silent */
+          }
+          return
+        }
+        if (data.status === 'failed') {
+          setStep('failed')
+          clearInterval(poll)
+          return
+        }
+        if (data.processingStep) setStep(data.processingStep)
+        if (data.processingProgress) setPct(data.processingProgress)
+      } catch {
+        // silent
+      }
+    }, 3000)
+
+    return () => {
+      active = false
+      clearInterval(poll)
+    }
+  }, [videoId])
+
+  const toggleDownloadable = async () => {
+    setToggling(true)
+    try {
+      const res = await fetch(`${API}/api/video/${videoId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ downloadable: !downloadable }),
+      })
+      if (res.ok) setDownloadable(!downloadable)
+    } catch {
+      /* silent */
+    } finally {
+      setToggling(false)
+    }
+  }
+
+  const label = done
+    ? 'Processing complete -- your video is ready'
+    : STEP_LABELS[step] || 'Processing video...'
+
+  return (
+    <div style={{ padding: '20px 16px' }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 8,
+        }}
+      >
+        <span
+          style={{
+            color: done ? 'var(--sh-success-text)' : 'var(--sh-text)',
+            fontSize: 'var(--type-sm)',
+            fontWeight: 600,
+          }}
+        >
+          {label}
+        </span>
+        <span style={{ color: 'var(--sh-muted)', fontSize: 'var(--type-xs)', fontWeight: 700 }}>
+          {pct}%
+        </span>
+      </div>
+      <div
+        style={{
+          width: '100%',
+          height: 8,
+          background: 'var(--sh-soft)',
+          borderRadius: 4,
+          overflow: 'hidden',
+        }}
+      >
+        <div
+          style={{
+            height: '100%',
+            background: done ? 'var(--sh-success)' : 'var(--sh-brand)',
+            borderRadius: 4,
+            transition: 'width 0.5s ease',
+            width: `${pct}%`,
+          }}
+        />
+      </div>
+
+      {step === 'failed' && (
+        <p style={{ color: 'var(--sh-danger-text)', fontSize: 'var(--type-xs)', marginTop: 8 }}>
+          Video processing failed. Please try uploading again.
+        </p>
+      )}
+
+      {!done && step !== 'failed' && (
+        <p style={{ color: 'var(--sh-muted)', fontSize: 'var(--type-xs)', marginTop: 8 }}>
+          This may take a few minutes depending on video length.
+        </p>
+      )}
+
+      {/* Preview player after processing completes */}
+      {done && previewUrl && (
+        <div style={{ marginTop: 12, borderRadius: 10, overflow: 'hidden', background: '#000' }}>
+          <video
+            src={previewUrl}
+            controls
+            playsInline
+            preload="metadata"
+            style={{ width: '100%', display: 'block', maxHeight: 300 }}
+          />
+        </div>
+      )}
+
+      {/* Download toggle for the creator */}
+      {done && (
+        <div
+          style={{
+            marginTop: 10,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '8px 12px',
+            background: 'var(--sh-soft)',
+            borderRadius: 8,
+            border: '1px solid var(--sh-border)',
+          }}
+        >
+          <div>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--sh-text)' }}>
+              Allow downloads
+            </span>
+            <span style={{ fontSize: 11, color: 'var(--sh-muted)', display: 'block' }}>
+              {downloadable ? 'Viewers can download this video' : 'Downloads are disabled'}
+            </span>
+          </div>
+          <button
+            onClick={toggleDownloadable}
+            disabled={toggling}
+            style={{
+              width: 44,
+              height: 24,
+              borderRadius: 12,
+              border: 'none',
+              cursor: toggling ? 'not-allowed' : 'pointer',
+              background: downloadable ? 'var(--sh-success)' : 'var(--sh-border)',
+              position: 'relative',
+              transition: 'background 0.2s',
+            }}
+          >
+            <span
+              style={{
+                display: 'block',
+                width: 18,
+                height: 18,
+                borderRadius: 9,
+                background: '#fff',
+                position: 'absolute',
+                top: 3,
+                left: downloadable ? 23 : 3,
+                transition: 'left 0.2s',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+              }}
+            />
+          </button>
         </div>
       )}
     </div>

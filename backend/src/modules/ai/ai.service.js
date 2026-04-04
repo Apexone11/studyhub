@@ -51,6 +51,17 @@ async function getDailyLimit(user) {
     // Subscription table may not exist yet — graceful degradation
   }
 
+  // Check donor status (donors get elevated limits)
+  try {
+    const donation = await prisma.donation.findFirst({
+      where: { userId: user.id || user.userId, status: 'completed' },
+      select: { id: true },
+    })
+    if (donation) return DAILY_LIMITS.donor
+  } catch {
+    // Graceful degradation
+  }
+
   if (user.isStaffVerified || user.emailVerified) return DAILY_LIMITS.verified
   return DAILY_LIMITS.default
 }
@@ -265,7 +276,10 @@ async function streamMessage({ user, conversationId, content, currentPage, image
   }
 
   // Determine max output tokens based on whether the user is asking for a sheet.
-  const isSheetRequest = /\b(create|make|generate|build|write|design)\b.*\b(sheet|cheatsheet|cheat sheet|study guide|reference sheet|review sheet|formula sheet)\b/i.test(content)
+  const isSheetRequest =
+    /\b(create|make|generate|build|write|design)\b.*\b(sheet|cheatsheet|cheat sheet|study guide|reference sheet|review sheet|formula sheet)\b/i.test(
+      content,
+    )
   const maxTokens = isSheetRequest ? MAX_OUTPUT_TOKENS_SHEET : MAX_OUTPUT_TOKENS_QA
 
   // 6. Stream from Claude.
@@ -284,10 +298,14 @@ async function streamMessage({ user, conversationId, content, currentPage, image
 
     let aborted = false
     if (signal) {
-      signal.addEventListener('abort', () => {
-        aborted = true
-        stream.abort()
-      }, { once: true })
+      signal.addEventListener(
+        'abort',
+        () => {
+          aborted = true
+          stream.abort()
+        },
+        { once: true },
+      )
     }
 
     for await (const event of stream) {
@@ -323,7 +341,10 @@ async function streamMessage({ user, conversationId, content, currentPage, image
     // Abort errors from client disconnect are expected; don't report them.
     if (signal?.aborted) return
     captureError(err, { tags: { module: 'ai' } })
-    sendSSE(res, { type: 'error', message: 'AI service temporarily unavailable. Please try again.' })
+    sendSSE(res, {
+      type: 'error',
+      message: 'AI service temporarily unavailable. Please try again.',
+    })
     res.end()
     return
   }

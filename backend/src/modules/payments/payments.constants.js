@@ -6,7 +6,7 @@ const PLANS = {
   free: {
     name: 'Free',
     uploadsPerMonth: 10,
-    aiMessagesPerDay: 30,
+    aiMessagesPerDay: 10,
     storageMb: 500,
     prioritySupport: false,
     proBadge: false,

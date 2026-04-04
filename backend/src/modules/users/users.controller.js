@@ -60,7 +60,16 @@ const getMyBadges = async (req, res) => {
       orderBy: { unlockedAt: 'desc' },
       select: {
         unlockedAt: true,
-        badge: { select: { slug: true, name: true, description: true, category: true, tier: true, iconUrl: true } },
+        badge: {
+          select: {
+            slug: true,
+            name: true,
+            description: true,
+            category: true,
+            tier: true,
+            iconUrl: true,
+          },
+        },
       },
     })
     res.json(badges.map((ub) => ({ ...ub.badge, unlockedAt: ub.unlockedAt })))
@@ -84,7 +93,16 @@ const getBadgesByUsername = async (req, res) => {
       orderBy: { unlockedAt: 'desc' },
       select: {
         unlockedAt: true,
-        badge: { select: { slug: true, name: true, description: true, category: true, tier: true, iconUrl: true } },
+        badge: {
+          select: {
+            slug: true,
+            name: true,
+            description: true,
+            category: true,
+            tier: true,
+            iconUrl: true,
+          },
+        },
       },
     })
     res.json(badges.map((ub) => ({ ...ub.badge, unlockedAt: ub.unlockedAt })))
@@ -185,8 +203,8 @@ const reorderPinnedSheets = async (req, res) => {
         prisma.userPinnedSheet.updateMany({
           where: { userId: req.user.userId, sheetId: Number(sheetId) },
           data: { position: index },
-        })
-      )
+        }),
+      ),
     )
     res.json({ reordered: true })
   } catch (err) {
@@ -212,7 +230,7 @@ const getUserByUsername = async (req, res) => {
             studySheets: { where: { status: 'published' } },
             followers: true,
             following: true,
-          }
+          },
         },
         enrollments: {
           include: { course: { include: { school: true } } },
@@ -233,9 +251,10 @@ const getUserByUsername = async (req, res) => {
     const accessDecision = await getProfileAccessDecision(prisma, req.user, user.id)
 
     if (!accessDecision.allowed) {
-      const errorMessage = accessDecision.visibility === PROFILE_VISIBILITY.PRIVATE
-        ? 'This profile is private.'
-        : 'This profile is only visible to classmates.'
+      const errorMessage =
+        accessDecision.visibility === PROFILE_VISIBILITY.PRIVATE
+          ? 'This profile is private.'
+          : 'This profile is only visible to classmates.'
 
       return res.status(403).json({ error: errorMessage })
     }
@@ -243,7 +262,7 @@ const getUserByUsername = async (req, res) => {
     let isFollowing = false
     if (req.user?.userId && req.user.userId !== user.id) {
       const follow = await prisma.userFollow.findUnique({
-        where: { followerId_followingId: { followerId: req.user.userId, followingId: user.id } }
+        where: { followerId_followingId: { followerId: req.user.userId, followingId: user.id } },
       })
       isFollowing = !!follow
     }
@@ -312,9 +331,7 @@ const getUserByUsername = async (req, res) => {
           },
         },
       })
-      starredSheets = starredRows
-        .map((r) => r.sheet)
-        .filter((s) => s && s.status === 'published')
+      starredSheets = starredRows.map((r) => r.sheet).filter((s) => s && s.status === 'published')
     } catch {
       // Degrade gracefully if starred query fails
     }
@@ -353,13 +370,14 @@ const followUser = async (req, res) => {
   try {
     const target = await prisma.user.findUnique({
       where: { username: req.params.username },
-      select: { id: true, username: true, _count: { select: { followers: true } } }
+      select: { id: true, username: true, _count: { select: { followers: true } } },
     })
     if (!target) return res.status(404).json({ error: 'User not found.' })
-    if (target.id === req.user.userId) return res.status(400).json({ error: 'You cannot follow yourself.' })
+    if (target.id === req.user.userId)
+      return res.status(400).json({ error: 'You cannot follow yourself.' })
 
     await prisma.userFollow.create({
-      data: { followerId: req.user.userId, followingId: target.id }
+      data: { followerId: req.user.userId, followingId: target.id },
     })
 
     await createNotification(prisma, {
@@ -385,12 +403,12 @@ const unfollowUser = async (req, res) => {
   try {
     const target = await prisma.user.findUnique({
       where: { username: req.params.username },
-      select: { id: true }
+      select: { id: true },
     })
     if (!target) return res.status(404).json({ error: 'User not found.' })
 
     await prisma.userFollow.delete({
-      where: { followerId_followingId: { followerId: req.user.userId, followingId: target.id } }
+      where: { followerId_followingId: { followerId: req.user.userId, followingId: target.id } },
     })
 
     const followerCount = await prisma.userFollow.count({ where: { followingId: target.id } })
@@ -522,7 +540,7 @@ const getMe = async (req, res) => {
 const getFollowSuggestions = async (req, res) => {
   try {
     // Get IDs the user already follows
-    const following = await prisma.follow.findMany({
+    const following = await prisma.userFollow.findMany({
       where: { followerId: req.user.userId },
       select: { followingId: true },
     })
@@ -560,9 +578,7 @@ const getFollowSuggestions = async (req, res) => {
         schoolId: true,
         _count: { select: { studySheets: true, followers: true } },
       },
-      orderBy: [
-        { followers: { _count: 'desc' } },
-      ],
+      orderBy: [{ followers: { _count: 'desc' } }],
       take: 20,
     })
 

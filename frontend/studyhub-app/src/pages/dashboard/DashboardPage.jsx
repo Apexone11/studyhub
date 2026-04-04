@@ -67,7 +67,9 @@ export default function DashboardPage() {
   } = useDashboardData()
 
   /* Tutorial popup — first-visit or re-trigger via floating "?" button */
-  const tutorial = useTutorial('dashboard', DASHBOARD_STEPS, { version: TUTORIAL_VERSIONS.dashboard })
+  const tutorial = useTutorial('dashboard', DASHBOARD_STEPS, {
+    version: TUTORIAL_VERSIONS.dashboard,
+  })
 
   const navActions = (
     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -103,8 +105,8 @@ export default function DashboardPage() {
           {isWelcome && !welcomeDismissed ? (
             <div
               style={{
-                background: 'linear-gradient(135deg, #eff6ff, #dbeafe)',
-                border: '1px solid #93c5fd',
+                background: 'var(--sh-info-bg)',
+                border: '1px solid var(--sh-info-border)',
                 borderRadius: 14,
                 padding: '14px 18px',
                 display: 'flex',
@@ -120,7 +122,15 @@ export default function DashboardPage() {
               <button
                 type="button"
                 onClick={() => setWelcomeDismissed(true)}
-                style={{ background: 'none', border: 'none', color: 'var(--sh-brand)', fontSize: 18, cursor: 'pointer', lineHeight: 1, padding: 4 }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--sh-brand)',
+                  fontSize: 18,
+                  cursor: 'pointer',
+                  lineHeight: 1,
+                  padding: 4,
+                }}
                 aria-label="Dismiss welcome banner"
               >
                 ×
@@ -145,16 +155,29 @@ export default function DashboardPage() {
             }}
           >
             <div>
-              <div style={{ fontSize: 13, color: 'var(--sh-slate-300)', fontWeight: 700, marginBottom: 8 }}>
+              <div
+                style={{
+                  fontSize: 13,
+                  color: 'var(--sh-slate-300)',
+                  fontWeight: 700,
+                  marginBottom: 8,
+                }}
+              >
                 SESSION READY
               </div>
               <h1 style={{ margin: 0, fontSize: 30, fontWeight: 800, letterSpacing: '-0.03em' }}>
                 Welcome back, {hero.username || user?.username || 'Student'}.
               </h1>
-              <p style={{ margin: '10px 0 0', fontSize: 14, lineHeight: 1.7, color: 'var(--sh-slate-300)' }}>
-                Joined {formatJoinedDate(hero.createdAt || user?.createdAt)}.
-                {' '}
-                Your study sheets, notes, and practice tests are ready.
+              <p
+                style={{
+                  margin: '10px 0 0',
+                  fontSize: 14,
+                  lineHeight: 1.7,
+                  color: 'var(--sh-slate-300)',
+                }}
+              >
+                Joined {formatJoinedDate(hero.createdAt || user?.createdAt)}. Your study sheets,
+                notes, and practice tests are ready.
               </p>
             </div>
 
@@ -195,7 +218,7 @@ export default function DashboardPage() {
             <div
               style={{
                 background: 'var(--sh-danger-bg)',
-                border: '1px solid #fecaca',
+                border: '1px solid var(--sh-danger-border)',
                 borderRadius: 14,
                 padding: '12px 14px',
                 color: 'var(--sh-danger)',
@@ -217,7 +240,7 @@ export default function DashboardPage() {
                 style={{
                   padding: '7px 12px',
                   borderRadius: 8,
-                  border: '1px solid #fecaca',
+                  border: '1px solid var(--sh-danger-border)',
                   background: 'var(--sh-surface)',
                   color: 'var(--sh-danger)',
                   fontSize: 12,
@@ -244,11 +267,19 @@ export default function DashboardPage() {
               <ResumeStudying entries={recentlyViewed} />
 
               {/* Content: Recent Sheets (wider) | Course Focus + Quick Actions */}
-              <section ref={contentRef} className="dashboard-content-grid" data-tutorial="dashboard-sheets">
+              <section
+                ref={contentRef}
+                className="dashboard-content-grid"
+                data-tutorial="dashboard-sheets"
+              >
                 <RecentSheets recentSheets={recentSheets} newCount={newSheetCount} />
 
                 <div style={{ display: 'grid', gap: 16 }}>
-                  <StudyQueue counts={studyQueueCounts} toReview={studyToReview} studying={studyStudying} />
+                  <StudyQueue
+                    counts={studyQueueCounts}
+                    toReview={studyToReview}
+                    studying={studyStudying}
+                  />
                   <CourseFocus courses={courses} />
                   <QuickActions />
                 </div>
@@ -261,7 +292,31 @@ export default function DashboardPage() {
       {/* Tutorial popup */}
       <SafeJoyride {...tutorial.joyrideProps} />
       {tutorial.seen && (
-        <button type="button" onClick={tutorial.restart} title="Show tutorial" style={{ position: 'fixed', bottom: 88, right: 24, width: 44, height: 44, borderRadius: '50%', border: 'none', background: 'var(--sh-brand)', color: '#fff', fontSize: 18, fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 14px rgba(59,130,246,0.4)', zIndex: 50, display: 'grid', placeItems: 'center' }}>?</button>
+        <button
+          type="button"
+          onClick={tutorial.restart}
+          title="Show tutorial"
+          style={{
+            position: 'fixed',
+            bottom: 88,
+            right: 24,
+            width: 44,
+            height: 44,
+            borderRadius: '50%',
+            border: 'none',
+            background: 'var(--sh-brand)',
+            color: '#fff',
+            fontSize: 18,
+            fontWeight: 800,
+            cursor: 'pointer',
+            boxShadow: '0 4px 14px rgba(59,130,246,0.4)',
+            zIndex: 50,
+            display: 'grid',
+            placeItems: 'center',
+          }}
+        >
+          ?
+        </button>
       )}
     </div>
   )

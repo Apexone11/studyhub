@@ -12,6 +12,7 @@ const FAST_MODEL = 'claude-haiku-4-5-20251001'
 const DAILY_LIMITS = {
   default: 10,
   verified: 20,
+  donor: 60,
   pro: 120,
   admin: 120,
 }

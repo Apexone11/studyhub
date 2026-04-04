@@ -23,7 +23,6 @@ const r2 = require('../../lib/r2Storage')
 const { processVideo, deleteVideoAssets } = require('./video.service')
 const { scanBufferWithClamAv } = require('../../lib/clamav')
 const {
-  MAX_VIDEO_SIZE,
   VIDEO_DURATION_LIMITS,
   VIDEO_SIZE_LIMITS,
   MAX_CAPTION_SIZE,
@@ -141,7 +140,7 @@ router.post('/upload/init', requireAuth, videoUploadInitLimiter, async (req, res
       if (sub && sub.status === 'active') {
         userPlan = sub.plan
       }
-    } catch (e) {
+    } catch {
       // Graceful degradation: treat as free on error
     }
 
@@ -154,7 +153,7 @@ router.post('/upload/init', requireAuth, videoUploadInitLimiter, async (req, res
         if (donation) {
           userPlan = 'donor'
         }
-      } catch (e) {
+      } catch {
         // Graceful degradation
       }
     }
@@ -225,68 +224,75 @@ router.post('/upload/init', requireAuth, videoUploadInitLimiter, async (req, res
  * Note: express.raw() middleware is applied at the app level in index.js
  * to ensure binary data is not parsed as JSON before reaching this handler.
  */
-router.post(
-  '/upload/chunk',
-  requireAuth,
-  videoUploadChunkLimiter,
-  async (req, res) => {
-    try {
-      const uploadId = req.headers['x-upload-id']
-      const r2Key = req.headers['x-r2-key']
-      const partNumber = parseInt(req.headers['x-part-number'], 10)
-      const videoId = parseInt(req.headers['x-video-id'], 10)
+router.post('/upload/chunk', requireAuth, videoUploadChunkLimiter, async (req, res) => {
+  try {
+    const uploadId = req.headers['x-upload-id']
+    const r2Key = req.headers['x-r2-key']
+    const partNumber = parseInt(req.headers['x-part-number'], 10)
+    const videoId = parseInt(req.headers['x-video-id'], 10)
 
-      if (!uploadId || !r2Key || isNaN(partNumber) || isNaN(videoId)) {
-        return res.status(400).json({ error: 'Missing required upload headers.' })
-      }
-
-      // Validate chunk size
-      if (req.headers['content-length'] && parseInt(req.headers['content-length']) > CHUNK_SIZE + 1024) {
-        return res.status(413).json({ error: 'Chunk exceeds maximum size.' })
-      }
-
-      // Verify ownership
-      const video = await prisma.video.findUnique({ where: { id: videoId } })
-      if (!video || video.userId !== req.user.userId) {
-        return res.status(404).json({ error: 'Video not found.' })
-      }
-
-      const chunkBuffer = req.body
-      if (!chunkBuffer || !Buffer.isBuffer(chunkBuffer) || chunkBuffer.length === 0) {
-        console.error('[video:chunk] Empty or unparsed body. Content-Type:', req.headers['content-type'], 'Body type:', typeof chunkBuffer, 'Is Buffer:', Buffer.isBuffer(chunkBuffer))
-        return res.status(400).json({ error: 'Empty chunk. Ensure Content-Type: application/octet-stream is set.' })
-      }
-
-      // For the first chunk, validate magic bytes
-      if (partNumber === 1) {
-        const isValid = validateVideoSignature(chunkBuffer)
-        if (!isValid) {
-          clearBuffer(uploadId)
-          await r2.abortMultipartUpload(r2Key, uploadId)
-          await prisma.video.update({
-            where: { id: videoId },
-            data: { status: VIDEO_STATUS.FAILED },
-          })
-          return res
-            .status(400)
-            .json({ error: 'File content does not match a supported video format.' })
-        }
-      }
-
-      // Append to server-side buffer
-      const state = getOrCreateBuffer(uploadId)
-      state.buffer = Buffer.concat([state.buffer, chunkBuffer])
-
-      // Flush to R2 if buffer >= 5 MB
-      await flushBufferIfReady(r2Key, uploadId, state)
-
-      res.json({ received: true, buffered: state.buffer.length, partNumber })
-    } catch (err) {
-      captureError(err, { route: req.originalUrl, method: req.method })
-      res.status(500).json({ error: 'Failed to upload chunk.' })
+    if (!uploadId || !r2Key || isNaN(partNumber) || isNaN(videoId)) {
+      return res.status(400).json({ error: 'Missing required upload headers.' })
     }
-  },
-)
+
+    // Validate chunk size
+    if (
+      req.headers['content-length'] &&
+      parseInt(req.headers['content-length']) > CHUNK_SIZE + 1024
+    ) {
+      return res.status(413).json({ error: 'Chunk exceeds maximum size.' })
+    }
+
+    // Verify ownership
+    const video = await prisma.video.findUnique({ where: { id: videoId } })
+    if (!video || video.userId !== req.user.userId) {
+      return res.status(404).json({ error: 'Video not found.' })
+    }
+
+    const chunkBuffer = req.body
+    if (!chunkBuffer || !Buffer.isBuffer(chunkBuffer) || chunkBuffer.length === 0) {
+      console.error(
+        '[video:chunk] Empty or unparsed body. Content-Type:',
+        req.headers['content-type'],
+        'Body type:',
+        typeof chunkBuffer,
+        'Is Buffer:',
+        Buffer.isBuffer(chunkBuffer),
+      )
+      return res
+        .status(400)
+        .json({ error: 'Empty chunk. Ensure Content-Type: application/octet-stream is set.' })
+    }
+
+    // For the first chunk, validate magic bytes
+    if (partNumber === 1) {
+      const isValid = validateVideoSignature(chunkBuffer)
+      if (!isValid) {
+        clearBuffer(uploadId)
+        await r2.abortMultipartUpload(r2Key, uploadId)
+        await prisma.video.update({
+          where: { id: videoId },
+          data: { status: VIDEO_STATUS.FAILED },
+        })
+        return res
+          .status(400)
+          .json({ error: 'File content does not match a supported video format.' })
+      }
+    }
+
+    // Append to server-side buffer
+    const state = getOrCreateBuffer(uploadId)
+    state.buffer = Buffer.concat([state.buffer, chunkBuffer])
+
+    // Flush to R2 if buffer >= 5 MB
+    await flushBufferIfReady(r2Key, uploadId, state)
+
+    res.json({ received: true, buffered: state.buffer.length, partNumber })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Failed to upload chunk.' })
+  }
+})
 
 /**
  * POST /api/video/upload/complete
@@ -499,6 +505,52 @@ router.get('/media/*path', readLimiter, async (req, res) => {
 })
 
 // ═══════════════════════════════════════════════════════════════════════════
+// Video Update (metadata + downloadable toggle)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * PATCH /api/video/:id
+ * Update video metadata (title, description, downloadable).
+ * Only the video owner can update.
+ */
+router.patch('/:id', requireAuth, async (req, res) => {
+  try {
+    const videoId = parseInt(req.params.id, 10)
+    if (isNaN(videoId)) return res.status(400).json({ error: 'Invalid video ID.' })
+
+    const video = await prisma.video.findUnique({
+      where: { id: videoId },
+      select: { userId: true },
+    })
+
+    if (!video) return res.status(404).json({ error: 'Video not found.' })
+    if (video.userId !== req.user.userId) {
+      return res.status(403).json({ error: 'You can only edit your own videos.' })
+    }
+
+    const updates = {}
+    if (req.body.title !== undefined) updates.title = String(req.body.title).slice(0, 200)
+    if (req.body.description !== undefined)
+      updates.description = String(req.body.description).slice(0, 2000)
+    if (req.body.downloadable !== undefined) updates.downloadable = Boolean(req.body.downloadable)
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: 'No fields to update.' })
+    }
+
+    const updated = await prisma.video.update({
+      where: { id: videoId },
+      data: updates,
+    })
+
+    res.json(formatVideoResponse(updated))
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
 // Video Delete
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -687,6 +739,9 @@ function formatVideoResponse(video) {
     hlsManifestUrl: video.hlsManifestR2Key ? r2.getPublicUrl(video.hlsManifestR2Key) : null,
     variants,
     captions: video.captions || [],
+    processingStep: video.processingStep || null,
+    processingProgress: video.processingProgress || 0,
+    downloadable: video.downloadable !== false,
     createdAt: video.createdAt,
   }
 }

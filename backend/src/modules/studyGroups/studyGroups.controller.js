@@ -61,12 +61,14 @@ async function listGroups(req, res) {
       AND: [
         isMine ? { id: { in: userGroupIds } } : { privacy: 'public' },
         courseIdNum ? { courseId: courseIdNum } : {},
-        search ? {
-          OR: [
-            { name: { contains: search, mode: 'insensitive' } },
-            { description: { contains: search, mode: 'insensitive' } },
-          ],
-        } : {},
+        search
+          ? {
+              OR: [
+                { name: { contains: search, mode: 'insensitive' } },
+                { description: { contains: search, mode: 'insensitive' } },
+              ],
+            }
+          : {},
       ],
     }
 
@@ -80,9 +82,7 @@ async function listGroups(req, res) {
       prisma.studyGroup.count({ where }),
     ])
 
-    const formatted = await Promise.all(
-      groups.map((g) => formatGroup(g, req.user.userId))
-    )
+    const formatted = await Promise.all(groups.map((g) => formatGroup(g, req.user.userId)))
 
     res.json({ groups: formatted, total, limit: limitNum, offset: offsetNum })
   } catch (err) {
@@ -263,6 +263,30 @@ async function updateGroup(req, res) {
     if (privacy !== undefined) {
       if (!['public', 'private', 'invite_only'].includes(privacy)) {
         return res.status(400).json({ error: 'Invalid privacy setting.' })
+      }
+      // Check private group limit when changing from public to private/invite_only
+      if ((privacy === 'private' || privacy === 'invite_only') && group.privacy === 'public') {
+        try {
+          const { getUserPlan, isPro } = require('../../lib/getUserPlan')
+          const userPlan = await getUserPlan(req.user.userId)
+          if (!isPro(userPlan)) {
+            const privateCount = await prisma.studyGroup.count({
+              where: {
+                createdById: req.user.userId,
+                privacy: { in: ['private', 'invite_only'] },
+              },
+            })
+            const limit = isPro(userPlan) ? 10 : 2
+            if (privateCount >= limit) {
+              return res.status(403).json({
+                error: `You have reached your private group limit (${limit}). Upgrade to Pro for more.`,
+                code: 'GROUP_LIMIT',
+              })
+            }
+          }
+        } catch {
+          // Graceful degradation
+        }
       }
       updates.privacy = privacy
     }

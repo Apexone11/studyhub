@@ -46,6 +46,11 @@ export default function PricingPage() {
     }
   }, [successFromUrl, refreshSession])
 
+  // Derive effective subscription: use fetched data, or fall back to session user.plan
+  const effectiveSubscription =
+    subscription ||
+    (user?.plan && user.plan !== 'free' ? { plan: user.plan, status: 'active' } : null)
+
   useEffect(() => {
     const fetchSubscription = async () => {
       if (!user) {
@@ -58,7 +63,7 @@ export default function PricingPage() {
         })
         if (res.ok) {
           const data = await res.json()
-          setSubscription(data && data.plan ? data : null)
+          if (data && data.plan) setSubscription(data)
         }
       } catch (err) {
         console.error('[fetchSubscription]', err)
@@ -92,9 +97,9 @@ export default function PricingPage() {
       {/* ── PRICING CARDS ────────────────────────────── */}
       <section style={s.cardsSection}>
         <div style={s.cardsContainer}>
-          <PricingCard tier="free" subscription={subscription} />
-          <PricingCard tier="pro" subscription={subscription} />
-          <PricingCard tier="institution" subscription={subscription} />
+          <PricingCard tier="free" subscription={effectiveSubscription} />
+          <PricingCard tier="pro" subscription={effectiveSubscription} />
+          <PricingCard tier="institution" subscription={effectiveSubscription} />
         </div>
       </section>
 
@@ -131,11 +136,14 @@ function PricingCard({ tier, subscription }) {
   const [waitlistMessage, setWaitlistMessage] = useState('')
   const [waitlistError, setWaitlistError] = useState('')
 
-  // Check if user has active pro subscription
+  // Check if user has active pro subscription (active, trialing, or past_due all count)
   const hasActivePro =
     subscription &&
     (subscription.plan === 'pro_monthly' || subscription.plan === 'pro_yearly') &&
-    subscription.status === 'active'
+    (subscription.status === 'active' ||
+      subscription.status === 'trialing' ||
+      subscription.status === 'past_due' ||
+      !subscription.status)
 
   const handleSubscribe = async (plan) => {
     setSubscribeError('')
@@ -227,7 +235,7 @@ function PricingCard({ tier, subscription }) {
           <Feature text="Browse all study sheets" included />
           <Feature text="10 uploads per month" included />
           <Feature text="10 AI messages per day (Hub AI)" included />
-          <Feature text="5-minute video uploads" included />
+          <Feature text="30-minute video uploads" included />
           <Feature text="50 library bookmarks" included />
           <Feature text="2 private study groups" included />
           <Feature text="3 playground projects" included />
