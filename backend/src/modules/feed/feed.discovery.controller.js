@@ -117,7 +117,7 @@ router.get('/trending', discoveryLimiter, optionalAuth, async (req, res) => {
     const result = scored.slice(0, limit).map(({ _score, ...sheet }) => ({
       ...sheet,
       commentCount: sheet._count?.comments || 0,
-      forkCount: sheet._count?.forks || 0,
+      forkCount: sheet._count?.forkChildren || 0,
     }))
 
     cache.set(cacheKey, result, 5 * 60 * 1000)
@@ -191,7 +191,7 @@ router.get('/recommended', discoveryLimiter, optionalAuth, async (req, res) => {
       .map((sheet) => ({
         ...sheet,
         commentCount: sheet._count?.comments || 0,
-        forkCount: sheet._count?.forks || 0,
+        forkCount: sheet._count?.forkChildren || 0,
       }))
 
     res.json(results)
@@ -379,7 +379,7 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
       .map(({ _score, ...sheet }) => ({
         ...sheet,
         commentCount: sheet._count?.comments || 0,
-        forkCount: sheet._count?.forks || 0,
+        forkCount: sheet._count?.forkChildren || 0,
       }))
 
     // Score trending sheets
@@ -399,7 +399,7 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
       .map(({ _score, ...sheet }) => ({
         ...sheet,
         commentCount: sheet._count?.comments || 0,
-        forkCount: sheet._count?.forks || 0,
+        forkCount: sheet._count?.forkChildren || 0,
       }))
 
     // Deduplicate and rank classmates by shared courses
@@ -605,7 +605,7 @@ router.get('/courses/:courseId/discover', discoveryLimiter, optionalAuth, async 
       sheets: sheets.map((s) => ({
         ...s,
         commentCount: s._count?.comments || 0,
-        forkCount: s._count?.forks || 0,
+        forkCount: s._count?.forkChildren || 0,
       })),
       topContributors: topContributors.map((tc) => ({
         user: contribMap[tc.userId] || { id: tc.userId, username: 'Unknown' },
