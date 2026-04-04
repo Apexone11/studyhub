@@ -188,7 +188,7 @@ export default function SupportersPage() {
 
 function DonorCard({ donor, rank }) {
   const isTop3 = rank <= 3
-  const rankColors = { 1: '#f59e0b', 2: '#94a3b8', 3: '#cd7f32' }
+  const rankColors = { 1: 'var(--sh-warning)', 2: 'var(--sh-slate-400)', 3: '#cd7f32' }
   const rankColor = rankColors[rank] || 'var(--sh-muted)'
 
   return (
@@ -276,7 +276,7 @@ const s = {
 
   /* Hero */
   hero: {
-    background: 'linear-gradient(135deg, #059669 0%, #0d9488 50%, #3b82f6 100%)',
+    background: 'linear-gradient(135deg, var(--sh-success), var(--sh-brand))',
     padding: '100px 20px 80px',
   },
   heroInner: {

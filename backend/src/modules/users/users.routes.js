@@ -1,12 +1,6 @@
 const express = require('express')
 const requireAuth = require('../../middleware/auth')
-const { captureError } = require('../../monitoring/sentry')
-const { createNotification } = require('../../lib/notify')
 const { getAuthTokenFromRequest, verifyAuthToken } = require('../../lib/authTokens')
-const { getProfileAccessDecision, PROFILE_VISIBILITY } = require('../../lib/profileVisibility')
-const prisma = require('../../lib/prisma')
-const { checkAndAwardBadges } = require('../../lib/badges')
-const { getUserStreak, getWeeklyActivity } = require('../../lib/streaks')
 const { readLimiter, usersFollowLimiter } = require('../../lib/rateLimiters')
 const usersController = require('./users.controller')
 
@@ -94,5 +88,17 @@ router.get('/me/blocked', requireAuth, usersController.getBlockedUsers)
 // ── GET /api/users/me/muted ──────────────────────────────────────
 // Returns the list of user IDs the authenticated user has muted.
 router.get('/me/muted', requireAuth, usersController.getMutedUsers)
+
+// ── POST /api/users/:username/block ──────────────────────────────
+router.post('/:username/block', requireAuth, followLimiter, usersController.blockUser)
+
+// ── DELETE /api/users/:username/block ────────────────────────────
+router.delete('/:username/block', requireAuth, followLimiter, usersController.unblockUser)
+
+// ── POST /api/users/:username/mute ───────────────────────────────
+router.post('/:username/mute', requireAuth, followLimiter, usersController.muteUser)
+
+// ── DELETE /api/users/:username/mute ─────────────────────────────
+router.delete('/:username/mute', requireAuth, followLimiter, usersController.unmuteUser)
 
 module.exports = router

@@ -647,6 +647,117 @@ const getMutedUsers = async (req, res) => {
   }
 }
 
+// ── POST /api/users/:username/block ──────────────────────────────
+// Block a user. Bidirectional: neither sees the other.
+const blockUser = async (req, res) => {
+  try {
+    const target = await prisma.user.findFirst({
+      where: { username: { equals: req.params.username, mode: 'insensitive' } },
+      select: { id: true },
+    })
+    if (!target) return res.status(404).json({ error: 'User not found.' })
+    if (target.id === req.user.userId) return res.status(400).json({ error: 'Cannot block yourself.' })
+
+    await prisma.userBlock.create({
+      data: { blockerId: req.user.userId, blockedId: target.id },
+    })
+
+    // Also remove any existing follow relationship in both directions
+    await prisma.userFollow.deleteMany({
+      where: {
+        OR: [
+          { followerId: req.user.userId, followingId: target.id },
+          { followerId: target.id, followingId: req.user.userId },
+        ],
+      },
+    })
+
+    res.json({ blocked: true })
+  } catch (err) {
+    // Unique constraint = already blocked
+    if (err.code === 'P2002') return res.json({ blocked: true })
+    if (err.code === 'P2021' || err.message?.includes('does not exist')) {
+      return res.status(500).json({ error: 'Block feature is not available yet.' })
+    }
+    captureError(err, { route: req.originalUrl })
+    res.status(500).json({ error: 'Server error.' })
+  }
+}
+
+// ── DELETE /api/users/:username/block ────────────────────────────
+// Unblock a user.
+const unblockUser = async (req, res) => {
+  try {
+    const target = await prisma.user.findFirst({
+      where: { username: { equals: req.params.username, mode: 'insensitive' } },
+      select: { id: true },
+    })
+    if (!target) return res.status(404).json({ error: 'User not found.' })
+
+    await prisma.userBlock.deleteMany({
+      where: { blockerId: req.user.userId, blockedId: target.id },
+    })
+
+    res.json({ blocked: false })
+  } catch (err) {
+    if (err.code === 'P2021' || err.message?.includes('does not exist')) {
+      return res.json({ blocked: false })
+    }
+    captureError(err, { route: req.originalUrl })
+    res.status(500).json({ error: 'Server error.' })
+  }
+}
+
+// ── POST /api/users/:username/mute ──────────────────────────────
+// Mute a user. One-directional: only the muter's feed is affected.
+const muteUser = async (req, res) => {
+  try {
+    const target = await prisma.user.findFirst({
+      where: { username: { equals: req.params.username, mode: 'insensitive' } },
+      select: { id: true },
+    })
+    if (!target) return res.status(404).json({ error: 'User not found.' })
+    if (target.id === req.user.userId) return res.status(400).json({ error: 'Cannot mute yourself.' })
+
+    await prisma.userMute.create({
+      data: { muterId: req.user.userId, mutedId: target.id },
+    })
+
+    res.json({ muted: true })
+  } catch (err) {
+    if (err.code === 'P2002') return res.json({ muted: true })
+    if (err.code === 'P2021' || err.message?.includes('does not exist')) {
+      return res.status(500).json({ error: 'Mute feature is not available yet.' })
+    }
+    captureError(err, { route: req.originalUrl })
+    res.status(500).json({ error: 'Server error.' })
+  }
+}
+
+// ── DELETE /api/users/:username/mute ────────────────────────────
+// Unmute a user.
+const unmuteUser = async (req, res) => {
+  try {
+    const target = await prisma.user.findFirst({
+      where: { username: { equals: req.params.username, mode: 'insensitive' } },
+      select: { id: true },
+    })
+    if (!target) return res.status(404).json({ error: 'User not found.' })
+
+    await prisma.userMute.deleteMany({
+      where: { muterId: req.user.userId, mutedId: target.id },
+    })
+
+    res.json({ muted: false })
+  } catch (err) {
+    if (err.code === 'P2021' || err.message?.includes('does not exist')) {
+      return res.json({ muted: false })
+    }
+    captureError(err, { route: req.originalUrl })
+    res.status(500).json({ error: 'Server error.' })
+  }
+}
+
 module.exports = {
   getMyActivity,
   getActivityByUsername,
@@ -667,4 +778,8 @@ module.exports = {
   getFollowSuggestions,
   getBlockedUsers,
   getMutedUsers,
+  blockUser,
+  unblockUser,
+  muteUser,
+  unmuteUser,
 }

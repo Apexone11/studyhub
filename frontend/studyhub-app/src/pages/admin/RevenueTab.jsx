@@ -166,9 +166,10 @@ export default function RevenueTab() {
       })
       const result = await r.json()
       if (r.ok) {
+        const errorDetail = result.lastError ? ` Last error: ${result.lastError}` : ''
         setSyncResult({
-          type: 'success',
-          text: `Synced ${result.synced} subscription(s) from Stripe.${result.errors ? ` ${result.errors} error(s).` : ''}`,
+          type: result.errors > 0 ? 'error' : 'success',
+          text: `Synced ${result.synced} subscription(s) from Stripe.${result.errors ? ` ${result.errors} error(s).${errorDetail}` : ''}`,
         })
         // Reload revenue data
         const rev = await fetch(`${API}/api/payments/admin/revenue`, {
@@ -251,25 +252,25 @@ export default function RevenueTab() {
             label="Total Revenue"
             value={formatCents(data.totalRevenueCents)}
             sub="All-time subscription payments"
-            color="white"
+            color="var(--sh-heading)"
           />
           <MetricCard
             label="Last 30 Days"
             value={formatCents(data.monthlyRevenueCents)}
             sub="Subscription revenue"
-            color="white"
+            color="var(--sh-heading)"
           />
           <MetricCard
             label="Active Subscribers"
             value={data.activeSubscribers}
             sub="Pro monthly + yearly"
-            color="white"
+            color="var(--sh-heading)"
           />
           <MetricCard
             label="Donations"
             value={formatCents(data.totalDonationsCents)}
             sub={`${data.totalDonationCount} total donation${data.totalDonationCount === 1 ? '' : 's'}`}
-            color="white"
+            color="var(--sh-heading)"
           />
         </div>
       </section>

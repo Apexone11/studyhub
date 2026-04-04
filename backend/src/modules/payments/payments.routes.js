@@ -221,7 +221,8 @@ router.post('/webhook', async (req, res) => {
     captureError(error, { context: 'stripe.webhook', eventType: event.type })
     log.error({ err: error, eventType: event.type }, 'Error processing Stripe webhook')
     console.error('[stripe:webhook] Handler failed for', event.type, '-', error.message)
-    // Return 200 anyway so Stripe does not retry endlessly
+    // Return 500 so Stripe retries the webhook (up to ~3 days)
+    return res.status(500).json({ error: 'Webhook handler failed', eventType: event.type })
   }
 
   res.json({ received: true, handled })
@@ -243,12 +244,29 @@ router.get('/subscription', paymentReadLimiter, requireAuth, async (req, res) =>
 // ── GET /subscription/debug — Raw DB record for debugging ────────────────
 router.get('/subscription/debug', paymentReadLimiter, requireAuth, async (req, res) => {
   try {
-    const raw = await prisma.subscription.findUnique({ where: { userId: req.user.userId } })
+    // Test if the Subscription table exists by running a raw query
+    let tableExists = true
+    try {
+      await prisma.$queryRaw`SELECT 1 FROM "Subscription" LIMIT 1`
+    } catch {
+      tableExists = false
+    }
+
+    const raw = tableExists
+      ? await prisma.subscription.findUnique({ where: { userId: req.user.userId } })
+      : null
+
     const planFromEnv = {
       STRIPE_PRICE_ID_PRO: process.env.STRIPE_PRICE_ID_PRO ? 'set' : 'MISSING',
       STRIPE_PRICE_ID_PRO_YEARLY: process.env.STRIPE_PRICE_ID_PRO_YEARLY ? 'set' : 'MISSING',
     }
-    res.json({ raw: raw || null, envStatus: planFromEnv, userId: req.user.userId })
+    res.json({
+      raw: raw || null,
+      envStatus: planFromEnv,
+      userId: req.user.userId,
+      tableExists,
+      migrationHint: !tableExists ? 'Subscription table does not exist. Run: npx prisma migrate deploy' : null,
+    })
   } catch (error) {
     res.status(500).json({ error: error.message })
   }
@@ -424,13 +442,15 @@ router.post(
 
           synced++
         } catch (err) {
-          log.error({ err: err.message, subId: sub.id }, 'Failed to sync subscription')
+          log.error({ err, subId: sub.id, userId: parseInt(sub.metadata?.studyhub_user_id, 10) }, 'Failed to sync subscription')
           errors++
+          // Surface the last error in the response so admin can debug
+          res.locals._lastSyncError = err.message
         }
       }
 
       log.info({ synced, errors }, 'Stripe subscription sync complete')
-      res.json({ synced, errors, total: subscriptions.data.length })
+      res.json({ synced, errors, total: subscriptions.data.length, lastError: res.locals._lastSyncError || null })
     } catch (error) {
       captureError(error, { context: 'payments.admin.syncStripe' })
       log.error({ err: error }, 'Failed to sync Stripe subscriptions')
@@ -539,8 +559,15 @@ router.post('/subscription/sync', paymentReadLimiter, requireAuth, async (req, r
             )
             break
           }
-        } catch {
-          // Continue with next status
+        } catch (syncErr) {
+          log.error({ err: syncErr, customerId, status, userId: req.user.userId }, 'Sync: DB write failed for subscription')
+          // Surface the ACTUAL error to the user so we can debug
+          return res.status(500).json({
+            synced: false,
+            message: `Database write failed: ${syncErr.message}`,
+            hint: 'This usually means the Subscription table does not exist. Run: npx prisma migrate deploy',
+            customersFound: customerIds.size,
+          })
         }
       }
       if (synced) break
