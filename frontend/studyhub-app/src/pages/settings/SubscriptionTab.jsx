@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { API } from '../../config'
+import { useSession } from '../../lib/session-context'
 import { SectionCard, Button, Message } from './settingsShared'
 import { FONT } from './settingsState'
 
@@ -18,6 +19,7 @@ const PLAN_LABELS = {
 }
 
 export default function SubscriptionTab() {
+  const { refreshSession } = useSession()
   const [sub, setSub] = useState(null)
   const [history, setHistory] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -26,30 +28,61 @@ export default function SubscriptionTab() {
   const [error, setError] = useState('')
   const [showSuccess, setShowSuccess] = useState(false)
 
-  // Check for payment=success in URL params
+  // Fetch subscription + history helper
+  const fetchSubscriptionData = useCallback(async () => {
+    const [subRes, histRes] = await Promise.all([
+      fetch(`${API}/api/payments/subscription`, { credentials: 'include' }),
+      fetch(`${API}/api/payments/history?page=1&limit=10`, { credentials: 'include' }),
+    ])
+    const subData = subRes.ok ? await subRes.json() : null
+    const histData = histRes.ok ? await histRes.json() : null
+    return { subData, histData }
+  }, [])
+
+  // Check for payment=success in URL params and trigger refresh + polling
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     if (params.has('payment') && params.get('payment') === 'success') {
       setShowSuccess(true)
-      // Clear the param from URL
-      window.history.replaceState({}, '', window.location.pathname)
-    }
-  }, [])
+      window.history.replaceState({}, '', window.location.pathname + '?tab=subscription')
 
-  // Fetch subscription + first page of history
+      // Refresh session so badges/avatar update across the app
+      refreshSession()
+
+      // Poll for subscription data (webhook may take a few seconds)
+      let attempts = 0
+      const MAX_ATTEMPTS = 8
+      const poll = setInterval(async () => {
+        attempts++
+        try {
+          const { subData, histData } = await fetchSubscriptionData()
+          if (subData) setSub(subData)
+          if (histData) setHistory(histData)
+          // Stop polling once we detect an active subscription or exhaust retries
+          if ((subData && subData.plan !== 'free') || attempts >= MAX_ATTEMPTS) {
+            clearInterval(poll)
+            // Refresh session once more after subscription is confirmed
+            if (subData && subData.plan !== 'free') refreshSession()
+          }
+        } catch {
+          if (attempts >= MAX_ATTEMPTS) clearInterval(poll)
+        }
+      }, 3000)
+
+      return () => clearInterval(poll)
+    }
+  }, [refreshSession, fetchSubscriptionData])
+
+  // Initial fetch of subscription + history
   useEffect(() => {
     let cancelled = false
 
     async function load() {
       try {
-        const [subRes, histRes] = await Promise.all([
-          fetch(`${API}/api/payments/subscription`, { credentials: 'include' }),
-          fetch(`${API}/api/payments/history?page=1&limit=10`, { credentials: 'include' }),
-        ])
-
+        const { subData, histData } = await fetchSubscriptionData()
         if (!cancelled) {
-          if (subRes.ok) setSub(await subRes.json())
-          if (histRes.ok) setHistory(await histRes.json())
+          if (subData) setSub(subData)
+          if (histData) setHistory(histData)
         }
       } catch (err) {
         if (!cancelled) setError('Failed to load subscription data.')
@@ -63,7 +96,7 @@ export default function SubscriptionTab() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [fetchSubscriptionData])
 
   // Load more history pages
   const loadHistoryPage = useCallback(async (page) => {
@@ -105,6 +138,67 @@ export default function SubscriptionTab() {
       setPortalLoading(false)
     }
   }, [])
+
+  // Cancel subscription (keeps access until period end)
+  const [cancelLoading, setCancelLoading] = useState(false)
+  const handleCancel = useCallback(async () => {
+    if (
+      !window.confirm(
+        'Are you sure you want to cancel? You will keep Pro access until the end of your billing period.',
+      )
+    )
+      return
+    setCancelLoading(true)
+    try {
+      const res = await fetch(`${API}/api/payments/subscription/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error || 'Failed to cancel subscription.')
+        return
+      }
+      setSub((prev) =>
+        prev
+          ? {
+              ...prev,
+              cancelAtPeriodEnd: true,
+              currentPeriodEnd: data.currentPeriodEnd || prev.currentPeriodEnd,
+            }
+          : prev,
+      )
+      refreshSession()
+    } catch {
+      setError('Network error. Please try again.')
+    } finally {
+      setCancelLoading(false)
+    }
+  }, [refreshSession])
+
+  // Reactivate subscription (undo pending cancellation)
+  const handleReactivate = useCallback(async () => {
+    setCancelLoading(true)
+    try {
+      const res = await fetch(`${API}/api/payments/subscription/reactivate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error || 'Failed to reactivate subscription.')
+        return
+      }
+      setSub((prev) => (prev ? { ...prev, cancelAtPeriodEnd: false } : prev))
+      refreshSession()
+    } catch {
+      setError('Network error. Please try again.')
+    } finally {
+      setCancelLoading(false)
+    }
+  }, [refreshSession])
 
   if (loading) {
     return (
@@ -223,17 +317,27 @@ export default function SubscriptionTab() {
               Upgrade to Pro
             </Link>
           ) : (
-            <Button onClick={handleManage} disabled={portalLoading} secondary>
-              {portalLoading ? 'Opening...' : 'Manage Subscription'}
-            </Button>
+            <>
+              <Button onClick={handleManage} disabled={portalLoading} secondary>
+                {portalLoading ? 'Opening...' : 'Manage Billing'}
+              </Button>
+              {sub?.cancelAtPeriodEnd ? (
+                <Button onClick={handleReactivate} disabled={cancelLoading}>
+                  {cancelLoading ? 'Reactivating...' : 'Keep Subscription'}
+                </Button>
+              ) : (
+                <Button onClick={handleCancel} disabled={cancelLoading} danger>
+                  {cancelLoading ? 'Canceling...' : 'Cancel Subscription'}
+                </Button>
+              )}
+            </>
           )}
         </div>
 
-        {!isFree && (
+        {!isFree && !sub?.cancelAtPeriodEnd && (
           <p style={s.portalNote}>
-            Use the billing portal to update your payment method, switch between monthly and yearly,
-            or cancel your subscription. Cancellation takes effect at the end of your current
-            billing period. No refunds for partial periods.
+            Cancellation takes effect at the end of your billing period. You keep Pro features until
+            then. Use the billing portal to update payment method or switch plans.
           </p>
         )}
       </SectionCard>

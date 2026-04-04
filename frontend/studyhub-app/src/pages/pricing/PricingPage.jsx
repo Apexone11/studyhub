@@ -33,9 +33,18 @@ const FAQ_ITEMS = [
 export default function PricingPage() {
   const [searchParams] = useSearchParams()
   const [subscription, setSubscription] = useState(null)
-  const { user } = useSession()
+  const { user, refreshSession } = useSession()
 
-  const successFromUrl = searchParams.get('success') === 'true'
+  // Support both ?success=true (legacy) and ?payment=success (from Stripe redirect)
+  const successFromUrl =
+    searchParams.get('success') === 'true' || searchParams.get('payment') === 'success'
+
+  // Refresh session on successful payment return so badges update site-wide
+  useEffect(() => {
+    if (successFromUrl) {
+      refreshSession()
+    }
+  }, [successFromUrl, refreshSession])
 
   useEffect(() => {
     const fetchSubscription = async () => {
@@ -49,7 +58,6 @@ export default function PricingPage() {
         })
         if (res.ok) {
           const data = await res.json()
-          // API returns { plan, status, ... } directly (not wrapped in .subscription)
           setSubscription(data && data.plan ? data : null)
         }
       } catch (err) {
@@ -282,9 +290,19 @@ function PricingCard({ tier, subscription }) {
                   : `Renews ${new Date(subscription.currentPeriodEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
               </p>
             )}
-            <a href="/settings?tab=subscription" style={s.manageSubLink}>
-              Manage Subscription
-            </a>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+              <a href="/settings?tab=subscription" style={s.manageSubLink}>
+                Manage Subscription
+              </a>
+              {!subscription?.cancelAtPeriodEnd && (
+                <a
+                  href="/settings?tab=subscription"
+                  style={{ ...s.manageSubLink, color: 'var(--sh-danger)' }}
+                >
+                  Cancel
+                </a>
+              )}
+            </div>
           </div>
         ) : (
           <div style={s.subscribeButtonGroup}>

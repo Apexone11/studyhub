@@ -31,16 +31,43 @@ export default function GroupDetailView({ groupId }) {
   const [activeTab, setActiveTab] = useState('overview')
 
   const {
-    activeGroup, activeGroupLoading, activeGroupError,
-    loadGroupDetails, updateGroup, deleteGroup, joinGroup, leaveGroup,
+    activeGroup,
+    activeGroupLoading,
+    activeGroupError,
+    loadGroupDetails,
+    updateGroup,
+    deleteGroup,
+    joinGroup,
+    leaveGroup,
     courses: allCourses,
     // Sub-resources
-    members, membersLoading, loadMembers, removeMember, updateMember, inviteMember,
-    resources, addResource, deleteResource,
-    sessions, sessionsLoading, loadSessions, createSession, rsvpSession,
-    discussions, discussionsLoading, loadDiscussions, createPost, addReply, resolvePost, deletePost,
+    members,
+    membersLoading,
+    loadMembers,
+    removeMember,
+    updateMember,
+    inviteMember,
+    resources,
+    addResource,
+    deleteResource,
+    sessions,
+    sessionsLoading,
+    loadSessions,
+    createSession,
+    rsvpSession,
+    discussions,
+    discussionsLoading,
+    loadDiscussions,
+    createPost,
+    addReply,
+    resolvePost,
+    deletePost,
     // Activity + upvotes
-    activities, activitiesLoading, upcomingSessionsPreview, loadActivity, toggleUpvote,
+    activities,
+    activitiesLoading,
+    upcomingSessionsPreview,
+    loadActivity,
+    toggleUpvote,
   } = useStudyGroupsData()
 
   // Load group details on mount
@@ -64,7 +91,10 @@ export default function GroupDetailView({ groupId }) {
 
   if (activeGroupLoading) {
     return (
-      <PageShell nav={<Navbar crumbs={[{ label: 'Study Groups', to: '/study-groups' }]} />} sidebar={<AppSidebar />}>
+      <PageShell
+        nav={<Navbar crumbs={[{ label: 'Study Groups', to: '/study-groups' }]} />}
+        sidebar={<AppSidebar />}
+      >
         <div style={styles.loadingPlaceholder}>Loading group...</div>
       </PageShell>
     )
@@ -72,22 +102,28 @@ export default function GroupDetailView({ groupId }) {
 
   if (activeGroupError) {
     return (
-      <PageShell nav={<Navbar crumbs={[{ label: 'Study Groups', to: '/study-groups' }]} />} sidebar={<AppSidebar />}>
-        <div style={styles.alert('danger')}>
-          {activeGroupError}
-        </div>
-        <Link to="/study-groups" style={styles.backLink}>Back to Study Groups</Link>
+      <PageShell
+        nav={<Navbar crumbs={[{ label: 'Study Groups', to: '/study-groups' }]} />}
+        sidebar={<AppSidebar />}
+      >
+        <div style={styles.alert('danger')}>{activeGroupError}</div>
+        <Link to="/study-groups" style={styles.backLink}>
+          Back to Study Groups
+        </Link>
       </PageShell>
     )
   }
 
   if (!activeGroup) {
     return (
-      <PageShell nav={<Navbar crumbs={[{ label: 'Study Groups', to: '/study-groups' }]} />} sidebar={<AppSidebar />}>
-        <div style={styles.alert('danger')}>
-          Group not found
-        </div>
-        <Link to="/study-groups" style={styles.backLink}>Back to Study Groups</Link>
+      <PageShell
+        nav={<Navbar crumbs={[{ label: 'Study Groups', to: '/study-groups' }]} />}
+        sidebar={<AppSidebar />}
+      >
+        <div style={styles.alert('danger')}>Group not found</div>
+        <Link to="/study-groups" style={styles.backLink}>
+          Back to Study Groups
+        </Link>
       </PageShell>
     )
   }
@@ -127,166 +163,217 @@ export default function GroupDetailView({ groupId }) {
   }
 
   return (
-    <PageShell nav={<Navbar crumbs={[{ label: 'Study Groups', to: '/study-groups' }]} />} sidebar={<AppSidebar />}>
-          <div>
-            {/* Back link */}
-            <Link to="/study-groups" style={styles.backLink}>
-              Back to Study Groups
-            </Link>
+    <PageShell
+      nav={<Navbar crumbs={[{ label: 'Study Groups', to: '/study-groups' }]} />}
+      sidebar={<AppSidebar />}
+    >
+      <div>
+        {/* Back link */}
+        <Link to="/study-groups" style={styles.backLink}>
+          Back to Study Groups
+        </Link>
 
-            {/* Group header */}
-            <section style={styles.detailHeader}>
-              <div>
-                <h1 style={styles.detailTitle}>{activeGroup.name}</h1>
-                <p style={styles.detailDesc}>{activeGroup.description}</p>
+        {/* Group header */}
+        <section style={styles.detailHeader}>
+          <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+            {/* Group avatar */}
+            <div
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: 14,
+                background: activeGroup.avatarUrl
+                  ? 'transparent'
+                  : 'linear-gradient(135deg, var(--sh-brand), var(--sh-brand-accent))',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                overflow: 'hidden',
+                border: '2px solid var(--sh-border)',
+              }}
+            >
+              {activeGroup.avatarUrl ? (
+                <img
+                  src={activeGroup.avatarUrl}
+                  alt={activeGroup.name}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              ) : (
+                <span style={{ fontSize: 22, fontWeight: 800, color: '#fff' }}>
+                  {activeGroup.name.charAt(0).toUpperCase()}
+                </span>
+              )}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <h1 style={styles.detailTitle}>{activeGroup.name}</h1>
+              <p style={styles.detailDesc}>{activeGroup.description}</p>
 
-                <div style={styles.detailMeta}>
-                  <span style={styles.privacyBadge}>
-                    {getPrivacyLabel(activeGroup.privacy)}
+              <div style={styles.detailMeta}>
+                <span style={styles.privacyBadge}>{getPrivacyLabel(activeGroup.privacy)}</span>
+                <span style={styles.memberBadge}>
+                  {activeGroup.memberCount}
+                  {activeGroup.maxMembers ? `/${activeGroup.maxMembers}` : ''} member
+                  {activeGroup.memberCount === 1 ? '' : 's'}
+                </span>
+                {activeGroup.courseId && (
+                  <span style={styles.courseBadge}>{activeGroup.courseName}</span>
+                )}
+                {activeGroup.createdAt && (
+                  <span style={{ fontSize: 12, color: 'var(--sh-muted)' }}>
+                    Created{' '}
+                    {new Date(activeGroup.createdAt).toLocaleDateString('en-US', {
+                      month: 'short',
+                      year: 'numeric',
+                    })}
                   </span>
-                  <span style={styles.memberBadge}>
-                    {activeGroup.memberCount} member{activeGroup.memberCount === 1 ? '' : 's'}
-                  </span>
-                  {activeGroup.courseId && (
-                    <span style={styles.courseBadge}>
-                      Course: {activeGroup.courseName}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Action buttons */}
-              <div style={styles.actionButtons}>
-                {!isMember ? (
-                  <button
-                    onClick={handleJoin}
-                    style={styles.joinBtn}
-                  >
-                    Join Group
-                  </button>
-                ) : (
-                  <>
-                    {isAdmin && (
-                      <button
-                        onClick={() => setEditModalOpen(true)}
-                        style={styles.editBtn}
-                      >
-                        Edit Group
-                      </button>
-                    )}
-                    {isAdmin && (
-                      <button
-                        onClick={handleDelete}
-                        style={styles.deleteBtn}
-                      >
-                        Delete Group
-                      </button>
-                    )}
-                    <button
-                      onClick={handleLeave}
-                      style={styles.leaveBtn}
-                    >
-                      Leave Group
-                    </button>
-                  </>
                 )}
               </div>
-            </section>
-
-            {/* Tab navigation */}
-            <div style={styles.tabBar} role="tablist">
-              {['overview', 'resources', 'sessions', 'discussions', 'members'].map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  style={{
-                    ...styles.tabButton,
-                    ...(activeTab === tab ? styles.tabButtonActive : {}),
-                  }}
-                  role="tab"
-                  aria-selected={activeTab === tab}
-                  aria-current={activeTab === tab ? 'page' : undefined}
-                >
-                  {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                </button>
-              ))}
-            </div>
-
-            {/* Tab content */}
-            <div style={styles.tabContent}>
-              {activeTab === 'overview' && (
-                <GroupOverviewTab
-                  group={activeGroup}
-                  activities={activities}
-                  activitiesLoading={activitiesLoading}
-                  upcomingSessions={upcomingSessionsPreview}
-                />
-              )}
-              {activeTab === 'resources' && (
-                <GroupResourcesTab
-                  groupId={groupId}
-                  resources={resources}
-                  onAdd={(data) => addResource(groupId, data)}
-                  onDelete={(resourceId) => deleteResource(groupId, resourceId)}
-                  isAdminOrMod={isAdmin || activeGroup?.userRole === 'moderator'}
-                  isMember={isMember}
-                />
-              )}
-              {activeTab === 'sessions' && (
-                <GroupSessionsTab
-                  groupId={groupId}
-                  sessions={sessions}
-                  loading={sessionsLoading}
-                  loadSessions={loadSessions}
-                  onAdd={(data) => createSession(groupId, data)}
-                  onRsvp={(sessionId, status) => rsvpSession(groupId, sessionId, { status })}
-                  isAdminOrMod={isAdmin || activeGroup?.userRole === 'moderator'}
-                  isMember={isMember}
-                />
-              )}
-              {activeTab === 'discussions' && (
-                <GroupDiscussionsTab
-                  groupId={groupId}
-                  discussions={discussions}
-                  loading={discussionsLoading}
-                  loadDiscussions={loadDiscussions}
-                  onCreatePost={createPost}
-                  onAddReply={addReply}
-                  onResolve={resolvePost}
-                  onDeletePost={deletePost}
-                  onUpvote={(postId) => toggleUpvote(groupId, postId)}
-                  isMember={isMember}
-                  isAdminOrMod={isAdmin || activeGroup?.userRole === 'moderator'}
-                  userId={currentUserId}
-                />
-              )}
-              {activeTab === 'members' && (
-                <GroupMembersTab
-                  groupId={groupId}
-                  members={members}
-                  loading={membersLoading}
-                  loadMembers={loadMembers}
-                  onRemoveMember={(userId) => removeMember(groupId, userId)}
-                  onUpdateMember={(userId, data) => updateMember(groupId, userId, data)}
-                  onInvite={(data) => inviteMember(groupId, data)}
-                  isAdmin={isAdmin}
-                  currentUserId={currentUserId}
-                />
-              )}
             </div>
           </div>
 
+          {/* Action buttons */}
+          <div style={{ ...styles.actionButtons, flexDirection: 'row', flexWrap: 'wrap' }}>
+            {!isMember ? (
+              <button onClick={handleJoin} style={styles.joinBtn}>
+                Join Group
+              </button>
+            ) : (
+              <>
+                {isAdmin && (
+                  <button onClick={() => setEditModalOpen(true)} style={styles.editBtn}>
+                    Edit Group
+                  </button>
+                )}
+                {isAdmin && (
+                  <button onClick={handleDelete} style={styles.deleteBtn}>
+                    Delete Group
+                  </button>
+                )}
+                <button onClick={handleLeave} style={styles.leaveBtn}>
+                  Leave Group
+                </button>
+              </>
+            )}
+          </div>
+        </section>
+
+        {/* Tab navigation */}
+        <div style={styles.tabBar} role="tablist">
+          {[
+            { key: 'overview', label: 'Overview' },
+            { key: 'resources', label: 'Resources', count: activeGroup.resourceCount },
+            { key: 'sessions', label: 'Sessions', count: activeGroup.upcomingSessionCount },
+            { key: 'discussions', label: 'Discussions', count: activeGroup.discussionCount },
+            { key: 'members', label: 'Members', count: activeGroup.memberCount },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              style={{
+                ...styles.tabButton,
+                ...(activeTab === tab.key ? styles.tabButtonActive : {}),
+              }}
+              role="tab"
+              aria-selected={activeTab === tab.key}
+              aria-current={activeTab === tab.key ? 'page' : undefined}
+            >
+              {tab.label}
+              {tab.count > 0 && (
+                <span
+                  style={{
+                    marginLeft: 5,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    padding: '1px 6px',
+                    borderRadius: 8,
+                    background: activeTab === tab.key ? 'var(--sh-brand)' : 'var(--sh-soft)',
+                    color: activeTab === tab.key ? '#fff' : 'var(--sh-muted)',
+                  }}
+                >
+                  {tab.count}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Tab content */}
+        <div style={styles.tabContent}>
+          {activeTab === 'overview' && (
+            <GroupOverviewTab
+              group={activeGroup}
+              activities={activities}
+              activitiesLoading={activitiesLoading}
+              upcomingSessions={upcomingSessionsPreview}
+            />
+          )}
+          {activeTab === 'resources' && (
+            <GroupResourcesTab
+              groupId={groupId}
+              resources={resources}
+              onAdd={(data) => addResource(groupId, data)}
+              onDelete={(resourceId) => deleteResource(groupId, resourceId)}
+              isAdminOrMod={isAdmin || activeGroup?.userRole === 'moderator'}
+              isMember={isMember}
+            />
+          )}
+          {activeTab === 'sessions' && (
+            <GroupSessionsTab
+              groupId={groupId}
+              sessions={sessions}
+              loading={sessionsLoading}
+              loadSessions={loadSessions}
+              onAdd={(data) => createSession(groupId, data)}
+              onRsvp={(sessionId, status) => rsvpSession(groupId, sessionId, { status })}
+              isAdminOrMod={isAdmin || activeGroup?.userRole === 'moderator'}
+              isMember={isMember}
+            />
+          )}
+          {activeTab === 'discussions' && (
+            <GroupDiscussionsTab
+              groupId={groupId}
+              discussions={discussions}
+              loading={discussionsLoading}
+              loadDiscussions={loadDiscussions}
+              onCreatePost={createPost}
+              onAddReply={addReply}
+              onResolve={resolvePost}
+              onDeletePost={deletePost}
+              onUpvote={(postId) => toggleUpvote(groupId, postId)}
+              isMember={isMember}
+              isAdminOrMod={isAdmin || activeGroup?.userRole === 'moderator'}
+              userId={currentUserId}
+            />
+          )}
+          {activeTab === 'members' && (
+            <GroupMembersTab
+              groupId={groupId}
+              members={members}
+              loading={membersLoading}
+              loadMembers={loadMembers}
+              onRemoveMember={(userId) => removeMember(groupId, userId)}
+              onUpdateMember={(userId, data) => updateMember(groupId, userId, data)}
+              onInvite={(data) => inviteMember(groupId, data)}
+              isAdmin={isAdmin}
+              currentUserId={currentUserId}
+            />
+          )}
+        </div>
+      </div>
+
       {/* Edit Group Modal */}
-      {editModalOpen && createPortal(
-        <EditGroupModal
-          open={editModalOpen}
-          group={activeGroup}
-          onClose={() => setEditModalOpen(false)}
-          onSubmit={handleEdit}
-          courses={allCourses}
-        />,
-        document.body
-      )}
+      {editModalOpen &&
+        createPortal(
+          <EditGroupModal
+            open={editModalOpen}
+            group={activeGroup}
+            onClose={() => setEditModalOpen(false)}
+            onSubmit={handleEdit}
+            courses={allCourses}
+          />,
+          document.body,
+        )}
     </PageShell>
   )
 }

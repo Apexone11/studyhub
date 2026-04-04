@@ -334,7 +334,22 @@ async function handleSubscriptionUpdated(subscription) {
   }
 
   const priceId = subscription.items?.data?.[0]?.price?.id || ''
-  const plan = planFromPriceId(priceId)
+  const resolvedPlan = planFromPriceId(priceId)
+
+  // If we cannot resolve the price ID to a plan, try to preserve existing plan
+  // from the DB rather than overwriting with a wrong value.
+  let plan = resolvedPlan
+  if (!plan) {
+    try {
+      const existing = await prisma.subscription.findUnique({
+        where: { userId },
+        select: { plan: true },
+      })
+      plan = existing?.plan || 'free'
+    } catch {
+      plan = 'free'
+    }
+  }
 
   await prisma.subscription.upsert({
     where: { userId },
@@ -463,7 +478,8 @@ async function getUserSubscription(userId) {
     },
   })
 
-  if (!sub || sub.status === 'canceled') {
+  const inactiveStatuses = ['canceled', 'incomplete', 'incomplete_expired']
+  if (!sub || inactiveStatuses.includes(sub.status)) {
     return { plan: 'free', status: 'active', features: PLANS.free }
   }
 
