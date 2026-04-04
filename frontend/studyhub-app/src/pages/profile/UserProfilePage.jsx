@@ -354,6 +354,18 @@ export default function UserProfilePage() {
                     ? <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 99, background: 'var(--sh-warning-light-bg)', color: 'var(--sh-warning-text)', border: '1px solid var(--sh-warning-border)' }}>Admin</span>
                     : <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 99, background: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.8)', border: '1px solid rgba(255,255,255,0.2)' }}>{profile.accountType === 'teacher' ? 'Teacher' : profile.accountType === 'other' ? 'Member' : 'Student'}</span>
                   }
+                  {(profile.plan === 'pro_monthly' || profile.plan === 'pro_yearly') && (
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 99, background: '#f59e0b', color: '#ffffff', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <svg width={10} height={10} viewBox="0 0 16 16" fill="#ffffff"><path d="M2 12h12v1.5H2V12zM3 11l-1-7 3.5 3L8 3l2.5 4L14 4l-1 7H3z" /></svg>
+                      PRO
+                    </span>
+                  )}
+                  {profile.isDonor && (
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 99, background: '#10b981', color: '#ffffff', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <svg width={10} height={10} viewBox="0 0 16 16" fill="#ffffff"><path d="M8 14s-5.5-3.5-5.5-7.5C2.5 4 4 2.5 5.5 2.5c1 0 2 .5 2.5 1.5.5-1 1.5-1.5 2.5-1.5C12 2.5 13.5 4 13.5 6.5 13.5 10.5 8 14 8 14z" /></svg>
+                      Supporter
+                    </span>
+                  )}
                 </div>
                 <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', marginBottom: 10 }}>
                   Joined {fmtDate(profile.createdAt)}

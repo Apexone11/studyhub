@@ -3,8 +3,8 @@ import { Link } from 'react-router-dom'
 import UserAvatar from '../../components/UserAvatar'
 
 /* Re-export UserAvatar as Avatar for backward compatibility with FeedCard imports */
-export function Avatar({ username, role, size = 42, avatarUrl }) {
-  return <UserAvatar username={username} role={role} size={size} avatarUrl={avatarUrl} />
+export function Avatar({ username, role, size = 42, avatarUrl, plan, isDonor, donorLevel }) {
+  return <UserAvatar username={username} role={role} size={size} avatarUrl={avatarUrl} plan={plan} isDonor={isDonor} donorLevel={donorLevel} />
 }
 
 export function Panel({ title, children, helper }) {

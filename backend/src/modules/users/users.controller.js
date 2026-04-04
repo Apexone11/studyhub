@@ -4,6 +4,7 @@ const { getProfileAccessDecision, PROFILE_VISIBILITY } = require('../../lib/prof
 const prisma = require('../../lib/prisma')
 const { checkAndAwardBadges } = require('../../lib/badges')
 const { getUserStreak, getWeeklyActivity } = require('../../lib/streaks')
+const { enrichUserWithBadges } = require('../../lib/userBadges')
 
 // ── GET /api/users/me/activity ─────────────────────────
 const getMyActivity = async (req, res) => {
@@ -318,6 +319,9 @@ const getUserByUsername = async (req, res) => {
       // Degrade gracefully if starred query fails
     }
 
+    // Enrich with Pro/Donor badge info
+    const badges = await enrichUserWithBadges(user)
+
     res.json({
       id: user.id,
       username: user.username,
@@ -325,6 +329,9 @@ const getUserByUsername = async (req, res) => {
       avatarUrl: user.avatarUrl || null,
       coverImageUrl: user.coverImageUrl || null,
       createdAt: user.createdAt,
+      plan: badges.plan || 'free',
+      isDonor: badges.isDonor || false,
+      donorLevel: badges.donorLevel || null,
       sheetCount: user._count.studySheets,
       followerCount: user._count.followers,
       followingCount: user._count.following,

@@ -31,6 +31,28 @@ function ensureTempDir() {
   }
 }
 
+// ── Check ffmpeg availability ────────────────────────────────────────────
+
+const { execFileSync } = require('child_process')
+
+let _ffmpegAvailable = null
+
+/**
+ * Check if ffmpeg and ffprobe are available in PATH.
+ * Caches the result after the first check.
+ */
+function isFfmpegAvailable() {
+  if (_ffmpegAvailable !== null) return _ffmpegAvailable
+  try {
+    execFileSync('ffprobe', ['-version'], { stdio: 'ignore', timeout: 5000 })
+    execFileSync('ffmpeg', ['-version'], { stdio: 'ignore', timeout: 5000 })
+    _ffmpegAvailable = true
+  } catch {
+    _ffmpegAvailable = false
+  }
+  return _ffmpegAvailable
+}
+
 // ── ffprobe: Extract video metadata ──────────────────────────────────────
 
 /**
@@ -257,6 +279,35 @@ async function processVideo(videoId) {
   const rawPath = path.join(baseDir, 'raw.mp4')
 
   try {
+    // Check if ffmpeg/ffprobe are available on this system
+    const hasFfmpeg = isFfmpegAvailable()
+
+    if (!hasFfmpeg) {
+      // ffmpeg not installed — skip transcoding, use original file as-is.
+      // This allows videos to still be playable (direct R2 streaming) even
+      // without the full processing pipeline.
+      console.warn(`[video:process] ffmpeg not available. Marking video ${videoId} as ready with original file only.`)
+
+      const variants = {
+        original: {
+          key: video.r2Key,
+          width: 0,
+          height: 0,
+        },
+      }
+
+      await prisma.video.update({
+        where: { id: videoId },
+        data: {
+          status: VIDEO_STATUS.READY,
+          variants,
+        },
+      })
+
+      cleanup(baseDir)
+      return
+    }
+
     // 1. Download raw video from R2
     const { body } = await r2.getObject(video.r2Key)
     const writeStream = fs.createWriteStream(rawPath)
@@ -398,6 +449,7 @@ async function processVideo(videoId) {
     })
   } catch (err) {
     captureError(err, { context: 'video-process-pipeline', videoId })
+    console.error(`[video:process] Pipeline failed for video ${videoId}:`, err.message)
 
     // Mark as failed
     try {
