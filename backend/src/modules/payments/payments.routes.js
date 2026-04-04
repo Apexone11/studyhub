@@ -29,6 +29,7 @@ const {
   DONATION_MAX_CENTS,
   DONATION_MESSAGE_MAX_LENGTH,
   PLANS,
+  planFromPriceId,
 } = require('./payments.constants')
 const service = require('./payments.service')
 const prisma = require('../../lib/prisma')
@@ -437,6 +438,92 @@ router.post(
     }
   },
 )
+
+// ── POST /subscription/sync — Self-heal: sync current user's subscription from Stripe ──
+// Any authenticated user can call this to recover their subscription if the
+// webhook failed (e.g., because migrations weren't deployed when the webhook fired).
+router.post('/subscription/sync', paymentReadLimiter, requireAuth, async (req, res) => {
+  try {
+    const stripe = service.getStripe()
+
+    // Find all Stripe customers with this user's metadata
+    const customers = await stripe.customers.search({
+      query: `metadata["studyhub_user_id"]:"${req.user.userId}"`,
+      limit: 5,
+    })
+
+    if (!customers.data.length) {
+      return res.json({ synced: false, message: 'No Stripe customer found for your account.' })
+    }
+
+    let synced = false
+    for (const customer of customers.data) {
+      const subs = await stripe.subscriptions.list({
+        customer: customer.id,
+        status: 'active',
+        limit: 1,
+      })
+
+      if (subs.data.length === 0) {
+        // Also check trialing
+        const trialingSubs = await stripe.subscriptions.list({
+          customer: customer.id,
+          status: 'trialing',
+          limit: 1,
+        })
+        if (trialingSubs.data.length > 0) subs.data.push(...trialingSubs.data)
+      }
+
+      for (const sub of subs.data) {
+        const priceId = sub.items?.data?.[0]?.price?.id || ''
+        const resolved = planFromPriceId(priceId)
+        const plan = resolved || 'pro_monthly'
+
+        await prisma.subscription.upsert({
+          where: { userId: req.user.userId },
+          create: {
+            userId: req.user.userId,
+            stripeCustomerId: customer.id,
+            stripeSubscriptionId: sub.id,
+            stripePriceId: priceId,
+            plan,
+            status: sub.status,
+            currentPeriodStart: new Date(sub.current_period_start * 1000),
+            currentPeriodEnd: new Date(sub.current_period_end * 1000),
+            cancelAtPeriodEnd: sub.cancel_at_period_end,
+          },
+          update: {
+            stripeCustomerId: customer.id,
+            stripeSubscriptionId: sub.id,
+            stripePriceId: priceId,
+            plan,
+            status: sub.status,
+            currentPeriodStart: new Date(sub.current_period_start * 1000),
+            currentPeriodEnd: new Date(sub.current_period_end * 1000),
+            cancelAtPeriodEnd: sub.cancel_at_period_end,
+            canceledAt: null,
+          },
+        })
+
+        synced = true
+        log.info({ userId: req.user.userId, plan, subId: sub.id }, 'User self-synced subscription')
+        break
+      }
+      if (synced) break
+    }
+
+    if (synced) {
+      const updated = await service.getUserSubscription(req.user.userId)
+      res.json({ synced: true, subscription: updated })
+    } else {
+      res.json({ synced: false, message: 'No active Stripe subscription found.' })
+    }
+  } catch (error) {
+    captureError(error, { context: 'payments.subscription.sync' })
+    log.error({ err: error }, 'Failed to sync user subscription')
+    sendError(res, 500, 'Failed to sync subscription.', ERROR_CODES.INTERNAL)
+  }
+})
 
 // ── GET /usage ───────────────────────────────────────────────────────────
 
