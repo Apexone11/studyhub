@@ -44,7 +44,11 @@ export default function SettingsPage() {
   const [searchParams] = useSearchParams()
   const { user: sessionUser, setSessionUser, signOut, clearSession } = useSession()
 
-  const initialTab = NAV_TABS.find((t) => t.id === searchParams.get('tab'))?.id || 'profile'
+  // Auto-switch to subscription tab if payment=success is in URL
+  const hasPaymentSuccess = searchParams.get('payment') === 'success'
+  const initialTab = hasPaymentSuccess
+    ? 'subscription'
+    : NAV_TABS.find((t) => t.id === searchParams.get('tab'))?.id || 'profile'
   const [tab, setTab] = useState(initialTab)
   const tutorial = useTutorial('settings', SETTINGS_STEPS, { version: TUTORIAL_VERSIONS.settings })
   const tabContentRef = useRef(null)

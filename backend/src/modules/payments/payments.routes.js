@@ -74,7 +74,7 @@ router.post('/checkout/subscription', paymentCheckoutLimiter, requireAuth, async
     }
 
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
-    const successUrl = `${frontendUrl}/settings?payment=success&session_id={CHECKOUT_SESSION_ID}`
+    const successUrl = `${frontendUrl}/settings?tab=subscription&payment=success&session_id={CHECKOUT_SESSION_ID}`
     const cancelUrl = `${frontendUrl}/pricing?payment=canceled`
 
     // Fetch email from DB (auth middleware doesn't include email in req.user)
