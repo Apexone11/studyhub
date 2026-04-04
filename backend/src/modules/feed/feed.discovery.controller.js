@@ -448,7 +448,8 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
     res.json(results)
   } catch (err) {
     captureError(err, { route: req.originalUrl })
-    res.status(500).json({ error: 'Server error.' })
+    console.error('[for-you] Feed error:', err.message)
+    res.status(500).json({ error: `For You error: ${err.message}` })
   }
 })
 

@@ -385,6 +385,14 @@ router.post(
 
           const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer?.id
 
+          // Safely convert Stripe Unix timestamps (seconds) to Date objects
+          const periodStart = sub.current_period_start
+            ? new Date(sub.current_period_start * 1000)
+            : null
+          const periodEnd = sub.current_period_end
+            ? new Date(sub.current_period_end * 1000)
+            : null
+
           await prisma.subscription.upsert({
             where: { userId },
             create: {
@@ -394,9 +402,9 @@ router.post(
               stripePriceId: priceId,
               plan,
               status: sub.status,
-              currentPeriodStart: new Date(sub.current_period_start * 1000),
-              currentPeriodEnd: new Date(sub.current_period_end * 1000),
-              cancelAtPeriodEnd: sub.cancel_at_period_end,
+              currentPeriodStart: periodStart,
+              currentPeriodEnd: periodEnd,
+              cancelAtPeriodEnd: sub.cancel_at_period_end ?? false,
             },
             update: {
               stripeCustomerId: customerId,
@@ -404,9 +412,9 @@ router.post(
               stripePriceId: priceId,
               plan,
               status: sub.status,
-              currentPeriodStart: new Date(sub.current_period_start * 1000),
-              currentPeriodEnd: new Date(sub.current_period_end * 1000),
-              cancelAtPeriodEnd: sub.cancel_at_period_end,
+              currentPeriodStart: periodStart,
+              currentPeriodEnd: periodEnd,
+              cancelAtPeriodEnd: sub.cancel_at_period_end ?? false,
               canceledAt: null,
             },
           })
@@ -526,6 +534,13 @@ router.post('/subscription/sync', paymentReadLimiter, requireAuth, async (req, r
             const resolved = planFromPriceId(priceId)
             const plan = resolved || 'pro_monthly'
 
+            const periodStart = sub.current_period_start
+              ? new Date(sub.current_period_start * 1000)
+              : null
+            const periodEnd = sub.current_period_end
+              ? new Date(sub.current_period_end * 1000)
+              : null
+
             await prisma.subscription.upsert({
               where: { userId: req.user.userId },
               create: {
@@ -535,9 +550,9 @@ router.post('/subscription/sync', paymentReadLimiter, requireAuth, async (req, r
                 stripePriceId: priceId,
                 plan,
                 status: sub.status,
-                currentPeriodStart: new Date(sub.current_period_start * 1000),
-                currentPeriodEnd: new Date(sub.current_period_end * 1000),
-                cancelAtPeriodEnd: sub.cancel_at_period_end,
+                currentPeriodStart: periodStart,
+                currentPeriodEnd: periodEnd,
+                cancelAtPeriodEnd: sub.cancel_at_period_end ?? false,
               },
               update: {
                 stripeCustomerId: customerId,
@@ -545,9 +560,9 @@ router.post('/subscription/sync', paymentReadLimiter, requireAuth, async (req, r
                 stripePriceId: priceId,
                 plan,
                 status: sub.status,
-                currentPeriodStart: new Date(sub.current_period_start * 1000),
-                currentPeriodEnd: new Date(sub.current_period_end * 1000),
-                cancelAtPeriodEnd: sub.cancel_at_period_end,
+                currentPeriodStart: periodStart,
+                currentPeriodEnd: periodEnd,
+                cancelAtPeriodEnd: sub.cancel_at_period_end ?? false,
                 canceledAt: null,
               },
             })

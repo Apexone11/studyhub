@@ -27,8 +27,8 @@ export default function ForYouSection() {
         const response = await fetch(`${API}/api/feed/for-you`, {
           credentials: 'include',
         })
+        const result = await response.json()
         if (response.ok) {
-          const result = await response.json()
           setData({
             sheets: Array.isArray(result.sheets) ? result.sheets : [],
             groups: Array.isArray(result.groups) ? result.groups : [],
@@ -37,7 +37,7 @@ export default function ForYouSection() {
           })
           setError('')
         } else {
-          setError('Could not load personalized content.')
+          setError(result.error || 'Could not load personalized content.')
         }
       } catch {
         setError('Could not load personalized content.')
