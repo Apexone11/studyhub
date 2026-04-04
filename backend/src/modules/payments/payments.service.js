@@ -251,6 +251,14 @@ async function handleCheckoutCompleted(session) {
   const stripe = getStripe()
   const stripeSub = await stripe.subscriptions.retrieve(stripeSubscriptionId)
 
+  // Safely convert Stripe Unix timestamps to Date objects (null-safe)
+  const periodStart = stripeSub.current_period_start
+    ? new Date(stripeSub.current_period_start * 1000)
+    : null
+  const periodEnd = stripeSub.current_period_end
+    ? new Date(stripeSub.current_period_end * 1000)
+    : null
+
   try {
     await prisma.subscription.upsert({
       where: { userId },
@@ -261,9 +269,9 @@ async function handleCheckoutCompleted(session) {
         stripePriceId: stripeSub.items.data[0]?.price?.id || '',
         plan,
         status: stripeSub.status,
-        currentPeriodStart: new Date(stripeSub.current_period_start * 1000),
-        currentPeriodEnd: new Date(stripeSub.current_period_end * 1000),
-        cancelAtPeriodEnd: stripeSub.cancel_at_period_end,
+        currentPeriodStart: periodStart,
+        currentPeriodEnd: periodEnd,
+        cancelAtPeriodEnd: stripeSub.cancel_at_period_end ?? false,
       },
       update: {
         stripeCustomerId: session.customer,
@@ -271,9 +279,9 @@ async function handleCheckoutCompleted(session) {
         stripePriceId: stripeSub.items.data[0]?.price?.id || '',
         plan,
         status: stripeSub.status,
-        currentPeriodStart: new Date(stripeSub.current_period_start * 1000),
-        currentPeriodEnd: new Date(stripeSub.current_period_end * 1000),
-        cancelAtPeriodEnd: stripeSub.cancel_at_period_end,
+        currentPeriodStart: periodStart,
+        currentPeriodEnd: periodEnd,
+        cancelAtPeriodEnd: stripeSub.cancel_at_period_end ?? false,
         canceledAt: null,
       },
     })
@@ -361,6 +369,13 @@ async function handleSubscriptionUpdated(subscription) {
     }
   }
 
+  const pStart = subscription.current_period_start
+    ? new Date(subscription.current_period_start * 1000)
+    : null
+  const pEnd = subscription.current_period_end
+    ? new Date(subscription.current_period_end * 1000)
+    : null
+
   await prisma.subscription.upsert({
     where: { userId },
     create: {
@@ -370,18 +385,18 @@ async function handleSubscriptionUpdated(subscription) {
       stripePriceId: priceId,
       plan,
       status: subscription.status,
-      currentPeriodStart: new Date(subscription.current_period_start * 1000),
-      currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-      cancelAtPeriodEnd: subscription.cancel_at_period_end,
+      currentPeriodStart: pStart,
+      currentPeriodEnd: pEnd,
+      cancelAtPeriodEnd: subscription.cancel_at_period_end ?? false,
       canceledAt: subscription.canceled_at ? new Date(subscription.canceled_at * 1000) : null,
     },
     update: {
       stripePriceId: priceId,
       plan,
       status: subscription.status,
-      currentPeriodStart: new Date(subscription.current_period_start * 1000),
-      currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-      cancelAtPeriodEnd: subscription.cancel_at_period_end,
+      currentPeriodStart: pStart,
+      currentPeriodEnd: pEnd,
+      cancelAtPeriodEnd: subscription.cancel_at_period_end ?? false,
       canceledAt: subscription.canceled_at ? new Date(subscription.canceled_at * 1000) : null,
     },
   })
