@@ -33,11 +33,16 @@ const PLANS = {
 
 const DONATION_PRICE_ID = process.env.STRIPE_PRICE_ID_DONATION || ''
 
-// Map Stripe price IDs back to our plan names
+// Map Stripe price IDs back to our plan names.
+// Reads env vars at call time (not module load) to handle late-bound config.
+// Returns null for unknown price IDs so callers can preserve existing plan data.
 function planFromPriceId(priceId) {
-  if (priceId === PLANS.pro_monthly.stripePriceId) return 'pro_monthly'
-  if (priceId === PLANS.pro_yearly.stripePriceId) return 'pro_yearly'
-  return 'free'
+  if (!priceId) return null
+  const monthlyId = process.env.STRIPE_PRICE_ID_PRO
+  const yearlyId = process.env.STRIPE_PRICE_ID_PRO_YEARLY
+  if (monthlyId && priceId === monthlyId) return 'pro_monthly'
+  if (yearlyId && priceId === yearlyId) return 'pro_yearly'
+  return null
 }
 
 // Minimum and maximum donation amounts (in cents)

@@ -464,6 +464,81 @@ router.get('/usage', requireAuth, paymentReadLimiter, async (req, res) => {
   }
 })
 
+// ── Cancel Subscription ────────────────────────────────────────────────────
+// Sets cancel_at_period_end on Stripe so the user keeps access until the
+// billing period ends, then moves to free.
+router.post('/subscription/cancel', paymentPortalLimiter, requireAuth, async (req, res) => {
+  try {
+    const sub = await prisma.subscription.findUnique({
+      where: { userId: req.user.userId },
+      select: { stripeSubscriptionId: true, status: true, plan: true },
+    })
+
+    if (!sub || sub.status === 'canceled' || sub.plan === 'free') {
+      return sendError(res, 400, 'No active subscription to cancel.', ERROR_CODES.BAD_REQUEST)
+    }
+
+    if (!sub.stripeSubscriptionId) {
+      return sendError(res, 400, 'No Stripe subscription found.', ERROR_CODES.BAD_REQUEST)
+    }
+
+    const stripe = service.getStripe()
+    const updated = await stripe.subscriptions.update(sub.stripeSubscriptionId, {
+      cancel_at_period_end: true,
+    })
+
+    await prisma.subscription.update({
+      where: { userId: req.user.userId },
+      data: {
+        cancelAtPeriodEnd: true,
+      },
+    })
+
+    log.info({ userId: req.user.userId }, 'Subscription set to cancel at period end')
+
+    res.json({
+      message: 'Subscription will be canceled at the end of your billing period.',
+      cancelAtPeriodEnd: true,
+      currentPeriodEnd: new Date(updated.current_period_end * 1000),
+    })
+  } catch (err) {
+    captureError(err, { context: 'payments.cancel' })
+    log.error({ err }, 'Failed to cancel subscription')
+    sendError(res, 500, 'Failed to cancel subscription.', ERROR_CODES.INTERNAL)
+  }
+})
+
+// ── Reactivate Subscription (undo cancel) ─────────────────────────────────
+router.post('/subscription/reactivate', paymentPortalLimiter, requireAuth, async (req, res) => {
+  try {
+    const sub = await prisma.subscription.findUnique({
+      where: { userId: req.user.userId },
+      select: { stripeSubscriptionId: true, cancelAtPeriodEnd: true },
+    })
+
+    if (!sub?.stripeSubscriptionId || !sub.cancelAtPeriodEnd) {
+      return sendError(res, 400, 'No pending cancellation to undo.', ERROR_CODES.BAD_REQUEST)
+    }
+
+    const stripe = service.getStripe()
+    await stripe.subscriptions.update(sub.stripeSubscriptionId, {
+      cancel_at_period_end: false,
+    })
+
+    await prisma.subscription.update({
+      where: { userId: req.user.userId },
+      data: { cancelAtPeriodEnd: false },
+    })
+
+    log.info({ userId: req.user.userId }, 'Subscription reactivated')
+    res.json({ message: 'Subscription reactivated. You will continue to be billed.' })
+  } catch (err) {
+    captureError(err, { context: 'payments.reactivate' })
+    log.error({ err }, 'Failed to reactivate subscription')
+    sendError(res, 500, 'Failed to reactivate subscription.', ERROR_CODES.INTERNAL)
+  }
+})
+
 // ── Sprint E: Pro-level features (referral, gift, trial, pause, student) ──
 const sprintERoutes = require('./sprintE.routes')
 router.use('/', sprintERoutes)

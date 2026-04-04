@@ -106,26 +106,13 @@ function CreateGroupModal({ open, onClose, onSubmit, courses }) {
             </select>
           </div>
 
-          {submitError && (
-            <div style={styles.alert('danger')}>
-              {submitError}
-            </div>
-          )}
+          {submitError && <div style={styles.alert('danger')}>{submitError}</div>}
 
           <div style={styles.modalActions}>
-            <button
-              type="button"
-              onClick={onClose}
-              style={styles.cancelBtn}
-              disabled={submitting}
-            >
+            <button type="button" onClick={onClose} style={styles.cancelBtn} disabled={submitting}>
               Cancel
             </button>
-            <button
-              type="submit"
-              style={styles.submitBtn}
-              disabled={submitting || !name.trim()}
-            >
+            <button type="submit" style={styles.submitBtn} disabled={submitting || !name.trim()}>
               {submitting ? 'Creating...' : 'Create Group'}
             </button>
           </div>
@@ -140,6 +127,7 @@ export function EditGroupModal({ open, group, onClose, onSubmit, courses }) {
   const [description, setDescription] = useState(group?.description || '')
   const [privacy, setPrivacy] = useState(group?.privacy || 'public')
   const [courseId, setCourseId] = useState(group?.courseId || '')
+  const [maxMembers, setMaxMembers] = useState(group?.maxMembers || 50)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
 
@@ -161,6 +149,7 @@ export function EditGroupModal({ open, group, onClose, onSubmit, courses }) {
         description: description.trim() || null,
         privacy,
         courseId: courseId ? parseInt(courseId, 10) : null,
+        maxMembers: parseInt(maxMembers, 10) || 50,
       })
     } catch (err) {
       setSubmitError(err.message || 'Failed to update group.')
@@ -234,26 +223,26 @@ export function EditGroupModal({ open, group, onClose, onSubmit, courses }) {
             </select>
           </div>
 
-          {submitError && (
-            <div style={styles.alert('danger')}>
-              {submitError}
-            </div>
-          )}
+          <div style={styles.formGroup}>
+            <label style={styles.label}>Max Members</label>
+            <input
+              type="number"
+              value={maxMembers}
+              onChange={(e) => setMaxMembers(e.target.value)}
+              min={1}
+              max={1000}
+              style={styles.input}
+            />
+            <span style={styles.charCount}>1 - 1000</span>
+          </div>
+
+          {submitError && <div style={styles.alert('danger')}>{submitError}</div>}
 
           <div style={styles.modalActions}>
-            <button
-              type="button"
-              onClick={onClose}
-              style={styles.cancelBtn}
-              disabled={submitting}
-            >
+            <button type="button" onClick={onClose} style={styles.cancelBtn} disabled={submitting}>
               Cancel
             </button>
-            <button
-              type="submit"
-              style={styles.submitBtn}
-              disabled={submitting || !name.trim()}
-            >
+            <button type="submit" style={styles.submitBtn} disabled={submitting || !name.trim()}>
               {submitting ? 'Saving...' : 'Save Changes'}
             </button>
           </div>

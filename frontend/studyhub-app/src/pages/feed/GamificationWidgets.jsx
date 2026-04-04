@@ -22,7 +22,11 @@ const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
  * StreakWidget — Shows current streak, longest streak, and today's activity status.
  */
 export function StreakWidget() {
-  const { data: streak, loading, error } = useFetch('/api/users/me/streak', {
+  const {
+    data: streak,
+    loading,
+    error,
+  } = useFetch('/api/users/me/streak', {
     initialData: { currentStreak: 0, longestStreak: 0, lastActiveDate: null, todayActive: false },
     swr: 5 * 60 * 1000,
   })
@@ -46,11 +50,13 @@ export function StreakWidget() {
   return (
     <Panel title="Your Streak" helper="Stay consistent">
       <div style={{ display: 'grid', gap: 14 }}>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: 12,
-        }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: 12,
+          }}
+        >
           <div style={streakBoxStyle}>
             <div style={streakNumberStyle}>{streak.currentStreak}</div>
             <div style={streakLabelStyle}>Current Streak</div>
@@ -61,16 +67,18 @@ export function StreakWidget() {
           </div>
         </div>
         {streak.todayActive && (
-          <div style={{
-            padding: '8px 12px',
-            borderRadius: 10,
-            background: 'var(--sh-success-bg)',
-            border: '1px solid var(--sh-success-border)',
-            color: 'var(--sh-success-text)',
-            fontSize: 12,
-            fontWeight: 600,
-            textAlign: 'center',
-          }}>
+          <div
+            style={{
+              padding: '8px 12px',
+              borderRadius: 10,
+              background: 'var(--sh-success-bg)',
+              border: '1px solid var(--sh-success-border)',
+              color: 'var(--sh-success-text)',
+              fontSize: 12,
+              fontWeight: 600,
+              textAlign: 'center',
+            }}
+          >
             Active today
           </div>
         )}
@@ -83,14 +91,18 @@ export function StreakWidget() {
  * WeeklyProgressWidget — 7-day bar chart showing activity progress.
  */
 export function WeeklyProgressWidget() {
-  const { data: weekly, loading, error } = useFetch('/api/users/me/weekly-activity', {
+  const {
+    data: weekly,
+    loading,
+    error,
+  } = useFetch('/api/users/me/weekly-activity', {
     initialData: {
       daysActive: 0,
       totalActions: 0,
       goal: 0,
       goalMet: false,
       dailyBreakdown: [],
-    }
+    },
   })
 
   if (loading) {
@@ -111,9 +123,10 @@ export function WeeklyProgressWidget() {
 
   const goalProgress = weekly.goal > 0 ? (weekly.daysActive / weekly.goal) * 100 : 0
   const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-  const maxDaily = weekly.dailyBreakdown.length > 0
-    ? Math.max(...weekly.dailyBreakdown.map((d) => d.actions || 0))
-    : 1
+  const maxDaily =
+    weekly.dailyBreakdown.length > 0
+      ? Math.max(...weekly.dailyBreakdown.map((d) => d.actions || 0))
+      : 1
 
   // Circle progress ring dimensions
   const ringRadius = 32
@@ -125,67 +138,85 @@ export function WeeklyProgressWidget() {
     <Panel title="This Week" helper="Activity goal">
       <div style={{ display: 'grid', gap: 16 }}>
         {/* Circular progress ring */}
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: 8,
-        }}>
-          <svg
-            width="80"
-            height="80"
-            viewBox="0 0 80 80"
-            style={{ transform: 'rotate(-90deg)' }}
-          >
-            {/* Background track */}
-            <circle
-              cx="40"
-              cy="40"
-              r={ringRadius}
-              fill="none"
-              stroke="var(--sh-soft)"
-              strokeWidth="4"
-            />
-            {/* Progress ring */}
-            <circle
-              cx="40"
-              cy="40"
-              r={ringRadius}
-              fill="none"
-              stroke={ringColor}
-              strokeWidth="4"
-              strokeDasharray={circumference}
-              strokeDashoffset={strokeDashoffset}
-              strokeLinecap="round"
-              style={{
-                transition: 'stroke-dashoffset 0.3s ease, stroke 0.3s ease',
-              }}
-            />
-          </svg>
-          {/* Center text */}
-          <div style={{
-            position: 'absolute',
+        <div
+          style={{
             display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: 2,
-            marginTop: 8,
-          }}>
-            <div style={{
-              fontSize: 14,
-              fontWeight: 700,
-              color: 'var(--sh-heading)',
-              fontFamily: FONT,
-            }}>
-              {weekly.daysActive}/{weekly.goal}
-            </div>
-            <div style={{
-              fontSize: 10,
-              fontWeight: 600,
-              color: 'var(--sh-muted)',
-              fontFamily: FONT,
-            }}>
-              {weekly.goalMet ? 'Goal reached' : 'days'}
+            justifyContent: 'center',
+          }}
+        >
+          <div
+            style={{
+              position: 'relative',
+              width: 80,
+              height: 80,
+            }}
+          >
+            <svg
+              width="80"
+              height="80"
+              viewBox="0 0 80 80"
+              style={{ transform: 'rotate(-90deg)', display: 'block' }}
+            >
+              {/* Background track */}
+              <circle
+                cx="40"
+                cy="40"
+                r={ringRadius}
+                fill="none"
+                stroke="var(--sh-soft)"
+                strokeWidth="4"
+              />
+              {/* Progress ring */}
+              <circle
+                cx="40"
+                cy="40"
+                r={ringRadius}
+                fill="none"
+                stroke={ringColor}
+                strokeWidth="4"
+                strokeDasharray={circumference}
+                strokeDashoffset={strokeDashoffset}
+                strokeLinecap="round"
+                style={{
+                  transition: 'stroke-dashoffset 0.3s ease, stroke 0.3s ease',
+                }}
+              />
+            </svg>
+            {/* Center text overlaid on ring */}
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: 80,
+                height: 80,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 14,
+                  fontWeight: 700,
+                  color: 'var(--sh-heading)',
+                  fontFamily: FONT,
+                  lineHeight: 1,
+                }}
+              >
+                {weekly.daysActive}/{weekly.goal}
+              </div>
+              <div
+                style={{
+                  fontSize: 10,
+                  fontWeight: 600,
+                  color: 'var(--sh-muted)',
+                  fontFamily: FONT,
+                }}
+              >
+                {weekly.goalMet ? 'Goal met' : 'days'}
+              </div>
             </div>
           </div>
         </div>
@@ -219,12 +250,14 @@ export function WeeklyProgressWidget() {
                       cursor: 'pointer',
                     }}
                   />
-                  <div style={{
-                    fontSize: 10,
-                    fontWeight: 600,
-                    color: 'var(--sh-muted)',
-                    fontFamily: FONT,
-                  }}>
+                  <div
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 600,
+                      color: 'var(--sh-muted)',
+                      fontFamily: FONT,
+                    }}
+                  >
                     {dayLabels[idx]}
                   </div>
                 </div>
@@ -234,15 +267,17 @@ export function WeeklyProgressWidget() {
         )}
 
         {/* Total actions count */}
-        <div style={{
-          fontSize: 13,
-          fontWeight: 600,
-          color: 'var(--sh-subtext)',
-          textAlign: 'center',
-          paddingTop: 4,
-          borderTop: '1px solid var(--sh-border)',
-          fontFamily: FONT,
-        }}>
+        <div
+          style={{
+            fontSize: 13,
+            fontWeight: 600,
+            color: 'var(--sh-subtext)',
+            textAlign: 'center',
+            paddingTop: 4,
+            borderTop: '1px solid var(--sh-border)',
+            fontFamily: FONT,
+          }}
+        >
           {weekly.totalActions} action{weekly.totalActions !== 1 ? 's' : ''} this week
         </div>
       </div>
@@ -254,15 +289,20 @@ export function WeeklyProgressWidget() {
  * LeaderboardWidget — Top 5 users with ranking and score.
  */
 export function LeaderboardWidget() {
-  const { data: leaderboard, loading, error } = useFetch('/api/feed/leaderboard?period=weekly&limit=5', {
+  const {
+    data: leaderboard,
+    loading,
+    error,
+  } = useFetch('/api/feed/leaderboard?period=weekly&limit=5', {
     initialData: [],
     swr: 5 * 60 * 1000,
   })
   const { data: currentUser } = useFetch('/api/users/me', { swr: 2 * 60 * 1000 })
 
-  const currentUserRank = leaderboard && Array.isArray(leaderboard) && currentUser && currentUser.id
-    ? leaderboard.findIndex((u) => u.userId === currentUser.id)
-    : -1
+  const currentUserRank =
+    leaderboard && Array.isArray(leaderboard) && currentUser && currentUser.id
+      ? leaderboard.findIndex((u) => u.userId === currentUser.id)
+      : -1
 
   if (loading) {
     return (
@@ -309,52 +349,60 @@ export function LeaderboardWidget() {
                 transition: 'background 0.15s',
               }}
             >
-              <div style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: 24,
-                height: 24,
-                borderRadius: '50%',
-                background: 'var(--sh-brand)',
-                color: '#fff',
-                fontSize: 10,
-                fontWeight: 800,
-                flexShrink: 0,
-              }}>
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 24,
+                  height: 24,
+                  borderRadius: '50%',
+                  background: 'var(--sh-brand)',
+                  color: '#fff',
+                  fontSize: 10,
+                  fontWeight: 800,
+                  flexShrink: 0,
+                }}
+              >
                 {user.rank || idx + 1}
               </div>
 
               <UserAvatar username={user.username} avatarUrl={user.avatarUrl} size={32} />
 
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{
-                  fontSize: 13,
-                  fontWeight: 700,
-                  color: 'var(--sh-heading)',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}>
+                <div
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: 'var(--sh-heading)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
                   {user.username}
                 </div>
                 {user.breakdown && (
-                  <div style={{
-                    fontSize: 10,
-                    color: 'var(--sh-muted)',
-                  }}>
+                  <div
+                    style={{
+                      fontSize: 10,
+                      color: 'var(--sh-muted)',
+                    }}
+                  >
                     {user.breakdown.posts || 0} posts
                   </div>
                 )}
               </div>
 
-              <div style={{
-                fontSize: 13,
-                fontWeight: 800,
-                color: 'var(--sh-brand)',
-                whiteSpace: 'nowrap',
-                flexShrink: 0,
-              }}>
+              <div
+                style={{
+                  fontSize: 13,
+                  fontWeight: 800,
+                  color: 'var(--sh-brand)',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                }}
+              >
                 {user.score || 0}
               </div>
             </Link>

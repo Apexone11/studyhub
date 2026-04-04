@@ -197,7 +197,12 @@ function DonorCard({ donor, rank }) {
         <span style={{ ...s.rankBadge, borderColor: rankColor, color: rankColor }}>#{rank}</span>
       </div>
       <Link to={`/users/${donor.username}`} style={s.donorAvatarLink}>
-        <UserAvatar username={donor.username} avatarUrl={donor.avatarUrl} size={isTop3 ? 56 : 44} />
+        <UserAvatar
+          username={donor.username}
+          avatarUrl={donor.avatarUrl}
+          isDonor
+          size={isTop3 ? 56 : 44}
+        />
       </Link>
       <div style={s.donorInfo}>
         <Link to={`/users/${donor.username}`} style={s.donorName}>
@@ -225,7 +230,12 @@ function SubscriberCard({ subscriber }) {
 
   return (
     <Link to={`/users/${subscriber.username}`} style={s.subCard}>
-      <UserAvatar username={subscriber.username} avatarUrl={subscriber.avatarUrl} size={40} />
+      <UserAvatar
+        username={subscriber.username}
+        avatarUrl={subscriber.avatarUrl}
+        plan={subscriber.plan}
+        size={40}
+      />
       <div style={s.subInfo}>
         <span style={s.subName}>{subscriber.username}</span>
         <span style={s.subPlan}>Pro {planLabel}</span>
