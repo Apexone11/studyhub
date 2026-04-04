@@ -446,68 +446,102 @@ router.post('/subscription/sync', paymentReadLimiter, requireAuth, async (req, r
   try {
     const stripe = service.getStripe()
 
-    // Find all Stripe customers with this user's metadata
-    const customers = await stripe.customers.search({
-      query: `metadata["studyhub_user_id"]:"${req.user.userId}"`,
-      limit: 5,
+    // Get user's email for broader search
+    const dbUser = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: { email: true },
     })
 
-    if (!customers.data.length) {
-      return res.json({ synced: false, message: 'No Stripe customer found for your account.' })
+    // Search for customers by metadata AND email
+    const customerIds = new Set()
+
+    // Search by metadata
+    try {
+      const byMeta = await stripe.customers.search({
+        query: `metadata["studyhub_user_id"]:"${req.user.userId}"`,
+        limit: 10,
+      })
+      byMeta.data.forEach((c) => customerIds.add(c.id))
+    } catch {
+      // Search API may not be available in test mode
     }
 
-    let synced = false
-    for (const customer of customers.data) {
-      const subs = await stripe.subscriptions.list({
-        customer: customer.id,
-        status: 'active',
-        limit: 1,
-      })
-
-      if (subs.data.length === 0) {
-        // Also check trialing
-        const trialingSubs = await stripe.subscriptions.list({
-          customer: customer.id,
-          status: 'trialing',
-          limit: 1,
+    // Search by email
+    if (dbUser?.email) {
+      try {
+        const byEmail = await stripe.customers.list({
+          email: dbUser.email,
+          limit: 10,
         })
-        if (trialingSubs.data.length > 0) subs.data.push(...trialingSubs.data)
+        byEmail.data.forEach((c) => customerIds.add(c.id))
+      } catch {
+        // Graceful degradation
       }
+    }
 
-      for (const sub of subs.data) {
-        const priceId = sub.items?.data?.[0]?.price?.id || ''
-        const resolved = planFromPriceId(priceId)
-        const plan = resolved || 'pro_monthly'
+    if (customerIds.size === 0) {
+      return res.json({
+        synced: false,
+        message:
+          'No Stripe customer found for your account. Try subscribing from the pricing page.',
+      })
+    }
 
-        await prisma.subscription.upsert({
-          where: { userId: req.user.userId },
-          create: {
-            userId: req.user.userId,
-            stripeCustomerId: customer.id,
-            stripeSubscriptionId: sub.id,
-            stripePriceId: priceId,
-            plan,
-            status: sub.status,
-            currentPeriodStart: new Date(sub.current_period_start * 1000),
-            currentPeriodEnd: new Date(sub.current_period_end * 1000),
-            cancelAtPeriodEnd: sub.cancel_at_period_end,
-          },
-          update: {
-            stripeCustomerId: customer.id,
-            stripeSubscriptionId: sub.id,
-            stripePriceId: priceId,
-            plan,
-            status: sub.status,
-            currentPeriodStart: new Date(sub.current_period_start * 1000),
-            currentPeriodEnd: new Date(sub.current_period_end * 1000),
-            cancelAtPeriodEnd: sub.cancel_at_period_end,
-            canceledAt: null,
-          },
-        })
+    // Search ALL subscription statuses across all matching customers
+    let synced = false
+    const statusesToCheck = ['active', 'trialing', 'past_due']
 
-        synced = true
-        log.info({ userId: req.user.userId, plan, subId: sub.id }, 'User self-synced subscription')
-        break
+    for (const customerId of customerIds) {
+      for (const status of statusesToCheck) {
+        if (synced) break
+        try {
+          const subs = await stripe.subscriptions.list({
+            customer: customerId,
+            status,
+            limit: 1,
+          })
+
+          for (const sub of subs.data) {
+            const priceId = sub.items?.data?.[0]?.price?.id || ''
+            const resolved = planFromPriceId(priceId)
+            const plan = resolved || 'pro_monthly'
+
+            await prisma.subscription.upsert({
+              where: { userId: req.user.userId },
+              create: {
+                userId: req.user.userId,
+                stripeCustomerId: customerId,
+                stripeSubscriptionId: sub.id,
+                stripePriceId: priceId,
+                plan,
+                status: sub.status,
+                currentPeriodStart: new Date(sub.current_period_start * 1000),
+                currentPeriodEnd: new Date(sub.current_period_end * 1000),
+                cancelAtPeriodEnd: sub.cancel_at_period_end,
+              },
+              update: {
+                stripeCustomerId: customerId,
+                stripeSubscriptionId: sub.id,
+                stripePriceId: priceId,
+                plan,
+                status: sub.status,
+                currentPeriodStart: new Date(sub.current_period_start * 1000),
+                currentPeriodEnd: new Date(sub.current_period_end * 1000),
+                cancelAtPeriodEnd: sub.cancel_at_period_end,
+                canceledAt: null,
+              },
+            })
+
+            synced = true
+            log.info(
+              { userId: req.user.userId, plan, subId: sub.id, customerId },
+              'User self-synced subscription',
+            )
+            break
+          }
+        } catch {
+          // Continue with next status
+        }
       }
       if (synced) break
     }
@@ -516,7 +550,12 @@ router.post('/subscription/sync', paymentReadLimiter, requireAuth, async (req, r
       const updated = await service.getUserSubscription(req.user.userId)
       res.json({ synced: true, subscription: updated })
     } else {
-      res.json({ synced: false, message: 'No active Stripe subscription found.' })
+      res.json({
+        synced: false,
+        message:
+          'No active subscription found in Stripe. Your previous subscriptions may have been refunded or canceled. Try subscribing again from the pricing page.',
+        customersFound: customerIds.size,
+      })
     }
   } catch (error) {
     captureError(error, { context: 'payments.subscription.sync' })
