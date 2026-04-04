@@ -8,11 +8,15 @@ const { createNotification } = require('../../lib/notify')
 const { isModerationEnabled, scanContent } = require('../../lib/moderation/moderationEngine')
 const { SHEET_STATUS, AUTHOR_SELECT, sheetWriteLimiter } = require('./sheets.constants')
 const { serializeSheet } = require('./sheets.serializer')
+const { getUserPlan, isPro } = require('../../lib/getUserPlan')
 
 const router = express.Router()
 
 function computeChecksum(content) {
-  return crypto.createHash('sha256').update(content || '', 'utf8').digest('hex')
+  return crypto
+    .createHash('sha256')
+    .update(content || '', 'utf8')
+    .digest('hex')
 }
 
 router.post('/:id/fork', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (req, res) => {
@@ -74,12 +78,35 @@ router.post('/:id/fork', requireAuth, requireVerifiedEmail, sheetWriteLimiter, a
       return res.status(200).json(serializeSheet(existingFork))
     }
 
+    // ── Upload quota check (forks count toward monthly limit) ──
+    try {
+      const plan = await getUserPlan(req.user.userId)
+      if (!isPro(plan)) {
+        const startOfMonth = new Date()
+        startOfMonth.setDate(1)
+        startOfMonth.setHours(0, 0, 0, 0)
+        const uploadsThisMonth = await prisma.studySheet.count({
+          where: { userId: req.user.userId, createdAt: { gte: startOfMonth } },
+        })
+        if (uploadsThisMonth >= 10) {
+          return res.status(403).json({
+            error:
+              'You have reached your monthly upload limit (10). Upgrade to Pro for unlimited uploads.',
+            code: 'UPLOAD_LIMIT',
+          })
+        }
+      }
+    } catch {
+      // Graceful degradation: allow fork if plan check fails
+    }
+
     // ── Resolve root sheet id: trace back to the ultimate original ──
     const rootSheetId = original.rootSheetId || original.forkOf || original.id
 
-    const forkTitle = typeof req.body.title === 'string' && req.body.title.trim()
-      ? req.body.title.trim().slice(0, 160)
-      : `${original.title} (fork)`
+    const forkTitle =
+      typeof req.body.title === 'string' && req.body.title.trim()
+        ? req.body.title.trim().slice(0, 160)
+        : `${original.title} (fork)`
 
     // ── Create fork as DRAFT + initial fork_base commit in one transaction ──
     const checksum = computeChecksum(original.content)
@@ -147,9 +174,15 @@ router.post('/:id/fork', requireAuth, requireVerifiedEmail, sheetWriteLimiter, a
 
     /* Async content moderation — scan forked content under new author */
     if (isModerationEnabled()) {
-      const textToScan = `${forkTitle} ${original.description || ''} ${original.contentFormat === 'markdown' ? original.content : ''}`.trim()
+      const textToScan =
+        `${forkTitle} ${original.description || ''} ${original.contentFormat === 'markdown' ? original.content : ''}`.trim()
       if (textToScan) {
-        void scanContent({ contentType: 'sheet', contentId: forked.id, text: textToScan, userId: req.user.userId })
+        void scanContent({
+          contentType: 'sheet',
+          contentId: forked.id,
+          text: textToScan,
+          userId: req.user.userId,
+        })
       }
     }
   } catch (error) {

@@ -20,7 +20,12 @@ const os = require('os')
 const { captureError } = require('../../monitoring/sentry')
 const r2 = require('../../lib/r2Storage')
 const prisma = require('../../lib/prisma')
-const { TRANSCODE_PRESETS, VIDEO_STATUS, VIDEO_DURATION_LIMITS, MAX_VIDEO_DURATION } = require('./video.constants')
+const {
+  TRANSCODE_PRESETS,
+  VIDEO_STATUS,
+  VIDEO_DURATION_LIMITS,
+  MAX_VIDEO_DURATION,
+} = require('./video.constants')
 
 // ── Temp directory for processing ────────────────────────────────────────
 const TEMP_DIR = path.join(os.tmpdir(), 'studyhub-video')
@@ -179,7 +184,7 @@ function transcodeToPreset(inputPath, outputPath, preset, sourceInfo) {
       '-c:v',
       'libx264',
       '-preset',
-      'medium',
+      'fast',
       '-b:v',
       preset.videoBitrate,
       '-maxrate',
@@ -286,7 +291,9 @@ async function processVideo(videoId) {
       // ffmpeg not installed — skip transcoding, use original file as-is.
       // This allows videos to still be playable (direct R2 streaming) even
       // without the full processing pipeline.
-      console.warn(`[video:process] ffmpeg not available. Marking video ${videoId} as ready with original file only.`)
+      console.warn(
+        `[video:process] ffmpeg not available. Marking video ${videoId} as ready with original file only.`,
+      )
 
       const variants = {
         original: {
@@ -308,7 +315,20 @@ async function processVideo(videoId) {
       return
     }
 
+    // Helper to update processing progress in the DB
+    const updateProgress = async (step, pct) => {
+      try {
+        await prisma.video.update({
+          where: { id: videoId },
+          data: { processingStep: step, processingProgress: pct },
+        })
+      } catch {
+        /* non-fatal */
+      }
+    }
+
     // 1. Download raw video from R2
+    await updateProgress('downloading', 5)
     const { body } = await r2.getObject(video.r2Key)
     const writeStream = fs.createWriteStream(rawPath)
     await new Promise((resolve, reject) => {
@@ -318,6 +338,7 @@ async function processVideo(videoId) {
     })
 
     // 2. Probe metadata
+    await updateProgress('analyzing', 15)
     const metadata = await probeVideo(rawPath)
 
     // 3. Validate duration based on user's subscription plan
@@ -332,7 +353,7 @@ async function processVideo(videoId) {
       if (sub && sub.status === 'active') {
         userPlan = sub.plan
       }
-    } catch (e) {
+    } catch {
       // Graceful degradation
     }
 
@@ -344,7 +365,7 @@ async function processVideo(videoId) {
         if (donation) {
           userPlan = 'donor'
         }
-      } catch (e) {
+      } catch {
         // Graceful degradation
       }
     }
@@ -358,7 +379,7 @@ async function processVideo(videoId) {
       if (user && user.role === 'admin') {
         userPlan = 'admin'
       }
-    } catch (e) {
+    } catch {
       // Graceful degradation
     }
 
@@ -374,6 +395,7 @@ async function processVideo(videoId) {
     }
 
     // 4. Generate thumbnail
+    await updateProgress('thumbnail', 20)
     let thumbnailR2Key = null
     try {
       const thumbPath = path.join(baseDir, 'thumb.jpg')
@@ -390,10 +412,15 @@ async function processVideo(videoId) {
     }
 
     // 5. Transcode to quality presets
+    await updateProgress('transcoding', 30)
     const variants = {}
-    for (const [quality, preset] of Object.entries(TRANSCODE_PRESETS)) {
+    const presetEntries = Object.entries(TRANSCODE_PRESETS)
+    for (let i = 0; i < presetEntries.length; i++) {
+      const [quality, preset] = presetEntries[i]
+      const pct = 30 + Math.round(((i + 1) / presetEntries.length) * 50)
       try {
         const outPath = path.join(baseDir, `${quality}.mp4`)
+        await updateProgress(`transcoding ${quality}`, pct)
         const result = await transcodeToPreset(rawPath, outPath, preset, metadata)
         if (result === null) continue // Source too small for this preset
 
@@ -422,6 +449,7 @@ async function processVideo(videoId) {
     }
 
     // 6. Generate HLS manifest
+    await updateProgress('finalizing', 90)
     let hlsManifestR2Key = null
     try {
       const manifestContent = generateHlsManifest(variants)

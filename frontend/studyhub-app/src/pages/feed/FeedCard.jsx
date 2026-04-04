@@ -9,6 +9,7 @@ import { Avatar } from './FeedWidgets'
 import CommentSection from './CommentSection'
 import { FONT, timeAgo, courseColor, actionButton, linkButton, pillStyle } from './feedConstants'
 import { API } from '../../config'
+import ProBadge from '../../components/ProBadge'
 
 /* ── Inline feed video player (lazy loaded) ────────────────────────────── */
 
@@ -175,31 +176,77 @@ function FeedVideoPlayer({ video }) {
         controls
         playsInline
         preload="metadata"
+        controlsList={video.downloadable === false ? 'nodownload' : undefined}
         style={{ width: '100%', display: 'block', maxHeight: 500 }}
       />
-      {video.duration && (
-        <div
-          style={{
-            padding: '6px 12px',
-            display: 'flex',
-            gap: 12,
-            alignItems: 'center',
-            background: 'var(--sh-soft)',
-            fontSize: 'var(--type-xs)',
-            color: 'var(--sh-muted)',
-          }}
-        >
+      <div
+        style={{
+          padding: '8px 12px',
+          display: 'flex',
+          gap: 12,
+          alignItems: 'center',
+          background: 'var(--sh-soft)',
+          fontSize: 'var(--type-xs)',
+          color: 'var(--sh-muted)',
+        }}
+      >
+        <div style={{ flex: 1, display: 'flex', gap: 10, alignItems: 'center', minWidth: 0 }}>
           {video.title && (
-            <span style={{ fontWeight: 600, color: 'var(--sh-text)' }}>{video.title}</span>
+            <span
+              style={{
+                fontWeight: 600,
+                color: 'var(--sh-text)',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {video.title}
+            </span>
           )}
-          <span>{formatDuration(video.duration)}</span>
-          {video.width && video.height && (
+          {video.duration > 0 && <span>{formatDuration(video.duration)}</span>}
+          {video.width > 0 && video.height > 0 && (
             <span>
               {video.width}x{video.height}
             </span>
           )}
         </div>
-      )}
+        {video.downloadable !== false && streamUrl && (
+          <a
+            href={streamUrl}
+            download
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              color: 'var(--sh-brand)',
+              fontWeight: 600,
+              fontSize: 11,
+              textDecoration: 'none',
+              padding: '3px 8px',
+              borderRadius: 6,
+              background: 'var(--sh-brand-soft)',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            Download
+          </a>
+        )}
+      </div>
     </div>
   )
 }
@@ -262,17 +309,20 @@ function FeedCardInner({
             <div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 {item.author?.username ? (
-                  <Link
-                    to={`/users/${item.author.username}`}
-                    style={{
-                      fontWeight: 800,
-                      color: 'var(--sh-heading)',
-                      fontSize: 14,
-                      textDecoration: 'none',
-                    }}
-                  >
-                    {item.author.username}
-                  </Link>
+                  <>
+                    <Link
+                      to={`/users/${item.author.username}`}
+                      style={{
+                        fontWeight: 800,
+                        color: 'var(--sh-heading)',
+                        fontSize: 14,
+                        textDecoration: 'none',
+                      }}
+                    >
+                      {item.author.username}
+                    </Link>
+                    <ProBadge plan={item.author.plan} size="xs" />
+                  </>
                 ) : (
                   <span style={{ fontWeight: 800, color: 'var(--sh-heading)', fontSize: 14 }}>
                     StudyHub

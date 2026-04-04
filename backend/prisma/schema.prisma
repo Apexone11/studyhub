@@ -1401,6 +1401,9 @@ model Video {
   thumbnailR2Key String?
   variants      Json?     // { "360p": { key, width, height }, "720p": {...}, "1080p": {...} }
   hlsManifestR2Key String?
+  processingStep   String?   // Current step: downloading, analyzing, thumbnail, transcoding, finalizing
+  processingProgress Int?    // 0-100 percentage
+  downloadable     Boolean   @default(true) // Whether viewers can download this video
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
