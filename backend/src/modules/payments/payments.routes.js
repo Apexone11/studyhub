@@ -33,29 +33,18 @@ const {
 const service = require('./payments.service')
 const prisma = require('../../lib/prisma')
 const { getUserPlan, isPro } = require('../../lib/getUserPlan')
+const requireAuth = require('../../middleware/auth')
 
 const router = express.Router()
 
 // ── Auth middleware ───────────────────────────────────────────────────────
 
-function requireAuth(req, res, next) {
-  const token = getAuthTokenFromRequest(req)
-  if (!token) return sendError(res, 401, 'Authentication required.', ERROR_CODES.UNAUTHORIZED)
-
-  try {
-    const payload = verifyAuthToken(token)
-    req.user = payload
-    next()
-  } catch {
-    return sendError(res, 401, 'Invalid or expired token.', ERROR_CODES.UNAUTHORIZED)
-  }
-}
-
 function optionalAuth(req, _res, next) {
   const token = getAuthTokenFromRequest(req)
   if (token) {
     try {
-      req.user = verifyAuthToken(token)
+      const payload = verifyAuthToken(token)
+      req.user = { userId: payload.sub, role: payload.role }
     } catch {
       req.user = null
     }
@@ -88,16 +77,26 @@ router.post('/checkout/subscription', paymentCheckoutLimiter, requireAuth, async
     const successUrl = `${frontendUrl}/settings?payment=success&session_id={CHECKOUT_SESSION_ID}`
     const cancelUrl = `${frontendUrl}/pricing?payment=canceled`
 
-    const user = { id: req.user.userId, email: req.user.email, username: req.user.username }
+    // Fetch email from DB (auth middleware doesn't include email in req.user)
+    const dbUser = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: { email: true, username: true },
+    })
+    const user = {
+      id: req.user.userId,
+      email: dbUser?.email || '',
+      username: dbUser?.username || req.user.username,
+    }
     const session = await service.createSubscriptionCheckout(user, plan, successUrl, cancelUrl)
 
     res.json({ url: session.url, sessionId: session.id })
   } catch (error) {
     captureError(error, { context: 'checkout.subscription' })
     log.error({ err: error }, 'Failed to create subscription checkout')
-    const msg = error.message && error.message.includes('not configured')
-      ? 'Payments are not fully configured yet. Please try again later.'
-      : 'Failed to create checkout session.'
+    const msg =
+      error.message && error.message.includes('not configured')
+        ? 'Payments are not fully configured yet. Please try again later.'
+        : 'Failed to create checkout session.'
     sendError(res, 500, msg, ERROR_CODES.INTERNAL)
   }
 })
@@ -133,12 +132,21 @@ router.post('/checkout/donation', paymentCheckoutLimiter, optionalAuth, async (r
     }
 
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
-    const successUrl = `${frontendUrl}/donate?payment=success`
-    const cancelUrl = `${frontendUrl}/donate?payment=canceled`
+    const successUrl = `${frontendUrl}/supporters?payment=success`
+    const cancelUrl = `${frontendUrl}/pricing?payment=canceled`
 
-    const user = req.user
-      ? { id: req.user.userId, email: req.user.email, username: req.user.username }
-      : null
+    let user = null
+    if (req.user) {
+      const donorDbUser = await prisma.user.findUnique({
+        where: { id: req.user.userId },
+        select: { email: true, username: true },
+      })
+      user = {
+        id: req.user.userId,
+        email: donorDbUser?.email || '',
+        username: donorDbUser?.username || '',
+      }
+    }
     const session = await service.createDonationCheckout({
       user,
       amountCents,
@@ -308,6 +316,114 @@ router.get('/admin/revenue', paymentReadLimiter, requireAuth, requireAdmin, asyn
   }
 })
 
+// ── POST /admin/sync-stripe ─────────────────────────────────────────────
+// Admin-only: sync all active Stripe subscriptions into the DB.
+// Recovers subscriptions that were missed due to webhook failures.
+
+router.post(
+  '/admin/sync-stripe',
+  paymentReadLimiter,
+  requireAuth,
+  requireAdmin,
+  async (_req, res) => {
+    try {
+      const stripe = service.getStripe()
+      const subscriptions = await stripe.subscriptions.list({
+        status: 'active',
+        limit: 100,
+        expand: ['data.customer', 'data.latest_invoice'],
+      })
+
+      let synced = 0
+      let errors = 0
+
+      for (const sub of subscriptions.data) {
+        try {
+          const userId = parseInt(sub.metadata?.studyhub_user_id, 10)
+          if (!userId || isNaN(userId)) continue
+
+          const priceId = sub.items?.data?.[0]?.price?.id || ''
+          const plan =
+            PLANS.pro_monthly?.stripePriceId === priceId
+              ? 'pro_monthly'
+              : PLANS.pro_yearly?.stripePriceId === priceId
+                ? 'pro_yearly'
+                : 'pro_monthly'
+
+          const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer?.id
+
+          await prisma.subscription.upsert({
+            where: { userId },
+            create: {
+              userId,
+              stripeCustomerId: customerId,
+              stripeSubscriptionId: sub.id,
+              stripePriceId: priceId,
+              plan,
+              status: sub.status,
+              currentPeriodStart: new Date(sub.current_period_start * 1000),
+              currentPeriodEnd: new Date(sub.current_period_end * 1000),
+              cancelAtPeriodEnd: sub.cancel_at_period_end,
+            },
+            update: {
+              stripeCustomerId: customerId,
+              stripeSubscriptionId: sub.id,
+              stripePriceId: priceId,
+              plan,
+              status: sub.status,
+              currentPeriodStart: new Date(sub.current_period_start * 1000),
+              currentPeriodEnd: new Date(sub.current_period_end * 1000),
+              cancelAtPeriodEnd: sub.cancel_at_period_end,
+              canceledAt: null,
+            },
+          })
+
+          // Also sync payment record from latest invoice
+          const invoice = typeof sub.latest_invoice === 'object' ? sub.latest_invoice : null
+          if (invoice?.id) {
+            const exists = await prisma.payment.findFirst({
+              where: { stripeInvoiceId: invoice.id },
+              select: { id: true },
+            })
+            if (!exists) {
+              const dbSub = await prisma.subscription.findUnique({
+                where: { userId },
+                select: { id: true },
+              })
+              await prisma.payment.create({
+                data: {
+                  userId,
+                  subscriptionId: dbSub?.id || null,
+                  stripeInvoiceId: invoice.id,
+                  stripePaymentIntentId: invoice.payment_intent || null,
+                  amount: invoice.amount_paid || 0,
+                  currency: (invoice.currency || 'usd').toLowerCase(),
+                  status: 'succeeded',
+                  description: invoice.lines?.data?.[0]?.description || `${plan} subscription`,
+                  receiptUrl: invoice.hosted_invoice_url || null,
+                  type: 'subscription',
+                },
+              })
+            }
+          }
+
+          synced++
+        } catch (err) {
+          log.error({ err: err.message, subId: sub.id }, 'Failed to sync subscription')
+          errors++
+        }
+      }
+
+      log.info({ synced, errors }, 'Stripe subscription sync complete')
+      res.json({ synced, errors, total: subscriptions.data.length })
+    } catch (error) {
+      captureError(error, { context: 'payments.admin.syncStripe' })
+      log.error({ err: error }, 'Failed to sync Stripe subscriptions')
+      sendError(res, 500, 'Failed to sync subscriptions.', ERROR_CODES.INTERNAL)
+    }
+  },
+)
+
 // ── GET /usage ───────────────────────────────────────────────────────────
 
 router.get('/usage', requireAuth, paymentReadLimiter, async (req, res) => {
@@ -337,7 +453,7 @@ router.get('/usage', requireAuth, paymentReadLimiter, async (req, res) => {
         uploadsLimit: pro ? -1 : planDef.uploadsPerMonth,
         privateGroups,
         privateGroupsLimit: pro ? 10 : 2,
-        aiMessagesPerDay: pro ? 120 : (planDef.aiMessagesPerDay || 30),
+        aiMessagesPerDay: pro ? 120 : planDef.aiMessagesPerDay || 30,
         storageMb: planDef.storageMb,
       },
     })
@@ -347,5 +463,9 @@ router.get('/usage', requireAuth, paymentReadLimiter, async (req, res) => {
     res.status(500).json({ error: 'Failed to load usage data.' })
   }
 })
+
+// ── Sprint E: Pro-level features (referral, gift, trial, pause, student) ──
+const sprintERoutes = require('./sprintE.routes')
+router.use('/', sprintERoutes)
 
 module.exports = router

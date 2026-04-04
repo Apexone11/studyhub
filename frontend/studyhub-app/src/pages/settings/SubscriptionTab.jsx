@@ -60,7 +60,9 @@ export default function SubscriptionTab() {
     }
 
     load()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   // Load more history pages
@@ -128,24 +130,21 @@ export default function SubscriptionTab() {
     <>
       {/* ── Success Banner ────────────────────────────── */}
       {showSuccess && (
-        <Message tone="success">
-          Welcome to Pro! Your subscription is now active.
-        </Message>
+        <Message tone="success">Welcome to Pro! Your subscription is now active.</Message>
       )}
 
       {/* ── Current Plan ──────────────────────────────── */}
-      <SectionCard
-        title="Current Plan"
-        subtitle="Your active subscription and billing details."
-      >
+      <SectionCard title="Current Plan" subtitle="Your active subscription and billing details.">
         <div style={s.planRow}>
           <div style={s.planInfo}>
             <div style={s.planBadge}>
-              <span style={{
-                ...s.badge,
-                background: isFree ? 'var(--sh-soft)' : 'var(--sh-soft)',
-                color: isFree ? 'var(--sh-text)' : 'var(--sh-brand-accent)',
-              }}>
+              <span
+                style={{
+                  ...s.badge,
+                  background: isFree ? 'var(--sh-soft)' : 'var(--sh-soft)',
+                  color: isFree ? 'var(--sh-text)' : 'var(--sh-brand-accent)',
+                }}
+              >
                 {PLAN_LABELS[sub?.plan] || 'Free'}
               </span>
               {isActive && !isFree && (
@@ -168,21 +167,20 @@ export default function SubscriptionTab() {
             )}
 
             {!isFree && sub?.createdAt && (
-              <p style={s.periodText}>
-                Member since {formatDate(sub.createdAt)}
-              </p>
+              <p style={s.periodText}>Member since {formatDate(sub.createdAt)}</p>
             )}
 
             {isPastDue && (
               <Message tone="error">
-                Your latest payment failed. Please update your payment method to keep your Pro features.
+                Your latest payment failed. Please update your payment method to keep your Pro
+                features.
               </Message>
             )}
 
             {sub?.cancelAtPeriodEnd && (
               <Message tone="info">
-                Your subscription will end on {formatDate(sub.currentPeriodEnd)}.
-                You will keep Pro features until then. You can resubscribe at any time.
+                Your subscription will end on {formatDate(sub.currentPeriodEnd)}. You will keep Pro
+                features until then. You can resubscribe at any time.
               </Message>
             )}
           </div>
@@ -194,11 +192,7 @@ export default function SubscriptionTab() {
               Upgrade to Pro
             </Link>
           ) : (
-            <Button
-              onClick={handleManage}
-              disabled={portalLoading}
-              secondary
-            >
+            <Button onClick={handleManage} disabled={portalLoading} secondary>
               {portalLoading ? 'Opening...' : 'Manage Subscription'}
             </Button>
           )}
@@ -207,8 +201,8 @@ export default function SubscriptionTab() {
         {!isFree && (
           <p style={s.portalNote}>
             Use the billing portal to update your payment method, switch between monthly and yearly,
-            or cancel your subscription. Cancellation takes effect at the end of your current billing period.
-            No refunds for partial periods.
+            or cancel your subscription. Cancellation takes effect at the end of your current
+            billing period. No refunds for partial periods.
           </p>
         )}
       </SectionCard>
@@ -219,21 +213,34 @@ export default function SubscriptionTab() {
         subtitle={isFree ? 'Upgrade to Pro to unlock more.' : 'Everything included in your plan.'}
       >
         <div style={s.featuresGrid}>
-          <FeatureItem label="Uploads" value={isFree ? '10/month' : 'Unlimited'} highlight={!isFree} />
-          <FeatureItem label="AI Messages" value={isFree ? '10/day' : '120/day'} highlight={!isFree} />
-          <FeatureItem label="Video Uploads" value={isFree ? '5 min max' : '60 min max'} highlight={!isFree} />
+          <FeatureItem
+            label="Uploads"
+            value={isFree ? '10/month' : 'Unlimited'}
+            highlight={!isFree}
+          />
+          <FeatureItem
+            label="AI Messages"
+            value={isFree ? '10/day' : '120/day'}
+            highlight={!isFree}
+          />
+          <FeatureItem
+            label="Video Uploads"
+            value={isFree ? '5 min max' : '60 min max'}
+            highlight={!isFree}
+          />
           <FeatureItem label="Storage" value={isFree ? '500 MB' : '5 GB'} highlight={!isFree} />
-          <FeatureItem label="Study Groups" value={isFree ? '2 private' : '10 private'} highlight={!isFree} />
+          <FeatureItem
+            label="Study Groups"
+            value={isFree ? '2 private' : '10 private'}
+            highlight={!isFree}
+          />
           <FeatureItem label="Pro Badge" value={isFree ? 'No' : 'Yes'} highlight={!isFree} />
           <FeatureItem label="Priority Support" value={isFree ? 'No' : 'Yes'} highlight={!isFree} />
         </div>
       </SectionCard>
 
       {/* ── Payment History ────────────────────────────── */}
-      <SectionCard
-        title="Payment History"
-        subtitle="Your recent payments and receipts."
-      >
+      <SectionCard title="Payment History" subtitle="Your recent payments and receipts.">
         {!history || history.payments.length === 0 ? (
           <p style={s.emptyText}>No payment history yet.</p>
         ) : (
@@ -256,17 +263,28 @@ export default function SubscriptionTab() {
                     ${(p.amount / 100).toFixed(2)} {p.currency.toUpperCase()}
                   </span>
                   <span style={s.historyColRight}>
-                    <span style={{
-                      ...s.statusPill,
-                      background: p.status === 'succeeded' ? 'var(--sh-success-bg)' : 'var(--sh-danger-bg)',
-                      color: p.status === 'succeeded' ? 'var(--sh-success-text)' : 'var(--sh-danger-text)',
-                    }}>
+                    <span
+                      style={{
+                        ...s.statusPill,
+                        background:
+                          p.status === 'succeeded' ? 'var(--sh-success-bg)' : 'var(--sh-danger-bg)',
+                        color:
+                          p.status === 'succeeded'
+                            ? 'var(--sh-success-text)'
+                            : 'var(--sh-danger-text)',
+                      }}
+                    >
                       {p.status}
                     </span>
                   </span>
                   <span style={s.historyColRight}>
                     {p.receiptUrl ? (
-                      <a href={p.receiptUrl} target="_blank" rel="noopener noreferrer" style={s.receiptLink}>
+                      <a
+                        href={p.receiptUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={s.receiptLink}
+                      >
                         View
                       </a>
                     ) : (
@@ -301,6 +319,40 @@ export default function SubscriptionTab() {
           </>
         )}
       </SectionCard>
+
+      {/* ── Sprint E: Pro Features ───────────────────────── */}
+
+      {/* Free Trial / Student Discount (only for free users) */}
+      {isFree && (
+        <SectionCard title="Special Offers" subtitle="Ways to get started with Pro.">
+          <TrialAndDiscountSection />
+        </SectionCard>
+      )}
+
+      {/* Referral Codes */}
+      <SectionCard
+        title="Referral Codes"
+        subtitle="Share your code and earn rewards when friends join."
+      >
+        <ReferralSection />
+      </SectionCard>
+
+      {/* Gift Subscription */}
+      <SectionCard title="Gift a Subscription" subtitle="Give the gift of Pro to a friend.">
+        <GiftSection />
+      </SectionCard>
+
+      {/* Pause Subscription (only for active subscribers) */}
+      {!isFree && isActive && (
+        <SectionCard title="Pause Subscription" subtitle="Take a break without losing your spot.">
+          <PauseSection />
+        </SectionCard>
+      )}
+
+      {/* Redeem Codes */}
+      <SectionCard title="Redeem a Code" subtitle="Have a referral or gift code? Enter it here.">
+        <RedeemSection />
+      </SectionCard>
     </>
   )
 }
@@ -320,11 +372,589 @@ function FeatureItem({ label, value, highlight }) {
   return (
     <div style={s.featureItem}>
       <span style={s.featureLabel}>{label}</span>
-      <span style={{ ...s.featureValue, color: highlight ? 'var(--sh-success)' : 'var(--sh-text)' }}>
+      <span
+        style={{ ...s.featureValue, color: highlight ? 'var(--sh-success)' : 'var(--sh-text)' }}
+      >
         {value}
       </span>
     </div>
   )
+}
+
+// ── Sprint E Components ─────────────────────────────────────────────────
+
+function TrialAndDiscountSection() {
+  const [trialLoading, setTrialLoading] = useState(false)
+  const [studentLoading, setStudentLoading] = useState(false)
+  const [msg, setMsg] = useState(null)
+
+  const startTrial = async () => {
+    setTrialLoading(true)
+    setMsg(null)
+    try {
+      const res = await fetch(`${API}/api/payments/checkout/trial`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setMsg({ tone: 'error', text: data.error || 'Failed to start trial.' })
+        return
+      }
+      window.location.href = data.url
+    } catch {
+      setMsg({ tone: 'error', text: 'Network error. Please try again.' })
+    } finally {
+      setTrialLoading(false)
+    }
+  }
+
+  const applyStudentDiscount = async () => {
+    setStudentLoading(true)
+    setMsg(null)
+    try {
+      const res = await fetch(`${API}/api/payments/checkout/student-discount`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ plan: 'pro_monthly' }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setMsg({ tone: 'error', text: data.error || 'Failed to apply student discount.' })
+        return
+      }
+      window.location.href = data.url
+    } catch {
+      setMsg({ tone: 'error', text: 'Network error. Please try again.' })
+    } finally {
+      setStudentLoading(false)
+    }
+  }
+
+  return (
+    <div style={se.stack}>
+      {msg && <Message tone={msg.tone}>{msg.text}</Message>}
+      <div style={se.offerRow}>
+        <div style={se.offerCard}>
+          <p style={se.offerTitle}>7-Day Free Trial</p>
+          <p style={se.offerDesc}>
+            Try Pro free for 7 days. Cancel anytime before the trial ends and you will not be
+            charged.
+          </p>
+          <Button onClick={startTrial} disabled={trialLoading}>
+            {trialLoading ? 'Loading...' : 'Start Free Trial'}
+          </Button>
+        </div>
+        <div style={se.offerCard}>
+          <p style={se.offerTitle}>Student Discount (20% off)</p>
+          <p style={se.offerDesc}>
+            Have a verified .edu email? Get 20% off Pro for as long as you are subscribed.
+          </p>
+          <Button onClick={applyStudentDiscount} disabled={studentLoading} secondary>
+            {studentLoading ? 'Loading...' : 'Apply Student Discount'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ReferralSection() {
+  const [codes, setCodes] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [creating, setCreating] = useState(false)
+  const [msg, setMsg] = useState(null)
+  const [copied, setCopied] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      try {
+        const res = await fetch(`${API}/api/payments/referral/mine`, { credentials: 'include' })
+        if (res.ok && !cancelled) {
+          const data = await res.json()
+          setCodes(data.codes || [])
+        }
+      } catch {
+        // silent
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const createCode = async () => {
+    setCreating(true)
+    setMsg(null)
+    try {
+      const res = await fetch(`${API}/api/payments/referral/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setMsg({ tone: 'error', text: data.error || 'Failed to create code.' })
+        return
+      }
+      setCodes((prev) => [data, ...prev])
+      setMsg({ tone: 'success', text: 'Referral code created.' })
+    } catch {
+      setMsg({ tone: 'error', text: 'Network error.' })
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const deactivateCode = async (id) => {
+    try {
+      const res = await fetch(`${API}/api/payments/referral/${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      if (res.ok) {
+        setCodes((prev) => prev.map((c) => (c.id === id ? { ...c, active: false } : c)))
+      }
+    } catch {
+      // silent
+    }
+  }
+
+  const copyCode = (code) => {
+    navigator.clipboard
+      .writeText(code)
+      .then(() => {
+        setCopied(code)
+        setTimeout(() => setCopied(null), 2000)
+      })
+      .catch(() => {})
+  }
+
+  if (loading) return <p style={s.emptyText}>Loading referral codes...</p>
+
+  return (
+    <div style={se.stack}>
+      {msg && <Message tone={msg.tone}>{msg.text}</Message>}
+      <div style={se.row}>
+        <Button
+          onClick={createCode}
+          disabled={creating || codes.filter((c) => c.active).length >= 5}
+        >
+          {creating ? 'Creating...' : 'Create Referral Code'}
+        </Button>
+        <span style={se.hint}>{codes.filter((c) => c.active).length}/5 active codes</span>
+      </div>
+      {codes.length === 0 ? (
+        <p style={s.emptyText}>No referral codes yet. Create one to share with friends.</p>
+      ) : (
+        <div style={se.codeList}>
+          {codes.map((c) => (
+            <div key={c.id} style={{ ...se.codeRow, opacity: c.active ? 1 : 0.5 }}>
+              <span style={se.codeText}>{c.code}</span>
+              <span style={se.codeUses}>
+                {c.currentUses} use{c.currentUses !== 1 ? 's' : ''}
+              </span>
+              {c.active && (
+                <>
+                  <button style={se.smallBtn} onClick={() => copyCode(c.code)}>
+                    {copied === c.code ? 'Copied' : 'Copy'}
+                  </button>
+                  <button
+                    style={{ ...se.smallBtn, color: 'var(--sh-danger)' }}
+                    onClick={() => deactivateCode(c.id)}
+                  >
+                    Deactivate
+                  </button>
+                </>
+              )}
+              {!c.active && <span style={se.inactiveLabel}>Inactive</span>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function GiftSection() {
+  const [email, setEmail] = useState('')
+  const [plan, setPlan] = useState('pro_monthly')
+  const [months, setMonths] = useState(1)
+  const [giftMessage, setGiftMessage] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [msg, setMsg] = useState(null)
+
+  const handleGift = async (e) => {
+    e.preventDefault()
+    if (!email.trim()) {
+      setMsg({ tone: 'error', text: 'Recipient email is required.' })
+      return
+    }
+    setLoading(true)
+    setMsg(null)
+    try {
+      const res = await fetch(`${API}/api/payments/gift/checkout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          recipientEmail: email.trim(),
+          plan,
+          durationMonths: months,
+          message: giftMessage,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setMsg({ tone: 'error', text: data.error || 'Failed to create gift checkout.' })
+        return
+      }
+      window.location.href = data.url
+    } catch {
+      setMsg({ tone: 'error', text: 'Network error. Please try again.' })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleGift} style={se.stack}>
+      {msg && <Message tone={msg.tone}>{msg.text}</Message>}
+      <div style={se.fieldGroup}>
+        <label style={se.label}>Recipient Email</label>
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="friend@example.com"
+          style={se.input}
+          required
+        />
+      </div>
+      <div style={se.fieldRow}>
+        <div style={se.fieldGroup}>
+          <label style={se.label}>Plan</label>
+          <select value={plan} onChange={(e) => setPlan(e.target.value)} style={se.input}>
+            <option value="pro_monthly">Pro Monthly</option>
+            <option value="pro_yearly">Pro Yearly</option>
+          </select>
+        </div>
+        <div style={se.fieldGroup}>
+          <label style={se.label}>Duration (months)</label>
+          <select
+            value={months}
+            onChange={(e) => setMonths(Number(e.target.value))}
+            style={se.input}
+          >
+            {[1, 3, 6, 12].map((m) => (
+              <option key={m} value={m}>
+                {m} month{m > 1 ? 's' : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <div style={se.fieldGroup}>
+        <label style={se.label}>Personal Message (optional)</label>
+        <textarea
+          value={giftMessage}
+          onChange={(e) => setGiftMessage(e.target.value)}
+          placeholder="Enjoy StudyHub Pro!"
+          style={{ ...se.input, minHeight: 60, resize: 'vertical' }}
+          maxLength={500}
+        />
+      </div>
+      <Button type="submit" disabled={loading}>
+        {loading ? 'Processing...' : 'Purchase Gift'}
+      </Button>
+    </form>
+  )
+}
+
+function PauseSection() {
+  const [days, setDays] = useState(14)
+  const [reason, setReason] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [pauseStatus, setPauseStatus] = useState(null)
+  const [statusLoading, setStatusLoading] = useState(true)
+  const [msg, setMsg] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      try {
+        const res = await fetch(`${API}/api/payments/subscription/pause-status`, {
+          credentials: 'include',
+        })
+        if (res.ok && !cancelled) {
+          const data = await res.json()
+          setPauseStatus(data)
+        }
+      } catch {
+        // silent
+      } finally {
+        if (!cancelled) setStatusLoading(false)
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const handlePause = async () => {
+    setLoading(true)
+    setMsg(null)
+    try {
+      const res = await fetch(`${API}/api/payments/subscription/pause`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ days, reason }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setMsg({ tone: 'error', text: data.error || 'Failed to pause subscription.' })
+        return
+      }
+      setMsg({ tone: 'success', text: data.message })
+      setPauseStatus({ paused: true, pause: data.pause })
+    } catch {
+      setMsg({ tone: 'error', text: 'Network error.' })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleResume = async () => {
+    setLoading(true)
+    setMsg(null)
+    try {
+      const res = await fetch(`${API}/api/payments/subscription/resume`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setMsg({ tone: 'error', text: data.error || 'Failed to resume.' })
+        return
+      }
+      setMsg({ tone: 'success', text: data.message })
+      setPauseStatus({ paused: false, pause: null })
+    } catch {
+      setMsg({ tone: 'error', text: 'Network error.' })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (statusLoading) return <p style={s.emptyText}>Checking pause status...</p>
+
+  if (pauseStatus?.paused) {
+    return (
+      <div style={se.stack}>
+        {msg && <Message tone={msg.tone}>{msg.text}</Message>}
+        <Message tone="info">
+          Your subscription is paused until {formatDate(pauseStatus.pause.resumeAt)}.
+        </Message>
+        <Button onClick={handleResume} disabled={loading}>
+          {loading ? 'Resuming...' : 'Resume Now'}
+        </Button>
+      </div>
+    )
+  }
+
+  return (
+    <div style={se.stack}>
+      {msg && <Message tone={msg.tone}>{msg.text}</Message>}
+      <p style={se.desc}>
+        Need a break? Pause your subscription for up to 30 days. You will keep access during the
+        pause period, but billing will be paused.
+      </p>
+      <div style={se.fieldRow}>
+        <div style={se.fieldGroup}>
+          <label style={se.label}>Pause Duration</label>
+          <select value={days} onChange={(e) => setDays(Number(e.target.value))} style={se.input}>
+            {[7, 14, 21, 30].map((d) => (
+              <option key={d} value={d}>
+                {d} days
+              </option>
+            ))}
+          </select>
+        </div>
+        <div style={{ ...se.fieldGroup, flex: 2 }}>
+          <label style={se.label}>Reason (optional)</label>
+          <input
+            type="text"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Taking a study break..."
+            style={se.input}
+            maxLength={500}
+          />
+        </div>
+      </div>
+      <Button onClick={handlePause} disabled={loading} secondary>
+        {loading ? 'Pausing...' : 'Pause Subscription'}
+      </Button>
+    </div>
+  )
+}
+
+function RedeemSection() {
+  const [code, setCode] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [msg, setMsg] = useState(null)
+
+  const handleRedeem = async (e) => {
+    e.preventDefault()
+    const trimmed = code.trim().toUpperCase()
+    if (!trimmed) {
+      setMsg({ tone: 'error', text: 'Please enter a code.' })
+      return
+    }
+    setLoading(true)
+    setMsg(null)
+    try {
+      // Try referral first, then gift
+      const isGift = trimmed.startsWith('GIFT-')
+      const endpoint = isGift
+        ? `${API}/api/payments/gift/redeem`
+        : `${API}/api/payments/referral/redeem`
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ code: trimmed }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        // If referral failed and it is not a GIFT code, try gift endpoint too
+        if (!isGift) {
+          const giftRes = await fetch(`${API}/api/payments/gift/redeem`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ code: trimmed }),
+          })
+          const giftData = await giftRes.json()
+          if (giftRes.ok) {
+            setMsg({ tone: 'success', text: giftData.message })
+            setCode('')
+            return
+          }
+        }
+        setMsg({ tone: 'error', text: data.error || 'Invalid code.' })
+        return
+      }
+      setMsg({ tone: 'success', text: data.message })
+      setCode('')
+    } catch {
+      setMsg({ tone: 'error', text: 'Network error. Please try again.' })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleRedeem} style={se.stack}>
+      {msg && <Message tone={msg.tone}>{msg.text}</Message>}
+      <p style={se.desc}>
+        Enter a referral code (SH-...) or gift code (GIFT-...) to redeem rewards.
+      </p>
+      <div style={se.row}>
+        <input
+          type="text"
+          value={code}
+          onChange={(e) => setCode(e.target.value.toUpperCase())}
+          placeholder="SH-XXXXXXXX or GIFT-XXXXXXXX"
+          style={{ ...se.input, flex: 1 }}
+          maxLength={20}
+        />
+        <Button type="submit" disabled={loading || !code.trim()}>
+          {loading ? 'Redeeming...' : 'Redeem'}
+        </Button>
+      </div>
+    </form>
+  )
+}
+
+// ── Sprint E Styles ─────────────────────────────────────────────────────
+
+const se = {
+  stack: { display: 'flex', flexDirection: 'column', gap: 12 },
+  row: { display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
+  fieldRow: { display: 'flex', gap: 12, flexWrap: 'wrap' },
+  fieldGroup: { display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 160 },
+  label: {
+    fontSize: 12,
+    fontWeight: 600,
+    color: 'var(--sh-subtext)',
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
+  },
+  input: {
+    padding: '9px 12px',
+    fontSize: 14,
+    border: '1px solid var(--sh-border)',
+    borderRadius: 8,
+    background: 'var(--sh-bg)',
+    color: 'var(--sh-text)',
+    fontFamily: FONT,
+    outline: 'none',
+    width: '100%',
+    boxSizing: 'border-box',
+  },
+  hint: { fontSize: 12, color: 'var(--sh-muted)' },
+  desc: { fontSize: 13, color: 'var(--sh-subtext)', margin: 0, lineHeight: 1.5 },
+  offerRow: { display: 'flex', gap: 16, flexWrap: 'wrap' },
+  offerCard: {
+    flex: 1,
+    minWidth: 220,
+    padding: 16,
+    border: '1px solid var(--sh-border)',
+    borderRadius: 12,
+    background: 'var(--sh-bg)',
+  },
+  offerTitle: { fontSize: 15, fontWeight: 700, color: 'var(--sh-text)', margin: '0 0 6px' },
+  offerDesc: { fontSize: 13, color: 'var(--sh-subtext)', margin: '0 0 12px', lineHeight: 1.5 },
+  codeList: { display: 'flex', flexDirection: 'column', gap: 6 },
+  codeRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    padding: '8px 12px',
+    background: 'var(--sh-bg)',
+    border: '1px solid var(--sh-border)',
+    borderRadius: 8,
+    flexWrap: 'wrap',
+  },
+  codeText: {
+    fontFamily: 'monospace',
+    fontSize: 14,
+    fontWeight: 700,
+    color: 'var(--sh-brand-accent)',
+  },
+  codeUses: { fontSize: 12, color: 'var(--sh-muted)' },
+  smallBtn: {
+    fontSize: 12,
+    fontWeight: 600,
+    color: 'var(--sh-brand)',
+    background: 'transparent',
+    border: 'none',
+    cursor: 'pointer',
+    padding: '4px 8px',
+    fontFamily: FONT,
+  },
+  inactiveLabel: { fontSize: 12, color: 'var(--sh-muted)', fontStyle: 'italic' },
 }
 
 // ── Styles ───────────────────────────────────────────────────────────────

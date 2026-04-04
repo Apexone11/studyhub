@@ -34,7 +34,14 @@ function MetricCard({ label, value, sub, color }) {
       <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--sh-muted)', marginBottom: 6 }}>
         {label}
       </div>
-      <div style={{ fontSize: 26, fontWeight: 800, color: color || 'var(--sh-heading)', lineHeight: 1.2 }}>
+      <div
+        style={{
+          fontSize: 26,
+          fontWeight: 800,
+          color: color || 'var(--sh-heading)',
+          lineHeight: 1.2,
+        }}
+      >
         {value}
       </div>
       {sub ? (
@@ -46,9 +53,21 @@ function MetricCard({ label, value, sub, color }) {
 
 function StatusPill({ status }) {
   const map = {
-    succeeded: { bg: 'var(--sh-success-bg)', border: 'var(--sh-success-border)', text: 'var(--sh-success-text)' },
-    failed: { bg: 'var(--sh-danger-bg)', border: 'var(--sh-danger-border)', text: 'var(--sh-danger-text)' },
-    pending: { bg: 'var(--sh-warning-bg)', border: 'var(--sh-warning-border)', text: 'var(--sh-warning-text)' },
+    succeeded: {
+      bg: 'var(--sh-success-bg)',
+      border: 'var(--sh-success-border)',
+      text: 'var(--sh-success-text)',
+    },
+    failed: {
+      bg: 'var(--sh-danger-bg)',
+      border: 'var(--sh-danger-border)',
+      text: 'var(--sh-danger-text)',
+    },
+    pending: {
+      bg: 'var(--sh-warning-bg)',
+      border: 'var(--sh-warning-border)',
+      text: 'var(--sh-warning-text)',
+    },
   }
   const s = map[status] || map.pending
   return (
@@ -73,6 +92,8 @@ export default function RevenueTab() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [syncing, setSyncing] = useState(false)
+  const [syncResult, setSyncResult] = useState(null)
 
   useEffect(() => {
     let active = true
@@ -98,7 +119,9 @@ export default function RevenueTab() {
         if (active) setLoading(false)
       })
 
-    return () => { active = false }
+    return () => {
+      active = false
+    }
   }, [])
 
   if (loading) {
@@ -132,8 +155,84 @@ export default function RevenueTab() {
 
   const payments = data.recentPayments || []
 
+  const handleSyncStripe = async () => {
+    setSyncing(true)
+    setSyncResult(null)
+    try {
+      const r = await fetch(`${API}/api/payments/admin/sync-stripe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      })
+      const result = await r.json()
+      if (r.ok) {
+        setSyncResult({
+          type: 'success',
+          text: `Synced ${result.synced} subscription(s) from Stripe.${result.errors ? ` ${result.errors} error(s).` : ''}`,
+        })
+        // Reload revenue data
+        const rev = await fetch(`${API}/api/payments/admin/revenue`, {
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+        })
+        if (rev.ok) setData(await rev.json())
+      } else {
+        setSyncResult({ type: 'error', text: result.error || 'Sync failed.' })
+      }
+    } catch {
+      setSyncResult({ type: 'error', text: 'Network error during sync.' })
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* ── Sync Stripe Button ───────────────────────────────────────── */}
+      <section
+        style={{ ...SECTION, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}
+      >
+        <button
+          onClick={handleSyncStripe}
+          disabled={syncing}
+          style={{
+            padding: '8px 18px',
+            borderRadius: 10,
+            border: '1px solid var(--sh-border)',
+            background: 'var(--sh-soft)',
+            color: 'var(--sh-heading)',
+            fontSize: 13,
+            fontWeight: 700,
+            cursor: syncing ? 'default' : 'pointer',
+            opacity: syncing ? 0.6 : 1,
+            fontFamily: FONT,
+          }}
+        >
+          {syncing ? 'Syncing...' : 'Sync Stripe Data'}
+        </button>
+        <span style={{ fontSize: 12, color: 'var(--sh-muted)' }}>
+          Recover subscriptions and payments from Stripe if webhooks missed them.
+        </span>
+        {syncResult && (
+          <div
+            style={{
+              width: '100%',
+              padding: '8px 12px',
+              borderRadius: 8,
+              fontSize: 13,
+              fontWeight: 600,
+              background:
+                syncResult.type === 'success' ? 'var(--sh-success-bg)' : 'var(--sh-danger-bg)',
+              color:
+                syncResult.type === 'success' ? 'var(--sh-success-text)' : 'var(--sh-danger-text)',
+              border: `1px solid ${syncResult.type === 'success' ? 'var(--sh-success-border)' : 'var(--sh-danger-border)'}`,
+            }}
+          >
+            {syncResult.text}
+          </div>
+        )}
+      </section>
+
       {/* ── Metric Cards ─────────────────────────────────────────────── */}
       <section style={SECTION}>
         <h3
@@ -227,20 +326,30 @@ export default function RevenueTab() {
                           borderRadius: 6,
                           fontSize: 11,
                           fontWeight: 700,
-                          background: p.type === 'donation' ? 'var(--sh-warning-bg)' : 'var(--sh-info-bg)',
-                          color: p.type === 'donation' ? 'var(--sh-warning-text)' : 'var(--sh-info-text)',
+                          background:
+                            p.type === 'donation' ? 'var(--sh-warning-bg)' : 'var(--sh-info-bg)',
+                          color:
+                            p.type === 'donation'
+                              ? 'var(--sh-warning-text)'
+                              : 'var(--sh-info-text)',
                         }}
                       >
                         {p.type}
                       </span>
                     </td>
-                    <td style={{ ...tableCell, fontWeight: 700 }}>
-                      {formatCents(p.amount)}
-                    </td>
+                    <td style={{ ...tableCell, fontWeight: 700 }}>{formatCents(p.amount)}</td>
                     <td style={tableCell}>
                       <StatusPill status={p.status} />
                     </td>
-                    <td style={{ ...tableCell, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <td
+                      style={{
+                        ...tableCell,
+                        maxWidth: 200,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
                       {p.description || '--'}
                     </td>
                     <td style={{ ...tableCell, whiteSpace: 'nowrap' }}>

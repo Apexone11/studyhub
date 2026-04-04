@@ -71,7 +71,9 @@ async function createSubscriptionCheckout(user, plan, successUrl, cancelUrl) {
     throw new Error(`Invalid plan: ${plan}`)
   }
   if (!planDef.stripePriceId) {
-    throw new Error(`Stripe price ID not configured for plan: ${plan}. Set STRIPE_PRICE_ID_PRO and STRIPE_PRICE_ID_PRO_YEARLY env vars.`)
+    throw new Error(
+      `Stripe price ID not configured for plan: ${plan}. Set STRIPE_PRICE_ID_PRO and STRIPE_PRICE_ID_PRO_YEARLY env vars.`,
+    )
   }
 
   const customerId = await getOrCreateCustomer(user)
@@ -217,6 +219,20 @@ async function handleCheckoutCompleted(session) {
     return
   }
 
+  // Gift subscription checkout
+  if (metadata.type === 'gift') {
+    try {
+      await prisma.giftSubscription.updateMany({
+        where: { stripeSessionId: session.id },
+        data: { status: 'paid' },
+      })
+      log.info({ sessionId: session.id, giftCode: metadata.gift_code }, 'Gift subscription paid')
+    } catch (err) {
+      log.warn({ err: err.message }, 'Failed to update gift status (table may not exist)')
+    }
+    return
+  }
+
   // Subscription checkout
   const userId = parseInt(metadata.studyhub_user_id, 10)
   const plan = metadata.plan || 'pro_monthly'
@@ -288,7 +304,9 @@ async function handleCheckoutCompleted(session) {
             amount: invoice.amount_paid || session.amount_total || 0,
             currency: (invoice.currency || 'usd').toLowerCase(),
             status: 'succeeded',
-            description: invoice.lines?.data?.[0]?.description || `${plan === 'pro_yearly' ? 'Pro Yearly' : 'Pro Monthly'} subscription`,
+            description:
+              invoice.lines?.data?.[0]?.description ||
+              `${plan === 'pro_yearly' ? 'Pro Yearly' : 'Pro Monthly'} subscription`,
             receiptUrl: invoice.hosted_invoice_url || null,
             type: 'subscription',
           },

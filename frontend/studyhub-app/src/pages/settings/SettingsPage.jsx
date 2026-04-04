@@ -6,7 +6,7 @@
  * 8 tabs: Profile, Security, Notifications, Privacy, Appearance, Account, Moderation
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import Navbar from '../../components/navbar/Navbar'
 import SafeJoyride from '../../components/SafeJoyride'
 import { API } from '../../config'
@@ -70,7 +70,10 @@ export default function SettingsPage() {
         return r.json()
       })
       .then((data) => {
-        if (active) { setUser(data); setLoadError('') }
+        if (active) {
+          setUser(data)
+          setLoadError('')
+        }
       })
       .catch(() => {
         if (active) setLoadError('Could not load your settings. Please refresh the page.')
@@ -79,7 +82,9 @@ export default function SettingsPage() {
         if (active) setLoading(false)
       })
 
-    return () => { active = false }
+    return () => {
+      active = false
+    }
   }, [])
 
   function syncUser(nextUser) {
@@ -123,7 +128,15 @@ export default function SettingsPage() {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: FONT }}>
         <Navbar crumbs={[{ label: 'Settings', to: '/settings' }]} hideTabs />
-        <div style={{ maxWidth: 1180, width: '100%', margin: '0 auto', padding: '28px clamp(12px, 2vw, 24px) 60px', boxSizing: 'border-box' }}>
+        <div
+          style={{
+            maxWidth: 1180,
+            width: '100%',
+            margin: '0 auto',
+            padding: '28px clamp(12px, 2vw, 24px) 60px',
+            boxSizing: 'border-box',
+          }}
+        >
           <div style={{ display: 'grid', gap: 12 }}>
             <Skeleton width="100%" height={48} borderRadius={12} />
             <Skeleton width="100%" height={200} borderRadius={16} />
@@ -140,15 +153,34 @@ export default function SettingsPage() {
         <Navbar crumbs={[{ label: 'Settings', to: '/settings' }]} hideTabs />
         <div style={{ maxWidth: 600, margin: '0 auto', padding: '60px 24px', textAlign: 'center' }}>
           <div style={{ fontSize: 40, marginBottom: 16 }}>&#9888;&#65039;</div>
-          <h2 style={{ margin: '0 0 8px', color: 'var(--sh-heading)', fontSize: 20, fontWeight: 800 }}>Settings unavailable</h2>
-          <p style={{ margin: '0 0 20px', color: 'var(--sh-subtext)', fontSize: 14, lineHeight: 1.6 }}>{loadError}</p>
+          <h2
+            style={{ margin: '0 0 8px', color: 'var(--sh-heading)', fontSize: 20, fontWeight: 800 }}
+          >
+            Settings unavailable
+          </h2>
+          <p
+            style={{
+              margin: '0 0 20px',
+              color: 'var(--sh-subtext)',
+              fontSize: 14,
+              lineHeight: 1.6,
+            }}
+          >
+            {loadError}
+          </p>
           <button
             type="button"
             onClick={() => window.location.reload()}
             style={{
-              padding: '10px 20px', borderRadius: 10, border: 'none',
-              background: 'var(--sh-brand)', color: '#fff',
-              fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+              padding: '10px 20px',
+              borderRadius: 10,
+              border: 'none',
+              background: 'var(--sh-brand)',
+              color: '#fff',
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
             }}
           >
             Refresh page
@@ -164,15 +196,17 @@ export default function SettingsPage() {
         return (
           <>
             {sessionUser?.trustLevel === 'new' && (
-              <div style={{
-                background: 'var(--sh-info-bg, #dbeafe)',
-                border: '1px solid var(--sh-info-border, #93c5fd)',
-                borderRadius: 8,
-                padding: '12px 16px',
-                fontSize: 13,
-                color: 'var(--sh-info-text, #1e40af)',
-                marginBottom: 16,
-              }}>
+              <div
+                style={{
+                  background: 'var(--sh-info-bg, #dbeafe)',
+                  border: '1px solid var(--sh-info-border, #93c5fd)',
+                  borderRadius: 8,
+                  padding: '12px 16px',
+                  fontSize: 13,
+                  color: 'var(--sh-info-text, #1e40af)',
+                  marginBottom: 16,
+                }}
+              >
                 <strong>Account Status: New</strong>
                 <p style={{ margin: '6px 0 0', lineHeight: 1.5 }}>
                   {sessionUser?.emailVerified
@@ -182,15 +216,17 @@ export default function SettingsPage() {
               </div>
             )}
             {sessionUser?.trustLevel === 'trusted' && (
-              <div style={{
-                background: 'var(--sh-success-bg, #d1fae5)',
-                border: '1px solid var(--sh-success-border, #6ee7b7)',
-                borderRadius: 8,
-                padding: '12px 16px',
-                fontSize: 13,
-                color: 'var(--sh-success-text, #065f46)',
-                marginBottom: 16,
-              }}>
+              <div
+                style={{
+                  background: 'var(--sh-success-bg, #d1fae5)',
+                  border: '1px solid var(--sh-success-border, #6ee7b7)',
+                  borderRadius: 8,
+                  padding: '12px 16px',
+                  fontSize: 13,
+                  color: 'var(--sh-success-text, #065f46)',
+                  marginBottom: 16,
+                }}
+              >
                 <strong>Account Status: Trusted</strong>
                 <p style={{ margin: '6px 0 0' }}>Your content publishes immediately.</p>
               </div>
@@ -198,8 +234,14 @@ export default function SettingsPage() {
             <ProfileTab
               user={user}
               sessionUser={sessionUser}
-              onAvatarChange={(url) => { setUser((u) => u ? { ...u, avatarUrl: url } : u); setSessionUser((u) => u ? { ...u, avatarUrl: url } : u) }}
-              onCoverChange={(url) => { setUser((u) => u ? { ...u, coverImageUrl: url } : u); setSessionUser((u) => u ? { ...u, coverImageUrl: url } : u) }}
+              onAvatarChange={(url) => {
+                setUser((u) => (u ? { ...u, avatarUrl: url } : u))
+                setSessionUser((u) => (u ? { ...u, avatarUrl: url } : u))
+              }}
+              onCoverChange={(url) => {
+                setUser((u) => (u ? { ...u, coverImageUrl: url } : u))
+                setSessionUser((u) => (u ? { ...u, coverImageUrl: url } : u))
+              }}
             />
           </>
         )
@@ -215,11 +257,19 @@ export default function SettingsPage() {
           />
         )
       case 'notifications':
-        return <div data-tutorial="settings-notifications"><NotificationsTab /></div>
+        return (
+          <div data-tutorial="settings-notifications">
+            <NotificationsTab />
+          </div>
+        )
       case 'privacy':
         return <PrivacyTab />
       case 'appearance':
-        return <div data-tutorial="settings-appearance"><AppearanceTab /></div>
+        return (
+          <div data-tutorial="settings-appearance">
+            <AppearanceTab />
+          </div>
+        )
       case 'account':
         return (
           <AccountTab
@@ -245,9 +295,15 @@ export default function SettingsPage() {
     <button
       onClick={() => signOut().then(() => navigate('/login', { replace: true }))}
       style={{
-        padding: '6px 14px', borderRadius: 8, border: '1px solid var(--sh-border)',
-        background: 'transparent', color: 'var(--sh-muted)', fontSize: 12, fontWeight: 700,
-        cursor: 'pointer', fontFamily: FONT,
+        padding: '6px 14px',
+        borderRadius: 8,
+        border: '1px solid var(--sh-border)',
+        background: 'transparent',
+        color: 'var(--sh-muted)',
+        fontSize: 12,
+        fontWeight: 700,
+        cursor: 'pointer',
+        fontFamily: FONT,
       }}
     >
       Sign Out
@@ -258,7 +314,16 @@ export default function SettingsPage() {
     <div style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: FONT }}>
       <Navbar crumbs={[{ label: 'Settings', to: '/settings' }]} hideTabs actions={navActions} />
 
-      <div className="settings-layout" style={{ maxWidth: 1180, width: '100%', margin: '0 auto', padding: '28px clamp(12px, 2vw, 24px) 60px', boxSizing: 'border-box' }}>
+      <div
+        className="settings-layout"
+        style={{
+          maxWidth: 1180,
+          width: '100%',
+          margin: '0 auto',
+          padding: '28px clamp(12px, 2vw, 24px) 60px',
+          boxSizing: 'border-box',
+        }}
+      >
         <aside>
           <nav className="settings-nav" data-tutorial="settings-tabs">
             {NAV_TABS.map((item) => (
@@ -288,6 +353,43 @@ export default function SettingsPage() {
               </button>
             ))}
           </nav>
+
+          {/* Admin Panel shortcut — only visible to admins */}
+          {sessionUser?.role === 'admin' && (
+            <Link
+              to="/admin"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                marginTop: 12,
+                padding: '10px 14px',
+                borderRadius: 10,
+                background: 'var(--sh-warning-bg)',
+                color: 'var(--sh-warning-text)',
+                border: '1px solid var(--sh-warning-border)',
+                fontSize: 13,
+                fontWeight: 700,
+                textDecoration: 'none',
+                transition: 'opacity 0.15s',
+              }}
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+              Admin Panel
+            </Link>
+          )}
         </aside>
 
         <main id="main-content" ref={tabContentRef}>

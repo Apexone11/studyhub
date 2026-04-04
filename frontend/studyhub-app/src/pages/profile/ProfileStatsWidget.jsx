@@ -8,8 +8,7 @@
  */
 import { useEffect, useState } from 'react'
 import { FONT, cardStyle, sectionHeadingStyle } from './profileConstants'
-
-const API = import.meta.env.VITE_API_URL || ''
+import { API } from '../../config'
 
 export default function ProfileStatsWidget({ username }) {
   const [result, setResult] = useState({ forUser: null, stats: null, done: false })
@@ -21,9 +20,15 @@ export default function ProfileStatsWidget({ username }) {
     let cancelled = false
     fetch(`${API}/api/users/${encodeURIComponent(username)}/stats`, { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : null))
-      .then((data) => { if (!cancelled) setResult({ forUser: username, stats: data, done: true }) })
-      .catch(() => { if (!cancelled) setResult({ forUser: username, stats: null, done: true }) })
-    return () => { cancelled = true }
+      .then((data) => {
+        if (!cancelled) setResult({ forUser: username, stats: data, done: true })
+      })
+      .catch(() => {
+        if (!cancelled) setResult({ forUser: username, stats: null, done: true })
+      })
+    return () => {
+      cancelled = true
+    }
   }, [username])
 
   if (loading) return null
@@ -42,10 +47,24 @@ export default function ProfileStatsWidget({ username }) {
       <h3 style={sectionHeadingStyle}>Contribution Stats</h3>
 
       {/* Metric grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 10, marginBottom: stats.topCourses?.length > 0 ? 18 : 0 }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))',
+          gap: 10,
+          marginBottom: stats.topCourses?.length > 0 ? 18 : 0,
+        }}
+      >
         {metrics.map((m) => (
           <div key={m.label} style={metricCard}>
-            <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--sh-heading)', fontFamily: FONT }}>
+            <div
+              style={{
+                fontSize: 22,
+                fontWeight: 800,
+                color: 'var(--sh-heading)',
+                fontFamily: FONT,
+              }}
+            >
               {formatCount(m.value)}
             </div>
             <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--sh-muted)', marginTop: 2 }}>
@@ -57,15 +76,31 @@ export default function ProfileStatsWidget({ username }) {
 
       {/* 30-day trend */}
       {stats.last30Days && (stats.last30Days.sheets > 0 || stats.last30Days.comments > 0) && (
-        <div style={{ fontSize: 12, color: 'var(--sh-subtext)', marginBottom: stats.topCourses?.length > 0 ? 14 : 0 }}>
-          Last 30 days: <strong>{stats.last30Days.sheets}</strong> sheets, <strong>{stats.last30Days.comments}</strong> comments
+        <div
+          style={{
+            fontSize: 12,
+            color: 'var(--sh-subtext)',
+            marginBottom: stats.topCourses?.length > 0 ? 14 : 0,
+          }}
+        >
+          Last 30 days: <strong>{stats.last30Days.sheets}</strong> sheets,{' '}
+          <strong>{stats.last30Days.comments}</strong> comments
         </div>
       )}
 
       {/* Top courses */}
       {stats.topCourses && stats.topCourses.length > 0 && (
         <>
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--sh-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+          <div
+            style={{
+              fontSize: 12,
+              fontWeight: 700,
+              color: 'var(--sh-muted)',
+              marginBottom: 8,
+              textTransform: 'uppercase',
+              letterSpacing: '0.3px',
+            }}
+          >
             Top Courses
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>

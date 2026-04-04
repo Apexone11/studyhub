@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import Navbar from '../../components/navbar/Navbar'
 import UserAvatar from '../../components/UserAvatar'
 import { API } from '../../config'
@@ -7,10 +7,22 @@ import { API } from '../../config'
 // ── Main Component ───────────────────────────────────────────────────────
 
 export default function SupportersPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [donors, setDonors] = useState([])
   const [subscribers, setSubscribers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const paymentStatus = searchParams.get('payment')
+
+  /* Clear payment query param after showing banner */
+  useEffect(() => {
+    if (paymentStatus) {
+      const timer = setTimeout(() => {
+        setSearchParams({}, { replace: true })
+      }, 8000)
+      return () => clearTimeout(timer)
+    }
+  }, [paymentStatus, setSearchParams])
 
   useEffect(() => {
     let cancelled = false
@@ -41,12 +53,35 @@ export default function SupportersPage() {
     }
 
     load()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   return (
     <div style={s.page}>
       <Navbar />
+
+      {/* ── Donation success banner ──────────────────── */}
+      {paymentStatus === 'success' && (
+        <div
+          style={{
+            maxWidth: 700,
+            margin: '16px auto 0',
+            padding: '14px 20px',
+            borderRadius: 12,
+            background: 'var(--sh-success-bg)',
+            border: '1px solid var(--sh-success-border)',
+            color: 'var(--sh-success-text)',
+            fontSize: 14,
+            fontWeight: 600,
+            textAlign: 'center',
+          }}
+        >
+          Thank you for your donation! Your support helps keep StudyHub free for students
+          everywhere.
+        </div>
+      )}
 
       {/* ── HERO ─────────────────────────────────────── */}
       <section style={s.hero}>
@@ -78,7 +113,11 @@ export default function SupportersPage() {
               </p>
 
               {donors.length === 0 ? (
-                <EmptyState message="No donations yet. Be the first to support StudyHub!" ctaTo="/pricing" ctaLabel="Donate Now" />
+                <EmptyState
+                  message="No donations yet. Be the first to support StudyHub!"
+                  ctaTo="/pricing"
+                  ctaLabel="Donate Now"
+                />
               ) : (
                 <div style={s.leaderboardGrid}>
                   {donors.map((donor, index) => (
@@ -93,12 +132,14 @@ export default function SupportersPage() {
           <section style={s.sectionAlt}>
             <div style={s.sectionInner}>
               <h2 style={s.sectionTitle}>Pro Members</h2>
-              <p style={s.sectionSub}>
-                These members support StudyHub with a Pro subscription.
-              </p>
+              <p style={s.sectionSub}>These members support StudyHub with a Pro subscription.</p>
 
               {subscribers.length === 0 ? (
-                <EmptyState message="No Pro subscribers yet. Upgrade to Pro and be the first!" ctaTo="/pricing" ctaLabel="See Plans" />
+                <EmptyState
+                  message="No Pro subscribers yet. Upgrade to Pro and be the first!"
+                  ctaTo="/pricing"
+                  ctaLabel="See Plans"
+                />
               ) : (
                 <div style={s.subscriberGrid}>
                   {subscribers.map((sub) => (
@@ -114,7 +155,8 @@ export default function SupportersPage() {
             <div style={s.ctaInner}>
               <h2 style={s.ctaTitle}>Want to support StudyHub?</h2>
               <p style={s.ctaSub}>
-                Every contribution helps us keep the lights on, improve the platform, and support students worldwide.
+                Every contribution helps us keep the lights on, improve the platform, and support
+                students worldwide.
               </p>
               <Link to="/pricing" style={s.ctaButton}>
                 View Plans and Donate
@@ -142,16 +184,10 @@ function DonorCard({ donor, rank }) {
   return (
     <div style={{ ...s.donorCard, ...(isTop3 ? s.donorCardTop : {}) }}>
       <div style={s.donorRank}>
-        <span style={{ ...s.rankBadge, borderColor: rankColor, color: rankColor }}>
-          #{rank}
-        </span>
+        <span style={{ ...s.rankBadge, borderColor: rankColor, color: rankColor }}>#{rank}</span>
       </div>
       <Link to={`/users/${donor.username}`} style={s.donorAvatarLink}>
-        <UserAvatar
-          username={donor.username}
-          avatarUrl={donor.avatarUrl}
-          size={isTop3 ? 56 : 44}
-        />
+        <UserAvatar username={donor.username} avatarUrl={donor.avatarUrl} size={isTop3 ? 56 : 44} />
       </Link>
       <div style={s.donorInfo}>
         <Link to={`/users/${donor.username}`} style={s.donorName}>
@@ -175,11 +211,7 @@ function SubscriberCard({ subscriber }) {
 
   return (
     <Link to={`/users/${subscriber.username}`} style={s.subCard}>
-      <UserAvatar
-        username={subscriber.username}
-        avatarUrl={subscriber.avatarUrl}
-        size={40}
-      />
+      <UserAvatar username={subscriber.username} avatarUrl={subscriber.avatarUrl} size={40} />
       <div style={s.subInfo}>
         <span style={s.subName}>{subscriber.username}</span>
         <span style={s.subPlan}>Pro {planLabel}</span>
@@ -194,7 +226,9 @@ function EmptyState({ message, ctaTo, ctaLabel }) {
   return (
     <div style={s.emptyState}>
       <p style={s.emptyText}>{message}</p>
-      <Link to={ctaTo} style={s.emptyButton}>{ctaLabel}</Link>
+      <Link to={ctaTo} style={s.emptyButton}>
+        {ctaLabel}
+      </Link>
     </div>
   )
 }
