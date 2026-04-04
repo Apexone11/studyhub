@@ -3,7 +3,7 @@
  *
  * Handles the full upload lifecycle:
  *   1. Init   — POST /api/video/upload/init   -> videoId, uploadId, r2Key
- *   2. Chunks — POST /api/video/upload/chunk   -> sequential 10 MB parts
+ *   2. Chunks — POST /api/video/upload/chunk   -> sequential 2 MB parts
  *   3. Done   — POST /api/video/upload/complete -> triggers processing
  *
  * Returns { upload, abort, reset, state } where state includes:
@@ -12,7 +12,7 @@
 import { useState, useRef, useCallback } from 'react'
 import { API } from '../config'
 
-const CHUNK_SIZE = 5 * 1024 * 1024 // 5 MB — reduced to avoid Railway HTTP/2 proxy body size limits
+const CHUNK_SIZE = 2 * 1024 * 1024 // 2 MB — Railway HTTP/2 proxy rejects bodies larger than ~2 MB
 const MAX_VIDEO_SIZE = 500 * 1024 * 1024 // 500 MB
 const ALLOWED_TYPES = new Set(['video/mp4', 'video/webm', 'video/quicktime'])
 const ALLOWED_EXTENSIONS = new Set(['.mp4', '.webm', '.mov'])
@@ -158,8 +158,8 @@ export default function useVideoUpload() {
       setMaxSize(size)
 
       // ── Step 2: Upload chunks ────────────────────────────────────────
+      // Frontend sends 2 MB chunks; backend buffers them into 5 MB+ R2 parts.
       const totalChunks = Math.ceil(file.size / CHUNK_SIZE)
-      const parts = []
 
       for (let i = 0; i < totalChunks; i++) {
         if (abortRef.current) return null
@@ -174,7 +174,6 @@ export default function useVideoUpload() {
 
         let attempt = 0
         const maxRetries = 3
-        let partData = null
 
         while (attempt < maxRetries) {
           try {
@@ -195,7 +194,7 @@ export default function useVideoUpload() {
               throw new Error(body.error || `Chunk ${partNumber} failed (${res.status})`)
             }
 
-            partData = await res.json()
+            await res.json() // { received: true, buffered, partNumber }
             break
           } catch (err) {
             attempt++
@@ -209,10 +208,6 @@ export default function useVideoUpload() {
             // Wait before retry with exponential backoff
             await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)))
           }
-        }
-
-        if (partData?.ETag || partData?.etag) {
-          parts.push({ ETag: partData.ETag || partData.etag, PartNumber: partNumber })
         }
 
         // Update progress (chunks account for 90% of total progress)
@@ -234,7 +229,6 @@ export default function useVideoUpload() {
             videoId: vid,
             uploadId,
             r2Key,
-            parts,
           }),
         })
 

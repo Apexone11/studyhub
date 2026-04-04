@@ -26,7 +26,7 @@ const VIDEO_SIZE_LIMITS = {
 
 const MAX_VIDEO_SIZE = VIDEO_SIZE_LIMITS.free
 const MAX_CAPTION_SIZE = 1 * 1024 * 1024 // 1 MB (VTT files)
-const CHUNK_SIZE = 5 * 1024 * 1024 // 5 MB per upload chunk (reduced to avoid Railway HTTP/2 proxy body size limits)
+const CHUNK_SIZE = 2 * 1024 * 1024 // 2 MB per upload chunk — Railway HTTP/2 proxy rejects bodies larger than ~2 MB
 const MIN_CHUNK_SIZE = 5 * 1024 * 1024 // 5 MB minimum (S3/R2 requirement)
 
 // ── Allowed MIME types and magic bytes ───────────────────────────────────

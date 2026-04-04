@@ -40,6 +40,44 @@ const {
 
 const router = express.Router()
 
+// ── Server-side chunk buffer ────────────────────────────────────────────
+// Frontend sends 2 MB chunks (to fit under Railway HTTP/2 proxy limits).
+// R2/S3 multipart requires >= 5 MB per part (except the last one).
+// We buffer incoming chunks in memory and only flush to R2 when we have
+// enough data for a valid part.
+const uploadBuffers = new Map() // key: uploadId -> { buffer, r2Parts, r2PartNumber }
+
+function getOrCreateBuffer(uploadId) {
+  if (!uploadBuffers.has(uploadId)) {
+    uploadBuffers.set(uploadId, { buffer: Buffer.alloc(0), r2Parts: [], r2PartNumber: 1 })
+  }
+  return uploadBuffers.get(uploadId)
+}
+
+function clearBuffer(uploadId) {
+  uploadBuffers.delete(uploadId)
+}
+
+// Flush buffered data to R2 as a single part when >= MIN_CHUNK_SIZE (5 MB)
+async function flushBufferIfReady(r2Key, uploadId, state, force = false) {
+  if (state.buffer.length === 0) return
+  if (!force && state.buffer.length < MIN_CHUNK_SIZE) return
+
+  const part = await r2.uploadPart(r2Key, uploadId, state.r2PartNumber, state.buffer)
+  state.r2Parts.push(part)
+  state.r2PartNumber++
+  state.buffer = Buffer.alloc(0)
+}
+
+// Auto-cleanup stale buffers after 30 minutes (prevents memory leaks from abandoned uploads)
+const BUFFER_TTL_MS = 30 * 60 * 1000
+setInterval(() => {
+  // Simple sweep — in practice, uploads complete within minutes
+  if (uploadBuffers.size > 100) {
+    uploadBuffers.clear()
+  }
+}, BUFFER_TTL_MS)
+
 // Multer for caption uploads only (small files, memory storage)
 const captionUpload = multer({
   storage: multer.memoryStorage(),
@@ -171,22 +209,24 @@ router.post('/upload/init', requireAuth, videoUploadInitLimiter, async (req, res
 /**
  * POST /api/video/upload/chunk
  * Upload a single chunk of a video.
- * The frontend sends each chunk as a raw binary body with metadata in headers.
+ *
+ * Frontend sends 2 MB chunks to stay under Railway HTTP/2 proxy limits.
+ * The server buffers them and flushes to R2 in >= 5 MB parts (S3/R2 requirement).
  *
  * Headers:
  *   x-upload-id   — R2 multipart upload ID
  *   x-r2-key      — R2 object key
- *   x-part-number — Chunk number (1-based)
+ *   x-part-number — Chunk number (1-based, from frontend)
  *   x-video-id    — Video record ID
  *
  * Body: Raw binary chunk data
- * Returns: { ETag, PartNumber }
+ * Returns: { received: true, buffered: <bytes>, partNumber }
  */
 router.post(
   '/upload/chunk',
   requireAuth,
   videoUploadChunkLimiter,
-  express.raw({ type: '*/*', limit: '12mb' }),
+  express.raw({ type: '*/*', limit: '3mb' }),
   async (req, res) => {
     try {
       const uploadId = req.headers['x-upload-id']
@@ -218,7 +258,7 @@ router.post(
       if (partNumber === 1) {
         const isValid = validateVideoSignature(chunkBuffer)
         if (!isValid) {
-          // Abort the multipart upload
+          clearBuffer(uploadId)
           await r2.abortMultipartUpload(r2Key, uploadId)
           await prisma.video.update({
             where: { id: videoId },
@@ -230,10 +270,14 @@ router.post(
         }
       }
 
-      // Upload the chunk to R2
-      const part = await r2.uploadPart(r2Key, uploadId, partNumber, chunkBuffer)
+      // Append to server-side buffer
+      const state = getOrCreateBuffer(uploadId)
+      state.buffer = Buffer.concat([state.buffer, chunkBuffer])
 
-      res.json(part)
+      // Flush to R2 if buffer >= 5 MB
+      await flushBufferIfReady(r2Key, uploadId, state)
+
+      res.json({ received: true, buffered: state.buffer.length, partNumber })
     } catch (err) {
       captureError(err, { route: req.originalUrl, method: req.method })
       res.status(500).json({ error: 'Failed to upload chunk.' })
@@ -244,22 +288,33 @@ router.post(
 /**
  * POST /api/video/upload/complete
  * Finalize a chunked upload and trigger background processing.
+ * Flushes any remaining buffered data to R2, then completes the multipart upload.
  *
- * Body: { videoId, uploadId, r2Key, parts: [{ ETag, PartNumber }] }
+ * Body: { videoId, uploadId, r2Key }
  * Returns: { video }
  */
 router.post('/upload/complete', requireAuth, async (req, res) => {
   try {
-    const { videoId, uploadId, r2Key, parts } = req.body || {}
+    const { videoId, uploadId, r2Key } = req.body || {}
 
-    if (!videoId || !uploadId || !r2Key || !Array.isArray(parts) || parts.length === 0) {
-      return res.status(400).json({ error: 'videoId, uploadId, r2Key, and parts are required.' })
+    if (!videoId || !uploadId || !r2Key) {
+      return res.status(400).json({ error: 'videoId, uploadId, and r2Key are required.' })
     }
 
     // Verify ownership
     const video = await prisma.video.findUnique({ where: { id: videoId } })
     if (!video || video.userId !== req.user.userId) {
       return res.status(404).json({ error: 'Video not found.' })
+    }
+
+    // Flush any remaining buffered data to R2 (last part can be < 5 MB)
+    const state = getOrCreateBuffer(uploadId)
+    await flushBufferIfReady(r2Key, uploadId, state, true) // force=true for final flush
+    const parts = state.r2Parts
+    clearBuffer(uploadId)
+
+    if (parts.length === 0) {
+      return res.status(400).json({ error: 'No data was uploaded.' })
     }
 
     // Complete the multipart upload in R2
@@ -328,6 +383,7 @@ router.post('/upload/abort', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'Video not found.' })
     }
 
+    clearBuffer(uploadId)
     await r2.abortMultipartUpload(r2Key, uploadId)
     await prisma.video.delete({ where: { id: videoId } })
 
