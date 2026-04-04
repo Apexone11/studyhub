@@ -251,33 +251,43 @@ async function handleCheckoutCompleted(session) {
   const stripe = getStripe()
   const stripeSub = await stripe.subscriptions.retrieve(stripeSubscriptionId)
 
-  await prisma.subscription.upsert({
-    where: { userId },
-    create: {
-      userId,
-      stripeCustomerId: session.customer,
-      stripeSubscriptionId,
-      stripePriceId: stripeSub.items.data[0]?.price?.id || '',
-      plan,
-      status: stripeSub.status,
-      currentPeriodStart: new Date(stripeSub.current_period_start * 1000),
-      currentPeriodEnd: new Date(stripeSub.current_period_end * 1000),
-      cancelAtPeriodEnd: stripeSub.cancel_at_period_end,
-    },
-    update: {
-      stripeCustomerId: session.customer,
-      stripeSubscriptionId,
-      stripePriceId: stripeSub.items.data[0]?.price?.id || '',
-      plan,
-      status: stripeSub.status,
-      currentPeriodStart: new Date(stripeSub.current_period_start * 1000),
-      currentPeriodEnd: new Date(stripeSub.current_period_end * 1000),
-      cancelAtPeriodEnd: stripeSub.cancel_at_period_end,
-      canceledAt: null,
-    },
-  })
-
-  log.info({ userId, plan, stripeSubscriptionId }, 'Subscription activated via checkout')
+  try {
+    await prisma.subscription.upsert({
+      where: { userId },
+      create: {
+        userId,
+        stripeCustomerId: session.customer,
+        stripeSubscriptionId,
+        stripePriceId: stripeSub.items.data[0]?.price?.id || '',
+        plan,
+        status: stripeSub.status,
+        currentPeriodStart: new Date(stripeSub.current_period_start * 1000),
+        currentPeriodEnd: new Date(stripeSub.current_period_end * 1000),
+        cancelAtPeriodEnd: stripeSub.cancel_at_period_end,
+      },
+      update: {
+        stripeCustomerId: session.customer,
+        stripeSubscriptionId,
+        stripePriceId: stripeSub.items.data[0]?.price?.id || '',
+        plan,
+        status: stripeSub.status,
+        currentPeriodStart: new Date(stripeSub.current_period_start * 1000),
+        currentPeriodEnd: new Date(stripeSub.current_period_end * 1000),
+        cancelAtPeriodEnd: stripeSub.cancel_at_period_end,
+        canceledAt: null,
+      },
+    })
+    log.info({ userId, plan, stripeSubscriptionId }, 'Subscription activated via checkout')
+  } catch (upsertErr) {
+    // This is the most critical error — the DB write failed.
+    // Most likely cause: Subscription table does not exist (migration not deployed).
+    log.error(
+      { err: upsertErr.message, userId, plan, code: upsertErr.code },
+      'CRITICAL: Failed to write subscription to database. Run npx prisma migrate deploy on Railway.',
+    )
+    console.error('[CRITICAL] Subscription DB write failed:', upsertErr.message)
+    throw upsertErr // Re-throw so the webhook handler logs it too
+  }
 
   // Also create a Payment record immediately so the user sees payment history
   // even if the invoice.payment_succeeded webhook is delayed or misconfigured.

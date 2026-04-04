@@ -318,9 +318,17 @@ export default function SubscriptionTab() {
 
         <div style={s.actionRow}>
           {isFree ? (
-            <Link to="/pricing" style={s.upgradeLink}>
-              Upgrade to Pro
-            </Link>
+            <>
+              <Link to="/pricing" style={s.upgradeLink}>
+                Upgrade to Pro
+              </Link>
+              <SyncButton
+                onSync={(subData) => {
+                  setSub(subData)
+                  refreshSession()
+                }}
+              />
+            </>
           ) : (
             <>
               <Button onClick={handleManage} disabled={portalLoading} secondary>
@@ -522,6 +530,43 @@ function FeatureItem({ label, value, highlight }) {
 }
 
 // ── Sprint E Components ─────────────────────────────────────────────────
+
+function SyncButton({ onSync }) {
+  const [syncing, setSyncing] = useState(false)
+  const [result, setResult] = useState(null)
+
+  const handleSync = async () => {
+    setSyncing(true)
+    setResult(null)
+    try {
+      const res = await fetch(`${API}/api/payments/subscription/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      })
+      const data = await res.json()
+      if (data.synced && data.subscription) {
+        setResult({ tone: 'success', text: 'Subscription synced successfully.' })
+        onSync(data.subscription)
+      } else {
+        setResult({ tone: 'info', text: data.message || 'No active subscription found in Stripe.' })
+      }
+    } catch {
+      setResult({ tone: 'error', text: 'Failed to sync. Please try again.' })
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <Button onClick={handleSync} disabled={syncing} secondary style={{ fontSize: 12 }}>
+        {syncing ? 'Syncing...' : 'Already paid? Sync subscription'}
+      </Button>
+      {result && <Message tone={result.tone}>{result.text}</Message>}
+    </div>
+  )
+}
 
 function TrialAndDiscountSection() {
   const [trialLoading, setTrialLoading] = useState(false)
