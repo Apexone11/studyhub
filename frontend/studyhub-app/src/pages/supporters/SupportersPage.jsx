@@ -153,14 +153,24 @@ export default function SupportersPage() {
           {/* ── CTA ──────────────────────────────────── */}
           <section style={s.ctaSection}>
             <div style={s.ctaInner}>
+              <img
+                src="/images/plan-donation.png"
+                alt="Support StudyHub"
+                style={{ width: 72, height: 'auto', borderRadius: 14, marginBottom: 16 }}
+              />
               <h2 style={s.ctaTitle}>Want to support StudyHub?</h2>
               <p style={s.ctaSub}>
                 Every contribution helps us keep the lights on, improve the platform, and support
                 students worldwide.
               </p>
-              <Link to="/pricing" style={s.ctaButton}>
-                View Plans and Donate
-              </Link>
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+                <Link to="/pricing#donate" style={s.ctaButton}>
+                  Donate
+                </Link>
+                <Link to="/pricing" style={s.ctaButtonOutline}>
+                  View Plans
+                </Link>
+              </div>
             </div>
           </section>
         </>
@@ -208,6 +218,10 @@ function DonorCard({ donor, rank }) {
 
 function SubscriberCard({ subscriber }) {
   const planLabel = subscriber.plan === 'pro_yearly' ? 'Yearly' : 'Monthly'
+  const planImg =
+    subscriber.plan === 'pro_yearly'
+      ? '/images/plan-pro-yearly.png'
+      : '/images/plan-pro-monthly.png'
 
   return (
     <Link to={`/users/${subscriber.username}`} style={s.subCard}>
@@ -216,6 +230,7 @@ function SubscriberCard({ subscriber }) {
         <span style={s.subName}>{subscriber.username}</span>
         <span style={s.subPlan}>Pro {planLabel}</span>
       </div>
+      <img src={planImg} alt={`Pro ${planLabel}`} style={s.subPlanImg} />
     </Link>
   )
 }
@@ -225,6 +240,12 @@ function SubscriberCard({ subscriber }) {
 function EmptyState({ message, ctaTo, ctaLabel }) {
   return (
     <div style={s.emptyState}>
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" style={{ marginBottom: 12 }}>
+        <path
+          d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
+          fill="var(--sh-border)"
+        />
+      </svg>
       <p style={s.emptyText}>{message}</p>
       <Link to={ctaTo} style={s.emptyButton}>
         {ctaLabel}
@@ -415,6 +436,13 @@ const s = {
     marginTop: 2,
     display: 'block',
   },
+  subPlanImg: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    objectFit: 'cover',
+    flexShrink: 0,
+  },
 
   /* Empty State */
   emptyState: {
@@ -431,14 +459,15 @@ const s = {
   },
   emptyButton: {
     display: 'inline-block',
-    background: 'var(--sh-success-bg)',
-    color: '#ffffff',
+    background: 'var(--sh-brand)',
+    color: 'var(--sh-nav-text)',
     padding: '10px 24px',
     borderRadius: 10,
     fontWeight: 600,
     fontSize: 14,
     textDecoration: 'none',
     fontFamily: "'Plus Jakarta Sans', sans-serif",
+    transition: 'opacity 0.15s',
   },
 
   /* CTA Section */
@@ -465,8 +494,8 @@ const s = {
   },
   ctaButton: {
     display: 'inline-block',
-    background: 'var(--sh-info-bg)',
-    color: '#ffffff',
+    background: 'var(--sh-brand)',
+    color: 'var(--sh-nav-text)',
     padding: '12px 32px',
     borderRadius: 10,
     fontWeight: 600,
@@ -475,6 +504,20 @@ const s = {
     fontFamily: "'Plus Jakarta Sans', sans-serif",
     transition: 'opacity 0.15s',
     cursor: 'pointer',
+  },
+  ctaButtonOutline: {
+    display: 'inline-block',
+    background: 'transparent',
+    color: 'var(--sh-brand)',
+    padding: '11px 32px',
+    borderRadius: 10,
+    fontWeight: 600,
+    fontSize: 15,
+    textDecoration: 'none',
+    fontFamily: "'Plus Jakarta Sans', sans-serif",
+    transition: 'opacity 0.15s',
+    cursor: 'pointer',
+    border: '1.5px solid var(--sh-brand)',
   },
 
   /* Footer */
