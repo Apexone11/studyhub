@@ -186,7 +186,7 @@ router.post(
   '/upload/chunk',
   requireAuth,
   videoUploadChunkLimiter,
-  express.raw({ type: '*/*', limit: '12mb' }),
+  express.raw({ type: '*/*', limit: '3mb' }),
   async (req, res) => {
     try {
       const uploadId = req.headers['x-upload-id']

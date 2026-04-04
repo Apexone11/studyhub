@@ -12,7 +12,7 @@
 import { useState, useRef, useCallback } from 'react'
 import { API } from '../config'
 
-const CHUNK_SIZE = 5 * 1024 * 1024 // 5 MB — reduced to avoid Railway HTTP/2 proxy body size limits
+const CHUNK_SIZE = 2 * 1024 * 1024 // 2 MB — Railway HTTP/2 proxy rejects bodies larger than ~2 MB
 const MAX_VIDEO_SIZE = 500 * 1024 * 1024 // 500 MB
 const ALLOWED_TYPES = new Set(['video/mp4', 'video/webm', 'video/quicktime'])
 const ALLOWED_EXTENSIONS = new Set(['.mp4', '.webm', '.mov'])
