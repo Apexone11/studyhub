@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import Navbar from '../../components/navbar/Navbar'
 import { API } from '../../config'
 import { useSession } from '../../lib/session-context'
@@ -28,9 +28,44 @@ const FAQ_ITEMS = [
 ]
 
 export default function PricingPage() {
+  const [searchParams] = useSearchParams()
+  const [subscription, setSubscription] = useState(null)
+  const { user } = useSession()
+
+  const successFromUrl = searchParams.get('success') === 'true'
+
+  useEffect(() => {
+    const fetchSubscription = async () => {
+      if (!user) {
+        return
+      }
+
+      try {
+        const res = await fetch(`${API}/api/payments/subscription`, {
+          credentials: 'include',
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setSubscription(data.subscription || null)
+        }
+      } catch (err) {
+        console.error('[fetchSubscription]', err)
+      }
+    }
+
+    fetchSubscription()
+  }, [user])
+
   return (
     <div style={s.page}>
       <Navbar />
+
+      {/* ── SUCCESS BANNER ────────────────────────────– */}
+      {successFromUrl && (
+        <div style={s.successBanner}>
+          <p style={s.successBannerText}>Success! Your subscription is now active. Thank you for supporting StudyHub.</p>
+        </div>
+      )}
 
       {/* ── HERO ─────────────────────────────────────── */}
       <section style={s.hero}>
@@ -43,9 +78,9 @@ export default function PricingPage() {
       {/* ── PRICING CARDS ────────────────────────────── */}
       <section style={s.cardsSection}>
         <div style={s.cardsContainer}>
-          <PricingCard tier="free" />
-          <PricingCard tier="pro" />
-          <PricingCard tier="institution" />
+          <PricingCard tier="free" subscription={subscription} />
+          <PricingCard tier="pro" subscription={subscription} />
+          <PricingCard tier="institution" subscription={subscription} />
         </div>
       </section>
 
@@ -69,7 +104,7 @@ export default function PricingPage() {
   )
 }
 
-function PricingCard({ tier }) {
+function PricingCard({ tier, subscription }) {
   const navigate = useNavigate()
   const { user } = useSession()
   const [subscribing, setSubscribing] = useState(null)
@@ -78,6 +113,11 @@ function PricingCard({ tier }) {
   const [waitlistLoading, setWaitlistLoading] = useState(false)
   const [waitlistMessage, setWaitlistMessage] = useState('')
   const [waitlistError, setWaitlistError] = useState('')
+
+  // Check if user has active pro subscription
+  const hasActivePro = subscription &&
+    (subscription.plan === 'pro_monthly' || subscription.plan === 'pro_yearly') &&
+    subscription.status === 'active'
 
   const handleSubscribe = async (plan) => {
     setSubscribeError('')
@@ -165,13 +205,16 @@ function PricingCard({ tier }) {
           <Feature text="Browse all study sheets" included />
           <Feature text="10 uploads per month" included />
           <Feature text="10 AI messages per day (Hub AI)" included />
+          <Feature text="5-minute video uploads" included />
           <Feature text="50 library bookmarks" included />
           <Feature text="2 private study groups" included />
           <Feature text="3 playground projects" included />
         </div>
-        <button style={s.ctaDisabled} disabled>
-          Current Plan
-        </button>
+        {!hasActivePro && (
+          <button style={s.ctaDisabled} disabled>
+            Current Plan
+          </button>
+        )}
       </div>
     )
   }
@@ -189,8 +232,10 @@ function PricingCard({ tier }) {
         <div style={s.featureList}>
           <Feature text="Everything in Free, plus:" included />
           <Feature text="Unlimited uploads" included />
-          <Feature text="100 AI messages per day" included />
+          <Feature text="120 AI messages per day" included />
           <Feature text="Upload PDFs and code to AI" included />
+          <Feature text="60-minute video uploads" included />
+          <Feature text="5 GB storage" included />
           <Feature text="Unlimited library bookmarks" included />
           <Feature text="10 private study groups" included />
           <Feature text="25 playground projects" included />
@@ -198,22 +243,36 @@ function PricingCard({ tier }) {
           <Feature text="Priority support" included />
         </div>
 
-        <div style={s.subscribeButtonGroup}>
-          <button
-            style={s.ctaPrimary}
-            disabled={subscribing !== null}
-            onClick={() => handleSubscribe('pro_monthly')}
-          >
-            {subscribing === 'pro_monthly' ? 'Redirecting...' : 'Subscribe Monthly'}
-          </button>
-          <button
-            style={s.ctaSecondary}
-            disabled={subscribing !== null}
-            onClick={() => handleSubscribe('pro_yearly')}
-          >
-            {subscribing === 'pro_yearly' ? 'Redirecting...' : 'Subscribe Yearly (Save 33%)'}
-          </button>
-        </div>
+        {hasActivePro ? (
+          <div style={s.currentPlanGroup}>
+            <button style={s.ctaDisabled} disabled>
+              Current Plan
+            </button>
+            <a
+              href="/settings?tab=subscription"
+              style={s.manageSubLink}
+            >
+              Manage Subscription
+            </a>
+          </div>
+        ) : (
+          <div style={s.subscribeButtonGroup}>
+            <button
+              style={s.ctaPrimary}
+              disabled={subscribing !== null}
+              onClick={() => handleSubscribe('pro_monthly')}
+            >
+              {subscribing === 'pro_monthly' ? 'Redirecting...' : 'Subscribe Monthly'}
+            </button>
+            <button
+              style={s.ctaSecondary}
+              disabled={subscribing !== null}
+              onClick={() => handleSubscribe('pro_yearly')}
+            >
+              {subscribing === 'pro_yearly' ? 'Redirecting...' : 'Subscribe Yearly (Save 33%)'}
+            </button>
+          </div>
+        )}
 
         {subscribeError && <div style={s.errorMessage}>{subscribeError}</div>}
       </div>
@@ -336,6 +395,17 @@ const s = {
     fontFamily: "'Plus Jakarta Sans', sans-serif",
     background: 'var(--sh-surface)',
     color: 'var(--sh-text)',
+  },
+  successBanner: {
+    background: 'var(--sh-success-bg)',
+    padding: '16px 20px',
+    textAlign: 'center',
+  },
+  successBannerText: {
+    color: 'var(--sh-success-text)',
+    margin: 0,
+    fontSize: 15,
+    fontWeight: 500,
   },
   hero: {
     background: 'linear-gradient(135deg, #6d28d9 0%, #3b82f6 100%)',
@@ -489,6 +559,20 @@ const s = {
     display: 'flex',
     flexDirection: 'column',
     gap: 12,
+  },
+  currentPlanGroup: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 12,
+  },
+  manageSubLink: {
+    color: 'var(--sh-brand-accent)',
+    textDecoration: 'none',
+    fontSize: 14,
+    fontWeight: 600,
+    textAlign: 'center',
+    padding: '10px 0',
+    transition: 'color 0.2s ease-out',
   },
   waitlistForm: {
     display: 'flex',

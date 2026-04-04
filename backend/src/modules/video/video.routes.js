@@ -221,12 +221,14 @@ router.post('/upload/init', requireAuth, videoUploadInitLimiter, async (req, res
  *
  * Body: Raw binary chunk data
  * Returns: { received: true, buffered: <bytes>, partNumber }
+ *
+ * Note: express.raw() middleware is applied at the app level in index.js
+ * to ensure binary data is not parsed as JSON before reaching this handler.
  */
 router.post(
   '/upload/chunk',
   requireAuth,
   videoUploadChunkLimiter,
-  express.raw({ type: '*/*', limit: '3mb' }),
   async (req, res) => {
     try {
       const uploadId = req.headers['x-upload-id']

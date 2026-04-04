@@ -24,6 +24,17 @@ export default function SubscriptionTab() {
   const [historyPage, setHistoryPage] = useState(1)
   const [portalLoading, setPortalLoading] = useState(false)
   const [error, setError] = useState('')
+  const [showSuccess, setShowSuccess] = useState(false)
+
+  // Check for payment=success in URL params
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.has('payment') && params.get('payment') === 'success') {
+      setShowSuccess(true)
+      // Clear the param from URL
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [])
 
   // Fetch subscription + first page of history
   useEffect(() => {
@@ -115,6 +126,13 @@ export default function SubscriptionTab() {
 
   return (
     <>
+      {/* ── Success Banner ────────────────────────────── */}
+      {showSuccess && (
+        <Message tone="success">
+          Welcome to Pro! Your subscription is now active.
+        </Message>
+      )}
+
       {/* ── Current Plan ──────────────────────────────── */}
       <SectionCard
         title="Current Plan"
@@ -146,6 +164,12 @@ export default function SubscriptionTab() {
                 {sub.cancelAtPeriodEnd
                   ? `Access until ${formatDate(sub.currentPeriodEnd)}`
                   : `Renews on ${formatDate(sub.currentPeriodEnd)}`}
+              </p>
+            )}
+
+            {!isFree && sub?.createdAt && (
+              <p style={s.periodText}>
+                Member since {formatDate(sub.createdAt)}
               </p>
             )}
 
@@ -196,7 +220,8 @@ export default function SubscriptionTab() {
       >
         <div style={s.featuresGrid}>
           <FeatureItem label="Uploads" value={isFree ? '10/month' : 'Unlimited'} highlight={!isFree} />
-          <FeatureItem label="AI Messages" value={isFree ? '30/day' : '120/day'} highlight={!isFree} />
+          <FeatureItem label="AI Messages" value={isFree ? '10/day' : '120/day'} highlight={!isFree} />
+          <FeatureItem label="Video Uploads" value={isFree ? '5 min max' : '60 min max'} highlight={!isFree} />
           <FeatureItem label="Storage" value={isFree ? '500 MB' : '5 GB'} highlight={!isFree} />
           <FeatureItem label="Study Groups" value={isFree ? '2 private' : '10 private'} highlight={!isFree} />
           <FeatureItem label="Pro Badge" value={isFree ? 'No' : 'Yes'} highlight={!isFree} />
@@ -295,7 +320,7 @@ function FeatureItem({ label, value, highlight }) {
   return (
     <div style={s.featureItem}>
       <span style={s.featureLabel}>{label}</span>
-      <span style={{ ...s.featureValue, color: highlight ? '#059669' : 'var(--sh-text)' }}>
+      <span style={{ ...s.featureValue, color: highlight ? 'var(--sh-success)' : 'var(--sh-text)' }}>
         {value}
       </span>
     </div>

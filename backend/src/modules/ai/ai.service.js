@@ -35,8 +35,22 @@ function getClient() {
 /**
  * Get the daily message limit for a user.
  */
-function getDailyLimit(user) {
+async function getDailyLimit(user) {
   if (user.role === 'admin') return DAILY_LIMITS.admin
+
+  // Check subscription plan
+  try {
+    const sub = await prisma.subscription.findUnique({
+      where: { userId: user.id || user.userId },
+      select: { plan: true, status: true },
+    })
+    if (sub && (sub.status === 'active' || sub.status === 'trialing') && sub.plan !== 'free') {
+      return DAILY_LIMITS.pro
+    }
+  } catch {
+    // Subscription table may not exist yet — graceful degradation
+  }
+
   if (user.isStaffVerified || user.emailVerified) return DAILY_LIMITS.verified
   return DAILY_LIMITS.default
 }
@@ -179,7 +193,7 @@ async function streamMessage({ user, conversationId, content, currentPage, image
 
   // 2. Check daily rate limit.
   const usage = await getOrCreateUsage(userId)
-  const limit = getDailyLimit(user)
+  const limit = await getDailyLimit(user)
   if (usage.messageCount >= limit) {
     sendSSE(res, {
       type: 'error',
@@ -357,7 +371,7 @@ function sendSSE(res, data) {
 async function getUsageStats(user) {
   const userId = user.id || user.userId
   const usage = await getOrCreateUsage(userId)
-  const limit = getDailyLimit(user)
+  const limit = await getDailyLimit(user)
   return {
     messagesUsed: usage.messageCount,
     messagesLimit: limit,

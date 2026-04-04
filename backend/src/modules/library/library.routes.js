@@ -38,7 +38,7 @@ const {
 const { searchBooks, getBookDetail, syncPopularBooksToDB } = require('./library.service')
 const {
   MAX_SHELVES_PER_USER,
-  MAX_BOOKMARKS_PER_BOOK,
+  MAX_BOOKMARKS_PER_USER_FREE,
   MAX_HIGHLIGHTS_PER_BOOK,
 } = require('./library.constants')
 
