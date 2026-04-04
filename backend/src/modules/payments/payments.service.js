@@ -32,13 +32,19 @@ async function getOrCreateCustomer(user) {
   const stripe = getStripe()
 
   // Check if user already has a subscription record with a Stripe customer ID
-  const existing = await prisma.subscription.findUnique({
-    where: { userId: user.id },
-    select: { stripeCustomerId: true },
-  })
+  // Wrapped in try-catch for graceful degradation if Subscription table does not exist yet
+  try {
+    const existing = await prisma.subscription.findUnique({
+      where: { userId: user.id },
+      select: { stripeCustomerId: true },
+    })
 
-  if (existing?.stripeCustomerId) {
-    return existing.stripeCustomerId
+    if (existing?.stripeCustomerId) {
+      return existing.stripeCustomerId
+    }
+  } catch (err) {
+    // Subscription table may not exist yet (migration not deployed)
+    log.warn({ err: err.message }, 'Subscription table query failed, creating new Stripe customer')
   }
 
   // Create new Stripe customer
@@ -61,8 +67,11 @@ async function getOrCreateCustomer(user) {
 async function createSubscriptionCheckout(user, plan, successUrl, cancelUrl) {
   const stripe = getStripe()
   const planDef = PLANS[plan]
-  if (!planDef || !planDef.stripePriceId) {
+  if (!planDef) {
     throw new Error(`Invalid plan: ${plan}`)
+  }
+  if (!planDef.stripePriceId) {
+    throw new Error(`Stripe price ID not configured for plan: ${plan}. Set STRIPE_PRICE_ID_PRO and STRIPE_PRICE_ID_PRO_YEARLY env vars.`)
   }
 
   const customerId = await getOrCreateCustomer(user)

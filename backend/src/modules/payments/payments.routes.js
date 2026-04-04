@@ -92,7 +92,10 @@ router.post('/checkout/subscription', paymentCheckoutLimiter, requireAuth, async
   } catch (error) {
     captureError(error, { context: 'checkout.subscription' })
     log.error({ err: error }, 'Failed to create subscription checkout')
-    sendError(res, 500, 'Failed to create checkout session.', ERROR_CODES.INTERNAL)
+    const msg = error.message && error.message.includes('not configured')
+      ? 'Payments are not fully configured yet. Please try again later.'
+      : 'Failed to create checkout session.'
+    sendError(res, 500, msg, ERROR_CODES.INTERNAL)
   }
 })
 

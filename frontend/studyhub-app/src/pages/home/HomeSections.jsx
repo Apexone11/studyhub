@@ -200,6 +200,9 @@ export function CtaSection() {
             Explore Study Sheets
           </Link>
         </div>
+        <p style={{ marginTop: '1.25rem', fontSize: '0.95rem', color: 'var(--sh-slate-400)' }}>
+          Love StudyHub? <Link to="/supporters" style={{ color: 'var(--sh-brand)', fontWeight: 600, textDecoration: 'underline' }} onClick={() => trackEvent('landing_cta_clicked', { target: 'supporters', location: 'bottom_cta' })}>Support the project</Link> or <Link to="/pricing" style={{ color: 'var(--sh-brand)', fontWeight: 600, textDecoration: 'underline' }}>go Pro</Link>.
+        </p>
       </div>
     </section>
   )
@@ -224,6 +227,7 @@ export function HomeFooter({ currentYear }) {
 
         <div className="home-footer-links">
           <Link to="/about">About</Link>
+          <Link to="/supporters">Supporters</Link>
           <Link to="/terms">Terms</Link>
           <Link to="/privacy">Privacy</Link>
           <Link to="/guidelines">Guidelines</Link>
