@@ -247,6 +247,9 @@ function FeedCardInner({
               username={item.author.username}
               role="student"
               avatarUrl={item.author.avatarUrl}
+              plan={item.author.plan}
+              isDonor={item.author.isDonor}
+              donorLevel={item.author.donorLevel}
             />
           </Link>
         ) : (

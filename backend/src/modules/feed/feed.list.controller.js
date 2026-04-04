@@ -10,6 +10,7 @@ const {
   formatPost,
   formatNote,
 } = require('./feed.service')
+const { enrichUsersWithBadges } = require('../../lib/userBadges')
 
 const router = express.Router()
 
@@ -381,8 +382,34 @@ router.get('/', async (req, res) => {
       return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
     })
 
+    // Enrich feed item authors with Pro/Donor badge data
+    const slicedItems = items.slice(offset, offset + limit)
+    try {
+      const authorMap = new Map()
+      for (const item of slicedItems) {
+        const author = item.author || item.user
+        if (author?.id) authorMap.set(author.id, author)
+      }
+      if (authorMap.size > 0) {
+        const authors = Array.from(authorMap.values())
+        const enriched = await enrichUsersWithBadges(authors)
+        const badgeMap = new Map(enriched.map((u) => [u.id, u]))
+        for (const item of slicedItems) {
+          const author = item.author || item.user
+          if (author?.id && badgeMap.has(author.id)) {
+            const b = badgeMap.get(author.id)
+            author.plan = b.plan
+            author.isDonor = b.isDonor
+            author.donorLevel = b.donorLevel
+          }
+        }
+      }
+    } catch {
+      // Non-fatal: badges degrade gracefully
+    }
+
     const payload = {
-      items: items.slice(offset, offset + limit),
+      items: slicedItems,
       total: items.length,
       limit,
       offset,

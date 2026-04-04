@@ -13,43 +13,81 @@ import { FONT, cardStyle, sectionHeadingStyle, pillStyle } from './profileConsta
 /* ── Avatar ─────────────────────────────────────────────────────────────── */
 export function ProfileAvatar({ profile, initials, isOwnProfile, onAvatarClick }) {
   const [imgError, setImgError] = useState(false)
+  const hasPro = profile.plan === 'pro_monthly' || profile.plan === 'pro_yearly'
+  const hasDonor = profile.isDonor || Boolean(profile.donorLevel)
+  const showBadge = hasPro || hasDonor
+
+  const DONOR_COLORS = { bronze: '#cd7f32', silver: '#94a3b8', gold: '#f59e0b' }
+
   return (
-    <div
-      data-tutorial="profile-avatar"
-      style={{
-        position: 'relative',
-        width: 'clamp(56px, 8vw, 80px)',
-        height: 'clamp(56px, 8vw, 80px)',
-        borderRadius: '50%',
-        background: 'var(--sh-avatar-bg)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexShrink: 0,
-        overflow: 'hidden',
-        cursor: isOwnProfile ? 'pointer' : 'default',
-      }}
-      onClick={isOwnProfile ? onAvatarClick : undefined}
-      role={isOwnProfile ? 'button' : undefined}
-      tabIndex={isOwnProfile ? 0 : undefined}
-      onKeyDown={isOwnProfile ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onAvatarClick() } } : undefined}
-      aria-label={isOwnProfile ? 'Upload profile photo' : undefined}
-    >
-      {profile.avatarUrl && !imgError
-        ? <img src={profile.avatarUrl.startsWith('http') ? profile.avatarUrl : `${API}${profile.avatarUrl}`} alt={profile.username} loading="lazy" onError={() => setImgError(true)} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
-        : <span style={{ fontSize: 'clamp(20px, 3vw, 28px)', fontWeight: 800, color: 'var(--sh-avatar-text)' }}>{initials}</span>
-      }
-      {isOwnProfile && (
-        <div style={{
-          position: 'absolute', inset: 0, borderRadius: '50%',
-          background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          opacity: 0, transition: 'opacity 0.15s',
+    <div style={{ position: 'relative', display: 'inline-block' }}>
+      <div
+        data-tutorial="profile-avatar"
+        style={{
+          position: 'relative',
+          width: 'clamp(56px, 8vw, 80px)',
+          height: 'clamp(56px, 8vw, 80px)',
+          borderRadius: '50%',
+          background: 'var(--sh-avatar-bg)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+          overflow: 'hidden',
+          cursor: isOwnProfile ? 'pointer' : 'default',
         }}
-        onMouseEnter={(e) => { e.currentTarget.style.opacity = '1' }}
-        onMouseLeave={(e) => { e.currentTarget.style.opacity = '0' }}
+        onClick={isOwnProfile ? onAvatarClick : undefined}
+        role={isOwnProfile ? 'button' : undefined}
+        tabIndex={isOwnProfile ? 0 : undefined}
+        onKeyDown={isOwnProfile ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onAvatarClick() } } : undefined}
+        aria-label={isOwnProfile ? 'Upload profile photo' : undefined}
+      >
+        {profile.avatarUrl && !imgError
+          ? <img src={profile.avatarUrl.startsWith('http') ? profile.avatarUrl : `${API}${profile.avatarUrl}`} alt={profile.username} loading="lazy" onError={() => setImgError(true)} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+          : <span style={{ fontSize: 'clamp(20px, 3vw, 28px)', fontWeight: 800, color: 'var(--sh-avatar-text)' }}>{initials}</span>
+        }
+        {isOwnProfile && (
+          <div style={{
+            position: 'absolute', inset: 0, borderRadius: '50%',
+            background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            opacity: 0, transition: 'opacity 0.15s',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.opacity = '1' }}
+          onMouseLeave={(e) => { e.currentTarget.style.opacity = '0' }}
+          >
+            <i className="fa-solid fa-camera" style={{ color: '#fff', fontSize: 'clamp(14px, 2vw, 18px)' }} />
+          </div>
+        )}
+      </div>
+
+      {/* Pro / Donor badge */}
+      {showBadge && (
+        <span
+          aria-label={hasPro ? 'Pro Subscriber' : 'Donor'}
+          style={{
+            position: 'absolute',
+            bottom: -2,
+            right: -2,
+            width: 24,
+            height: 24,
+            borderRadius: '50%',
+            background: hasPro ? '#f59e0b' : DONOR_COLORS[profile.donorLevel] || '#10b981',
+            border: '2px solid var(--sh-surface)',
+            display: 'grid',
+            placeItems: 'center',
+            zIndex: 2,
+          }}
         >
-          <i className="fa-solid fa-camera" style={{ color: '#fff', fontSize: 'clamp(14px, 2vw, 18px)' }} />
-        </div>
+          {hasPro ? (
+            <svg width={13} height={13} viewBox="0 0 16 16" fill="#ffffff">
+              <path d="M2 12h12v1.5H2V12zM3 11l-1-7 3.5 3L8 3l2.5 4L14 4l-1 7H3z" />
+            </svg>
+          ) : (
+            <svg width={13} height={13} viewBox="0 0 16 16" fill="#ffffff">
+              <path d="M8 14s-5.5-3.5-5.5-7.5C2.5 4 4 2.5 5.5 2.5c1 0 2 .5 2.5 1.5.5-1 1.5-1.5 2.5-1.5C12 2.5 13.5 4 13.5 6.5 13.5 10.5 8 14 8 14z" />
+            </svg>
+          )}
+        </span>
       )}
     </div>
   )

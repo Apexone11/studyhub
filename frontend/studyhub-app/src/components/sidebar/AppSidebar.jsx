@@ -60,6 +60,9 @@ export default function AppSidebar({ mode = 'fixed' }) {
           username={user.username}
           avatarUrl={user.avatarUrl}
           role={user.role}
+          plan={user.plan}
+          isDonor={user.isDonor}
+          donorLevel={user.donorLevel}
           size={44}
           border="2px solid var(--sh-border)"
           showStatus

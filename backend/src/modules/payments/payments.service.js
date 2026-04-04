@@ -220,6 +220,7 @@ async function handleCheckoutCompleted(session) {
   // Subscription checkout
   const userId = parseInt(metadata.studyhub_user_id, 10)
   const plan = metadata.plan || 'pro_monthly'
+  log.info({ metadata, userId, plan, sessionId: session.id }, 'Processing subscription checkout')
   if (!userId || isNaN(userId)) {
     log.warn({ metadata }, 'checkout.session.completed missing user ID')
     return

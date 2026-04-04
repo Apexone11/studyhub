@@ -181,22 +181,29 @@ router.post('/webhook', async (req, res) => {
 
   log.info({ type: event.type, id: event.id }, 'Stripe webhook received')
 
+  let handled = false
   try {
     switch (event.type) {
       case 'checkout.session.completed':
         await service.handleCheckoutCompleted(event.data.object)
+        handled = true
+        log.info({ eventId: event.id }, 'checkout.session.completed processed successfully')
         break
       case 'customer.subscription.updated':
         await service.handleSubscriptionUpdated(event.data.object)
+        handled = true
         break
       case 'customer.subscription.deleted':
         await service.handleSubscriptionDeleted(event.data.object)
+        handled = true
         break
       case 'invoice.payment_succeeded':
         await service.handleInvoicePaymentSucceeded(event.data.object)
+        handled = true
         break
       case 'invoice.payment_failed':
         await service.handleInvoicePaymentFailed(event.data.object)
+        handled = true
         break
       default:
         log.debug({ type: event.type }, 'Unhandled Stripe event type')
@@ -204,10 +211,11 @@ router.post('/webhook', async (req, res) => {
   } catch (error) {
     captureError(error, { context: 'stripe.webhook', eventType: event.type })
     log.error({ err: error, eventType: event.type }, 'Error processing Stripe webhook')
+    console.error('[stripe:webhook] Handler failed for', event.type, '-', error.message)
     // Return 200 anyway so Stripe does not retry endlessly
   }
 
-  res.json({ received: true })
+  res.json({ received: true, handled })
 })
 
 // ── GET /subscription ────────────────────────────────────────────────────

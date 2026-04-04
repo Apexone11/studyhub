@@ -6,7 +6,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends openssl \
+  && apt-get install -y --no-install-recommends openssl ffmpeg \
   && rm -rf /var/lib/apt/lists/*
 
 FROM base AS prod-deps

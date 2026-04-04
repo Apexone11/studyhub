@@ -85,6 +85,9 @@ export default function PricingPage() {
         </div>
       </section>
 
+      {/* ── DONATION SECTION ────────────────────────── */}
+      <DonationSection />
+
       {/* ── FAQ SECTION ──────────────────────────────── */}
       <section style={s.faqSection}>
         <div style={s.faqInner}>
@@ -388,6 +391,346 @@ function FaqItem({ question, answer }) {
       <p style={s.faqAnswer}>{answer}</p>
     </details>
   )
+}
+
+// ── Donation Section ────────────────────────────────────────────────────
+
+const DONATION_PRESETS = [3, 5, 10, 25, 50, 100]
+
+function DonationSection() {
+  const { user } = useSession()
+  const navigate = useNavigate()
+  const [amount, setAmount] = useState(10)
+  const [message, setMessage] = useState('')
+  const [anonymous, setAnonymous] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleDonate = async () => {
+    setError('')
+
+    if (!user) {
+      navigate('/login')
+      return
+    }
+
+    if (amount < 1 || amount > 1000) {
+      setError('Amount must be between $1 and $1,000.')
+      return
+    }
+
+    setLoading(true)
+
+    try {
+      const res = await fetch(`${API}/api/payments/checkout/donation`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          amount,
+          message: message.trim() || '',
+          anonymous,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error || data.message || 'Failed to start donation checkout.')
+        setLoading(false)
+        return
+      }
+
+      if (data.url) {
+        window.location.href = data.url
+      } else {
+        setError('No checkout URL received.')
+        setLoading(false)
+      }
+    } catch (err) {
+      console.error('[donate]', err)
+      setError('Network error. Please try again.')
+      setLoading(false)
+    }
+  }
+
+  return (
+    <section style={ds.section}>
+      <div style={ds.inner}>
+        <h2 style={ds.title}>Support StudyHub</h2>
+        <p style={ds.subtitle}>
+          StudyHub is built by students, for students. Your donation helps us keep the platform free and accessible.
+        </p>
+
+        {/* Preset amount buttons */}
+        <div style={ds.presetRow}>
+          {DONATION_PRESETS.map((preset) => (
+            <button
+              key={preset}
+              style={{
+                ...ds.presetBtn,
+                ...(amount === preset ? ds.presetBtnActive : {}),
+              }}
+              onClick={() => setAmount(preset)}
+            >
+              ${preset}
+            </button>
+          ))}
+        </div>
+
+        {/* Slider */}
+        <div style={ds.sliderContainer}>
+          <input
+            type="range"
+            min={1}
+            max={200}
+            step={1}
+            value={amount}
+            onChange={(e) => setAmount(Number(e.target.value))}
+            style={ds.slider}
+          />
+          <div style={ds.sliderLabels}>
+            <span style={ds.sliderLabel}>$1</span>
+            <span style={ds.sliderValue}>${amount}</span>
+            <span style={ds.sliderLabel}>$200</span>
+          </div>
+        </div>
+
+        {/* Custom amount input */}
+        <div style={ds.customRow}>
+          <label style={ds.customLabel}>Custom amount</label>
+          <div style={ds.customInputWrap}>
+            <span style={ds.dollarSign}>$</span>
+            <input
+              type="number"
+              min={1}
+              max={1000}
+              value={amount}
+              onChange={(e) => {
+                const v = Number(e.target.value)
+                if (v >= 0 && v <= 1000) setAmount(v)
+              }}
+              style={ds.customInput}
+            />
+          </div>
+        </div>
+
+        {/* Message */}
+        <div style={ds.messageRow}>
+          <input
+            type="text"
+            placeholder="Leave a message (optional, shown on supporters page)"
+            value={message}
+            onChange={(e) => setMessage(e.target.value.slice(0, 200))}
+            maxLength={200}
+            style={ds.messageInput}
+          />
+        </div>
+
+        {/* Anonymous toggle */}
+        <label style={ds.anonLabel}>
+          <input
+            type="checkbox"
+            checked={anonymous}
+            onChange={(e) => setAnonymous(e.target.checked)}
+            style={ds.anonCheckbox}
+          />
+          <span style={ds.anonText}>Donate anonymously</span>
+        </label>
+
+        {/* Donate button */}
+        <button
+          style={ds.donateBtn}
+          onClick={handleDonate}
+          disabled={loading || amount < 1}
+        >
+          {loading ? 'Redirecting to checkout...' : `Donate $${amount}`}
+        </button>
+
+        {error && <div style={ds.error}>{error}</div>}
+
+        <p style={ds.footnote}>
+          Donations are processed securely through Stripe. All donors are featured on our supporters page.
+        </p>
+      </div>
+    </section>
+  )
+}
+
+const ds = {
+  section: {
+    background: 'linear-gradient(135deg, #059669 0%, #0d9488 50%, #3b82f6 100%)',
+    padding: '80px 20px',
+  },
+  inner: {
+    maxWidth: 560,
+    margin: '0 auto',
+    textAlign: 'center',
+  },
+  title: {
+    fontSize: 'clamp(24px, 3vw, 36px)',
+    fontWeight: 'bold',
+    color: '#ffffff',
+    margin: '0 0 12px',
+  },
+  subtitle: {
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.85)',
+    margin: '0 0 32px',
+    lineHeight: 1.6,
+  },
+  presetRow: {
+    display: 'flex',
+    gap: 10,
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    marginBottom: 24,
+  },
+  presetBtn: {
+    background: 'rgba(255, 255, 255, 0.15)',
+    color: '#ffffff',
+    border: '2px solid rgba(255, 255, 255, 0.3)',
+    padding: '10px 20px',
+    borderRadius: 10,
+    fontSize: 15,
+    fontWeight: 700,
+    cursor: 'pointer',
+    fontFamily: "'Plus Jakarta Sans', sans-serif",
+    transition: 'all 0.15s',
+    minWidth: 64,
+  },
+  presetBtnActive: {
+    background: '#ffffff',
+    color: '#059669',
+    borderColor: '#ffffff',
+  },
+  sliderContainer: {
+    marginBottom: 20,
+    padding: '0 8px',
+  },
+  slider: {
+    width: '100%',
+    height: 6,
+    appearance: 'auto',
+    accentColor: '#ffffff',
+    cursor: 'pointer',
+  },
+  sliderLabels: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  sliderLabel: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontWeight: 500,
+  },
+  sliderValue: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
+  customRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    marginBottom: 16,
+  },
+  customLabel: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: 600,
+  },
+  customInputWrap: {
+    display: 'flex',
+    alignItems: 'center',
+    background: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 8,
+    padding: '0 12px',
+    border: '1px solid rgba(255, 255, 255, 0.3)',
+  },
+  dollarSign: {
+    color: '#ffffff',
+    fontWeight: 700,
+    fontSize: 16,
+    marginRight: 4,
+  },
+  customInput: {
+    background: 'transparent',
+    border: 'none',
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 600,
+    width: 80,
+    padding: '8px 0',
+    fontFamily: "'Plus Jakarta Sans', sans-serif",
+    outline: 'none',
+  },
+  messageRow: {
+    marginBottom: 16,
+  },
+  messageInput: {
+    width: '100%',
+    padding: '10px 14px',
+    borderRadius: 10,
+    border: '1px solid rgba(255, 255, 255, 0.3)',
+    background: 'rgba(255, 255, 255, 0.12)',
+    color: '#ffffff',
+    fontSize: 14,
+    fontFamily: "'Plus Jakarta Sans', sans-serif",
+    outline: 'none',
+    boxSizing: 'border-box',
+  },
+  anonLabel: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 24,
+    cursor: 'pointer',
+  },
+  anonCheckbox: {
+    width: 18,
+    height: 18,
+    accentColor: '#ffffff',
+    cursor: 'pointer',
+  },
+  anonText: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontWeight: 500,
+  },
+  donateBtn: {
+    background: '#ffffff',
+    color: '#059669',
+    border: 'none',
+    padding: '14px 40px',
+    borderRadius: 12,
+    fontWeight: 'bold',
+    fontSize: 17,
+    cursor: 'pointer',
+    fontFamily: "'Plus Jakarta Sans', sans-serif",
+    transition: 'opacity 0.15s, transform 0.1s',
+    marginBottom: 16,
+    width: '100%',
+    maxWidth: 320,
+  },
+  error: {
+    background: 'rgba(239, 68, 68, 0.2)',
+    color: '#fecaca',
+    padding: '10px 14px',
+    borderRadius: 8,
+    fontSize: 13,
+    marginBottom: 12,
+  },
+  footnote: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.55)',
+    margin: 0,
+    lineHeight: 1.5,
+  },
 }
 
 const s = {

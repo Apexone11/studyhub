@@ -12,6 +12,7 @@ const {
 } = require('../../lib/verification/verificationChallenges')
 const { isValidEmailAddress } = require('../../lib/email/emailValidation')
 const prisma = require('../../lib/prisma')
+const { enrichUserWithBadges } = require('../../lib/userBadges')
 const { USERNAME_REGEX, PASSWORD_MIN_LENGTH, COURSE_CODE_REGEX } = require('./auth.constants')
 
 class AppError extends Error {
@@ -239,7 +240,14 @@ async function issueAuthenticatedSession(res, userId) {
 
   const token = signAuthToken(user)
   setAuthCookie(res, token)
-  return buildAuthenticatedUserPayload(user)
+
+  // Enrich with subscription/donor badge data
+  const badges = await enrichUserWithBadges(user)
+  return buildAuthenticatedUserPayload(user, {
+    plan: badges.plan || 'free',
+    isDonor: badges.isDonor || false,
+    donorLevel: badges.donorLevel || null,
+  })
 }
 
 function loginVerificationResponse(challenge, overrides = {}) {
