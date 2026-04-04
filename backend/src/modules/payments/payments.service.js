@@ -261,6 +261,44 @@ async function handleCheckoutCompleted(session) {
   })
 
   log.info({ userId, plan, stripeSubscriptionId }, 'Subscription activated via checkout')
+
+  // Also create a Payment record immediately so the user sees payment history
+  // even if the invoice.payment_succeeded webhook is delayed or misconfigured.
+  try {
+    const latestInvoice = stripeSub.latest_invoice
+    const invoiceId = typeof latestInvoice === 'string' ? latestInvoice : latestInvoice?.id
+    if (invoiceId) {
+      const exists = await prisma.payment.findFirst({
+        where: { stripeInvoiceId: invoiceId },
+        select: { id: true },
+      })
+      if (!exists) {
+        const sub = await prisma.subscription.findUnique({
+          where: { userId },
+          select: { id: true },
+        })
+        const invoice = await stripe.invoices.retrieve(invoiceId)
+        await prisma.payment.create({
+          data: {
+            userId,
+            subscriptionId: sub?.id || null,
+            stripeInvoiceId: invoiceId,
+            stripePaymentIntentId: invoice.payment_intent || session.payment_intent || null,
+            amount: invoice.amount_paid || session.amount_total || 0,
+            currency: (invoice.currency || 'usd').toLowerCase(),
+            status: 'succeeded',
+            description: invoice.lines?.data?.[0]?.description || `${plan === 'pro_yearly' ? 'Pro Yearly' : 'Pro Monthly'} subscription`,
+            receiptUrl: invoice.hosted_invoice_url || null,
+            type: 'subscription',
+          },
+        })
+        log.info({ userId, invoiceId }, 'Payment record created from checkout')
+      }
+    }
+  } catch (err) {
+    // Non-fatal — payment record may be created later by invoice webhook
+    log.warn({ err: err.message, userId }, 'Failed to create payment record from checkout')
+  }
 }
 
 /**
