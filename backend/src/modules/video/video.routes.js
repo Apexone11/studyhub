@@ -129,19 +129,12 @@ router.post('/upload/init', requireAuth, videoUploadInitLimiter, async (req, res
     }
 
     // Determine user's subscription plan and get tier-based limits
+    const { getUserPlan: getVideoPlan } = require('../../lib/getUserPlan')
     let userPlan = 'free'
-
-    // Check active subscription
     try {
-      const sub = await prisma.subscription.findUnique({
-        where: { userId: req.user.userId },
-        select: { plan: true, status: true },
-      })
-      if (sub && sub.status === 'active') {
-        userPlan = sub.plan
-      }
+      userPlan = await getVideoPlan(req.user.userId)
     } catch {
-      // Graceful degradation: treat as free on error
+      // Graceful degradation
     }
 
     // Check if user has made a donation (upgrade free to donor)
@@ -149,10 +142,9 @@ router.post('/upload/init', requireAuth, videoUploadInitLimiter, async (req, res
       try {
         const donation = await prisma.donation.findFirst({
           where: { userId: req.user.userId },
+          select: { id: true },
         })
-        if (donation) {
-          userPlan = 'donor'
-        }
+        if (donation) userPlan = 'donor'
       } catch {
         // Graceful degradation
       }
@@ -532,7 +524,12 @@ router.patch('/:id', requireAuth, async (req, res) => {
     if (req.body.title !== undefined) updates.title = String(req.body.title).slice(0, 200)
     if (req.body.description !== undefined)
       updates.description = String(req.body.description).slice(0, 2000)
-    if (req.body.downloadable !== undefined) updates.downloadable = Boolean(req.body.downloadable)
+    if (req.body.downloadable !== undefined) {
+      if (typeof req.body.downloadable === 'boolean') updates.downloadable = req.body.downloadable
+      else if (req.body.downloadable === 'true') updates.downloadable = true
+      else if (req.body.downloadable === 'false') updates.downloadable = false
+      else return res.status(400).json({ error: 'Invalid downloadable value.' })
+    }
 
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({ error: 'No fields to update.' })

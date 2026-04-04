@@ -468,7 +468,7 @@ function VideoProcessingProgress({ videoId }) {
           return
         }
         if (data.processingStep) setStep(data.processingStep)
-        if (data.processingProgress) setPct(data.processingProgress)
+        if (data.processingProgress != null) setPct(data.processingProgress)
       } catch {
         // silent
       }

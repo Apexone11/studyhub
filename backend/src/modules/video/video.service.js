@@ -342,17 +342,10 @@ async function processVideo(videoId) {
     const metadata = await probeVideo(rawPath)
 
     // 3. Validate duration based on user's subscription plan
+    const { getUserPlan: resolveUserPlan } = require('../../lib/getUserPlan')
     let userPlan = 'free'
-
-    // Determine user plan (mirror of logic in routes)
     try {
-      const sub = await prisma.subscription.findUnique({
-        where: { userId: video.userId },
-        select: { plan: true, status: true },
-      })
-      if (sub && sub.status === 'active') {
-        userPlan = sub.plan
-      }
+      userPlan = await resolveUserPlan(video.userId)
     } catch {
       // Graceful degradation
     }
@@ -361,10 +354,9 @@ async function processVideo(videoId) {
       try {
         const donation = await prisma.donation.findFirst({
           where: { userId: video.userId },
+          select: { id: true },
         })
-        if (donation) {
-          userPlan = 'donor'
-        }
+        if (donation) userPlan = 'donor'
       } catch {
         // Graceful degradation
       }
