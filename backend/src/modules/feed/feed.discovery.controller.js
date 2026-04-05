@@ -214,12 +214,17 @@ router.get('/recommended', discoveryLimiter, optionalAuth, async (req, res) => {
  */
 router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
   try {
-    if (!req.user) {
-      return res.status(401).json({ error: 'Authentication required.' })
+    // Return empty personalized feed for unauthenticated users
+    if (!req.user?.userId) {
+      return res.json({
+        recommendedSheets: [],
+        courseActivity: [],
+        recommendedPeople: [],
+        trendingSheets: [],
+      })
     }
 
-    const userId = req.user?.userId
-    if (!userId) return res.status(401).json({ error: 'Authentication required.' })
+    const userId = req.user.userId
     const cacheKey = `for-you:${userId}`
     const cached = cache.get(cacheKey)
     if (cached) {
