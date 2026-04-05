@@ -6,13 +6,73 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { POLICY_URLS } from '../../lib/legalVersions'
+import { TERMLY_UUIDS, POLICY_URLS } from '../../lib/legalVersions'
 
 const TABS = [
-  { key: 'terms', label: 'Terms of Use', type: 'iframe' },
-  { key: 'privacy', label: 'Privacy Policy', type: 'iframe' },
+  { key: 'terms', label: 'Terms of Use', type: 'embed' },
+  { key: 'privacy', label: 'Privacy Policy', type: 'embed' },
   { key: 'guidelines', label: 'Community Guidelines', type: 'scroll' },
 ]
+
+const TERMLY_EMBED_SCRIPT = 'https://app.termly.io/embed.min.js'
+
+/**
+ * Hook that manages a Termly embed div inside a container ref.
+ * Injects the Termly SDK script once, creates the embed div,
+ * and uses a MutationObserver to detect when content loads.
+ * Calls onLoad when the embed content appears.
+ */
+function useTermlyEmbed(containerRef, dataId, { enabled, timeout = 15000, onLoad }) {
+  const [loaded, setLoaded] = useState(false)
+  const [timedOut, setTimedOut] = useState(false)
+  const onLoadRef = useRef(onLoad)
+  useEffect(() => { onLoadRef.current = onLoad })
+
+  useEffect(() => {
+    if (!enabled) return
+    const container = containerRef.current
+    if (!container) return
+
+    // Inject the Termly SDK script once globally
+    if (!document.getElementById('termly-jssdk')) {
+      const script = document.createElement('script')
+      script.id = 'termly-jssdk'
+      script.src = TERMLY_EMBED_SCRIPT
+      script.setAttribute('data-auto-block', 'on')
+      document.body.appendChild(script)
+    }
+
+    // Create the embed placeholder
+    const embed = document.createElement('div')
+    embed.setAttribute('name', 'termly-embed')
+    embed.setAttribute('data-id', dataId)
+    container.appendChild(embed)
+
+    // Timeout fallback
+    const timer = setTimeout(() => setTimedOut(true), timeout)
+
+    // Watch for Termly to populate the embed
+    const observer = new MutationObserver(() => {
+      if (embed.children.length > 0) {
+        clearTimeout(timer)
+        setLoaded(true)
+        onLoadRef.current?.()
+        observer.disconnect()
+      }
+    })
+    observer.observe(embed, { childList: true, subtree: true })
+
+    return () => {
+      observer.disconnect()
+      clearTimeout(timer)
+      if (container && embed.parentNode === container) {
+        container.removeChild(embed)
+      }
+    }
+  }, [enabled, dataId, containerRef, timeout])
+
+  return { loaded, timedOut }
+}
 
 /* ── Inline guidelines content (matches GuidelinesPage.jsx text) ───────── */
 function GuidelinesContent() {
@@ -151,22 +211,10 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
   const [activeTab, setActiveTab] = useState('terms')
   const [viewedTabs, setViewedTabs] = useState(new Set())
   const guidelinesRef = useRef(null)
-  const [termsLoaded, setTermsLoaded] = useState(false)
-  const [privacyLoaded, setPrivacyLoaded] = useState(false)
-  const [termsTimedOut, setTermsTimedOut] = useState(false)
-  const [privacyTimedOut, setPrivacyTimedOut] = useState(false)
 
-  useEffect(() => {
-    if (!open || termsLoaded) return
-    const timer = setTimeout(() => setTermsTimedOut(true), 12000)
-    return () => clearTimeout(timer)
-  }, [open, termsLoaded])
-
-  useEffect(() => {
-    if (!open || privacyLoaded) return
-    const timer = setTimeout(() => setPrivacyTimedOut(true), 12000)
-    return () => clearTimeout(timer)
-  }, [open, privacyLoaded])
+  // Termly embed refs and hooks for Terms and Privacy
+  const termsContainerRef = useRef(null)
+  const privacyContainerRef = useRef(null)
 
   const markViewed = useCallback((key) => {
     setViewedTabs((prev) => {
@@ -177,12 +225,17 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
     })
   }, [])
 
-  const handleIframeLoad = useCallback(
-    (tabKey) => {
-      markViewed(tabKey)
-    },
-    [markViewed],
-  )
+  const markTermsViewed = useCallback(() => markViewed('terms'), [markViewed])
+  const markPrivacyViewed = useCallback(() => markViewed('privacy'), [markViewed])
+
+  const termsEmbed = useTermlyEmbed(termsContainerRef, TERMLY_UUIDS.terms, {
+    enabled: open,
+    onLoad: markTermsViewed,
+  })
+  const privacyEmbed = useTermlyEmbed(privacyContainerRef, TERMLY_UUIDS.privacy, {
+    enabled: open,
+    onLoad: markPrivacyViewed,
+  })
 
   const handleGuidelinesScroll = useCallback(
     (e) => {
@@ -291,67 +344,75 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
 
         {/* Content area */}
         <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-          {/* Terms iframe */}
+          {/* Terms embed */}
           {activeTab === 'terms' && (
-            <div style={{ position: 'relative', flex: 1, minHeight: 300 }}>
-              {!termsLoaded && (
+            <div style={{ position: 'relative', flex: 1, minHeight: 300, overflowY: 'auto' }}>
+              {!termsEmbed.loaded && !termsEmbed.timedOut && (
                 <div style={{
                   position: 'absolute', inset: 0, display: 'flex', alignItems: 'center',
                   justifyContent: 'center', background: 'var(--sh-soft)',
                   color: 'var(--sh-muted)', fontSize: 13,
                 }}>
-                  {termsTimedOut ? (
-                    <div style={{ textAlign: 'center' }}>
-                      <p style={{ margin: '0 0 8px', color: 'var(--sh-muted)', fontSize: 13 }}>Could not load. </p>
-                      <a href={POLICY_URLS.terms} target="_blank" rel="noopener noreferrer"
-                        style={{ color: 'var(--sh-brand)', fontSize: 13, fontWeight: 600 }}
-                        onClick={() => markViewed('terms')}
-                      >View Terms of Use</a>
-                    </div>
-                  ) : 'Loading Terms of Use...'}
+                  Loading Terms of Use...
                 </div>
               )}
-              <iframe
-                key="terms-iframe"
-                src={POLICY_URLS.terms}
-                title="Terms of Use"
-                onLoad={() => { setTermsLoaded(true); handleIframeLoad('terms') }}
+              {termsEmbed.timedOut && !termsEmbed.loaded && (
+                <div style={{
+                  position: 'absolute', inset: 0, display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', background: 'var(--sh-soft)',
+                }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <p style={{ margin: '0 0 8px', color: 'var(--sh-muted)', fontSize: 13 }}>Could not load inline. </p>
+                    <a href={POLICY_URLS.terms} target="_blank" rel="noopener noreferrer"
+                      style={{ color: 'var(--sh-brand)', fontSize: 13, fontWeight: 600 }}
+                      onClick={() => markViewed('terms')}
+                    >View Terms of Use externally</a>
+                  </div>
+                </div>
+              )}
+              <div
+                ref={termsContainerRef}
                 style={{
-                  flex: 1, border: 'none', width: '100%', minHeight: 300,
-                  opacity: termsLoaded ? 1 : 0, transition: 'opacity 0.3s ease',
+                  padding: 16,
+                  opacity: termsEmbed.loaded ? 1 : 0,
+                  transition: 'opacity 0.3s ease',
                 }}
               />
             </div>
           )}
 
-          {/* Privacy iframe */}
+          {/* Privacy embed */}
           {activeTab === 'privacy' && (
-            <div style={{ position: 'relative', flex: 1, minHeight: 300 }}>
-              {!privacyLoaded && (
+            <div style={{ position: 'relative', flex: 1, minHeight: 300, overflowY: 'auto' }}>
+              {!privacyEmbed.loaded && !privacyEmbed.timedOut && (
                 <div style={{
                   position: 'absolute', inset: 0, display: 'flex', alignItems: 'center',
                   justifyContent: 'center', background: 'var(--sh-soft)',
                   color: 'var(--sh-muted)', fontSize: 13,
                 }}>
-                  {privacyTimedOut ? (
-                    <div style={{ textAlign: 'center' }}>
-                      <p style={{ margin: '0 0 8px', color: 'var(--sh-muted)', fontSize: 13 }}>Could not load. </p>
-                      <a href={POLICY_URLS.privacy} target="_blank" rel="noopener noreferrer"
-                        style={{ color: 'var(--sh-brand)', fontSize: 13, fontWeight: 600 }}
-                        onClick={() => markViewed('privacy')}
-                      >View Privacy Policy</a>
-                    </div>
-                  ) : 'Loading Privacy Policy...'}
+                  Loading Privacy Policy...
                 </div>
               )}
-              <iframe
-                key="privacy-iframe"
-                src={POLICY_URLS.privacy}
-                title="Privacy Policy"
-                onLoad={() => { setPrivacyLoaded(true); handleIframeLoad('privacy') }}
+              {privacyEmbed.timedOut && !privacyEmbed.loaded && (
+                <div style={{
+                  position: 'absolute', inset: 0, display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', background: 'var(--sh-soft)',
+                }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <p style={{ margin: '0 0 8px', color: 'var(--sh-muted)', fontSize: 13 }}>Could not load inline. </p>
+                    <a href={POLICY_URLS.privacy} target="_blank" rel="noopener noreferrer"
+                      style={{ color: 'var(--sh-brand)', fontSize: 13, fontWeight: 600 }}
+                      onClick={() => markViewed('privacy')}
+                    >View Privacy Policy externally</a>
+                  </div>
+                </div>
+              )}
+              <div
+                ref={privacyContainerRef}
                 style={{
-                  flex: 1, border: 'none', width: '100%', minHeight: 300,
-                  opacity: privacyLoaded ? 1 : 0, transition: 'opacity 0.3s ease',
+                  padding: 16,
+                  opacity: privacyEmbed.loaded ? 1 : 0,
+                  transition: 'opacity 0.3s ease',
                 }}
               />
             </div>
