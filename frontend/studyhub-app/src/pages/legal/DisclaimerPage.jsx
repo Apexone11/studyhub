@@ -29,17 +29,18 @@ function DisclaimerPage() {
     embed.setAttribute('data-id', TERMLY_UUIDS.disclaimer)
     container.appendChild(embed)
 
+    // Timeout fallback
+    const timer = setTimeout(() => setTimedOut(true), 10000)
+
     // Watch for Termly to populate the embed
     const observer = new MutationObserver(() => {
       if (embed.children.length > 0) {
+        clearTimeout(timer)
         setLoaded(true)
         observer.disconnect()
       }
     })
     observer.observe(embed, { childList: true, subtree: true })
-
-    // Timeout fallback
-    const timer = setTimeout(() => setTimedOut(true), 10000)
 
     return () => {
       observer.disconnect()

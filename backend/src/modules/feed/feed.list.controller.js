@@ -29,17 +29,16 @@ function scoreFeedItem(item, userContext = null) {
 
   // Personalization boosts when user context is available
   if (userContext) {
+    const courseId = item.course?.id || item.courseId
+    const authorId = item.author?.id || item.user?.id || item.authorId
+
     // Boost content from user's enrolled courses
-    if (userContext.courseIds && item.courseId && userContext.courseIds.has(item.courseId)) {
+    if (userContext.courseIds && courseId && userContext.courseIds.has(courseId)) {
       score *= 1.4
     }
     // Boost content from followed users
-    if (userContext.followingIds && item.authorId && userContext.followingIds.has(item.authorId)) {
+    if (userContext.followingIds && authorId && userContext.followingIds.has(authorId)) {
       score *= 1.3
-    }
-    // Slightly deprioritize content the user has already interacted with
-    if (userContext.interactedPostIds && userContext.interactedPostIds.has(item.id)) {
-      score *= 0.7
     }
   }
 
@@ -426,8 +425,9 @@ router.get('/', async (req, res) => {
           courseIds: new Set(enrollments.map((e) => e.courseId)),
           followingIds: new Set(follows.map((f) => f.followingId)),
         }
-      } catch {
+      } catch (err) {
         // Non-fatal - proceed without personalization
+        captureError(err, { context: 'feed.personalizationContext', route: req.originalUrl, method: req.method })
       }
     }
 

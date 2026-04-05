@@ -157,16 +157,16 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
   const [privacyTimedOut, setPrivacyTimedOut] = useState(false)
 
   useEffect(() => {
-    if (termsLoaded) return
+    if (!open || termsLoaded) return
     const timer = setTimeout(() => setTermsTimedOut(true), 12000)
     return () => clearTimeout(timer)
-  }, [termsLoaded])
+  }, [open, termsLoaded])
 
   useEffect(() => {
-    if (privacyLoaded) return
+    if (!open || privacyLoaded) return
     const timer = setTimeout(() => setPrivacyTimedOut(true), 12000)
     return () => clearTimeout(timer)
-  }, [privacyLoaded])
+  }, [open, privacyLoaded])
 
   const markViewed = useCallback((key) => {
     setViewedTabs((prev) => {
