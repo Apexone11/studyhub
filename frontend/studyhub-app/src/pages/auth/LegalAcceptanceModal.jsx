@@ -195,9 +195,8 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
         background: 'rgba(0,0,0,0.5)',
         padding: 16,
       }}
-      onClick={(e) => {
-        // Backdrop click closes but does not count as explicit decline
-        if (e.target === e.currentTarget) onDecline()
+      onClick={() => {
+        // Backdrop click does nothing -- user must explicitly Accept or Decline
       }}
     >
       {/* Modal card */}

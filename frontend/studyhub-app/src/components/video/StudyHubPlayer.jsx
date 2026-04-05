@@ -74,6 +74,7 @@ export default function StudyHubPlayer({
   const [activeQuality, setActiveQuality] = useState('auto')
   const [activeCaption, setActiveCaption] = useState('off')
   const [skipIndicator, setSkipIndicator] = useState(null) // { side, seconds }
+  const [isPiP, setIsPiP] = useState(false)
 
   // ── Initialize Video.js ──────────────────────────────────────────────
   useEffect(() => {
@@ -222,6 +223,37 @@ export default function StudyHubPlayer({
     }
   }, [])
 
+  // ── Picture-in-Picture ────────────────────────────────────────────────
+  const togglePiP = useCallback(async () => {
+    const video = videoRef.current
+    if (!video) return
+    try {
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture()
+        setIsPiP(false)
+      } else if (document.pictureInPictureEnabled) {
+        await video.requestPictureInPicture()
+        setIsPiP(true)
+      }
+    } catch {
+      // PiP not supported or user denied
+    }
+  }, [])
+
+  // Listen for PiP state changes (user may close PiP via browser controls)
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+    const onEnter = () => setIsPiP(true)
+    const onLeave = () => setIsPiP(false)
+    video.addEventListener('enterpictureinpicture', onEnter)
+    video.addEventListener('leavepictureinpicture', onLeave)
+    return () => {
+      video.removeEventListener('enterpictureinpicture', onEnter)
+      video.removeEventListener('leavepictureinpicture', onLeave)
+    }
+  }, [])
+
   const changeSpeed = useCallback((speed) => {
     const player = playerRef.current
     if (!player) return
@@ -359,6 +391,10 @@ export default function StudyHubPlayer({
         case 'L':
           toggleLoop()
           break
+        case 'p':
+        case 'P':
+          togglePiP()
+          break
         default:
           break
       }
@@ -376,6 +412,7 @@ export default function StudyHubPlayer({
     toggleFullscreen,
     toggleTheater,
     toggleLoop,
+    togglePiP,
     showControlsTemporarily,
   ])
 
@@ -692,6 +729,23 @@ export default function StudyHubPlayer({
                 <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z" />
               </svg>
             </button>
+
+            {/* Picture-in-Picture */}
+            {document.pictureInPictureEnabled && (
+              <button
+                className="shp-btn"
+                onClick={togglePiP}
+                aria-label={isPiP ? 'Exit picture-in-picture' : 'Picture-in-picture'}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                  {isPiP ? (
+                    <path d="M19 11h-8v6h8v-6zm4 8V5c0-1.1-.9-2-2-2H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2zm-2 .02H3V4.98h18v14.04z" />
+                  ) : (
+                    <path d="M19 11h-8v6h8v-6zm-2 4h-4v-2h4v2zm4-12H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16.02H3V4.98h18v14.04z" />
+                  )}
+                </svg>
+              </button>
+            )}
 
             {/* Theater mode */}
             <button

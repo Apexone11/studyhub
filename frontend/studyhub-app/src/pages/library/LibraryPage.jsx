@@ -11,11 +11,15 @@
  *   - Loading skeleton grid
  * ═══════════════════════════════════════════════════════════════════════════ */
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { Link } from 'react-router-dom'
 import Navbar from '../../components/navbar/Navbar'
 import { IconSearch, IconBook } from '../../components/Icons'
 import { SkeletonCard } from '../../components/Skeleton'
 import { usePageTitle } from '../../lib/usePageTitle'
+import { useSession } from '../../lib/session-context'
+import { API } from '../../config'
+import { authHeaders } from '../shared/pageUtils'
 import BookCard from './components/BookCard'
 import useLibraryData from './useLibraryData'
 import autoAnimate from '@formkit/auto-animate'
@@ -43,7 +47,37 @@ export default function LibraryPage() {
     setLanguage,
   } = useLibraryData()
 
+  const { user } = useSession()
   const [searchInput, setSearchInput] = useState(search)
+  const [shelves, setShelves] = useState([])
+  const [shelvesLoading, setShelvesLoading] = useState(false)
+  const [showShelves, setShowShelves] = useState(false)
+
+  // Fetch user's shelves with books
+  const loadShelves = useCallback(async () => {
+    if (!user) return
+    setShelvesLoading(true)
+    try {
+      const res = await fetch(`${API}/api/library/shelves?includeBooks=true`, {
+        credentials: 'include',
+        headers: authHeaders(),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setShelves(data.shelves || [])
+      }
+    } catch {
+      // Silent failure
+    } finally {
+      setShelvesLoading(false)
+    }
+  }, [user])
+
+  useEffect(() => {
+    if (showShelves && shelves.length === 0 && !shelvesLoading) {
+      loadShelves()
+    }
+  }, [showShelves, shelves.length, shelvesLoading, loadShelves])
 
   // Auto-animate the books grid for smooth transitions
   const gridRef = useRef(null)
@@ -161,6 +195,73 @@ export default function LibraryPage() {
             </div>
           </div>
         </section>
+
+        {/* My Shelves Section */}
+        {user && (
+          <section className="library-shelves">
+            <div className="library-shelves__container">
+              <button
+                className="library-shelves__toggle"
+                onClick={() => setShowShelves((prev) => !prev)}
+              >
+                <span className="library-shelves__toggle-label">My Bookshelves</span>
+                <span className="library-shelves__toggle-icon">{showShelves ? '\u25B2' : '\u25BC'}</span>
+              </button>
+
+              {showShelves && (
+                <div className="library-shelves__content">
+                  {shelvesLoading ? (
+                    <div className="library-shelves__loading">Loading shelves...</div>
+                  ) : shelves.length === 0 ? (
+                    <div className="library-shelves__empty">
+                      <p>No bookshelves yet. Add books to shelves from their detail page.</p>
+                    </div>
+                  ) : (
+                    shelves.map((shelf) => (
+                      <div key={shelf.id} className="library-shelf">
+                        <div className="library-shelf__header">
+                          <h3 className="library-shelf__name">{shelf.name}</h3>
+                          <span className="library-shelf__count">
+                            {shelf._count?.books || 0} book{(shelf._count?.books || 0) === 1 ? '' : 's'}
+                          </span>
+                        </div>
+                        {shelf.description && (
+                          <p className="library-shelf__desc">{shelf.description}</p>
+                        )}
+                        {shelf.books && shelf.books.length > 0 ? (
+                          <div className="library-shelf__books">
+                            {shelf.books.map((book) => (
+                              <Link
+                                key={book.volumeId}
+                                to={`/library/${book.volumeId}`}
+                                className="library-shelf__book"
+                              >
+                                {book.coverUrl ? (
+                                  <img
+                                    src={book.coverUrl}
+                                    alt={book.title}
+                                    className="library-shelf__book-cover"
+                                  />
+                                ) : (
+                                  <div className="library-shelf__book-placeholder">
+                                    <IconBook size={24} />
+                                  </div>
+                                )}
+                                <span className="library-shelf__book-title">{book.title}</span>
+                              </Link>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="library-shelf__empty-books">No books on this shelf yet.</p>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          </section>
+        )}
 
         {/* Main Content */}
         <main className="library-main">
