@@ -126,6 +126,12 @@ export default function SheetReviewsTab({
                     {record.htmlScanFindings.length} finding{record.htmlScanFindings.length !== 1 ? 's' : ''}
                   </span>
                 )}
+                {record.aiReviewDecision && (
+                  <PipelineBadge
+                    label={`AI: ${record.aiReviewDecision}`}
+                    type={record.aiReviewDecision === 'approve' ? 'success' : record.aiReviewDecision === 'reject' ? 'danger' : 'warning'}
+                  />
+                )}
               </div>
             </div>
             {record.description ? (

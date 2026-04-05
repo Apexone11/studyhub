@@ -229,6 +229,12 @@ model StudySheet {
   allowEditing           Boolean      @default(false)
   contentHash            String?
   contentSimhash         String?
+  aiReviewDecision       String?      // "approve", "reject", "escalate", null
+  aiReviewConfidence     Int?         // 0-100
+  aiReviewScore          Int?         // 0-100 risk score
+  aiReviewFindings       String?      @db.Text // JSON findings array
+  aiReviewReasoning      String?      @db.Text // 1-3 sentence reasoning
+  aiReviewedAt           DateTime?
   createdAt              DateTime     @default(now())
   updatedAt              DateTime     @updatedAt
   course                 Course       @relation(fields: [courseId], references: [id])
@@ -246,6 +252,7 @@ model StudySheet {
   commits               SheetCommit[]
   provenance            ProvenanceManifest?
   pinnedBy              UserPinnedSheet[]
+  aiReviewLogs          AiReviewLog[]
 
   @@index([createdAt(sort: Desc)])
   @@index([courseId, createdAt(sort: Desc)])
@@ -255,6 +262,7 @@ model StudySheet {
   @@index([htmlRiskTier, status, createdAt(sort: Desc)])
   @@index([contentHash])
   @@index([contentSimhash])
+  @@index([aiReviewDecision])
 }
 
 model SheetHtmlVersion {
@@ -1706,5 +1714,28 @@ model ReviewReport {
   generatedByUser User? @relation("ReviewReportGenerator", fields: [generatedBy], references: [id], onDelete: SetNull)
 
   @@index([periodEnd])
+  @@index([createdAt])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AI Review Log — Audit trail for AI-powered sheet reviews
+// ═══════════════════════════════════════════════════════════════════════════
+
+model AiReviewLog {
+  id         String     @id @default(cuid())
+  sheetId    Int
+  decision   String     // "approve", "reject", "escalate"
+  confidence Int        // 0-100
+  riskScore  Int        // 0-100
+  findings   String     @db.Text // JSON array of findings
+  reasoning  String     @db.Text
+  model      String     // which Claude model was used
+  inputTier  Int        // what tier the scanner assigned (1 or 2)
+  createdAt  DateTime   @default(now())
+
+  sheet StudySheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+
+  @@index([sheetId])
+  @@index([decision])
   @@index([createdAt])
 }

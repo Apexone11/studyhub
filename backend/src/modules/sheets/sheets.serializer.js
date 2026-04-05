@@ -74,8 +74,15 @@ function serializeSheet(sheet, { starred = false, reactions = null, commentCount
     ? sheet.htmlVersions.find((entry) => entry.kind === HTML_VERSION_KIND.WORKING)
     : null
 
+  // Strip AI review fields from public responses (admin-only data)
+  const {
+    aiReviewDecision: _aiD, aiReviewConfidence: _aiC, aiReviewScore: _aiS,
+    aiReviewFindings: _aiF, aiReviewReasoning: _aiR, aiReviewedAt: _aiAt,
+    ...publicSheet
+  } = sheet
+
   const response = {
-    ...sheet,
+    ...publicSheet,
     starred,
     allowDownloads: sheet.allowDownloads !== false,
     allowEditing: sheet.allowEditing === true,

@@ -1,8 +1,8 @@
 /* ═══════════════════════════════════════════════════════════════════════════
  * moderationEngine.js — Core moderation runtime for StudyHub
  *
- * Provides async content scanning via OpenAI Moderation API, strike
- * management, restriction enforcement, and case review utilities.
+ * Provides async content scanning via Claude Haiku, strike management,
+ * restriction enforcement, and case review utilities.
  *
  * Design:
  *   - scanContent() is FIRE-AND-FORGET (never blocks content creation)
@@ -10,64 +10,107 @@
  *   - Strike model: 90-day decay, 4 active strikes = auto-restrict
  *   - All errors are captured via Sentry, never re-thrown to callers
  *
- * Feature flag: OPENAI_API_KEY presence enables scanning. No key = no scan.
+ * Feature flag: ANTHROPIC_API_KEY presence enables scanning. No key = no scan.
  * ═══════════════════════════════════════════════════════════════════════════ */
-const OpenAI = require('openai')
+const Anthropic = require('@anthropic-ai/sdk')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../prisma')
 const { createNotification } = require('../notify')
 const { logModerationEvent } = require('./moderationLogger')
 
-/* ── Lazy-initialised OpenAI client ──────────────────────────────────────── */
-let _openai = null
-function getOpenAiClient() {
-  if (!_openai) _openai = new OpenAI()
-  return _openai
+/* ── Lazy-initialised Anthropic client ─────────────────────────────────── */
+let _anthropic = null
+function getAnthropicClient() {
+  if (!_anthropic) {
+    const apiKey = process.env.ANTHROPIC_API_KEY
+    if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set')
+    _anthropic = new Anthropic.default({ apiKey })
+  }
+  return _anthropic
 }
 
 /* ── Feature flag ────────────────────────────────────────────────────────── */
 
 /**
- * Returns true if the OpenAI Moderation API is configured.
+ * Returns true if the Anthropic API is configured for moderation.
  * When false, all scanning is silently skipped.
  */
 function isModerationEnabled() {
-  return Boolean(process.env.OPENAI_API_KEY)
+  return Boolean(process.env.ANTHROPIC_API_KEY)
 }
 
-/* ── OpenAI Moderation API call ──────────────────────────────────────────── */
+/* ── Claude moderation system prompt ─────────────────────────────────────── */
+
+const MODERATION_MODEL = 'claude-haiku-4-5-20251001'
+
+const MODERATION_SYSTEM_PROMPT = `You are a content moderation system for StudyHub, a college study platform. Evaluate the following text for policy violations.
+
+Evaluate these categories (score each 0.0 to 1.0):
+- hate: Content that expresses hatred toward a group based on protected characteristics
+- harassment: Content that targets, threatens, or intimidates an individual
+- self_harm: Content that promotes or glorifies self-harm or suicide
+- sexual: Sexually explicit content
+- violence: Content that depicts or promotes violence
+- academic_dishonesty: Content that facilitates cheating, plagiarism, or exam fraud
+
+RESPONSE FORMAT (JSON only, no other text):
+{
+  "flagged": true/false,
+  "categories": {
+    "hate": 0.0,
+    "harassment": 0.0,
+    "self_harm": 0.0,
+    "sexual": 0.0,
+    "violence": 0.0,
+    "academic_dishonesty": 0.0
+  },
+  "top_category": "string or null",
+  "top_score": 0.0,
+  "reasoning": "brief explanation"
+}
+
+Set flagged to true if ANY category scores above 0.5.
+Be calibrated: educational content about sensitive topics (e.g., a nursing student studying trauma, a history student studying war crimes) should NOT be flagged. Only flag content that is itself harmful, not content that discusses harmful topics academically.`
+
+/* ── Claude Moderation API call ──────────────────────────────────────────── */
 
 /**
- * Calls the OpenAI Moderation endpoint and returns the parsed result.
- * Returns null on any error (network, rate limit, invalid key, etc.)
- * so callers can safely skip case creation.
+ * Calls Claude Haiku for content moderation and returns the parsed result.
+ * Returns null on any error so callers can safely skip case creation.
  */
-const MODERATION_TIMEOUT_MS = 10_000
-
-async function callOpenAiModeration(text) {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), MODERATION_TIMEOUT_MS)
+async function callClaudeModeration(text) {
   try {
-    const client = getOpenAiClient()
-    const response = await client.moderations.create(
-      {
-        model: process.env.OPENAI_MODERATION_MODEL || 'omni-moderation-latest',
-        input: text,
-      },
-      { signal: controller.signal },
-    )
-    const result = response.results?.[0]
-    if (!result) return null
+    const client = getAnthropicClient()
+    const response = await client.messages.create({
+      model: MODERATION_MODEL,
+      max_tokens: 512,
+      system: MODERATION_SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: `Text to moderate:\n\n${text}` }],
+    })
+
+    const rawText = response.content[0]?.text || ''
+    const cleaned = rawText.replace(/^```(?:json)?\n?/gm, '').replace(/\n?```$/gm, '').trim()
+    const result = JSON.parse(cleaned)
+
+    // Map Claude response to the same format as before
+    const categories = result.categories || {}
+    const categoryScores = {}
+    const categoryFlags = {}
+    for (const [cat, score] of Object.entries(categories)) {
+      categoryScores[cat] = score
+      categoryFlags[cat] = score >= 0.5
+    }
+
     return {
-      flagged: result.flagged,
-      categories: result.categories,
-      categoryScores: result.category_scores,
+      flagged: result.flagged || false,
+      categories: categoryFlags,
+      categoryScores,
+      topCategory: result.top_category || null,
+      topScore: result.top_score || 0,
     }
   } catch (error) {
-    captureError(error, { context: 'openai-moderation', timedOut: error.name === 'AbortError' })
+    captureError(error, { context: 'claude-moderation' })
     return null
-  } finally {
-    clearTimeout(timer)
   }
 }
 
@@ -91,18 +134,21 @@ async function scanContent({ contentType, contentId, text, userId }) {
     /* Skip empty or very short content (noise) */
     if (!text || text.trim().length < 5) return
 
-    const modResult = await callOpenAiModeration(text.slice(0, 10000))
+    const modResult = await callClaudeModeration(text.slice(0, 10000))
     if (!modResult) return
 
-    /* Find the highest-scoring category */
+    /* Use top category/score from Claude response */
     const scores = modResult.categoryScores || {}
-    let topCategory = null
-    let topScore = 0
+    let topCategory = modResult.topCategory
+    let topScore = modResult.topScore || 0
 
-    for (const [category, score] of Object.entries(scores)) {
-      if (score > topScore) {
-        topScore = score
-        topCategory = category
+    // Fallback: find highest-scoring category from scores if not provided
+    if (!topCategory) {
+      for (const [category, score] of Object.entries(scores)) {
+        if (score > topScore) {
+          topScore = score
+          topCategory = category
+        }
       }
     }
 
@@ -123,7 +169,7 @@ async function scanContent({ contentType, contentId, text, userId }) {
         status: 'pending',
         confidence: Math.round(topScore * 1000) / 1000,
         category: topCategory,
-        provider: 'openai',
+        provider: 'claude',
         source: 'auto',
         reasonCategory: topCategory,
         excerpt: text.slice(0, 400),

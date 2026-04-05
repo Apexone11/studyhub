@@ -4,6 +4,7 @@ const { validateHtmlForRuntime, classifyHtmlRisk, RISK_TIER, generateRiskSummary
 const { sanitizePreviewHtml } = require('../../lib/html/htmlPreviewDocument')
 const prisma = require('../../lib/prisma')
 const { PAGE_SIZE, parsePage } = require('./admin.constants')
+const { reReviewSheet } = require('../../modules/sheetReviewer')
 
 const router = express.Router()
 
@@ -135,6 +136,13 @@ router.get('/sheets/:id/review-detail', async (req, res) => {
         issues: runtimeValidation.issues,
         enrichedIssues: runtimeValidation.enrichedIssues || [],
       },
+      // AI review data (admin-only)
+      aiReviewDecision: sheet.aiReviewDecision || null,
+      aiReviewConfidence: sheet.aiReviewConfidence || null,
+      aiReviewScore: sheet.aiReviewScore || null,
+      aiReviewFindings: sheet.aiReviewFindings || null,
+      aiReviewReasoning: sheet.aiReviewReasoning || null,
+      aiReviewedAt: sheet.aiReviewedAt || null,
       createdAt: sheet.createdAt,
       updatedAt: sheet.updatedAt,
     })
@@ -221,6 +229,31 @@ router.delete('/sheets/:id', async (req, res) => {
     if (err.code === 'P2025') return res.status(404).json({ error: 'Sheet not found.' })
     captureError(err, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── POST /api/admin/sheets/:id/ai-review — Trigger AI re-review ─────────
+router.post('/sheets/:id/ai-review', async (req, res) => {
+  const sheetId = parseInt(req.params.id, 10)
+  if (!Number.isInteger(sheetId)) {
+    return res.status(400).json({ error: 'Sheet id must be an integer.' })
+  }
+
+  try {
+    const result = await reReviewSheet(sheetId)
+    res.json({
+      message: 'AI re-review completed.',
+      decision: result.decision,
+      confidence: result.confidence,
+      risk_score: result.risk_score,
+      findings: result.findings,
+      reasoning: result.reasoning,
+    })
+  } catch (err) {
+    if (err.message === 'Sheet not found') return res.status(404).json({ error: err.message })
+    if (err.message === 'Only HTML sheets can be AI-reviewed') return res.status(400).json({ error: err.message })
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'AI review failed.' })
   }
 })
 

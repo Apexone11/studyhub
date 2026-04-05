@@ -615,7 +615,7 @@ function FeedCardInner({
                   popScale(e.currentTarget)
                   onStar(item)
                 }}
-                style={actionButton(item.starred ? '#f59e0b' : '#475569')}
+                style={actionButton(item.starred ? 'var(--sh-warning)' : 'var(--sh-slate-600)')}
               >
                 {item.starred ? <IconStarFilled size={14} /> : <IconStar size={14} />}
                 {item.stars || 0} stars
@@ -634,7 +634,7 @@ function FeedCardInner({
                   popScale(e.currentTarget)
                   onReact(item, 'like')
                 }}
-                style={actionButton(reaction.userReaction === 'like' ? '#16a34a' : '#475569')}
+                style={actionButton(reaction.userReaction === 'like' ? 'var(--sh-success)' : 'var(--sh-slate-600)')}
               >
                 Like {reaction.likes || 0}
               </button>
@@ -646,7 +646,7 @@ function FeedCardInner({
                   popScale(e.currentTarget)
                   onReact(item, 'dislike')
                 }}
-                style={actionButton(reaction.userReaction === 'dislike' ? '#dc2626' : '#475569')}
+                style={actionButton(reaction.userReaction === 'dislike' ? 'var(--sh-danger)' : 'var(--sh-slate-600)')}
               >
                 Dislike {reaction.dislikes || 0}
               </button>
@@ -658,7 +658,7 @@ function FeedCardInner({
                   popScale(e.currentTarget)
                   onReact(item, 'like')
                 }}
-                style={actionButton(reaction.userReaction === 'like' ? '#16a34a' : '#475569')}
+                style={actionButton(reaction.userReaction === 'like' ? 'var(--sh-success)' : 'var(--sh-slate-600)')}
               >
                 Helpful {reaction.likes || 0}
               </button>
@@ -670,7 +670,7 @@ function FeedCardInner({
                   popScale(e.currentTarget)
                   onReact(item, 'dislike')
                 }}
-                style={actionButton(reaction.userReaction === 'dislike' ? '#dc2626' : '#475569')}
+                style={actionButton(reaction.userReaction === 'dislike' ? 'var(--sh-danger)' : 'var(--sh-slate-600)')}
               >
                 Needs work {reaction.dislikes || 0}
               </button>

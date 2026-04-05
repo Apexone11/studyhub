@@ -177,7 +177,7 @@ export default function NoteCommentSection({ noteId, isOwner, user, noteContent,
                   }}
                 />
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
-                  <span style={{ fontSize: 11, color: draft.length > 500 ? '#dc2626' : 'var(--sh-slate-400)' }}>
+                  <span style={{ fontSize: 11, color: draft.length > 500 ? 'var(--sh-danger)' : 'var(--sh-slate-400)' }}>
                     {draft.length}/500
                   </span>
                   <button
@@ -195,7 +195,7 @@ export default function NoteCommentSection({ noteId, isOwner, user, noteContent,
                     {posting ? 'Posting...' : 'Comment'}
                   </button>
                 </div>
-                {error && <div style={{ fontSize: 12, color: '#dc2626', marginTop: 4 }}>{error}</div>}
+                {error && <div style={{ fontSize: 12, color: 'var(--sh-danger)', marginTop: 4 }}>{error}</div>}
               </div>
             </div>
           )}

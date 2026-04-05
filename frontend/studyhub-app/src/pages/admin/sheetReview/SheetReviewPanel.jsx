@@ -23,6 +23,7 @@ export default function SheetReviewPanel({ sheetId, onClose, onReviewComplete })
   const [submitError, setSubmitError] = useState('')
   const [submitEnrichedIssues, setSubmitEnrichedIssues] = useState([])
   const [activeTab, setActiveTab] = useState('preview') // 'preview' | 'raw' | 'findings'
+  const [aiReviewing, setAiReviewing] = useState(false)
   const [scrollToLine, setScrollToLine] = useState(0)
   const iframeRef = useRef(null)
 
@@ -75,6 +76,28 @@ export default function SheetReviewPanel({ sheetId, onClose, onReviewComplete })
       setSubmitError(err.message || `Could not ${action} sheet.`)
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  async function handleAiReReview() {
+    setAiReviewing(true)
+    try {
+      const response = await fetch(`${API}/api/admin/sheets/${sheetId}/ai-review`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      })
+      if (!response.ok) {
+        const data = await readJsonSafely(response, {})
+        throw new Error(data.error || 'AI re-review failed')
+      }
+      // Reload the detail to show updated AI review data
+      await loadDetail()
+      setActiveTab('findings')
+    } catch (err) {
+      setSubmitError(err.message || 'AI re-review failed')
+    } finally {
+      setAiReviewing(false)
     }
   }
 
@@ -179,6 +202,33 @@ export default function SheetReviewPanel({ sheetId, onClose, onReviewComplete })
           {isHtml && d.tierExplanation && d.htmlRiskTier > 0 && (
             <div style={{ marginTop: 6, fontSize: 11, color: 'var(--sh-muted)', lineHeight: 1.5 }}>
               {d.tierExplanation}
+            </div>
+          )}
+          {/* AI review badge + re-review button */}
+          {isHtml && (
+            <div style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              {d.aiReviewDecision && (
+                <span style={{
+                  fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 6,
+                  background: d.aiReviewDecision === 'approve' ? 'var(--sh-success-bg)' : d.aiReviewDecision === 'reject' ? 'var(--sh-danger-bg)' : 'var(--sh-warning-bg)',
+                  color: d.aiReviewDecision === 'approve' ? 'var(--sh-success-text)' : d.aiReviewDecision === 'reject' ? 'var(--sh-danger-text)' : 'var(--sh-warning-text)',
+                  border: `1px solid ${d.aiReviewDecision === 'approve' ? 'var(--sh-success-border)' : d.aiReviewDecision === 'reject' ? 'var(--sh-danger-border)' : 'var(--sh-warning-border)'}`,
+                }}>
+                  AI: {d.aiReviewDecision}{d.aiReviewConfidence ? ` (${d.aiReviewConfidence}%)` : ''}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={handleAiReReview}
+                disabled={aiReviewing}
+                style={{
+                  padding: '4px 12px', borderRadius: 6, border: '1px solid var(--sh-border)',
+                  background: 'var(--sh-surface)', color: 'var(--sh-subtext)', fontSize: 11,
+                  fontWeight: 700, cursor: aiReviewing ? 'wait' : 'pointer', fontFamily: FONT,
+                }}
+              >
+                {aiReviewing ? 'Running AI Review...' : 'AI Re-Review'}
+              </button>
             </div>
           )}
         </div>
