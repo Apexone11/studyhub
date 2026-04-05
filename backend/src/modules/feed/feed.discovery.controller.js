@@ -218,7 +218,8 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
       return res.status(401).json({ error: 'Authentication required.' })
     }
 
-    const userId = req.user.userId
+    const userId = req.user?.userId
+    if (!userId) return res.status(401).json({ error: 'Authentication required.' })
     const cacheKey = `for-you:${userId}`
     const cached = cache.get(cacheKey)
     if (cached) {
@@ -239,7 +240,7 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
     } catch {
       blockedIds = []
     }
-    const excludeUserIds = new Set([userId, ...blockedIds])
+    const excludeUserIds = new Set([userId, ...blockedIds].filter((id) => id != null && id !== undefined))
 
     // Get starred sheets
     const starredIds = await prisma.starredSheet.findMany({
@@ -317,7 +318,7 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
         ? prisma.enrollment.findMany({
             where: {
               courseId: { in: courseIds },
-              userId: { notIn: [...excludeUserIds] },
+              userId: { notIn: [...excludeUserIds].filter((id) => id != null) },
             },
             select: {
               userId: true,
@@ -449,7 +450,7 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
   } catch (err) {
     captureError(err, { route: req.originalUrl })
     console.error('[for-you] Feed error:', err.message)
-    res.status(500).json({ error: `For You error: ${err.message}` })
+    res.status(500).json({ error: 'Could not load personalized content. Please try again.' })
   }
 })
 

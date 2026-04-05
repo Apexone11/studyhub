@@ -71,6 +71,7 @@ export default function SheetViewerPage() {
     studyStatus,
     setStudyStatus,
     STUDY_STATUSES,
+    handleSheetUpdate,
   } = useSheetViewer()
 
   const [reportOpen, setReportOpen] = useState(false)
@@ -157,6 +158,7 @@ export default function SheetViewerPage() {
                   handleShare={handleShare}
                   setShowContributeModal={setShowContributeModal}
                   setReportOpen={setReportOpen}
+                  onSheetUpdate={handleSheetUpdate}
                 />
               )}
 

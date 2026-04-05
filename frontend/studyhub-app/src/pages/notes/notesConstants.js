@@ -57,11 +57,24 @@ export function applyToolbarAction(textareaRef, action, content, onChange) {
   })
 }
 
-/* ── Word count helper ───────────────────────────────────────────────── */
+/* ── Word count helper (plain text / markdown) ──────────────────────── */
 export function wordCount(text) {
   if (!text?.trim()) return 0
   return text.trim().split(/\s+/).length
 }
 
-/* ── Re-export JSX component from notesComponents.jsx ──────────────── */
-export { MarkdownPreview } from './notesComponents.jsx'
+/**
+ * Word count helper for HTML content.
+ * Creates a temporary element, extracts textContent, then counts words.
+ */
+export function countWordsFromHtml(html) {
+  if (!html?.trim()) return 0
+  const el = document.createElement('div')
+  el.innerHTML = html
+  const text = el.textContent || ''
+  if (!text.trim()) return 0
+  return text.trim().split(/\s+/).filter(Boolean).length
+}
+
+/* ── Re-export JSX components from notesComponents.jsx ─────────────── */
+export { MarkdownPreview, NoteContentRenderer } from './notesComponents.jsx'

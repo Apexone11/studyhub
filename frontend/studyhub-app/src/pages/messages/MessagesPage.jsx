@@ -61,6 +61,21 @@ export default function MessagesPage() {
     deleteConversation,
     setActiveConversation,
     emitTypingStart,
+    archiveConversation,
+    unarchiveConversation,
+    muteConversation,
+    blockUser,
+    sendBlocked,
+    // Requests
+    messageRequests,
+    totalPending,
+    loadRequests,
+    acceptRequest,
+    declineRequest,
+    // Archived
+    archivedConversations,
+    archivedCount,
+    loadArchived,
   } = useMessagingData(socket, currentUserId)
 
   const [showNewModal, setShowNewModal] = useState(false)
@@ -68,12 +83,14 @@ export default function MessagesPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const dmInitRef = useRef(false)
 
-  // Load conversations on mount
+  // Load conversations, requests, and archived on mount
   useEffect(() => {
     if (user) {
       loadConversations()
+      loadRequests()
+      loadArchived()
     }
-  }, [user, loadConversations])
+  }, [user, loadConversations, loadRequests, loadArchived])
 
   // Auto-start DM if navigated with ?dm=userId from profile
   useEffect(() => {
@@ -115,6 +132,19 @@ export default function MessagesPage() {
       selectConversation(conv.id)
     }
   }, [startConversation, selectConversation])
+
+  const handleBlockUser = useCallback(async (conversation) => {
+    if (!conversation || conversation.type !== 'dm') return
+    const other = conversation.participants?.find((p) => p.id !== currentUserId)
+    if (!other?.username) return
+    const confirmed = window.confirm(`Block ${other.username}? They will no longer be able to message you.`)
+    if (!confirmed) return
+    const success = await blockUser(other.username)
+    if (success) {
+      // Remove conversation from list
+      deleteConversation(conversation.id)
+    }
+  }, [currentUserId, blockUser, deleteConversation])
 
   const handleDeleteConversation = useCallback(() => {
     if (deleteTarget) {
@@ -186,8 +216,18 @@ export default function MessagesPage() {
               selectConversation={selectConversation}
               onNewClick={() => setShowNewModal(true)}
               onDeleteConversation={(id) => setDeleteTarget(id)}
+              onMuteConversation={muteConversation}
+              onArchiveConversation={archiveConversation}
+              onBlockUser={handleBlockUser}
               loading={loadingConversations}
               currentUserId={currentUserId}
+              messageRequests={messageRequests}
+              totalPending={totalPending}
+              onAcceptRequest={acceptRequest}
+              onDeclineRequest={declineRequest}
+              archivedConversations={archivedConversations}
+              archivedCount={archivedCount}
+              onUnarchiveConversation={unarchiveConversation}
             />
           </div>
         )}
@@ -206,6 +246,10 @@ export default function MessagesPage() {
               loadingMessages={loadingMessages}
               isPhone={layout.isPhone}
               currentUserId={currentUserId}
+              onMute={muteConversation}
+              onArchive={archiveConversation}
+              onBlock={handleBlockUser}
+              sendBlocked={sendBlocked}
             />
           </div>
         )}

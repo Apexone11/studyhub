@@ -16,6 +16,7 @@ const prisma = require('../../lib/prisma')
 const { readLimiter, messagingWriteLimiter } = require('../../lib/rateLimiters')
 const { getIO } = require('../../lib/socketio')
 const SOCKET_EVENTS = require('../../lib/socketEvents')
+const { isBlockedEitherWay } = require('../../lib/social/blockFilter')
 const {
   MAX_MESSAGE_LENGTH,
   sanitizeMessageContent,
@@ -193,6 +194,30 @@ router.post('/conversations/:id/messages', requireAuth, messagingWriteLimiter, a
 
     if (!participant) {
       return sendError(res, 404, 'Conversation not found.', ERROR_CODES.NOT_FOUND)
+    }
+
+    // For DMs, check if either user has blocked the other
+    try {
+      const conversation = await prisma.conversation.findUnique({
+        where: { id: conversationId },
+        include: {
+          participants: {
+            where: { userId: { not: req.user.userId } },
+            select: { userId: true },
+          },
+        },
+      })
+
+      if (conversation && conversation.type === 'dm' && conversation.participants.length > 0) {
+        const otherUserId = conversation.participants[0].userId
+        const blocked = await isBlockedEitherWay(prisma, req.user.userId, otherUserId)
+        if (blocked) {
+          return sendError(res, 403, 'You cannot message this person.', ERROR_CODES.FORBIDDEN)
+        }
+      }
+    } catch (blockErr) {
+      // Graceful degradation: if block check fails, allow the message through
+      captureError(blockErr, { route: req.originalUrl, context: 'block-check-send' })
     }
 
     const message = await prisma.message.create({

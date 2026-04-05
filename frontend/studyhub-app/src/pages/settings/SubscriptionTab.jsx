@@ -16,8 +16,15 @@ import { FONT } from './settingsState'
 
 const PLAN_LABELS = {
   free: 'Free',
+  donor: 'Supporter',
   pro_monthly: 'Pro (Monthly)',
   pro_yearly: 'Pro (Yearly)',
+}
+
+const PLAN_IMAGES = {
+  donor: '/images/plan-donation.png',
+  pro_monthly: '/images/plan-pro-monthly.png',
+  pro_yearly: '/images/plan-pro-yearly.png',
 }
 
 const STATUS_STYLES = {
@@ -25,6 +32,7 @@ const STATUS_STYLES = {
   trialing: { bg: 'var(--sh-info-bg)', border: 'var(--sh-info-border)', text: 'var(--sh-info-text)', label: 'Trial' },
   past_due: { bg: 'var(--sh-warning-bg)', border: 'var(--sh-warning-border)', text: 'var(--sh-warning-text)', label: 'Past Due' },
   canceling: { bg: 'var(--sh-warning-bg)', border: 'var(--sh-warning-border)', text: 'var(--sh-warning-text)', label: 'Canceling' },
+  donor: { bg: 'var(--sh-success-bg)', border: 'var(--sh-success-border)', text: 'var(--sh-success-text)', label: 'Supporter' },
   free: { bg: 'var(--sh-soft)', border: 'var(--sh-border)', text: 'var(--sh-muted)', label: 'Free' },
 }
 
@@ -44,6 +52,7 @@ function fmtCurrency(cents) {
 
 function getStatusKey(sub, cancelAtPeriodEnd) {
   if (!sub || sub.plan === 'free') return 'free'
+  if (sub.plan === 'donor') return 'donor'
   if (cancelAtPeriodEnd) return 'canceling'
   if (sub.status === 'trialing') return 'trialing'
   if (sub.status === 'past_due') return 'past_due'
@@ -356,15 +365,23 @@ export default function SubscriptionTab() {
       {/* Section 1: Plan Status */}
       <SectionCard title="Your Plan">
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-          <div style={{
-            width: 48, height: 48, borderRadius: 12,
-            background: isFree ? 'var(--sh-soft)' : 'linear-gradient(135deg, var(--sh-brand), var(--sh-brand-hover))',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 20, fontWeight: 800, color: isFree ? 'var(--sh-muted)' : 'var(--sh-btn-primary-text)',
-            flexShrink: 0,
-          }}>
-            {isFree ? 'F' : 'P'}
-          </div>
+          {PLAN_IMAGES[effectivePlan] ? (
+            <img
+              src={PLAN_IMAGES[effectivePlan]}
+              alt={PLAN_LABELS[effectivePlan] || 'Plan'}
+              style={{ width: 48, height: 48, borderRadius: 12, objectFit: 'cover', flexShrink: 0 }}
+            />
+          ) : (
+            <div style={{
+              width: 48, height: 48, borderRadius: 12,
+              background: 'var(--sh-soft)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 20, fontWeight: 800, color: 'var(--sh-muted)',
+              flexShrink: 0,
+            }}>
+              F
+            </div>
+          )}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 18, fontWeight: 800, color: 'var(--sh-heading)' }}>

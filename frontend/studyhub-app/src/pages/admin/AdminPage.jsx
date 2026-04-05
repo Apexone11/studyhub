@@ -19,6 +19,7 @@ import DeletionReasonsTab from './DeletionReasonsTab'
 import EmailSuppressionsTab from './EmailSuppressionsTab'
 import AdminSettingsTab from './AdminSettingsTab'
 import SchoolsTab from './SchoolsTab'
+import ReviewsTab from './ReviewsTab'
 
 const AnalyticsTab = lazy(() => import('./AnalyticsTab'))
 const RevenueTab = lazy(() => import('./RevenueTab'))
@@ -246,7 +247,8 @@ export default function AdminPage() {
                 activeTab !== 'analytics' &&
                 activeTab !== 'settings' &&
                 activeTab !== 'moderation' &&
-                activeTab !== 'schools' ? (
+                activeTab !== 'schools' &&
+                activeTab !== 'reviews' ? (
                   <section
                     style={{
                       background: 'var(--sh-surface, #fff)',
@@ -358,6 +360,19 @@ export default function AdminPage() {
                         Loading tab…
                       </div>
                     ) : null}
+                  </section>
+                ) : null}
+
+                {activeTab === 'reviews' ? (
+                  <section
+                    style={{
+                      background: 'var(--sh-surface, #fff)',
+                      borderRadius: 18,
+                      border: '1px solid var(--sh-border, #e2e8f0)',
+                      padding: '22px',
+                    }}
+                  >
+                    <ReviewsTab />
                   </section>
                 ) : null}
 

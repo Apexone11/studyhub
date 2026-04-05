@@ -30,6 +30,11 @@ model User {
   googleId                String?   @unique
   authProvider            String    @default("local")
   accountType             String    @default("student")
+  pendingAccountType      String?
+  accountTypeChangedAt    DateTime?
+  termsAcceptedVersion    String?
+  termsAcceptedAt         DateTime?
+  isPrivate               Boolean   @default(false)
   createdAt               DateTime  @default(now())
 
   studySheets                StudySheet[]
@@ -106,14 +111,19 @@ model User {
   commentReactions           CommentReaction[]
   feedPostCommentReactions   FeedPostCommentReaction[]
   noteCommentReactions       NoteCommentReaction[]
+  noteReactions              NoteReaction[]
   referralCodes              ReferralCode[]
   referralRedemptions        ReferralRedemption[]
   giftsSent                  GiftSubscription[]    @relation("GiftsSent")
   giftsReceived              GiftSubscription[]    @relation("GiftsReceived")
   subscriptionPauses         SubscriptionPause[]
+  lastActiveAt               DateTime?
+  userReviews                UserReview[]
+  generatedReviewReports     ReviewReport[]        @relation("ReviewReportGenerator")
 
   @@index([role])
   @@index([emailHash])
+  @@index([lastActiveAt])
 }
 
 model ShareLink {
@@ -219,8 +229,15 @@ model StudySheet {
   attachmentType         String?
   attachmentName         String?
   allowDownloads         Boolean      @default(true)
+  allowEditing           Boolean      @default(false)
   contentHash            String?
   contentSimhash         String?
+  aiReviewDecision       String?      // "approve", "reject", "escalate", null
+  aiReviewConfidence     Int?         // 0-100
+  aiReviewScore          Int?         // 0-100 risk score
+  aiReviewFindings       String?      @db.Text // JSON findings array
+  aiReviewReasoning      String?      @db.Text // 1-3 sentence reasoning
+  aiReviewedAt           DateTime?
   createdAt              DateTime     @default(now())
   updatedAt              DateTime     @updatedAt
   course                 Course       @relation(fields: [courseId], references: [id])
@@ -238,6 +255,7 @@ model StudySheet {
   commits               SheetCommit[]
   provenance            ProvenanceManifest?
   pinnedBy              UserPinnedSheet[]
+  aiReviewLogs          AiReviewLog[]
 
   @@index([createdAt(sort: Desc)])
   @@index([courseId, createdAt(sort: Desc)])
@@ -247,6 +265,7 @@ model StudySheet {
   @@index([htmlRiskTier, status, createdAt(sort: Desc)])
   @@index([contentHash])
   @@index([contentSimhash])
+  @@index([aiReviewDecision])
 }
 
 model SheetHtmlVersion {
@@ -362,9 +381,11 @@ model Note {
   updatedAt        DateTime      @updatedAt
   author           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   course           Course?       @relation(fields: [courseId], references: [id])
+  downloads        Int           @default(0)
   noteComments     NoteComment[]
   noteStars        NoteStar[]
   noteVersions     NoteVersion[]
+  noteReactions    NoteReaction[]
 }
 
 model NoteComment {
@@ -447,11 +468,13 @@ model Notification {
 model UserFollow {
   followerId  Int
   followingId Int
+  status      String   @default("active") // "active" or "pending" (for private accounts)
   createdAt   DateTime @default(now())
   follower    User     @relation("Following", fields: [followerId], references: [id], onDelete: Cascade)
   following   User     @relation("Followers", fields: [followingId], references: [id], onDelete: Cascade)
 
   @@id([followerId, followingId])
+  @@index([followingId, status])
 }
 
 model Reaction {
@@ -966,6 +989,7 @@ model ConversationParticipant {
   conversationId Int
   userId         Int
   role           String   @default("member") // "member" or "admin" (group only)
+  status         String   @default("active") // "active", "pending", "declined"
   joinedAt       DateTime @default(now())
   lastReadAt     DateTime @default(now()) // for read receipts
   muted          Boolean  @default(false) // mute notifications for this convo
@@ -976,6 +1000,7 @@ model ConversationParticipant {
 
   @@id([conversationId, userId])
   @@index([userId, archived])
+  @@index([userId, status])
 }
 
 model Message {
@@ -1579,6 +1604,17 @@ model NoteCommentReaction {
   @@index([commentId, type])
 }
 
+model NoteReaction {
+  userId Int
+  noteId Int
+  type   String // "like" or "dislike"
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  note   Note   @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@id([userId, noteId])
+  @@index([noteId, type])
+}
+
 // ── Sprint E: Pro-level payment features ────────────────────────────────
 
 model ReferralCode {
@@ -1651,4 +1687,71 @@ model SubscriptionPause {
 
   @@index([userId])
   @@index([status])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// User Reviews — Public testimonials shown on homepage
+// ═══════════════════════════════════════════════════════════════════════════
+
+model UserReview {
+  id               Int      @id @default(autoincrement())
+  userId           Int
+  stars            Int      // 1-5
+  text             String   @db.VarChar(500)
+  status           String   @default("pending") // "pending", "approved", "rejected"
+  aiClassification String?  // "positive", "negative", "neutral"
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId]) // one review per user
+  @@index([status, stars])
+  @@index([createdAt])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Review Reports — AI-generated weekly analysis of user reviews
+// ═══════════════════════════════════════════════════════════════════════════
+
+model ReviewReport {
+  id             Int      @id @default(autoincrement())
+  periodStart    DateTime // start of the review period
+  periodEnd      DateTime // end of the review period
+  reviewCount    Int      // number of reviews analyzed
+  averageStars   Float    // average star rating in the period
+  strengths      String   @db.Text // AI-identified strengths (JSON array)
+  weaknesses     String   @db.Text // AI-identified weaknesses (JSON array)
+  improvements   String   @db.Text // AI-suggested actionable improvements (JSON array)
+  rawAnalysis    String   @db.Text // full AI analysis text
+  generatedBy    Int?     // admin user who triggered generation
+  createdAt      DateTime @default(now())
+
+  generatedByUser User? @relation("ReviewReportGenerator", fields: [generatedBy], references: [id], onDelete: SetNull)
+
+  @@index([periodEnd])
+  @@index([createdAt])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AI Review Log — Audit trail for AI-powered sheet reviews
+// ═══════════════════════════════════════════════════════════════════════════
+
+model AiReviewLog {
+  id         String     @id @default(cuid())
+  sheetId    Int
+  decision   String     // "approve", "reject", "escalate"
+  confidence Int        // 0-100
+  riskScore  Int        // 0-100
+  findings   String     @db.Text // JSON array of findings
+  reasoning  String     @db.Text
+  model      String     // which Claude model was used
+  inputTier  Int        // what tier the scanner assigned (1 or 2)
+  createdAt  DateTime   @default(now())
+
+  sheet StudySheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+
+  @@index([sheetId])
+  @@index([decision])
+  @@index([createdAt])
 }

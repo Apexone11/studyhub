@@ -5,16 +5,18 @@ import { getApiErrorMessage, readJsonSafely } from '../../lib/http'
 
 /**
  * useBookReader -- Manages reading state for the Google Books embedded viewer.
- * Bookmarks and highlights still use CFI-style identifiers stored in the DB,
- * but the viewer itself is Google's embedded viewer (no EPUB loading needed).
+ * Handles book data, bookmarks, and reading progress.
+ *
+ * Note: Highlighting is not supported because the Google Books iframe is
+ * cross-origin and we cannot access its DOM content.
  */
 export default function useBookReader(volumeId) {
   const [book, setBook] = useState(null)
   const [bookmarks, setBookmarks] = useState([])
-  const [highlights, setHighlights] = useState([])
   const [progress, setProgress] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [bookmarkError, setBookmarkError] = useState('')
 
   const debounceTimerRef = useRef(null)
 
@@ -55,23 +57,8 @@ export default function useBookReader(volumeId) {
             const bookmarksData = await bookmarksResponse.json()
             setBookmarks(bookmarksData.bookmarks || [])
           }
-        } catch (err) {
-          console.error('Error fetching bookmarks:', err)
-        }
-
-        // Fetch highlights
-        try {
-          const highlightsResponse = await fetch(`${API}/api/library/highlights/${volumeId}`, {
-            credentials: 'include',
-            headers: authHeaders(),
-          })
-
-          if (highlightsResponse.ok) {
-            const highlightsData = await highlightsResponse.json()
-            setHighlights(highlightsData.highlights || [])
-          }
-        } catch (err) {
-          console.error('Error fetching highlights:', err)
+        } catch {
+          // Silent failure -- bookmarks are non-critical
         }
 
         // Fetch reading progress
@@ -85,8 +72,8 @@ export default function useBookReader(volumeId) {
             const progressData = await progressResponse.json()
             setProgress(progressData)
           }
-        } catch (err) {
-          console.error('Error fetching progress:', err)
+        } catch {
+          // Silent failure -- progress is non-critical
         }
       } catch (err) {
         const msg = getApiErrorMessage(err)
@@ -122,8 +109,8 @@ export default function useBookReader(volumeId) {
             const progressData = await response.json()
             setProgress(progressData)
           }
-        } catch (err) {
-          console.error('Error saving progress:', err)
+        } catch {
+          // Silent failure -- progress save is best-effort
         }
       }, 5000)
     },
@@ -132,8 +119,9 @@ export default function useBookReader(volumeId) {
 
   // Add bookmark
   const addBookmark = useCallback(
-    async (cfi, label, pageSnippet) => {
-      if (!volumeId || !cfi) return null
+    async (label, pageSnippet) => {
+      if (!volumeId) return null
+      setBookmarkError('')
 
       try {
         const response = await fetch(`${API}/api/library/bookmarks`, {
@@ -142,22 +130,25 @@ export default function useBookReader(volumeId) {
           headers: authHeaders(),
           body: JSON.stringify({
             volumeId,
-            cfi,
-            label,
-            pageSnippet,
+            cfi: `page-${Date.now()}`,
+            label: label || 'Bookmark',
+            pageSnippet: pageSnippet || '',
           }),
         })
 
         if (!response.ok) {
           const data = readJsonSafely(await response.text())
-          throw new Error(data?.message || `HTTP ${response.status}`)
+          const msg = data?.error || data?.message || `HTTP ${response.status}`
+          setBookmarkError(msg)
+          return null
         }
 
         const newBookmark = await response.json()
         setBookmarks((prev) => [...prev, newBookmark])
+        setBookmarkError('')
         return newBookmark
-      } catch (err) {
-        console.error('Error adding bookmark:', err)
+      } catch {
+        setBookmarkError('Failed to save bookmark')
         return null
       }
     },
@@ -173,95 +164,12 @@ export default function useBookReader(volumeId) {
         headers: authHeaders(),
       })
 
-      if (!response.ok) {
-        const data = readJsonSafely(await response.text())
-        throw new Error(data?.message || `HTTP ${response.status}`)
+      if (response.ok) {
+        setBookmarks((prev) => prev.filter((b) => b.id !== bookmarkId))
+        return true
       }
-
-      setBookmarks((prev) => prev.filter((b) => b.id !== bookmarkId))
-      return true
-    } catch (err) {
-      console.error('Error removing bookmark:', err)
       return false
-    }
-  }, [])
-
-  // Add highlight
-  const addHighlight = useCallback(
-    async (cfi, text, color) => {
-      if (!volumeId || !cfi || !text) return null
-
-      try {
-        const response = await fetch(`${API}/api/library/highlights`, {
-          method: 'POST',
-          credentials: 'include',
-          headers: authHeaders(),
-          body: JSON.stringify({
-            volumeId,
-            cfi,
-            text,
-            color,
-          }),
-        })
-
-        if (!response.ok) {
-          const data = readJsonSafely(await response.text())
-          throw new Error(data?.message || `HTTP ${response.status}`)
-        }
-
-        const newHighlight = await response.json()
-        setHighlights((prev) => [...prev, newHighlight])
-        return newHighlight
-      } catch (err) {
-        console.error('Error adding highlight:', err)
-        return null
-      }
-    },
-    [volumeId],
-  )
-
-  // Update highlight
-  const updateHighlight = useCallback(async (highlightId, updates) => {
-    try {
-      const response = await fetch(`${API}/api/library/highlights/${highlightId}`, {
-        method: 'PATCH',
-        credentials: 'include',
-        headers: authHeaders(),
-        body: JSON.stringify(updates),
-      })
-
-      if (!response.ok) {
-        const data = readJsonSafely(await response.text())
-        throw new Error(data?.message || `HTTP ${response.status}`)
-      }
-
-      const updatedHighlight = await response.json()
-      setHighlights((prev) => prev.map((h) => (h.id === highlightId ? updatedHighlight : h)))
-      return updatedHighlight
-    } catch (err) {
-      console.error('Error updating highlight:', err)
-      return null
-    }
-  }, [])
-
-  // Remove highlight
-  const removeHighlight = useCallback(async (highlightId) => {
-    try {
-      const response = await fetch(`${API}/api/library/highlights/${highlightId}`, {
-        method: 'DELETE',
-        credentials: 'include',
-        headers: authHeaders(),
-      })
-
-      if (!response.ok) {
-        const data = readJsonSafely(await response.text())
-        throw new Error(data?.message || `HTTP ${response.status}`)
-      }
-
-      setHighlights((prev) => prev.filter((h) => h.id !== highlightId))
-      return true
-    } catch (err) {
-      console.error('Error removing highlight:', err)
+    } catch {
       return false
     }
   }, [])
@@ -278,15 +186,12 @@ export default function useBookReader(volumeId) {
   return {
     book,
     bookmarks,
-    highlights,
     progress,
     loading,
     error,
+    bookmarkError,
     saveProgress,
     addBookmark,
     removeBookmark,
-    addHighlight,
-    updateHighlight,
-    removeHighlight,
   }
 }

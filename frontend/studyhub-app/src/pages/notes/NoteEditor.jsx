@@ -1,13 +1,194 @@
 /* ═══════════════════════════════════════════════════════════════════════════
- * NoteEditor.jsx — Note editing/creation component with markdown toolbar
+ * NoteEditor.jsx — Note editing/creation component with TipTap rich text
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useRef, useState } from 'react'
-import { API } from '../../config'
-import { PAGE_FONT, authHeaders } from '../shared/pageUtils'
-import { TOOLBAR_ACTIONS, applyToolbarAction, MarkdownPreview, wordCount } from './notesConstants'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEditor, EditorContent } from '@tiptap/react'
+import StarterKit from '@tiptap/starter-kit'
+import Underline from '@tiptap/extension-underline'
+import Link from '@tiptap/extension-link'
+import Placeholder from '@tiptap/extension-placeholder'
+import Image from '@tiptap/extension-image'
+import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
+import { marked } from 'marked'
+import DOMPurify from 'dompurify'
+import { MathInline, MathBlock } from '../../components/editor/MathExtension'
+import { lowlight } from '../../components/editor/codeHighlight'
+import EditorToolbar from '../../components/editor/EditorToolbar'
+import { PAGE_FONT } from '../shared/pageUtils'
 import NoteVersionHistory from './NoteVersionHistory'
 import NoteTagsInput from './NoteTagsInput'
+import '../../components/editor/richTextEditor.css'
 
+/* ── Configure marked for backward-compat conversion ────────── */
+marked.setOptions({ breaks: true, gfm: true })
+
+/* ── Detect whether content is markdown vs HTML ─────────────── */
+function isMarkdown(content) {
+  if (!content || !content.trim()) return false
+  const trimmed = content.trim()
+  // Detect actual HTML tags (not autolinks like <https://...> or <user@email>)
+  // Match tags like <p>, <div>, <h1>, <br/>, etc. but not <http or <mailto
+  if (!/<[a-z][a-z0-9-]*[\s>/]/i.test(trimmed) || /^<https?:\/\//.test(trimmed)) return true
+  // If it starts with common markdown patterns, treat as markdown
+  if (/^[#*\-+>`|![]/.test(trimmed)) return true
+  return false
+}
+
+/* ── Convert markdown content to sanitized HTML ─────────────── */
+function markdownToHtml(content) {
+  if (!content?.trim()) return ''
+  const raw = marked.parse(content)
+  return DOMPurify.sanitize(raw)
+}
+
+/* ── Word count from HTML text content ──────────────────────── */
+function htmlWordCount(html) {
+  if (!html?.trim()) return 0
+  // Strip tags, decode entities, count words
+  const tmp = document.createElement('div')
+  tmp.innerHTML = html
+  const text = tmp.textContent || tmp.innerText || ''
+  if (!text.trim()) return 0
+  return text.trim().split(/\s+/).length
+}
+
+/* ═══════════════════════════════════════════════════════════════
+ * NoteRichEditor — TipTap wrapper with theme-aware note styling
+ * and backward-compatible markdown-to-HTML conversion
+ * ═══════════════════════════════════════════════════════════════ */
+function NoteRichEditor({ content, onUpdate, noteId }) {
+  const onUpdateRef = useRef(onUpdate)
+  useEffect(() => { onUpdateRef.current = onUpdate })
+
+  // Convert markdown on first load per note
+  const initialContent = useMemo(() => {
+    if (isMarkdown(content)) return markdownToHtml(content)
+    return content || ''
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [noteId])
+
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        codeBlock: false,
+        heading: { levels: [1, 2, 3, 4] },
+        history: { depth: 100 },
+      }),
+      Underline,
+      Link.configure({
+        openOnClick: false,
+        HTMLAttributes: {
+          rel: 'noopener noreferrer nofollow',
+          target: '_blank',
+          class: 'sh-editor-link',
+        },
+        validate: (href) => /^https?:\/\/|^mailto:/i.test(href),
+      }),
+      Placeholder.configure({ placeholder: 'Start writing your notes...' }),
+      Image.configure({
+        inline: false,
+        allowBase64: false,
+        HTMLAttributes: {
+          class: 'sh-editor-image',
+          loading: 'lazy',
+        },
+      }),
+      CodeBlockLowlight.configure({
+        lowlight,
+        defaultLanguage: null,
+        HTMLAttributes: {
+          class: 'sh-editor-code-block',
+        },
+      }),
+      MathInline,
+      MathBlock,
+    ],
+    content: initialContent,
+    editable: true,
+    onUpdate: ({ editor: ed }) => {
+      const html = ed.getHTML()
+      // Treat empty editor as empty string
+      const cleaned = (!html || html === '<p></p>') ? '' : html
+      onUpdateRef.current?.(cleaned)
+    },
+    editorProps: {
+      attributes: {
+        class: 'sh-rich-editor-content',
+        role: 'textbox',
+        'aria-multiline': 'true',
+        'aria-label': 'Note content editor',
+      },
+      handlePaste: () => false, // Allow default TipTap paste — sanitized on save
+    },
+  })
+
+  // Sync content when switching notes (noteId change)
+  const lastNoteId = useRef(noteId)
+  useEffect(() => {
+    if (!editor) return
+    if (noteId !== lastNoteId.current) {
+      lastNoteId.current = noteId
+      const htmlContent = isMarkdown(content) ? markdownToHtml(content) : (content || '')
+      editor.commands.setContent(htmlContent, false)
+    }
+  }, [noteId, content, editor])
+
+  return (
+    <div
+      className="sh-note-editor-wrap"
+      style={{
+        background: 'var(--sh-surface)',
+        borderRadius: 12,
+        border: '1px solid var(--sh-border)',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      {/* Toolbar — theme-aware via CSS class override */}
+      <div className="sh-note-editor-toolbar">
+        <EditorToolbar editor={editor} />
+      </div>
+
+      {/* Editor content area */}
+      <div style={{
+        flex: 1,
+        minHeight: 300,
+        overflow: 'auto',
+        background: 'var(--sh-surface)',
+      }}>
+        <EditorContent
+          editor={editor}
+          style={{ height: '100%' }}
+        />
+      </div>
+
+      {/* Word count footer */}
+      <div style={{
+        display: 'flex', justifyContent: 'flex-end',
+        padding: '6px 14px',
+        borderTop: '1px solid var(--sh-border)',
+        background: 'var(--sh-soft)',
+      }}>
+        <span style={{
+          fontSize: 11,
+          color: 'var(--sh-subtext)',
+          fontWeight: 600,
+          padding: '2px 8px',
+          background: 'var(--sh-surface)',
+          borderRadius: 6,
+          border: '1px solid var(--sh-border)',
+        }}>
+          {htmlWordCount(editor?.getHTML?.() || '')} words
+        </span>
+      </div>
+    </div>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════════════
+ * NoteEditor — Main editor component
+ * ═══════════════════════════════════════════════════════════════ */
 export default function NoteEditor({
   activeNote,
   editorTitle,
@@ -31,70 +212,26 @@ export default function NoteEditor({
   handleRestore,
   layout,
 }) {
-  const editorRef = useRef(null)
-  const fileInputRef = useRef(null)
   const [showVersions, setShowVersions] = useState(false)
-  const [uploading, setUploading] = useState(false)
-
-  /* ── Image upload handler ──────────────────────────────────────── */
-  async function handleImageUpload(e) {
-    const file = e.target.files?.[0]
-    if (!file || !activeNote) return
-    e.target.value = '' // reset for re-upload of same file
-
-    setUploading(true)
-    try {
-      const formData = new FormData()
-      formData.append('image', file)
-
-      // authHeaders() returns { 'Content-Type': 'application/json', ... }
-      // For FormData, we need the token but NOT Content-Type (browser sets multipart boundary)
-      const headers = authHeaders()
-      delete headers['Content-Type']
-
-      const res = await fetch(`${API}/api/notes/${activeNote.id}/images`, {
-        method: 'POST',
-        headers,
-        credentials: 'include',
-        body: formData,
-      })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.error || 'Upload failed')
-      }
-      const { markdown } = await res.json()
-      // Insert markdown image syntax at cursor position
-      const textarea = editorRef.current
-      if (textarea) {
-        const pos = textarea.selectionStart || editorContent.length
-        const newContent = editorContent.slice(0, pos) + '\n' + markdown + '\n' + editorContent.slice(pos)
-        handleContentChange(newContent)
-      }
-    } catch (err) {
-      alert(err.message || 'Image upload failed')
-    } finally {
-      setUploading(false)
-    }
-  }
 
   if (!activeNote) {
     /* Empty state when no note selected (desktop only) */
     if (layout.isPhone) return null
     return (
-      <div style={{ background: 'var(--sh-surface, #fff)', borderRadius: 16, border: '2px dashed var(--sh-border, #cbd5e1)', padding: '64px 24px', textAlign: 'center' }}>
-        <div style={{ width: 64, height: 64, borderRadius: 16, background: 'linear-gradient(135deg, var(--sh-brand-bg, #eff6ff), var(--sh-soft, #dbeafe))', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16, color: 'var(--sh-brand)' }}>
+      <div style={{ background: 'var(--sh-surface)', borderRadius: 16, border: '2px dashed var(--sh-border)', padding: '64px 24px', textAlign: 'center' }}>
+        <div style={{ width: 64, height: 64, borderRadius: 16, background: 'linear-gradient(135deg, var(--sh-brand-bg, #eff6ff), var(--sh-soft))', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16, color: 'var(--sh-brand)' }}>
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
           </svg>
         </div>
-        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--sh-heading, #0f172a)', marginBottom: 8 }}>
+        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--sh-heading)', marginBottom: 8 }}>
           Select a note to edit
         </div>
-        <div style={{ fontSize: 13, color: 'var(--sh-muted, #94a3b8)', lineHeight: 1.6 }}>
+        <div style={{ fontSize: 13, color: 'var(--sh-muted)', lineHeight: 1.6 }}>
           Choose a note from the list or create a new one.
           <br />
-          Notes support <strong>full markdown</strong> with live preview.
+          Notes support <strong>rich text editing</strong> with formatting toolbar.
         </div>
       </div>
     )
@@ -109,26 +246,26 @@ export default function NoteEditor({
           aria-label="Back to notes list"
           style={{ background: 'none', border: 'none', color: 'var(--sh-brand)', fontSize: 13, cursor: 'pointer', fontFamily: PAGE_FONT, marginBottom: 12, padding: 0, display: 'flex', alignItems: 'center', gap: 5, fontWeight: 600 }}
         >
-          ← All Notes
+          &larr; All Notes
         </button>
       )}
 
       {/* Title bar with metadata controls */}
       <div style={{
-        background: 'var(--sh-surface, #fff)', borderRadius: 14, border: '1px solid var(--sh-border, #e2e8f0)',
+        background: 'var(--sh-surface)', borderRadius: 14, border: '1px solid var(--sh-border)',
         padding: '14px 18px', marginBottom: 10,
         display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap',
       }}>
         <input
           value={editorTitle}
           onChange={(e) => handleTitleChange(e.target.value)}
-          placeholder="Note title…"
-          style={{ flex: '1 1 200px', border: 'none', outline: 'none', fontSize: 18, fontWeight: 800, color: 'var(--sh-heading, #0f172a)', fontFamily: PAGE_FONT, minWidth: 120, background: 'transparent' }}
+          placeholder="Note title..."
+          style={{ flex: '1 1 200px', border: 'none', outline: 'none', fontSize: 18, fontWeight: 800, color: 'var(--sh-heading)', fontFamily: PAGE_FONT, minWidth: 120, background: 'transparent' }}
         />
         <select
           value={editorCourseId}
           onChange={(e) => handleCourseChange(e.target.value)}
-          style={{ border: '1px solid var(--sh-border, #e2e8f0)', borderRadius: 8, padding: '6px 10px', fontSize: 12, fontFamily: PAGE_FONT, color: 'var(--sh-muted, #64748b)', outline: 'none', background: 'var(--sh-surface, #fff)' }}
+          style={{ border: '1px solid var(--sh-border)', borderRadius: 8, padding: '6px 10px', fontSize: 12, fontFamily: PAGE_FONT, color: 'var(--sh-muted)', outline: 'none', background: 'var(--sh-surface)' }}
         >
           <option value="">No course</option>
           {courses.map((c) => <option key={c.id} value={String(c.id)}>{c.code}</option>)}
@@ -136,8 +273,8 @@ export default function NoteEditor({
         <label style={{
           display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer',
           padding: '4px 10px', borderRadius: 8,
-          background: editorPrivate ? 'var(--sh-soft, #f1f5f9)' : 'var(--sh-success-bg, #dcfce7)',
-          color: editorPrivate ? 'var(--sh-muted, #64748b)' : 'var(--sh-success-text, #16a34a)',
+          background: editorPrivate ? 'var(--sh-soft)' : 'var(--sh-success-bg)',
+          color: editorPrivate ? 'var(--sh-muted)' : 'var(--sh-success-text)',
           fontWeight: 600, transition: 'all .15s',
         }}>
           <input type="checkbox" checked={editorPrivate} onChange={(e) => handlePrivateChange(e.target.checked)} style={{ accentColor: 'var(--sh-brand)' }} />
@@ -147,8 +284,8 @@ export default function NoteEditor({
           <label style={{
             display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer',
             padding: '4px 10px', borderRadius: 8,
-            background: editorAllowDownloads ? 'var(--sh-info-bg, #dbeafe)' : 'var(--sh-soft, #f1f5f9)',
-            color: editorAllowDownloads ? 'var(--sh-info-text, #2563eb)' : 'var(--sh-muted, #64748b)',
+            background: editorAllowDownloads ? 'var(--sh-info-bg, #dbeafe)' : 'var(--sh-soft)',
+            color: editorAllowDownloads ? 'var(--sh-info-text, #2563eb)' : 'var(--sh-muted)',
             fontWeight: 600, transition: 'all .15s',
           }}>
             <input type="checkbox" checked={editorAllowDownloads || false} onChange={(e) => handleAllowDownloadsChange(e.target.checked)} style={{ accentColor: 'var(--sh-brand)' }} />
@@ -199,8 +336,8 @@ export default function NoteEditor({
         </button>
         <div style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 6 }}>
           {saving
-            ? <span style={{ color: 'var(--sh-muted)' }}>Saving…</span>
-            : <span style={{ color: 'var(--sh-success, #10b981)', fontWeight: 600 }}>✓ Saved</span>
+            ? <span style={{ color: 'var(--sh-muted)' }}>Saving...</span>
+            : <span style={{ color: 'var(--sh-success)', fontWeight: 600 }}>Saved</span>
           }
         </div>
       </div>
@@ -222,138 +359,23 @@ export default function NoteEditor({
         />
       )}
 
-      {/* Markdown editor with live preview */}
-      <div style={{ background: 'var(--sh-surface, #fff)', borderRadius: 14, border: '1px solid var(--sh-border, #e2e8f0)', overflow: 'hidden', marginBottom: 10, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
-        {/* Toolbar */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 1, padding: '8px 14px',
-          borderBottom: '1px solid var(--sh-border, #e2e8f0)',
-          background: 'var(--sh-soft, #f8fafc)',
-          flexWrap: 'wrap',
-        }}>
-          {TOOLBAR_ACTIONS.map((action) => action.sep ? (
-            <div key={action.key} style={{ width: 1, height: 20, background: 'var(--sh-border, #e2e8f0)', margin: '0 6px' }} />
-          ) : (
-            <button
-              key={action.key}
-              type="button"
-              title={action.title}
-              onClick={() => applyToolbarAction(editorRef, action, editorContent, handleContentChange)}
-              style={{
-                width: 34, height: 32, display: 'grid', placeItems: 'center',
-                border: '1px solid transparent', background: 'transparent', borderRadius: 8,
-                cursor: 'pointer', color: 'var(--sh-muted, #475569)',
-                transition: 'all .15s',
-                ...action.style,
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--sh-border, #e2e8f0)'; e.currentTarget.style.color = 'var(--sh-text, #0f172a)'; e.currentTarget.style.borderColor = 'var(--sh-border, #cbd5e1)' }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--sh-muted, #475569)'; e.currentTarget.style.borderColor = 'transparent' }}
-            >
-              {action.label}
-            </button>
-          ))}
-          {/* Separator before image upload */}
-          <div style={{ width: 1, height: 20, background: 'var(--sh-border, #e2e8f0)', margin: '0 6px' }} />
-          {/* Image upload button */}
-          <button
-            type="button"
-            title="Upload image"
-            aria-label="Upload image"
-            disabled={uploading}
-            onClick={() => fileInputRef.current?.click()}
-            style={{
-              width: 34, height: 32, display: 'grid', placeItems: 'center',
-              border: '1px solid transparent', background: 'transparent', borderRadius: 8,
-              cursor: uploading ? 'wait' : 'pointer', color: 'var(--sh-muted, #475569)',
-              transition: 'all .15s', fontSize: 10, fontWeight: 600, fontFamily: PAGE_FONT, opacity: uploading ? 0.5 : 1,
-            }}
-            onMouseEnter={(e) => { if (!uploading) { e.currentTarget.style.background = 'var(--sh-border, #e2e8f0)'; e.currentTarget.style.color = 'var(--sh-text, #0f172a)'; e.currentTarget.style.borderColor = 'var(--sh-border, #cbd5e1)' } }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--sh-muted, #475569)'; e.currentTarget.style.borderColor = 'transparent' }}
-          >
-            {uploading ? '...' : 'IMG'}
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/gif,image/webp"
-            style={{ display: 'none' }}
-            onChange={handleImageUpload}
-          />
-          <div style={{ flex: 1 }} />
-          <span style={{ fontSize: 11, color: 'var(--sh-subtext, #94a3b8)', fontWeight: 600, padding: '4px 8px', background: 'var(--sh-surface, #fff)', borderRadius: 6, border: '1px solid var(--sh-border, #e2e8f0)' }}>
-            {wordCount(editorContent)} words
-          </span>
-        </div>
-
-        {/* Editor + Preview split */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
-          {/* Column headers */}
-          <div style={{ padding: '10px 18px', borderBottom: '1px solid var(--sh-border, #e2e8f0)', borderRight: '1px solid var(--sh-border, #e2e8f0)', fontSize: 11, fontWeight: 700, color: 'var(--sh-brand)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--sh-brand)' }} />
-            Write
-          </div>
-          <div style={{ padding: '10px 18px', borderBottom: '1px solid var(--sh-border, #e2e8f0)', fontSize: 11, fontWeight: 700, color: 'var(--sh-muted, #64748b)', textTransform: 'uppercase', letterSpacing: '.06em', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--sh-success, #10b981)' }} />
-            Preview
-          </div>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', minHeight: 480 }}>
-          {/* Write pane */}
-          <div style={{ borderRight: '1px solid var(--sh-border, #e2e8f0)' }}>
-            <textarea
-              ref={editorRef}
-              value={editorContent}
-              onChange={(e) => handleContentChange(e.target.value)}
-              spellCheck={false}
-              placeholder={'Write your notes in markdown…\n\n# Heading\n**bold** _italic_ `code`\n- bullet list\n1. numbered list\n> blockquote'}
-              onKeyDown={(e) => {
-                // Tab key inserts 2 spaces
-                if (e.key === 'Tab') {
-                  e.preventDefault()
-                  const start = e.target.selectionStart
-                  const end = e.target.selectionEnd
-                  const val = editorContent
-                  handleContentChange(val.slice(0, start) + '  ' + val.slice(end))
-                  requestAnimationFrame(() => { e.target.selectionStart = e.target.selectionEnd = start + 2 })
-                }
-                // Keyboard shortcuts: Ctrl+B, Ctrl+I, Ctrl+H, Ctrl+K
-                if ((e.ctrlKey || e.metaKey) && !e.shiftKey) {
-                  const action = TOOLBAR_ACTIONS.find((a) => a.shortcut === e.key.toLowerCase())
-                  if (action) {
-                    e.preventDefault()
-                    applyToolbarAction(editorRef, action, editorContent, handleContentChange)
-                  }
-                }
-              }}
-              style={{
-                width: '100%', height: '100%', minHeight: 480,
-                background: 'transparent', border: 'none', outline: 'none',
-                resize: 'none', padding: '18px 20px',
-                fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
-                fontSize: 13.5, lineHeight: 1.9,
-                color: 'var(--sh-text, #1e293b)',
-                boxSizing: 'border-box',
-                letterSpacing: '0.01em',
-              }}
-            />
-          </div>
-          {/* Preview pane */}
-          <div data-note-preview style={{ padding: '18px 22px', overflowY: 'auto', maxHeight: 580 }}>
-            <MarkdownPreview content={editorContent} />
-          </div>
-        </div>
+      {/* TipTap rich text editor */}
+      <div style={{ marginBottom: 10 }}>
+        <NoteRichEditor
+          content={editorContent}
+          noteId={activeNote.id}
+          onUpdate={handleContentChange}
+        />
       </div>
 
       {/* Footer: export + delete */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
         <button
           onClick={() => {
-            // Open a new window with the rendered markdown for print/PDF
             const printWin = window.open('', '_blank', 'width=800,height=600')
             if (!printWin) return
-            const previewEl = document.querySelector('[data-note-preview]')
-            const previewHtml = previewEl ? previewEl.innerHTML : '<p>No content to export.</p>'
-            // HTML-escape the title to prevent XSS in the print window
+            // For the rich editor, content is already HTML
+            const exportHtml = DOMPurify.sanitize(editorContent || '<p>No content to export.</p>')
             const safeTitle = (editorTitle || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
             printWin.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${safeTitle || 'Note'}</title><style>
 body { font-family: 'Plus Jakarta Sans', -apple-system, sans-serif; max-width: 700px; margin: 40px auto; padding: 0 24px; color: #1e293b; line-height: 1.7; }
@@ -366,15 +388,18 @@ pre code { background: none; padding: 0; }
 blockquote { border-left: 3px solid #3b82f6; margin: 12px 0; padding: 8px 16px; color: #475569; }
 img { max-width: 100%; border-radius: 8px; }
 table { border-collapse: collapse; width: 100%; } th, td { border: 1px solid #e2e8f0; padding: 8px 12px; text-align: left; }
+ul { list-style-type: disc; padding-left: 1.5em; }
+ol { list-style-type: decimal; padding-left: 1.5em; }
+a { color: #2563eb; }
 @media print { body { margin: 0; } }
-</style></head><body><h1>${safeTitle || 'Untitled Note'}</h1>${previewHtml}</body></html>`)
+</style></head><body><h1>${safeTitle || 'Untitled Note'}</h1>${exportHtml}</body></html>`)
             printWin.document.close()
             setTimeout(() => printWin.print(), 300)
           }}
           aria-label="Export as PDF"
           style={{
-            background: 'var(--sh-soft, #f1f5f9)', border: '1px solid var(--sh-border, #e2e8f0)',
-            color: 'var(--sh-muted, #64748b)', borderRadius: 8, padding: '7px 16px',
+            background: 'var(--sh-soft)', border: '1px solid var(--sh-border)',
+            color: 'var(--sh-muted)', borderRadius: 8, padding: '7px 16px',
             fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: PAGE_FONT,
             transition: 'background .15s', display: 'flex', alignItems: 'center', gap: 5,
           }}
@@ -385,7 +410,7 @@ table { border-collapse: collapse; width: 100%; } th, td { border: 1px solid #e2
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <span style={{ fontSize: 12, color: 'var(--sh-danger)', fontWeight: 600 }}>Delete this note permanently?</span>
             <button onClick={deleteNote} style={{ background: 'var(--sh-danger)', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: PAGE_FONT }}>Yes, delete</button>
-            <button onClick={() => setConfirmDelete(false)} style={{ background: 'transparent', border: '1px solid var(--sh-border, #e2e8f0)', color: 'var(--sh-muted, #64748b)', borderRadius: 8, padding: '7px 14px', fontSize: 12, cursor: 'pointer', fontFamily: PAGE_FONT }}>Cancel</button>
+            <button onClick={() => setConfirmDelete(false)} style={{ background: 'transparent', border: '1px solid var(--sh-border)', color: 'var(--sh-muted)', borderRadius: 8, padding: '7px 14px', fontSize: 12, cursor: 'pointer', fontFamily: PAGE_FONT }}>Cancel</button>
           </div>
         ) : (
           <button onClick={() => setConfirmDelete(true)} aria-label="Delete note" style={{ background: 'var(--sh-danger-bg)', border: '1px solid var(--sh-danger-border)', color: 'var(--sh-danger)', borderRadius: 8, padding: '7px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: PAGE_FONT, transition: 'background .15s' }}>

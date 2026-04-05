@@ -10,7 +10,7 @@ const { findSimilarSheets } = require('../../lib/plagiarism')
 const { createProvenanceToken } = require('../../lib/provenance')
 const { isHtmlUploadsEnabled } = require('../../lib/html/htmlKillSwitch')
 const { SHEET_STATUS, AUTHOR_SELECT, sheetWriteLimiter } = require('./sheets.constants')
-const { getUserPlan, isPro } = require('../../lib/getUserPlan')
+const { getUserTier } = require('../../lib/getUserPlan')
 const { PLANS } = require('../payments/payments.constants')
 const { trackActivity } = require('../../lib/activityTracker')
 const { runAbuseChecks } = require('../../lib/abuseDetection')
@@ -38,9 +38,11 @@ router.post('/', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (re
   if (!courseId) return res.status(400).json({ error: 'Course is required.' })
 
   try {
-    /* Check upload quota for free users */
-    const userPlan = await getUserPlan(req.user.userId)
-    if (!isPro(userPlan)) {
+    /* Check upload quota based on user tier (free/donor/pro) */
+    const tier = await getUserTier(req.user.userId)
+    const tierConfig = PLANS[tier] || PLANS.free
+    const limit = tierConfig.uploadsPerMonth
+    if (limit !== -1) {
       const startOfMonth = new Date()
       startOfMonth.setDate(1)
       startOfMonth.setHours(0, 0, 0, 0)
@@ -53,7 +55,6 @@ router.post('/', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (re
           },
         })
 
-        const limit = PLANS.free.uploadsPerMonth
         if (monthlyCount >= limit) {
           return res.status(403).json({
             error: `Monthly upload limit reached (${limit}). Upgrade to Pro for unlimited uploads.`,

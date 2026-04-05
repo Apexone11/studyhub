@@ -120,7 +120,7 @@ function LinkPopover({ onSubmit, onCancel, initialUrl }) {
 
 /* ── Main EditorToolbar ────────────────────────────────────── */
 
-export default function EditorToolbar({ editor }) {
+export default function EditorToolbar({ editor, themeAware = false }) {
   const [showLinkInput, setShowLinkInput] = useState(false)
 
   const setLink = useCallback((url) => {
@@ -217,7 +217,8 @@ export default function EditorToolbar({ editor }) {
       style={{
         display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2,
         padding: '6px 10px',
-        background: '#1e293b', borderBottom: '1px solid #334155',
+        background: themeAware ? 'var(--sh-soft)' : '#1e293b',
+        borderBottom: themeAware ? '1px solid var(--sh-border)' : '1px solid #334155',
         position: 'relative',
       }}
     >

@@ -224,14 +224,8 @@ const getUserByUsername = async (req, res) => {
         role: true,
         avatarUrl: true,
         coverImageUrl: true,
+        isPrivate: true,
         createdAt: true,
-        _count: {
-          select: {
-            studySheets: { where: { status: 'published' } },
-            followers: true,
-            following: true,
-          },
-        },
         enrollments: {
           include: { course: { include: { school: true } } },
         },
@@ -259,12 +253,50 @@ const getUserByUsername = async (req, res) => {
       return res.status(403).json({ error: errorMessage })
     }
 
+    // Compute follower/following counts with status: 'active' filter
+    const [followerCount, followingCount, sheetCount] = await Promise.all([
+      prisma.userFollow.count({ where: { followingId: user.id, status: 'active' } }),
+      prisma.userFollow.count({ where: { followerId: user.id, status: 'active' } }),
+      prisma.studySheet.count({ where: { userId: user.id, status: 'published' } }),
+    ])
+
+    // Check follow relationship and status
     let isFollowing = false
-    if (req.user?.userId && req.user.userId !== user.id) {
+    let followStatus = null // null, 'active', or 'pending'
+    const isOwner = req.user?.userId && req.user.userId === user.id
+    if (req.user?.userId && !isOwner) {
       const follow = await prisma.userFollow.findUnique({
         where: { followerId_followingId: { followerId: req.user.userId, followingId: user.id } },
       })
-      isFollowing = !!follow
+      if (follow) {
+        followStatus = follow.status
+        isFollowing = follow.status === 'active'
+      }
+    }
+
+    // Private account gate: if private and viewer is not owner and not active follower
+    if (user.isPrivate && !isOwner && !isFollowing) {
+      // Enrich with Pro/Donor badge info
+      const badges = await enrichUserWithBadges(user)
+
+      return res.json({
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        avatarUrl: user.avatarUrl || null,
+        coverImageUrl: user.coverImageUrl || null,
+        isPrivate: true,
+        isPrivateProfile: true,
+        createdAt: user.createdAt,
+        plan: badges.plan || 'free',
+        isDonor: badges.isDonor || false,
+        donorLevel: badges.donorLevel || null,
+        followerCount,
+        followingCount,
+        sheetCount,
+        isFollowing: false,
+        followStatus,
+      })
     }
 
     /* Fetch shared (non-private) notes for profile display */
@@ -345,14 +377,16 @@ const getUserByUsername = async (req, res) => {
       role: user.role,
       avatarUrl: user.avatarUrl || null,
       coverImageUrl: user.coverImageUrl || null,
+      isPrivate: user.isPrivate || false,
       createdAt: user.createdAt,
       plan: badges.plan || 'free',
       isDonor: badges.isDonor || false,
       donorLevel: badges.donorLevel || null,
-      sheetCount: user._count.studySheets,
-      followerCount: user._count.followers,
-      followingCount: user._count.following,
+      sheetCount,
+      followerCount,
+      followingCount,
       isFollowing,
+      followStatus,
       recentSheets: user.studySheets,
       enrollments: user.enrollments,
       pinnedSheets,
@@ -370,15 +404,41 @@ const followUser = async (req, res) => {
   try {
     const target = await prisma.user.findUnique({
       where: { username: req.params.username },
-      select: { id: true, username: true, _count: { select: { followers: true } } },
+      select: { id: true, username: true, isPrivate: true },
     })
     if (!target) return res.status(404).json({ error: 'User not found.' })
     if (target.id === req.user.userId)
       return res.status(400).json({ error: 'You cannot follow yourself.' })
 
-    await prisma.userFollow.create({
-      data: { followerId: req.user.userId, followingId: target.id },
+    // Check if there's already a pending or active follow
+    const existing = await prisma.userFollow.findUnique({
+      where: { followerId_followingId: { followerId: req.user.userId, followingId: target.id } },
     })
+    if (existing) {
+      if (existing.status === 'pending') {
+        return res.status(409).json({ error: 'Follow request already pending.' })
+      }
+      return res.status(409).json({ error: 'Already following this user.' })
+    }
+
+    const isPending = target.isPrivate === true
+    const status = isPending ? 'pending' : 'active'
+
+    await prisma.userFollow.create({
+      data: { followerId: req.user.userId, followingId: target.id, status },
+    })
+
+    if (isPending) {
+      await createNotification(prisma, {
+        userId: target.id,
+        type: 'follow_request',
+        message: `${req.user.username} requested to follow you.`,
+        actorId: req.user.userId,
+        linkPath: `/users/${req.user.username}`,
+      })
+
+      return res.json({ following: false, requested: true })
+    }
 
     await createNotification(prisma, {
       userId: target.id,
@@ -388,7 +448,9 @@ const followUser = async (req, res) => {
       linkPath: `/users/${req.user.username}`,
     })
 
-    const followerCount = await prisma.userFollow.count({ where: { followingId: target.id } })
+    const followerCount = await prisma.userFollow.count({
+      where: { followingId: target.id, status: 'active' },
+    })
     checkAndAwardBadges(prisma, target.id)
     res.json({ following: true, followerCount })
   } catch (err) {
@@ -399,6 +461,7 @@ const followUser = async (req, res) => {
 }
 
 // ── DELETE /api/users/:username/follow ────────────────────────
+// Also cancels pending follow requests
 const unfollowUser = async (req, res) => {
   try {
     const target = await prisma.user.findUnique({
@@ -411,7 +474,9 @@ const unfollowUser = async (req, res) => {
       where: { followerId_followingId: { followerId: req.user.userId, followingId: target.id } },
     })
 
-    const followerCount = await prisma.userFollow.count({ where: { followingId: target.id } })
+    const followerCount = await prisma.userFollow.count({
+      where: { followingId: target.id, status: 'active' },
+    })
     res.json({ following: false, followerCount })
   } catch (err) {
     if (err.code === 'P2025') return res.status(404).json({ error: 'Not following this user.' })
@@ -430,7 +495,7 @@ const getFollowers = async (req, res) => {
     if (!user) return res.status(404).json({ error: 'User not found.' })
 
     const follows = await prisma.userFollow.findMany({
-      where: { followingId: user.id },
+      where: { followingId: user.id, status: 'active' },
       orderBy: { createdAt: 'desc' },
       take: 50,
       select: {
@@ -457,7 +522,7 @@ const getFollowing = async (req, res) => {
     if (!user) return res.status(404).json({ error: 'User not found.' })
 
     const follows = await prisma.userFollow.findMany({
-      where: { followerId: user.id },
+      where: { followerId: user.id, status: 'active' },
       orderBy: { createdAt: 'desc' },
       take: 50,
       select: {
@@ -512,6 +577,7 @@ const getMe = async (req, res) => {
         role: true,
         verified: true,
         bio: true,
+        isPrivate: true,
         createdAt: true,
         schoolId: true,
         school: { select: { id: true, name: true } },
@@ -539,7 +605,7 @@ const getMe = async (req, res) => {
 // prioritizing users at the same school and users with popular content.
 const getFollowSuggestions = async (req, res) => {
   try {
-    // Get IDs the user already follows
+    // Get IDs the user already follows (active or pending)
     const following = await prisma.userFollow.findMany({
       where: { followerId: req.user.userId },
       select: { followingId: true },
@@ -758,6 +824,181 @@ const unmuteUser = async (req, res) => {
   }
 }
 
+// ── GET /api/users/me/follow-requests ───────────────────────────
+const getFollowRequests = async (req, res) => {
+  try {
+    const pendingFollows = await prisma.userFollow.findMany({
+      where: { followingId: req.user.userId, status: 'pending' },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        createdAt: true,
+        follower: {
+          select: { id: true, username: true, avatarUrl: true, accountType: true },
+        },
+      },
+    })
+
+    res.json({
+      count: pendingFollows.length,
+      requests: pendingFollows.map((f) => ({
+        ...f.follower,
+        requestedAt: f.createdAt,
+      })),
+    })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl })
+    res.status(500).json({ error: 'Server error.' })
+  }
+}
+
+// ── POST /api/users/:username/follow-request/accept ────────────
+const acceptFollowRequest = async (req, res) => {
+  try {
+    const requester = await prisma.user.findUnique({
+      where: { username: req.params.username },
+      select: { id: true, username: true },
+    })
+    if (!requester) return res.status(404).json({ error: 'User not found.' })
+
+    const follow = await prisma.userFollow.findUnique({
+      where: {
+        followerId_followingId: { followerId: requester.id, followingId: req.user.userId },
+      },
+    })
+
+    if (!follow || follow.status !== 'pending') {
+      return res.status(404).json({ error: 'No pending follow request from this user.' })
+    }
+
+    await prisma.userFollow.update({
+      where: {
+        followerId_followingId: { followerId: requester.id, followingId: req.user.userId },
+      },
+      data: { status: 'active' },
+    })
+
+    await createNotification(prisma, {
+      userId: requester.id,
+      type: 'follow_accepted',
+      message: `${req.user.username} accepted your follow request.`,
+      actorId: req.user.userId,
+      linkPath: `/users/${req.user.username}`,
+    })
+
+    checkAndAwardBadges(prisma, req.user.userId)
+    res.json({ accepted: true })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+}
+
+// ── POST /api/users/:username/follow-request/decline ───────────
+const declineFollowRequest = async (req, res) => {
+  try {
+    const requester = await prisma.user.findUnique({
+      where: { username: req.params.username },
+      select: { id: true },
+    })
+    if (!requester) return res.status(404).json({ error: 'User not found.' })
+
+    const follow = await prisma.userFollow.findUnique({
+      where: {
+        followerId_followingId: { followerId: requester.id, followingId: req.user.userId },
+      },
+    })
+
+    if (!follow || follow.status !== 'pending') {
+      return res.status(404).json({ error: 'No pending follow request from this user.' })
+    }
+
+    await prisma.userFollow.delete({
+      where: {
+        followerId_followingId: { followerId: requester.id, followingId: req.user.userId },
+      },
+    })
+
+    res.json({ declined: true })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+}
+
+// ── PATCH /api/users/me/privacy ────────────────────────────────
+const updatePrivacy = async (req, res) => {
+  try {
+    const { isPrivate } = req.body || {}
+    if (typeof isPrivate !== 'boolean') {
+      return res.status(400).json({ error: 'isPrivate must be a boolean.' })
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: req.user.userId },
+      data: { isPrivate },
+      select: { id: true, isPrivate: true },
+    })
+
+    // When switching from private to public, auto-accept all pending follow requests
+    if (!isPrivate) {
+      await prisma.userFollow.updateMany({
+        where: { followingId: req.user.userId, status: 'pending' },
+        data: { status: 'active' },
+      })
+    }
+
+    res.json({ isPrivate: updated.isPrivate })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+}
+
+// ── GET /api/users/me/terms-status ──────────────────────────────
+const CURRENT_TERMS_VERSION = '2026-04-04'
+
+const getTermsStatus = async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: { termsAcceptedVersion: true, termsAcceptedAt: true },
+    })
+    res.json({
+      acceptedVersion: user?.termsAcceptedVersion || null,
+      acceptedAt: user?.termsAcceptedAt || null,
+      currentVersion: CURRENT_TERMS_VERSION,
+      needsUpdate: !user?.termsAcceptedVersion || user.termsAcceptedVersion < CURRENT_TERMS_VERSION,
+    })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl })
+    res.status(500).json({ error: 'Server error.' })
+  }
+}
+
+// ── POST /api/users/me/terms-accept ─────────────────────────────
+const acceptTerms = async (req, res) => {
+  try {
+    // Always use server's current version -- ignore client-provided version to prevent bypass
+    const acceptedAt = new Date()
+    await prisma.user.update({
+      where: { id: req.user.userId },
+      data: {
+        termsAcceptedVersion: CURRENT_TERMS_VERSION,
+        termsAcceptedAt: acceptedAt,
+      },
+    })
+    res.json({
+      acceptedVersion: CURRENT_TERMS_VERSION,
+      acceptedAt,
+      currentVersion: CURRENT_TERMS_VERSION,
+      needsUpdate: false,
+    })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl })
+    res.status(500).json({ error: 'Server error.' })
+  }
+}
+
 module.exports = {
   getMyActivity,
   getActivityByUsername,
@@ -772,6 +1013,10 @@ module.exports = {
   unfollowUser,
   getFollowers,
   getFollowing,
+  getFollowRequests,
+  acceptFollowRequest,
+  declineFollowRequest,
+  updatePrivacy,
   getMyStreak,
   getMyWeeklyActivity,
   getMe,
@@ -782,4 +1027,113 @@ module.exports = {
   unblockUser,
   muteUser,
   unmuteUser,
+  getTermsStatus,
+  acceptTerms,
+  requestAccountTypeChange,
+  getAccountTypeStatus,
+}
+
+// ── Account type change with 7-day cooldown ──────────────────────
+
+const VALID_ACCOUNT_TYPES = ['student', 'teacher', 'other']
+const ACCOUNT_TYPE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
+
+async function requestAccountTypeChange(req, res) {
+  try {
+    const { accountType } = req.body || {}
+    if (!accountType || !VALID_ACCOUNT_TYPES.includes(accountType)) {
+      return res.status(400).json({ error: `Account type must be one of: ${VALID_ACCOUNT_TYPES.join(', ')}` })
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: { accountType: true, pendingAccountType: true, accountTypeChangedAt: true },
+    })
+    if (!user) return res.status(404).json({ error: 'User not found.' })
+
+    if (user.accountType === accountType) {
+      return res.status(400).json({ error: 'You already have this account type.' })
+    }
+
+    // Check cooldown: if changed within last 7 days, reject
+    if (user.accountTypeChangedAt) {
+      const elapsed = Date.now() - new Date(user.accountTypeChangedAt).getTime()
+      if (elapsed < ACCOUNT_TYPE_COOLDOWN_MS) {
+        const remainingMs = ACCOUNT_TYPE_COOLDOWN_MS - elapsed
+        const remainingDays = Math.ceil(remainingMs / (24 * 60 * 60 * 1000))
+        return res.status(429).json({
+          error: `You can only change your account type once every 7 days. Please wait ${remainingDays} more day${remainingDays === 1 ? '' : 's'}.`,
+          cooldownEndsAt: new Date(new Date(user.accountTypeChangedAt).getTime() + ACCOUNT_TYPE_COOLDOWN_MS).toISOString(),
+        })
+      }
+    }
+
+    // Set the pending type and schedule the change
+    const changeAt = new Date(Date.now() + ACCOUNT_TYPE_COOLDOWN_MS)
+
+    await prisma.user.update({
+      where: { id: req.user.userId },
+      data: {
+        pendingAccountType: accountType,
+        accountTypeChangedAt: new Date(), // marks when the request was made
+      },
+    })
+
+    res.json({
+      message: `Account type change to "${accountType}" requested. It will take effect in 7 days.`,
+      pendingAccountType: accountType,
+      effectiveAt: changeAt.toISOString(),
+    })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+}
+
+async function getAccountTypeStatus(req, res) {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: { accountType: true, pendingAccountType: true, accountTypeChangedAt: true },
+    })
+    if (!user) return res.status(404).json({ error: 'User not found.' })
+
+    // Check if pending change should be applied
+    if (user.pendingAccountType && user.accountTypeChangedAt) {
+      const elapsed = Date.now() - new Date(user.accountTypeChangedAt).getTime()
+      if (elapsed >= ACCOUNT_TYPE_COOLDOWN_MS) {
+        // Apply the change
+        const updated = await prisma.user.update({
+          where: { id: req.user.userId },
+          data: {
+            accountType: user.pendingAccountType,
+            pendingAccountType: null,
+          },
+          select: { accountType: true, pendingAccountType: true, accountTypeChangedAt: true },
+        })
+        return res.json({
+          accountType: updated.accountType,
+          pendingAccountType: null,
+          effectiveAt: null,
+          cooldownEndsAt: updated.accountTypeChangedAt
+            ? new Date(new Date(updated.accountTypeChangedAt).getTime() + ACCOUNT_TYPE_COOLDOWN_MS).toISOString()
+            : null,
+        })
+      }
+    }
+
+    res.json({
+      accountType: user.accountType,
+      pendingAccountType: user.pendingAccountType || null,
+      effectiveAt: user.pendingAccountType && user.accountTypeChangedAt
+        ? new Date(new Date(user.accountTypeChangedAt).getTime() + ACCOUNT_TYPE_COOLDOWN_MS).toISOString()
+        : null,
+      cooldownEndsAt: user.accountTypeChangedAt
+        ? new Date(new Date(user.accountTypeChangedAt).getTime() + ACCOUNT_TYPE_COOLDOWN_MS).toISOString()
+        : null,
+    })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
 }

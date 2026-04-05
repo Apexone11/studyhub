@@ -12,17 +12,7 @@
 
 const express = require('express')
 const requireAuth = require('../../middleware/auth')
-const { captureError } = require('../../monitoring/sentry')
-const prisma = require('../../lib/prisma')
 const { readLimiter, writeLimiter } = require('../../lib/rateLimiters')
-const { getIO } = require('../../lib/socketio')
-const {
-  parseId,
-  requireGroupMember,
-  isGroupAdmin,
-  stripHtmlTags,
-  validateTitle,
-} = require('./studyGroups.helpers')
 
 // Import controller
 const {

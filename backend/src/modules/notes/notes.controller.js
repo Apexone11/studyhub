@@ -11,12 +11,12 @@ const prisma = require('../../lib/prisma')
 const { timedSection, logTiming } = require('../../lib/requestTiming')
 
 const COMMENT_INCLUDE = {
-  author: { select: { id: true, username: true } },
+  author: { select: { id: true, username: true, avatarUrl: true } },
 }
 
 const NOTE_INCLUDE = {
   course: { select: { id: true, code: true } },
-  author: { select: { id: true, username: true } },
+  author: { select: { id: true, username: true, avatarUrl: true } },
 }
 
 /**
@@ -43,16 +43,39 @@ async function getNoteById(req, res) {
 
     if (!note) return res.status(404).json({ error: 'Note not found.' })
 
-    const isOwner = req.user && (req.user.userId === note.userId || req.user.role === 'admin')
+    // Notes require authentication to view
+    if (!req.user) {
+      return res.status(401).json({ error: 'Sign in to view notes.' })
+    }
+
+    const isOwner = req.user.userId === note.userId || req.user.role === 'admin'
 
     // Private notes: only owner/admin can see
     if (note.private && !isOwner) {
       return res.status(404).json({ error: 'Note not found.' })
     }
 
+    // Fetch social data in parallel: star status, reaction counts, star count
+    const userId = req.user?.userId
+    const [starred, starCount, likes, dislikes, userReaction] = await Promise.all([
+      userId ? prisma.noteStar.findUnique({ where: { userId_noteId: { userId, noteId } } }).then(Boolean) : false,
+      prisma.noteStar.count({ where: { noteId } }),
+      prisma.noteReaction.count({ where: { noteId, type: 'like' } }).catch(() => 0),
+      prisma.noteReaction.count({ where: { noteId, type: 'dislike' } }).catch(() => 0),
+      userId ? prisma.noteReaction.findUnique({ where: { userId_noteId: { userId, noteId } }, select: { type: true } }).catch(() => null) : null,
+    ])
+
     logTiming(req, { sections: [mainSection], extra: { noteId, isOwner: Boolean(isOwner) } })
 
-    res.json({ ...note, isOwner: Boolean(isOwner) })
+    res.json({
+      ...note,
+      isOwner: Boolean(isOwner),
+      starred,
+      starCount,
+      downloads: note.downloads || 0,
+      reactionCounts: { like: likes, dislike: dislikes },
+      userReaction: userReaction?.type || null,
+    })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
@@ -304,9 +327,52 @@ async function listNoteComments(req, res) {
       timedSection('count', () => prisma.noteComment.count({ where: commentWhere })),
     ])
 
+    // Collect all comment IDs (top-level + replies) for batch reaction lookup
+    const allCommentIds = []
+    for (const c of commentsSection.data) {
+      allCommentIds.push(c.id)
+      for (const r of (c.replies || [])) allCommentIds.push(r.id)
+    }
+
+    // Batch fetch reaction counts and user reactions
+    const userId = req.user?.userId
+    const [reactionGroups, userReactions] = await Promise.all([
+      allCommentIds.length > 0
+        ? prisma.noteCommentReaction.groupBy({
+            by: ['commentId', 'type'],
+            where: { commentId: { in: allCommentIds } },
+            _count: true,
+          })
+        : [],
+      userId && allCommentIds.length > 0
+        ? prisma.noteCommentReaction.findMany({
+            where: { commentId: { in: allCommentIds }, userId },
+            select: { commentId: true, type: true },
+          })
+        : [],
+    ])
+
+    // Build lookup maps
+    const reactionMap = new Map()
+    for (const g of reactionGroups) {
+      if (!reactionMap.has(g.commentId)) reactionMap.set(g.commentId, { like: 0, dislike: 0 })
+      reactionMap.get(g.commentId)[g.type] = g._count
+    }
+    const userReactionMap = new Map()
+    for (const r of userReactions) userReactionMap.set(r.commentId, r.type)
+
+    function enrichComment(c) {
+      return {
+        ...c,
+        reactionCounts: reactionMap.get(c.id) || { like: 0, dislike: 0 },
+        userReaction: userReactionMap.get(c.id) || null,
+      }
+    }
+
     const comments = commentsSection.data.map((comment) => ({
-      ...comment,
+      ...enrichComment(comment),
       replyCount: (comment.replies || []).length,
+      replies: (comment.replies || []).map(enrichComment),
     }))
 
     logTiming(req, {

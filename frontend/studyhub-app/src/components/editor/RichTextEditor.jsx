@@ -42,6 +42,7 @@ export default function RichTextEditor({
   placeholder = 'Start writing your study notes...',
   minHeight = 400,
   editable = true,
+  themeAware = false,
 }) {
   const onUpdateRef = useRef(onUpdate)
   useEffect(() => { onUpdateRef.current = onUpdate })
@@ -125,18 +126,19 @@ export default function RichTextEditor({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {editable && <EditorToolbar editor={editor} />}
+      {editable && <EditorToolbar editor={editor} themeAware={themeAware} />}
       <div
         style={{
           flex: 1,
           minHeight,
           overflow: 'auto',
-          background: '#0f172a',
+          background: themeAware ? 'var(--sh-surface)' : '#0f172a',
         }}
       >
         <EditorContent
           editor={editor}
           style={{ height: '100%' }}
+          className={themeAware ? 'sh-editor-theme-aware' : ''}
         />
       </div>
     </div>

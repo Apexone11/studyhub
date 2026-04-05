@@ -546,13 +546,14 @@
 
 [data-theme='dark'] .notes-markdown-preview code {
   background: var(--sh-soft);
-  color: #fb7185;
+  color: var(--sh-danger-text);
+  border-color: var(--sh-border);
 }
 
 [data-theme='dark'] .notes-markdown-preview blockquote {
   background: var(--sh-soft);
   color: var(--sh-subtext);
-  border-left-color: #818cf8;
+  border-left-color: var(--sh-brand);
 }
 
 [data-theme='dark'] .notes-markdown-preview th {
@@ -2644,13 +2645,13 @@ textarea.sh-input {
 }
 
 .notes-markdown-preview a {
-  color: #3b82f6;
+  color: var(--sh-brand);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
 .notes-markdown-preview a:hover {
-  color: #2563eb;
+  color: var(--sh-brand-hover, var(--sh-brand));
 }
 
 .notes-markdown-preview strong {
@@ -2668,7 +2669,7 @@ textarea.sh-input {
 }
 
 .notes-markdown-preview li::marker {
-  color: #94a3b8;
+  color: var(--sh-muted);
 }
 
 .notes-markdown-preview code {
@@ -2676,8 +2677,9 @@ textarea.sh-input {
   font-size: 0.88em;
   padding: 2px 6px;
   border-radius: 5px;
-  background: var(--sh-code-bg, #f1f5f9);
-  color: #e11d48;
+  background: var(--sh-soft);
+  color: var(--sh-danger-text);
+  border: 1px solid var(--sh-border);
 }
 
 .notes-markdown-preview pre {
@@ -2691,7 +2693,8 @@ textarea.sh-input {
 .notes-markdown-preview pre code {
   padding: 0;
   background: none;
-  color: #e2e8f0;
+  color: var(--sh-slate-200);
+  border: none;
   font-size: 13px;
   line-height: 1.6;
 }
@@ -2699,10 +2702,10 @@ textarea.sh-input {
 .notes-markdown-preview blockquote {
   margin: 0.8em 0;
   padding: 8px 16px;
-  border-left: 3px solid #6366f1;
-  background: var(--sh-quote-bg, #f8fafc);
+  border-left: 3px solid var(--sh-brand);
+  background: var(--sh-soft);
   border-radius: 0 8px 8px 0;
-  color: #475569;
+  color: var(--sh-subtext);
   font-style: italic;
 }
 
@@ -2740,8 +2743,12 @@ textarea.sh-input {
 }
 
 .notes-markdown-preview th {
-  background: var(--sh-code-bg, #f1f5f9);
+  background: var(--sh-soft);
   font-weight: 700;
+}
+
+.notes-markdown-preview tr:nth-child(even) {
+  background: var(--sh-soft);
 }
 
 /* ── Profile page ──────────────────────────────────────────────────── */

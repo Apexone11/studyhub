@@ -42,15 +42,15 @@ export default function UploadSheetPage() {
 
   if (hook.initializing) {
     return (
-      <div style={{ minHeight: '100vh', background: '#edf0f5', fontFamily: FONT }}>
+      <div style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: FONT }}>
         <Navbar crumbs={[{ label: 'Study Sheets', to: '/sheets' }, { label: hook.isEditing ? 'Edit Sheet' : 'New Sheet', to: null }]} hideTabs hideSearch />
-        <div style={{ ...pageShell('editor', 20, 60), color: '#64748b', fontSize: 14 }}>Loading editor…</div>
+        <div style={{ ...pageShell('editor', 20, 60), color: 'var(--sh-slate-500)', fontSize: 14 }}>Loading editor…</div>
       </div>
     )
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#edf0f5', fontFamily: FONT }}>
+    <div style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: FONT }}>
       <Navbar crumbs={[{ label: 'Study Sheets', to: '/sheets' }, { label: hook.isEditing ? 'Edit Sheet' : 'New Sheet', to: null }]} hideTabs actions={navActions} hideSearch />
       <div style={pageShell('editor', 20, 60)}>
         {!hook.isEditing ? <UploadHelperCard /> : null}

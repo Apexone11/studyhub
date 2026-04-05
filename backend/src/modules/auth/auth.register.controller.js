@@ -44,6 +44,9 @@ router.post('/register', registerLimiter, async (req, res) => {
 
     const passwordHash = await bcrypt.hash(password, 12)
 
+    // Always store the server's current terms version -- never trust client-provided version
+    const CURRENT_TERMS_VERSION = '2026-04-04'
+
     const createdUser = await prisma.user.create({
       data: {
         username,
@@ -55,6 +58,8 @@ router.post('/register', registerLimiter, async (req, res) => {
         emailVerificationExpiry: null,
         trustLevel: TRUST_LEVELS.TRUSTED,
         trustedAt: new Date(),
+        termsAcceptedVersion: CURRENT_TERMS_VERSION,
+        termsAcceptedAt: new Date(),
       },
       select: { id: true },
     })

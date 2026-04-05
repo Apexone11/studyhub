@@ -3,6 +3,7 @@
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 import { API } from '../../config'
+import { CURRENT_TERMS_VERSION } from '../../lib/legalVersions'
 
 /* ── Validation rules ──────────────────────────────────────────────────── */
 export const RULES = {
@@ -28,7 +29,7 @@ export function validateAccountFields(form) {
     return 'Passwords do not match.'
   }
   if (!form.termsAccepted) {
-    return 'You must accept the Terms of Use and Community Guidelines.'
+    return 'You must accept the Terms of Use, Privacy Policy, and Community Guidelines.'
   }
   return ''
 }
@@ -56,6 +57,7 @@ export async function apiStartRegistration(form) {
       confirmPassword: form.confirmPassword,
       accountType: form.accountType || 'student',
       termsAccepted: form.termsAccepted,
+      termsVersion: CURRENT_TERMS_VERSION,
     }),
   })
   const data = await response.json()

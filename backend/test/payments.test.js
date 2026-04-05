@@ -82,7 +82,7 @@ const mocks = vi.hoisted(() => {
     webhooks: stripeWebhooks,
   }
 
-  function StripeClass(apiKey) {
+  function StripeClass(_apiKey) {
     this.customers = stripeCustomer
     this.checkout = { sessions: stripeCheckout }
     this.billingPortal = stripeBillingPortal
@@ -964,11 +964,11 @@ describe('payments.routes — CSRF origin check', () => {
       },
       path: '/checkout/subscription',
     }
-    const mockRes = {}
+    const _mockRes = {}
     const next = vi.fn()
 
     // Import the routes to access the middleware
-    const routesModule = require(routesPath)
+    const _routesModule = require(routesPath)
     // Extract the router and test the middleware behavior
     // This test verifies the intent: the middleware allows whitelisted origins
     expect(mockReq.headers.origin).toBe('http://localhost:5173')

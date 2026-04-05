@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════════════
  * useNoteComments.js — Hook for fetching, posting, resolving, deleting
- * comments on a note. Follows the feed CommentSection pattern.
+ * comments on a note. Supports threaded replies (1 level deep).
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useCallback, useRef, useState } from 'react'
 import { API } from '../../config'
@@ -27,7 +27,9 @@ export function useNoteComments(noteId) {
       if (!res.ok) { loadedRef.current = false; return }
       const data = await res.json()
       const list = Array.isArray(data.comments) ? data.comments : []
-      setComments(list)
+      // Backend already returns top-level with nested replies — ensure replies array exists
+      const nested = list.map((c) => ({ ...c, replies: c.replies || [] }))
+      setComments(nested)
       setTotal(typeof data.total === 'number' ? data.total : list.length)
     } catch {
       loadedRef.current = false
@@ -36,7 +38,7 @@ export function useNoteComments(noteId) {
     }
   }, [noteId])
 
-  const postComment = useCallback(async (content, anchor) => {
+  const postComment = useCallback(async (content, options = {}) => {
     const text = content.trim()
     if (!text) return false
     setPosting(true)
@@ -44,9 +46,16 @@ export function useNoteComments(noteId) {
 
     try {
       const body = { content: text }
-      if (anchor?.anchorText) {
-        body.anchorText = anchor.anchorText
-        if (typeof anchor.anchorOffset === 'number') body.anchorOffset = anchor.anchorOffset
+
+      // Support anchor (inline comment)
+      if (options.anchorText) {
+        body.anchorText = options.anchorText
+        if (typeof options.anchorOffset === 'number') body.anchorOffset = options.anchorOffset
+      }
+
+      // Support replies
+      if (options.parentId) {
+        body.parentId = options.parentId
       }
 
       const res = await fetch(`${API}/api/notes/${noteId}/comments`, {
@@ -61,8 +70,18 @@ export function useNoteComments(noteId) {
         return false
       }
 
-      loadedRef.current = true
-      setComments((prev) => [data, ...prev])
+      if (options.parentId) {
+        // Add reply to parent's replies array
+        setComments((prev) => prev.map((c) => {
+          if (c.id === options.parentId) {
+            return { ...c, replies: [...(c.replies || []), data] }
+          }
+          return c
+        }))
+      } else {
+        // Add as new top-level comment
+        setComments((prev) => [{ ...data, replies: [] }, ...prev])
+      }
       setTotal((prev) => prev + 1)
       return true
     } catch {
@@ -83,7 +102,7 @@ export function useNoteComments(noteId) {
       })
       if (res.ok) {
         const updated = await res.json()
-        setComments((prev) => prev.map((c) => (c.id === commentId ? updated : c)))
+        setComments((prev) => prev.map((c) => (c.id === commentId ? { ...c, ...updated } : c)))
       }
     } catch { /* silent */ }
   }, [noteId])
@@ -96,57 +115,56 @@ export function useNoteComments(noteId) {
         credentials: 'include',
       })
       if (res.ok) {
-        setComments((prev) => prev.filter((c) => c.id !== commentId))
+        // Remove from top-level or from parent's replies
+        setComments((prev) => {
+          const filtered = prev.filter((c) => c.id !== commentId)
+          return filtered.map((c) => ({
+            ...c,
+            replies: (c.replies || []).filter((r) => r.id !== commentId),
+          }))
+        })
         setTotal((prev) => Math.max(0, prev - 1))
       }
     } catch { /* silent */ }
   }, [noteId])
 
   const reactToComment = useCallback(async (commentId, type) => {
+    // Helper to update reaction in a comment
+    const updateReaction = (comment) => {
+      if (comment.id !== commentId) return comment
+      const oldType = comment.userReaction
+      const newType = oldType === type ? null : type
+      let newLikes = comment.reactionCounts?.like || 0
+      let newDislikes = comment.reactionCounts?.dislike || 0
+      if (oldType === 'like') newLikes--
+      else if (oldType === 'dislike') newDislikes--
+      if (newType === 'like') newLikes++
+      else if (newType === 'dislike') newDislikes++
+      return { ...comment, userReaction: newType, reactionCounts: { like: newLikes, dislike: newDislikes } }
+    }
+
+    // Optimistic update (check both top-level and replies)
+    setComments((prev) => prev.map((c) => {
+      const updated = updateReaction(c)
+      return {
+        ...updated,
+        replies: (updated.replies || []).map(updateReaction),
+      }
+    }))
+
     try {
-      // Optimistic update
-      setComments((prev) =>
-        prev.map((comment) => {
-          if (comment.id !== commentId) return comment
-
-          const oldType = comment.userReaction
-          const newType = oldType === type ? null : type
-
-          const oldLikes = comment.reactionCounts?.like || 0
-          const oldDislikes = comment.reactionCounts?.dislike || 0
-
-          let newLikes = oldLikes
-          let newDislikes = oldDislikes
-
-          // Remove old reaction
-          if (oldType === 'like') newLikes -= 1
-          else if (oldType === 'dislike') newDislikes -= 1
-
-          // Add new reaction
-          if (newType === 'like') newLikes += 1
-          else if (newType === 'dislike') newDislikes += 1
-
-          return {
-            ...comment,
-            userReaction: newType,
-            reactionCounts: { like: newLikes, dislike: newDislikes },
-          }
-        })
-      )
-
       const res = await fetch(`${API}/api/notes/${noteId}/comments/${commentId}/react`, {
         method: 'POST',
         headers: authHeaders(),
         credentials: 'include',
         body: JSON.stringify({ type }),
       })
-
       if (!res.ok) {
-        // Revert on error
+        loadedRef.current = false
         await loadComments()
       }
     } catch {
-      // Revert on error
+      loadedRef.current = false
       await loadComments()
     }
   }, [noteId, loadComments])

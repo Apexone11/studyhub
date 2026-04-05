@@ -18,43 +18,93 @@
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useRef, useState, useCallback, useEffect } from 'react'
 import useVideoUpload, { UPLOAD_STATUS } from '../../lib/useVideoUpload'
+import { useSession } from '../../lib/session-context'
 import { API } from '../../config'
 
-const MAX_SIZE_DEFAULT = 500 * 1024 * 1024
 const ACCEPT = '.mp4,.webm,.mov,video/mp4,video/webm,video/quicktime'
+
+// Tier-specific limits
+const TIER_LIMITS = {
+  free:        { sizeMb: 500,  durationMin: 30 },
+  donor:       { sizeMb: 1024, durationMin: 45 },
+  pro_monthly: { sizeMb: 1536, durationMin: 60 },
+  pro_yearly:  { sizeMb: 1536, durationMin: 60 },
+}
+
+function getTierLabel(tier) {
+  if (tier === 'pro_monthly' || tier === 'pro_yearly') return 'Pro'
+  if (tier === 'donor') return 'Supporter'
+  return 'Free'
+}
 
 export default function VideoUploader({
   onUploadComplete,
   onCancel,
-  maxSize = MAX_SIZE_DEFAULT,
+  maxSize: maxSizeProp,
   compact = false,
 }) {
+  const { user } = useSession()
+  const userTier = (user?.plan && user.plan !== 'free') ? user.plan : (user?.isDonor ? 'donor' : 'free')
+  const limits = TIER_LIMITS[userTier] || TIER_LIMITS.free
+  const maxSize = maxSizeProp || limits.sizeMb * 1024 * 1024
   const fileInputRef = useRef(null)
   const [file, setFile] = useState(null)
   const [preview, setPreview] = useState(null)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [dragOver, setDragOver] = useState(false)
+  const [validationError, setValidationError] = useState('')
+  const [videoDuration, setVideoDuration] = useState(null)
 
   const { upload, abort, reset, state } = useVideoUpload()
 
-  // ── File selection ──────────────────────────────────────────────────
+  // ── File selection with validation ──────────────────────────────────
   const handleFileSelect = useCallback(
     (selectedFile) => {
       if (!selectedFile) return
+      setValidationError('')
+      setVideoDuration(null)
 
-      // Create video preview URL
+      // Check file size
+      if (selectedFile.size > maxSize) {
+        const sizeMb = Math.round(selectedFile.size / (1024 * 1024))
+        const limitMb = Math.round(maxSize / (1024 * 1024))
+        setValidationError(
+          `File is ${sizeMb} MB, which exceeds your ${getTierLabel(userTier)} limit of ${limitMb} MB. ` +
+          (userTier === 'free' ? 'Upgrade to Pro or donate to increase your limit.' : userTier === 'donor' ? 'Upgrade to Pro for 1.5 GB uploads.' : '')
+        )
+        return
+      }
+
+      // Create video preview URL and check duration
       if (preview) URL.revokeObjectURL(preview)
       const url = URL.createObjectURL(selectedFile)
       setPreview(url)
       setFile(selectedFile)
+
+      // Check video duration via a temporary video element (separate URL to avoid revoking preview)
+      const metadataUrl = URL.createObjectURL(selectedFile)
+      const tempVideo = document.createElement('video')
+      tempVideo.preload = 'metadata'
+      tempVideo.onloadedmetadata = () => {
+        const durationMin = tempVideo.duration / 60
+        setVideoDuration(Math.round(durationMin * 10) / 10)
+        URL.revokeObjectURL(metadataUrl)
+        if (durationMin > limits.durationMin) {
+          setValidationError(
+            `Video is ${Math.round(durationMin)} minutes, which exceeds your ${getTierLabel(userTier)} limit of ${limits.durationMin} minutes. ` +
+            (userTier === 'free' ? 'Upgrade to Pro or donate to increase your limit.' : userTier === 'donor' ? 'Upgrade to Pro for 60-minute uploads.' : '')
+          )
+        }
+      }
+      tempVideo.src = metadataUrl
 
       // Default title from filename
       if (!title) {
         setTitle(selectedFile.name.replace(/\.[^.]+$/, ''))
       }
     },
-    [preview, title],
+    [preview, title, maxSize, limits.durationMin, userTier],
   )
 
   const handleInputChange = (e) => {
@@ -219,6 +269,17 @@ export default function VideoUploader({
         style={{ display: 'none' }}
       />
 
+      {/* ── Validation error (shown when file rejected before selection) */}
+      {!file && validationError && (
+        <div style={{
+          padding: '10px 14px', borderRadius: 8,
+          background: 'var(--sh-danger-bg)', border: '1px solid var(--sh-danger-border)',
+          color: 'var(--sh-danger-text)', fontSize: 'var(--type-sm)', fontWeight: 600,
+        }}>
+          {validationError}
+        </div>
+      )}
+
       {/* ── Drop zone (no file selected) ───────────────────────────── */}
       {!file && !showProcessing && (
         <div
@@ -259,10 +320,10 @@ export default function VideoUploader({
             Drag and drop a video here
           </p>
           <p style={{ color: 'var(--sh-muted)', fontSize: 'var(--type-sm)' }}>
-            or click to browse -- MP4, WebM, MOV up to {Math.round(maxSize / (1024 * 1024))} MB
-            {state.maxSize && (
-              <span> (Your limit: {(state.maxSize / (1024 * 1024 * 1024)).toFixed(1)} GB)</span>
-            )}
+            or click to browse -- MP4, WebM, MOV
+          </p>
+          <p style={{ color: 'var(--sh-muted)', fontSize: 'var(--type-xs)', marginTop: 6 }}>
+            {getTierLabel(userTier)} plan: up to {limits.sizeMb >= 1024 ? `${(limits.sizeMb / 1024).toFixed(1)} GB` : `${limits.sizeMb} MB`}, {limits.durationMin} min max
           </p>
         </div>
       )}
@@ -323,17 +384,31 @@ export default function VideoUploader({
             </div>
           )}
 
-          {/* File info */}
+          {/* File info + tier limits */}
           <p style={{ color: 'var(--sh-muted)', fontSize: 'var(--type-xs)' }}>
             {file.name} -- {(file.size / (1024 * 1024)).toFixed(1)} MB
-            {state.maxDuration && (
-              <span> | Duration limit: {Math.floor(state.maxDuration / 60)} minutes</span>
-            )}
+            {videoDuration != null && <span> -- {videoDuration} min</span>}
+            <span> | {getTierLabel(userTier)} limit: {limits.sizeMb >= 1024 ? `${(limits.sizeMb / 1024).toFixed(1)} GB` : `${limits.sizeMb} MB`}, {limits.durationMin} min</span>
           </p>
+
+          {/* Validation error */}
+          {validationError && (
+            <div style={{
+              padding: '10px 14px', borderRadius: 8,
+              background: 'var(--sh-danger-bg)', border: '1px solid var(--sh-danger-border)',
+              color: 'var(--sh-danger-text)', fontSize: 'var(--type-sm)', fontWeight: 600,
+            }}>
+              {validationError}
+            </div>
+          )}
 
           {/* Action buttons */}
           <div style={{ display: 'flex', gap: '10px' }}>
-            <button style={btnPrimary} onClick={handleUpload}>
+            <button
+              style={{ ...btnPrimary, opacity: validationError ? 0.5 : 1, cursor: validationError ? 'not-allowed' : 'pointer' }}
+              onClick={handleUpload}
+              disabled={!!validationError}
+            >
               Upload Video
             </button>
             <button style={btnSecondary} onClick={handleCancel}>

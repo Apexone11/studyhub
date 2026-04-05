@@ -8,7 +8,7 @@ import { PROOF_ITEMS } from './homeConstants'
 /*  Hero                                                               */
 /* ------------------------------------------------------------------ */
 
-export function HeroSection({ heroSearch, setHeroSearch, onSearch, platformStats }) {
+export function HeroSection({ platformStats }) {
   return (
     <section className="home-hero">
       {/* Enhanced fork-tree SVG */}
@@ -86,22 +86,6 @@ export function HeroSection({ heroSearch, setHeroSearch, onSearch, platformStats
             Browse Study Sheets
           </Link>
         </div>
-
-        <form onSubmit={onSearch} className="home-hero-search">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" style={{ flexShrink: 0, marginLeft: 14 }}>
-            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-          </svg>
-          <input
-            type="text"
-            value={heroSearch}
-            onChange={e => setHeroSearch(e.target.value)}
-            placeholder="Search sheets, courses, topics..."
-            style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#f1f5f9', fontSize: 14, padding: '14px 12px', fontFamily: 'inherit' }}
-          />
-          <button type="submit" className="home-hero-search-btn">
-            Search
-          </button>
-        </form>
 
         <div className="home-stats-row">
           {[

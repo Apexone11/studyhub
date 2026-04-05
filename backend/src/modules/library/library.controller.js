@@ -95,10 +95,12 @@ async function syncCatalogHandler(req, res) {
  */
 async function listShelvesHandler(req, res) {
   try {
+    const includeBooks = req.query.includeBooks === 'true'
     const shelves = await prisma.bookShelf.findMany({
       where: { userId: req.user.userId },
       include: {
         _count: { select: { books: true } },
+        ...(includeBooks ? { books: { orderBy: { addedAt: 'desc' }, take: 20 } } : {}),
       },
       orderBy: { createdAt: 'desc' },
     })

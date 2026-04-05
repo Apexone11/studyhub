@@ -19,9 +19,9 @@ import './SheetLabPage.css'
 
 /* ── Tab definitions ───────────────────────────────────────── */
 
-function buildTabs(isOwner, isFork) {
+function buildTabs(isOwner, isFork, canEditAsNonOwner) {
   const tabs = []
-  if (isOwner) {
+  if (isOwner || canEditAsNonOwner) {
     tabs.push({ id: 'editor', label: 'Editor' })
     tabs.push({ id: 'changes', label: 'Changes' })
   }
@@ -58,7 +58,8 @@ export default function SheetLabPage() {
 
   const lab = useSheetLab()
   const { sheet, error, isOwner, isFork, activeTab, setActiveTab, handleBack, deleting, handleDeleteFork, publishing, handlePublish } = lab
-  const tabs = buildTabs(isOwner, isFork)
+  const canEditAsNonOwner = !isOwner && sheet?.allowEditing === true
+  const tabs = buildTabs(isOwner, isFork, canEditAsNonOwner)
 
   // Ensure activeTab is valid for current tab set
   const validTab = tabs.find((t) => t.id === activeTab) ? activeTab : tabs[0]?.id || 'history'

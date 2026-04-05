@@ -14,6 +14,7 @@ export const TABS = [
   ['schools', 'Schools'],
   ['settings', 'Admin Settings'],
   ['revenue', 'Revenue'],
+  ['reviews', 'Reviews'],
 ]
 
 export function authHeaders() {

@@ -33,7 +33,7 @@ export default function NotesList({
       <div style={{ marginBottom: 14, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
         <div>
           <h1 style={{ fontSize: 20, fontWeight: 800, color: 'var(--sh-heading, #0f172a)', marginBottom: 4 }}>My Notes</h1>
-          <p style={{ fontSize: 13, color: 'var(--sh-muted, #64748b)' }}>Markdown notes per course. Private by default.</p>
+          <p style={{ fontSize: 13, color: 'var(--sh-muted, #64748b)' }}>Rich text notes per course. Private by default.</p>
           <div data-tutorial="notes-filters" style={{ display: 'flex', gap: 6, marginTop: 10 }}>
             {[
               ['all', 'All Notes'],
@@ -103,7 +103,7 @@ export default function NotesList({
                 ? 'Uncheck "Private" on a note to share it with classmates.'
                 : filterTab === 'starred'
                   ? 'Click the ☆ icon on any note to star it for quick access.'
-                  : 'Create your first markdown note to get started.'}
+                  : 'Create your first note to get started.'}
           </div>
           <button
             onClick={createNote}

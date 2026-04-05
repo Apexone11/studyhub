@@ -7,7 +7,7 @@ import { attachmentEndpoints, attachmentPreviewKind } from './feedHelpers'
 import { popScale } from '../../lib/animations'
 import { Avatar } from './FeedWidgets'
 import CommentSection from './CommentSection'
-import { FONT, timeAgo, courseColor, actionButton, linkButton, pillStyle } from './feedConstants'
+import { FONT, timeAgo, actionButton, linkButton, pillStyle } from './feedConstants'
 import { API } from '../../config'
 import ProBadge from '../../components/ProBadge'
 
@@ -283,8 +283,8 @@ function FeedCardInner({
   const previewKind = attachmentPreviewKind(item)
 
   return (
-    <article className="sh-card" data-post-id={item.id}>
-      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+    <article className="sh-card" data-post-id={item.id} style={{ padding: '20px 24px', transition: 'box-shadow 0.2s ease' }}>
+      <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
         {item.author?.username ? (
           <Link
             to={`/users/${item.author.username}`}
@@ -313,7 +313,7 @@ function FeedCardInner({
                     <Link
                       to={`/users/${item.author.username}`}
                       style={{
-                        fontWeight: 800,
+                        fontWeight: 700,
                         color: 'var(--sh-heading)',
                         fontSize: 14,
                         textDecoration: 'none',
@@ -324,22 +324,26 @@ function FeedCardInner({
                     <ProBadge plan={item.author.plan} size="xs" />
                   </>
                 ) : (
-                  <span style={{ fontWeight: 800, color: 'var(--sh-heading)', fontSize: 14 }}>
+                  <span style={{ fontWeight: 700, color: 'var(--sh-heading)', fontSize: 14 }}>
                     StudyHub
                   </span>
                 )}
                 <span
                   style={{
                     fontSize: 11,
-                    fontWeight: 800,
+                    fontWeight: 700,
                     textTransform: 'uppercase',
-                    letterSpacing: '.08em',
-                    color:
-                      item.type === 'announcement'
-                        ? 'var(--sh-warning)'
+                    letterSpacing: '.04em',
+                    borderRadius: 6,
+                    padding: '2px 8px',
+                    lineHeight: '18px',
+                    ...(item.type === 'announcement'
+                      ? { background: 'var(--sh-warning)', color: 'var(--sh-slate-900)' }
+                      : item.type === 'sheet'
+                        ? { background: 'var(--sh-success)', color: 'white' }
                         : item.type === 'note'
-                          ? 'var(--purple)'
-                          : courseColor(item.course?.code),
+                          ? { background: 'var(--sh-info)', color: 'white' }
+                          : { background: 'var(--sh-brand)', color: 'white' }),
                   }}
                 >
                   {item.video ? 'video' : item.type}
@@ -350,7 +354,7 @@ function FeedCardInner({
                   </span>
                 ) : null}
               </div>
-              <div style={{ fontSize: 12, color: 'var(--sh-muted)', marginTop: 2 }}>
+              <div style={{ fontSize: 11, color: 'var(--sh-muted)', marginTop: 4 }}>
                 {timeAgo(item.createdAt)}
               </div>
             </div>
@@ -510,7 +514,7 @@ function FeedCardInner({
             <PendingReviewBanner />
           )}
           {item.title ? (
-            <h3 style={{ margin: '0 0 10px', color: 'var(--sh-heading)', fontSize: 19 }}>
+            <h3 style={{ margin: '0 0 8px', color: 'var(--sh-heading)', fontSize: 17, fontWeight: 700 }}>
               {item.title}
             </h3>
           ) : null}
@@ -518,9 +522,9 @@ function FeedCardInner({
             <p
               style={{
                 margin: 0,
-                color: 'var(--sh-subtext)',
+                color: 'var(--sh-text)',
                 fontSize: 14,
-                lineHeight: 1.7,
+                lineHeight: 1.65,
                 whiteSpace: 'pre-wrap',
               }}
             >
@@ -603,7 +607,7 @@ function FeedCardInner({
             </section>
           ) : null}
 
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 14 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 16 }}>
             {isSheet ? (
               <button
                 type="button"
@@ -611,7 +615,7 @@ function FeedCardInner({
                   popScale(e.currentTarget)
                   onStar(item)
                 }}
-                style={actionButton(item.starred ? '#f59e0b' : '#475569')}
+                style={actionButton(item.starred ? 'var(--sh-warning)' : 'var(--sh-slate-600)')}
               >
                 {item.starred ? <IconStarFilled size={14} /> : <IconStar size={14} />}
                 {item.stars || 0} stars
@@ -630,7 +634,7 @@ function FeedCardInner({
                   popScale(e.currentTarget)
                   onReact(item, 'like')
                 }}
-                style={actionButton(reaction.userReaction === 'like' ? '#16a34a' : '#475569')}
+                style={actionButton(reaction.userReaction === 'like' ? 'var(--sh-success)' : 'var(--sh-slate-600)')}
               >
                 Like {reaction.likes || 0}
               </button>
@@ -642,7 +646,7 @@ function FeedCardInner({
                   popScale(e.currentTarget)
                   onReact(item, 'dislike')
                 }}
-                style={actionButton(reaction.userReaction === 'dislike' ? '#dc2626' : '#475569')}
+                style={actionButton(reaction.userReaction === 'dislike' ? 'var(--sh-danger)' : 'var(--sh-slate-600)')}
               >
                 Dislike {reaction.dislikes || 0}
               </button>
@@ -654,7 +658,7 @@ function FeedCardInner({
                   popScale(e.currentTarget)
                   onReact(item, 'like')
                 }}
-                style={actionButton(reaction.userReaction === 'like' ? '#16a34a' : '#475569')}
+                style={actionButton(reaction.userReaction === 'like' ? 'var(--sh-success)' : 'var(--sh-slate-600)')}
               >
                 Helpful {reaction.likes || 0}
               </button>
@@ -666,7 +670,7 @@ function FeedCardInner({
                   popScale(e.currentTarget)
                   onReact(item, 'dislike')
                 }}
-                style={actionButton(reaction.userReaction === 'dislike' ? '#dc2626' : '#475569')}
+                style={actionButton(reaction.userReaction === 'dislike' ? 'var(--sh-danger)' : 'var(--sh-slate-600)')}
               >
                 Needs work {reaction.dislikes || 0}
               </button>

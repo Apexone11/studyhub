@@ -1,6 +1,7 @@
 import LegalPageLayout, { LegalSection } from '../../components/LegalPageLayout'
 import { IconShield } from '../../components/Icons'
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '../../config'
+import { LEGAL_EMAILS } from '../../lib/legalConstants'
 
 function PrivacyPage() {
   return (
@@ -87,6 +88,10 @@ function PrivacyPage() {
       <LegalSection title="9. Contact">
         <p>
           Privacy questions: <a href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>.
+        </p>
+        <p>
+          For privacy inquiries, contact us at{' '}
+          <a href={`mailto:${LEGAL_EMAILS.privacy}`} style={{ color: 'var(--sh-brand)', textDecoration: 'none' }}>{LEGAL_EMAILS.privacy}</a>.
         </p>
       </LegalSection>
     </LegalPageLayout>

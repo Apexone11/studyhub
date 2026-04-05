@@ -58,12 +58,14 @@ export const OWN_TABS = [
   { key: 'overview',     label: 'Overview' },
   { key: 'study',        label: 'Study' },
   { key: 'sheets',       label: 'Sheets' },
+  { key: 'posts',        label: 'Posts' },
   { key: 'achievements', label: 'Achievements' },
 ]
 
 export const OTHER_TABS = [
   { key: 'overview',     label: 'Overview' },
   { key: 'sheets',       label: 'Sheets' },
+  { key: 'posts',        label: 'Posts' },
   { key: 'achievements', label: 'Achievements' },
 ]
 

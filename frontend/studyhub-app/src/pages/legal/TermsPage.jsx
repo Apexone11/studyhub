@@ -1,6 +1,7 @@
 import LegalPageLayout, { LegalSection } from '../../components/LegalPageLayout'
 import { IconInfoCircle } from '../../components/Icons'
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '../../config'
+import { LEGAL_EMAILS } from '../../lib/legalConstants'
 
 function TermsPage() {
   return (
@@ -93,9 +94,24 @@ function TermsPage() {
         </p>
       </LegalSection>
 
-      <LegalSection title="10. Contact">
+      <LegalSection title="10. Copyright and DMCA">
+        <p>
+          StudyHub respects intellectual property rights. If you believe content on StudyHub infringes your copyright,
+          you may submit a notice under the Digital Millennium Copyright Act (DMCA).
+        </p>
+        <p>
+          To report copyright infringement, contact our designated DMCA agent at{' '}
+          <a href={`mailto:${LEGAL_EMAILS.dmca}`} style={{ color: 'var(--sh-brand)', textDecoration: 'none' }}>{LEGAL_EMAILS.dmca}</a>.
+        </p>
+      </LegalSection>
+
+      <LegalSection title="11. Contact">
         <p>
           Questions about these terms: <a href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>.
+        </p>
+        <p>
+          For legal inquiries, contact us at{' '}
+          <a href={`mailto:${LEGAL_EMAILS.legal}`} style={{ color: 'var(--sh-brand)', textDecoration: 'none' }}>{LEGAL_EMAILS.legal}</a>.
         </p>
       </LegalSection>
     </LegalPageLayout>

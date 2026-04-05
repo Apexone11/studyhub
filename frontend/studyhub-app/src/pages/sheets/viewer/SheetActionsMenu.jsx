@@ -10,7 +10,8 @@ import {
   IconEye,
 } from '../../../components/Icons'
 import { API } from '../../../config'
-import { FONT, actionButton, linkButton, secondaryDropdown, dropdownItem } from './sheetViewerConstants'
+import { showToast } from '../../../lib/toast'
+import { FONT, authHeaders, actionButton, linkButton, secondaryDropdown, dropdownItem } from './sheetViewerConstants'
 
 const dropdownSectionLabel = {
   fontSize: 10, fontWeight: 800, color: 'var(--sh-muted)', textTransform: 'uppercase',
@@ -36,9 +37,60 @@ export default function SheetActionsMenu({
   handleShare,
   setShowContributeModal,
   setReportOpen,
+  onSheetUpdate,
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [togglingDownloads, setTogglingDownloads] = useState(false)
+  const [togglingEditing, setTogglingEditing] = useState(false)
   const menuRef = useRef(null)
+
+  const isOwner = user && sheet && (user.id === sheet.userId || user.role === 'admin')
+
+  const handleToggleDownloads = async () => {
+    if (togglingDownloads || !sheet) return
+    setTogglingDownloads(true)
+    try {
+      const response = await fetch(`${API}/api/sheets/${sheet.id}`, {
+        method: 'PATCH',
+        headers: authHeaders(),
+        credentials: 'include',
+        body: JSON.stringify({ allowDownloads: !sheet.allowDownloads }),
+      })
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error || 'Could not update setting.')
+      }
+      if (onSheetUpdate) onSheetUpdate({ allowDownloads: !sheet.allowDownloads })
+      showToast(sheet.allowDownloads ? 'Downloads disabled.' : 'Downloads enabled.', 'success')
+    } catch (err) {
+      showToast(err.message, 'error')
+    } finally {
+      setTogglingDownloads(false)
+    }
+  }
+
+  const handleToggleEditing = async () => {
+    if (togglingEditing || !sheet) return
+    setTogglingEditing(true)
+    try {
+      const response = await fetch(`${API}/api/sheets/${sheet.id}`, {
+        method: 'PATCH',
+        headers: authHeaders(),
+        credentials: 'include',
+        body: JSON.stringify({ allowEditing: !sheet.allowEditing }),
+      })
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error || 'Could not update setting.')
+      }
+      if (onSheetUpdate) onSheetUpdate({ allowEditing: !sheet.allowEditing })
+      showToast(sheet.allowEditing ? 'Editing by others disabled.' : 'Editing by others enabled.', 'success')
+    } catch (err) {
+      showToast(err.message, 'error')
+    } finally {
+      setTogglingEditing(false)
+    }
+  }
 
   useEffect(() => {
     if (!menuOpen) return
@@ -83,7 +135,7 @@ export default function SheetActionsMenu({
         </button>
       )}
 
-      {canEdit ? (
+      {canEdit || (user && sheet.allowEditing) ? (
         <Link to={`/sheets/${sheet.id}/lab`} style={linkButton()}>
           Edit in SheetLab
         </Link>
@@ -121,7 +173,7 @@ export default function SheetActionsMenu({
               Share
             </button>
 
-            {sheet.allowDownloads !== false && (
+            {(isOwner || sheet.allowDownloads !== false) && (
               <a href={`${API}/api/sheets/${sheet.id}/download`} style={dropdownItem()} onClick={() => setMenuOpen(false)} role="menuitem">
                 <IconDownload size={14} />
                 Download
@@ -205,6 +257,54 @@ export default function SheetActionsMenu({
                 >
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
                   Report
+                </button>
+              </>
+            )}
+
+            {/* ── Owner Controls ─────────────────────────── */}
+            {isOwner && (
+              <>
+                <div style={dropdownDivider} />
+                <div style={dropdownSectionLabel}>Owner Controls</div>
+                <button
+                  type="button"
+                  onClick={handleToggleDownloads}
+                  disabled={togglingDownloads}
+                  style={dropdownItem()}
+                  role="menuitem"
+                >
+                  <span style={{
+                    display: 'inline-block', width: 28, height: 16, borderRadius: 8, position: 'relative',
+                    background: sheet.allowDownloads !== false ? 'var(--sh-success)' : 'var(--sh-slate-300)',
+                    transition: 'background 0.15s', flexShrink: 0,
+                  }}>
+                    <span style={{
+                      position: 'absolute', top: 2, left: sheet.allowDownloads !== false ? 14 : 2,
+                      width: 12, height: 12, borderRadius: '50%', background: '#fff',
+                      transition: 'left 0.15s',
+                    }} />
+                  </span>
+                  Allow downloads
+                </button>
+                <button
+                  type="button"
+                  onClick={handleToggleEditing}
+                  disabled={togglingEditing}
+                  style={dropdownItem()}
+                  role="menuitem"
+                >
+                  <span style={{
+                    display: 'inline-block', width: 28, height: 16, borderRadius: 8, position: 'relative',
+                    background: sheet.allowEditing ? 'var(--sh-success)' : 'var(--sh-slate-300)',
+                    transition: 'background 0.15s', flexShrink: 0,
+                  }}>
+                    <span style={{
+                      position: 'absolute', top: 2, left: sheet.allowEditing ? 14 : 2,
+                      width: 12, height: 12, borderRadius: '50%', background: '#fff',
+                      transition: 'left 0.15s',
+                    }} />
+                  </span>
+                  Allow others to edit
                 </button>
               </>
             )}

@@ -9,6 +9,7 @@
 const { RISK_TIER, generateRiskSummary, generateTierExplanation, groupFindingsByCategory } = require('./htmlSecurity')
 const { sendHighRiskSheetAlert } = require('../email/email')
 const { createNotification } = require('../notify')
+const { reviewSheetAndUpdateStatus, isAiReviewEnabled } = require('../../modules/sheetReviewer')
 
 const {
   SCAN_STATUS,
@@ -235,7 +236,7 @@ async function submitHtmlDraftForReview(prisma, { sheetId, user }) {
       .catch((err) => console.error('[htmlDraftWorkflow] Failed to notify admins:', err.message))
   }
 
-  return prisma.studySheet.update({
+  const updated = await prisma.studySheet.update({
     where: { id: sheetId },
     data: {
       status: nextStatus,
@@ -246,6 +247,14 @@ async function submitHtmlDraftForReview(prisma, { sheetId, user }) {
       htmlVersions: true,
     },
   })
+
+  // Fire-and-forget AI review for Tier 1-2 sheets
+  if ((tier === RISK_TIER.FLAGGED || tier === RISK_TIER.HIGH_RISK) && isAiReviewEnabled()) {
+    reviewSheetAndUpdateStatus(sheetId, sheet.content, scan.findings, tier, sheet.title, sheet.description)
+      .catch((err) => console.error('[htmlDraftWorkflow] AI review failed for sheet', sheetId, err.message))
+  }
+
+  return updated
 }
 
 module.exports = {

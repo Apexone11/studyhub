@@ -59,6 +59,8 @@ import {
 } from '../dashboard/DashboardWidgets'
 import ProfileStatsWidget from './ProfileStatsWidget'
 import FollowSuggestions from './FollowSuggestions'
+import FeedCard from '../feed/FeedCard'
+import FollowRequestsList from './FollowRequestsList'
 
 /* ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -97,6 +99,7 @@ export default function UserProfilePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [following, setFollowing] = useState(false)
+  const [followStatus, setFollowStatus] = useState(null) // 'active' | 'pending' | null
   const [followers, setFollowers] = useState(0)
   const [toggling, setToggling] = useState(false)
   const [reportOpen, setReportOpen] = useState(false)
@@ -168,7 +171,8 @@ export default function UserProfilePage() {
       })
       .then((data) => {
         setProfile(data)
-        setFollowing(data.isFollowing || false)
+        setFollowing(data.isFollowing || data.followStatus === 'active' || false)
+        setFollowStatus(data.followStatus || null)
         setFollowers(data.followerCount || 0)
         setIsBlocked(data.isBlocked || false)
         setIsMuted(data.isMuted || false)
@@ -203,17 +207,27 @@ export default function UserProfilePage() {
   /* ── Follow toggle ─────────────────────────────────────────────────── */
   async function handleFollowToggle() {
     if (!isAuthenticated) { navigate('/login'); return }
+    // If pending, clicking again should cancel (unfollow)
+    const isUnfollow = following || followStatus === 'pending'
     setToggling(true)
     try {
-      const method = following ? 'DELETE' : 'POST'
+      const method = isUnfollow ? 'DELETE' : 'POST'
       const res = await fetch(`${API}/api/users/${username}/follow`, {
         method, headers: authHeaders(), credentials: 'include',
       })
       const data = await res.json()
       if (res.ok) {
-        setFollowing(data.following)
-        setFollowers(data.followerCount)
-        showToast(data.following ? `Following ${username}` : `Unfollowed ${username}`, 'success')
+        if (data.requested) {
+          // Follow request sent to a private account
+          setFollowing(false)
+          setFollowStatus('pending')
+          showToast(`Follow request sent to ${username}`, 'success')
+        } else {
+          setFollowing(data.following)
+          setFollowStatus(data.following ? 'active' : null)
+          if (data.followerCount != null) setFollowers(data.followerCount)
+          showToast(data.following ? `Following ${username}` : `Unfollowed ${username}`, 'success')
+        }
       } else {
         showToast(data.error || 'Could not update follow status.', 'error')
       }
@@ -235,6 +249,7 @@ export default function UserProfilePage() {
         setIsBlocked(data.blocked)
         if (data.blocked) {
           setFollowing(false)
+          setFollowStatus(null)
           showToast(`Blocked ${username}`, 'success')
         } else {
           showToast(`Unblocked ${username}`, 'success')
@@ -350,6 +365,11 @@ export default function UserProfilePage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
                   <h1 style={{ margin: 0, fontSize: 'clamp(20px, 2.5vw, 26px)', fontWeight: 800, color: 'var(--sh-nav-text)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                     {profile.username}
+                    {profile.isPrivate && (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.7 }} aria-label="Private account">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                      </svg>
+                    )}
                     <VerificationBadge user={profile} size={18} />
                   </h1>
                   {profile.role === 'admin'
@@ -407,14 +427,26 @@ export default function UserProfilePage() {
                         style={{
                           display: 'inline-flex', alignItems: 'center', padding: '8px 18px', borderRadius: 10,
                           fontWeight: 700, fontSize: 13, fontFamily: 'inherit',
-                          border: following ? '1px solid rgba(16,185,129,0.5)' : '1px solid rgba(255,255,255,0.25)',
-                          background: following ? 'rgba(16,185,129,0.2)' : 'var(--sh-brand)',
-                          color: following ? 'var(--sh-success)' : 'var(--sh-nav-text)',
+                          border: followStatus === 'active'
+                            ? '1px solid rgba(16,185,129,0.5)'
+                            : followStatus === 'pending'
+                              ? '1px solid var(--sh-border)'
+                              : '1px solid rgba(255,255,255,0.25)',
+                          background: followStatus === 'active'
+                            ? 'rgba(16,185,129,0.2)'
+                            : followStatus === 'pending'
+                              ? 'rgba(255,255,255,0.1)'
+                              : 'var(--sh-brand)',
+                          color: followStatus === 'active'
+                            ? 'var(--sh-success)'
+                            : followStatus === 'pending'
+                              ? 'rgba(255,255,255,0.6)'
+                              : 'var(--sh-nav-text)',
                           cursor: toggling ? 'wait' : 'pointer',
                           backdropFilter: 'blur(6px)',
                         }}
                       >
-                        {toggling ? '...' : following ? 'Following' : 'Follow'}
+                        {toggling ? '...' : followStatus === 'active' ? 'Following' : followStatus === 'pending' ? 'Requested' : 'Follow'}
                       </button>
                     )}
 
@@ -531,72 +563,102 @@ export default function UserProfilePage() {
           )}
         </div>
 
-        {/* ── TABS ──────────────────────────────────────────────────────── */}
-        <div style={{ marginBottom: 20 }}>
-          <div className="profile-tabs" role="tablist" aria-label="Profile sections">
-            {tabs.map((tab) => (
-              <button
-                key={tab.key}
-                role="tab"
-                aria-selected={activeTab === tab.key}
-                className={`profile-tab-btn${activeTab === tab.key ? ' profile-tab-btn--active' : ''}`}
-                onClick={() => setTab(tab.key)}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </div>
+        {/* ── Follow Requests (own profile) ─────────────────────────────── */}
+        {isOwnProfile && <FollowRequestsList />}
 
-        {/* ── TAB CONTENT ───────────────────────────────────────────────── */}
-        <div ref={contentRef} role="tabpanel" aria-label={activeTab}>
-          {activeTab === 'overview' && (
-            isOwnProfile
-              ? <OwnOverviewTab
-                  profile={profile}
-                  dashboardSummary={dashboardSummary}
+        {/* ── Private profile gate ─────────────────────────────────────── */}
+        {profile.isPrivateProfile && !isOwnProfile ? (
+          <div style={{
+            ...cardStyle,
+            textAlign: 'center',
+            padding: '48px 24px',
+          }}>
+            <div style={{ marginBottom: 16, color: 'var(--sh-muted)' }}>
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+            </div>
+            <div style={{ fontWeight: 700, fontSize: 18, color: 'var(--sh-heading)', marginBottom: 8 }}>
+              This account is private
+            </div>
+            <div style={{ fontSize: 14, color: 'var(--sh-muted)', maxWidth: 400, margin: '0 auto', lineHeight: 1.6 }}>
+              Follow this account to see their posts, sheets, and activity.
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* ── TABS ──────────────────────────────────────────────────────── */}
+            <div style={{ marginBottom: 20 }}>
+              <div className="profile-tabs" role="tablist" aria-label="Profile sections">
+                {tabs.map((tab) => (
+                  <button
+                    key={tab.key}
+                    role="tab"
+                    aria-selected={activeTab === tab.key}
+                    className={`profile-tab-btn${activeTab === tab.key ? ' profile-tab-btn--active' : ''}`}
+                    onClick={() => setTab(tab.key)}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* ── TAB CONTENT ───────────────────────────────────────────────── */}
+            <div ref={contentRef} role="tabpanel" aria-label={activeTab}>
+              {activeTab === 'overview' && (
+                isOwnProfile
+                  ? <OwnOverviewTab
+                      profile={profile}
+                      dashboardSummary={dashboardSummary}
+                      recentlyViewed={recentlyViewed}
+                      studyQueueCounts={studyQueueCounts}
+                      studyToReview={studyToReview}
+                      studyStudying={studyStudying}
+                      dashboardRecentSheets={dashboardRecentSheets}
+                      activityData={activityData}
+                      badges={badges}
+                      followers={followers}
+                      loadFollowList={loadFollowList}
+                    />
+                  : <OtherOverviewTab
+                      profile={profile}
+                      activityData={activityData}
+                      badges={badges}
+                    />
+              )}
+
+              {activeTab === 'study' && isOwnProfile && (
+                <StudyTab
                   recentlyViewed={recentlyViewed}
+                  studyActivity={studyActivity}
                   studyQueueCounts={studyQueueCounts}
                   studyToReview={studyToReview}
                   studyStudying={studyStudying}
                   dashboardRecentSheets={dashboardRecentSheets}
-                  activityData={activityData}
-                  badges={badges}
-                  followers={followers}
-                  loadFollowList={loadFollowList}
                 />
-              : <OtherOverviewTab
+              )}
+
+              {activeTab === 'sheets' && (
+                <SheetsTab
                   profile={profile}
+                  isOwnProfile={isOwnProfile}
+                />
+              )}
+
+              {activeTab === 'posts' && (
+                <PostsTab profileId={profile?.id} />
+              )}
+
+              {activeTab === 'achievements' && (
+                <AchievementsTab
                   activityData={activityData}
                   badges={badges}
                 />
-          )}
-
-          {activeTab === 'study' && isOwnProfile && (
-            <StudyTab
-              recentlyViewed={recentlyViewed}
-              studyActivity={studyActivity}
-              studyQueueCounts={studyQueueCounts}
-              studyToReview={studyToReview}
-              studyStudying={studyStudying}
-              dashboardRecentSheets={dashboardRecentSheets}
-            />
-          )}
-
-          {activeTab === 'sheets' && (
-            <SheetsTab
-              profile={profile}
-              isOwnProfile={isOwnProfile}
-            />
-          )}
-
-          {activeTab === 'achievements' && (
-            <AchievementsTab
-              activityData={activityData}
-              badges={badges}
-            />
-          )}
-        </div>
+              )}
+            </div>
+          </>
+        )}
       </div>
 
       <SafeJoyride {...tutorial.joyrideProps} />
@@ -705,6 +767,75 @@ function SheetsTab({ profile, isOwnProfile }) {
       <RecentSheetsSection sheets={profile.recentSheets} />
       <StarredSheetsSection sheets={profile.starredSheets} isOwnProfile={isOwnProfile} />
       <SharedNotesSection notes={profile.sharedNotes} />
+    </div>
+  )
+}
+
+/* ── Posts tab (both modes) ──────────────────────────────────────────────── */
+function PostsTab({ profileId }) {
+  const [posts, setPosts] = useState([])
+  const [postsLoading, setPostsLoading] = useState(true)
+  const { user: currentUser } = useSession()
+
+  useEffect(() => {
+    if (!profileId) return
+    let cancelled = false
+    fetch(`${API}/api/feed?userId=${profileId}`, { headers: authHeaders(), credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : { items: [] }))
+      .then((data) => {
+        if (!cancelled) setPosts(data.items || data.posts || [])
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setPostsLoading(false) })
+    return () => { cancelled = true }
+  }, [profileId])
+
+  if (postsLoading) {
+    return (
+      <div className="profile-columns">
+        {[1, 2, 3].map((n) => (
+          <div key={n} style={{ ...cardStyle, padding: '20px 24px' }}>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 14 }}>
+              <div className="sh-skeleton" style={{ width: 40, height: 40, borderRadius: '50%' }} />
+              <div style={{ flex: 1 }}>
+                <div className="sh-skeleton" style={{ width: '50%', height: 13, borderRadius: 6, marginBottom: 6 }} />
+                <div className="sh-skeleton" style={{ width: '30%', height: 10, borderRadius: 6 }} />
+              </div>
+            </div>
+            <div className="sh-skeleton" style={{ width: '80%', height: 14, borderRadius: 6, marginBottom: 8 }} />
+            <div className="sh-skeleton" style={{ width: '100%', height: 12, borderRadius: 6, marginBottom: 6 }} />
+            <div className="sh-skeleton" style={{ width: '60%', height: 12, borderRadius: 6 }} />
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  if (!posts.length) {
+    return (
+      <div style={{ ...cardStyle, textAlign: 'center', padding: '48px 24px' }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--sh-heading)', marginBottom: 6 }}>No posts yet</div>
+        <div style={{ fontSize: 13, color: 'var(--sh-muted)' }}>This user has not posted anything to the feed.</div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="profile-columns" style={{ gap: 12 }}>
+      {posts.map((item) => (
+        <FeedCard
+          key={item.id}
+          item={item}
+          currentUser={currentUser}
+          onReact={() => {}}
+          onStar={() => {}}
+          onDeletePost={() => {}}
+          canDeletePost={false}
+          isPostMenuOpen={false}
+          onTogglePostMenu={() => {}}
+          isDeletingPost={false}
+        />
+      ))}
     </div>
   )
 }

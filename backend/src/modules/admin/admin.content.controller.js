@@ -34,7 +34,7 @@ router.post('/announcements', async (req, res) => {
     const announcement = await prisma.announcement.create({
       data: {
         title: title.trim().slice(0, 200),
-        body: body.trim().slice(0, 2000),
+        body: body.trim().slice(0, 25000),
         authorId: req.user.userId,
         pinned: Boolean(pinned),
       },

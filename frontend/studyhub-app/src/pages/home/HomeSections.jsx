@@ -1,10 +1,11 @@
 // HomeSections.jsx — Features, Steps, Testimonials, CTA, and Footer sections for the HomePage.
 // Default export bundles all below-fold content for React.lazy() code-splitting.
-import { forwardRef, useEffect } from 'react'
+import { forwardRef, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { trackEvent } from '../../lib/telemetry'
 import { IconArrowRight, LogoMark } from '../../components/Icons'
 import { FEATURES, STEPS, TESTIMONIALS } from './homeConstants'
+import { API } from '../../config'
 
 /* ------------------------------------------------------------------ */
 /*  Features                                                           */
@@ -140,7 +141,96 @@ export const StepsSection = forwardRef(function StepsSection(_, ref) {
 /*  Testimonials                                                       */
 /* ------------------------------------------------------------------ */
 
+/* Avatar color palette for dynamic reviews without explicit color */
+const AVATAR_COLORS = ['#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4']
+
+function TestimonialCard({ t, index }) {
+  const isDynamic = Boolean(t.user)
+  const name = isDynamic ? t.user.username : t.name
+  const school = isDynamic ? (t.user.school || t.user.accountType || '') : t.school
+  const initial = isDynamic ? (t.user.username?.[0]?.toUpperCase() || '?') : t.initial
+  const avatarColor = isDynamic ? AVATAR_COLORS[index % AVATAR_COLORS.length] : t.color
+  const starCount = isDynamic ? (t.stars || 5) : 5
+  const text = isDynamic ? t.text : t.text
+  const avatarUrl = isDynamic ? t.user.avatarUrl : null
+
+  return (
+    <article className="home-testimonial-card">
+      <div className="home-testimonial-stars" aria-hidden="true">
+        {[...Array(5)].map((_, i) => (
+          <svg key={i} width="16" height="16" viewBox="0 0 24 24"
+            fill={i < starCount ? 'var(--sh-warning)' : 'none'}
+            stroke={i < starCount ? 'none' : 'var(--sh-border)'}
+            strokeWidth="1.5"
+          >
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+          </svg>
+        ))}
+      </div>
+      <p className="home-testimonial-text">"{text}"</p>
+      <div className="home-testimonial-author">
+        {avatarUrl ? (
+          <img
+            src={avatarUrl}
+            alt=""
+            style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+          />
+        ) : (
+          <div className="home-testimonial-avatar" style={{ background: avatarColor }}>
+            {initial}
+          </div>
+        )}
+        <div>
+          <div className="home-testimonial-name">{name}</div>
+          {school && <div className="home-testimonial-school">{school}</div>}
+        </div>
+      </div>
+    </article>
+  )
+}
+
+function TestimonialSkeleton() {
+  return (
+    <article className="home-testimonial-card" style={{ minHeight: 180 }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
+        {[1, 2, 3, 4, 5].map((n) => (
+          <div key={n} className="sh-skeleton" style={{ width: 16, height: 16, borderRadius: 3 }} />
+        ))}
+      </div>
+      <div className="sh-skeleton" style={{ width: '90%', height: 14, borderRadius: 6, marginBottom: 8 }} />
+      <div className="sh-skeleton" style={{ width: '70%', height: 14, borderRadius: 6, marginBottom: 16 }} />
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+        <div className="sh-skeleton" style={{ width: 36, height: 36, borderRadius: '50%' }} />
+        <div>
+          <div className="sh-skeleton" style={{ width: 80, height: 12, borderRadius: 6, marginBottom: 4 }} />
+          <div className="sh-skeleton" style={{ width: 120, height: 10, borderRadius: 6 }} />
+        </div>
+      </div>
+    </article>
+  )
+}
+
 export const TestimonialsSection = forwardRef(function TestimonialsSection(_, ref) {
+  const [dynamicReviews, setDynamicReviews] = useState(null)
+  const [loadingReviews, setLoadingReviews] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch(`${API}/api/reviews/public?limit=3`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled) return
+        if (data && Array.isArray(data.reviews) && data.reviews.length > 0) {
+          setDynamicReviews(data.reviews)
+        }
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoadingReviews(false) })
+    return () => { cancelled = true }
+  }, [])
+
+  const testimonials = dynamicReviews || TESTIMONIALS
+
   return (
     <section className="home-testimonials-section">
       <div className="home-shell home-shell-narrow">
@@ -150,27 +240,17 @@ export const TestimonialsSection = forwardRef(function TestimonialsSection(_, re
         </div>
 
         <div className="home-testimonials-grid" ref={ref}>
-          {TESTIMONIALS.map((t) => (
-            <article key={t.name} className="home-testimonial-card">
-              <div className="home-testimonial-stars" aria-hidden="true">
-                {[...Array(5)].map((_, i) => (
-                  <svg key={i} width="16" height="16" viewBox="0 0 24 24" fill="#f59e0b" stroke="none">
-                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                  </svg>
-                ))}
-              </div>
-              <p className="home-testimonial-text">"{t.text}"</p>
-              <div className="home-testimonial-author">
-                <div className="home-testimonial-avatar" style={{ background: t.color }}>
-                  {t.initial}
-                </div>
-                <div>
-                  <div className="home-testimonial-name">{t.name}</div>
-                  <div className="home-testimonial-school">{t.school}</div>
-                </div>
-              </div>
-            </article>
-          ))}
+          {loadingReviews && !dynamicReviews ? (
+            <>
+              <TestimonialSkeleton />
+              <TestimonialSkeleton />
+              <TestimonialSkeleton />
+            </>
+          ) : (
+            testimonials.map((t, i) => (
+              <TestimonialCard key={t.id || t.name || i} t={t} index={i} />
+            ))
+          )}
         </div>
       </div>
     </section>

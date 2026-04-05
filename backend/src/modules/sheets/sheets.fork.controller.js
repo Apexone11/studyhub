@@ -8,7 +8,8 @@ const { createNotification } = require('../../lib/notify')
 const { isModerationEnabled, scanContent } = require('../../lib/moderation/moderationEngine')
 const { SHEET_STATUS, AUTHOR_SELECT, sheetWriteLimiter } = require('./sheets.constants')
 const { serializeSheet } = require('./sheets.serializer')
-const { getUserPlan, isPro } = require('../../lib/getUserPlan')
+const { getUserTier } = require('../../lib/getUserPlan')
+const { PLANS } = require('../payments/payments.constants')
 
 const router = express.Router()
 
@@ -80,18 +81,19 @@ router.post('/:id/fork', requireAuth, requireVerifiedEmail, sheetWriteLimiter, a
 
     // ── Upload quota check (forks count toward monthly limit) ──
     try {
-      const plan = await getUserPlan(req.user.userId)
-      if (!isPro(plan)) {
+      const tier = await getUserTier(req.user.userId)
+      const tierConfig = PLANS[tier] || PLANS.free
+      const limit = tierConfig.uploadsPerMonth
+      if (limit !== -1) {
         const startOfMonth = new Date()
         startOfMonth.setDate(1)
         startOfMonth.setHours(0, 0, 0, 0)
         const uploadsThisMonth = await prisma.studySheet.count({
           where: { userId: req.user.userId, createdAt: { gte: startOfMonth } },
         })
-        if (uploadsThisMonth >= 10) {
+        if (uploadsThisMonth >= limit) {
           return res.status(403).json({
-            error:
-              'You have reached your monthly upload limit (10). Upgrade to Pro for unlimited uploads.',
+            error: `You have reached your monthly upload limit (${limit}). Upgrade to Pro for unlimited uploads.`,
             code: 'UPLOAD_LIMIT',
           })
         }

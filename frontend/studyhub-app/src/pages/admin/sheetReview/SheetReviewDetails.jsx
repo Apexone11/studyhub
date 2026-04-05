@@ -225,6 +225,11 @@ export function FindingsPanel({ findings, detail, runtimeValidation, onJumpToLin
         </div>
       )}
 
+      {/* AI Review section (admin-only) */}
+      {d.aiReviewDecision && (
+        <AiReviewSection detail={d} />
+      )}
+
       {/* Scan metadata */}
       <div style={{ marginTop: 16, padding: 12, borderRadius: 10, background: 'var(--sh-soft)', border: '1px solid var(--sh-border)', fontSize: 12, color: 'var(--sh-muted)', lineHeight: 1.8 }}>
         <div><strong>Scan status:</strong> {d.htmlScanStatus}</div>
@@ -237,6 +242,110 @@ export function FindingsPanel({ findings, detail, runtimeValidation, onJumpToLin
             <div><strong>Review date:</strong> {formatDateTime(d.reviewedAt)}</div>
             <div><strong>Reason:</strong> {d.reviewReason || '—'}</div>
           </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/* ── AI Review section (admin-only) ──────────────────────────────────────── */
+
+const AI_DECISION_STYLES = {
+  approve: { bg: 'var(--sh-success-bg)', color: 'var(--sh-success-text)', border: 'var(--sh-success-border)', label: 'Approved' },
+  reject:  { bg: 'var(--sh-danger-bg)',  color: 'var(--sh-danger-text)',  border: 'var(--sh-danger-border)',  label: 'Rejected' },
+  escalate: { bg: 'var(--sh-warning-bg)', color: 'var(--sh-warning-text)', border: 'var(--sh-warning-border)', label: 'Escalated' },
+}
+
+function ConfidenceBar({ value, label }) {
+  const pct = Math.max(0, Math.min(100, value || 0))
+  const barColor = pct >= 70 ? 'var(--sh-success)' : pct >= 40 ? 'var(--sh-warning)' : 'var(--sh-danger)'
+  return (
+    <div style={{ flex: 1, minWidth: 120 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, fontWeight: 600, color: 'var(--sh-muted)', marginBottom: 4 }}>
+        <span>{label}</span>
+        <span>{pct}/100</span>
+      </div>
+      <div style={{ height: 6, borderRadius: 3, background: 'var(--sh-border)', overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${pct}%`, borderRadius: 3, background: barColor, transition: 'width 0.3s ease' }} />
+      </div>
+    </div>
+  )
+}
+
+function AiReviewSection({ detail }) {
+  const d = detail
+  const style = AI_DECISION_STYLES[d.aiReviewDecision] || AI_DECISION_STYLES.escalate
+
+  let aiFindings = []
+  try {
+    aiFindings = typeof d.aiReviewFindings === 'string' ? JSON.parse(d.aiReviewFindings) : (d.aiReviewFindings || [])
+  } catch { /* ignore */ }
+
+  return (
+    <div style={{ marginTop: 16, borderRadius: 12, border: `1px solid ${style.border}`, overflow: 'hidden' }}>
+      {/* Header */}
+      <div style={{ padding: '12px 16px', background: style.bg, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={style.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 2a5 5 0 0 1 5 5v3a5 5 0 0 1-10 0V7a5 5 0 0 1 5-5z" />
+            <path d="M8.21 13.89 7 23l5-3 5 3-1.21-9.12" />
+          </svg>
+          <span style={{ fontSize: 13, fontWeight: 800, color: style.color }}>AI Review</span>
+          <span style={{
+            display: 'inline-flex', padding: '2px 10px', borderRadius: 999,
+            fontSize: 11, fontWeight: 700, background: style.bg, color: style.color,
+            border: `1px solid ${style.border}`, textTransform: 'capitalize',
+          }}>
+            {style.label}
+          </span>
+        </div>
+        {d.aiReviewedAt && (
+          <span style={{ fontSize: 11, color: 'var(--sh-muted)' }}>{formatDateTime(d.aiReviewedAt)}</span>
+        )}
+      </div>
+
+      {/* Body */}
+      <div style={{ padding: '14px 16px' }}>
+        {/* Confidence + Risk bars */}
+        <div style={{ display: 'flex', gap: 16, marginBottom: 14, flexWrap: 'wrap' }}>
+          <ConfidenceBar value={d.aiReviewConfidence} label="Confidence" />
+          <ConfidenceBar value={d.aiReviewScore} label="Risk Score" />
+        </div>
+
+        {/* Reasoning */}
+        {d.aiReviewReasoning && (
+          <div style={{ marginBottom: 14, padding: '10px 14px', borderRadius: 8, background: 'var(--sh-soft)', border: '1px solid var(--sh-border)' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--sh-muted)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Reasoning</div>
+            <div style={{ fontSize: 13, color: 'var(--sh-text)', lineHeight: 1.6 }}>{d.aiReviewReasoning}</div>
+          </div>
+        )}
+
+        {/* AI Findings */}
+        {aiFindings.length > 0 && (
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--sh-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>AI Findings</div>
+            <div style={{ display: 'grid', gap: 6 }}>
+              {aiFindings.map((f, i) => {
+                const sevColor = f.severity === 'critical' || f.severity === 'high'
+                  ? 'var(--sh-danger-text)'
+                  : f.severity === 'medium' ? 'var(--sh-warning-text)' : 'var(--sh-success-text)'
+                return (
+                  <div key={i} style={{ padding: '8px 12px', borderRadius: 8, background: 'var(--sh-soft)', border: '1px solid var(--sh-border)', fontSize: 12 }}>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
+                      <span style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', color: sevColor }}>{f.severity || 'none'}</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--sh-heading)' }}>{f.category}</span>
+                    </div>
+                    <div style={{ color: 'var(--sh-text)', lineHeight: 1.5 }}>{f.description}</div>
+                    {f.evidence && (
+                      <code style={{ display: 'block', marginTop: 4, fontSize: 10, color: 'var(--sh-muted)', background: 'var(--sh-surface)', padding: '4px 8px', borderRadius: 4, wordBreak: 'break-all' }}>
+                        {f.evidence}
+                      </code>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
         )}
       </div>
     </div>

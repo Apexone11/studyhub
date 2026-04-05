@@ -11,9 +11,25 @@ const PERIODS = [
 
 const SECTION_STYLE = {
   background: 'var(--sh-surface)',
-  borderRadius: 18,
+  borderRadius: 14,
   border: '1px solid var(--sh-border)',
-  padding: '22px',
+  padding: '28px',
+  boxShadow: '0 1px 3px rgba(0,0,0,.04), 0 1px 2px rgba(0,0,0,.02)',
+}
+
+const SECTION_HEADING = {
+  fontSize: 18,
+  fontWeight: 800,
+  color: 'var(--sh-heading)',
+  marginBottom: 4,
+  lineHeight: 1.3,
+}
+
+const SECTION_DESC = {
+  fontSize: 12,
+  color: 'var(--sh-subtext)',
+  marginBottom: 18,
+  lineHeight: 1.5,
 }
 
 const TH_STYLE = {
@@ -34,7 +50,7 @@ const TD_STYLE = {
 
 /* -- Tiny inline bar chart (SVG) ---------------------------------------- */
 
-function BarChart({ data, color = 'var(--sh-info)', height = 120 }) {
+function BarChart({ data, color = 'var(--sh-brand)', height = 120 }) {
   if (!data || data.length === 0) {
     return (
       <div
@@ -44,7 +60,8 @@ function BarChart({ data, color = 'var(--sh-info)', height = 120 }) {
           alignItems: 'center',
           justifyContent: 'center',
           color: 'var(--sh-muted)',
-          fontSize: 12,
+          fontSize: 13,
+          fontWeight: 500,
         }}
       >
         No data for this period
@@ -53,15 +70,41 @@ function BarChart({ data, color = 'var(--sh-info)', height = 120 }) {
   }
 
   const maxVal = Math.max(...data.map((d) => d.count), 1)
-  const barWidth = Math.max(4, Math.min(24, Math.floor(500 / data.length) - 2))
-  const chartWidth = data.length * (barWidth + 2)
+  const barWidth = Math.max(6, Math.min(28, Math.floor(500 / data.length) - 4))
+  const barGap = Math.max(2, Math.floor(barWidth * 0.25))
+  const chartWidth = data.length * (barWidth + barGap)
+  const gridLines = 4
 
   return (
-    <div style={{ overflowX: 'auto' }}>
-      <svg width={Math.max(chartWidth, 200)} height={height + 24} style={{ display: 'block' }}>
+    <div
+      style={{
+        overflowX: 'auto',
+        background: 'var(--sh-soft)',
+        borderRadius: 10,
+        padding: '16px 14px 8px',
+      }}
+    >
+      <svg width={Math.max(chartWidth, 200)} height={height + 28} style={{ display: 'block' }}>
+        {/* Gridlines */}
+        {Array.from({ length: gridLines + 1 }).map((_, gi) => {
+          const gy = (gi / gridLines) * height
+          return (
+            <line
+              key={`grid-${gi}`}
+              x1={0}
+              y1={gy}
+              x2={Math.max(chartWidth, 200)}
+              y2={gy}
+              stroke="var(--sh-border)"
+              strokeWidth={1}
+              strokeDasharray="3 3"
+              opacity={0.6}
+            />
+          )
+        })}
         {data.map((d, i) => {
           const barHeight = (d.count / maxVal) * height
-          const x = i * (barWidth + 2)
+          const x = i * (barWidth + barGap)
           const y = height - barHeight
           const showLabel = i === 0 || i === data.length - 1 || i === Math.floor(data.length / 2)
           return (
@@ -71,19 +114,20 @@ function BarChart({ data, color = 'var(--sh-info)', height = 120 }) {
                 y={y}
                 width={barWidth}
                 height={Math.max(barHeight, 1)}
-                rx={2}
+                rx={barWidth > 10 ? 4 : 2}
                 fill={color}
-                opacity={0.85}
+                opacity={0.9}
               >
                 <title>{`${d.date}: ${d.count}`}</title>
               </rect>
               {showLabel ? (
                 <text
                   x={x + barWidth / 2}
-                  y={height + 14}
+                  y={height + 18}
                   textAnchor="middle"
-                  fill="var(--sh-muted)"
-                  fontSize={9}
+                  fill="var(--sh-slate-500)"
+                  fontSize={10}
+                  fontWeight={600}
                   fontFamily={FONT}
                 >
                   {d.date.slice(5)}
@@ -165,17 +209,43 @@ function EngagementChart({ engagement, height = 140 }) {
     ...dates.flatMap((d) => series.map((s) => dateMap.get(d)?.[s.key] || 0)),
     1,
   )
-  const chartWidth = Math.max(dates.length * 18, 300)
+  const chartWidth = Math.max(dates.length * 20, 300)
+
+  const gridLines = 4
 
   return (
     <div>
-      <div style={{ overflowX: 'auto' }}>
-        <svg width={chartWidth} height={height + 24} style={{ display: 'block' }}>
+      <div
+        style={{
+          overflowX: 'auto',
+          background: 'var(--sh-soft)',
+          borderRadius: 10,
+          padding: '16px 14px 8px',
+        }}
+      >
+        <svg width={chartWidth} height={height + 28} style={{ display: 'block' }}>
+          {/* Gridlines */}
+          {Array.from({ length: gridLines + 1 }).map((_, gi) => {
+            const gy = (gi / gridLines) * height
+            return (
+              <line
+                key={`grid-${gi}`}
+                x1={0}
+                y1={gy}
+                x2={chartWidth}
+                y2={gy}
+                stroke="var(--sh-border)"
+                strokeWidth={1}
+                strokeDasharray="3 3"
+                opacity={0.6}
+              />
+            )
+          })}
           {dates.map((date, i) => {
-            const groupWidth = 14
-            const x = i * 18
+            const groupWidth = 16
+            const x = i * 20
             const vals = dateMap.get(date) || {}
-            const barW = Math.max(2, Math.floor(groupWidth / series.length))
+            const barW = Math.max(3, Math.floor(groupWidth / series.length))
             const showLabel =
               i === 0 || i === dates.length - 1 || i === Math.floor(dates.length / 2)
             return (
@@ -190,9 +260,9 @@ function EngagementChart({ engagement, height = 140 }) {
                       y={height - barH}
                       width={Math.max(barW - 1, 1)}
                       height={Math.max(barH, 0.5)}
-                      rx={1}
+                      rx={2}
                       fill={s.color}
-                      opacity={0.8}
+                      opacity={0.85}
                     >
                       <title>{`${date} ${s.label}: ${val}`}</title>
                     </rect>
@@ -201,10 +271,11 @@ function EngagementChart({ engagement, height = 140 }) {
                 {showLabel ? (
                   <text
                     x={x + groupWidth / 2}
-                    y={height + 14}
+                    y={height + 18}
                     textAnchor="middle"
-                    fill="var(--sh-muted)"
-                    fontSize={9}
+                    fill="var(--sh-slate-500)"
+                    fontSize={10}
+                    fontWeight={600}
                     fontFamily={FONT}
                   >
                     {date.slice(5)}
@@ -215,11 +286,11 @@ function EngagementChart({ engagement, height = 140 }) {
           })}
         </svg>
       </div>
-      <div style={{ display: 'flex', gap: 16, marginTop: 8, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 18, marginTop: 14, flexWrap: 'wrap' }}>
         {series.map((s) => (
-          <div key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <div style={{ width: 10, height: 10, borderRadius: 2, background: s.color }} />
-            <span style={{ fontSize: 11, color: 'var(--sh-slate-600)', fontWeight: 600 }}>
+          <div key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ width: 10, height: 10, borderRadius: 3, background: s.color }} />
+            <span style={{ fontSize: 12, color: 'var(--sh-slate-600)', fontWeight: 600 }}>
               {s.label}
             </span>
           </div>
@@ -231,32 +302,46 @@ function EngagementChart({ engagement, height = 140 }) {
 
 /* -- KPI Card ----------------------------------------------------------- */
 
+const KPI_ACCENTS = {
+  '#2563eb': { bg: 'rgba(37,99,235,.06)', border: 'rgba(37,99,235,.15)' },
+  '#7c3aed': { bg: 'rgba(124,58,237,.06)', border: 'rgba(124,58,237,.15)' },
+  '#059669': { bg: 'rgba(5,150,105,.06)', border: 'rgba(5,150,105,.15)' },
+  '#475569': { bg: 'rgba(71,85,105,.05)', border: 'rgba(71,85,105,.12)' },
+}
+
 function KpiCard({ label, value, subtitle, color = '#2563eb', sparkData }) {
+  const accent = KPI_ACCENTS[color] || { bg: 'var(--sh-soft)', border: 'var(--sh-border)' }
   return (
     <div
       style={{
-        background: 'var(--sh-surface)',
-        borderRadius: 16,
-        border: '1px solid var(--sh-border)',
-        padding: '18px 18px 16px',
+        background: accent.bg,
+        borderRadius: 14,
+        border: `1px solid ${accent.border}`,
+        padding: '22px 22px 18px',
         display: 'flex',
         flexDirection: 'column',
-        gap: 6,
+        gap: 8,
+        transition: 'box-shadow .15s ease',
       }}
     >
       <div
-        style={{ fontSize: 11, fontWeight: 700, color: 'var(--sh-muted)', letterSpacing: '.08em' }}
+        style={{
+          fontSize: 11,
+          fontWeight: 700,
+          color: 'var(--sh-slate-500)',
+          letterSpacing: '.08em',
+        }}
       >
         {label.toUpperCase()}
       </div>
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12 }}>
-        <div style={{ fontSize: 32, fontWeight: 800, color, lineHeight: 1 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 14 }}>
+        <div style={{ fontSize: 36, fontWeight: 800, color, lineHeight: 1, letterSpacing: '-.02em' }}>
           {typeof value === 'number' ? value.toLocaleString() : value}
         </div>
         {sparkData ? <Sparkline data={sparkData} color={color} /> : null}
       </div>
       {subtitle ? (
-        <div style={{ fontSize: 11, color: 'var(--sh-slate-500)' }}>{subtitle}</div>
+        <div style={{ fontSize: 12, color: 'var(--sh-slate-500)', fontWeight: 500 }}>{subtitle}</div>
       ) : null}
     </div>
   )
@@ -269,7 +354,7 @@ function RankTable({ title, columns, rows }) {
     return (
       <div style={{ marginTop: 20 }}>
         <div
-          style={{ fontSize: 14, fontWeight: 800, color: 'var(--sh-heading)', marginBottom: 10 }}
+          style={{ fontSize: 15, fontWeight: 800, color: 'var(--sh-heading)', marginBottom: 12 }}
         >
           {title}
         </div>
@@ -280,7 +365,7 @@ function RankTable({ title, columns, rows }) {
 
   return (
     <div style={{ marginTop: 20 }}>
-      <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--sh-heading)', marginBottom: 10 }}>
+      <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--sh-heading)', marginBottom: 12 }}>
         {title}
       </div>
       <div style={{ overflowX: 'auto' }}>
@@ -369,7 +454,7 @@ export default function AnalyticsTab() {
   }, [period, fetchAnalytics])
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Header + Period Selector */}
       <section style={SECTION_STYLE}>
         <div
@@ -378,31 +463,40 @@ export default function AnalyticsTab() {
             alignItems: 'center',
             justifyContent: 'space-between',
             flexWrap: 'wrap',
-            gap: 12,
+            gap: 14,
           }}
         >
           <div>
-            <h1 style={{ margin: 0, fontSize: 22, color: 'var(--sh-heading)' }}>Analytics</h1>
-            <div style={{ fontSize: 12, color: 'var(--sh-subtext)', marginTop: 4 }}>
+            <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: 'var(--sh-heading)', letterSpacing: '-.01em' }}>Analytics</h1>
+            <div style={{ fontSize: 13, color: 'var(--sh-subtext)', marginTop: 4, lineHeight: 1.5 }}>
               Platform performance metrics and engagement data
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 6 }}>
+          <div
+            style={{
+              display: 'flex',
+              gap: 4,
+              background: 'var(--sh-soft)',
+              borderRadius: 10,
+              padding: 3,
+            }}
+          >
             {PERIODS.map((p) => (
               <button
                 key={p.value}
                 type="button"
                 onClick={() => setPeriod(p.value)}
                 style={{
-                  padding: '7px 14px',
+                  padding: '7px 16px',
                   borderRadius: 8,
-                  border: period === p.value ? '1px solid #2563eb' : '1px solid var(--sh-border)',
-                  background: period === p.value ? 'var(--sh-info-bg)' : 'var(--sh-surface)',
-                  color: period === p.value ? 'var(--sh-info-text)' : 'var(--sh-slate-600)',
+                  border: 'none',
+                  background: period === p.value ? 'var(--sh-brand)' : 'transparent',
+                  color: period === p.value ? '#fff' : 'var(--sh-text)',
                   fontSize: 12,
                   fontWeight: 700,
                   cursor: 'pointer',
                   fontFamily: 'inherit',
+                  transition: 'background .15s ease, color .15s ease',
                 }}
               >
                 {p.label}
@@ -436,16 +530,13 @@ export default function AnalyticsTab() {
       {/* DAU / WAU / MAU */}
       {activeUsers ? (
         <section style={SECTION_STYLE}>
-          <div
-            style={{ fontSize: 14, fontWeight: 800, color: 'var(--sh-heading)', marginBottom: 14 }}
-          >
-            Active Users
-          </div>
+          <div style={SECTION_HEADING}>Active Users</div>
+          <div style={SECTION_DESC}>Real-time platform user activity across time windows</div>
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-              gap: 14,
+              gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+              gap: 16,
             }}
           >
             <KpiCard
@@ -470,28 +561,20 @@ export default function AnalyticsTab() {
       {/* User Growth Chart */}
       {userGrowth ? (
         <section style={SECTION_STYLE}>
-          <div
-            style={{ fontSize: 14, fontWeight: 800, color: 'var(--sh-heading)', marginBottom: 4 }}
-          >
-            New User Signups
-          </div>
-          <div style={{ fontSize: 11, color: 'var(--sh-subtext)', marginBottom: 14 }}>
+          <div style={SECTION_HEADING}>New User Signups</div>
+          <div style={SECTION_DESC}>
             {userGrowth.activeUsers} new user{userGrowth.activeUsers !== 1 ? 's' : ''} in this
             period
           </div>
-          <BarChart data={userGrowth.data} color="#6366f1" />
+          <BarChart data={userGrowth.data} color="var(--sh-brand)" />
         </section>
       ) : null}
 
       {/* Engagement Trends */}
       {engagement ? (
         <section style={SECTION_STYLE}>
-          <div
-            style={{ fontSize: 14, fontWeight: 800, color: 'var(--sh-heading)', marginBottom: 4 }}
-          >
-            Engagement Trends
-          </div>
-          <div style={{ fontSize: 11, color: 'var(--sh-subtext)', marginBottom: 14 }}>
+          <div style={SECTION_HEADING}>Engagement Trends</div>
+          <div style={SECTION_DESC}>
             Daily activity across posts, comments, stars, and reactions
           </div>
           <EngagementChart engagement={engagement} />
@@ -501,11 +584,8 @@ export default function AnalyticsTab() {
       {/* Content Creation Breakdown */}
       {contentData ? (
         <section style={SECTION_STYLE}>
-          <div
-            style={{ fontSize: 14, fontWeight: 800, color: 'var(--sh-heading)', marginBottom: 14 }}
-          >
-            Content Creation
-          </div>
+          <div style={SECTION_HEADING}>Content Creation</div>
+          <div style={SECTION_DESC}>Breakdown of new sheets, notes, and feed posts over time</div>
           <div
             style={{
               display: 'grid',
@@ -516,41 +596,41 @@ export default function AnalyticsTab() {
             <div>
               <div
                 style={{
-                  fontSize: 12,
+                  fontSize: 13,
                   fontWeight: 700,
-                  color: 'var(--sh-slate-600)',
-                  marginBottom: 8,
+                  color: 'var(--sh-heading)',
+                  marginBottom: 10,
                 }}
               >
                 Sheets
               </div>
-              <BarChart data={contentData.sheets} color="#059669" height={80} />
+              <BarChart data={contentData.sheets} color="#059669" height={90} />
             </div>
             <div>
               <div
                 style={{
-                  fontSize: 12,
+                  fontSize: 13,
                   fontWeight: 700,
-                  color: 'var(--sh-slate-600)',
-                  marginBottom: 8,
+                  color: 'var(--sh-heading)',
+                  marginBottom: 10,
                 }}
               >
                 Notes
               </div>
-              <BarChart data={contentData.notes} color="#0f766e" height={80} />
+              <BarChart data={contentData.notes} color="#0f766e" height={90} />
             </div>
             <div>
               <div
                 style={{
-                  fontSize: 12,
+                  fontSize: 13,
                   fontWeight: 700,
-                  color: 'var(--sh-slate-600)',
-                  marginBottom: 8,
+                  color: 'var(--sh-heading)',
+                  marginBottom: 10,
                 }}
               >
                 Feed Posts
               </div>
-              <BarChart data={contentData.feedPosts} color="#8b5cf6" height={80} />
+              <BarChart data={contentData.feedPosts} color="#8b5cf6" height={90} />
             </div>
           </div>
         </section>
@@ -559,12 +639,8 @@ export default function AnalyticsTab() {
       {/* Top Content Rankings */}
       {topContent ? (
         <section style={SECTION_STYLE}>
-          <div
-            style={{ fontSize: 14, fontWeight: 800, color: 'var(--sh-heading)', marginBottom: 4 }}
-          >
-            Content Performance Rankings
-          </div>
-          <div style={{ fontSize: 11, color: 'var(--sh-subtext)', marginBottom: 8 }}>
+          <div style={SECTION_HEADING}>Content Performance Rankings</div>
+          <div style={SECTION_DESC}>
             All-time top performers across sheets, posts, and contributors
           </div>
 

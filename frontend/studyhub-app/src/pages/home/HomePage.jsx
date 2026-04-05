@@ -1,8 +1,6 @@
 // HomePage renders the public landing experience and routes anonymous users into discovery flows.
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { API } from '../../config'
-import { trackEvent } from '../../lib/telemetry'
 import { usePageTitle } from '../../lib/usePageTitle'
 import { fadeInOnScroll } from '../../lib/animations'
 import Navbar from '../../components/navbar/Navbar'
@@ -25,8 +23,6 @@ const scheduleIdle = typeof requestIdleCallback === 'function'
 export default function HomePage() {
   usePageTitle('The GitHub of Studying')
   const currentYear = new Date().getFullYear()
-  const navigate = useNavigate()
-  const [heroSearch, setHeroSearch] = useState('')
   const [platformStats, setPlatformStats] = useState(null)
   const featuresRef = useRef(null)
   const stepsRef = useRef(null)
@@ -70,25 +66,12 @@ export default function HomePage() {
     })
   }, [])
 
-  function handleHeroSearch(e) {
-    e.preventDefault()
-    if (heroSearch.trim()) {
-      trackEvent('landing_search_used', { query: heroSearch.trim() })
-      navigate(`/sheets?search=${encodeURIComponent(heroSearch.trim())}`)
-    }
-  }
-
   return (
     <div className="home-page">
       <Navbar variant="landing" />
 
       <main id="main-content">
-        <HeroSection
-          heroSearch={heroSearch}
-          setHeroSearch={setHeroSearch}
-          onSearch={handleHeroSearch}
-          platformStats={platformStats}
-        />
+        <HeroSection platformStats={platformStats} />
         <ProofBanner />
         <Suspense fallback={<BelowFoldFallback />}>
           <HomeSections
