@@ -4,7 +4,7 @@
  * Uses createPortal to escape the animated register card's transform context.
  * ═══════════════════════════════════════════════════════════════════════════ */
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { POLICY_URLS } from '../../lib/legalVersions'
 
@@ -151,6 +151,22 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
   const [activeTab, setActiveTab] = useState('terms')
   const [viewedTabs, setViewedTabs] = useState(new Set())
   const guidelinesRef = useRef(null)
+  const [termsLoaded, setTermsLoaded] = useState(false)
+  const [privacyLoaded, setPrivacyLoaded] = useState(false)
+  const [termsTimedOut, setTermsTimedOut] = useState(false)
+  const [privacyTimedOut, setPrivacyTimedOut] = useState(false)
+
+  useEffect(() => {
+    if (termsLoaded) return
+    const timer = setTimeout(() => setTermsTimedOut(true), 12000)
+    return () => clearTimeout(timer)
+  }, [termsLoaded])
+
+  useEffect(() => {
+    if (privacyLoaded) return
+    const timer = setTimeout(() => setPrivacyTimedOut(true), 12000)
+    return () => clearTimeout(timer)
+  }, [privacyLoaded])
 
   const markViewed = useCallback((key) => {
     setViewedTabs((prev) => {
@@ -277,34 +293,68 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
         <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
           {/* Terms iframe */}
           {activeTab === 'terms' && (
-            <iframe
-              key="terms-iframe"
-              src={POLICY_URLS.terms}
-              title="Terms of Use"
-              onLoad={() => handleIframeLoad('terms')}
-              style={{
-                flex: 1,
-                border: 'none',
-                width: '100%',
-                minHeight: 300,
-              }}
-            />
+            <div style={{ position: 'relative', flex: 1, minHeight: 300 }}>
+              {!termsLoaded && (
+                <div style={{
+                  position: 'absolute', inset: 0, display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', background: 'var(--sh-soft)',
+                  color: 'var(--sh-muted)', fontSize: 13,
+                }}>
+                  {termsTimedOut ? (
+                    <div style={{ textAlign: 'center' }}>
+                      <p style={{ margin: '0 0 8px', color: 'var(--sh-muted)', fontSize: 13 }}>Could not load. </p>
+                      <a href={POLICY_URLS.terms} target="_blank" rel="noopener noreferrer"
+                        style={{ color: 'var(--sh-brand)', fontSize: 13, fontWeight: 600 }}
+                        onClick={() => markViewed('terms')}
+                      >View Terms of Use</a>
+                    </div>
+                  ) : 'Loading Terms of Use...'}
+                </div>
+              )}
+              <iframe
+                key="terms-iframe"
+                src={POLICY_URLS.terms}
+                title="Terms of Use"
+                onLoad={() => { setTermsLoaded(true); handleIframeLoad('terms') }}
+                style={{
+                  flex: 1, border: 'none', width: '100%', minHeight: 300,
+                  opacity: termsLoaded ? 1 : 0, transition: 'opacity 0.3s ease',
+                }}
+              />
+            </div>
           )}
 
           {/* Privacy iframe */}
           {activeTab === 'privacy' && (
-            <iframe
-              key="privacy-iframe"
-              src={POLICY_URLS.privacy}
-              title="Privacy Policy"
-              onLoad={() => handleIframeLoad('privacy')}
-              style={{
-                flex: 1,
-                border: 'none',
-                width: '100%',
-                minHeight: 300,
-              }}
-            />
+            <div style={{ position: 'relative', flex: 1, minHeight: 300 }}>
+              {!privacyLoaded && (
+                <div style={{
+                  position: 'absolute', inset: 0, display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', background: 'var(--sh-soft)',
+                  color: 'var(--sh-muted)', fontSize: 13,
+                }}>
+                  {privacyTimedOut ? (
+                    <div style={{ textAlign: 'center' }}>
+                      <p style={{ margin: '0 0 8px', color: 'var(--sh-muted)', fontSize: 13 }}>Could not load. </p>
+                      <a href={POLICY_URLS.privacy} target="_blank" rel="noopener noreferrer"
+                        style={{ color: 'var(--sh-brand)', fontSize: 13, fontWeight: 600 }}
+                        onClick={() => markViewed('privacy')}
+                      >View Privacy Policy</a>
+                    </div>
+                  ) : 'Loading Privacy Policy...'}
+                </div>
+              )}
+              <iframe
+                key="privacy-iframe"
+                src={POLICY_URLS.privacy}
+                title="Privacy Policy"
+                onLoad={() => { setPrivacyLoaded(true); handleIframeLoad('privacy') }}
+                style={{
+                  flex: 1, border: 'none', width: '100%', minHeight: 300,
+                  opacity: privacyLoaded ? 1 : 0, transition: 'opacity 0.3s ease',
+                }}
+              />
+            </div>
           )}
 
           {/* Guidelines scrollable content */}
