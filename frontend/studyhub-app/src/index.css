@@ -1052,6 +1052,26 @@ textarea.sh-input {
   }
 }
 
+@keyframes treeColorCycle {
+  0%   { filter: blur(12px) hue-rotate(0deg); opacity: 0.18; }
+  25%  { filter: blur(16px) hue-rotate(40deg); opacity: 0.28; }
+  50%  { filter: blur(14px) hue-rotate(90deg); opacity: 0.22; }
+  75%  { filter: blur(18px) hue-rotate(160deg); opacity: 0.26; }
+  100% { filter: blur(12px) hue-rotate(360deg); opacity: 0.18; }
+}
+
+@keyframes treeGlowRadial {
+  0%   { opacity: 0.06; transform: translate(-50%, -54%) scale(1); }
+  33%  { opacity: 0.12; transform: translate(-50%, -54%) scale(1.05); }
+  66%  { opacity: 0.08; transform: translate(-50%, -54%) scale(1.02); }
+  100% { opacity: 0.06; transform: translate(-50%, -54%) scale(1); }
+}
+
+@keyframes treeNodeTwinkle {
+  0%, 100% { opacity: 0.3; }
+  50%      { opacity: 0.8; }
+}
+
 .home-hero-tree {
   position: absolute;
   top: 50%;
@@ -1068,11 +1088,34 @@ textarea.sh-input {
 }
 
 .hero-tree-pulse {
-  animation: treePulse 3.2s ease-in-out infinite;
+  animation: treeColorCycle 12s ease-in-out infinite, treePulse 3.2s ease-in-out infinite;
   transform-origin: center;
   opacity: 0.18;
   filter: blur(10px);
 }
+
+.hero-tree-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -54%);
+  width: 600px;
+  height: 600px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(96, 165, 250, 0.15) 0%, rgba(139, 92, 246, 0.08) 40%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+  animation: treeGlowRadial 8s ease-in-out infinite, treeColorCycle 16s ease-in-out infinite;
+}
+
+.hero-tree-base .tree-node-glow {
+  animation: treeNodeTwinkle 4s ease-in-out infinite;
+}
+
+.hero-tree-base .tree-node-glow:nth-child(2n)   { animation-delay: -1s; }
+.hero-tree-base .tree-node-glow:nth-child(3n)   { animation-delay: -2s; }
+.hero-tree-base .tree-node-glow:nth-child(4n+1) { animation-delay: -3s; }
+.hero-tree-base .tree-node-glow:nth-child(5n+2) { animation-delay: -0.5s; }
 
 .hero-cta-glow {
   animation: ctaGlow 3.2s ease-in-out infinite;

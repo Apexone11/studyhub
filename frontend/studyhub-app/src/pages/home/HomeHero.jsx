@@ -11,7 +11,10 @@ import { PROOF_ITEMS } from './homeConstants'
 export function HeroSection({ platformStats }) {
   return (
     <section className="home-hero">
-      {/* Enhanced fork-tree SVG */}
+      {/* Radial color-cycling glow behind the tree */}
+      <div className="hero-tree-glow" aria-hidden="true" />
+
+      {/* Enhanced fork-tree SVG with twinkling nodes */}
       <svg className="home-hero-tree hero-tree-base" viewBox="0 0 56 56" fill="none" aria-hidden="true">
         <line x1="28" y1="48" x2="28" y2="32" stroke="#60a5fa" strokeWidth="2.4" strokeLinecap="round"/>
         <path d="M28 32 Q28 24 16 16" stroke="#60a5fa" strokeWidth="2" fill="none" strokeLinecap="round"/>
@@ -25,26 +28,26 @@ export function HeroSection({ platformStats }) {
         <path d="M9 7 Q11 4 13 3" stroke="#bfdbfe" strokeWidth="1" fill="none" strokeLinecap="round"/>
         <path d="M47 7 Q45 4 43 3" stroke="#bfdbfe" strokeWidth="1" fill="none" strokeLinecap="round"/>
         <path d="M47 7 Q49 4 51 2" stroke="#bfdbfe" strokeWidth="1" fill="none" strokeLinecap="round"/>
-        {/* Nodes with gradient-like fills */}
-        <circle cx="28" cy="48" r="4" fill="#3b82f6" opacity="0.3"/>
+        {/* Nodes with twinkling glow */}
+        <circle className="tree-node-glow" cx="28" cy="48" r="4" fill="#3b82f6" opacity="0.3"/>
         <circle cx="28" cy="48" r="3" stroke="#60a5fa" strokeWidth="1.6" fill="none"/>
-        <circle cx="28" cy="32" r="3" fill="#3b82f6" opacity="0.2"/>
+        <circle className="tree-node-glow" cx="28" cy="32" r="3" fill="#3b82f6" opacity="0.2"/>
         <circle cx="28" cy="32" r="2.5" stroke="#60a5fa" strokeWidth="1.4" fill="none"/>
-        <circle cx="16" cy="16" r="2.8" fill="#60a5fa" opacity="0.15"/>
+        <circle className="tree-node-glow" cx="16" cy="16" r="2.8" fill="#60a5fa" opacity="0.15"/>
         <circle cx="16" cy="16" r="2.3" stroke="#60a5fa" strokeWidth="1.3" fill="none"/>
-        <circle cx="40" cy="16" r="2.8" fill="#60a5fa" opacity="0.15"/>
+        <circle className="tree-node-glow" cx="40" cy="16" r="2.8" fill="#60a5fa" opacity="0.15"/>
         <circle cx="40" cy="16" r="2.3" stroke="#60a5fa" strokeWidth="1.3" fill="none"/>
-        <circle cx="9" cy="7" r="2" fill="#93c5fd" opacity="0.2"/>
+        <circle className="tree-node-glow" cx="9" cy="7" r="2" fill="#93c5fd" opacity="0.2"/>
         <circle cx="9" cy="7" r="1.6" stroke="#93c5fd" strokeWidth="1.1" fill="none"/>
         <circle cx="21" cy="7" r="1.6" stroke="#93c5fd" strokeWidth="1.1" fill="none"/>
         <circle cx="35" cy="7" r="1.6" stroke="#93c5fd" strokeWidth="1.1" fill="none"/>
-        <circle cx="47" cy="7" r="2" fill="#93c5fd" opacity="0.2"/>
+        <circle className="tree-node-glow" cx="47" cy="7" r="2" fill="#93c5fd" opacity="0.2"/>
         <circle cx="47" cy="7" r="1.6" stroke="#93c5fd" strokeWidth="1.1" fill="none"/>
         {/* Leaf nodes */}
-        <circle cx="5" cy="2" r="1.1" fill="#bfdbfe" opacity="0.4"/>
-        <circle cx="13" cy="3" r="1.1" fill="#bfdbfe" opacity="0.4"/>
-        <circle cx="43" cy="3" r="1.1" fill="#bfdbfe" opacity="0.4"/>
-        <circle cx="51" cy="2" r="1.1" fill="#bfdbfe" opacity="0.4"/>
+        <circle className="tree-node-glow" cx="5" cy="2" r="1.1" fill="#bfdbfe" opacity="0.4"/>
+        <circle className="tree-node-glow" cx="13" cy="3" r="1.1" fill="#bfdbfe" opacity="0.4"/>
+        <circle className="tree-node-glow" cx="43" cy="3" r="1.1" fill="#bfdbfe" opacity="0.4"/>
+        <circle className="tree-node-glow" cx="51" cy="2" r="1.1" fill="#bfdbfe" opacity="0.4"/>
       </svg>
       <svg className="home-hero-tree hero-tree-pulse" viewBox="0 0 56 56" fill="none" aria-hidden="true">
         <line x1="28" y1="48" x2="28" y2="32" stroke="#60a5fa" strokeWidth="2.4" strokeLinecap="round"/>
