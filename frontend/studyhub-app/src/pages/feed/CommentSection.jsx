@@ -259,7 +259,7 @@ function ReplyInput({ user, onReply }) {
 
   return (
     <div style={commentInputRowStyle}>
-      <Avatar username={user?.username} role={user?.role} size={32} />
+      <Avatar username={user?.username} avatarUrl={user?.avatarUrl} role={user?.role} size={32} />
       <div style={{ flex: 1 }}>
         <textarea
           value={value}
@@ -428,7 +428,7 @@ function CommentInput({ user, value, onChange, onSubmit, posting, error, onAttac
 
   return (
     <div style={commentInputRowStyle}>
-      <Avatar username={user?.username} role={user?.role} size={32} />
+      <Avatar username={user?.username} avatarUrl={user?.avatarUrl} role={user?.role} size={32} />
       <div style={{ flex: 1 }}>
         <textarea
           value={value}

@@ -3,12 +3,22 @@
  *
  * Supports text posts, file attachments, and video uploads.
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { IconUpload, IconX } from '../../components/Icons'
 import { COMPOSER_PROMPTS, linkButton } from './feedConstants'
 import { VideoUploader } from '../../components/video'
+import { API } from '../../config'
 
 const composerPromptIndex = Math.floor(Date.now() / 60000) % COMPOSER_PROMPTS.length
+
+// Keyframes injected once at module level so they are available to inline
+// animation styles without requiring a CSS file change.
+if (typeof document !== 'undefined' && !document.getElementById('sh-spin-kf')) {
+  const style = document.createElement('style')
+  style.id = 'sh-spin-kf'
+  style.textContent = '@keyframes sh-spin { to { transform: rotate(360deg); } }'
+  document.head.appendChild(style)
+}
 
 export default function FeedComposer({ user, onSubmitPost }) {
   const [composer, setComposer] = useState({ content: '', courseId: '' })
@@ -17,7 +27,36 @@ export default function FeedComposer({ user, onSubmitPost }) {
   const [showVideoUploader, setShowVideoUploader] = useState(false)
   const [pendingVideoId, setPendingVideoId] = useState(null)
   const [videoProcessing, setVideoProcessing] = useState(false)
+  const [videoReady, setVideoReady] = useState(false)
+  const [videoFailed, setVideoFailed] = useState(false)
   const fileInputRef = useRef(null)
+
+  // Poll video status every 3 seconds while processing
+  useEffect(() => {
+    if (!videoProcessing || !pendingVideoId) return
+
+    const poll = async () => {
+      try {
+        const res = await fetch(`${API}/api/video/${pendingVideoId}`, {
+          credentials: 'include',
+        })
+        if (!res.ok) return
+        const data = await res.json()
+        if (data.status === 'ready') {
+          setVideoProcessing(false)
+          setVideoReady(true)
+        } else if (data.status === 'failed') {
+          setVideoProcessing(false)
+          setVideoFailed(true)
+        }
+      } catch {
+        // Graceful degradation: keep polling until component unmounts or video clears
+      }
+    }
+
+    const intervalId = setInterval(poll, 3000)
+    return () => clearInterval(intervalId)
+  }, [videoProcessing, pendingVideoId])
 
   const handleSubmitPost = async (event) => {
     event.preventDefault()
@@ -39,6 +78,8 @@ export default function FeedComposer({ user, onSubmitPost }) {
       setPendingVideoId(null)
       setShowVideoUploader(false)
       setVideoProcessing(false)
+      setVideoReady(false)
+      setVideoFailed(false)
       setComposeState({ saving: false, error: '' })
     } catch (error) {
       setComposeState({ saving: false, error: error.message || 'Could not post to the feed.' })
@@ -48,12 +89,16 @@ export default function FeedComposer({ user, onSubmitPost }) {
   const handleVideoUploadComplete = (videoId) => {
     setPendingVideoId(videoId)
     setVideoProcessing(true)
+    setVideoReady(false)
+    setVideoFailed(false)
     setShowVideoUploader(false)
   }
 
   const handleRemoveVideo = () => {
     setPendingVideoId(null)
     setVideoProcessing(false)
+    setVideoReady(false)
+    setVideoFailed(false)
     setShowVideoUploader(false)
   }
 
@@ -66,6 +111,23 @@ export default function FeedComposer({ user, onSubmitPost }) {
       setShowVideoUploader(true)
     }
   }
+
+  // Compute indicator appearance based on video state
+  const indicatorBg = videoFailed
+    ? 'var(--sh-danger-bg)'
+    : videoReady
+      ? 'var(--sh-success-bg)'
+      : 'var(--sh-brand-soft-bg)'
+  const indicatorColor = videoFailed
+    ? 'var(--sh-danger-text)'
+    : videoReady
+      ? 'var(--sh-success-text)'
+      : 'var(--sh-brand)'
+  const indicatorText = videoFailed
+    ? 'Video processing failed'
+    : videoReady
+      ? 'Video ready'
+      : 'Video uploaded -- processing in the background'
 
   return (
     <form onSubmit={handleSubmitPost} style={{ display: 'grid', gap: 12 }}>
@@ -97,7 +159,7 @@ export default function FeedComposer({ user, onSubmitPost }) {
         />
       )}
 
-      {/* Video attached indicator */}
+      {/* Video status indicator */}
       {pendingVideoId && (
         <div
           style={{
@@ -105,28 +167,76 @@ export default function FeedComposer({ user, onSubmitPost }) {
             alignItems: 'center',
             gap: 8,
             padding: '8px 12px',
-            background: 'var(--sh-brand-soft-bg)',
+            background: indicatorBg,
             borderRadius: 8,
             fontSize: 12,
-            color: 'var(--sh-brand)',
+            color: indicatorColor,
           }}
         >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <polygon points="23 7 16 12 23 17 23 7" />
-            <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
-          </svg>
-          <span style={{ flex: 1, fontWeight: 600 }}>
-            {videoProcessing ? 'Video uploaded -- processing in the background' : 'Video attached'}
-          </span>
+          {videoProcessing ? (
+            // Spinning border indicator during processing
+            <span
+              style={{
+                display: 'inline-block',
+                width: 14,
+                height: 14,
+                borderRadius: '50%',
+                border: '2px solid currentColor',
+                borderTopColor: 'transparent',
+                animation: 'sh-spin 0.8s linear infinite',
+                flexShrink: 0,
+              }}
+            />
+          ) : videoReady ? (
+            // Green checkmark when ready
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ flexShrink: 0 }}
+            >
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          ) : videoFailed ? (
+            // Red X circle when failed
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ flexShrink: 0 }}
+            >
+              <circle cx="12" cy="12" r="10" />
+              <line x1="15" y1="9" x2="9" y2="15" />
+              <line x1="9" y1="9" x2="15" y2="15" />
+            </svg>
+          ) : (
+            // Video camera icon when attached (fallback)
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ flexShrink: 0 }}
+            >
+              <polygon points="23 7 16 12 23 17 23 7" />
+              <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+            </svg>
+          )}
+          <span style={{ flex: 1, fontWeight: 600 }}>{indicatorText}</span>
           <button
             type="button"
             onClick={handleRemoveVideo}
@@ -134,7 +244,7 @@ export default function FeedComposer({ user, onSubmitPost }) {
               background: 'none',
               border: 'none',
               cursor: 'pointer',
-              color: 'var(--sh-brand)',
+              color: indicatorColor,
               display: 'flex',
               padding: 2,
             }}
@@ -188,6 +298,8 @@ export default function FeedComposer({ user, onSubmitPost }) {
                 // Clear video if switching to file
                 setPendingVideoId(null)
                 setVideoProcessing(false)
+                setVideoReady(false)
+                setVideoFailed(false)
                 setShowVideoUploader(false)
               }
               e.target.value = ''
