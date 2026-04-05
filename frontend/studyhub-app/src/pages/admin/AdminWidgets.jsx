@@ -18,21 +18,22 @@ export function StatsGrid({ stats }) {
   ]
 
   return (
-    <div className="admin-stats-grid" style={{ gap: 14 }}>
+    <div className="admin-stats-grid" style={{ gap: 20 }}>
       {cards.map(([label, value, tone]) => (
         <div
           key={label}
           style={{
             background: 'var(--sh-surface)',
-            borderRadius: 16,
+            borderRadius: 12,
             border: '1px solid var(--sh-border)',
-            padding: '18px 18px 20px',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+            padding: 24,
           }}
         >
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--sh-muted)', letterSpacing: '.08em', marginBottom: 8 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--sh-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 8 }}>
             {label.toUpperCase()}
           </div>
-          <div style={{ fontSize: 30, fontWeight: 800, color: tone }}>{value ?? 0}</div>
+          <div style={{ fontSize: 36, fontWeight: 700, color: tone }}>{value ?? 0}</div>
         </div>
       ))}
     </div>
