@@ -6,9 +6,6 @@
 
 const express = require('express')
 const requireAuth = require('../../middleware/auth')
-const { captureError } = require('../../monitoring/sentry')
-const prisma = require('../../lib/prisma')
-const { getBlockedUserIds } = require('../../lib/social/blockFilter')
 const { getAuthTokenFromRequest, verifyAuthToken } = require('../../lib/authTokens')
 const { libraryWriteLimiter } = require('../../lib/rateLimiters')
 
@@ -34,13 +31,6 @@ const {
   deleteHighlightHandler,
   getSocialHighlightsHandler,
 } = require('./library.controller')
-
-const { searchBooks, getBookDetail, syncPopularBooksToDB } = require('./library.service')
-const {
-  MAX_SHELVES_PER_USER,
-  MAX_BOOKMARKS_PER_USER_FREE,
-  MAX_HIGHLIGHTS_PER_BOOK,
-} = require('./library.constants')
 
 /**
  * Optional auth -- sets req.user if a valid token is present, otherwise

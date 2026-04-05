@@ -437,7 +437,7 @@ const followUser = async (req, res) => {
         linkPath: `/users/${req.user.username}`,
       })
 
-      return res.json({ followed: false, requested: true })
+      return res.json({ following: false, requested: true })
     }
 
     await createNotification(prisma, {
@@ -452,7 +452,7 @@ const followUser = async (req, res) => {
       where: { followingId: target.id, status: 'active' },
     })
     checkAndAwardBadges(prisma, target.id)
-    res.json({ followed: true, followerCount })
+    res.json({ following: true, followerCount })
   } catch (err) {
     if (err.code === 'P2002') return res.status(409).json({ error: 'Already following this user.' })
     captureError(err, { route: req.originalUrl, method: req.method })
@@ -979,16 +979,17 @@ const getTermsStatus = async (req, res) => {
 const acceptTerms = async (req, res) => {
   try {
     // Always use server's current version -- ignore client-provided version to prevent bypass
+    const acceptedAt = new Date()
     await prisma.user.update({
       where: { id: req.user.userId },
       data: {
         termsAcceptedVersion: CURRENT_TERMS_VERSION,
-        termsAcceptedAt: new Date(),
+        termsAcceptedAt: acceptedAt,
       },
     })
     res.json({
       acceptedVersion: CURRENT_TERMS_VERSION,
-      acceptedAt: new Date(),
+      acceptedAt,
       currentVersion: CURRENT_TERMS_VERSION,
       needsUpdate: false,
     })

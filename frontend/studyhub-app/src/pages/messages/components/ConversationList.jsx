@@ -105,7 +105,7 @@ function RequestItem({ request, onAccept, onDecline, currentUserId }) {
       borderBottom: '1px solid var(--sh-border)',
     }}>
       <a
-        href={other ? `/profile/${other.username}` : '#'}
+        href={other ? `/users/${other.username}` : '#'}
         target="_blank"
         rel="noopener noreferrer"
         style={{ flexShrink: 0, textDecoration: 'none' }}
@@ -116,7 +116,7 @@ function RequestItem({ request, onAccept, onDecline, currentUserId }) {
 
       <div style={{ flex: 1, minWidth: 0 }}>
         <a
-          href={other ? `/profile/${other.username}` : '#'}
+          href={other ? `/users/${other.username}` : '#'}
           target="_blank"
           rel="noopener noreferrer"
           style={{

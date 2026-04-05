@@ -132,7 +132,7 @@ router.get('/public', reviewReadLimiter, async (req, res) => {
     }))
 
     res.setHeader('Cache-Control', 'public, max-age=300')
-    res.json(mapped)
+    res.json({ reviews: mapped })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })

@@ -28,11 +28,7 @@
 
 const express = require('express')
 const requireAuth = require('../../middleware/auth')
-const { captureError } = require('../../monitoring/sentry')
-const prisma = require('../../lib/prisma')
 const { readLimiter, writeLimiter } = require('../../lib/rateLimiters')
-const { getBlockedUserIds } = require('../../lib/social/blockFilter')
-const { createNotification } = require('../../lib/notify')
 
 // Import controller
 const {
@@ -48,17 +44,6 @@ const {
   removeMember,
   inviteUser,
 } = require('./studyGroups.controller')
-
-// Import helpers
-const {
-  parseId,
-  requireGroupMember,
-  isGroupAdmin,
-  isGroupAdminOrMod,
-  validateGroupName,
-  validateDescription,
-  formatGroup,
-} = require('./studyGroups.helpers')
 
 // Import sub-routers
 const resourcesRouter = require('./studyGroups.resources.routes')

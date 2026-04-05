@@ -82,12 +82,9 @@ export default function ReviewPage() {
     setSuccess('')
 
     try {
-      const method = existingReview ? 'PATCH' : 'POST'
-      const url = existingReview
-        ? `${API}/api/reviews/${existingReview.id}`
-        : `${API}/api/reviews`
-      const res = await fetch(url, {
-        method,
+      // Always POST -- backend upserts by userId
+      const res = await fetch(`${API}/api/reviews`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ stars, text: text.trim() }),
