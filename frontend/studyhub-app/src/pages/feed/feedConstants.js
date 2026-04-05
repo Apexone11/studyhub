@@ -172,3 +172,79 @@ export function pillStyle() {
     fontWeight: 700,
   }
 }
+
+/* ── Post action bar styles (Facebook-style layout) ────────────────── */
+export const statsBarStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  padding: '10px 0',
+  marginTop: 12,
+  borderTop: '1px solid var(--sh-border)',
+  borderBottom: '1px solid var(--sh-border)',
+  fontSize: 13,
+  color: 'var(--sh-muted)',
+}
+
+export const statsCountStyle = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 6,
+  fontSize: 13,
+  color: 'var(--sh-subtext)',
+  fontWeight: 600,
+}
+
+export const statsLinkStyle = {
+  background: 'none',
+  border: 'none',
+  padding: 0,
+  fontSize: 13,
+  color: 'var(--sh-muted)',
+  cursor: 'pointer',
+  fontFamily: FONT,
+  fontWeight: 600,
+}
+
+export const actionBarStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 4,
+  padding: '4px 0',
+}
+
+export function actionBarButton(isActive, activeColor) {
+  return {
+    flex: 1,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderRadius: 8,
+    border: 'none',
+    background: 'transparent',
+    color: isActive ? activeColor : 'var(--sh-muted)',
+    padding: '8px 0',
+    fontSize: 13,
+    fontWeight: 700,
+    cursor: 'pointer',
+    fontFamily: FONT,
+    transition: 'background 0.15s, color 0.15s',
+  }
+}
+
+export const shareToastStyle = {
+  position: 'fixed',
+  bottom: 32,
+  left: '50%',
+  transform: 'translateX(-50%)',
+  background: 'var(--sh-slate-900)',
+  color: '#fff',
+  padding: '10px 20px',
+  borderRadius: 10,
+  fontSize: 13,
+  fontWeight: 700,
+  fontFamily: FONT,
+  zIndex: 9999,
+  boxShadow: 'var(--elevation-3)',
+}
