@@ -1,4 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line,
+} from 'recharts'
 import { API } from '../../config'
 import { FONT } from './adminConstants'
 import UserAvatar from '../../components/UserAvatar'
@@ -48,256 +52,25 @@ const TD_STYLE = {
   borderBottom: '1px solid var(--sh-border)',
 }
 
-/* -- Tiny inline bar chart (SVG) ---------------------------------------- */
-
-function BarChart({ data, color = 'var(--sh-brand)', height = 120 }) {
-  if (!data || data.length === 0) {
-    return (
-      <div
-        style={{
-          height,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: 'var(--sh-muted)',
-          fontSize: 13,
-          fontWeight: 500,
-        }}
-      >
-        No data for this period
-      </div>
-    )
-  }
-
-  const maxVal = Math.max(...data.map((d) => d.count), 1)
-  const barWidth = Math.max(6, Math.min(28, Math.floor(500 / data.length) - 4))
-  const barGap = Math.max(2, Math.floor(barWidth * 0.25))
-  const chartWidth = data.length * (barWidth + barGap)
-  const gridLines = 4
-
-  return (
-    <div
-      style={{
-        overflowX: 'auto',
-        background: 'var(--sh-soft)',
-        borderRadius: 10,
-        padding: '16px 14px 8px',
-      }}
-    >
-      <svg width={Math.max(chartWidth, 200)} height={height + 28} style={{ display: 'block' }}>
-        {/* Gridlines */}
-        {Array.from({ length: gridLines + 1 }).map((_, gi) => {
-          const gy = (gi / gridLines) * height
-          return (
-            <line
-              key={`grid-${gi}`}
-              x1={0}
-              y1={gy}
-              x2={Math.max(chartWidth, 200)}
-              y2={gy}
-              stroke="var(--sh-border)"
-              strokeWidth={1}
-              strokeDasharray="3 3"
-              opacity={0.6}
-            />
-          )
-        })}
-        {data.map((d, i) => {
-          const barHeight = (d.count / maxVal) * height
-          const x = i * (barWidth + barGap)
-          const y = height - barHeight
-          const showLabel = i === 0 || i === data.length - 1 || i === Math.floor(data.length / 2)
-          return (
-            <g key={d.date}>
-              <rect
-                x={x}
-                y={y}
-                width={barWidth}
-                height={Math.max(barHeight, 1)}
-                rx={barWidth > 10 ? 4 : 2}
-                fill={color}
-                opacity={0.9}
-              >
-                <title>{`${d.date}: ${d.count}`}</title>
-              </rect>
-              {showLabel ? (
-                <text
-                  x={x + barWidth / 2}
-                  y={height + 18}
-                  textAnchor="middle"
-                  fill="var(--sh-slate-500)"
-                  fontSize={10}
-                  fontWeight={600}
-                  fontFamily={FONT}
-                >
-                  {d.date.slice(5)}
-                </text>
-              ) : null}
-            </g>
-          )
-        })}
-      </svg>
-    </div>
-  )
+const CHART_COLORS = {
+  brand: '#6366f1',
+  blue: '#2563eb',
+  amber: '#f59e0b',
+  pink: '#ec4899',
+  green: '#10b981',
+  slate: '#64748b',
 }
 
-/* -- Sparkline (SVG polyline) ------------------------------------------- */
+const PIE_LABEL = ({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`
 
-function Sparkline({ data, color = '#2563eb', width = 120, height = 32 }) {
-  if (!data || data.length < 2) return null
-
-  const maxVal = Math.max(...data.map((d) => d.count), 1)
-  const points = data
-    .map((d, i) => {
-      const x = (i / (data.length - 1)) * width
-      const y = height - (d.count / maxVal) * (height - 4)
-      return `${x},${y}`
-    })
-    .join(' ')
-
-  return (
-    <svg width={width} height={height} style={{ display: 'block' }}>
-      <polyline
-        points={points}
-        fill="none"
-        stroke={color}
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
-/* -- Multi-series engagement chart -------------------------------------- */
-
-function EngagementChart({ engagement, height = 140 }) {
-  const series = [
-    { key: 'posts', label: 'Posts', color: '#8b5cf6' },
-    { key: 'comments', label: 'Comments', color: '#2563eb' },
-    { key: 'stars', label: 'Stars', color: '#f59e0b' },
-    { key: 'reactions', label: 'Reactions', color: '#ec4899' },
-  ]
-
-  const dateMap = new Map()
-  for (const s of series) {
-    for (const point of engagement[s.key] || []) {
-      if (!dateMap.has(point.date)) dateMap.set(point.date, {})
-      dateMap.get(point.date)[s.key] = point.count
-    }
-  }
-
-  const dates = [...dateMap.keys()].sort()
-  if (dates.length === 0) {
-    return (
-      <div
-        style={{
-          height,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: 'var(--sh-muted)',
-          fontSize: 12,
-        }}
-      >
-        No engagement data for this period
-      </div>
-    )
-  }
-
-  const maxVal = Math.max(
-    ...dates.flatMap((d) => series.map((s) => dateMap.get(d)?.[s.key] || 0)),
-    1,
-  )
-  const chartWidth = Math.max(dates.length * 20, 300)
-
-  const gridLines = 4
-
-  return (
-    <div>
-      <div
-        style={{
-          overflowX: 'auto',
-          background: 'var(--sh-soft)',
-          borderRadius: 10,
-          padding: '16px 14px 8px',
-        }}
-      >
-        <svg width={chartWidth} height={height + 28} style={{ display: 'block' }}>
-          {/* Gridlines */}
-          {Array.from({ length: gridLines + 1 }).map((_, gi) => {
-            const gy = (gi / gridLines) * height
-            return (
-              <line
-                key={`grid-${gi}`}
-                x1={0}
-                y1={gy}
-                x2={chartWidth}
-                y2={gy}
-                stroke="var(--sh-border)"
-                strokeWidth={1}
-                strokeDasharray="3 3"
-                opacity={0.6}
-              />
-            )
-          })}
-          {dates.map((date, i) => {
-            const groupWidth = 16
-            const x = i * 20
-            const vals = dateMap.get(date) || {}
-            const barW = Math.max(3, Math.floor(groupWidth / series.length))
-            const showLabel =
-              i === 0 || i === dates.length - 1 || i === Math.floor(dates.length / 2)
-            return (
-              <g key={date}>
-                {series.map((s, si) => {
-                  const val = vals[s.key] || 0
-                  const barH = (val / maxVal) * height
-                  return (
-                    <rect
-                      key={s.key}
-                      x={x + si * barW}
-                      y={height - barH}
-                      width={Math.max(barW - 1, 1)}
-                      height={Math.max(barH, 0.5)}
-                      rx={2}
-                      fill={s.color}
-                      opacity={0.85}
-                    >
-                      <title>{`${date} ${s.label}: ${val}`}</title>
-                    </rect>
-                  )
-                })}
-                {showLabel ? (
-                  <text
-                    x={x + groupWidth / 2}
-                    y={height + 18}
-                    textAnchor="middle"
-                    fill="var(--sh-slate-500)"
-                    fontSize={10}
-                    fontWeight={600}
-                    fontFamily={FONT}
-                  >
-                    {date.slice(5)}
-                  </text>
-                ) : null}
-              </g>
-            )
-          })}
-        </svg>
-      </div>
-      <div style={{ display: 'flex', gap: 18, marginTop: 14, flexWrap: 'wrap' }}>
-        {series.map((s) => (
-          <div key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{ width: 10, height: 10, borderRadius: 3, background: s.color }} />
-            <span style={{ fontSize: 12, color: 'var(--sh-slate-600)', fontWeight: 600 }}>
-              {s.label}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
+const TOOLTIP_STYLE = {
+  contentStyle: {
+    background: 'var(--sh-surface)',
+    border: '1px solid var(--sh-border)',
+    borderRadius: 8,
+    fontFamily: FONT,
+    fontSize: 13,
+  },
 }
 
 /* -- KPI Card ----------------------------------------------------------- */
@@ -338,7 +111,13 @@ function KpiCard({ label, value, subtitle, color = '#2563eb', sparkData }) {
         <div style={{ fontSize: 36, fontWeight: 800, color, lineHeight: 1, letterSpacing: '-.02em' }}>
           {typeof value === 'number' ? value.toLocaleString() : value}
         </div>
-        {sparkData ? <Sparkline data={sparkData} color={color} /> : null}
+        {sparkData?.length > 1 && (
+          <ResponsiveContainer width={120} height={32}>
+            <LineChart data={sparkData}>
+              <Line type="monotone" dataKey="count" stroke={color || CHART_COLORS.brand} strokeWidth={2} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
       </div>
       {subtitle ? (
         <div style={{ fontSize: 12, color: 'var(--sh-slate-500)', fontWeight: 500 }}>{subtitle}</div>
@@ -405,6 +184,101 @@ function RankTable({ title, columns, rows }) {
   )
 }
 
+/* -- Helper: merge engagement arrays into single dataset ---------------- */
+
+function mergeEngagementData(engagement) {
+  const dateMap = new Map()
+  const keys = ['posts', 'comments', 'stars', 'reactions']
+  for (const key of keys) {
+    for (const point of engagement[key] || []) {
+      if (!dateMap.has(point.date)) dateMap.set(point.date, { date: point.date })
+      dateMap.get(point.date)[key] = point.count
+    }
+  }
+  return [...dateMap.values()].sort((a, b) => a.date.localeCompare(b.date))
+}
+
+/* -- Helper: build content distribution pie data ------------------------ */
+
+function buildContentPieData(contentData) {
+  if (!contentData) return []
+  const sum = (arr) => (arr || []).reduce((s, d) => s + (d.count || 0), 0)
+  return [
+    { name: 'Sheets', value: sum(contentData.sheets) },
+    { name: 'Notes', value: sum(contentData.notes) },
+    { name: 'Feed Posts', value: sum(contentData.feedPosts) },
+  ].filter((d) => d.value > 0)
+}
+
+/* -- Pie chart card wrapper --------------------------------------------- */
+
+const PIE_COLORS = [CHART_COLORS.brand, CHART_COLORS.blue, CHART_COLORS.amber, CHART_COLORS.pink, CHART_COLORS.green, CHART_COLORS.slate]
+
+function PieCard({ title, data }) {
+  if (!data || data.length === 0) {
+    return (
+      <div style={{
+        background: 'var(--sh-surface)', borderRadius: 12, padding: 20,
+        border: '1px solid var(--sh-border)',
+      }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--sh-heading)', marginBottom: 12 }}>{title}</div>
+        <div style={{ color: 'var(--sh-muted)', fontSize: 12 }}>No data yet</div>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{
+      background: 'var(--sh-surface)', borderRadius: 12, padding: 20,
+      border: '1px solid var(--sh-border)',
+    }}>
+      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--sh-heading)', marginBottom: 12 }}>{title}</div>
+      <ResponsiveContainer width="100%" height={220}>
+        <PieChart>
+          <Pie
+            data={data}
+            dataKey="value"
+            nameKey="name"
+            cx="50%"
+            cy="50%"
+            outerRadius={70}
+            label={PIE_LABEL}
+            labelLine={false}
+            fontSize={11}
+            fontFamily={FONT}
+          >
+            {data.map((_, idx) => (
+              <Cell key={`cell-${idx}`} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
+            ))}
+          </Pie>
+          <Tooltip {...TOOLTIP_STYLE} />
+          <Legend wrapperStyle={{ fontSize: 12, fontFamily: FONT }} />
+        </PieChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+/* -- No-data placeholder ------------------------------------------------ */
+
+function NoChartData({ height = 120 }) {
+  return (
+    <div
+      style={{
+        height,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: 'var(--sh-muted)',
+        fontSize: 13,
+        fontWeight: 500,
+      }}
+    >
+      No data for this period
+    </div>
+  )
+}
+
 /* -- Main AnalyticsTab -------------------------------------------------- */
 
 export default function AnalyticsTab() {
@@ -417,6 +291,8 @@ export default function AnalyticsTab() {
   const [contentData, setContentData] = useState(null)
   const [engagement, setEngagement] = useState(null)
   const [topContent, setTopContent] = useState(null)
+  const [userRoles, setUserRoles] = useState(null)
+  const [engagementTotals, setEngagementTotals] = useState(null)
 
   const fetchAnalytics = useCallback(async (p) => {
     setLoading(true)
@@ -442,6 +318,12 @@ export default function AnalyticsTab() {
       setContentData(cdData)
       setEngagement(enData)
       setTopContent(tcData)
+
+      /* Pie chart data -- fetched alongside, failures are non-critical */
+      fetch(`${API}/api/admin/analytics/user-roles`, { credentials: 'include' })
+        .then(r => r.json()).then(setUserRoles).catch(() => {})
+      fetch(`${API}/api/admin/analytics/engagement-totals?period=${p}`, { credentials: 'include' })
+        .then(r => r.json()).then(setEngagementTotals).catch(() => {})
     } catch (err) {
       setError(err.message || 'Failed to load analytics')
     } finally {
@@ -452,6 +334,18 @@ export default function AnalyticsTab() {
   useEffect(() => {
     void fetchAnalytics(period)
   }, [period, fetchAnalytics])
+
+  /* Derived data for pie charts */
+  const contentPieData = buildContentPieData(contentData)
+  const rolePieData = userRoles?.roles || []
+  const engagementPieData = engagementTotals?.totals
+    ? Object.entries(engagementTotals.totals)
+        .map(([name, value]) => ({ name: name.charAt(0).toUpperCase() + name.slice(1), value }))
+        .filter((d) => d.value > 0)
+    : []
+
+  /* Merged engagement data for grouped bar chart */
+  const engagementChartData = engagement ? mergeEngagementData(engagement) : []
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -558,6 +452,19 @@ export default function AnalyticsTab() {
         </section>
       ) : null}
 
+      {/* Pie Charts */}
+      {(contentPieData.length > 0 || rolePieData.length > 0 || engagementPieData.length > 0) && (
+        <section style={SECTION_STYLE}>
+          <div style={SECTION_HEADING}>Distribution Overview</div>
+          <div style={SECTION_DESC}>Content, user roles, and engagement breakdown for this period</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+            <PieCard title="Content Distribution" data={contentPieData} />
+            <PieCard title="User Roles" data={rolePieData} />
+            <PieCard title="Engagement Breakdown" data={engagementPieData} />
+          </div>
+        </section>
+      )}
+
       {/* User Growth Chart */}
       {userGrowth ? (
         <section style={SECTION_STYLE}>
@@ -566,7 +473,26 @@ export default function AnalyticsTab() {
             {userGrowth.activeUsers} new user{userGrowth.activeUsers !== 1 ? 's' : ''} in this
             period
           </div>
-          <BarChart data={userGrowth.data} color="var(--sh-brand)" />
+          {!userGrowth.data || userGrowth.data.length === 0 ? (
+            <NoChartData />
+          ) : (
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={userGrowth.data}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--sh-border)" opacity={0.6} />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 11, fontFamily: FONT, fill: '#64748b' }}
+                  angle={-35}
+                  textAnchor="end"
+                  height={50}
+                  tickFormatter={(v) => v.slice(5)}
+                />
+                <YAxis tick={{ fontSize: 11, fontFamily: FONT, fill: '#64748b' }} allowDecimals={false} />
+                <Tooltip {...TOOLTIP_STYLE} />
+                <Bar dataKey="count" fill={CHART_COLORS.brand} radius={[4, 4, 0, 0]} name="Signups" />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </section>
       ) : null}
 
@@ -577,7 +503,30 @@ export default function AnalyticsTab() {
           <div style={SECTION_DESC}>
             Daily activity across posts, comments, stars, and reactions
           </div>
-          <EngagementChart engagement={engagement} />
+          {engagementChartData.length === 0 ? (
+            <NoChartData height={140} />
+          ) : (
+            <ResponsiveContainer width="100%" height={400}>
+              <BarChart data={engagementChartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--sh-border)" opacity={0.6} />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 11, fontFamily: FONT, fill: '#64748b' }}
+                  angle={-35}
+                  textAnchor="end"
+                  height={50}
+                  tickFormatter={(v) => v.slice(5)}
+                />
+                <YAxis tick={{ fontSize: 11, fontFamily: FONT, fill: '#64748b' }} allowDecimals={false} />
+                <Tooltip {...TOOLTIP_STYLE} />
+                <Legend wrapperStyle={{ fontSize: 12, fontFamily: FONT }} />
+                <Bar dataKey="posts" fill="#8b5cf6" radius={[4, 4, 0, 0]} name="Posts" />
+                <Bar dataKey="comments" fill={CHART_COLORS.blue} radius={[4, 4, 0, 0]} name="Comments" />
+                <Bar dataKey="stars" fill={CHART_COLORS.amber} radius={[4, 4, 0, 0]} name="Stars" />
+                <Bar dataKey="reactions" fill={CHART_COLORS.pink} radius={[4, 4, 0, 0]} name="Reactions" />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </section>
       ) : null}
 
@@ -594,43 +543,58 @@ export default function AnalyticsTab() {
             }}
           >
             <div>
-              <div
-                style={{
-                  fontSize: 13,
-                  fontWeight: 700,
-                  color: 'var(--sh-heading)',
-                  marginBottom: 10,
-                }}
-              >
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--sh-heading)', marginBottom: 10 }}>
                 Sheets
               </div>
-              <BarChart data={contentData.sheets} color="#059669" height={90} />
+              {!contentData.sheets || contentData.sheets.length === 0 ? (
+                <NoChartData height={200} />
+              ) : (
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={contentData.sheets}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--sh-border)" opacity={0.6} />
+                    <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={(v) => v.slice(5)} />
+                    <YAxis tick={{ fontSize: 10, fill: '#64748b' }} allowDecimals={false} />
+                    <Tooltip {...TOOLTIP_STYLE} />
+                    <Bar dataKey="count" fill={CHART_COLORS.green} radius={[3, 3, 0, 0]} name="Sheets" />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </div>
             <div>
-              <div
-                style={{
-                  fontSize: 13,
-                  fontWeight: 700,
-                  color: 'var(--sh-heading)',
-                  marginBottom: 10,
-                }}
-              >
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--sh-heading)', marginBottom: 10 }}>
                 Notes
               </div>
-              <BarChart data={contentData.notes} color="#0f766e" height={90} />
+              {!contentData.notes || contentData.notes.length === 0 ? (
+                <NoChartData height={200} />
+              ) : (
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={contentData.notes}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--sh-border)" opacity={0.6} />
+                    <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={(v) => v.slice(5)} />
+                    <YAxis tick={{ fontSize: 10, fill: '#64748b' }} allowDecimals={false} />
+                    <Tooltip {...TOOLTIP_STYLE} />
+                    <Bar dataKey="count" fill="#0f766e" radius={[3, 3, 0, 0]} name="Notes" />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </div>
             <div>
-              <div
-                style={{
-                  fontSize: 13,
-                  fontWeight: 700,
-                  color: 'var(--sh-heading)',
-                  marginBottom: 10,
-                }}
-              >
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--sh-heading)', marginBottom: 10 }}>
                 Feed Posts
               </div>
-              <BarChart data={contentData.feedPosts} color="#8b5cf6" height={90} />
+              {!contentData.feedPosts || contentData.feedPosts.length === 0 ? (
+                <NoChartData height={200} />
+              ) : (
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={contentData.feedPosts}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--sh-border)" opacity={0.6} />
+                    <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={(v) => v.slice(5)} />
+                    <YAxis tick={{ fontSize: 10, fill: '#64748b' }} allowDecimals={false} />
+                    <Tooltip {...TOOLTIP_STYLE} />
+                    <Bar dataKey="count" fill="#8b5cf6" radius={[3, 3, 0, 0]} name="Feed Posts" />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </div>
         </section>
