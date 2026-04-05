@@ -694,6 +694,17 @@ const reviewReadLimiter = rateLimit({
   message: { error: 'Too many review requests. Please slow down.' },
 })
 
+/**
+ * Review report generation — 5 requests per hour per user (AI call, expensive).
+ */
+const reviewReportGenerateLimiter = rateLimit({
+  windowMs: WINDOW_1_HOUR,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Report generation limit reached. Please try again later.' },
+})
+
 // ── Exports ────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -797,4 +808,5 @@ module.exports = {
   // Reviews module
   reviewSubmitLimiter,
   reviewReadLimiter,
+  reviewReportGenerateLimiter,
 }

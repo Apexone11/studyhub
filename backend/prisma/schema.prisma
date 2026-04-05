@@ -116,6 +116,7 @@ model User {
   subscriptionPauses         SubscriptionPause[]
   lastActiveAt               DateTime?
   userReviews                UserReview[]
+  generatedReviewReports     ReviewReport[]        @relation("ReviewReportGenerator")
 
   @@index([role])
   @@index([emailHash])
@@ -1682,5 +1683,28 @@ model UserReview {
 
   @@unique([userId]) // one review per user
   @@index([status, stars])
+  @@index([createdAt])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Review Reports — AI-generated weekly analysis of user reviews
+// ═══════════════════════════════════════════════════════════════════════════
+
+model ReviewReport {
+  id             Int      @id @default(autoincrement())
+  periodStart    DateTime // start of the review period
+  periodEnd      DateTime // end of the review period
+  reviewCount    Int      // number of reviews analyzed
+  averageStars   Float    // average star rating in the period
+  strengths      String   @db.Text // AI-identified strengths (JSON array)
+  weaknesses     String   @db.Text // AI-identified weaknesses (JSON array)
+  improvements   String   @db.Text // AI-suggested actionable improvements (JSON array)
+  rawAnalysis    String   @db.Text // full AI analysis text
+  generatedBy    Int?     // admin user who triggered generation
+  createdAt      DateTime @default(now())
+
+  generatedByUser User? @relation("ReviewReportGenerator", fields: [generatedBy], references: [id], onDelete: SetNull)
+
+  @@index([periodEnd])
   @@index([createdAt])
 }

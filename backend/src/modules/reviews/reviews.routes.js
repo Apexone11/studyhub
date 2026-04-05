@@ -12,10 +12,11 @@ const prisma = require('../../lib/prisma')
 const { captureError } = require('../../monitoring/sentry')
 const requireAuth = require('../../middleware/auth')
 const requireAdmin = require('../../middleware/requireAdmin')
-const { reviewSubmitLimiter, reviewReadLimiter } = require('../../lib/rateLimiters')
+const { reviewSubmitLimiter, reviewReadLimiter, reviewReportGenerateLimiter } = require('../../lib/rateLimiters')
 const { ERROR_CODES, sendError } = require('../../middleware/errorEnvelope')
 const { clampLimit, clampPage } = require('../../lib/constants')
 const { MAX_REVIEW_LENGTH, MIN_STARS, MAX_STARS } = require('./reviews.constants')
+const { generateReviewReport, listReviewReports, getReviewReport } = require('./reviews.service')
 
 const router = express.Router()
 
@@ -204,6 +205,60 @@ router.patch('/admin/:id', requireAuth, requireAdmin, async (req, res) => {
     })
 
     res.json(updated)
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── POST /admin/reports/generate — Trigger AI review report generation ────
+router.post('/admin/reports/generate', requireAuth, requireAdmin, reviewReportGenerateLimiter, async (req, res) => {
+  try {
+    const days = Number.parseInt(req.body?.days, 10) || 7
+
+    const report = await generateReviewReport({
+      days: Math.min(Math.max(days, 1), 90),
+      adminUserId: req.user.userId,
+    })
+
+    res.status(201).json(report)
+  } catch (err) {
+    if (err.message === 'No reviews found in the specified period.') {
+      return sendError(res, 400, err.message, ERROR_CODES.BAD_REQUEST)
+    }
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Failed to generate review report.' })
+  }
+})
+
+// ── GET /admin/reports — List all review reports ──────────────────────────
+router.get('/admin/reports', requireAuth, requireAdmin, reviewReadLimiter, async (req, res) => {
+  try {
+    const page = clampPage(req.query.page)
+    const limit = clampLimit(req.query.limit)
+
+    const result = await listReviewReports({ limit, page })
+    res.json(result)
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── GET /admin/reports/:id — Get a single review report ───────────────────
+router.get('/admin/reports/:id', requireAuth, requireAdmin, reviewReadLimiter, async (req, res) => {
+  try {
+    const reportId = Number.parseInt(req.params.id, 10)
+    if (!Number.isInteger(reportId)) {
+      return sendError(res, 400, 'Invalid report id.', ERROR_CODES.BAD_REQUEST)
+    }
+
+    const report = await getReviewReport(reportId)
+    if (!report) {
+      return sendError(res, 404, 'Report not found.', ERROR_CODES.NOT_FOUND)
+    }
+
+    res.json(report)
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
