@@ -24,6 +24,10 @@ const log = require('../../lib/logger')
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const { PLANS } = require('./payments.constants')
 const service = require('./payments.service')
+const {
+  paymentCheckoutLimiter,
+  paymentReadLimiter,
+} = require('../../lib/rateLimiters')
 
 const router = express.Router()
 
@@ -42,7 +46,7 @@ function generateCode(prefix, length = 8) {
 // ── REFERRAL CODES ──────────────────────────────────────────────────────
 
 // POST /referral/create — Create a referral code (any authenticated user)
-router.post('/referral/create', requireAuth, async (req, res) => {
+router.post('/referral/create', requireAuth, paymentCheckoutLimiter, async (req, res) => {
   try {
     const userId = req.user.userId
 
@@ -88,7 +92,7 @@ router.post('/referral/create', requireAuth, async (req, res) => {
 })
 
 // GET /referral/mine — Get current user's referral codes with stats
-router.get('/referral/mine', requireAuth, async (req, res) => {
+router.get('/referral/mine', requireAuth, paymentReadLimiter, async (req, res) => {
   try {
     const codes = await prisma.referralCode.findMany({
       where: { ownerId: req.user.userId },
@@ -118,7 +122,7 @@ router.get('/referral/mine', requireAuth, async (req, res) => {
 })
 
 // POST /referral/redeem — Redeem a referral code
-router.post('/referral/redeem', requireAuth, async (req, res) => {
+router.post('/referral/redeem', requireAuth, paymentCheckoutLimiter, async (req, res) => {
   try {
     const { code } = req.body
     const userId = req.user.userId
@@ -231,13 +235,33 @@ router.delete('/referral/:id', requireAuth, async (req, res) => {
 // ── GIFT SUBSCRIPTIONS ──────────────────────────────────────────────────
 
 // POST /gift/checkout — Purchase a gift subscription
-router.post('/gift/checkout', requireAuth, async (req, res) => {
+router.post('/gift/checkout', requireAuth, paymentCheckoutLimiter, async (req, res) => {
   try {
     const { recipientEmail, plan, durationMonths, message } = req.body
     const userId = req.user.userId
 
     if (!recipientEmail || typeof recipientEmail !== 'string') {
       return sendError(res, 400, 'Recipient email is required.', ERROR_CODES.VALIDATION)
+    }
+
+    const normalizedEmail = recipientEmail.trim().toLowerCase()
+
+    // Prevent gifting to yourself
+    const gifterUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true, username: true },
+    })
+    if (gifterUser?.email && gifterUser.email.toLowerCase() === normalizedEmail) {
+      return sendError(res, 400, 'You cannot gift a subscription to yourself.', ERROR_CODES.BAD_REQUEST)
+    }
+
+    // Limit gifts per day to prevent abuse (max 3 gifts per 24 hours)
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
+    const recentGiftCount = await prisma.giftSubscription.count({
+      where: { gifterId: userId, createdAt: { gte: oneDayAgo } },
+    })
+    if (recentGiftCount >= 3) {
+      return sendError(res, 429, 'You can send at most 3 gifts per day.', ERROR_CODES.RATE_LIMITED)
     }
 
     const validPlans = ['pro_monthly', 'pro_yearly']
@@ -251,12 +275,6 @@ router.post('/gift/checkout', requireAuth, async (req, res) => {
 
     const giftCode = generateCode('GIFT')
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
-
-    // Fetch email from DB (middleware auth doesn't include email)
-    const gifterUser = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { email: true, username: true },
-    })
 
     // Calculate amount: monthly price * duration months
     const stripe = service.getStripe()
@@ -321,7 +339,7 @@ router.post('/gift/checkout', requireAuth, async (req, res) => {
 })
 
 // POST /gift/redeem — Redeem a gift subscription code
-router.post('/gift/redeem', requireAuth, async (req, res) => {
+router.post('/gift/redeem', requireAuth, paymentCheckoutLimiter, async (req, res) => {
   try {
     const { code } = req.body
     const userId = req.user.userId
@@ -336,6 +354,11 @@ router.post('/gift/redeem', requireAuth, async (req, res) => {
 
     if (!gift || gift.status !== 'paid') {
       return sendError(res, 404, 'Invalid or already redeemed gift code.', ERROR_CODES.NOT_FOUND)
+    }
+
+    // Prevent redeeming your own gift
+    if (gift.gifterId === userId) {
+      return sendError(res, 400, 'You cannot redeem a gift you purchased yourself.', ERROR_CODES.BAD_REQUEST)
     }
 
     if (gift.expiresAt && gift.expiresAt < new Date()) {
@@ -391,7 +414,7 @@ router.post('/gift/redeem', requireAuth, async (req, res) => {
 })
 
 // GET /gift/mine — Get gifts sent by current user
-router.get('/gift/mine', requireAuth, async (req, res) => {
+router.get('/gift/mine', requireAuth, paymentReadLimiter, async (req, res) => {
   try {
     const gifts = await prisma.giftSubscription.findMany({
       where: { gifterId: req.user.userId },

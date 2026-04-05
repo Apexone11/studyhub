@@ -109,6 +109,7 @@ model User {
   commentReactions           CommentReaction[]
   feedPostCommentReactions   FeedPostCommentReaction[]
   noteCommentReactions       NoteCommentReaction[]
+  noteReactions              NoteReaction[]
   referralCodes              ReferralCode[]
   referralRedemptions        ReferralRedemption[]
   giftsSent                  GiftSubscription[]    @relation("GiftsSent")
@@ -378,9 +379,11 @@ model Note {
   updatedAt        DateTime      @updatedAt
   author           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   course           Course?       @relation(fields: [courseId], references: [id])
+  downloads        Int           @default(0)
   noteComments     NoteComment[]
   noteStars        NoteStar[]
   noteVersions     NoteVersion[]
+  noteReactions    NoteReaction[]
 }
 
 model NoteComment {
@@ -1597,6 +1600,17 @@ model NoteCommentReaction {
 
   @@id([userId, commentId])
   @@index([commentId, type])
+}
+
+model NoteReaction {
+  userId Int
+  noteId Int
+  type   String // "like" or "dislike"
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  note   Note   @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@id([userId, noteId])
+  @@index([noteId, type])
 }
 
 // ── Sprint E: Pro-level payment features ────────────────────────────────

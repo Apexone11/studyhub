@@ -218,4 +218,84 @@ router.post('/:id/images', requireAuth, mutateLimiter, requireVerifiedEmail, (re
   })
 })
 
+// ── POST /api/notes/:id/react — Like or dislike a note ──────────────────
+router.post('/:id/react', requireAuth, commentReactLimiter, async (req, res) => {
+  const noteId = parseInt(req.params.id, 10)
+  const userId = req.user.userId
+  const { type } = req.body || {}
+
+  if (!['like', 'dislike'].includes(type)) {
+    return res.status(400).json({ error: 'Type must be "like" or "dislike".' })
+  }
+
+  try {
+    const note = await prisma.note.findUnique({ where: { id: noteId }, select: { id: true, private: true } })
+    if (!note) return res.status(404).json({ error: 'Note not found.' })
+    if (note.private) return res.status(403).json({ error: 'Cannot react to private notes.' })
+
+    const existing = await prisma.noteReaction.findUnique({
+      where: { userId_noteId: { userId, noteId } },
+    })
+
+    if (existing) {
+      if (existing.type === type) {
+        // Same type -> remove
+        await prisma.noteReaction.delete({ where: { userId_noteId: { userId, noteId } } })
+      } else {
+        // Different type -> update
+        await prisma.noteReaction.update({
+          where: { userId_noteId: { userId, noteId } },
+          data: { type },
+        })
+      }
+    } else {
+      // Create new
+      await prisma.noteReaction.create({ data: { userId, noteId, type } })
+    }
+
+    // Get updated counts
+    const [likes, dislikes] = await Promise.all([
+      prisma.noteReaction.count({ where: { noteId, type: 'like' } }),
+      prisma.noteReaction.count({ where: { noteId, type: 'dislike' } }),
+    ])
+
+    const currentReaction = await prisma.noteReaction.findUnique({
+      where: { userId_noteId: { userId, noteId } },
+      select: { type: true },
+    })
+
+    res.json({
+      reactionCounts: { like: likes, dislike: dislikes },
+      userReaction: currentReaction?.type || null,
+    })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── POST /api/notes/:id/download — Track a note download ────────────────
+router.post('/:id/download', optionalAuth, readLimiter, async (req, res) => {
+  const noteId = parseInt(req.params.id, 10)
+  try {
+    const note = await prisma.note.findUnique({
+      where: { id: noteId },
+      select: { id: true, private: true, allowDownloads: true },
+    })
+    if (!note || note.private || !note.allowDownloads) {
+      return res.status(404).json({ error: 'Note not found or downloads not allowed.' })
+    }
+
+    await prisma.note.update({
+      where: { id: noteId },
+      data: { downloads: { increment: 1 } },
+    })
+
+    res.json({ message: 'Download tracked.' })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
 module.exports = router
