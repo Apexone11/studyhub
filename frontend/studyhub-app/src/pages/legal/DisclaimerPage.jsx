@@ -14,6 +14,15 @@ function DisclaimerPage() {
     const container = containerRef.current
     if (!container) return
 
+    // Dynamically load the Termly embed SDK if not already present
+    if (!document.getElementById('termly-jssdk')) {
+      const script = document.createElement('script')
+      script.id = 'termly-jssdk'
+      script.src = 'https://app.termly.io/embed.min.js'
+      script.setAttribute('data-auto-block', 'on')
+      document.body.appendChild(script)
+    }
+
     // Create the Termly embed div
     const embed = document.createElement('div')
     embed.setAttribute('name', 'termly-embed')
