@@ -77,6 +77,9 @@ function AnnouncementVideoPlayer({ video }) {
       controls
       playsInline
       preload="metadata"
+      controlsList="nodownload nofullscreen noremoteplayback"
+      disablePictureInPicture
+      onContextMenu={(e) => e.preventDefault()}
       style={{ width: '100%', display: 'block', borderRadius: 'var(--radius)', maxHeight: 400 }}
     />
   )

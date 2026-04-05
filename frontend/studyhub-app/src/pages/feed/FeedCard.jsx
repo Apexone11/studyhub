@@ -176,7 +176,9 @@ function FeedVideoPlayer({ video }) {
         controls
         playsInline
         preload="metadata"
-        controlsList={video.downloadable === false ? 'nodownload' : undefined}
+        controlsList={video.downloadable === false ? 'nodownload nofullscreen noremoteplayback' : undefined}
+        disablePictureInPicture={video.downloadable === false}
+        onContextMenu={video.downloadable === false ? (e) => e.preventDefault() : undefined}
         style={{ width: '100%', display: 'block', maxHeight: 500 }}
       />
       <div

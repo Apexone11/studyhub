@@ -286,6 +286,7 @@ async function streamMessage({ user, conversationId, content, currentPage, image
   let fullResponse = ''
   let totalInputTokens = 0
   let totalOutputTokens = 0
+  let wasTruncated = false
 
   try {
     const client = getClient()
@@ -337,6 +338,12 @@ async function streamMessage({ user, conversationId, content, currentPage, image
     const finalMessage = await stream.finalMessage()
     totalInputTokens = finalMessage?.usage?.input_tokens || 0
     totalOutputTokens = finalMessage?.usage?.output_tokens || 0
+
+    // Detect truncation: Claude stopped because it hit the token limit.
+    if (finalMessage?.stop_reason === 'max_tokens') {
+      wasTruncated = true
+      sendSSE(res, { type: 'truncated' })
+    }
   } catch (err) {
     // Abort errors from client disconnect are expected; don't report them.
     if (signal?.aborted) return
@@ -351,6 +358,9 @@ async function streamMessage({ user, conversationId, content, currentPage, image
 
   // 7. Save assistant response.
   const totalTokens = totalInputTokens + totalOutputTokens
+  const msgMetadata = isSheetRequest || wasTruncated
+    ? { ...(isSheetRequest ? { sheetGeneration: true } : {}), ...(wasTruncated ? { truncated: true } : {}) }
+    : undefined
   const assistantMsg = await prisma.aiMessage.create({
     data: {
       conversation: { connect: { id: conversationId } },
@@ -358,7 +368,7 @@ async function streamMessage({ user, conversationId, content, currentPage, image
       content: fullResponse,
       tokenCount: totalTokens,
       model: conversation.model || DEFAULT_MODEL,
-      metadata: isSheetRequest ? { sheetGeneration: true } : undefined,
+      metadata: msgMetadata,
     },
   })
 

@@ -4,9 +4,75 @@ import Navbar from '../../components/navbar/Navbar'
 import UserAvatar from '../../components/UserAvatar'
 import { API } from '../../config'
 
+// ── Inject premium keyframe animations ──────────────────────────────────
+
+function useInjectedStyles() {
+  useEffect(() => {
+    const STYLE_ID = 'supporters-premium-styles'
+    if (document.getElementById(STYLE_ID)) return
+
+    const style = document.createElement('style')
+    style.id = STYLE_ID
+    style.textContent = `
+      @keyframes gradientShift {
+        0%   { background-position: 0% 50%; }
+        50%  { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+      }
+      @keyframes float {
+        0%, 100% { transform: translateY(0); }
+        50%      { transform: translateY(-20px); }
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50%      { opacity: 0.7; }
+      }
+      @keyframes shimmer {
+        0%   { background-position: -200% 0; }
+        100% { background-position: 200% 0; }
+      }
+      @keyframes pulseGlow {
+        0%, 100% { box-shadow: 0 0 20px rgba(99,102,241,0.3); }
+        50%      { box-shadow: 0 0 40px rgba(139,92,246,0.5); }
+      }
+      @keyframes goldPulse {
+        0%, 100% { box-shadow: 0 0 20px rgba(255,215,0,0.3); }
+        50%      { box-shadow: 0 0 35px rgba(255,215,0,0.5); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+          animation-duration: 0s !important;
+          transition-duration: 0s !important;
+        }
+      }
+    `
+    document.head.appendChild(style)
+
+    return () => {
+      const existing = document.getElementById(STYLE_ID)
+      if (existing) existing.remove()
+    }
+  }, [])
+}
+
+// ── Particle configuration ──────────────────────────────────────────────
+
+const PARTICLES = [
+  { top: '12%', left: '8%', size: 6, opacity: 0.2, duration: '6s', delay: '0s' },
+  { top: '22%', right: '12%', size: 4, opacity: 0.15, duration: '7s', delay: '1s' },
+  { top: '60%', left: '15%', size: 8, opacity: 0.1, duration: '5s', delay: '0.5s' },
+  { top: '45%', right: '20%', size: 5, opacity: 0.25, duration: '8s', delay: '2s' },
+  { top: '75%', left: '30%', size: 4, opacity: 0.3, duration: '4s', delay: '1.5s' },
+  { top: '35%', right: '35%', size: 7, opacity: 0.12, duration: '6.5s', delay: '0.8s' },
+  { top: '80%', right: '10%', size: 5, opacity: 0.18, duration: '7.5s', delay: '3s' },
+  { top: '15%', left: '50%', size: 6, opacity: 0.22, duration: '5.5s', delay: '2.5s' },
+]
+
 // ── Main Component ───────────────────────────────────────────────────────
 
 export default function SupportersPage() {
+  useInjectedStyles()
+
   const [searchParams, setSearchParams] = useSearchParams()
   const [donors, setDonors] = useState([])
   const [subscribers, setSubscribers] = useState([])
@@ -64,20 +130,7 @@ export default function SupportersPage() {
 
       {/* ── Donation success banner ──────────────────── */}
       {paymentStatus === 'success' && (
-        <div
-          style={{
-            maxWidth: 700,
-            margin: '16px auto 0',
-            padding: '14px 20px',
-            borderRadius: 12,
-            background: 'var(--sh-success-bg)',
-            border: '1px solid var(--sh-success-border)',
-            color: 'var(--sh-success-text)',
-            fontSize: 14,
-            fontWeight: 600,
-            textAlign: 'center',
-          }}
-        >
+        <div style={s.successBanner}>
           Thank you for your donation! Your support helps keep StudyHub free for students
           everywhere.
         </div>
@@ -85,6 +138,24 @@ export default function SupportersPage() {
 
       {/* ── HERO ─────────────────────────────────────── */}
       <section style={s.hero}>
+        {PARTICLES.map((p, i) => (
+          <div
+            key={i}
+            style={{
+              position: 'absolute',
+              top: p.top,
+              left: p.left,
+              right: p.right,
+              width: p.size,
+              height: p.size,
+              borderRadius: '50%',
+              background: `rgba(255, 255, 255, ${p.opacity})`,
+              animation: `float ${p.duration} ease-in-out infinite`,
+              animationDelay: p.delay,
+              pointerEvents: 'none',
+            }}
+          />
+        ))}
         <div style={s.heroInner}>
           <h1 style={s.heroH1}>Our Supporters</h1>
           <p style={s.heroSub}>
@@ -152,7 +223,7 @@ export default function SupportersPage() {
 
           {/* ── CTA ──────────────────────────────────── */}
           <section style={s.ctaSection}>
-            <div style={s.ctaInner}>
+            <div style={s.ctaCard}>
               <img
                 src="/images/plan-donation.png"
                 alt="Support StudyHub"
@@ -187,14 +258,64 @@ export default function SupportersPage() {
 // ── Donor Card ───────────────────────────────────────────────────────────
 
 function DonorCard({ donor, rank }) {
+  const [hovered, setHovered] = useState(false)
   const isTop3 = rank <= 3
-  const rankColors = { 1: 'var(--sh-warning)', 2: 'var(--sh-slate-400)', 3: '#cd7f32' }
-  const rankColor = rankColors[rank] || 'var(--sh-muted)'
+
+  const glowStyles = {
+    1: {
+      boxShadow: hovered
+        ? '0 0 30px rgba(255, 215, 0, 0.5), inset 0 0 25px rgba(255, 215, 0, 0.08)'
+        : '0 0 20px rgba(255, 215, 0, 0.3), inset 0 0 20px rgba(255, 215, 0, 0.05)',
+      animation: 'goldPulse 3s ease-in-out infinite',
+    },
+    2: {
+      boxShadow: hovered
+        ? '0 0 30px rgba(192, 192, 192, 0.5)'
+        : '0 0 20px rgba(192, 192, 192, 0.3)',
+    },
+    3: {
+      boxShadow: hovered
+        ? '0 0 30px rgba(205, 127, 50, 0.5)'
+        : '0 0 20px rgba(205, 127, 50, 0.3)',
+    },
+  }
+
+  const rankBadgeStyles = {
+    1: {
+      background: 'linear-gradient(135deg, #ffd700, #ffaa00)',
+      color: '#1a1a2e',
+      border: 'none',
+    },
+    2: {
+      background: 'linear-gradient(135deg, #c0c0c0, #e8e8e8)',
+      color: '#1a1a2e',
+      border: 'none',
+    },
+    3: {
+      background: 'linear-gradient(135deg, #cd7f32, #e8a862)',
+      color: '#ffffff',
+      border: 'none',
+    },
+  }
+
+  const badgeStyle = rankBadgeStyles[rank] || {
+    background: 'var(--sh-soft)',
+    color: 'var(--sh-muted)',
+    border: 'none',
+  }
 
   return (
-    <div style={{ ...s.donorCard, ...(isTop3 ? s.donorCardTop : {}) }}>
+    <div
+      style={{
+        ...s.donorCard,
+        ...(isTop3 ? glowStyles[rank] : {}),
+        transform: hovered ? 'translateY(-2px)' : 'translateY(0)',
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
       <div style={s.donorRank}>
-        <span style={{ ...s.rankBadge, borderColor: rankColor, color: rankColor }}>#{rank}</span>
+        <span style={{ ...s.rankBadge, ...badgeStyle }}>#{rank}</span>
       </div>
       <Link to={`/users/${donor.username}`} style={s.donorAvatarLink}>
         <UserAvatar
@@ -222,6 +343,7 @@ function DonorCard({ donor, rank }) {
 // ── Subscriber Card ──────────────────────────────────────────────────────
 
 function SubscriberCard({ subscriber }) {
+  const [hovered, setHovered] = useState(false)
   const planLabel = subscriber.plan === 'pro_yearly' ? 'Yearly' : 'Monthly'
   const planImg =
     subscriber.plan === 'pro_yearly'
@@ -229,7 +351,18 @@ function SubscriberCard({ subscriber }) {
       : '/images/plan-pro-monthly.png'
 
   return (
-    <Link to={`/users/${subscriber.username}`} style={s.subCard}>
+    <Link
+      to={`/users/${subscriber.username}`}
+      style={{
+        ...s.subCard,
+        transform: hovered ? 'translateY(-4px)' : 'translateY(0)',
+        boxShadow: hovered
+          ? '0 8px 32px rgba(139, 92, 246, 0.2)'
+          : '0 2px 12px rgba(0, 0, 0, 0.04)',
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
       <UserAvatar
         username={subscriber.username}
         avatarUrl={subscriber.avatarUrl}
@@ -238,7 +371,7 @@ function SubscriberCard({ subscriber }) {
       />
       <div style={s.subInfo}>
         <span style={s.subName}>{subscriber.username}</span>
-        <span style={s.subPlan}>Pro {planLabel}</span>
+        <span style={s.subPlanShimmer}>Pro {planLabel}</span>
       </div>
       <img src={planImg} alt={`Pro ${planLabel}`} style={s.subPlanImg} />
     </Link>
@@ -250,7 +383,13 @@ function SubscriberCard({ subscriber }) {
 function EmptyState({ message, ctaTo, ctaLabel }) {
   return (
     <div style={s.emptyState}>
-      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" style={{ marginBottom: 12 }}>
+      <svg
+        width="48"
+        height="48"
+        viewBox="0 0 24 24"
+        fill="none"
+        style={{ marginBottom: 12, animation: 'pulse 2s ease-in-out infinite' }}
+      >
         <path
           d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
           fill="var(--sh-border)"
@@ -274,15 +413,35 @@ const s = {
     color: 'var(--sh-text)',
   },
 
+  /* Success banner */
+  successBanner: {
+    maxWidth: 700,
+    margin: '16px auto 0',
+    padding: '14px 20px',
+    borderRadius: 12,
+    background: 'var(--sh-success-bg)',
+    border: '1px solid var(--sh-success-border)',
+    color: 'var(--sh-success-text)',
+    fontSize: 14,
+    fontWeight: 600,
+    textAlign: 'center',
+  },
+
   /* Hero */
   hero: {
-    background: 'linear-gradient(135deg, var(--sh-success), var(--sh-brand))',
-    padding: '100px 20px 80px',
+    background: 'linear-gradient(135deg, #6366f1, #8b5cf6, #06b6d4, #6366f1)',
+    backgroundSize: '300% 300%',
+    animation: 'gradientShift 8s ease infinite',
+    padding: '120px 20px 100px',
+    position: 'relative',
+    overflow: 'hidden',
   },
   heroInner: {
     maxWidth: 720,
     margin: '0 auto',
     textAlign: 'center',
+    position: 'relative',
+    zIndex: 1,
   },
   heroH1: {
     fontSize: 'clamp(32px, 5vw, 48px)',
@@ -290,6 +449,7 @@ const s = {
     color: '#ffffff',
     margin: '0 0 16px',
     lineHeight: 1.2,
+    textShadow: '0 0 40px rgba(139, 92, 246, 0.5), 0 0 80px rgba(99, 102, 241, 0.3)',
   },
   heroSub: {
     fontSize: 17,
@@ -317,7 +477,7 @@ const s = {
   /* Sections */
   section: {
     padding: '64px 20px',
-    background: 'var(--sh-surface)',
+    background: 'transparent',
   },
   sectionAlt: {
     padding: '64px 20px',
@@ -353,13 +513,12 @@ const s = {
     alignItems: 'center',
     gap: 16,
     padding: '16px 20px',
-    background: 'var(--sh-surface)',
-    border: '1px solid var(--sh-border)',
+    background: 'rgba(255, 255, 255, 0.05)',
+    backdropFilter: 'blur(12px)',
+    WebkitBackdropFilter: 'blur(12px)',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
     borderRadius: 14,
-    transition: 'box-shadow 0.15s',
-  },
-  donorCardTop: {
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
+    transition: 'all 0.3s ease',
   },
   donorRank: {
     flexShrink: 0,
@@ -370,7 +529,6 @@ const s = {
     display: 'inline-block',
     fontSize: 14,
     fontWeight: 700,
-    border: '2px solid',
     borderRadius: 8,
     padding: '2px 8px',
     minWidth: 36,
@@ -420,11 +578,13 @@ const s = {
     alignItems: 'center',
     gap: 12,
     padding: '14px 16px',
-    background: 'var(--sh-surface)',
-    border: '1px solid var(--sh-border)',
+    background: 'rgba(255, 255, 255, 0.05)',
+    backdropFilter: 'blur(12px)',
+    WebkitBackdropFilter: 'blur(12px)',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
     textDecoration: 'none',
-    transition: 'box-shadow 0.15s',
+    transition: 'all 0.3s ease',
   },
   subInfo: {
     flex: 1,
@@ -439,12 +599,17 @@ const s = {
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
   },
-  subPlan: {
+  subPlanShimmer: {
     fontSize: 12,
-    color: 'var(--sh-info-text)',
     fontWeight: 600,
     marginTop: 2,
-    display: 'block',
+    display: 'inline-block',
+    background: 'linear-gradient(90deg, #8b5cf6 0%, #06b6d4 50%, #8b5cf6 100%)',
+    backgroundSize: '200% 100%',
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+    backgroundClip: 'text',
+    animation: 'shimmer 3s linear infinite',
   },
   subPlanImg: {
     width: 32,
@@ -458,8 +623,9 @@ const s = {
   emptyState: {
     textAlign: 'center',
     padding: '48px 20px',
-    background: 'var(--sh-soft)',
+    background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.06), rgba(139, 92, 246, 0.06))',
     borderRadius: 16,
+    border: '1px solid rgba(139, 92, 246, 0.15)',
   },
   emptyText: {
     fontSize: 15,
@@ -469,8 +635,8 @@ const s = {
   },
   emptyButton: {
     display: 'inline-block',
-    background: 'var(--sh-brand)',
-    color: 'var(--sh-nav-text)',
+    background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+    color: '#ffffff',
     padding: '10px 24px',
     borderRadius: 10,
     fontWeight: 600,
@@ -486,9 +652,15 @@ const s = {
     background: 'var(--sh-surface)',
     textAlign: 'center',
   },
-  ctaInner: {
+  ctaCard: {
     maxWidth: 560,
     margin: '0 auto',
+    padding: '48px 40px',
+    background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.1))',
+    backdropFilter: 'blur(8px)',
+    WebkitBackdropFilter: 'blur(8px)',
+    border: '1px solid rgba(139, 92, 246, 0.2)',
+    borderRadius: 24,
   },
   ctaTitle: {
     fontSize: 'clamp(22px, 3vw, 28px)',
@@ -504,30 +676,31 @@ const s = {
   },
   ctaButton: {
     display: 'inline-block',
-    background: 'var(--sh-brand)',
-    color: 'var(--sh-nav-text)',
+    background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+    color: '#ffffff',
     padding: '12px 32px',
     borderRadius: 10,
     fontWeight: 600,
     fontSize: 15,
     textDecoration: 'none',
     fontFamily: "'Plus Jakarta Sans', sans-serif",
-    transition: 'opacity 0.15s',
+    transition: 'all 0.3s ease',
     cursor: 'pointer',
+    animation: 'pulseGlow 3s ease-in-out infinite',
   },
   ctaButtonOutline: {
     display: 'inline-block',
     background: 'transparent',
-    color: 'var(--sh-brand)',
+    color: '#8b5cf6',
     padding: '11px 32px',
     borderRadius: 10,
     fontWeight: 600,
     fontSize: 15,
     textDecoration: 'none',
     fontFamily: "'Plus Jakarta Sans', sans-serif",
-    transition: 'opacity 0.15s',
+    transition: 'all 0.3s ease',
     cursor: 'pointer',
-    border: '1.5px solid var(--sh-brand)',
+    border: '1.5px solid rgba(139, 92, 246, 0.5)',
   },
 
   /* Footer */

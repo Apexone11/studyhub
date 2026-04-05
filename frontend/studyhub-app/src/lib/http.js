@@ -25,6 +25,36 @@ function dispatchAuthExpired() {
 
 const AUTH_ERROR_CODES = new Set(['AUTH_REQUIRED', 'AUTH_EXPIRED'])
 
+/**
+ * Only trigger auth-expired logout if the user actually had an active session.
+ * 401s from optional-auth endpoints (for-you, search, etc.) should not log out
+ * users who are genuinely authenticated -- those endpoints return 401 when
+ * req.user is not set, which can happen transiently.
+ */
+function handlePossibleAuthExpiry(response) {
+  // Only log out if the user currently has a stored session.
+  // If there's no stored user, 401 is expected (not logged in).
+  if (!getStoredUser()) return
+
+  // Check for explicit session-expired header from backend
+  const expiredHeader = response.headers.get('X-Session-Expired')
+  if (expiredHeader === 'true') {
+    dispatchAuthExpired()
+    return
+  }
+
+  // For /api/users/me endpoint, 401 definitively means session expired
+  const url = typeof response.url === 'string' ? response.url : ''
+  if (url.includes('/api/users/me') || url.includes('/api/auth/')) {
+    dispatchAuthExpired()
+    return
+  }
+
+  // For other endpoints, don't auto-logout -- the 401 might be from
+  // an optional-auth endpoint where the cookie wasn't sent or expired
+  // but the user's local session state is still valid.
+}
+
 export async function readJsonSafely(response, fallback = {}) {
   try {
     return await response.json()
@@ -135,14 +165,14 @@ export function installApiFetchShim() {
     if (input instanceof Request) {
       const response = await nativeFetch(new Request(input, nextInit))
       if (response.status === 401) {
-        dispatchAuthExpired()
+        handlePossibleAuthExpiry(response)
       }
       return response
     }
 
     const response = await nativeFetch(input, nextInit)
     if (response.status === 401) {
-      dispatchAuthExpired()
+      handlePossibleAuthExpiry(response)
     }
     return response
   }

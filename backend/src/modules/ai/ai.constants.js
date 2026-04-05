@@ -10,8 +10,8 @@ const FAST_MODEL = 'claude-haiku-4-5-20251001'
 
 /** Daily message limits by user status. Matches plan tiers in payments.constants.js. */
 const DAILY_LIMITS = {
-  default: 10,
-  verified: 20,
+  default: 30,
+  verified: 60,
   donor: 60,
   pro: 120,
   admin: 200,
@@ -36,7 +36,7 @@ const CONVERSATION_HISTORY_LIMIT = 20
 const MAX_OUTPUT_TOKENS_QA = 2048
 
 /** Max tokens for Claude output (sheet generation -- full HTML documents need more room). */
-const MAX_OUTPUT_TOKENS_SHEET = 12288
+const MAX_OUTPUT_TOKENS_SHEET = 16384
 
 /** API-level rate limit: requests per minute per user. */
 const AI_RATE_LIMIT_RPM = 10

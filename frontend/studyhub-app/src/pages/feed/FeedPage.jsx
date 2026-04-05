@@ -100,6 +100,7 @@ export default function FeedPage() {
   const visibleItems = useMemo(() => {
     if (activeFilter === 'all') return feedState.items
     if (activeFilter === 'videos') return feedState.items.filter((item) => item.video)
+    if (activeFilter === 'posts') return feedState.items.filter((item) => item.type === 'post' && !item.video)
     const nextType = activeFilter === 'announcements' ? 'announcement' : activeFilter.slice(0, -1)
     return feedState.items.filter((item) => item.type === nextType)
   }, [activeFilter, feedState.items])

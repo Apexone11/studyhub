@@ -18,6 +18,8 @@ export function SheetPreviewBar({ html, conversationTitle }) {
   const [showPreview, setShowPreview] = useState(false)
   const navigate = useNavigate()
 
+  const isIncomplete = (/<(!DOCTYPE|html)/i.test(html)) && !/<\/html>/i.test(html)
+
   const handleEditInLab = () => {
     // Pass the AI-generated HTML to the Sheet Lab via navigation state.
     // The Lab can read this from location.state and pre-fill the editor.
@@ -61,6 +63,21 @@ export function SheetPreviewBar({ html, conversationTitle }) {
           <IconPen size={14} /> Edit in Sheet Lab
         </button>
       </div>
+
+      {isIncomplete && (
+        <p style={{
+          margin: '6px 0 0',
+          fontSize: 12,
+          color: 'var(--sh-warning-text)',
+          background: 'var(--sh-warning-bg)',
+          border: '1px solid var(--sh-warning-border)',
+          borderRadius: 6,
+          padding: '5px 10px',
+          width: '100%',
+        }}>
+          This sheet may be incomplete due to length limits.
+        </p>
+      )}
 
       {showPreview && createPortal(
         <SheetPreviewModal html={html} onClose={() => setShowPreview(false)} />,

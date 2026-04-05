@@ -14,6 +14,7 @@
  */
 
 const { spawn } = require('child_process')
+const crypto = require('crypto')
 const fs = require('fs')
 const path = require('path')
 const os = require('os')
@@ -26,6 +27,28 @@ const {
   VIDEO_DURATION_LIMITS,
   MAX_VIDEO_DURATION,
 } = require('./video.constants')
+
+// ── Watermark position presets ──────────────────────────────────────────
+const WATERMARK_POSITIONS = {
+  'top-left':     { x: 'w*0.03', y: 'h*0.03' },
+  'top-right':    { x: 'w*0.97-tw', y: 'h*0.03' },
+  'bottom-left':  { x: 'w*0.03', y: 'h*0.95' },
+  'bottom-right': { x: 'w*0.97-tw', y: 'h*0.95' },
+}
+
+const WATERMARK_CORNERS = Object.keys(WATERMARK_POSITIONS)
+
+function pickRandomCorner() {
+  return WATERMARK_CORNERS[Math.floor(Math.random() * WATERMARK_CORNERS.length)]
+}
+
+function buildWatermarkFilter(username, position) {
+  const pos = WATERMARK_POSITIONS[position]
+  if (!pos) return null
+  // Escape special characters in username for ffmpeg drawtext
+  const safeUser = username.replace(/[\\':]/g, '\\$&')
+  return `drawtext=text='@${safeUser}':fontsize=h*0.03:fontcolor=white@0.4:shadowcolor=black@0.3:shadowx=1:shadowy=1:x=${pos.x}:y=${pos.y}`
+}
 
 // ── Temp directory for processing ────────────────────────────────────────
 const TEMP_DIR = path.join(os.tmpdir(), 'studyhub-video')
@@ -169,7 +192,7 @@ function generateThumbnail(inputPath, outputPath, timestamp = 3) {
  * @param {object} sourceInfo - { width, height } from probeVideo
  * @returns {Promise<string>} outputPath
  */
-function transcodeToPreset(inputPath, outputPath, preset, sourceInfo) {
+function transcodeToPreset(inputPath, outputPath, preset, sourceInfo, watermarkFilter = null) {
   return new Promise((resolve, reject) => {
     // Skip transcoding to a quality higher than the source
     if (sourceInfo.height < preset.height && sourceInfo.width < preset.width) {
@@ -192,7 +215,7 @@ function transcodeToPreset(inputPath, outputPath, preset, sourceInfo) {
       '-bufsize',
       String(parseInt(preset.videoBitrate) * 2) + 'k',
       '-vf',
-      `scale=${preset.width}:${preset.height}:force_original_aspect_ratio=decrease,pad=${preset.width}:${preset.height}:(ow-iw)/2:(oh-ih)/2`,
+      `scale=${preset.width}:${preset.height}:force_original_aspect_ratio=decrease,pad=${preset.width}:${preset.height}:(ow-iw)/2:(oh-ih)/2${watermarkFilter ? ',' + watermarkFilter : ''}`,
       // Audio encoding
       '-c:a',
       'aac',
@@ -278,6 +301,25 @@ async function processVideo(videoId) {
   const video = await prisma.video.findUnique({ where: { id: videoId } })
   if (!video) return
 
+  // Look up creator username for watermarking
+  let watermarkFilter = null
+  try {
+    const creator = await prisma.user.findUnique({
+      where: { id: video.userId },
+      select: { username: true },
+    })
+    if (creator) {
+      const watermarkPosition = pickRandomCorner()
+      watermarkFilter = buildWatermarkFilter(creator.username, watermarkPosition)
+      await prisma.video.update({
+        where: { id: videoId },
+        data: { watermarkPosition },
+      })
+    }
+  } catch {
+    // Non-fatal -- proceed without watermark
+  }
+
   const baseDir = path.join(TEMP_DIR, `v-${videoId}-${Date.now()}`)
   fs.mkdirSync(baseDir, { recursive: true })
 
@@ -336,6 +378,68 @@ async function processVideo(videoId) {
       body.on('error', reject)
       writeStream.on('finish', resolve)
     })
+
+    // Compute SHA-256 content hash for plagiarism detection
+    let contentHash = null
+    try {
+      const hashStream = fs.createReadStream(rawPath)
+      const hash = crypto.createHash('sha256')
+      await new Promise((resolve, reject) => {
+        hashStream.on('data', (chunk) => hash.update(chunk))
+        hashStream.on('end', resolve)
+        hashStream.on('error', reject)
+      })
+      contentHash = hash.digest('hex')
+
+      // Store hash immediately
+      await prisma.video.update({
+        where: { id: videoId },
+        data: { contentHash },
+      })
+
+      // Check for duplicate content from other users
+      const duplicate = await prisma.video.findFirst({
+        where: {
+          contentHash,
+          userId: { not: video.userId },
+          status: VIDEO_STATUS.READY,
+          id: { not: videoId },
+        },
+        include: {
+          user: { select: { id: true, username: true } },
+        },
+      })
+
+      if (duplicate) {
+        // Block this video
+        await prisma.video.update({
+          where: { id: videoId },
+          data: { status: 'blocked' },
+        })
+
+        // Notify the original creator
+        try {
+          await prisma.notification.create({
+            data: {
+              userId: duplicate.userId,
+              type: 'video_copy_detected',
+              message: `Someone attempted to upload a copy of your video "${duplicate.title || 'Untitled'}"`,
+              actorId: video.userId,
+              linkPath: '/feed?filter=videos',
+              priority: 'high',
+            },
+          })
+        } catch {
+          // Non-fatal
+        }
+
+        cleanup(baseDir)
+        return // Stop processing -- video is blocked
+      }
+    } catch (hashErr) {
+      captureError(hashErr, { context: 'video-content-hash', videoId })
+      // Non-fatal -- proceed without hash
+    }
 
     // 2. Probe metadata
     await updateProgress('analyzing', 15)
@@ -413,7 +517,7 @@ async function processVideo(videoId) {
       try {
         const outPath = path.join(baseDir, `${quality}.mp4`)
         await updateProgress(`transcoding ${quality}`, pct)
-        const result = await transcodeToPreset(rawPath, outPath, preset, metadata)
+        const result = await transcodeToPreset(rawPath, outPath, preset, metadata, watermarkFilter)
         if (result === null) continue // Source too small for this preset
 
         const variantKey = r2.generateVariantKey(video.r2Key, quality)
