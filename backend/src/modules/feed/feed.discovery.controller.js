@@ -218,7 +218,8 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
       return res.status(401).json({ error: 'Authentication required.' })
     }
 
-    const userId = req.user.userId
+    const userId = req.user?.userId
+    if (!userId) return res.status(401).json({ error: 'Authentication required.' })
     const cacheKey = `for-you:${userId}`
     const cached = cache.get(cacheKey)
     if (cached) {
@@ -239,7 +240,7 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
     } catch {
       blockedIds = []
     }
-    const excludeUserIds = new Set([userId, ...blockedIds].filter(Boolean))
+    const excludeUserIds = new Set([userId, ...blockedIds].filter((id) => id != null && id !== undefined))
 
     // Get starred sheets
     const starredIds = await prisma.starredSheet.findMany({
@@ -317,7 +318,7 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
         ? prisma.enrollment.findMany({
             where: {
               courseId: { in: courseIds },
-              userId: { notIn: [...excludeUserIds] },
+              userId: { notIn: [...excludeUserIds].filter((id) => id != null) },
             },
             select: {
               userId: true,

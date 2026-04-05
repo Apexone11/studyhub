@@ -601,10 +601,10 @@ function CommentItem({ comment, user, onDelete, onReact, onReply, isReply = fals
       <div key={comment.id} data-comment-id={comment.id} style={{ ...commentItemStyle, ...(isReply ? { marginLeft: '32px', marginTop: '12px', paddingLeft: '12px', borderLeft: '2px solid var(--sh-border)' } : {}) }}>
         {comment.author?.username ? (
           <Link to={`/users/${comment.author.username}`} style={{ textDecoration: 'none', flexShrink: 0 }}>
-            <Avatar username={comment.author.username} role="student" size={28} />
+            <Avatar username={comment.author.username} avatarUrl={comment.author.avatarUrl} size={28} />
           </Link>
         ) : (
-          <Avatar username="?" role="student" size={28} />
+          <Avatar username="?" size={28} />
         )}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={commentHeaderStyle}>

@@ -38,7 +38,7 @@ router.get('/posts/:id/comments', async (req, res) => {
         prisma.feedPostComment.findMany({
           where: { postId, parentId: null },
           include: {
-            author: { select: { id: true, username: true } },
+            author: { select: { id: true, username: true, avatarUrl: true } },
             reactions: {
               select: { userId: true, type: true },
             },
@@ -47,7 +47,7 @@ router.get('/posts/:id/comments', async (req, res) => {
             },
             replies: {
               include: {
-                author: { select: { id: true, username: true } },
+                author: { select: { id: true, username: true, avatarUrl: true } },
                 reactions: {
                   select: { userId: true, type: true },
                 },
@@ -159,7 +159,7 @@ router.post('/posts/:id/comments', requireAuth, commentLimiter, async (req, res)
         } : undefined,
       },
       include: {
-        author: { select: { id: true, username: true } },
+        author: { select: { id: true, username: true, avatarUrl: true } },
         attachments: { select: { id: true, url: true, type: true, name: true } },
       },
     })

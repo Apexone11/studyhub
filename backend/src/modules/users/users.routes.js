@@ -80,6 +80,12 @@ router.get('/me/follow-requests', requireAuth, usersController.getFollowRequests
 // ── PATCH /api/users/me/privacy ─────────────────────────────────
 router.patch('/me/privacy', requireAuth, usersController.updatePrivacy)
 
+// ── PATCH /api/users/me/account-type ───────────────────────────
+router.patch('/me/account-type', requireAuth, usersController.requestAccountTypeChange)
+
+// ── GET /api/users/me/account-type-status ──────────────────────
+router.get('/me/account-type-status', requireAuth, usersController.getAccountTypeStatus)
+
 // ── GET /api/users/:username ───────────────────────────────────
 router.get('/:username', optionalAuth, usersController.getUserByUsername)
 

@@ -30,6 +30,8 @@ model User {
   googleId                String?   @unique
   authProvider            String    @default("local")
   accountType             String    @default("student")
+  pendingAccountType      String?
+  accountTypeChangedAt    DateTime?
   termsAcceptedVersion    String?
   termsAcceptedAt         DateTime?
   isPrivate               Boolean   @default(false)

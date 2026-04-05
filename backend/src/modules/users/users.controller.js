@@ -1028,4 +1028,111 @@ module.exports = {
   unmuteUser,
   getTermsStatus,
   acceptTerms,
+  requestAccountTypeChange,
+  getAccountTypeStatus,
+}
+
+// ── Account type change with 7-day cooldown ──────────────────────
+
+const VALID_ACCOUNT_TYPES = ['student', 'teacher', 'other']
+const ACCOUNT_TYPE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
+
+async function requestAccountTypeChange(req, res) {
+  try {
+    const { accountType } = req.body || {}
+    if (!accountType || !VALID_ACCOUNT_TYPES.includes(accountType)) {
+      return res.status(400).json({ error: `Account type must be one of: ${VALID_ACCOUNT_TYPES.join(', ')}` })
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: { accountType: true, pendingAccountType: true, accountTypeChangedAt: true },
+    })
+    if (!user) return res.status(404).json({ error: 'User not found.' })
+
+    if (user.accountType === accountType) {
+      return res.status(400).json({ error: 'You already have this account type.' })
+    }
+
+    // Check cooldown: if changed within last 7 days, reject
+    if (user.accountTypeChangedAt) {
+      const elapsed = Date.now() - new Date(user.accountTypeChangedAt).getTime()
+      if (elapsed < ACCOUNT_TYPE_COOLDOWN_MS) {
+        const remainingMs = ACCOUNT_TYPE_COOLDOWN_MS - elapsed
+        const remainingDays = Math.ceil(remainingMs / (24 * 60 * 60 * 1000))
+        return res.status(429).json({
+          error: `You can only change your account type once every 7 days. Please wait ${remainingDays} more day${remainingDays === 1 ? '' : 's'}.`,
+          cooldownEndsAt: new Date(new Date(user.accountTypeChangedAt).getTime() + ACCOUNT_TYPE_COOLDOWN_MS).toISOString(),
+        })
+      }
+    }
+
+    // Set the pending type and schedule the change
+    const changeAt = new Date(Date.now() + ACCOUNT_TYPE_COOLDOWN_MS)
+
+    await prisma.user.update({
+      where: { id: req.user.userId },
+      data: {
+        pendingAccountType: accountType,
+        accountTypeChangedAt: new Date(), // marks when the request was made
+      },
+    })
+
+    res.json({
+      message: `Account type change to "${accountType}" requested. It will take effect in 7 days.`,
+      pendingAccountType: accountType,
+      effectiveAt: changeAt.toISOString(),
+    })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+}
+
+async function getAccountTypeStatus(req, res) {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: { accountType: true, pendingAccountType: true, accountTypeChangedAt: true },
+    })
+    if (!user) return res.status(404).json({ error: 'User not found.' })
+
+    // Check if pending change should be applied
+    if (user.pendingAccountType && user.accountTypeChangedAt) {
+      const elapsed = Date.now() - new Date(user.accountTypeChangedAt).getTime()
+      if (elapsed >= ACCOUNT_TYPE_COOLDOWN_MS) {
+        // Apply the change
+        const updated = await prisma.user.update({
+          where: { id: req.user.userId },
+          data: {
+            accountType: user.pendingAccountType,
+            pendingAccountType: null,
+          },
+          select: { accountType: true, pendingAccountType: true, accountTypeChangedAt: true },
+        })
+        return res.json({
+          accountType: updated.accountType,
+          pendingAccountType: null,
+          effectiveAt: null,
+          cooldownEndsAt: updated.accountTypeChangedAt
+            ? new Date(new Date(updated.accountTypeChangedAt).getTime() + ACCOUNT_TYPE_COOLDOWN_MS).toISOString()
+            : null,
+        })
+      }
+    }
+
+    res.json({
+      accountType: user.accountType,
+      pendingAccountType: user.pendingAccountType || null,
+      effectiveAt: user.pendingAccountType && user.accountTypeChangedAt
+        ? new Date(new Date(user.accountTypeChangedAt).getTime() + ACCOUNT_TYPE_COOLDOWN_MS).toISOString()
+        : null,
+      cooldownEndsAt: user.accountTypeChangedAt
+        ? new Date(new Date(user.accountTypeChangedAt).getTime() + ACCOUNT_TYPE_COOLDOWN_MS).toISOString()
+        : null,
+    })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
 }
