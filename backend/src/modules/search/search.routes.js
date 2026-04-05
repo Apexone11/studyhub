@@ -224,7 +224,8 @@ router.get('/', optionalAuth, async (req, res) => {
       sections.push(timedSection('users-skip', () => []))
     }
 
-    if (wantNotes) {
+    if (wantNotes && req.user) {
+      // Notes are only searchable by authenticated users
       sections.push(
         timedSection('notes', () =>
           prisma.note.findMany({

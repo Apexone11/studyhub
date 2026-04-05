@@ -374,7 +374,7 @@ export default function NoteEditor({
             const printWin = window.open('', '_blank', 'width=800,height=600')
             if (!printWin) return
             // For the rich editor, content is already HTML
-            const exportHtml = editorContent || '<p>No content to export.</p>'
+            const exportHtml = DOMPurify.sanitize(editorContent || '<p>No content to export.</p>')
             const safeTitle = (editorTitle || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
             printWin.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${safeTitle || 'Note'}</title><style>
 body { font-family: 'Plus Jakarta Sans', -apple-system, sans-serif; max-width: 700px; margin: 40px auto; padding: 0 24px; color: #1e293b; line-height: 1.7; }

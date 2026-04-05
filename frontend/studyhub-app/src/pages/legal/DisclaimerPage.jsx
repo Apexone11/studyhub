@@ -1,5 +1,6 @@
 import LegalPageLayout, { LegalSection } from '../../components/LegalPageLayout'
 import { IconInfoCircle } from '../../components/Icons'
+import { LEGAL_EMAILS } from '../../lib/legalConstants'
 
 function DisclaimerPage() {
   return (
@@ -15,6 +16,10 @@ function DisclaimerPage() {
         <p>
           This disclaimer outlines the limitations of liability for StudyHub and its content.
           For full details, please review the disclaimer below.
+        </p>
+        <p>
+          For legal inquiries, contact{' '}
+          <a href={`mailto:${LEGAL_EMAILS.legal}`} style={{ color: 'var(--sh-brand)', textDecoration: 'none' }}>{LEGAL_EMAILS.legal}</a>.
         </p>
         <iframe
           src="https://app.termly.io/policy-viewer/policy.html?policyUUID=55c02c39-21be-41cf-a1aa-a8ae0181e69b"

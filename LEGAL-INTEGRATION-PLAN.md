@@ -315,6 +315,109 @@ In `backend/src/modules/users/` (or a new `backend/src/modules/legal/` module):
 
 ---
 
+## Part 7: Trademark Registration (Post-Copyright)
+
+### Status
+- USPTO trademark search on "StudyHub" returned **zero results** (no live or dead marks in any class) as of April 4, 2026.
+- The name is clear for federal trademark registration.
+
+### What to Do
+File a trademark application through the USPTO Trademark Electronic Application System (TEAS) at https://www.uspto.gov/trademarks.
+
+### Classes to Register
+- **Class 9** -- Computer software (covers the StudyHub web application itself)
+- **Class 41** -- Education and entertainment services (covers the educational/study collaboration service)
+
+### Filing Details
+- **Application type:** TEAS Plus ($250/class) or TEAS Standard ($350/class)
+  - TEAS Plus is cheaper but requires selecting from pre-approved descriptions of goods/services
+  - Recommended: TEAS Plus if the descriptions fit, otherwise TEAS Standard
+- **Mark type:** Standard character mark (text only: "StudyHub")
+- **Filing basis:** Section 1(a) -- Use in commerce (the platform is already live at getstudyhub.org)
+- **Specimen:** Screenshot of getstudyhub.org showing the StudyHub name in use (e.g., homepage or login page)
+- **Date of first use:** The date getstudyhub.org first went live to the public
+- **Date of first use in commerce:** Same date (it's accessible to anyone on the internet)
+- **Owner:** Abdul Rahman Fornah (individual) -- same as copyright claimant
+- **Estimated cost:** $250-$350 per class, so $500-$700 total for both classes
+
+### Goods/Services Description Examples
+- Class 9: "Downloadable and non-downloadable computer software for collaborative study and educational content sharing"
+- Class 41: "Providing an online platform for collaborative study, educational resource sharing, and student community engagement"
+
+### Timeline
+- USPTO review takes 3-4 months for initial examination
+- If approved, the mark publishes for 30-day opposition period
+- If no opposition, registration certificate issues ~3 months later
+- Total: roughly 8-12 months from filing to registration
+
+### When to Do This
+- After completing the eCO copyright registration
+- Not urgent -- common law trademark rights already exist from using the name in commerce
+- Federal registration adds: nationwide priority, right to use the (r) symbol, ability to record with US Customs, stronger legal presumptions
+
+---
+
+## Part 8: Legal Contact Emails
+
+### Email Aliases (all configured in Google Workspace, forwarding to abdulrfornah@getstudyhub.org)
+
+| Email | Purpose |
+|---|---|
+| `privacy@getstudyhub.org` | Privacy inquiries, data requests, GDPR/CCPA questions |
+| `legal@getstudyhub.org` | General legal inquiries, terms questions, disputes |
+| `dmca@getstudyhub.org` | DMCA takedown notices, copyright infringement reports |
+
+### Where Each Email Must Appear
+
+#### privacy@getstudyhub.org
+1. **Privacy Policy page** (`PrivacyPage.jsx`) -- in the "Contact Us" or "Data Protection" section as the primary contact for privacy concerns
+2. **Data Request page** (`DataRequestPage.jsx`) -- above the DSAR iframe as an alternative: "You can also email us directly at privacy@getstudyhub.org"
+3. **Cookie Policy page** (`CookiePolicyPage.jsx`) -- in a contact section for cookie-related questions
+4. **Settings > Legal tab** (`LegalTab.jsx`) -- in a "Privacy Contact" card or "Contact Us" section
+5. **AppFooter.jsx** -- optional, but recommended as a subtle link
+6. **Registration Legal Acceptance Modal** -- at the bottom of the Privacy Policy tab content
+
+#### legal@getstudyhub.org
+1. **Terms of Use page** (`TermsPage.jsx`) -- in the contact/disputes section as the primary contact for legal matters
+2. **Disclaimer page** (`DisclaimerPage.jsx`) -- as the contact for disclaimer-related questions
+3. **Settings > Legal tab** (`LegalTab.jsx`) -- in the "Contact Us" section alongside privacy email
+4. **Community Guidelines page** (`GuidelinesPage.jsx`) -- for reporting concerns or appealing moderation decisions
+
+#### dmca@getstudyhub.org
+1. **Terms of Use page** (`TermsPage.jsx`) -- in the DMCA/Copyright section: "To report copyright infringement, email dmca@getstudyhub.org"
+2. **DMCA notice instructions** -- if a dedicated DMCA page or section exists, this is the primary contact
+3. **Settings > Legal tab** (`LegalTab.jsx`) -- in the "Contact Us" section
+4. **Study sheet pages** -- anywhere a user can report content, include a link or reference to dmca@getstudyhub.org for copyright claims
+
+### Settings > Legal Tab -- Contact Section Layout
+
+In `LegalTab.jsx`, add a "Legal Contacts" card at the bottom (after all document cards and the DSAR card):
+
+```
+Legal Contacts
+---
+Privacy Inquiries & Data Requests    privacy@getstudyhub.org
+General Legal Questions               legal@getstudyhub.org
+DMCA & Copyright Notices              dmca@getstudyhub.org
+```
+
+Each email should be a clickable `mailto:` link. Style the card consistently with the other cards in the Legal tab. Use `var(--sh-slate-*)` tokens for text colors.
+
+### Implementation Notes
+- All email addresses must be rendered as `<a href="mailto:privacy@getstudyhub.org">privacy@getstudyhub.org</a>` (not plain text)
+- Use consistent wording across all pages. For example, always say "For privacy inquiries, contact us at" followed by the email link
+- Do not hardcode the email strings in every file. Create a shared constants object in `frontend/studyhub-app/src/lib/legalConstants.js`:
+  ```js
+  export const LEGAL_EMAILS = {
+    privacy: 'privacy@getstudyhub.org',
+    legal: 'legal@getstudyhub.org',
+    dmca: 'dmca@getstudyhub.org',
+  }
+  ```
+  Import from this file everywhere so if an email ever changes, it only needs updating in one place.
+
+---
+
 ## Summary Checklist
 
 ### Registration
@@ -362,6 +465,18 @@ In `backend/src/modules/users/` (or a new `backend/src/modules/legal/` module):
 - [ ] Add terms-outdated banner to app shell (similar to email verification banner)
 - [ ] Create `AppFooter.jsx` for authenticated pages
 - [ ] Re-run Termly site scan after consent banner is installed
+
+### Legal Contact Emails
+- [ ] Add all three email aliases to the correct pages (see Part 8 below)
+- [ ] Add "Contact Us" section to Settings > Legal tab with all three emails
+- [ ] Verify emails render as clickable `mailto:` links everywhere they appear
+
+### Trademark Registration (after copyright is done)
+- [x] Search USPTO for "StudyHub" -- confirmed clear (zero results, April 4 2026)
+- [ ] File TEAS application for Class 9 (computer software)
+- [ ] File TEAS application for Class 41 (education services)
+- [ ] Prepare specimen: screenshot of getstudyhub.org showing the name in use
+- [ ] Submit filing fee ($250-$350 per class)
 
 ---
 

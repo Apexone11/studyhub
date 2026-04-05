@@ -758,34 +758,6 @@ const unmuteUser = async (req, res) => {
   }
 }
 
-module.exports = {
-  getMyActivity,
-  getActivityByUsername,
-  getMyBadges,
-  getBadgesByUsername,
-  getMyPinnedSheets,
-  addPinnedSheet,
-  deletePinnedSheet,
-  reorderPinnedSheets,
-  getUserByUsername,
-  followUser,
-  unfollowUser,
-  getFollowers,
-  getFollowing,
-  getMyStreak,
-  getMyWeeklyActivity,
-  getMe,
-  getFollowSuggestions,
-  getBlockedUsers,
-  getMutedUsers,
-  blockUser,
-  unblockUser,
-  muteUser,
-  unmuteUser,
-  getTermsStatus,
-  acceptTerms,
-}
-
 // ── GET /api/users/me/terms-status ──────────────────────────────
 const CURRENT_TERMS_VERSION = '2026-04-04'
 
@@ -828,4 +800,32 @@ const acceptTerms = async (req, res) => {
     captureError(err, { route: req.originalUrl })
     res.status(500).json({ error: 'Server error.' })
   }
+}
+
+module.exports = {
+  getMyActivity,
+  getActivityByUsername,
+  getMyBadges,
+  getBadgesByUsername,
+  getMyPinnedSheets,
+  addPinnedSheet,
+  deletePinnedSheet,
+  reorderPinnedSheets,
+  getUserByUsername,
+  followUser,
+  unfollowUser,
+  getFollowers,
+  getFollowing,
+  getMyStreak,
+  getMyWeeklyActivity,
+  getMe,
+  getFollowSuggestions,
+  getBlockedUsers,
+  getMutedUsers,
+  blockUser,
+  unblockUser,
+  muteUser,
+  unmuteUser,
+  getTermsStatus,
+  acceptTerms,
 }

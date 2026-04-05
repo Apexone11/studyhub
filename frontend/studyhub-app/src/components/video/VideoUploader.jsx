@@ -82,13 +82,14 @@ export default function VideoUploader({
       setPreview(url)
       setFile(selectedFile)
 
-      // Check video duration via a temporary video element
+      // Check video duration via a temporary video element (separate URL to avoid revoking preview)
+      const metadataUrl = URL.createObjectURL(selectedFile)
       const tempVideo = document.createElement('video')
       tempVideo.preload = 'metadata'
       tempVideo.onloadedmetadata = () => {
         const durationMin = tempVideo.duration / 60
         setVideoDuration(Math.round(durationMin * 10) / 10)
-        URL.revokeObjectURL(tempVideo.src)
+        URL.revokeObjectURL(metadataUrl)
         if (durationMin > limits.durationMin) {
           setValidationError(
             `Video is ${Math.round(durationMin)} minutes, which exceeds your ${getTierLabel(userTier)} limit of ${limits.durationMin} minutes. ` +
@@ -96,7 +97,7 @@ export default function VideoUploader({
           )
         }
       }
-      tempVideo.src = url
+      tempVideo.src = metadataUrl
 
       // Default title from filename
       if (!title) {

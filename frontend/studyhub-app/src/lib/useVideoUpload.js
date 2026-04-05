@@ -13,7 +13,7 @@ import { useState, useRef, useCallback } from 'react'
 import { API } from '../config'
 
 const CHUNK_SIZE = 2 * 1024 * 1024 // 2 MB — Railway HTTP/2 proxy rejects bodies larger than ~2 MB
-const MAX_VIDEO_SIZE = 500 * 1024 * 1024 // 500 MB
+const MAX_VIDEO_SIZE_DEFAULT = 1.5 * 1024 * 1024 * 1024 // 1.5 GB (Pro tier max -- actual limit enforced by VideoUploader per tier)
 const ALLOWED_TYPES = new Set(['video/mp4', 'video/webm', 'video/quicktime'])
 const ALLOWED_EXTENSIONS = new Set(['.mp4', '.webm', '.mov'])
 
@@ -107,8 +107,8 @@ export default function useVideoUpload() {
         return null
       }
 
-      if (file.size > MAX_VIDEO_SIZE) {
-        setError(`File too large. Maximum is ${MAX_VIDEO_SIZE / (1024 * 1024)} MB.`)
+      if (file.size > MAX_VIDEO_SIZE_DEFAULT) {
+        setError(`File too large. Maximum upload size is ${Math.round(MAX_VIDEO_SIZE_DEFAULT / (1024 * 1024))} MB.`)
         setStatus(STATUS.ERROR)
         return null
       }

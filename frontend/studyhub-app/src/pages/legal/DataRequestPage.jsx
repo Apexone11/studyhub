@@ -1,5 +1,6 @@
 import LegalPageLayout, { LegalSection } from '../../components/LegalPageLayout'
 import { IconShieldCheck } from '../../components/Icons'
+import { LEGAL_EMAILS } from '../../lib/legalConstants'
 
 function DataRequestPage() {
   return (
@@ -16,6 +17,10 @@ function DataRequestPage() {
           Under privacy laws including CCPA and GDPR, you have the right to request access
           to your personal data, ask for corrections, or request deletion. Use the form below
           to submit your request. We will respond within 24 hours.
+        </p>
+        <p>
+          You can also email us directly at{' '}
+          <a href={`mailto:${LEGAL_EMAILS.privacy}`} style={{ color: 'var(--sh-brand)', textDecoration: 'none' }}>{LEGAL_EMAILS.privacy}</a>.
         </p>
         <iframe
           src="https://app.termly.io/dsar/af795fa7-a3b0-41e4-b342-8797a0194d55"

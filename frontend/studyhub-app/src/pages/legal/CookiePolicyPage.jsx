@@ -1,5 +1,6 @@
 import LegalPageLayout, { LegalSection } from '../../components/LegalPageLayout'
 import { IconShield } from '../../components/Icons'
+import { LEGAL_EMAILS } from '../../lib/legalConstants'
 
 function CookiePolicyPage() {
   return (
@@ -15,6 +16,10 @@ function CookiePolicyPage() {
         <p>
           This policy explains how StudyHub uses cookies and similar tracking technologies.
           For full details, please review the policy below.
+        </p>
+        <p>
+          For cookie-related questions, contact{' '}
+          <a href={`mailto:${LEGAL_EMAILS.privacy}`} style={{ color: 'var(--sh-brand)', textDecoration: 'none' }}>{LEGAL_EMAILS.privacy}</a>.
         </p>
         <iframe
           src="https://app.termly.io/policy-viewer/policy.html?policyUUID=49c5d88c-ee36-4bbb-bde7-6c641a540268"

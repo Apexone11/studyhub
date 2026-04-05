@@ -43,7 +43,12 @@ async function getNoteById(req, res) {
 
     if (!note) return res.status(404).json({ error: 'Note not found.' })
 
-    const isOwner = req.user && (req.user.userId === note.userId || req.user.role === 'admin')
+    // Notes require authentication to view
+    if (!req.user) {
+      return res.status(401).json({ error: 'Sign in to view notes.' })
+    }
+
+    const isOwner = req.user.userId === note.userId || req.user.role === 'admin'
 
     // Private notes: only owner/admin can see
     if (note.private && !isOwner) {

@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { API } from '../../config'
 import { CURRENT_TERMS_VERSION } from '../../lib/legalVersions'
+import { LEGAL_EMAILS } from '../../lib/legalConstants'
 import { SectionCard, Button, Message } from './settingsShared'
 import { FONT } from './settingsState'
 
@@ -50,7 +51,7 @@ export default function LegalTab() {
     return () => { active = false }
   }, [])
 
-  const isTermsCurrent = termsStatus?.termsAcceptedVersion === CURRENT_TERMS_VERSION
+  const isTermsCurrent = termsStatus?.acceptedVersion === CURRENT_TERMS_VERSION
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -201,6 +202,35 @@ export default function LegalTab() {
               </Button>
             </Link>
           </div>
+        </div>
+      </SectionCard>
+
+      {/* Section 4: Legal Contacts */}
+      <SectionCard title="Legal Contacts" subtitle="Reach our legal and privacy teams directly.">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {[
+            { label: 'Privacy Inquiries & Data Requests', email: LEGAL_EMAILS.privacy },
+            { label: 'General Legal Questions', email: LEGAL_EMAILS.legal },
+            { label: 'DMCA & Copyright Notices', email: LEGAL_EMAILS.dmca },
+          ].map(({ label, email }) => (
+            <div key={email} style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: '12px 16px', borderRadius: 10,
+              background: 'var(--sh-bg)', border: '1px solid var(--sh-border)',
+              flexWrap: 'wrap', gap: 8,
+            }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--sh-text)' }}>{label}</span>
+              <a
+                href={`mailto:${email}`}
+                style={{
+                  fontSize: 13, fontWeight: 700, color: 'var(--sh-brand)',
+                  textDecoration: 'none', fontFamily: FONT,
+                }}
+              >
+                {email}
+              </a>
+            </div>
+          ))}
         </div>
       </SectionCard>
     </div>

@@ -449,7 +449,7 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
   } catch (err) {
     captureError(err, { route: req.originalUrl })
     console.error('[for-you] Feed error:', err.message)
-    res.status(500).json({ error: `For You error: ${err.message}` })
+    res.status(500).json({ error: 'Could not load personalized content. Please try again.' })
   }
 })
 

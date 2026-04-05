@@ -5,6 +5,7 @@
  * Designed to be unobtrusive with small text and muted colors.
  */
 import { Link } from 'react-router-dom'
+import { LEGAL_EMAILS } from '../lib/legalConstants'
 
 const FOOTER_LINKS = [
   { label: 'Terms', to: '/terms' },
@@ -52,6 +53,19 @@ export default function AppFooter() {
             </Link>
           </span>
         ))}
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ color: 'var(--sh-muted)', opacity: 0.5 }} aria-hidden="true">·</span>
+          <a
+            href={`mailto:${LEGAL_EMAILS.privacy}`}
+            style={{
+              color: 'var(--sh-muted)',
+              textDecoration: 'none',
+              fontWeight: 500,
+            }}
+          >
+            Contact
+          </a>
+        </span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
           <span style={{ color: 'var(--sh-muted)', opacity: 0.5 }} aria-hidden="true">·</span>
           <a
