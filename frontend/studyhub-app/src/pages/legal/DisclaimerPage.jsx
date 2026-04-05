@@ -1,6 +1,7 @@
 import LegalPageLayout, { LegalSection } from '../../components/LegalPageLayout'
 import { IconInfoCircle } from '../../components/Icons'
 import { LEGAL_EMAILS } from '../../lib/legalConstants'
+import { POLICY_URLS } from '../../lib/legalVersions'
 
 function DisclaimerPage() {
   return (
@@ -22,7 +23,7 @@ function DisclaimerPage() {
           <a href={`mailto:${LEGAL_EMAILS.legal}`} style={{ color: 'var(--sh-brand)', textDecoration: 'none' }}>{LEGAL_EMAILS.legal}</a>.
         </p>
         <iframe
-          src="https://app.termly.io/policy-viewer/policy.html?policyUUID=55c02c39-21be-41cf-a1aa-a8ae0181e69b"
+          src={POLICY_URLS.disclaimer}
           style={{ width: '100%', minHeight: 600, border: 'none', borderRadius: 8 }}
           title="Disclaimer"
         />

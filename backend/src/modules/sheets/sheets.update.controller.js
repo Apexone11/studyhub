@@ -2,7 +2,6 @@ const express = require('express')
 const prisma = require('../../core/db/prisma')
 const { captureError } = require('../../core/monitoring/sentry')
 const requireAuth = require('../../core/auth/requireAuth')
-const { assertOwnerOrAdmin } = require('../../lib/accessControl')
 const { cleanupAttachmentIfUnused } = require('../../lib/storage')
 const { validateHtmlForSubmission } = require('../../lib/html/htmlSecurity')
 const { isModerationEnabled, scanContent } = require('../../lib/moderation/moderationEngine')
@@ -23,7 +22,7 @@ const router = express.Router()
 
 router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
   const sheetId = Number.parseInt(req.params.id, 10)
-  const { title, description, content, courseId, allowDownloads, removeAttachment } = req.body || {}
+  const { title, description, content, courseId, allowDownloads, allowEditing, removeAttachment } = req.body || {}
 
   try {
     const sheet = await prisma.studySheet.findUnique({
@@ -36,18 +35,26 @@ router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
         contentFormat: true,
         status: true,
         attachmentUrl: true,
+        allowEditing: true,
       },
     })
 
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
-    if (!assertOwnerOrAdmin({
-      res,
-      user: req.user,
-      ownerId: sheet.userId,
-      message: 'Not your sheet.',
-      targetType: 'sheet',
-      targetId: sheetId,
-    })) return
+    const isOwnerOrAdmin = req.user.role === 'admin' || req.user.userId === sheet.userId
+    if (!isOwnerOrAdmin && !sheet.allowEditing) {
+      return res.status(403).json({ error: 'The owner has disabled editing on this sheet.' })
+    }
+    if (!isOwnerOrAdmin) {
+      // Non-owners with editing permission can only update content fields,
+      // not metadata like allowDownloads, allowEditing, status, courseId, or removeAttachment.
+      const restricted = ['allowDownloads', 'allowEditing', 'status', 'courseId', 'removeAttachment']
+      const body = req.body || {}
+      for (const key of restricted) {
+        if (Object.hasOwn(body, key)) {
+          return res.status(403).json({ error: 'Only the owner can change sheet settings.' })
+        }
+      }
+    }
 
     const data = {}
     const requestedContentFormat = req.body && Object.hasOwn(req.body, 'contentFormat')
@@ -76,6 +83,9 @@ router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
     }
     if (typeof allowDownloads === 'boolean') {
       data.allowDownloads = allowDownloads
+    }
+    if (typeof allowEditing === 'boolean') {
+      data.allowEditing = allowEditing
     }
     if (removeAttachment === true) {
       data.attachmentUrl = null

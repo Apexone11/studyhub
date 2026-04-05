@@ -978,16 +978,16 @@ const getTermsStatus = async (req, res) => {
 // ── POST /api/users/me/terms-accept ─────────────────────────────
 const acceptTerms = async (req, res) => {
   try {
-    const version = typeof req.body?.version === 'string' ? req.body.version.trim() : CURRENT_TERMS_VERSION
+    // Always use server's current version -- ignore client-provided version to prevent bypass
     await prisma.user.update({
       where: { id: req.user.userId },
       data: {
-        termsAcceptedVersion: version,
+        termsAcceptedVersion: CURRENT_TERMS_VERSION,
         termsAcceptedAt: new Date(),
       },
     })
     res.json({
-      acceptedVersion: version,
+      acceptedVersion: CURRENT_TERMS_VERSION,
       acceptedAt: new Date(),
       currentVersion: CURRENT_TERMS_VERSION,
       needsUpdate: false,

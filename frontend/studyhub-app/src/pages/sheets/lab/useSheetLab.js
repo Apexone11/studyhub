@@ -82,11 +82,11 @@ export default function useSheetLab() {
     reloadSheet()
   }, [sheetId, reloadSheet])
 
-  // Route guard: non-owners of non-published sheets get redirected
+  // Route guard: non-owners of non-published sheets get redirected (unless editing is allowed)
   useEffect(() => {
     if (!sheet || !user) return
     const owns = user.role === 'admin' || user.id === sheet.userId
-    if (!owns && sheet.status !== 'published') {
+    if (!owns && sheet.status !== 'published' && !sheet.allowEditing) {
       showToast("You can\u2019t edit this sheet directly. Go back and click \u2018Make your own copy\u2019 to get started.", 'error')
       navigate(`/sheets/${sheetId}`, { replace: true })
     }
@@ -104,7 +104,8 @@ export default function useSheetLab() {
         setActiveTab(urlTab)
       } else {
         const owns = user.role === 'admin' || user.id === sheet.userId
-        setActiveTab(owns ? 'editor' : 'history')
+        const canEditAsNonOwner = !owns && sheet.allowEditing === true
+        setActiveTab(owns || canEditAsNonOwner ? 'editor' : 'history')
       }
     }
   }, [sheet, user, searchParams])

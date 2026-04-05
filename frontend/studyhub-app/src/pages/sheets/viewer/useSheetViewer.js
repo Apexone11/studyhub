@@ -512,6 +512,13 @@ export default function useSheetViewer() {
     }
   }
 
+  const handleSheetUpdate = useCallback((patch) => {
+    setSheetState((current) => ({
+      ...current,
+      sheet: current.sheet ? { ...current.sheet, ...patch } : current.sheet,
+    }))
+  }, [])
+
   return {
     user,
     sheet,
@@ -556,5 +563,6 @@ export default function useSheetViewer() {
     studyStatus,
     setStudyStatus,
     STUDY_STATUSES,
+    handleSheetUpdate,
   }
 }

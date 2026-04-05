@@ -26,8 +26,9 @@ marked.setOptions({ breaks: true, gfm: true })
 function isMarkdown(content) {
   if (!content || !content.trim()) return false
   const trimmed = content.trim()
-  // If it contains no HTML tags at all, treat as markdown
-  if (!/<[a-z][\s\S]*>/i.test(trimmed)) return true
+  // Detect actual HTML tags (not autolinks like <https://...> or <user@email>)
+  // Match tags like <p>, <div>, <h1>, <br/>, etc. but not <http or <mailto
+  if (!/<[a-z][a-z0-9-]*[\s>/]/i.test(trimmed) || /^<https?:\/\//.test(trimmed)) return true
   // If it starts with common markdown patterns, treat as markdown
   if (/^[#*\-+>`|![]/.test(trimmed)) return true
   return false

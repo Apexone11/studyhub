@@ -78,6 +78,7 @@ function serializeSheet(sheet, { starred = false, reactions = null, commentCount
     ...sheet,
     starred,
     allowDownloads: sheet.allowDownloads !== false,
+    allowEditing: sheet.allowEditing === true,
     hasAttachment: Boolean(sheet.attachmentUrl),
     attachmentName: sheet.attachmentName || null,
     attachmentUrl: null,

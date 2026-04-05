@@ -225,6 +225,7 @@ model StudySheet {
   attachmentType         String?
   attachmentName         String?
   allowDownloads         Boolean      @default(true)
+  allowEditing           Boolean      @default(false)
   contentHash            String?
   contentSimhash         String?
   createdAt              DateTime     @default(now())

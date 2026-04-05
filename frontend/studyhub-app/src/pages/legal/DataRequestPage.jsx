@@ -1,6 +1,7 @@
 import LegalPageLayout, { LegalSection } from '../../components/LegalPageLayout'
 import { IconShieldCheck } from '../../components/Icons'
 import { LEGAL_EMAILS } from '../../lib/legalConstants'
+import { TERMLY_DSAR_URL } from '../../lib/legalVersions'
 
 function DataRequestPage() {
   return (
@@ -23,7 +24,7 @@ function DataRequestPage() {
           <a href={`mailto:${LEGAL_EMAILS.privacy}`} style={{ color: 'var(--sh-brand)', textDecoration: 'none' }}>{LEGAL_EMAILS.privacy}</a>.
         </p>
         <iframe
-          src="https://app.termly.io/dsar/af795fa7-a3b0-41e4-b342-8797a0194d55"
+          src={TERMLY_DSAR_URL}
           style={{ width: '100%', minHeight: 700, border: 'none', borderRadius: 8 }}
           title="Data Subject Access Request Form"
         />

@@ -1,6 +1,7 @@
 import LegalPageLayout, { LegalSection } from '../../components/LegalPageLayout'
 import { IconShield } from '../../components/Icons'
 import { LEGAL_EMAILS } from '../../lib/legalConstants'
+import { POLICY_URLS } from '../../lib/legalVersions'
 
 function CookiePolicyPage() {
   return (
@@ -22,7 +23,7 @@ function CookiePolicyPage() {
           <a href={`mailto:${LEGAL_EMAILS.privacy}`} style={{ color: 'var(--sh-brand)', textDecoration: 'none' }}>{LEGAL_EMAILS.privacy}</a>.
         </p>
         <iframe
-          src="https://app.termly.io/policy-viewer/policy.html?policyUUID=49c5d88c-ee36-4bbb-bde7-6c641a540268"
+          src={POLICY_URLS.cookies}
           style={{ width: '100%', minHeight: 600, border: 'none', borderRadius: 8 }}
           title="Cookie Policy"
         />

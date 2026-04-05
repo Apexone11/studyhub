@@ -207,11 +207,13 @@ export function AccountStep({ form, setField, loading, onSubmit, onGoogleSuccess
       <LegalAcceptanceModal
         open={showLegalModal}
         onAccept={() => {
+          setError('')
           setField('termsAccepted', true)
           setShowLegalModal(false)
         }}
         onDecline={() => {
           setShowLegalModal(false)
+          setError('You must accept the Terms of Use, Privacy Policy, and Community Guidelines to register.')
         }}
       />
 

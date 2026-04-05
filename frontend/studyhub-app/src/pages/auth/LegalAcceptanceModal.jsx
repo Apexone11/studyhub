@@ -196,6 +196,7 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
         padding: 16,
       }}
       onClick={(e) => {
+        // Backdrop click closes but does not count as explicit decline
         if (e.target === e.currentTarget) onDecline()
       }}
     >

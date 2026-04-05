@@ -12,9 +12,9 @@ export const COMPOSER_PROMPTS = [
 
 /* ── Style objects ───────────────────────────────────────────────────── */
 export const commentSectionContainerStyle = {
-  marginTop: 14,
+  marginTop: 16,
   borderTop: '1px solid var(--sh-border)',
-  paddingTop: 12,
+  paddingTop: 16,
 }
 export const commentToggleButtonStyle = {
   display: 'inline-flex',
@@ -128,16 +128,17 @@ export function actionButton(color) {
   return {
     display: 'inline-flex',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
     borderRadius: 999,
     border: '1px solid var(--sh-border)',
     background: 'var(--sh-surface)',
     color,
     padding: '6px 12px',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: 700,
     cursor: 'pointer',
     fontFamily: FONT,
+    transition: 'background 0.15s, border-color 0.15s',
   }
 }
 
@@ -145,13 +146,13 @@ export function linkButton() {
   return {
     display: 'inline-flex',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
     borderRadius: 999,
     border: '1px solid transparent',
     background: 'var(--sh-brand-soft)',
     color: 'var(--sh-brand-hover)',
     padding: '6px 12px',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: 700,
     textDecoration: 'none',
   }
@@ -161,12 +162,12 @@ export function pillStyle() {
   return {
     display: 'inline-flex',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
     borderRadius: 999,
     background: 'var(--sh-soft)',
     border: '1px solid var(--sh-border)',
     padding: '6px 12px',
-    fontSize: 12,
+    fontSize: 13,
     color: 'var(--sh-subtext)',
     fontWeight: 700,
   }
