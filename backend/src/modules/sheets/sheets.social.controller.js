@@ -475,7 +475,7 @@ router.patch('/:id/comments/:commentId', requireAuth, commentLimiter, async (req
 
     res.json(updated)
   } catch (err) {
-    console.error('Edit sheet comment error:', err)
+    captureError(err, { route: req.originalUrl, method: req.method })
     sendError(res, 500, 'Failed to edit comment.', ERROR_CODES.INTERNAL)
   }
 })
