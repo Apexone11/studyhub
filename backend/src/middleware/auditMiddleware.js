@@ -22,6 +22,10 @@ const AUDIT_ROUTES = [
   // Fork
   { method: 'POST',   pattern: '/api/sheets/',  suffix: '/fork', event: AUDIT_EVENTS.SHEET_FORK },
 
+  // Comments
+  { method: 'POST',   pattern: '/api/sheets/',  suffix: '/comments', event: AUDIT_EVENTS.COMMENT_CREATE },
+  { method: 'DELETE', pattern: '/api/sheets/',  suffix: '/comments/', event: AUDIT_EVENTS.COMMENT_DELETE },
+
   // Contributions
   { method: 'POST',   pattern: '/api/sheets/',  suffix: '/contributions', event: AUDIT_EVENTS.CONTRIBUTION_CREATE },
   { method: 'PATCH',  pattern: '/api/sheets/contributions/',    event: AUDIT_EVENTS.CONTRIBUTION_ACCEPT }, // accept/reject
@@ -41,6 +45,11 @@ const AUDIT_ROUTES = [
   { method: 'POST',   pattern: '/api/auth/logout',              event: AUDIT_EVENTS.AUTH_LOGOUT },
   { method: 'PATCH',  pattern: '/api/auth/password',            event: AUDIT_EVENTS.AUTH_PASSWORD_CHANGE },
   { method: 'DELETE', pattern: '/api/auth/account',             event: AUDIT_EVENTS.AUTH_ACCOUNT_DELETE },
+
+  // Settings
+  { method: 'PATCH',  pattern: '/api/settings/password',        event: AUDIT_EVENTS.SETTINGS_PASSWORD_CHANGE },
+  { method: 'PATCH',  pattern: '/api/settings/username',        event: AUDIT_EVENTS.SETTINGS_PROFILE_UPDATE },
+  { method: 'PATCH',  pattern: '/api/settings/account-type',    event: AUDIT_EVENTS.SETTINGS_PROFILE_UPDATE },
 ]
 
 /**

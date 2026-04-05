@@ -907,12 +907,17 @@ model AuditLog {
   targetUserId Int?
   route        String?
   method       String?
+  resource     String?
+  resourceId   Int?
+  details      Json?
+  ipAddress    String?
   createdAt    DateTime @default(now())
 
   @@index([event])
   @@index([actorId])
   @@index([targetUserId])
   @@index([createdAt])
+  @@index([resource])
 }
 
 // ── PII Vault (envelope-encrypted sensitive data) ───────────
