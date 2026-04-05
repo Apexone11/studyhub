@@ -6,5 +6,6 @@ module.exports = defineConfig({
     setupFiles: ['./test/setup.js'],
     restoreMocks: true,
     clearMocks: true,
+    exclude: ['**/node_modules/**', '**/.claude/worktrees/**'],
   },
 })

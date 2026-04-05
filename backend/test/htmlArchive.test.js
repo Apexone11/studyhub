@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { archiveExpiredOriginalVersions } from '../src/lib/htmlArchive'
+import { archiveExpiredOriginalVersions } from '../src/lib/html/htmlArchive'
 
 describe('htmlArchive', () => {
   it('archives expired original versions and marks sheet metadata', async () => {

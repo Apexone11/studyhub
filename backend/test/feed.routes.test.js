@@ -449,7 +449,10 @@ describe('feed routes', () => {
           content: 'Comment 1',
           postId: 10,
           createdAt: new Date(),
-          author: { id: 42, username: 'test_user' },
+          author: { id: 42, username: 'test_user', avatarUrl: null },
+          reactions: [],
+          attachments: [],
+          replies: [],
         },
       ])
       mocks.prisma.feedPostComment.count.mockResolvedValue(1)

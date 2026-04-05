@@ -104,6 +104,9 @@ const mocks = vi.hoisted(() => {
     note: {
       findMany: vi.fn(),
     },
+    studyGroup: {
+      findMany: vi.fn(),
+    },
   }
 
   return {
@@ -118,6 +121,12 @@ const mocks = vi.hoisted(() => {
         return session
       }),
     },
+    rateLimiters: {
+      searchLimiter: (_req, _res, next) => next(),
+    },
+    blockFilter: {
+      getBlockedUserIds: vi.fn().mockResolvedValue([]),
+    },
     sentry: {
       captureError: vi.fn(),
     },
@@ -128,6 +137,8 @@ const mockTargets = new Map([
   [require.resolve('../src/lib/prisma'), mocks.prisma],
   [require.resolve('../src/lib/authTokens'), mocks.authTokens],
   [require.resolve('../src/monitoring/sentry'), mocks.sentry],
+  [require.resolve('../src/lib/rateLimiters'), mocks.rateLimiters],
+  [require.resolve('../src/lib/social/blockFilter'), mocks.blockFilter],
 ])
 
 const originalModuleLoad = Module._load
@@ -219,6 +230,7 @@ beforeEach(() => {
       }))
   })
   mocks.prisma.note.findMany.mockResolvedValue([])
+  mocks.prisma.studyGroup.findMany.mockResolvedValue([])
 })
 
 describe('search routes', () => {
@@ -305,19 +317,15 @@ describe('search routes', () => {
     expect(noteCall?.where?.private).toBe(false)
   })
 
-  it('does not return notes for unauthenticated search (notes still query-safe)', async () => {
-    mocks.prisma.note.findMany.mockResolvedValue([
-      { id: 302, title: 'Public Note', createdAt: new Date(), course: null, author: { id: 1, username: 'anon_author' } },
-    ])
-
+  it('does not return notes for unauthenticated search', async () => {
     const response = await request(app)
       .get('/')
       .query({ q: 'Public Note', type: 'all' })
 
-    // Notes are still returned because the where clause enforces private:false
+    // Notes are skipped for unauthenticated users
     expect(response.status).toBe(200)
     expect(response.body.results.notes).toBeDefined()
-    expect(response.body.results.notes[0].title).toBe('Public Note')
+    expect(response.body.results.notes).toHaveLength(0)
   })
 
   it('does not expose note content in search results', async () => {

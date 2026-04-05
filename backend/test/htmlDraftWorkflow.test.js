@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeHtmlChecksum, normalizeFindings } from '../src/lib/htmlDraftWorkflow'
+import { computeHtmlChecksum, normalizeFindings } from '../src/lib/html/htmlDraftWorkflow'
 
 describe('htmlDraftWorkflow helpers', () => {
   it('generates stable checksum for identical content', () => {

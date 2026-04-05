@@ -24,6 +24,12 @@ const mocks = vi.hoisted(() => {
     starredSheet: {
       findMany: vi.fn(),
     },
+    studySheet: {
+      count: vi.fn(),
+    },
+    userPinnedSheet: {
+      findMany: vi.fn(),
+    },
     userPreferences: {
       findMany: vi.fn(),
     },
@@ -48,6 +54,25 @@ const mocks = vi.hoisted(() => {
     notify: {
       createNotification: vi.fn(),
     },
+    profileVisibility: {
+      getProfileAccessDecision: vi.fn().mockResolvedValue({ allowed: true, visibility: 'public' }),
+      PROFILE_VISIBILITY: { PUBLIC: 'public', ENROLLED: 'enrolled', PRIVATE: 'private' },
+    },
+    userBadges: {
+      enrichUserWithBadges: vi.fn((user) => Promise.resolve({ ...user, plan: 'free', isDonor: false, donorLevel: null })),
+      enrichUsersWithBadges: vi.fn((users) => Promise.resolve(users)),
+    },
+    badges: {
+      checkAndAwardBadges: vi.fn(),
+    },
+    streaks: {
+      getUserStreak: vi.fn().mockResolvedValue({ currentStreak: 0, longestStreak: 0 }),
+      getWeeklyActivity: vi.fn().mockResolvedValue({ daysActive: 0, goal: 5, goalMet: false }),
+    },
+    rateLimiters: {
+      readLimiter: (_req, _res, next) => next(),
+      usersFollowLimiter: (_req, _res, next) => next(),
+    },
   }
 })
 
@@ -57,6 +82,11 @@ const mockTargets = new Map([
   [require.resolve('../src/lib/authTokens'), mocks.authTokens],
   [require.resolve('../src/monitoring/sentry'), mocks.sentry],
   [require.resolve('../src/lib/notify'), mocks.notify],
+  [require.resolve('../src/lib/profileVisibility'), mocks.profileVisibility],
+  [require.resolve('../src/lib/userBadges'), mocks.userBadges],
+  [require.resolve('../src/lib/badges'), mocks.badges],
+  [require.resolve('../src/lib/streaks'), mocks.streaks],
+  [require.resolve('../src/lib/rateLimiters'), mocks.rateLimiters],
 ])
 
 const originalModuleLoad = Module._load
@@ -96,11 +126,15 @@ beforeEach(() => {
 
   mocks.prisma.note.findMany.mockResolvedValue([])
   mocks.prisma.starredSheet.findMany.mockResolvedValue([])
+  mocks.prisma.studySheet.count.mockResolvedValue(0)
+  mocks.prisma.userPinnedSheet.findMany.mockResolvedValue([])
   mocks.prisma.userPreferences.findMany.mockResolvedValue([])
   mocks.prisma.enrollment.findMany.mockResolvedValue([])
   mocks.prisma.userFollow.findUnique.mockResolvedValue(null)
   mocks.prisma.userFollow.count.mockResolvedValue(0)
   mocks.notify.createNotification.mockResolvedValue({})
+  mocks.profileVisibility.getProfileAccessDecision.mockResolvedValue({ allowed: true, visibility: 'public' })
+  mocks.userBadges.enrichUserWithBadges.mockImplementation((user) => Promise.resolve({ ...user, plan: 'free', isDonor: false, donorLevel: null }))
 })
 
 describe('users routes', () => {
@@ -111,13 +145,16 @@ describe('users routes', () => {
         username: 'profile_user',
         role: 'student',
         avatarUrl: null,
+        coverImageUrl: null,
+        isPrivate: false,
         createdAt: new Date('2026-01-01'),
-        _count: { studySheets: 3, followers: 5, following: 2 },
         enrollments: [],
         studySheets: [
           { id: 1, title: 'Sheet 1', createdAt: new Date(), course: null },
         ],
       })
+      mocks.prisma.userFollow.count.mockResolvedValue(5)
+      mocks.prisma.studySheet.count.mockResolvedValue(3)
       mocks.prisma.note.findMany.mockResolvedValue([
         { id: 1, title: 'Note 1', updatedAt: new Date(), course: null },
       ])
@@ -142,8 +179,6 @@ describe('users routes', () => {
         id: 10,
         username: 'profile_user',
         sheetCount: 3,
-        followerCount: 5,
-        followingCount: 2,
         isFollowing: false,
       })
       expect(response.body.recentSheets).toHaveLength(1)
@@ -166,14 +201,16 @@ describe('users routes', () => {
         username: 'private_user',
         role: 'student',
         avatarUrl: null,
+        coverImageUrl: null,
+        isPrivate: false,
         createdAt: new Date(),
-        _count: { studySheets: 0, followers: 0, following: 0 },
         enrollments: [],
         studySheets: [],
       })
-      mocks.prisma.userPreferences.findMany.mockResolvedValue([
-        { userId: 99, profileVisibility: 'private' },
-      ])
+      mocks.profileVisibility.getProfileAccessDecision.mockResolvedValue({
+        allowed: false,
+        visibility: 'private',
+      })
 
       const response = await request(app).get('/private_user')
 
@@ -187,16 +224,16 @@ describe('users routes', () => {
         username: 'enrolled_user',
         role: 'student',
         avatarUrl: null,
+        coverImageUrl: null,
+        isPrivate: false,
         createdAt: new Date(),
-        _count: { studySheets: 0, followers: 0, following: 0 },
         enrollments: [],
         studySheets: [],
       })
-      mocks.prisma.userPreferences.findMany.mockResolvedValue([
-        { userId: 88, profileVisibility: 'enrolled' },
-      ])
-      // No shared enrollments
-      mocks.prisma.enrollment.findMany.mockResolvedValue([])
+      mocks.profileVisibility.getProfileAccessDecision.mockResolvedValue({
+        allowed: false,
+        visibility: 'enrolled',
+      })
 
       const response = await request(app).get('/enrolled_user')
 
@@ -212,8 +249,10 @@ describe('users routes', () => {
       mocks.prisma.user.findUnique.mockResolvedValue({
         id: 10,
         username: 'target_user',
-        _count: { followers: 5 },
+        isPrivate: false,
       })
+      // findUnique for existing follow check returns null (no existing follow)
+      mocks.prisma.userFollow.findUnique.mockResolvedValue(null)
       mocks.prisma.userFollow.create.mockResolvedValue({})
       mocks.prisma.userFollow.count.mockResolvedValue(6)
 
@@ -222,7 +261,7 @@ describe('users routes', () => {
       expect(response.status).toBe(200)
       expect(response.body).toMatchObject({ following: true, followerCount: 6 })
       expect(mocks.prisma.userFollow.create).toHaveBeenCalledWith({
-        data: { followerId: 42, followingId: 10 },
+        data: { followerId: 42, followingId: 10, status: 'active' },
       })
       expect(mocks.notify.createNotification).toHaveBeenCalled()
     })
@@ -231,7 +270,7 @@ describe('users routes', () => {
       mocks.prisma.user.findUnique.mockResolvedValue({
         id: 42,
         username: 'test_user',
-        _count: { followers: 0 },
+        isPrivate: false,
       })
 
       const response = await request(app).post('/test_user/follow')
@@ -254,11 +293,14 @@ describe('users routes', () => {
       mocks.prisma.user.findUnique.mockResolvedValue({
         id: 10,
         username: 'target_user',
-        _count: { followers: 5 },
+        isPrivate: false,
       })
-      const duplicateError = new Error('Unique constraint')
-      duplicateError.code = 'P2002'
-      mocks.prisma.userFollow.create.mockRejectedValue(duplicateError)
+      // Existing follow record found
+      mocks.prisma.userFollow.findUnique.mockResolvedValue({
+        followerId: 42,
+        followingId: 10,
+        status: 'active',
+      })
 
       const response = await request(app).post('/target_user/follow')
 

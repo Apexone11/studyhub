@@ -2,7 +2,7 @@
  * Auth Cookie Hardening — Regression Tests
  *
  * Proves:
- * - Auth cookie is set with HttpOnly, Secure (prod), SameSite, Path=/api
+ * - Auth cookie is set with HttpOnly, Secure (prod), SameSite, Path=/
  * - setAuthCookie / clearAuthCookie produce correct Set-Cookie headers
  * - JWT_SECRET validation catches missing/short secrets at startup
  */
@@ -71,7 +71,7 @@ afterAll(() => {
  * setAuthCookie — direct unit test via a mini Express app
  * ═══════════════════════════════════════════════════════════════════════════ */
 describe('setAuthCookie() produces correct Set-Cookie header', () => {
-  it('sets HttpOnly, SameSite=Lax, Path=/api, Max-Age in dev', async () => {
+  it('sets HttpOnly, SameSite=Lax, Path=/, Max-Age in dev', async () => {
     const { setAuthCookie, signAuthToken } = require(authTokensPath)
     const miniApp = express()
     miniApp.get('/test-cookie', (_req, res) => {
@@ -90,7 +90,7 @@ describe('setAuthCookie() produces correct Set-Cookie header', () => {
 
     expect(sessionCookie).toBeDefined()
     expect(sessionCookie).toMatch(/HttpOnly/i)
-    expect(sessionCookie).toMatch(/Path=\/api/i)
+    expect(sessionCookie).toMatch(/Path=\//i)
     expect(sessionCookie).toMatch(/SameSite=Lax/i)
     expect(sessionCookie).toMatch(/Max-Age=86400/i)
     // In dev mode, Secure flag should NOT be present
@@ -102,7 +102,7 @@ describe('setAuthCookie() produces correct Set-Cookie header', () => {
  * Logout clears cookie with matching path/flags
  * ═══════════════════════════════════════════════════════════════════════════ */
 describe('POST /api/auth/logout — clears cookie correctly', () => {
-  it('clears studyhub_session with HttpOnly and Path=/api', async () => {
+  it('clears studyhub_session with HttpOnly and Path=/', async () => {
     const res = await request(logoutApp).post('/api/auth/logout')
 
     const cookies = res.headers['set-cookie']
@@ -114,7 +114,7 @@ describe('POST /api/auth/logout — clears cookie correctly', () => {
 
     expect(clearCookie).toBeDefined()
     expect(clearCookie).toMatch(/HttpOnly/i)
-    expect(clearCookie).toMatch(/Path=\/api/i)
+    expect(clearCookie).toMatch(/Path=\//i)
   })
 })
 
@@ -136,7 +136,7 @@ describe('getAuthCookieOptions()', () => {
       expect(opts.httpOnly).toBe(true)
       expect(opts.secure).toBe(false)
       expect(opts.sameSite).toBe('lax')
-      expect(opts.path).toBe('/api')
+      expect(opts.path).toBe('/')
       expect(opts.maxAge).toBe(86400000)
     } finally {
       process.env.NODE_ENV = prev
@@ -153,7 +153,7 @@ describe('getAuthCookieOptions()', () => {
       expect(opts.secure).toBe(true)
       // SameSite=None is required for cross-origin cookie auth on split-origin deploy
       expect(opts.sameSite).toBe('none')
-      expect(opts.path).toBe('/api')
+      expect(opts.path).toBe('/')
     } finally {
       process.env.NODE_ENV = prev
     }
