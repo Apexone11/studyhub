@@ -2,67 +2,45 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import MentionText from '../../../components/MentionText'
 import { SkeletonCard } from '../../../components/Skeleton'
+import UserAvatar from '../../../components/UserAvatar'
 import { FONT, panelStyle, timeAgo } from './sheetViewerConstants'
 
 function CommentReactionsSheet({ commentId, reactionCounts = {}, userReaction = null, onReact }) {
   const likes = reactionCounts.like || 0
   const dislikes = reactionCounts.dislike || 0
 
-  const thumbsUpSvg = (
-    <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" style={{ marginRight: 3 }}>
-      <path d="M2 10.5a1.5 1.5 0 1 1 3 0v6a1.5 1.5 0 0 1-3 0v-6zM6 10.333v5.43a2 2 0 0 0 .97 1.679V17.5a.5.5 0 1 0 1 0v-.04a2 2 0 0 0 .97-1.679v-.745a2 2 0 0 0 .211-.126c1.04-.678 1.946-.122 2.469.856.653 1.31 1.422 2.105 2.188 2.01.374-.056.695-.481 1.088-1.461.36-.896.748-2.144.948-2.979.179-.633.45-1.559.838-2.form.158-.34.355-.638.57-.88a3 3 0 0 0 .281-1.249A3 3 0 0 0 15.3 9h1.023a.75.75 0 0 0 .75-.75V3.75a.75.75 0 0 0-.75-.75H15.3a3 3 0 0 0-2.973 2.5H13a.75.75 0 0 0 0 1.5h-.227c.038.58.076 1.254.076 2v1.5a2 2 0 0 0 .053.477c-.038.58-.076 1.254-.076 2 0 .888.106 1.72.282 2.38.168.594.411 1.084.693 1.38" />
-    </svg>
-  )
-
-  const thumbsDownSvg = (
-    <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" style={{ marginRight: 3 }}>
-      <path d="M18 9.5a1.5 1.5 0 1 1-3 0v-6a1.5 1.5 0 0 1 3 0v6zM14 9.667v-5.43a2 2 0 0 1-.97-1.679V2.5a.5.5 0 1 1-1 0v.04a2 2 0 0 1-.97 1.679v.745a2 2 0 0 1-.211.126c-1.04.678-1.946.122-2.469-.856-.653-1.31-1.422-2.105-2.188-2.01-.374.056-.695.481-1.088 1.461-.36.896-.748 2.144-.948 2.979-.179.633-.45 1.559-.838 2.form-.158.34-.355.638-.57.88a3 3 0 0 1-.281 1.249A3 3 0 0 1 4.7 11H3.75a.75.75 0 0 1-.75-.75V7.25a.75.75 0 0 1 .75-.75H4.7a3 3 0 0 1 2.973-2.5h.227a.75.75 0 0 1 0 1.5H7a2 2 0 0 1-.053.477c.038.58.076 1.254.076 2v1.5a2 2 0 0 1-.053.477c-.038.58-.076 1.254-.076 2 0 .888-.106 1.72-.282 2.38-.168.594-.411 1.084-.693 1.38" />
-    </svg>
-  )
+  const btnBase = {
+    fontSize: 12,
+    fontWeight: 500,
+    background: 'none',
+    border: 'none',
+    padding: 0,
+    cursor: 'pointer',
+    fontFamily: FONT,
+    transition: 'color 0.2s',
+  }
 
   return (
-    <div style={{ display: 'flex', gap: '6px', marginTop: '8px', alignItems: 'center' }}>
+    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
       <button
         type="button"
         onClick={() => onReact(commentId, 'like')}
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '3px',
-          padding: '3px 6px',
-          border: 'none',
-          borderRadius: '4px',
-          background: 'transparent',
-          cursor: 'pointer',
-          fontSize: '11px',
+          ...btnBase,
           color: userReaction === 'like' ? 'var(--sh-brand)' : 'var(--sh-muted)',
-          transition: 'color 0.2s',
-          fontFamily: FONT,
         }}
       >
-        {thumbsUpSvg}
-        {likes > 0 ? likes : ''}
+        Like{likes > 0 ? ` ${likes}` : ''}
       </button>
       <button
         type="button"
         onClick={() => onReact(commentId, 'dislike')}
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '3px',
-          padding: '3px 6px',
-          border: 'none',
-          borderRadius: '4px',
-          background: 'transparent',
-          cursor: 'pointer',
-          fontSize: '11px',
-          color: userReaction === 'dislike' ? 'var(--sh-brand)' : 'var(--sh-muted)',
-          transition: 'color 0.2s',
-          fontFamily: FONT,
+          ...btnBase,
+          color: userReaction === 'dislike' ? 'var(--sh-danger)' : 'var(--sh-muted)',
         }}
       >
-        {thumbsDownSvg}
-        {dislikes > 0 ? dislikes : ''}
+        Dislike{dislikes > 0 ? ` ${dislikes}` : ''}
       </button>
     </div>
   )
@@ -122,41 +100,51 @@ export default function SheetCommentsPanel({
               </Link>
             </div>
           ) : (
-            <form onSubmit={submitComment} style={{ display: 'grid', gap: 12, marginBottom: 16 }}>
-              <textarea
-                value={commentDraft}
-                onChange={(event) => setCommentDraft(event.target.value)}
-                placeholder="Share a clarification, correction, or study tip…"
-                rows={3}
-                style={{
-                  width: '100%',
-                  resize: 'vertical',
-                  borderRadius: 12,
-                  border: '1px solid var(--sh-input-border)',
-                  padding: 12,
-                  font: 'inherit',
-                  background: 'var(--sh-input-bg)',
-                  color: 'var(--sh-input-text)',
-                }}
+            <form onSubmit={submitComment} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 16 }}>
+              <UserAvatar
+                username={user.username}
+                avatarUrl={user.avatarUrl}
+                role={user.role}
+                plan={user.plan}
+                size={34}
               />
-              <div>
-                <button
-                  type="submit"
-                  disabled={commentSaving}
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <textarea
+                  value={commentDraft}
+                  onChange={(event) => setCommentDraft(event.target.value)}
+                  placeholder="Share a clarification, correction, or study tip..."
+                  rows={3}
                   style={{
-                    borderRadius: 10,
+                    width: '100%',
+                    resize: 'vertical',
+                    borderRadius: 20,
                     border: 'none',
-                    background: 'var(--sh-btn-primary-bg)',
-                    color: 'var(--sh-btn-primary-text)',
-                    fontWeight: 800,
-                    fontSize: 13,
                     padding: '10px 14px',
-                    cursor: commentSaving ? 'wait' : 'pointer',
-                    fontFamily: FONT,
+                    font: 'inherit',
+                    background: 'var(--sh-soft)',
+                    color: 'var(--sh-input-text)',
+                    fontSize: 13,
                   }}
-                >
-                  {commentSaving ? 'Posting...' : 'Post comment'}
-                </button>
+                />
+                <div>
+                  <button
+                    type="submit"
+                    disabled={commentSaving}
+                    style={{
+                      borderRadius: 10,
+                      border: 'none',
+                      background: 'var(--sh-btn-primary-bg)',
+                      color: 'var(--sh-btn-primary-text)',
+                      fontWeight: 800,
+                      fontSize: 13,
+                      padding: '10px 14px',
+                      cursor: commentSaving ? 'wait' : 'pointer',
+                      fontFamily: FONT,
+                    }}
+                  >
+                    {commentSaving ? 'Posting...' : 'Post comment'}
+                  </button>
+                </div>
               </div>
             </form>
           )}
@@ -167,27 +155,81 @@ export default function SheetCommentsPanel({
             <div style={{ textAlign: 'center', padding: '16px 12px' }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--sh-heading)', marginBottom: 4 }}>No comments yet</div>
               <div style={{ fontSize: 12, color: 'var(--sh-muted)', lineHeight: 1.5 }}>
-                Be the first to leave feedback — corrections, study tips, and clarifications help everyone.
+                Be the first to leave feedback -- corrections, study tips, and clarifications help everyone.
               </div>
             </div>
           ) : (
             <div style={{ display: 'grid', gap: 12 }}>
               {commentsState.comments.map((comment) => (
-                <div key={comment.id} style={{ borderTop: '1px solid var(--sh-soft)', paddingTop: 12 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 4, alignItems: 'center' }}>
-                    <Link to={`/users/${comment.author?.username}`} style={{ fontSize: 13, fontWeight: 700, color: 'var(--sh-heading)', textDecoration: 'none' }}>
-                      {comment.author?.username || 'Unknown'}
-                    </Link>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 11, color: 'var(--sh-muted)' }}>{timeAgo(comment.createdAt)}</span>
+                <div key={comment.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                  <Link to={`/users/${comment.author?.username}`} style={{ flexShrink: 0 }}>
+                    <UserAvatar
+                      username={comment.author?.username}
+                      avatarUrl={comment.author?.avatarUrl}
+                      role={comment.author?.role}
+                      plan={comment.author?.plan}
+                      size={34}
+                    />
+                  </Link>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{
+                      background: 'var(--sh-soft)',
+                      borderRadius: 16,
+                      padding: '10px 14px',
+                    }}>
+                      <Link
+                        to={`/users/${comment.author?.username}`}
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: 'var(--sh-text)',
+                          textDecoration: 'none',
+                          fontFamily: FONT,
+                        }}
+                      >
+                        {comment.author?.username || 'Unknown'}
+                      </Link>
+                      <div style={{
+                        fontSize: 13,
+                        color: 'var(--sh-subtext)',
+                        lineHeight: 1.7,
+                        whiteSpace: 'pre-wrap',
+                        marginTop: 2,
+                      }}>
+                        <MentionText text={comment.content} />
+                      </div>
+                    </div>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      marginTop: 4,
+                      paddingLeft: 4,
+                    }}>
+                      {user && onReactToComment ? (
+                        <CommentReactionsSheet
+                          commentId={comment.id}
+                          reactionCounts={comment.reactionCounts}
+                          userReaction={comment.userReaction}
+                          onReact={onReactToComment}
+                        />
+                      ) : null}
+                      <span style={{ fontSize: 12, color: 'var(--sh-muted)', fontFamily: FONT }}>
+                        {timeAgo(comment.createdAt)}
+                      </span>
                       {user && (user.id === comment.author?.id || user.role === 'admin') ? (
                         <button
                           type="button"
                           onClick={() => deleteComment(comment.id)}
                           style={{
-                            padding: '2px 8px', borderRadius: 6, border: '1px solid var(--sh-danger-border)',
-                            background: 'var(--sh-surface)', color: 'var(--sh-danger)', fontSize: 11, fontWeight: 600,
-                            cursor: 'pointer', fontFamily: FONT,
+                            fontSize: 12,
+                            fontWeight: 500,
+                            color: 'var(--sh-danger)',
+                            background: 'none',
+                            border: 'none',
+                            padding: 0,
+                            cursor: 'pointer',
+                            fontFamily: FONT,
                           }}
                         >
                           Delete
@@ -195,17 +237,6 @@ export default function SheetCommentsPanel({
                       ) : null}
                     </div>
                   </div>
-                  <div style={{ fontSize: 13, color: 'var(--sh-subtext)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
-                    <MentionText text={comment.content} />
-                  </div>
-                  {user && onReactToComment ? (
-                    <CommentReactionsSheet
-                      commentId={comment.id}
-                      reactionCounts={comment.reactionCounts}
-                      userReaction={comment.userReaction}
-                      onReact={onReactToComment}
-                    />
-                  ) : null}
                 </div>
               ))}
             </div>
