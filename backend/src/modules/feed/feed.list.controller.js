@@ -14,6 +14,20 @@ const { enrichUsersWithBadges } = require('../../lib/userBadges')
 
 const router = express.Router()
 
+/**
+ * Score a feed item by weighted engagement signals + recency.
+ * Higher score = shown higher in feed.
+ */
+function scoreFeedItem(item) {
+  const likes = item.reactionSummary?.likes || item.stars || 0
+  const dislikes = item.reactionSummary?.dislikes || 0
+  const comments = item.commentCount || 0
+  const forks = item.forkCount || 0
+  const ageHours = (Date.now() - new Date(item.createdAt).getTime()) / (1000 * 60 * 60)
+  const recencyBoost = Math.max(0, 1 - ageHours / 720) * 15
+  return (likes * 3) + (dislikes * -1) + (comments * 5) + (forks * 8) + recencyBoost
+}
+
 router.get('/', async (req, res) => {
   const startedAt = Date.now()
   const limit = parsePositiveInt(req.query.limit, 20)
@@ -359,7 +373,7 @@ router.get('/', async (req, res) => {
     const postCommentCounts = new Map(postCommentRows.map((row) => [row.postId, row._count._all]))
     const noteCommentCounts = new Map(noteCommentRows.map((row) => [row.noteId, row._count._all]))
 
-    const items = [
+    const merged = [
       ...announcements.map(formatAnnouncement),
       ...posts.map((post) =>
         formatPost(post, postCommentCounts, postReactionRows, currentPostReactions),
@@ -374,17 +388,22 @@ router.get('/', async (req, res) => {
         ),
       ),
       ...notes.map((note) => formatNote(note, noteCommentCounts)),
-    ].sort((left, right) => {
-      if (left.type === 'announcement' && right.type === 'announcement') {
-        if (left.pinned !== right.pinned) return left.pinned ? -1 : 1
-      } else if (left.type === 'announcement' && left.pinned) {
+    ]
+
+    merged.sort((a, b) => {
+      // Pinned announcements always float to the top
+      if (a.type === 'announcement' && b.type === 'announcement') {
+        if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
+      } else if (a.type === 'announcement' && a.pinned) {
         return -1
-      } else if (right.type === 'announcement' && right.pinned) {
+      } else if (b.type === 'announcement' && b.pinned) {
         return 1
       }
 
-      return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
+      return scoreFeedItem(b) - scoreFeedItem(a)
     })
+
+    const items = merged
 
     // Enrich feed item authors with Pro/Donor badge data
     const slicedItems = items.slice(offset, offset + limit)

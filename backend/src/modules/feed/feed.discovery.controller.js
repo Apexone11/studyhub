@@ -370,14 +370,18 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
     ])
 
     // Score and rank sheets by weighted metrics: stars*3 + forks*5 + recencyBoost*10
+    // Content from enrolled courses receives a 2x score multiplier.
     const now = Date.now()
+    const enrolledCourseSet = new Set(courseIds)
     const scoredSheets = sheetCandidates
       .filter((s) => !starredSet.has(s.id))
       .map((sheet) => {
         const ageHours = (now - new Date(sheet.createdAt).getTime()) / (1000 * 60 * 60)
         const recencyBoost = Math.max(0, 1 - ageHours / DISCOVERY_RECENCY_DECAY_HOURS)
-        const score =
+        const baseScore =
           (sheet.stars || 0) * 3 + (sheet._count.forkChildren || 0) * 5 + recencyBoost * 10
+        const isEnrolledCourse = sheet.course?.id != null && enrolledCourseSet.has(sheet.course.id)
+        const score = isEnrolledCourse ? baseScore * 2 : baseScore
         return { ...sheet, _score: score }
       })
       .sort((a, b) => b._score - a._score)

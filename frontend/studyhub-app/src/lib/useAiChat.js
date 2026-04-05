@@ -53,6 +53,7 @@ export function useAiChat() {
   const [error, setError] = useState(null)
   const [usage, setUsage] = useState(null)
   const [loadingConversations, setLoadingConversations] = useState(true)
+  const [truncated, setTruncated] = useState(false)
 
   const abortRef = useRef(null)
   const location = useLocation()
@@ -148,6 +149,7 @@ export function useAiChat() {
     setStreaming(true)
     setStreamingText('')
     setError(null)
+    setTruncated(false)
 
     try {
       const reader = await aiService.sendMessage({
@@ -206,6 +208,10 @@ export function useAiChat() {
                   messagesRemaining: event.usage.limit - event.usage.used,
                 }))
               }
+              break
+
+            case 'truncated':
+              setTruncated(true)
               break
 
             case 'error':
@@ -291,6 +297,7 @@ export function useAiChat() {
     loadingConversations,
     streaming,
     streamingText,
+    truncated,
     error,
     usage,
 
