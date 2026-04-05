@@ -9,7 +9,7 @@ import ReportModal from '../../components/ReportModal'
 import ModerationBanner from '../../components/ModerationBanner'
 import PendingReviewBanner from '../../components/PendingReviewBanner'
 import { PAGE_FONT } from '../shared/pageUtils'
-import { MarkdownPreview, wordCount } from './notesConstants'
+import { MarkdownPreview, wordCount, countWordsFromHtml } from './notesConstants'
 import NoteCommentSection from './NoteCommentSection'
 import { useNoteViewer } from './useNoteViewer'
 import { useNoteComments } from './useNoteComments'
@@ -21,12 +21,19 @@ function formatDate(dateStr) {
   })
 }
 
-function downloadMarkdown(title, content) {
-  const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' })
+function isHtmlContent(content) {
+  return content && content.trim().includes('<') && !(/^(#{1,6}\s|[-*+]\s|\d+\.\s|>\s)/.test(content.trim()))
+}
+
+function downloadNote(title, content) {
+  const isHtml = isHtmlContent(content)
+  const mimeType = isHtml ? 'text/html;charset=utf-8' : 'text/markdown;charset=utf-8'
+  const ext = isHtml ? '.html' : '.md'
+  const blob = new Blob([content], { type: mimeType })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `${(title || 'note').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 80)}.md`
+  a.download = `${(title || 'note').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 80)}${ext}`
   a.click()
   URL.revokeObjectURL(url)
 }
@@ -59,7 +66,7 @@ export default function NoteViewerPage() {
     )
   }
 
-  const words = wordCount(note.content)
+  const words = isHtmlContent(note.content) ? countWordsFromHtml(note.content) : wordCount(note.content)
 
   return (
     <div style={{ fontFamily: PAGE_FONT, maxWidth: 820, margin: '0 auto', padding: '24px 16px' }}>
@@ -144,7 +151,7 @@ export default function NoteViewerPage() {
         {note.allowDownloads && !note.private && (
           <button
             type="button"
-            onClick={() => downloadMarkdown(note.title, note.content)}
+            onClick={() => downloadNote(note.title, note.content)}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -159,7 +166,7 @@ export default function NoteViewerPage() {
               fontWeight: 600,
             }}
           >
-            Download .md
+            Download
           </button>
         )}
         {user && !note.isOwner && (

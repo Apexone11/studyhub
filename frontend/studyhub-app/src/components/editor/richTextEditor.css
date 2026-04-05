@@ -481,3 +481,114 @@
 .sh-richtext-viewer div[data-math-display] .katex {
   color: var(--sh-text);
 }
+
+/* ══════════════════════════════════════════════════════════════
+ * Notes editor — theme-aware variant (light/dark adapts to user theme)
+ * Applied via .sh-note-editor-content class on the TipTap editor.
+ * Overrides the dark-always styles from .sh-rich-editor-content.
+ * ══════════════════════════════════════════════════════════════ */
+
+.sh-note-editor-wrap .sh-rich-editor-content {
+  color: var(--sh-text);
+  padding: 20px 22px;
+  min-height: 300px;
+}
+
+.sh-note-editor-wrap .sh-rich-editor-content p.is-editor-empty:first-child::before {
+  color: var(--sh-muted);
+}
+
+.sh-note-editor-wrap .sh-rich-editor-content h1,
+.sh-note-editor-wrap .sh-rich-editor-content h2,
+.sh-note-editor-wrap .sh-rich-editor-content h3 {
+  color: var(--sh-heading);
+}
+
+.sh-note-editor-wrap .sh-rich-editor-content h4 {
+  color: var(--sh-subtext);
+}
+
+.sh-note-editor-wrap .sh-rich-editor-content strong {
+  color: var(--sh-heading);
+}
+
+.sh-note-editor-wrap .sh-rich-editor-content code {
+  background: var(--sh-soft);
+  color: var(--sh-brand);
+}
+
+.sh-note-editor-wrap .sh-rich-editor-content a,
+.sh-note-editor-wrap .sh-editor-link {
+  color: var(--sh-brand);
+}
+
+.sh-note-editor-wrap .sh-rich-editor-content a:hover {
+  color: var(--sh-brand-hover);
+}
+
+.sh-note-editor-wrap .sh-rich-editor-content blockquote {
+  border-left-color: var(--sh-brand);
+  color: var(--sh-muted);
+}
+
+.sh-note-editor-wrap .sh-rich-editor-content pre,
+.sh-note-editor-wrap .sh-editor-code-block {
+  background: var(--sh-soft);
+  border-color: var(--sh-border);
+  color: var(--sh-text);
+}
+
+.sh-note-editor-wrap .sh-rich-editor-content hr {
+  border-top-color: var(--sh-border);
+}
+
+.sh-note-editor-wrap .sh-rich-editor-content ::selection {
+  background: rgba(37, 99, 235, 0.2);
+}
+
+/* Notes editor — code syntax highlighting (theme-aware) */
+.sh-note-editor-wrap .sh-rich-editor-content pre code .hljs-keyword,
+.sh-note-editor-wrap .sh-rich-editor-content pre code .hljs-selector-tag {
+  color: #7c3aed;
+}
+.sh-note-editor-wrap .sh-rich-editor-content pre code .hljs-string,
+.sh-note-editor-wrap .sh-rich-editor-content pre code .hljs-addition {
+  color: #16a34a;
+}
+.sh-note-editor-wrap .sh-rich-editor-content pre code .hljs-number,
+.sh-note-editor-wrap .sh-rich-editor-content pre code .hljs-literal {
+  color: #d97706;
+}
+.sh-note-editor-wrap .sh-rich-editor-content pre code .hljs-comment,
+.sh-note-editor-wrap .sh-rich-editor-content pre code .hljs-quote {
+  color: var(--sh-muted);
+  font-style: italic;
+}
+.sh-note-editor-wrap .sh-rich-editor-content pre code .hljs-function,
+.sh-note-editor-wrap .sh-rich-editor-content pre code .hljs-title {
+  color: #2563eb;
+}
+.sh-note-editor-wrap .sh-rich-editor-content pre code .hljs-type,
+.sh-note-editor-wrap .sh-rich-editor-content pre code .hljs-built_in {
+  color: #0891b2;
+}
+
+/* Notes editor — math (theme-aware) */
+.sh-note-editor-wrap .sh-math-inline .katex {
+  color: var(--sh-text);
+}
+
+.sh-note-editor-wrap .sh-math-block {
+  background: var(--sh-soft);
+  border-color: var(--sh-border);
+}
+
+.sh-note-editor-wrap .sh-math-block .katex {
+  color: var(--sh-text);
+}
+
+/* Notes editor — toolbar theme override */
+.sh-note-editor-toolbar {
+  background: var(--sh-soft) !important;
+  border-bottom: 1px solid var(--sh-border) !important;
+}

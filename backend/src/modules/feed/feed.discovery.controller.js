@@ -239,7 +239,7 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
     } catch {
       blockedIds = []
     }
-    const excludeUserIds = new Set([userId, ...blockedIds])
+    const excludeUserIds = new Set([userId, ...blockedIds].filter(Boolean))
 
     // Get starred sheets
     const starredIds = await prisma.starredSheet.findMany({

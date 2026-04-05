@@ -356,15 +356,23 @@ export default function SubscriptionTab() {
       {/* Section 1: Plan Status */}
       <SectionCard title="Your Plan">
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-          <div style={{
-            width: 48, height: 48, borderRadius: 12,
-            background: isFree ? 'var(--sh-soft)' : 'linear-gradient(135deg, var(--sh-brand), var(--sh-brand-hover))',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 20, fontWeight: 800, color: isFree ? 'var(--sh-muted)' : 'var(--sh-btn-primary-text)',
-            flexShrink: 0,
-          }}>
-            {isFree ? 'F' : 'P'}
-          </div>
+          {isFree ? (
+            <div style={{
+              width: 48, height: 48, borderRadius: 12,
+              background: 'var(--sh-soft)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 20, fontWeight: 800, color: 'var(--sh-muted)',
+              flexShrink: 0,
+            }}>
+              F
+            </div>
+          ) : (
+            <img
+              src={effectivePlan === 'pro_yearly' ? '/images/plan-pro-yearly.png' : '/images/plan-pro-monthly.png'}
+              alt={PLAN_LABELS[effectivePlan] || 'Pro'}
+              style={{ width: 48, height: 48, borderRadius: 12, objectFit: 'cover', flexShrink: 0 }}
+            />
+          )}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 18, fontWeight: 800, color: 'var(--sh-heading)' }}>
