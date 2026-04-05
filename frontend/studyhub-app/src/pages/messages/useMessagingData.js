@@ -39,6 +39,13 @@ export function useMessagingData(socket, currentUserId) {
   // (avoids stale closure bug where incoming messages increment unread on the active conversation)
   const activeConversationIdRef = useRef(null)
 
+  /* ── Requests & Archived state ──────────────────────────────────────── */
+  const [messageRequests, setMessageRequests] = useState([])
+  const [totalPending, setTotalPending] = useState(0)
+  const [archivedConversations, setArchivedConversations] = useState([])
+  const [archivedCount, setArchivedCount] = useState(0)
+  const [sendBlocked, setSendBlocked] = useState(false)
+
   /* ── Load conversations ──────────────────────────────────────────────── */
   const loadConversations = useCallback(async () => {
     setLoadingConversations(true)
@@ -57,6 +64,138 @@ export function useMessagingData(socket, currentUserId) {
       showToast('Failed to load conversations', 'error')
     } finally {
       setLoadingConversations(false)
+    }
+  }, [])
+
+  /* ── Load message requests ────────────────────────────────────────────── */
+  const loadRequests = useCallback(async () => {
+    try {
+      const response = await fetch(`${API}/api/messages/requests`, {
+        headers: authHeaders(),
+        credentials: 'include',
+      })
+      if (!response.ok) return
+      const data = await response.json()
+      setMessageRequests(data.requests || [])
+      setTotalPending(data.totalPending || 0)
+    } catch {
+      // Silent failure
+    }
+  }, [])
+
+  /* ── Load archived conversations ────────────────────────────────────── */
+  const loadArchived = useCallback(async () => {
+    try {
+      const response = await fetch(`${API}/api/messages/archived`, {
+        headers: authHeaders(),
+        credentials: 'include',
+      })
+      if (!response.ok) return
+      const data = await response.json()
+      const list = Array.isArray(data) ? data : data?.conversations || []
+      setArchivedConversations(list)
+      setArchivedCount(list.length)
+    } catch {
+      // Silent failure
+    }
+  }, [])
+
+  /* ── Accept message request ─────────────────────────────────────────── */
+  const acceptRequest = useCallback(async (conversationId) => {
+    try {
+      const response = await fetch(`${API}/api/messages/requests/${conversationId}/accept`, {
+        method: 'POST',
+        headers: authHeaders(),
+        credentials: 'include',
+      })
+      if (!response.ok) {
+        showToast('Failed to accept request', 'error')
+        return false
+      }
+      const conversation = await response.json()
+      // Normalize participants
+      if (conversation.participants) {
+        conversation.participants = conversation.participants.map((p) =>
+          p.user ? { id: p.user.id, username: p.user.username, avatarUrl: p.user.avatarUrl } : p,
+        )
+      }
+      // Move from requests to main list
+      setMessageRequests((prev) => prev.filter((r) => r.id !== conversationId))
+      setTotalPending((prev) => Math.max(0, prev - 1))
+      setConversations((prev) => [conversation, ...prev])
+      showToast('Request accepted', 'success')
+      return true
+    } catch {
+      showToast('Failed to accept request', 'error')
+      return false
+    }
+  }, [])
+
+  /* ── Decline message request ────────────────────────────────────────── */
+  const declineRequest = useCallback(async (conversationId) => {
+    try {
+      const response = await fetch(`${API}/api/messages/requests/${conversationId}/decline`, {
+        method: 'POST',
+        headers: authHeaders(),
+        credentials: 'include',
+      })
+      if (!response.ok) {
+        showToast('Failed to decline request', 'error')
+        return false
+      }
+      setMessageRequests((prev) => prev.filter((r) => r.id !== conversationId))
+      setTotalPending((prev) => Math.max(0, prev - 1))
+      showToast('Request declined', 'success')
+      return true
+    } catch {
+      showToast('Failed to decline request', 'error')
+      return false
+    }
+  }, [])
+
+  /* ── Unarchive conversation ─────────────────────────────────────────── */
+  const unarchiveConversation = useCallback(async (id) => {
+    try {
+      const response = await fetch(`${API}/api/messages/conversations/${id}/unarchive`, {
+        method: 'POST',
+        headers: authHeaders(),
+        credentials: 'include',
+      })
+      if (!response.ok) {
+        showToast('Failed to unarchive conversation', 'error')
+        return
+      }
+      // Move from archived to main list
+      const conv = archivedConversations.find((c) => c.id === id)
+      setArchivedConversations((prev) => prev.filter((c) => c.id !== id))
+      setArchivedCount((prev) => Math.max(0, prev - 1))
+      if (conv) {
+        setConversations((prev) => [conv, ...prev])
+      }
+      showToast('Conversation unarchived', 'success')
+    } catch {
+      showToast('Failed to unarchive conversation', 'error')
+    }
+  }, [archivedConversations])
+
+  /* ── Block user (DM context) ────────────────────────────────────────── */
+  const blockUser = useCallback(async (username) => {
+    try {
+      const response = await fetch(`${API}/api/users/${encodeURIComponent(username)}/block`, {
+        method: 'POST',
+        headers: authHeaders(),
+        credentials: 'include',
+      })
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}))
+        showToast(errData.error || 'Failed to block user', 'error')
+        return false
+      }
+      showToast(`Blocked ${username}`, 'success')
+      return true
+    } catch {
+      showToast('Failed to block user', 'error')
+      return false
     }
   }, [])
 
@@ -148,6 +287,7 @@ export function useMessagingData(socket, currentUserId) {
         setMessages([])
         setHasMoreMessages(true)
         setTypingUsers(new Map())
+        setSendBlocked(false)
 
         // Join the conversation room via socket
         if (socket && socket.connected) {
@@ -213,6 +353,9 @@ export function useMessagingData(socket, currentUserId) {
           },
         )
         if (!response.ok) {
+          if (response.status === 403) {
+            setSendBlocked(true)
+          }
           showToast('Failed to send message', 'error')
           setMessages((prev) => prev.filter((m) => m.id !== optimisticMessage.id))
           return
@@ -404,17 +547,21 @@ export function useMessagingData(socket, currentUserId) {
   const archiveConversation = useCallback(
     async (id) => {
       try {
-        const response = await fetch(`${API}/api/messages/conversations/${id}`, {
-          method: 'PATCH',
+        const response = await fetch(`${API}/api/messages/conversations/${id}/archive`, {
+          method: 'POST',
           headers: authHeaders(),
           credentials: 'include',
-          body: JSON.stringify({ archived: true }),
         })
         if (!response.ok) {
           showToast('Failed to archive conversation', 'error')
           return
         }
-        setConversations((prev) => prev.filter((conv) => conv.id !== id))
+        const conv = conversations.find((c) => c.id === id)
+        setConversations((prev) => prev.filter((c) => c.id !== id))
+        if (conv) {
+          setArchivedConversations((prev) => [conv, ...prev])
+          setArchivedCount((prev) => prev + 1)
+        }
         if (activeConversation?.id === id) {
           setActiveConversation(null)
           activeConversationIdRef.current = null
@@ -425,18 +572,18 @@ export function useMessagingData(socket, currentUserId) {
         showToast('Failed to archive conversation', 'error')
       }
     },
-    [activeConversation],
+    [activeConversation, conversations],
   )
 
   /* ── Toggle mute on conversation ────────────────────────────────────── */
   const muteConversation = useCallback(
     async (id, muted) => {
       try {
-        const response = await fetch(`${API}/api/messages/conversations/${id}`, {
-          method: 'PATCH',
+        const endpoint = muted ? 'mute' : 'unmute'
+        const response = await fetch(`${API}/api/messages/conversations/${id}/${endpoint}`, {
+          method: 'POST',
           headers: authHeaders(),
           credentials: 'include',
-          body: JSON.stringify({ muted }),
         })
         if (!response.ok) {
           showToast('Failed to update mute status', 'error')
@@ -446,6 +593,7 @@ export function useMessagingData(socket, currentUserId) {
         if (activeConversation?.id === id) {
           setActiveConversation((prev) => (prev ? { ...prev, muted } : prev))
         }
+        showToast(muted ? 'Conversation muted' : 'Conversation unmuted', 'success')
       } catch {
         showToast('Failed to update mute status', 'error')
       }
@@ -649,8 +797,22 @@ export function useMessagingData(socket, currentUserId) {
     removeReaction,
     markAsRead,
     archiveConversation,
+    unarchiveConversation,
     muteConversation,
     emitTypingStart,
     emitTypingStop,
+    // Requests
+    messageRequests,
+    totalPending,
+    loadRequests,
+    acceptRequest,
+    declineRequest,
+    // Archived
+    archivedConversations,
+    archivedCount,
+    loadArchived,
+    // Block
+    blockUser,
+    sendBlocked,
   }
 }

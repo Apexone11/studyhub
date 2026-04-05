@@ -32,6 +32,7 @@ model User {
   accountType             String    @default("student")
   termsAcceptedVersion    String?
   termsAcceptedAt         DateTime?
+  isPrivate               Boolean   @default(false)
   createdAt               DateTime  @default(now())
 
   studySheets                StudySheet[]
@@ -452,11 +453,13 @@ model Notification {
 model UserFollow {
   followerId  Int
   followingId Int
+  status      String   @default("active") // "active" or "pending" (for private accounts)
   createdAt   DateTime @default(now())
   follower    User     @relation("Following", fields: [followerId], references: [id], onDelete: Cascade)
   following   User     @relation("Followers", fields: [followingId], references: [id], onDelete: Cascade)
 
   @@id([followerId, followingId])
+  @@index([followingId, status])
 }
 
 model Reaction {
@@ -971,6 +974,7 @@ model ConversationParticipant {
   conversationId Int
   userId         Int
   role           String   @default("member") // "member" or "admin" (group only)
+  status         String   @default("active") // "active", "pending", "declined"
   joinedAt       DateTime @default(now())
   lastReadAt     DateTime @default(now()) // for read receipts
   muted          Boolean  @default(false) // mute notifications for this convo
@@ -981,6 +985,7 @@ model ConversationParticipant {
 
   @@id([conversationId, userId])
   @@index([userId, archived])
+  @@index([userId, status])
 }
 
 model Message {

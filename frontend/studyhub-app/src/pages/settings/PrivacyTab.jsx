@@ -3,11 +3,79 @@ import { Link } from 'react-router-dom'
 import { Button, FormField, MsgList, SectionCard, Select, ToggleRow } from './settingsShared'
 import { usePreferences, FONT } from './settingsState'
 import { API } from '../../config'
+import { useSession } from '../../lib/session-context'
 import { showToast } from '../../lib/toast'
 import UserAvatar from '../../components/UserAvatar'
 
 function authHeaders() {
   return { 'Content-Type': 'application/json' }
+}
+
+/* ── Private Account toggle sub-component ────────────────────────────── */
+function PrivateAccountToggle() {
+  const { user, setSessionUser } = useSession()
+  const [isPrivate, setIsPrivate] = useState(user?.isPrivate || false)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    setIsPrivate(user?.isPrivate || false)
+  }, [user?.isPrivate])
+
+  async function handleToggle() {
+    const newValue = !isPrivate
+    setIsPrivate(newValue)
+    setSaving(true)
+    try {
+      const res = await fetch(`${API}/api/users/me/privacy`, {
+        method: 'PATCH',
+        headers: authHeaders(),
+        credentials: 'include',
+        body: JSON.stringify({ isPrivate: newValue }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setSessionUser((u) => u ? { ...u, isPrivate: newValue } : u)
+        showToast(newValue ? 'Your account is now private.' : 'Your account is now public.', 'success')
+      } else {
+        setIsPrivate(!newValue) // revert
+        showToast(data.error || 'Could not update privacy setting.', 'error')
+      }
+    } catch {
+      setIsPrivate(!newValue) // revert
+      showToast('Check your connection and try again.', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <SectionCard
+      title="Private Account"
+      subtitle="Control who can follow you and see your content."
+    >
+      <ToggleRow
+        label="Private Account"
+        description="When your account is private, only people you approve can see your posts, sheets, and activity."
+        checked={isPrivate}
+        onChange={handleToggle}
+        disabled={saving}
+      />
+      {isPrivate && (
+        <div style={{
+          marginTop: 8,
+          padding: '10px 14px',
+          borderRadius: 8,
+          background: 'var(--sh-info-bg)',
+          border: '1px solid var(--sh-info-border)',
+          fontSize: 12,
+          color: 'var(--sh-info-text)',
+          lineHeight: 1.5,
+        }}>
+          New followers will need your approval. Your existing followers will not be affected.
+        </div>
+      )}
+    </SectionCard>
+  )
 }
 
 /* ── Blocked / Muted user list sub-component ──────────────────────────── */
@@ -115,6 +183,8 @@ export default function PrivacyTab() {
 
   return (
     <>
+      <PrivateAccountToggle />
+
       <SectionCard title="Profile Visibility" subtitle="Control who can see your profile page and activity.">
         <FormField label="Who can view your profile">
           <Select

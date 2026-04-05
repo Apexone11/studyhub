@@ -2,12 +2,16 @@
  * messaging.conversations.routes.js — Conversation CRUD endpoints
  *
  * Endpoints:
- * - GET /conversations - List user's conversations
- * - POST /conversations - Create or return existing DM
+ * - GET /conversations - List user's active conversations
+ * - POST /conversations - Create or return existing DM (with message-request logic)
  * - GET /conversations/:id - Get conversation details
  * - PATCH /conversations/:id - Update conversation (name, avatar, mute, archive)
  * - DELETE /conversations/:id - Leave conversation or archive DM
  * - POST /conversations/:id/read - Mark conversation as read
+ * - POST /conversations/:id/mute - Mute conversation
+ * - POST /conversations/:id/unmute - Unmute conversation
+ * - POST /conversations/:id/archive - Archive conversation
+ * - POST /conversations/:id/unarchive - Unarchive conversation
  */
 
 const express = require('express')
@@ -17,14 +21,67 @@ const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
 const { readLimiter, messagingWriteLimiter } = require('../../lib/rateLimiters')
 const { getBlockedUserIds } = require('../../lib/social/blockFilter')
+const { areMutualFollowers, formatConversationItem } = require('./messaging.helpers')
 
 const router = express.Router({ mergeParams: true })
 
 router.use(readLimiter)
 
+// --- Shared include shape for conversation queries ---
+function conversationInclude(userId) {
+  return {
+    conversation: {
+      include: {
+        createdBy: {
+          select: { id: true, username: true, avatarUrl: true },
+        },
+        participants: {
+          where: {
+            userId: { notIn: [userId] }, // Exclude current user
+          },
+          include: {
+            user: {
+              select: { id: true, username: true, avatarUrl: true },
+            },
+          },
+        },
+        messages: {
+          orderBy: { createdAt: 'desc' },
+          take: 1, // Last message
+          include: {
+            sender: {
+              select: { id: true, username: true },
+            },
+          },
+        },
+      },
+    },
+  }
+}
+
+/**
+ * Compute unread count for a single ConversationParticipant record.
+ * Attaches the result as cp._unreadCount.
+ */
+async function attachUnreadCount(cp, userId) {
+  try {
+    const lastReadAt = cp.lastReadAt || new Date(0)
+    cp._unreadCount = await prisma.message.count({
+      where: {
+        conversationId: cp.conversation.id,
+        createdAt: { gt: lastReadAt },
+        senderId: { not: userId },
+        deletedAt: null,
+      },
+    })
+  } catch {
+    cp._unreadCount = 0
+  }
+}
+
 /**
  * GET /conversations
- * List user's conversations with pagination
+ * List user's active conversations (excludes pending, declined, and archived)
  */
 router.get('/', requireAuth, async (req, res) => {
   try {
@@ -40,40 +97,14 @@ router.get('/', requireAuth, async (req, res) => {
       captureError(blockErr, { route: req.originalUrl, context: 'block-filter' })
     }
 
-    // Fetch conversations for the user
+    // Only fetch conversations where participant status is 'active' and not archived
     const conversations = await prisma.conversationParticipant.findMany({
       where: {
         userId: req.user.userId,
+        status: 'active',
         archived: false,
       },
-      include: {
-        conversation: {
-          include: {
-            createdBy: {
-              select: { id: true, username: true, avatarUrl: true },
-            },
-            participants: {
-              where: {
-                userId: { notIn: [req.user.userId] }, // Exclude current user
-              },
-              include: {
-                user: {
-                  select: { id: true, username: true, avatarUrl: true },
-                },
-              },
-            },
-            messages: {
-              orderBy: { createdAt: 'desc' },
-              take: 1, // Last message
-              include: {
-                sender: {
-                  select: { id: true, username: true },
-                },
-              },
-            },
-          },
-        },
-      },
+      include: conversationInclude(req.user.userId),
       orderBy: { conversation: { updatedAt: 'desc' } },
       skip: offsetNum,
       take: limitNum,
@@ -81,20 +112,7 @@ router.get('/', requireAuth, async (req, res) => {
 
     // Compute unread counts per conversation
     for (const cp of conversations) {
-      try {
-        const lastReadAt = cp.lastReadAt || new Date(0)
-        const unreadCount = await prisma.message.count({
-          where: {
-            conversationId: cp.conversation.id,
-            createdAt: { gt: lastReadAt },
-            senderId: { not: req.user.userId },
-            deletedAt: null,
-          },
-        })
-        cp._unreadCount = unreadCount
-      } catch {
-        cp._unreadCount = 0
-      }
+      await attachUnreadCount(cp, req.user.userId)
     }
 
     // Filter out conversations with blocked users and format response
@@ -106,24 +124,7 @@ router.get('/', requireAuth, async (req, res) => {
         }
         return true
       })
-      .map((cp) => ({
-        id: cp.conversation.id,
-        type: cp.conversation.type,
-        name: cp.conversation.name,
-        avatarUrl: cp.conversation.avatarUrl,
-        participants: cp.conversation.participants.map((p) => ({
-          id: p.user.id,
-          username: p.user.username,
-          avatarUrl: p.user.avatarUrl,
-        })),
-        createdBy: cp.conversation.createdBy,
-        lastMessage: cp.conversation.messages[0] || null,
-        unreadCount: cp._unreadCount || 0,
-        muted: cp.muted,
-        lastReadAt: cp.lastReadAt,
-        createdAt: cp.conversation.createdAt,
-        updatedAt: cp.conversation.updatedAt,
-      }))
+      .map(formatConversationItem)
 
     res.json(result)
   } catch (err) {
@@ -134,7 +135,10 @@ router.get('/', requireAuth, async (req, res) => {
 
 /**
  * POST /conversations
- * Create a new conversation or return existing DM
+ * Create a new conversation or return existing DM.
+ *
+ * For DMs between non-mutual followers, the recipient gets status 'pending'
+ * (message request). Mutual followers get 'active' for both participants.
  */
 router.post('/', requireAuth, messagingWriteLimiter, async (req, res) => {
   try {
@@ -161,10 +165,6 @@ router.post('/', requireAuth, messagingWriteLimiter, async (req, res) => {
     }
 
     // For DMs, check if conversation already exists between both users.
-    // Use explicit `some` checks for both users instead of `every` — the
-    // `every` clause suffers from Prisma's vacuous-truth behavior (matches
-    // conversations with 0 participants) and also matches conversations
-    // where only ONE of the two intended users is a participant.
     if (type === 'dm' && participantIds.length === 1) {
       const existingDm = await prisma.conversation.findFirst({
         where: {
@@ -177,6 +177,17 @@ router.post('/', requireAuth, messagingWriteLimiter, async (req, res) => {
       })
 
       if (existingDm) {
+        // Re-activate if the sender previously declined or archived
+        await prisma.conversationParticipant.update({
+          where: {
+            conversationId_userId: {
+              conversationId: existingDm.id,
+              userId: req.user.userId,
+            },
+          },
+          data: { archived: false },
+        })
+
         // Re-fetch with full participant data so the frontend has everything
         const fullDm = await prisma.conversation.findUnique({
           where: { id: existingDm.id },
@@ -194,7 +205,29 @@ router.post('/', requireAuth, messagingWriteLimiter, async (req, res) => {
       }
     }
 
+    // For DMs, determine if this is a message request based on mutual follow status
+    let recipientStatus = 'active'
+    if (type === 'dm' && participantIds.length === 1) {
+      try {
+        const mutual = await areMutualFollowers(req.user.userId, participantIds[0])
+        if (!mutual) {
+          recipientStatus = 'pending'
+        }
+      } catch (followErr) {
+        // If follow check fails, default to pending for safety
+        captureError(followErr, { route: req.originalUrl, context: 'mutual-follow-check' })
+        recipientStatus = 'pending'
+      }
+    }
+
     // Create conversation
+    const participantData = participantIds.map((id) => ({
+      userId: id,
+      // For DMs: recipients get status based on mutual follow check
+      // For groups: all participants are active
+      status: type === 'dm' ? recipientStatus : 'active',
+    }))
+
     const conversation = await prisma.conversation.create({
       data: {
         type,
@@ -202,8 +235,8 @@ router.post('/', requireAuth, messagingWriteLimiter, async (req, res) => {
         createdById: req.user.userId,
         participants: {
           create: [
-            { userId: req.user.userId, role: 'admin' },
-            ...participantIds.map((id) => ({ userId: id })),
+            { userId: req.user.userId, role: 'admin', status: 'active' },
+            ...participantData,
           ],
         },
       },
@@ -411,7 +444,6 @@ router.delete('/:id', requireAuth, messagingWriteLimiter, async (req, res) => {
 /**
  * POST /conversations/:id/read
  * Mark a conversation as read (HTTP fallback when Socket.io unavailable).
- * Updates lastReadAt to now and returns the new unread count (0).
  */
 router.post('/:id/read', requireAuth, async (req, res) => {
   try {
@@ -420,7 +452,6 @@ router.post('/:id/read', requireAuth, async (req, res) => {
       return sendError(res, 400, 'Invalid conversation ID.', ERROR_CODES.BAD_REQUEST)
     }
 
-    // Verify user is a participant
     const participant = await prisma.conversationParticipant.findUnique({
       where: {
         conversationId_userId: {
@@ -434,7 +465,6 @@ router.post('/:id/read', requireAuth, async (req, res) => {
       return sendError(res, 403, 'Not a participant.', ERROR_CODES.FORBIDDEN)
     }
 
-    // Update lastReadAt to now
     await prisma.conversationParticipant.update({
       where: {
         conversationId_userId: {
@@ -452,4 +482,176 @@ router.post('/:id/read', requireAuth, async (req, res) => {
   }
 })
 
+// ─── Mute / Unmute ──────────────────────────────────────────────────────────
+
+/**
+ * POST /conversations/:id/mute
+ * Mute notifications for a conversation.
+ */
+router.post('/:id/mute', requireAuth, messagingWriteLimiter, async (req, res) => {
+  try {
+    const conversationId = parseInt(req.params.id, 10)
+    if (isNaN(conversationId)) {
+      return sendError(res, 400, 'Invalid conversation ID.', ERROR_CODES.BAD_REQUEST)
+    }
+
+    const participant = await prisma.conversationParticipant.findUnique({
+      where: {
+        conversationId_userId: {
+          conversationId,
+          userId: req.user.userId,
+        },
+      },
+    })
+
+    if (!participant) {
+      return sendError(res, 404, 'Conversation not found.', ERROR_CODES.NOT_FOUND)
+    }
+
+    await prisma.conversationParticipant.update({
+      where: {
+        conversationId_userId: {
+          conversationId,
+          userId: req.user.userId,
+        },
+      },
+      data: { muted: true },
+    })
+
+    res.json({ conversationId, muted: true })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
+  }
+})
+
+/**
+ * POST /conversations/:id/unmute
+ * Unmute notifications for a conversation.
+ */
+router.post('/:id/unmute', requireAuth, messagingWriteLimiter, async (req, res) => {
+  try {
+    const conversationId = parseInt(req.params.id, 10)
+    if (isNaN(conversationId)) {
+      return sendError(res, 400, 'Invalid conversation ID.', ERROR_CODES.BAD_REQUEST)
+    }
+
+    const participant = await prisma.conversationParticipant.findUnique({
+      where: {
+        conversationId_userId: {
+          conversationId,
+          userId: req.user.userId,
+        },
+      },
+    })
+
+    if (!participant) {
+      return sendError(res, 404, 'Conversation not found.', ERROR_CODES.NOT_FOUND)
+    }
+
+    await prisma.conversationParticipant.update({
+      where: {
+        conversationId_userId: {
+          conversationId,
+          userId: req.user.userId,
+        },
+      },
+      data: { muted: false },
+    })
+
+    res.json({ conversationId, muted: false })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
+  }
+})
+
+// ─── Archive / Unarchive ────────────────────────────────────────────────────
+
+/**
+ * POST /conversations/:id/archive
+ * Archive a conversation (hide from main list).
+ */
+router.post('/:id/archive', requireAuth, messagingWriteLimiter, async (req, res) => {
+  try {
+    const conversationId = parseInt(req.params.id, 10)
+    if (isNaN(conversationId)) {
+      return sendError(res, 400, 'Invalid conversation ID.', ERROR_CODES.BAD_REQUEST)
+    }
+
+    const participant = await prisma.conversationParticipant.findUnique({
+      where: {
+        conversationId_userId: {
+          conversationId,
+          userId: req.user.userId,
+        },
+      },
+    })
+
+    if (!participant) {
+      return sendError(res, 404, 'Conversation not found.', ERROR_CODES.NOT_FOUND)
+    }
+
+    await prisma.conversationParticipant.update({
+      where: {
+        conversationId_userId: {
+          conversationId,
+          userId: req.user.userId,
+        },
+      },
+      data: { archived: true },
+    })
+
+    res.json({ conversationId, archived: true })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
+  }
+})
+
+/**
+ * POST /conversations/:id/unarchive
+ * Unarchive a conversation (restore to main list).
+ */
+router.post('/:id/unarchive', requireAuth, messagingWriteLimiter, async (req, res) => {
+  try {
+    const conversationId = parseInt(req.params.id, 10)
+    if (isNaN(conversationId)) {
+      return sendError(res, 400, 'Invalid conversation ID.', ERROR_CODES.BAD_REQUEST)
+    }
+
+    const participant = await prisma.conversationParticipant.findUnique({
+      where: {
+        conversationId_userId: {
+          conversationId,
+          userId: req.user.userId,
+        },
+      },
+    })
+
+    if (!participant) {
+      return sendError(res, 404, 'Conversation not found.', ERROR_CODES.NOT_FOUND)
+    }
+
+    await prisma.conversationParticipant.update({
+      where: {
+        conversationId_userId: {
+          conversationId,
+          userId: req.user.userId,
+        },
+      },
+      data: { archived: false },
+    })
+
+    res.json({ conversationId, archived: false })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
+  }
+})
+
 module.exports = router
+
+// Export shared utilities for use in the main messaging router
+module.exports.conversationInclude = conversationInclude
+module.exports.attachUnreadCount = attachUnreadCount

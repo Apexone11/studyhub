@@ -24,6 +24,10 @@ export function MessageThread({
   loadingMessages,
   isPhone,
   currentUserId,
+  onMute,
+  onArchive,
+  onBlock,
+  sendBlocked,
 }) {
   const messagesEndRef = useRef(null)
   const fileInputRef = useRef(null)
@@ -39,6 +43,8 @@ export function MessageThread({
   const [showImageInput, setShowImageInput] = useState(false)
   const [showGifPicker, setShowGifPicker] = useState(false)
   const [showMessageSearch, setShowMessageSearch] = useState(false)
+  const [showHeaderMenu, setShowHeaderMenu] = useState(false)
+  const headerMenuRef = useRef(null)
   const [replyTo, setReplyTo] = useState(null)
   const [attachmentPreviews, setAttachmentPreviews] = useState([])
   const conversationName = getConversationDisplayName(conversation, currentUserId)
@@ -47,6 +53,18 @@ export function MessageThread({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, typingUsernames])
+
+  // Close header menu on click outside
+  useEffect(() => {
+    if (!showHeaderMenu) return
+    function handleClickOutside(e) {
+      if (headerMenuRef.current && !headerMenuRef.current.contains(e.target)) {
+        setShowHeaderMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showHeaderMenu])
 
   // Clean up attachment preview URLs
   useEffect(() => {
@@ -250,6 +268,81 @@ export function MessageThread({
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
         </button>
+
+        {/* Kebab menu */}
+        <div style={{ position: 'relative' }}>
+          <button
+            onClick={() => setShowHeaderMenu(!showHeaderMenu)}
+            aria-label="More options"
+            aria-haspopup="menu"
+            aria-expanded={showHeaderMenu}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sh-muted)', padding: 4 }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="12" cy="19" r="2" /></svg>
+          </button>
+
+          {showHeaderMenu && (
+            <div
+              ref={headerMenuRef}
+              style={{
+                position: 'absolute',
+                top: '100%',
+                right: 0,
+                marginTop: 4,
+                background: 'var(--sh-surface)',
+                border: '1px solid var(--sh-border)',
+                borderRadius: 8,
+                boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+                zIndex: 100,
+                padding: 4,
+                minWidth: 160,
+              }}
+            >
+              {[
+                {
+                  label: conversation.muted ? 'Unmute' : 'Mute',
+                  onClick: () => { setShowHeaderMenu(false); onMute?.(conversation.id, !conversation.muted) },
+                },
+                {
+                  label: 'Archive',
+                  onClick: () => { setShowHeaderMenu(false); onArchive?.(conversation.id) },
+                },
+                ...(conversation.type === 'dm' ? [{
+                  label: 'Block User',
+                  danger: true,
+                  onClick: () => { setShowHeaderMenu(false); onBlock?.(conversation) },
+                }] : []),
+                {
+                  label: 'Report',
+                  danger: true,
+                  onClick: () => { setShowHeaderMenu(false); window.open('/support', '_blank') },
+                },
+              ].map((item) => (
+                <button
+                  key={item.label}
+                  onClick={(e) => { e.stopPropagation(); item.onClick() }}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: item.danger ? 'var(--sh-danger-text)' : 'var(--sh-text)',
+                    textAlign: 'left',
+                    borderRadius: 6,
+                    fontFamily: PAGE_FONT,
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = item.danger ? 'var(--sh-danger-bg)' : 'var(--sh-soft)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Message search bar */}
@@ -323,7 +416,24 @@ export function MessageThread({
         style={{ display: 'none' }}
       />
 
+      {/* Blocked banner */}
+      {sendBlocked && (
+        <div style={{
+          padding: '12px 16px',
+          background: 'var(--sh-danger-bg)',
+          borderTop: '1px solid var(--sh-danger-border)',
+          color: 'var(--sh-danger-text)',
+          fontSize: 13,
+          fontWeight: 600,
+          textAlign: 'center',
+          fontFamily: PAGE_FONT,
+        }}>
+          You can no longer send messages to this person.
+        </div>
+      )}
+
       {/* Input area */}
+      {!sendBlocked && (
       <div style={{ padding: '12px 16px', borderTop: '1px solid var(--sh-border)', background: 'var(--sh-surface)' }}>
         {/* Reply-to banner */}
         {replyTo && (
@@ -518,6 +628,7 @@ export function MessageThread({
           </button>
         </div>
       </div>
+      )}
     </div>
   )
 }

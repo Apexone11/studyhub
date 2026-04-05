@@ -224,14 +224,8 @@ const getUserByUsername = async (req, res) => {
         role: true,
         avatarUrl: true,
         coverImageUrl: true,
+        isPrivate: true,
         createdAt: true,
-        _count: {
-          select: {
-            studySheets: { where: { status: 'published' } },
-            followers: true,
-            following: true,
-          },
-        },
         enrollments: {
           include: { course: { include: { school: true } } },
         },
@@ -259,12 +253,50 @@ const getUserByUsername = async (req, res) => {
       return res.status(403).json({ error: errorMessage })
     }
 
+    // Compute follower/following counts with status: 'active' filter
+    const [followerCount, followingCount, sheetCount] = await Promise.all([
+      prisma.userFollow.count({ where: { followingId: user.id, status: 'active' } }),
+      prisma.userFollow.count({ where: { followerId: user.id, status: 'active' } }),
+      prisma.studySheet.count({ where: { userId: user.id, status: 'published' } }),
+    ])
+
+    // Check follow relationship and status
     let isFollowing = false
-    if (req.user?.userId && req.user.userId !== user.id) {
+    let followStatus = null // null, 'active', or 'pending'
+    const isOwner = req.user?.userId && req.user.userId === user.id
+    if (req.user?.userId && !isOwner) {
       const follow = await prisma.userFollow.findUnique({
         where: { followerId_followingId: { followerId: req.user.userId, followingId: user.id } },
       })
-      isFollowing = !!follow
+      if (follow) {
+        followStatus = follow.status
+        isFollowing = follow.status === 'active'
+      }
+    }
+
+    // Private account gate: if private and viewer is not owner and not active follower
+    if (user.isPrivate && !isOwner && !isFollowing) {
+      // Enrich with Pro/Donor badge info
+      const badges = await enrichUserWithBadges(user)
+
+      return res.json({
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        avatarUrl: user.avatarUrl || null,
+        coverImageUrl: user.coverImageUrl || null,
+        isPrivate: true,
+        isPrivateProfile: true,
+        createdAt: user.createdAt,
+        plan: badges.plan || 'free',
+        isDonor: badges.isDonor || false,
+        donorLevel: badges.donorLevel || null,
+        followerCount,
+        followingCount,
+        sheetCount,
+        isFollowing: false,
+        followStatus,
+      })
     }
 
     /* Fetch shared (non-private) notes for profile display */
@@ -345,14 +377,16 @@ const getUserByUsername = async (req, res) => {
       role: user.role,
       avatarUrl: user.avatarUrl || null,
       coverImageUrl: user.coverImageUrl || null,
+      isPrivate: user.isPrivate || false,
       createdAt: user.createdAt,
       plan: badges.plan || 'free',
       isDonor: badges.isDonor || false,
       donorLevel: badges.donorLevel || null,
-      sheetCount: user._count.studySheets,
-      followerCount: user._count.followers,
-      followingCount: user._count.following,
+      sheetCount,
+      followerCount,
+      followingCount,
       isFollowing,
+      followStatus,
       recentSheets: user.studySheets,
       enrollments: user.enrollments,
       pinnedSheets,
@@ -370,15 +404,41 @@ const followUser = async (req, res) => {
   try {
     const target = await prisma.user.findUnique({
       where: { username: req.params.username },
-      select: { id: true, username: true, _count: { select: { followers: true } } },
+      select: { id: true, username: true, isPrivate: true },
     })
     if (!target) return res.status(404).json({ error: 'User not found.' })
     if (target.id === req.user.userId)
       return res.status(400).json({ error: 'You cannot follow yourself.' })
 
-    await prisma.userFollow.create({
-      data: { followerId: req.user.userId, followingId: target.id },
+    // Check if there's already a pending or active follow
+    const existing = await prisma.userFollow.findUnique({
+      where: { followerId_followingId: { followerId: req.user.userId, followingId: target.id } },
     })
+    if (existing) {
+      if (existing.status === 'pending') {
+        return res.status(409).json({ error: 'Follow request already pending.' })
+      }
+      return res.status(409).json({ error: 'Already following this user.' })
+    }
+
+    const isPending = target.isPrivate === true
+    const status = isPending ? 'pending' : 'active'
+
+    await prisma.userFollow.create({
+      data: { followerId: req.user.userId, followingId: target.id, status },
+    })
+
+    if (isPending) {
+      await createNotification(prisma, {
+        userId: target.id,
+        type: 'follow_request',
+        message: `${req.user.username} requested to follow you.`,
+        actorId: req.user.userId,
+        linkPath: `/users/${req.user.username}`,
+      })
+
+      return res.json({ followed: false, requested: true })
+    }
 
     await createNotification(prisma, {
       userId: target.id,
@@ -388,9 +448,11 @@ const followUser = async (req, res) => {
       linkPath: `/users/${req.user.username}`,
     })
 
-    const followerCount = await prisma.userFollow.count({ where: { followingId: target.id } })
+    const followerCount = await prisma.userFollow.count({
+      where: { followingId: target.id, status: 'active' },
+    })
     checkAndAwardBadges(prisma, target.id)
-    res.json({ following: true, followerCount })
+    res.json({ followed: true, followerCount })
   } catch (err) {
     if (err.code === 'P2002') return res.status(409).json({ error: 'Already following this user.' })
     captureError(err, { route: req.originalUrl, method: req.method })
@@ -399,6 +461,7 @@ const followUser = async (req, res) => {
 }
 
 // ── DELETE /api/users/:username/follow ────────────────────────
+// Also cancels pending follow requests
 const unfollowUser = async (req, res) => {
   try {
     const target = await prisma.user.findUnique({
@@ -411,7 +474,9 @@ const unfollowUser = async (req, res) => {
       where: { followerId_followingId: { followerId: req.user.userId, followingId: target.id } },
     })
 
-    const followerCount = await prisma.userFollow.count({ where: { followingId: target.id } })
+    const followerCount = await prisma.userFollow.count({
+      where: { followingId: target.id, status: 'active' },
+    })
     res.json({ following: false, followerCount })
   } catch (err) {
     if (err.code === 'P2025') return res.status(404).json({ error: 'Not following this user.' })
@@ -430,7 +495,7 @@ const getFollowers = async (req, res) => {
     if (!user) return res.status(404).json({ error: 'User not found.' })
 
     const follows = await prisma.userFollow.findMany({
-      where: { followingId: user.id },
+      where: { followingId: user.id, status: 'active' },
       orderBy: { createdAt: 'desc' },
       take: 50,
       select: {
@@ -457,7 +522,7 @@ const getFollowing = async (req, res) => {
     if (!user) return res.status(404).json({ error: 'User not found.' })
 
     const follows = await prisma.userFollow.findMany({
-      where: { followerId: user.id },
+      where: { followerId: user.id, status: 'active' },
       orderBy: { createdAt: 'desc' },
       take: 50,
       select: {
@@ -512,6 +577,7 @@ const getMe = async (req, res) => {
         role: true,
         verified: true,
         bio: true,
+        isPrivate: true,
         createdAt: true,
         schoolId: true,
         school: { select: { id: true, name: true } },
@@ -539,7 +605,7 @@ const getMe = async (req, res) => {
 // prioritizing users at the same school and users with popular content.
 const getFollowSuggestions = async (req, res) => {
   try {
-    // Get IDs the user already follows
+    // Get IDs the user already follows (active or pending)
     const following = await prisma.userFollow.findMany({
       where: { followerId: req.user.userId },
       select: { followingId: true },
@@ -758,6 +824,136 @@ const unmuteUser = async (req, res) => {
   }
 }
 
+// ── GET /api/users/me/follow-requests ───────────────────────────
+const getFollowRequests = async (req, res) => {
+  try {
+    const pendingFollows = await prisma.userFollow.findMany({
+      where: { followingId: req.user.userId, status: 'pending' },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        createdAt: true,
+        follower: {
+          select: { id: true, username: true, avatarUrl: true, accountType: true },
+        },
+      },
+    })
+
+    res.json({
+      count: pendingFollows.length,
+      requests: pendingFollows.map((f) => ({
+        ...f.follower,
+        requestedAt: f.createdAt,
+      })),
+    })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl })
+    res.status(500).json({ error: 'Server error.' })
+  }
+}
+
+// ── POST /api/users/:username/follow-request/accept ────────────
+const acceptFollowRequest = async (req, res) => {
+  try {
+    const requester = await prisma.user.findUnique({
+      where: { username: req.params.username },
+      select: { id: true, username: true },
+    })
+    if (!requester) return res.status(404).json({ error: 'User not found.' })
+
+    const follow = await prisma.userFollow.findUnique({
+      where: {
+        followerId_followingId: { followerId: requester.id, followingId: req.user.userId },
+      },
+    })
+
+    if (!follow || follow.status !== 'pending') {
+      return res.status(404).json({ error: 'No pending follow request from this user.' })
+    }
+
+    await prisma.userFollow.update({
+      where: {
+        followerId_followingId: { followerId: requester.id, followingId: req.user.userId },
+      },
+      data: { status: 'active' },
+    })
+
+    await createNotification(prisma, {
+      userId: requester.id,
+      type: 'follow_accepted',
+      message: `${req.user.username} accepted your follow request.`,
+      actorId: req.user.userId,
+      linkPath: `/users/${req.user.username}`,
+    })
+
+    checkAndAwardBadges(prisma, req.user.userId)
+    res.json({ accepted: true })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+}
+
+// ── POST /api/users/:username/follow-request/decline ───────────
+const declineFollowRequest = async (req, res) => {
+  try {
+    const requester = await prisma.user.findUnique({
+      where: { username: req.params.username },
+      select: { id: true },
+    })
+    if (!requester) return res.status(404).json({ error: 'User not found.' })
+
+    const follow = await prisma.userFollow.findUnique({
+      where: {
+        followerId_followingId: { followerId: requester.id, followingId: req.user.userId },
+      },
+    })
+
+    if (!follow || follow.status !== 'pending') {
+      return res.status(404).json({ error: 'No pending follow request from this user.' })
+    }
+
+    await prisma.userFollow.delete({
+      where: {
+        followerId_followingId: { followerId: requester.id, followingId: req.user.userId },
+      },
+    })
+
+    res.json({ declined: true })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+}
+
+// ── PATCH /api/users/me/privacy ────────────────────────────────
+const updatePrivacy = async (req, res) => {
+  try {
+    const { isPrivate } = req.body || {}
+    if (typeof isPrivate !== 'boolean') {
+      return res.status(400).json({ error: 'isPrivate must be a boolean.' })
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: req.user.userId },
+      data: { isPrivate },
+      select: { id: true, isPrivate: true },
+    })
+
+    // When switching from private to public, auto-accept all pending follow requests
+    if (!isPrivate) {
+      await prisma.userFollow.updateMany({
+        where: { followingId: req.user.userId, status: 'pending' },
+        data: { status: 'active' },
+      })
+    }
+
+    res.json({ isPrivate: updated.isPrivate })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+}
+
 // ── GET /api/users/me/terms-status ──────────────────────────────
 const CURRENT_TERMS_VERSION = '2026-04-04'
 
@@ -816,6 +1012,10 @@ module.exports = {
   unfollowUser,
   getFollowers,
   getFollowing,
+  getFollowRequests,
+  acceptFollowRequest,
+  declineFollowRequest,
+  updatePrivacy,
   getMyStreak,
   getMyWeeklyActivity,
   getMe,

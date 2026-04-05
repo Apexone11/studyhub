@@ -158,6 +158,7 @@ async function getSettingsUser(userId) {
         emailVerified: true,
         avatarUrl: true,
         coverImageUrl: true,
+        isPrivate: true,
         authProvider: true,
         accountType: true,
         googleId: true,

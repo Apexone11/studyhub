@@ -50,21 +50,6 @@ router.delete('/me/pinned-sheets/:sheetId', requireAuth, usersController.deleteP
 // ── PATCH /api/users/me/pinned-sheets/reorder ────────────────
 router.patch('/me/pinned-sheets/reorder', requireAuth, usersController.reorderPinnedSheets)
 
-// ── GET /api/users/:username ───────────────────────────────────
-router.get('/:username', optionalAuth, usersController.getUserByUsername)
-
-// ── POST /api/users/:username/follow ──────────────────────────
-router.post('/:username/follow', requireAuth, followLimiter, usersController.followUser)
-
-// ── DELETE /api/users/:username/follow ────────────────────────
-router.delete('/:username/follow', requireAuth, followLimiter, usersController.unfollowUser)
-
-// ── GET /api/users/:username/followers ─────────────────────
-router.get('/:username/followers', optionalAuth, usersController.getFollowers)
-
-// ── GET /api/users/:username/following ─────────────────────
-router.get('/:username/following', optionalAuth, usersController.getFollowing)
-
 // ── GET /api/users/me/streak ────────────────────────────────────
 router.get('/me/streak', requireAuth, usersController.getMyStreak)
 
@@ -72,13 +57,9 @@ router.get('/me/streak', requireAuth, usersController.getMyStreak)
 router.get('/me/weekly-activity', requireAuth, usersController.getMyWeeklyActivity)
 
 // ── GET /api/users/me ─────────────────────────────────────────────
-// Returns the authenticated user's profile data. Used by gamification
-// widgets and any component that needs the current user's info.
 router.get('/me', requireAuth, usersController.getMe)
 
 // ── GET /api/users/me/follow-suggestions ──────────────────────────
-// Returns up to 8 users the authenticated user may want to follow,
-// prioritizing users at the same school and users with popular content.
 router.get('/me/follow-suggestions', requireAuth, usersController.getFollowSuggestions)
 
 // ── GET /api/users/me/blocked ─────────────────────────────────────
@@ -92,6 +73,33 @@ router.get('/me/terms-status', requireAuth, usersController.getTermsStatus)
 
 // ── POST /api/users/me/terms-accept ─────────────────────────────
 router.post('/me/terms-accept', requireAuth, usersController.acceptTerms)
+
+// ── GET /api/users/me/follow-requests ───────────────────────────
+router.get('/me/follow-requests', requireAuth, usersController.getFollowRequests)
+
+// ── PATCH /api/users/me/privacy ─────────────────────────────────
+router.patch('/me/privacy', requireAuth, usersController.updatePrivacy)
+
+// ── GET /api/users/:username ───────────────────────────────────
+router.get('/:username', optionalAuth, usersController.getUserByUsername)
+
+// ── POST /api/users/:username/follow ──────────────────────────
+router.post('/:username/follow', requireAuth, followLimiter, usersController.followUser)
+
+// ── DELETE /api/users/:username/follow ────────────────────────
+router.delete('/:username/follow', requireAuth, followLimiter, usersController.unfollowUser)
+
+// ── POST /api/users/:username/follow-request/accept ─────────────
+router.post('/:username/follow-request/accept', requireAuth, followLimiter, usersController.acceptFollowRequest)
+
+// ── POST /api/users/:username/follow-request/decline ────────────
+router.post('/:username/follow-request/decline', requireAuth, followLimiter, usersController.declineFollowRequest)
+
+// ── GET /api/users/:username/followers ─────────────────────
+router.get('/:username/followers', optionalAuth, usersController.getFollowers)
+
+// ── GET /api/users/:username/following ─────────────────────
+router.get('/:username/following', optionalAuth, usersController.getFollowing)
 
 // ── POST /api/users/:username/block ──────────────────────────────
 router.post('/:username/block', requireAuth, followLimiter, usersController.blockUser)
