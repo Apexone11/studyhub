@@ -782,4 +782,50 @@ module.exports = {
   unblockUser,
   muteUser,
   unmuteUser,
+  getTermsStatus,
+  acceptTerms,
+}
+
+// ── GET /api/users/me/terms-status ──────────────────────────────
+const CURRENT_TERMS_VERSION = '2026-04-04'
+
+const getTermsStatus = async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: { termsAcceptedVersion: true, termsAcceptedAt: true },
+    })
+    res.json({
+      acceptedVersion: user?.termsAcceptedVersion || null,
+      acceptedAt: user?.termsAcceptedAt || null,
+      currentVersion: CURRENT_TERMS_VERSION,
+      needsUpdate: !user?.termsAcceptedVersion || user.termsAcceptedVersion < CURRENT_TERMS_VERSION,
+    })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl })
+    res.status(500).json({ error: 'Server error.' })
+  }
+}
+
+// ── POST /api/users/me/terms-accept ─────────────────────────────
+const acceptTerms = async (req, res) => {
+  try {
+    const version = typeof req.body?.version === 'string' ? req.body.version.trim() : CURRENT_TERMS_VERSION
+    await prisma.user.update({
+      where: { id: req.user.userId },
+      data: {
+        termsAcceptedVersion: version,
+        termsAcceptedAt: new Date(),
+      },
+    })
+    res.json({
+      acceptedVersion: version,
+      acceptedAt: new Date(),
+      currentVersion: CURRENT_TERMS_VERSION,
+      needsUpdate: false,
+    })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl })
+    res.status(500).json({ error: 'Server error.' })
+  }
 }

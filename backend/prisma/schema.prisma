@@ -30,6 +30,8 @@ model User {
   googleId                String?   @unique
   authProvider            String    @default("local")
   accountType             String    @default("student")
+  termsAcceptedVersion    String?
+  termsAcceptedAt         DateTime?
   createdAt               DateTime  @default(now())
 
   studySheets                StudySheet[]

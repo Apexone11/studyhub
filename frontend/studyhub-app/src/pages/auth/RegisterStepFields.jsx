@@ -2,9 +2,10 @@
  * RegisterStepFields.jsx — Individual step/form-field components
  * ═══════════════════════════════════════════════════════════════════════════ */
 
-import { Link } from 'react-router-dom'
+import { useState } from 'react'
 import { GoogleLogin } from '@react-oauth/google'
 import { GOOGLE_CLIENT_ID } from '../../config'
+import LegalAcceptanceModal from './LegalAcceptanceModal'
 
 /* ── Password strength indicator ───────────────────────────────────────── */
 export function PasswordHint({ password, confirmPassword }) {
@@ -62,6 +63,8 @@ export function StepIndicator({ steps, step }) {
  * STEP 1: Account Creation
  * ══════════════════════════════════════════════════════════════════════════ */
 export function AccountStep({ form, setField, loading, onSubmit, onGoogleSuccess, setError }) {
+  const [showLegalModal, setShowLegalModal] = useState(false)
+
   return (
     <form onSubmit={onSubmit}>
       <div className="register-section-header">
@@ -173,17 +176,31 @@ export function AccountStep({ form, setField, loading, onSubmit, onGoogleSuccess
         </div>
       </div>
 
-      {/* Terms checkbox */}
-      <label className="register-terms">
-        <input
-          type="checkbox"
-          checked={form.termsAccepted}
-          onChange={(event) => setField('termsAccepted', event.target.checked)}
-        />
+      {/* Terms checkbox -- opens legal acceptance modal */}
+      <label
+        className="register-terms"
+        onClick={(e) => { e.preventDefault(); setShowLegalModal(true) }}
+        style={{ cursor: 'pointer' }}
+      >
+        <input type="checkbox" checked={form.termsAccepted} readOnly tabIndex={-1} />
         <span>
-          I agree to the <Link to="/terms">Terms of Use</Link> and <Link to="/guidelines">Community Guidelines</Link>.
+          I agree to the{' '}
+          <span style={{ color: 'var(--sh-brand)' }}>Terms of Use</span>,{' '}
+          <span style={{ color: 'var(--sh-brand)' }}>Privacy Policy</span>, and{' '}
+          <span style={{ color: 'var(--sh-brand)' }}>Community Guidelines</span>
         </span>
       </label>
+
+      <LegalAcceptanceModal
+        open={showLegalModal}
+        onAccept={() => {
+          setField('termsAccepted', true)
+          setShowLegalModal(false)
+        }}
+        onDecline={() => {
+          setShowLegalModal(false)
+        }}
+      />
 
       <button type="submit" disabled={loading} className="register-btn-primary">
         {loading ? 'Creating account...' : 'Create Account'}

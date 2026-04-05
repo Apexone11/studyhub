@@ -16,6 +16,9 @@ const RegisterScreen = lazy(() => import('./pages/auth/RegisterScreen'))
 const TermsPage = lazy(() => import('./pages/legal/TermsPage'))
 const PrivacyPage = lazy(() => import('./pages/legal/PrivacyPage'))
 const GuidelinesPage = lazy(() => import('./pages/legal/GuidelinesPage'))
+const CookiePolicyPage = lazy(() => import('./pages/legal/CookiePolicyPage'))
+const DisclaimerPage = lazy(() => import('./pages/legal/DisclaimerPage'))
+const DataRequestPage = lazy(() => import('./pages/legal/DataRequestPage'))
 const FeedPage = lazy(() => import('./pages/feed/FeedPage'))
 const SheetsPage = lazy(() => import('./pages/sheets/SheetsPage'))
 const SheetViewerPage = lazy(() => import('./pages/sheets/viewer/SheetViewerPage'))
@@ -327,6 +330,9 @@ function AppRoutes() {
               <Route path="/terms" element={<TermsPage />} />
               <Route path="/privacy" element={<PrivacyPage />} />
               <Route path="/guidelines" element={<GuidelinesPage />} />
+              <Route path="/cookies" element={<CookiePolicyPage />} />
+              <Route path="/disclaimer" element={<DisclaimerPage />} />
+              <Route path="/data-request" element={<DataRequestPage />} />
               <Route path="/about" element={<AboutPage />} />
               <Route path="/pricing" element={<PricingPage />} />
               <Route path="/supporters" element={<SupportersPage />} />

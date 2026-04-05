@@ -5,7 +5,10 @@ import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '../config'
 const RELATED_LINKS = [
   { label: 'Terms of Use', to: '/terms' },
   { label: 'Privacy Policy', to: '/privacy' },
+  { label: 'Cookie Policy', to: '/cookies' },
   { label: 'Community Guidelines', to: '/guidelines' },
+  { label: 'Disclaimer', to: '/disclaimer' },
+  { label: 'Data Request', to: '/data-request' },
 ]
 
 export function LegalSection({ title, children }) {
@@ -92,9 +95,26 @@ export default function LegalPageLayout({
       </main>
 
       <footer className="legal-footer">
-        <span className="legal-footer-brand">StudyHub</span>
-        <span className="legal-footer-divider">·</span>
-        <span>Built by students, for students</span>
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '6px 14px', marginBottom: 8 }}>
+          {RELATED_LINKS.map((link) => (
+            <Link key={link.to} to={link.to} style={{ color: 'var(--sh-muted)', fontSize: 12, textDecoration: 'none', fontWeight: 500 }}>
+              {link.label}
+            </Link>
+          ))}
+          <a
+            href="#"
+            className="termly-display-preferences"
+            onClick={(e) => e.preventDefault()}
+            style={{ color: 'var(--sh-muted)', fontSize: 12, textDecoration: 'none', fontWeight: 500 }}
+          >
+            Consent Preferences
+          </a>
+        </div>
+        <div>
+          <span className="legal-footer-brand">StudyHub</span>
+          <span className="legal-footer-divider">·</span>
+          <span>Built by students, for students</span>
+        </div>
       </footer>
     </div>
   )

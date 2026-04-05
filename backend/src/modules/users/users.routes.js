@@ -82,12 +82,16 @@ router.get('/me', requireAuth, usersController.getMe)
 router.get('/me/follow-suggestions', requireAuth, usersController.getFollowSuggestions)
 
 // ── GET /api/users/me/blocked ─────────────────────────────────────
-// Returns the list of user IDs the authenticated user has blocked.
 router.get('/me/blocked', requireAuth, usersController.getBlockedUsers)
 
 // ── GET /api/users/me/muted ──────────────────────────────────────
-// Returns the list of user IDs the authenticated user has muted.
 router.get('/me/muted', requireAuth, usersController.getMutedUsers)
+
+// ── GET /api/users/me/terms-status ──────────────────────────────
+router.get('/me/terms-status', requireAuth, usersController.getTermsStatus)
+
+// ── POST /api/users/me/terms-accept ─────────────────────────────
+router.post('/me/terms-accept', requireAuth, usersController.acceptTerms)
 
 // ── POST /api/users/:username/block ──────────────────────────────
 router.post('/:username/block', requireAuth, followLimiter, usersController.blockUser)

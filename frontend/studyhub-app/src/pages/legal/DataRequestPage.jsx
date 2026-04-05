@@ -1,0 +1,30 @@
+import LegalPageLayout, { LegalSection } from '../../components/LegalPageLayout'
+import { IconShieldCheck } from '../../components/Icons'
+
+function DataRequestPage() {
+  return (
+    <LegalPageLayout
+      tone="blue"
+      title="Data Request"
+      updated="Your Privacy Rights"
+      summary="Request access to, correction of, or deletion of your personal data."
+      intro="Under privacy laws including CCPA and GDPR, you have the right to manage your personal data. Use this page to submit a request."
+      icon={<IconShieldCheck size={26} />}
+    >
+      <LegalSection title="Submit a Data Request">
+        <p>
+          Under privacy laws including CCPA and GDPR, you have the right to request access
+          to your personal data, ask for corrections, or request deletion. Use the form below
+          to submit your request. We will respond within 24 hours.
+        </p>
+        <iframe
+          src="https://app.termly.io/dsar/af795fa7-a3b0-41e4-b342-8797a0194d55"
+          style={{ width: '100%', minHeight: 700, border: 'none', borderRadius: 8 }}
+          title="Data Subject Access Request Form"
+        />
+      </LegalSection>
+    </LegalPageLayout>
+  )
+}
+
+export default DataRequestPage

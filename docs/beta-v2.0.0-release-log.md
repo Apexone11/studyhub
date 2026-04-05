@@ -113,3 +113,71 @@ Frontend:
 - `NoteEditor.jsx` - TipTap WYSIWYG upgrade
 - `notesComponents.jsx` - HTML content renderer
 - `notesConstants.js` - HTML word count
+
+### Legal Compliance Integration (Termly)
+
+**Consent Banner**
+- Termly resource-blocker script added to `index.html` head
+- Auto-blocks non-essential cookies until user consent
+- Website UUID: `f44c5c0c-a4fc-4ca4-980b-89068e5aeb41`
+
+**Registration Legal Acceptance Modal**
+- Created `LegalAcceptanceModal.jsx` with 3-tab interface (Terms, Privacy, Guidelines)
+- Terms and Privacy tabs load Termly-hosted policies via iframe
+- Guidelines tab renders inline content with scroll-to-bottom tracking
+- Accept button disabled until all 3 documents are viewed
+- Checkbox on register page now opens modal (readOnly, not directly togglable)
+- `termsVersion` sent to backend on registration, stored in User record
+
+**New Legal Pages**
+- `CookiePolicyPage.jsx` at `/cookies` - Termly cookie policy iframe
+- `DisclaimerPage.jsx` at `/disclaimer` - Termly disclaimer iframe
+- `DataRequestPage.jsx` at `/data-request` - Termly DSAR form iframe for GDPR/CCPA data requests
+- Routes added to App.jsx
+
+**Legal Page Layout Updates**
+- `RELATED_LINKS` updated to include all 6 pages (Terms, Privacy, Cookies, Guidelines, Disclaimer, Data Request)
+- Footer updated with all legal links + Consent Preferences trigger
+
+**Settings Legal Tab**
+- 9th tab added to SettingsPage: "Legal"
+- Terms acceptance status with version checking
+- Legal document cards grid linking to each page
+- Privacy controls: Consent Preferences (Termly) + Data Request link
+
+**App Footer**
+- Created `AppFooter.jsx` component
+- Links to all 6 legal pages + Consent Preferences
+- Minimal design with `var(--sh-muted)` styling
+
+**Backend: Terms Acceptance Tracking**
+- Added `termsAcceptedVersion` (String?) and `termsAcceptedAt` (DateTime?) to User model
+- Migration: `20260404200000_add_terms_acceptance_tracking`
+- `GET /api/users/me/terms-status` - Returns accepted version, current version, needsUpdate flag
+- `POST /api/users/me/terms-accept` - Records acceptance of terms version
+- Registration endpoint stores `termsAcceptedVersion` and `termsAcceptedAt` on user creation
+
+**Constants**
+- `legalVersions.js` - CURRENT_TERMS_VERSION, Termly UUIDs, policy URLs, DSAR URL
+
+### Donor Benefits System
+
+**Donor Tier Added to PLANS**
+- 15 uploads/month, 60 AI messages/day, 4 private groups, 100 bookmarks
+- 45 min video, 1 GB file size, 1 GB storage
+- Upload quota enforcement uses `getUserTier()` (resolves free/donor/pro)
+
+**Subscription Tab Updates**
+- Plan icon shows actual plan images (not letter "P")
+- Donor plan shows `plan-donation.png`
+- Donor status badge with green "Supporter" styling
+
+**Video Upload Tier Enforcement**
+- Drop zone shows tier-specific limits (size + duration)
+- Client-side validation on file selection with duration check via video metadata
+- Upload button disabled when file exceeds tier limits
+- Clear error messages with upgrade suggestions
+
+### For You Feed Fix
+- Fixed `undefined` values in Prisma `notIn` array (`.filter(Boolean)`)
+- Error messages now surface actual backend error
