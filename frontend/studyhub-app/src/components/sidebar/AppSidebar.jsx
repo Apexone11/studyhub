@@ -40,7 +40,9 @@ export default function AppSidebar({ mode = 'fixed' }) {
   if (!user) return null
 
   const enrollments = user.enrollments || []
-  const courseCodes = enrollments.map((e) => e.course?.code).filter(Boolean)
+  const courseEntries = enrollments
+    .filter((e) => e.course?.code && e.course?.id)
+    .map((e) => ({ code: e.course.code, id: e.course.id }))
   const joinDate = user.createdAt
     ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
     : null
@@ -149,7 +151,7 @@ export default function AppSidebar({ mode = 'fixed' }) {
           <div className="sh-label" style={{ marginBottom: 8, paddingLeft: 2 }}>
             {user.accountType === 'teacher' ? 'MY COURSES (TEACHING)' : 'MY COURSES'}
           </div>
-          {courseCodes.length === 0 ? (
+          {courseEntries.length === 0 ? (
             <Link
               to="/my-courses"
               style={{
@@ -162,32 +164,38 @@ export default function AppSidebar({ mode = 'fixed' }) {
               Set up your courses &rarr;
             </Link>
           ) : (
-            courseCodes.map((code) => (
-              <div
-                key={code}
+            courseEntries.map((entry) => (
+              <Link
+                key={entry.id}
+                to={`/sheets?courseId=${entry.id}`}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: 8,
                   padding: '6px 2px',
                   borderBottom: '1px solid var(--sh-border)',
+                  textDecoration: 'none',
+                  borderRadius: 6,
+                  transition: 'background 0.15s',
                 }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--sh-soft)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
               >
                 <div
                   style={{
                     width: 7,
                     height: 7,
                     borderRadius: '50%',
-                    background: courseColor(code),
+                    background: courseColor(entry.code),
                     flexShrink: 0,
                   }}
                 />
                 <span
                   style={{ fontSize: 'var(--type-sm)', fontWeight: 600, color: 'var(--sh-text)' }}
                 >
-                  {code}
+                  {entry.code}
                 </span>
-              </div>
+              </Link>
             ))
           )}
           <button
