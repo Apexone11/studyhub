@@ -79,6 +79,7 @@ function FeedVideoPlayer({ video }) {
   const [streamUrl, setStreamUrl] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [buffering, setBuffering] = useState(true)
 
   useEffect(() => {
     if (!video?.id || video.status !== 'ready') return
@@ -232,17 +233,37 @@ function FeedVideoPlayer({ video }) {
         background: '#000',
       }}
     >
-      <video
-        src={streamUrl}
-        poster={thumbnailUrl || undefined}
-        controls
-        playsInline
-        preload="metadata"
-        controlsList={video.downloadable === false ? 'nodownload nofullscreen noremoteplayback' : undefined}
-        disablePictureInPicture={video.downloadable === false}
-        onContextMenu={video.downloadable === false ? (e) => e.preventDefault() : undefined}
-        style={{ width: '100%', display: 'block', maxHeight: 500 }}
-      />
+      <div style={{ position: 'relative' }}>
+        {buffering && thumbnailUrl && (
+          <img
+            src={thumbnailUrl}
+            alt=""
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              borderRadius: 8,
+            }}
+          />
+        )}
+        <video
+          src={streamUrl}
+          poster={thumbnailUrl || undefined}
+          controls
+          playsInline
+          preload="metadata"
+          controlsList={video.downloadable === false ? 'nodownload nofullscreen noremoteplayback' : undefined}
+          disablePictureInPicture={video.downloadable === false}
+          onContextMenu={video.downloadable === false ? (e) => e.preventDefault() : undefined}
+          onCanPlay={() => setBuffering(false)}
+          onWaiting={() => setBuffering(true)}
+          onPlaying={() => setBuffering(false)}
+          style={{ width: '100%', display: 'block', maxHeight: 500, opacity: buffering ? 0 : 1, transition: 'opacity 0.2s' }}
+        />
+      </div>
       <div
         style={{
           padding: '8px 12px',
