@@ -28,6 +28,7 @@ export default function LegalTab() {
   const [termsStatus, setTermsStatus] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [accepting, setAccepting] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -74,7 +75,7 @@ export default function LegalTab() {
             fontSize: 13,
             lineHeight: 1.6,
           }}>
-            <strong>Up to date</strong> -- Your terms acceptance is current (version {termsStatus.termsAcceptedVersion}).
+            <strong>Up to date</strong> -- Your terms acceptance is current (version {termsStatus.acceptedVersion}).
           </div>
         ) : (
           <>
@@ -90,9 +91,32 @@ export default function LegalTab() {
             }}>
               <strong>Update required</strong> -- Our terms have been updated. Please review and accept the latest version.
             </div>
-            <Link to="/terms" style={{ textDecoration: 'none' }}>
-              <Button>Review and Accept</Button>
-            </Link>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <Link to="/terms" style={{ textDecoration: 'none' }}>
+                <Button secondary>Review Terms</Button>
+              </Link>
+              <Button
+                disabled={accepting}
+                onClick={async () => {
+                  setAccepting(true)
+                  try {
+                    const res = await fetch(`${API}/api/users/me/terms-accept`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      credentials: 'include',
+                      body: JSON.stringify({ version: CURRENT_TERMS_VERSION }),
+                    })
+                    if (res.ok) {
+                      const data = await res.json()
+                      setTermsStatus(data)
+                    }
+                  } catch { /* silent */ }
+                  finally { setAccepting(false) }
+                }}
+              >
+                {accepting ? 'Accepting...' : 'Accept Current Terms'}
+              </Button>
+            </div>
           </>
         )}
       </SectionCard>

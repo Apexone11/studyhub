@@ -177,19 +177,32 @@ export function AccountStep({ form, setField, loading, onSubmit, onGoogleSuccess
       </div>
 
       {/* Terms checkbox -- opens legal acceptance modal */}
-      <label
+      <button
+        type="button"
         className="register-terms"
-        onClick={(e) => { e.preventDefault(); setShowLegalModal(true) }}
-        style={{ cursor: 'pointer' }}
+        onClick={() => setShowLegalModal(true)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowLegalModal(true) } }}
+        style={{ cursor: 'pointer', background: 'none', border: 'none', padding: 0, textAlign: 'left', display: 'flex', alignItems: 'flex-start', gap: 8, width: '100%' }}
+        aria-label={form.termsAccepted ? 'Terms accepted. Click to review.' : 'Click to review and accept terms'}
       >
-        <input type="checkbox" checked={form.termsAccepted} readOnly tabIndex={-1} />
-        <span>
+        <span style={{
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          width: 18, height: 18, borderRadius: 4, flexShrink: 0, marginTop: 2,
+          border: form.termsAccepted ? 'none' : '2px solid var(--sh-border)',
+          background: form.termsAccepted ? 'var(--sh-brand)' : 'transparent',
+          color: 'white', fontSize: 12,
+        }}>
+          {form.termsAccepted && (
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+          )}
+        </span>
+        <span style={{ fontSize: 13, color: 'var(--sh-text)', lineHeight: 1.5 }}>
           I agree to the{' '}
           <span style={{ color: 'var(--sh-brand)' }}>Terms of Use</span>,{' '}
           <span style={{ color: 'var(--sh-brand)' }}>Privacy Policy</span>, and{' '}
           <span style={{ color: 'var(--sh-brand)' }}>Community Guidelines</span>
         </span>
-      </label>
+      </button>
 
       <LegalAcceptanceModal
         open={showLegalModal}

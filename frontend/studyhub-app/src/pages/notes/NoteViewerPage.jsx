@@ -22,7 +22,9 @@ function formatDate(dateStr) {
 }
 
 function isHtmlContent(content) {
-  return content && content.trim().includes('<') && !(/^(#{1,6}\s|[-*+]\s|\d+\.\s|>\s)/.test(content.trim()))
+  if (!content) return false
+  // Detect actual HTML tags (not markdown autolinks like <https://...>)
+  return /<[a-z][\s\S]*>/i.test(content)
 }
 
 function downloadNote(title, content) {
