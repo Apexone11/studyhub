@@ -542,6 +542,11 @@ function VideoProcessingProgress({ videoId }) {
           clearInterval(poll)
           return
         }
+        if (data.status === 'blocked') {
+          setStep('blocked')
+          clearInterval(poll)
+          return
+        }
         if (data.processingStep) setStep(data.processingStep)
         if (data.processingProgress != null) setPct(data.processingProgress)
       } catch {
@@ -623,6 +628,17 @@ function VideoProcessingProgress({ videoId }) {
         <p style={{ color: 'var(--sh-danger-text)', fontSize: 'var(--type-xs)', marginTop: 8 }}>
           Video processing failed. Please try uploading again.
         </p>
+      )}
+
+      {step === 'blocked' && (
+        <div style={{ marginTop: 12, padding: '12px 16px', background: 'var(--sh-warning-bg)', border: '1px solid var(--sh-warning-border)', borderRadius: 8 }}>
+          <p style={{ color: 'var(--sh-warning-text)', fontSize: 'var(--type-sm)', fontWeight: 600, margin: '0 0 8px' }}>
+            This video appears to belong to another user. Upload has been blocked.
+          </p>
+          <p style={{ color: 'var(--sh-warning-text)', fontSize: 'var(--type-xs)', margin: 0 }}>
+            If this is your content, you can submit an appeal from your video settings.
+          </p>
+        </div>
       )}
 
       {!done && step !== 'failed' && (

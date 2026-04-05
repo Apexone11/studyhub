@@ -441,6 +441,14 @@ router.get('/:id/stream', readLimiter, async (req, res) => {
       return res.status(409).json({ error: 'Video is still processing.' })
     }
 
+    // Enforce download protection -- owners can always stream their own videos
+    if (video.downloadable === false) {
+      const requesterId = req.user?.userId || null
+      if (requesterId !== video.userId) {
+        return res.status(403).json({ error: 'Downloads are disabled for this video.' })
+      }
+    }
+
     const quality = req.query.quality || null
     const variants = video.variants || {}
 
@@ -580,6 +588,67 @@ router.delete('/:id', requireAuth, async (req, res) => {
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+/**
+ * POST /api/video/:id/appeal
+ * Submit an appeal for a blocked video (plagiarism detection).
+ * Body: { reason }
+ */
+router.post('/:id/appeal', requireAuth, async (req, res) => {
+  try {
+    const videoId = parseInt(req.params.id, 10)
+    if (isNaN(videoId)) return res.status(400).json({ error: 'Invalid video ID.' })
+
+    const { reason } = req.body || {}
+    if (!reason || reason.trim().length < 10) {
+      return res.status(400).json({ error: 'Please provide a reason (at least 10 characters).' })
+    }
+
+    const video = await prisma.video.findUnique({ where: { id: videoId } })
+    if (!video) return res.status(404).json({ error: 'Video not found.' })
+    if (video.userId !== req.user.userId) {
+      return res.status(403).json({ error: 'You can only appeal your own videos.' })
+    }
+    if (video.status !== 'blocked') {
+      return res.status(400).json({ error: 'Only blocked videos can be appealed.' })
+    }
+
+    // Check for existing pending appeal
+    const existingAppeal = await prisma.videoAppeal.findFirst({
+      where: { videoId, status: 'pending' },
+    })
+    if (existingAppeal) {
+      return res.status(409).json({ error: 'An appeal is already pending for this video.' })
+    }
+
+    // Find the original video this was flagged against
+    const original = await prisma.video.findFirst({
+      where: {
+        contentHash: video.contentHash,
+        userId: { not: video.userId },
+        status: VIDEO_STATUS.READY,
+      },
+    })
+
+    if (!original) {
+      return res.status(400).json({ error: 'Could not find the original video for appeal.' })
+    }
+
+    const appeal = await prisma.videoAppeal.create({
+      data: {
+        videoId,
+        uploaderId: req.user.userId,
+        originalVideoId: original.id,
+        reason: reason.trim().slice(0, 1000),
+      },
+    })
+
+    res.json({ appeal, message: 'Appeal submitted. An admin will review it.' })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Failed to submit appeal.' })
   }
 })
 
@@ -739,6 +808,8 @@ function formatVideoResponse(video) {
     processingStep: video.processingStep || null,
     processingProgress: video.processingProgress || 0,
     downloadable: video.downloadable !== false,
+    contentHash: video.contentHash || null,
+    watermarkPosition: video.watermarkPosition || null,
     createdAt: video.createdAt,
   }
 }

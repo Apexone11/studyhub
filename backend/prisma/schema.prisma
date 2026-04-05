@@ -120,6 +120,8 @@ model User {
   lastActiveAt               DateTime?
   userReviews                UserReview[]
   generatedReviewReports     ReviewReport[]        @relation("ReviewReportGenerator")
+  videoAppeals               VideoAppeal[]         @relation("VideoAppealUploader")
+  videoAppealReviews         VideoAppeal[]         @relation("VideoAppealReviewer")
 
   @@index([role])
   @@index([emailHash])
@@ -1429,6 +1431,8 @@ model Video {
   processingStep   String?   // Current step: downloading, analyzing, thumbnail, transcoding, finalizing
   processingProgress Int?    // 0-100 percentage
   downloadable     Boolean   @default(true) // Whether viewers can download this video
+  contentHash       String?
+  watermarkPosition String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -1436,9 +1440,12 @@ model Video {
   captions          VideoCaption[]
   feedPosts         FeedPost[]          @relation("FeedPostVideo")
   announcementMedia AnnouncementMedia[]
+  appeals           VideoAppeal[]       @relation("VideoAppealVideo")
+  appealOriginals   VideoAppeal[]       @relation("VideoAppealOriginal")
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([status])
+  @@index([contentHash])
 }
 
 model VideoCaption {
@@ -1453,6 +1460,28 @@ model VideoCaption {
 
   @@unique([videoId, language])
   @@index([videoId])
+}
+
+model VideoAppeal {
+  id              Int      @id @default(autoincrement())
+  videoId         Int
+  uploaderId      Int
+  originalVideoId Int
+  status          String   @default("pending")
+  reason          String?
+  reviewedBy      Int?
+  reviewNote      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  video           Video    @relation("VideoAppealVideo", fields: [videoId], references: [id], onDelete: Cascade)
+  uploader        User     @relation("VideoAppealUploader", fields: [uploaderId], references: [id])
+  originalVideo   Video    @relation("VideoAppealOriginal", fields: [originalVideoId], references: [id])
+  reviewer        User?    @relation("VideoAppealReviewer", fields: [reviewedBy], references: [id])
+
+  @@index([videoId])
+  @@index([uploaderId])
+  @@index([status])
 }
 
 model AnnouncementMedia {
