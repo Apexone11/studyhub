@@ -1,29 +1,39 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import MentionText from '../../components/MentionText'
+import UserAvatar from '../../components/UserAvatar'
 import { API } from '../../config'
 import { getApiErrorMessage, readJsonSafely } from '../../lib/http'
-import { Avatar } from './FeedWidgets'
 import {
   authHeaders,
   timeAgo,
+  FONT,
   commentSectionContainerStyle,
   commentToggleButtonStyle,
   commentExpandedContentStyle,
-  commentInputRowStyle,
-  commentTextareaStyle,
   commentInputFooterStyle,
   commentMetaTextStyle,
   commentErrorTextStyle,
   commentListStyle,
-  commentItemStyle,
-  commentHeaderStyle,
-  commentAuthorStyle,
-  commentTimestampStyle,
-  commentDeleteButtonStyle,
-  commentBodyStyle,
   commentButtonStyle,
 } from './feedConstants'
+
+/* ── Avatar sizes per nesting depth ──────────────────────────────────── */
+const AVATAR_SIZES = [34, 28, 24]
+
+/* ── Shared action-link base style ───────────────────────────────────── */
+const actionLinkBase = {
+  background: 'none',
+  border: 'none',
+  cursor: 'pointer',
+  fontSize: 12,
+  fontWeight: 500,
+  fontFamily: FONT,
+  padding: 0,
+  lineHeight: 1,
+}
+
+/* ── Hook ────────────────────────────────────────────────────────────── */
 
 function useComments(postId, initialCount = 0) {
   const [comments, setComments] = useState([])
@@ -95,17 +105,25 @@ function useComments(postId, initialCount = 0) {
 
       loadedRef.current = true
       if (parentId) {
-        // Reply to existing comment - update the parent comment with the new reply
+        // Reply to existing comment - walk up to 3 levels to find the parent
         setComments((current) =>
-          current.map((comment) => {
-            if (comment.id === parentId) {
-              return {
-                ...comment,
-                replies: [...(comment.replies || []), data],
-                replyCount: (comment.replyCount || 0) + 1,
+          current.map((c) => {
+            if (c.id === parentId) {
+              return { ...c, replies: [...(c.replies || []), data], replyCount: (c.replyCount || 0) + 1 }
+            }
+            // Check depth-1 replies
+            if (c.replies) {
+              const updatedReplies = c.replies.map((r) => {
+                if (r.id === parentId) {
+                  return { ...r, replies: [...(r.replies || []), data], replyCount: (r.replyCount || 0) + 1 }
+                }
+                return r
+              })
+              if (updatedReplies !== c.replies) {
+                return { ...c, replies: updatedReplies }
               }
             }
-            return comment
+            return c
           })
         )
       } else {
@@ -141,35 +159,26 @@ function useComments(postId, initialCount = 0) {
 
   const reactToComment = useCallback(async (commentId, type) => {
     try {
-      // Optimistic update
-      setComments((current) =>
-        current.map((comment) => {
-          if (comment.id !== commentId) return comment
+      // Optimistic update - walk 3 levels
+      setComments((current) => updateCommentInTree(current, commentId, (comment) => {
+        const oldType = comment.userReaction
+        const newType = oldType === type ? null : type
 
-          const oldType = comment.userReaction
-          const newType = oldType === type ? null : type
+        let newLikes = comment.reactionCounts?.like || 0
+        let newDislikes = comment.reactionCounts?.dislike || 0
 
-          const oldLikes = comment.reactionCounts.like
-          const oldDislikes = comment.reactionCounts.dislike
+        if (oldType === 'like') newLikes -= 1
+        else if (oldType === 'dislike') newDislikes -= 1
 
-          let newLikes = oldLikes
-          let newDislikes = oldDislikes
+        if (newType === 'like') newLikes += 1
+        else if (newType === 'dislike') newDislikes += 1
 
-          // Remove old reaction
-          if (oldType === 'like') newLikes -= 1
-          else if (oldType === 'dislike') newDislikes -= 1
-
-          // Add new reaction
-          if (newType === 'like') newLikes += 1
-          else if (newType === 'dislike') newDislikes += 1
-
-          return {
-            ...comment,
-            userReaction: newType,
-            reactionCounts: { like: newLikes, dislike: newDislikes },
-          }
-        })
-      )
+        return {
+          ...comment,
+          userReaction: newType,
+          reactionCounts: { like: newLikes, dislike: newDislikes },
+        }
+      }))
 
       const response = await fetch(`${API}/api/feed/posts/${postId}/comments/${commentId}/react`, {
         method: 'POST',
@@ -179,14 +188,40 @@ function useComments(postId, initialCount = 0) {
       })
 
       if (!response.ok) {
-        // Revert on error
         await loadComments()
       }
     } catch {
-      // Revert on error
       await loadComments()
     }
   }, [postId, loadComments])
+
+  const editComment = useCallback(async (commentId, content) => {
+    try {
+      const response = await fetch(`${API}/api/feed/posts/${postId}/comments/${commentId}`, {
+        method: 'PATCH',
+        headers: authHeaders(),
+        credentials: 'include',
+        body: JSON.stringify({ content }),
+      })
+
+      if (!response.ok) {
+        return false
+      }
+
+      const data = await readJsonSafely(response, {})
+
+      // Update the comment in the tree (up to 3 levels deep)
+      setComments((current) => updateCommentInTree(current, commentId, (comment) => ({
+        ...comment,
+        content: data.content || content,
+        updatedAt: data.updatedAt || new Date().toISOString(),
+      })))
+
+      return true
+    } catch {
+      return false
+    }
+  }, [postId])
 
   return {
     comments,
@@ -199,8 +234,35 @@ function useComments(postId, initialCount = 0) {
     postComment,
     deleteComment,
     reactToComment,
+    editComment,
   }
 }
+
+/* ── Tree helpers ────────────────────────────────────────────────────── */
+
+/** Walk up to 3 levels of comment nesting and apply `fn` to the matched comment. */
+function updateCommentInTree(comments, targetId, fn) {
+  return comments.map((c) => {
+    if (c.id === targetId) return fn(c)
+    if (!c.replies) return c
+    const updatedL1 = c.replies.map((r1) => {
+      if (r1.id === targetId) return fn(r1)
+      if (!r1.replies) return r1
+      const updatedL2 = r1.replies.map((r2) => (r2.id === targetId ? fn(r2) : r2))
+      return { ...r1, replies: updatedL2 }
+    })
+    return { ...c, replies: updatedL1 }
+  })
+}
+
+/* ── Pill input wrapper style ────────────────────────────────────────── */
+const pillInputStyle = {
+  background: 'var(--sh-soft)',
+  borderRadius: 20,
+  padding: '8px 14px',
+}
+
+/* ── ReplyInput ──────────────────────────────────────────────────────── */
 
 function ReplyInput({ user, onReply }) {
   const [value, setValue] = useState('')
@@ -258,16 +320,35 @@ function ReplyInput({ user, onReply }) {
   }
 
   return (
-    <div style={commentInputRowStyle}>
-      <Avatar username={user?.username} avatarUrl={user?.avatarUrl} role={user?.role} size={32} />
+    <div style={{ display: 'flex', gap: 8, marginBottom: 12, marginTop: 8 }}>
+      <UserAvatar
+        username={user?.username}
+        avatarUrl={user?.avatarUrl}
+        role={user?.role}
+        plan={user?.plan}
+        size={28}
+      />
       <div style={{ flex: 1 }}>
-        <textarea
-          value={value}
-          onChange={(event) => setValue(event.target.value)}
-          placeholder="Write a reply..."
-          rows={2}
-          style={commentTextareaStyle}
-        />
+        <div style={pillInputStyle}>
+          <textarea
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+            placeholder="Write a reply..."
+            rows={2}
+            style={{
+              width: '100%',
+              resize: 'vertical',
+              border: 'none',
+              background: 'transparent',
+              fontSize: 13,
+              fontFamily: FONT,
+              color: 'var(--sh-input-text)',
+              outline: 'none',
+              boxSizing: 'border-box',
+              padding: 0,
+            }}
+          />
+        </div>
         {attachments.length > 0 && (
           <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
             {attachments.map((att, i) => (
@@ -360,6 +441,8 @@ function ReplyInput({ user, onReply }) {
   )
 }
 
+/* ── CommentInput ────────────────────────────────────────────────────── */
+
 function CommentInput({ user, value, onChange, onSubmit, posting, error, onAttachImage, attachments, isReply }) {
   const hasValue = Boolean(value.trim())
   const { length } = value
@@ -427,16 +510,35 @@ function CommentInput({ user, value, onChange, onSubmit, posting, error, onAttac
   }
 
   return (
-    <div style={commentInputRowStyle}>
-      <Avatar username={user?.username} avatarUrl={user?.avatarUrl} role={user?.role} size={32} />
+    <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+      <UserAvatar
+        username={user?.username}
+        avatarUrl={user?.avatarUrl}
+        role={user?.role}
+        plan={user?.plan}
+        size={32}
+      />
       <div style={{ flex: 1 }}>
-        <textarea
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder={isReply ? "Write a reply..." : "Write a comment..."}
-          rows={2}
-          style={commentTextareaStyle}
-        />
+        <div style={pillInputStyle}>
+          <textarea
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            placeholder={isReply ? "Write a reply..." : "Write a comment..."}
+            rows={2}
+            style={{
+              width: '100%',
+              resize: 'vertical',
+              border: 'none',
+              background: 'transparent',
+              fontSize: 13,
+              fontFamily: FONT,
+              color: 'var(--sh-input-text)',
+              outline: 'none',
+              boxSizing: 'border-box',
+              padding: 0,
+            }}
+          />
+        </div>
         {displayAttachments && displayAttachments.length > 0 && (
           <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
             {displayAttachments.map((att, i) => (
@@ -530,176 +632,274 @@ function CommentInput({ user, value, onChange, onSubmit, posting, error, onAttac
   )
 }
 
+/* ── CommentReactions (text-link style) ──────────────────────────────── */
+
 function CommentReactions({ commentId, reactionCounts = {}, userReaction = null, onReact }) {
   const likes = reactionCounts.like || 0
   const dislikes = reactionCounts.dislike || 0
 
-  const thumbsUpSvg = (
-    <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor" style={{ marginRight: 4 }}>
-      <path d="M2 10.5a1.5 1.5 0 1 1 3 0v6a1.5 1.5 0 0 1-3 0v-6zM6 10.333v5.43a2 2 0 0 0 .97 1.679V17.5a.5.5 0 1 0 1 0v-.04a2 2 0 0 0 .97-1.679v-.745a2 2 0 0 0 .211-.126c1.04-.678 1.946-.122 2.469.856.653 1.31 1.422 2.105 2.188 2.01.374-.056.695-.481 1.088-1.461.36-.896.748-2.144.948-2.979.179-.633.45-1.559.838-2.form.158-.34.355-.638.57-.88a3 3 0 0 0 .281-1.249A3 3 0 0 0 15.3 9h1.023a.75.75 0 0 0 .75-.75V3.75a.75.75 0 0 0-.75-.75H15.3a3 3 0 0 0-2.973 2.5H13a.75.75 0 0 0 0 1.5h-.227c.038.58.076 1.254.076 2v1.5a2 2 0 0 0 .053.477c-.038.58-.076 1.254-.076 2 0 .888.106 1.72.282 2.38.168.594.411 1.084.693 1.38" />
-    </svg>
-  )
-
-  const thumbsDownSvg = (
-    <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor" style={{ marginRight: 4 }}>
-      <path d="M18 9.5a1.5 1.5 0 1 1-3 0v-6a1.5 1.5 0 0 1 3 0v6zM14 9.667v-5.43a2 2 0 0 1-.97-1.679V2.5a.5.5 0 1 1-1 0v.04a2 2 0 0 1-.97 1.679v.745a2 2 0 0 1-.211.126c-1.04.678-1.946.122-2.469-.856-.653-1.31-1.422-2.105-2.188-2.01-.374.056-.695.481-1.088 1.461-.36.896-.748 2.144-.948 2.979-.179.633-.45 1.559-.838 2.form-.158.34-.355.638-.57.88a3 3 0 0 1-.281 1.249A3 3 0 0 1 4.7 11H3.75a.75.75 0 0 1-.75-.75V7.25a.75.75 0 0 1 .75-.75H4.7a3 3 0 0 1 2.973-2.5h.227a.75.75 0 0 1 0 1.5H7a2 2 0 0 1-.053.477c.038.58.076 1.254.076 2v1.5a2 2 0 0 1-.053.477c-.038.58-.076 1.254-.076 2 0 .888-.106 1.72-.282 2.38-.168.594-.411 1.084-.693 1.38" />
-    </svg>
-  )
-
   return (
-    <div style={{ display: 'flex', gap: '8px', marginTop: '8px', alignItems: 'center' }}>
+    <>
       <button
         type="button"
         onClick={() => onReact(commentId, 'like')}
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '4px',
-          padding: '4px 8px',
-          border: 'none',
-          borderRadius: '4px',
-          background: 'transparent',
-          cursor: 'pointer',
-          fontSize: '12px',
+          ...actionLinkBase,
           color: userReaction === 'like' ? 'var(--sh-brand)' : 'var(--sh-muted)',
-          transition: 'color 0.2s',
         }}
       >
-        {thumbsUpSvg}
-        {likes > 0 ? likes : ''}
+        Like{likes > 0 ? ` ${likes}` : ''}
       </button>
       <button
         type="button"
         onClick={() => onReact(commentId, 'dislike')}
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '4px',
-          padding: '4px 8px',
-          border: 'none',
-          borderRadius: '4px',
-          background: 'transparent',
-          cursor: 'pointer',
-          fontSize: '12px',
-          color: userReaction === 'dislike' ? 'var(--sh-brand)' : 'var(--sh-muted)',
-          transition: 'color 0.2s',
+          ...actionLinkBase,
+          color: userReaction === 'dislike' ? 'var(--sh-danger)' : 'var(--sh-muted)',
         }}
       >
-        {thumbsDownSvg}
-        {dislikes > 0 ? dislikes : ''}
+        Dislike{dislikes > 0 ? ` ${dislikes}` : ''}
       </button>
-    </div>
+    </>
   )
 }
 
-function CommentItem({ comment, user, onDelete, onReact, onReply, isReply = false }) {
+/* ── CommentItem (recursive, 3-level nesting) ────────────────────────── */
+
+function CommentItem({ comment, user, onDelete, onReact, onReply, onEdit, depth = 0 }) {
   const [showReplyInput, setShowReplyInput] = useState(false)
   const [showReplies, setShowReplies] = useState(true)
+  const [editing, setEditing] = useState(false)
+  const [editValue, setEditValue] = useState(comment.content || '')
+  const [saving, setSaving] = useState(false)
+
+  const isOwn = comment.author?.id === user?.id
+  const isAdmin = user?.role === 'admin'
+  const wasEdited = comment.updatedAt && comment.updatedAt !== comment.createdAt
+
+  const avatarSize = AVATAR_SIZES[Math.min(depth, 2)]
+  const replies = comment.replies || []
+  const replyCount = comment.replyCount || replies.length
+  const canReply = depth < 2 && Boolean(user)
+
+  const handleSaveEdit = async () => {
+    const trimmed = editValue.trim()
+    if (!trimmed || trimmed === comment.content) {
+      setEditing(false)
+      return
+    }
+    setSaving(true)
+    const ok = await onEdit(comment.id, trimmed)
+    setSaving(false)
+    if (ok) {
+      setEditing(false)
+    }
+  }
+
+  const handleCancelEdit = () => {
+    setEditValue(comment.content || '')
+    setEditing(false)
+  }
+
+  const nestingStyle = depth > 0
+    ? { marginLeft: 20, paddingLeft: 12, borderLeft: '2px solid var(--sh-border)' }
+    : {}
 
   return (
-    <div>
-      <div key={comment.id} data-comment-id={comment.id} style={{ ...commentItemStyle, ...(isReply ? { marginLeft: '32px', marginTop: '12px', paddingLeft: '12px', borderLeft: '2px solid var(--sh-border)' } : {}) }}>
+    <div style={{ ...nestingStyle, marginTop: depth > 0 ? 10 : 0 }}>
+      <div data-comment-id={comment.id} style={{ display: 'flex', gap: 8 }}>
+        {/* Avatar */}
         {comment.author?.username ? (
           <Link to={`/users/${comment.author.username}`} style={{ textDecoration: 'none', flexShrink: 0 }}>
-            <Avatar username={comment.author.username} avatarUrl={comment.author.avatarUrl} size={28} />
+            <UserAvatar
+              username={comment.author.username}
+              avatarUrl={comment.author.avatarUrl}
+              role={comment.author.role}
+              plan={comment.author.plan}
+              size={avatarSize}
+            />
           </Link>
         ) : (
-          <Avatar username="?" size={28} />
+          <UserAvatar username="?" size={avatarSize} />
         )}
+
+        {/* Content column */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={commentHeaderStyle}>
-            <div>
-              {comment.author?.username ? (
-                <Link to={`/users/${comment.author.username}`} style={{ ...commentAuthorStyle, textDecoration: 'none' }}>
-                  {comment.author.username}
-                </Link>
-              ) : (
-                <span style={commentAuthorStyle}>Unknown</span>
-              )}
-              <span style={commentTimestampStyle}>{timeAgo(comment.createdAt)}</span>
-            </div>
-            {(comment.author?.id === user?.id || user?.role === 'admin') ? (
-              <button
-                type="button"
-                onClick={() => onDelete(comment.id)}
-                style={commentDeleteButtonStyle}
+          {/* Pill bubble */}
+          <div style={{ background: 'var(--sh-soft)', borderRadius: 16, padding: '10px 14px' }}>
+            {/* Author name */}
+            {comment.author?.username ? (
+              <Link
+                to={`/users/${comment.author.username}`}
+                style={{ textDecoration: 'none', color: 'var(--sh-text)', fontWeight: 600, fontSize: 13 }}
               >
-                Delete
-              </button>
-            ) : null}
-          </div>
-          <p style={commentBodyStyle}><MentionText text={comment.content} /></p>
-          {comment.attachments && comment.attachments.length > 0 && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
-              {comment.attachments.map((att) => (
-                <img
-                  key={att.id}
-                  src={att.url}
-                  alt="attachment"
-                  style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '8px' }}
+                {comment.author.username}
+              </Link>
+            ) : (
+              <span style={{ color: 'var(--sh-text)', fontWeight: 600, fontSize: 13 }}>Unknown</span>
+            )}
+
+            {/* Comment body or edit textarea */}
+            {editing ? (
+              <div style={{ marginTop: 6 }}>
+                <textarea
+                  value={editValue}
+                  onChange={(e) => setEditValue(e.target.value)}
+                  rows={3}
+                  style={{
+                    width: '100%',
+                    resize: 'vertical',
+                    border: '1px solid var(--sh-border)',
+                    borderRadius: 8,
+                    padding: '6px 10px',
+                    fontSize: 13,
+                    fontFamily: FONT,
+                    color: 'var(--sh-input-text)',
+                    background: 'var(--sh-input-bg)',
+                    boxSizing: 'border-box',
+                    outline: 'none',
+                  }}
                 />
-              ))}
+                <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                  <button
+                    type="button"
+                    onClick={handleSaveEdit}
+                    disabled={saving}
+                    style={{
+                      ...actionLinkBase,
+                      color: 'var(--sh-brand)',
+                      fontWeight: 600,
+                    }}
+                  >
+                    {saving ? 'Saving...' : 'Save'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCancelEdit}
+                    disabled={saving}
+                    style={{
+                      ...actionLinkBase,
+                      color: 'var(--sh-muted)',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p style={{ margin: '2px 0 0', fontSize: 13, color: 'var(--sh-subtext)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                <MentionText text={comment.content} />
+              </p>
+            )}
+
+            {/* Attachments inside bubble */}
+            {!editing && comment.attachments && comment.attachments.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
+                {comment.attachments.map((att) => (
+                  <img
+                    key={att.id}
+                    src={att.url}
+                    alt="attachment"
+                    style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '8px' }}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Action row below the bubble */}
+          {!editing && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4, flexWrap: 'wrap' }}>
+              {/* Like / Dislike */}
+              {user && onReact && (
+                <CommentReactions
+                  commentId={comment.id}
+                  reactionCounts={comment.reactionCounts}
+                  userReaction={comment.userReaction}
+                  onReact={onReact}
+                />
+              )}
+
+              {/* Reply */}
+              {canReply && (
+                <button
+                  type="button"
+                  onClick={() => setShowReplyInput(!showReplyInput)}
+                  style={{ ...actionLinkBase, color: 'var(--sh-muted)' }}
+                >
+                  {showReplyInput ? 'Cancel' : 'Reply'}
+                </button>
+              )}
+
+              {/* Edit (15-min window, checked on click) */}
+              {isOwn && onEdit && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const ageMs = Date.now() - new Date(comment.createdAt).getTime()
+                    if (ageMs >= 15 * 60 * 1000) return
+                    setEditValue(comment.content || '')
+                    setEditing(true)
+                  }}
+                  style={{ ...actionLinkBase, color: 'var(--sh-muted)' }}
+                >
+                  Edit
+                </button>
+              )}
+
+              {/* Delete */}
+              {(isOwn || isAdmin) && (
+                <button
+                  type="button"
+                  onClick={() => onDelete(comment.id)}
+                  style={{ ...actionLinkBase, color: 'var(--sh-danger)' }}
+                >
+                  Delete
+                </button>
+              )}
+
+              {/* Timestamp + edited indicator */}
+              <span style={{ fontSize: 11, color: 'var(--sh-muted)' }}>
+                {timeAgo(comment.createdAt)}{wasEdited ? ' (edited)' : ''}
+              </span>
             </div>
-          )}
-          {user && onReact ? (
-            <CommentReactions
-              commentId={comment.id}
-              reactionCounts={comment.reactionCounts}
-              userReaction={comment.userReaction}
-              onReact={onReact}
-            />
-          ) : null}
-          {!isReply && user && (
-            <button
-              type="button"
-              onClick={() => setShowReplyInput(!showReplyInput)}
-              style={{
-                marginTop: '8px',
-                background: 'none',
-                border: 'none',
-                color: 'var(--sh-brand)',
-                cursor: 'pointer',
-                fontSize: '12px',
-                padding: '0px 4px',
-              }}
-            >
-              {showReplyInput ? 'Cancel' : 'Reply'}
-            </button>
           )}
         </div>
       </div>
 
+      {/* Reply input */}
       {showReplyInput && (
-        <ReplyInput
-          user={user}
-          onReply={(text, attachments) => {
-            onReply(text, comment.id, attachments)
-            setShowReplyInput(false)
-          }}
-        />
+        <div style={{ marginLeft: 20 + avatarSize + 8 }}>
+          <ReplyInput
+            user={user}
+            onReply={(text, attachments) => {
+              onReply(text, comment.id, attachments)
+              setShowReplyInput(false)
+            }}
+          />
+        </div>
       )}
 
-      {(comment.replies || []).length > 0 && (
+      {/* Nested replies */}
+      {replies.length > 0 && (
         <div>
-          {!isReply && (
+          {replies.length > 2 && (
             <button
               type="button"
               onClick={() => setShowReplies(!showReplies)}
               style={{
-                background: 'none',
-                border: 'none',
+                ...actionLinkBase,
                 color: 'var(--sh-brand)',
-                cursor: 'pointer',
-                fontSize: '12px',
-                marginLeft: '32px',
-                marginTop: '8px',
-                padding: '0px 4px',
+                marginLeft: 20,
+                marginTop: 6,
               }}
             >
-              {showReplies ? `Hide ${comment.replyCount} ${comment.replyCount === 1 ? 'reply' : 'replies'}` : `Show ${comment.replyCount} ${comment.replyCount === 1 ? 'reply' : 'replies'}`}
+              {showReplies
+                ? `Hide ${replyCount > 1 ? `${replyCount} replies` : '1 reply'}`
+                : `View ${replyCount > 1 ? `${replyCount} replies` : '1 reply'}`}
             </button>
           )}
-          {showReplies && comment.replies.map((reply) => (
+          {(replies.length <= 2 || showReplies) && replies.map((reply) => (
             <CommentItem
               key={reply.id}
               comment={reply}
@@ -707,7 +907,8 @@ function CommentItem({ comment, user, onDelete, onReact, onReply, isReply = fals
               onDelete={onDelete}
               onReact={onReact}
               onReply={onReply}
-              isReply
+              onEdit={onEdit}
+              depth={depth + 1}
             />
           ))}
         </div>
@@ -716,7 +917,9 @@ function CommentItem({ comment, user, onDelete, onReact, onReply, isReply = fals
   )
 }
 
-function CommentList({ comments, loading, user, onDelete, onReact, onReply }) {
+/* ── CommentList ─────────────────────────────────────────────────────── */
+
+function CommentList({ comments, loading, user, onDelete, onReact, onReply, onEdit }) {
   if (loading) {
     return <div style={commentMetaTextStyle}>Loading comments...</div>
   }
@@ -735,11 +938,14 @@ function CommentList({ comments, loading, user, onDelete, onReact, onReply }) {
           onDelete={onDelete}
           onReact={onReact}
           onReply={onReply}
+          onEdit={onEdit}
         />
       ))}
     </div>
   )
 }
+
+/* ── Main export ─────────────────────────────────────────────────────── */
 
 export default function CommentSection({ postId, commentCount, user, targetCommentId }) {
   const [expanded, setExpanded] = useState(() => Boolean(targetCommentId))
@@ -756,6 +962,7 @@ export default function CommentSection({ postId, commentCount, user, targetComme
     postComment,
     deleteComment,
     reactToComment,
+    editComment,
   } = useComments(postId, commentCount || 0)
 
   useEffect(() => {
@@ -799,10 +1006,7 @@ export default function CommentSection({ postId, commentCount, user, targetComme
   }
 
   const handleReply = async (text, parentId, replyAttachments) => {
-    const posted = await postComment(text, parentId, replyAttachments)
-    if (posted) {
-      // Reply input will be cleared by component
-    }
+    await postComment(text, parentId, replyAttachments)
   }
 
   const handleAttachImage = (attachment, clearAll = false, newAttachments = []) => {
@@ -843,6 +1047,7 @@ export default function CommentSection({ postId, commentCount, user, targetComme
             onDelete={deleteComment}
             onReact={user ? reactToComment : null}
             onReply={user ? handleReply : null}
+            onEdit={user ? editComment : null}
           />
         </div>
       )}

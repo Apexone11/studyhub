@@ -10,8 +10,8 @@ describe('AUTHOR_SELECT constant', () => {
     expect(AUTHOR_SELECT.username).toBe(true)
   })
 
-  it('includes emailVerified', () => {
-    expect(AUTHOR_SELECT.emailVerified).toBe(true)
+  it('includes avatarUrl', () => {
+    expect(AUTHOR_SELECT.avatarUrl).toBe(true)
   })
 
   it('includes isStaffVerified', () => {

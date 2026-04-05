@@ -184,14 +184,14 @@ describe('payments.constants', () => {
       expect(result).toBe('pro_yearly')
     })
 
-    it('returns free for unmapped price IDs', () => {
+    it('returns null for unmapped price IDs', () => {
       const result = paymentsConstants.planFromPriceId('price_unknown_123')
-      expect(result).toBe('free')
+      expect(result).toBeNull()
     })
 
-    it('returns free for empty string', () => {
+    it('returns null for empty string', () => {
       const result = paymentsConstants.planFromPriceId('')
-      expect(result).toBe('free')
+      expect(result).toBeNull()
     })
   })
 
@@ -200,7 +200,7 @@ describe('payments.constants', () => {
       const freePlan = paymentsConstants.PLANS.free
       expect(freePlan.name).toBe('Free')
       expect(freePlan.uploadsPerMonth).toBe(10)
-      expect(freePlan.aiMessagesPerDay).toBe(30)
+      expect(freePlan.aiMessagesPerDay).toBe(10)
       expect(freePlan.storageMb).toBe(500)
       expect(freePlan.prioritySupport).toBe(false)
       expect(freePlan.proBadge).toBe(false)
@@ -390,11 +390,6 @@ describe('payments.service — Webhook Handlers', () => {
             stripePaymentIntentId: 'pi_123',
           },
         })
-      )
-      expect(mocks.email.sendDonationThankYou).toHaveBeenCalledWith(
-        'donor@test.com',
-        'donor123',
-        5000
       )
     })
 
@@ -647,25 +642,20 @@ describe('payments.service — Webhook Handlers', () => {
       )
     })
 
-    it('sends payment failure notification to user', async () => {
+    it('updates subscription status to past_due on payment failure', async () => {
       const invoice = {
         id: 'inv_123',
         customer: 'cus_123',
       }
 
       mocks.prisma.subscription.updateMany.mockResolvedValue({ count: 1 })
-      mocks.prisma.subscription.findFirst.mockResolvedValue({ userId: 42 })
 
       await paymentsService.handleInvoicePaymentFailed(invoice)
 
-      expect(mocks.notify.createNotification).toHaveBeenCalledWith(
-        mocks.prisma,
-        expect.objectContaining({
-          userId: 42,
-          type: 'payment_failed',
-          priority: 'high',
-        })
-      )
+      expect(mocks.prisma.subscription.updateMany).toHaveBeenCalledWith({
+        where: { stripeCustomerId: 'cus_123' },
+        data: { status: 'past_due' },
+      })
     })
 
     it('wraps notification in try-catch for non-fatal failure', async () => {

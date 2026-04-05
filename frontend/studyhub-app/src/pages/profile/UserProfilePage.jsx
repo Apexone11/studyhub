@@ -12,7 +12,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import Navbar from '../../components/navbar/Navbar'
-import { IconShield, IconProfile, IconStar } from '../../components/Icons'
+import { IconShield, IconProfile, IconStar, IconSchool } from '../../components/Icons'
 import ReportModal from '../../components/ReportModal'
 import SafeJoyride from '../../components/SafeJoyride'
 import { SkeletonProfile } from '../../components/Skeleton'
@@ -378,6 +378,21 @@ export default function UserProfilePage() {
                   }
                   <ProBadge plan={profile.plan} size="sm" />
                   <DonorBadge isDonor={profile.isDonor} donorLevel={profile.donorLevel} size="sm" />
+                  {(() => {
+                    const school = profile.enrollments?.[0]?.course?.school
+                    if (!school) return null
+                    return (
+                      <span style={{
+                        fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 99,
+                        background: 'rgba(14,165,233,0.18)', color: 'var(--sh-info-text)',
+                        border: '1px solid rgba(14,165,233,0.3)',
+                        display: 'inline-flex', alignItems: 'center', gap: 4,
+                      }}>
+                        <IconSchool size={11} />
+                        {school.short}
+                      </span>
+                    )
+                  })()}
                 </div>
                 <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', marginBottom: 10 }}>
                   Joined {fmtDate(profile.createdAt)}

@@ -8,6 +8,7 @@ const { updateFingerprint } = require('../../lib/plagiarismService')
 const { getInitialModerationStatus } = require('../../lib/trustGate')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
+const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const { timedSection, logTiming } = require('../../lib/requestTiming')
 
 const COMMENT_INCLUDE = {
@@ -509,38 +510,70 @@ async function createNoteComment(req, res) {
 }
 
 /**
- * PATCH /api/notes/:id/comments/:commentId — Resolve/unresolve a comment
+ * PATCH /api/notes/:id/comments/:commentId — Resolve/unresolve or edit a comment
  */
 async function updateNoteComment(req, res) {
   const noteId = parseInt(req.params.id, 10)
   const commentId = parseInt(req.params.commentId, 10)
-  if (!Number.isInteger(noteId) || noteId < 1) return res.status(400).json({ error: 'Invalid note id.' })
-  if (!Number.isInteger(commentId) || commentId < 1) return res.status(400).json({ error: 'Invalid comment id.' })
+  if (!Number.isInteger(noteId) || noteId < 1) return sendError(res, 400, 'Invalid note id.', ERROR_CODES.VALIDATION)
+  if (!Number.isInteger(commentId) || commentId < 1) return sendError(res, 400, 'Invalid comment id.', ERROR_CODES.VALIDATION)
 
-  const { resolved } = req.body || {}
-  if (typeof resolved !== 'boolean') return res.status(400).json({ error: 'resolved must be a boolean.' })
+  const { resolved, content } = req.body || {}
+  const hasResolved = typeof resolved === 'boolean'
+  const hasContent = content !== undefined
+
+  if (!hasResolved && !hasContent) {
+    return sendError(res, 400, 'Provide resolved (boolean) or content (string).', ERROR_CODES.VALIDATION)
+  }
 
   try {
     const comment = await prisma.noteComment.findUnique({
       where: { id: commentId },
       include: { note: { select: { id: true, userId: true } } },
     })
-    if (!comment || comment.noteId !== noteId) return res.status(404).json({ error: 'Comment not found.' })
+    if (!comment || comment.noteId !== noteId) {
+      return sendError(res, 404, 'Comment not found.', ERROR_CODES.NOT_FOUND)
+    }
 
-    // Only note owner or admin can resolve/unresolve
-    const isNoteOwner = req.user.userId === comment.note.userId || req.user.role === 'admin'
-    if (!isNoteOwner) return res.status(403).json({ error: 'Only the note owner can resolve comments.' })
+    const updateData = {}
+
+    // Handle resolve/unresolve — note owner or admin only
+    if (hasResolved) {
+      const isNoteOwner = req.user.userId === comment.note.userId || req.user.role === 'admin'
+      if (!isNoteOwner) {
+        return sendError(res, 403, 'Only the note owner can resolve comments.', ERROR_CODES.FORBIDDEN)
+      }
+      updateData.resolved = resolved
+    }
+
+    // Handle content editing — comment author only, 15-minute window
+    if (hasContent) {
+      if (typeof content !== 'string' || content.trim().length === 0) {
+        return sendError(res, 400, 'Comment content is required.', ERROR_CODES.VALIDATION)
+      }
+      if (content.length > 500) {
+        return sendError(res, 400, 'Comment must be 500 characters or fewer.', ERROR_CODES.VALIDATION)
+      }
+      if (comment.userId !== req.user.userId) {
+        return sendError(res, 403, 'You can only edit your own comments.', ERROR_CODES.FORBIDDEN)
+      }
+      const fifteenMinutes = 15 * 60 * 1000
+      if (Date.now() - new Date(comment.createdAt).getTime() > fifteenMinutes) {
+        return sendError(res, 403, 'Can only edit comments within 15 minutes.', ERROR_CODES.FORBIDDEN)
+      }
+      updateData.content = content.trim()
+    }
 
     const updated = await prisma.noteComment.update({
       where: { id: commentId },
-      data: { resolved },
+      data: updateData,
       include: COMMENT_INCLUDE,
     })
 
     res.json(updated)
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 

@@ -1,15 +1,19 @@
 /* ═══════════════════════════════════════════════════════════════════════════
  * NoteCommentSection.jsx — Comment thread for note viewer pages
  *
- * Features: expand/collapse, sub-comments (replies), collapsible reply
- * threads, inline anchor badges, resolve/unresolve, UserAvatar, reactions.
+ * Features: expand/collapse, 3-level nesting, pill bubble style, inline
+ * editing, anchor badges, resolve/unresolve, UserAvatar, text-link reactions.
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import MentionText from '../../components/MentionText'
 import UserAvatar from '../../components/UserAvatar'
 import { PAGE_FONT, timeAgo } from '../shared/pageUtils'
 import { useNoteComments } from './useNoteComments'
+
+const EDIT_WINDOW_MS = 15 * 60 * 1000 // 15 minutes
+const AVATAR_SIZES = [34, 28, 24]
+const MAX_VISIBLE_REPLIES = 2
 
 /**
  * Check if an anchor still exists in the note content.
@@ -41,47 +45,43 @@ function resolveAnchorStatus(comment, noteContent) {
   return 'orphaned'
 }
 
-// ── Reaction buttons ────────────────────────────────────────────────────
+// ── Text-link reaction buttons ─────────────────────────────────────────
 
 function CommentReactions({ commentId, reactionCounts = {}, userReaction = null, onReact }) {
   const likes = reactionCounts.like || 0
   const dislikes = reactionCounts.dislike || 0
 
-  const btnStyle = (active) => ({
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 4,
-    padding: '3px 8px',
-    border: 'none',
-    borderRadius: 6,
-    background: active ? 'var(--sh-brand-bg, var(--sh-info-bg))' : 'transparent',
-    cursor: 'pointer',
-    fontSize: 12,
-    fontWeight: 600,
-    color: active ? 'var(--sh-brand)' : 'var(--sh-muted)',
-    transition: 'all 0.15s',
-    fontFamily: PAGE_FONT,
-  })
+  const btnStyle = (type) => {
+    const active = userReaction === type
+    return {
+      background: 'none',
+      border: 'none',
+      cursor: 'pointer',
+      padding: 0,
+      fontSize: 12,
+      fontWeight: 500,
+      fontFamily: PAGE_FONT,
+      color: active
+        ? (type === 'like' ? 'var(--sh-brand)' : 'var(--sh-danger)')
+        : 'var(--sh-muted)',
+      transition: 'color 0.15s',
+    }
+  }
 
   return (
-    <div style={{ display: 'flex', gap: 4, marginTop: 8 }}>
-      <button type="button" onClick={() => onReact(commentId, 'like')} style={btnStyle(userReaction === 'like')}>
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M7 10v12" /><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z" />
-        </svg>
-        {likes > 0 ? likes : ''}
+    <>
+      <button type="button" onClick={() => onReact(commentId, 'like')} style={btnStyle('like')}>
+        Like{likes > 0 ? ` (${likes})` : ''}
       </button>
-      <button type="button" onClick={() => onReact(commentId, 'dislike')} style={btnStyle(userReaction === 'dislike')}>
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M17 14V2" /><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22h0a3.13 3.13 0 0 1-3-3.88Z" />
-        </svg>
-        {dislikes > 0 ? dislikes : ''}
+      <span style={{ color: 'var(--sh-border)' }}>|</span>
+      <button type="button" onClick={() => onReact(commentId, 'dislike')} style={btnStyle('dislike')}>
+        Dislike{dislikes > 0 ? ` (${dislikes})` : ''}
       </button>
-    </div>
+    </>
   )
 }
 
-// ── Comment input ───────────────────────────────────────────────────────
+// ── Comment input (pill style) ─────────────────────────────────────────
 
 function CommentInput({ user, placeholder, onSubmit, posting }) {
   const [draft, setDraft] = useState('')
@@ -108,10 +108,10 @@ function CommentInput({ user, placeholder, onSubmit, posting }) {
           rows={2}
           style={{
             width: '100%', boxSizing: 'border-box', resize: 'vertical',
-            border: '1px solid var(--sh-border)', borderRadius: 10,
+            border: '1px solid var(--sh-border)', borderRadius: 20,
             padding: '10px 14px', fontFamily: PAGE_FONT, fontSize: 13,
             color: 'var(--sh-text)', outline: 'none',
-            background: 'var(--sh-surface)',
+            background: 'var(--sh-soft)',
           }}
         />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
@@ -139,21 +139,92 @@ function CommentInput({ user, placeholder, onSubmit, posting }) {
   )
 }
 
-// ── Single comment item ─────────────────────────────────────────────────
+// ── Inline edit textarea ───────────────────────────────────────────────
 
-function CommentItem({ comment, user, isNoteOwner, noteContent, noteId, onResolve, onDelete, onReact, onReply, isReply = false }) {
-  const anchorStatus = !isReply ? resolveAnchorStatus(comment, noteContent) : 'found'
-  const canDelete = user && (
-    user.id === comment.author?.id
-    || isNoteOwner
-    || user.role === 'admin'
+function InlineEditor({ initialContent, onSave, onCancel }) {
+  const [text, setText] = useState(initialContent)
+  const [saving, setSaving] = useState(false)
+
+  const handleSave = async () => {
+    const trimmed = text.trim()
+    if (!trimmed || trimmed === initialContent) { onCancel(); return }
+    if (trimmed.length > 500) return
+    setSaving(true)
+    const ok = await onSave(trimmed)
+    setSaving(false)
+    if (ok) onCancel()
+  }
+
+  return (
+    <div>
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        rows={2}
+        style={{
+          width: '100%', boxSizing: 'border-box', resize: 'vertical',
+          border: '1px solid var(--sh-border)', borderRadius: 10,
+          padding: '8px 12px', fontFamily: PAGE_FONT, fontSize: 13,
+          color: 'var(--sh-text)', outline: 'none',
+          background: 'var(--sh-surface)',
+        }}
+      />
+      <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={saving || !text.trim()}
+          style={{
+            padding: '4px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
+            fontSize: 11, fontWeight: 700, fontFamily: PAGE_FONT,
+            background: 'var(--sh-brand)', color: '#fff',
+          }}
+        >
+          {saving ? 'Saving...' : 'Save'}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          style={{
+            padding: '4px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
+            fontSize: 11, fontWeight: 700, fontFamily: PAGE_FONT,
+            background: 'var(--sh-soft)', color: 'var(--sh-muted)',
+          }}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
   )
-  const canResolve = !isReply && (isNoteOwner || (user && user.role === 'admin'))
+}
+
+// ── Single comment item (pill bubble, 3-level nesting) ─────────────────
+
+function CommentItem({
+  comment, user, isNoteOwner, noteContent, noteId, depth = 0,
+  onResolve, onDelete, onEdit, onReact, onReply,
+}) {
+  const anchorStatus = depth === 0 ? resolveAnchorStatus(comment, noteContent) : 'found'
+  const isOwn = user && user.id === comment.author?.id
+  const canDelete = user && (isOwn || isNoteOwner || user.role === 'admin')
+  const canResolve = depth === 0 && (isNoteOwner || (user && user.role === 'admin'))
+  const createdMs = comment.createdAt ? new Date(comment.createdAt).getTime() : 0
+  const editDeadlineRef = useRef(createdMs + EDIT_WINDOW_MS)
+  const showEditBtn = isOwn
+  const wasEdited = comment.updatedAt && comment.createdAt && comment.updatedAt !== comment.createdAt
 
   const [showReplyInput, setShowReplyInput] = useState(false)
   const [repliesCollapsed, setRepliesCollapsed] = useState(false)
   const [replyPosting, setReplyPosting] = useState(false)
+  const [editing, setEditing] = useState(false)
   const replies = comment.replies || []
+  const avatarSize = AVATAR_SIZES[Math.min(depth, 2)]
+  const canReply = depth < 2 && user && onReply
+
+  // Collapse replies when more than MAX_VISIBLE_REPLIES
+  const [showAllReplies, setShowAllReplies] = useState(false)
+  const visibleReplies = showAllReplies ? replies : replies.slice(0, MAX_VISIBLE_REPLIES)
+  const hiddenCount = replies.length - MAX_VISIBLE_REPLIES
 
   const handleReplySubmit = async (text) => {
     setReplyPosting(true)
@@ -163,32 +234,45 @@ function CommentItem({ comment, user, isNoteOwner, noteContent, noteId, onResolv
     return ok
   }
 
+  const handleEditSave = async (newContent) => {
+    if (!onEdit) return false
+    return onEdit(comment.id, newContent)
+  }
+
+  // Action link style
+  const actionStyle = (color) => ({
+    background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+    fontSize: 12, fontWeight: 500, fontFamily: PAGE_FONT,
+    color: color || 'var(--sh-muted)', transition: 'color 0.15s',
+  })
+
   return (
-    <div style={{ marginBottom: isReply ? 0 : 4 }}>
-      <div style={{
-        display: 'flex', gap: 10, padding: '12px 14px',
-        background: comment.resolved ? 'var(--sh-soft)' : 'var(--sh-surface)',
-        border: '1px solid var(--sh-border)', borderRadius: 10,
-        opacity: comment.resolved ? 0.7 : 1,
-        transition: 'opacity .15s',
-      }}>
+    <div style={{ marginBottom: depth === 0 ? 4 : 0 }}>
+      <div style={{ display: 'flex', gap: 10 }}>
         {/* Avatar */}
         {comment.author?.username ? (
-          <Link to={`/users/${comment.author.username}`} style={{ textDecoration: 'none', flexShrink: 0 }}>
-            <UserAvatar user={comment.author} size={isReply ? 26 : 30} />
+          <Link to={`/users/${comment.author.username}`} style={{ textDecoration: 'none', flexShrink: 0, alignSelf: 'flex-start' }}>
+            <UserAvatar user={comment.author} size={avatarSize} />
           </Link>
         ) : (
           <div style={{
-            width: isReply ? 26 : 30, height: isReply ? 26 : 30, borderRadius: '50%', flexShrink: 0,
+            width: avatarSize, height: avatarSize, borderRadius: '50%', flexShrink: 0,
             background: 'var(--sh-soft)', display: 'grid', placeItems: 'center',
             fontSize: 12, color: 'var(--sh-muted)',
           }}>?</div>
         )}
 
         <div style={{ flex: 1, minWidth: 0 }}>
-          {/* Header */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
+          {/* Pill bubble */}
+          <div style={{
+            background: comment.resolved ? 'var(--sh-soft)' : 'var(--sh-soft)',
+            borderRadius: 16,
+            padding: '10px 14px',
+            opacity: comment.resolved ? 0.7 : 1,
+            transition: 'opacity .15s',
+          }}>
+            {/* Author line */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' }}>
               {comment.author?.username ? (
                 <Link
                   to={`/users/${comment.author.username}`}
@@ -199,7 +283,6 @@ function CommentItem({ comment, user, isNoteOwner, noteContent, noteId, onResolv
               ) : (
                 <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--sh-muted)' }}>Unknown</span>
               )}
-              <span style={{ fontSize: 11, color: 'var(--sh-muted)' }}>{timeAgo(comment.createdAt)}</span>
               {comment.resolved && (
                 <span style={{
                   fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 4,
@@ -208,98 +291,106 @@ function CommentItem({ comment, user, isNoteOwner, noteContent, noteId, onResolv
               )}
             </div>
 
-            {/* Action buttons */}
-            <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+            {/* Anchor badge (if inline comment, depth 0 only) */}
+            {depth === 0 && comment.anchorText && (
+              <div style={{
+                fontSize: 12, fontStyle: 'italic',
+                color: anchorStatus === 'orphaned' ? 'var(--sh-danger-text)' : 'var(--sh-subtext)',
+                padding: '4px 8px', marginBottom: 6,
+                background: anchorStatus === 'orphaned' ? 'var(--sh-danger-bg)' : 'var(--sh-warning-bg)',
+                borderRadius: 6,
+                borderLeft: `3px solid ${anchorStatus === 'orphaned' ? 'var(--sh-danger-border)' : 'var(--sh-warning-border)'}`,
+                whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              }}>
+                &ldquo;{comment.anchorText}&rdquo;
+                {anchorStatus === 'orphaned' && (
+                  <span style={{ fontSize: 10, fontStyle: 'normal', fontWeight: 600, marginLeft: 6 }}>
+                    (text changed)
+                  </span>
+                )}
+                {anchorStatus === 'moved' && (
+                  <span style={{ fontSize: 10, fontStyle: 'normal', fontWeight: 600, marginLeft: 6, color: 'var(--sh-info-text)' }}>
+                    (moved)
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Comment body or inline editor */}
+            {editing ? (
+              <InlineEditor
+                initialContent={comment.content}
+                onSave={handleEditSave}
+                onCancel={() => setEditing(false)}
+              />
+            ) : (
+              <p style={{ margin: 0, fontSize: 13, lineHeight: 1.65, color: 'var(--sh-text)' }}>
+                <MentionText text={comment.content} />
+                {wasEdited && (
+                  <span style={{ fontSize: 11, color: 'var(--sh-muted)', marginLeft: 6 }}>(edited)</span>
+                )}
+              </p>
+            )}
+          </div>
+
+          {/* Action row: Like | Dislike | Reply | Edit | Resolve/Reopen | Delete | timestamp */}
+          {!editing && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 4, paddingLeft: 4 }}>
+              {onReact && (
+                <CommentReactions
+                  commentId={comment.id}
+                  reactionCounts={comment.reactionCounts}
+                  userReaction={comment.userReaction}
+                  onReact={onReact}
+                />
+              )}
+              {canReply && (
+                <>
+                  <span style={{ color: 'var(--sh-border)' }}>|</span>
+                  <button type="button" onClick={() => setShowReplyInput(!showReplyInput)} style={actionStyle()}>
+                    Reply
+                  </button>
+                </>
+              )}
+              {showEditBtn && (
+                <>
+                  <span style={{ color: 'var(--sh-border)' }}>|</span>
+                  <button type="button" onClick={() => { if (Date.now() < editDeadlineRef.current) setEditing(true) }} style={actionStyle()}>
+                    Edit
+                  </button>
+                </>
+              )}
               {canResolve && (
-                <button
-                  type="button"
-                  onClick={() => onResolve(comment.id, !comment.resolved)}
-                  style={{
-                    background: 'none', border: 'none', cursor: 'pointer',
-                    fontSize: 11, fontWeight: 600, padding: '2px 6px',
-                    color: comment.resolved ? 'var(--sh-warning-text)' : 'var(--sh-success-text)',
-                    fontFamily: PAGE_FONT,
-                  }}
-                >
-                  {comment.resolved ? 'Reopen' : 'Resolve'}
-                </button>
+                <>
+                  <span style={{ color: 'var(--sh-border)' }}>|</span>
+                  <button
+                    type="button"
+                    onClick={() => onResolve(comment.id, !comment.resolved)}
+                    style={actionStyle(comment.resolved ? 'var(--sh-warning-text)' : 'var(--sh-success-text)')}
+                  >
+                    {comment.resolved ? 'Reopen' : 'Resolve'}
+                  </button>
+                </>
               )}
               {canDelete && (
-                <button
-                  type="button"
-                  onClick={() => onDelete(comment.id)}
-                  style={{
-                    background: 'none', border: 'none', cursor: 'pointer',
-                    fontSize: 11, fontWeight: 600, padding: '2px 6px',
-                    color: 'var(--sh-danger-text)', fontFamily: PAGE_FONT,
-                  }}
-                >
-                  Delete
-                </button>
+                <>
+                  <span style={{ color: 'var(--sh-border)' }}>|</span>
+                  <button type="button" onClick={() => onDelete(comment.id)} style={actionStyle('var(--sh-danger-text)')}>
+                    Delete
+                  </button>
+                </>
               )}
-            </div>
-          </div>
-
-          {/* Anchor badge (if inline comment) */}
-          {!isReply && comment.anchorText && (
-            <div style={{
-              fontSize: 12, fontStyle: 'italic',
-              color: anchorStatus === 'orphaned' ? 'var(--sh-danger-text)' : 'var(--sh-subtext)',
-              padding: '4px 8px', marginBottom: 6,
-              background: anchorStatus === 'orphaned' ? 'var(--sh-danger-bg)' : 'var(--sh-warning-bg)',
-              borderRadius: 6,
-              borderLeft: `3px solid ${anchorStatus === 'orphaned' ? 'var(--sh-danger-border)' : 'var(--sh-warning-border)'}`,
-              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-            }}>
-              &ldquo;{comment.anchorText}&rdquo;
-              {anchorStatus === 'orphaned' && (
-                <span style={{ fontSize: 10, fontStyle: 'normal', fontWeight: 600, marginLeft: 6 }}>
-                  (text changed)
-                </span>
-              )}
-              {anchorStatus === 'moved' && (
-                <span style={{ fontSize: 10, fontStyle: 'normal', fontWeight: 600, marginLeft: 6, color: 'var(--sh-info-text)' }}>
-                  (moved)
-                </span>
-              )}
+              <span style={{ fontSize: 11, color: 'var(--sh-muted)', marginLeft: 2 }}>
+                {timeAgo(comment.createdAt)}
+              </span>
             </div>
           )}
-
-          {/* Comment body */}
-          <p style={{ margin: 0, fontSize: 13, lineHeight: 1.65, color: 'var(--sh-text)' }}>
-            <MentionText text={comment.content} />
-          </p>
-
-          {/* Reactions + Reply button */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            {onReact && (
-              <CommentReactions
-                commentId={comment.id}
-                reactionCounts={comment.reactionCounts}
-                userReaction={comment.userReaction}
-                onReact={onReact}
-              />
-            )}
-            {user && !isReply && onReply && (
-              <button
-                type="button"
-                onClick={() => setShowReplyInput(!showReplyInput)}
-                style={{
-                  background: 'none', border: 'none', cursor: 'pointer', marginTop: 8,
-                  fontSize: 12, fontWeight: 600, color: 'var(--sh-muted)',
-                  fontFamily: PAGE_FONT, padding: '2px 6px',
-                }}
-              >
-                Reply
-              </button>
-            )}
-          </div>
         </div>
       </div>
 
       {/* Reply input */}
       {showReplyInput && (
-        <div style={{ marginLeft: 40, marginTop: 8 }}>
+        <div style={{ marginLeft: 20, paddingLeft: 12, marginTop: 8, borderLeft: '2px solid var(--sh-border)' }}>
           <CommentInput
             user={user}
             placeholder="Write a reply..."
@@ -309,9 +400,9 @@ function CommentItem({ comment, user, isNoteOwner, noteContent, noteId, onResolv
         </div>
       )}
 
-      {/* Replies (sub-comments) */}
-      {!isReply && replies.length > 0 && (
-        <div style={{ marginLeft: 40, marginTop: 8 }}>
+      {/* Replies (nested comments) */}
+      {replies.length > 0 && (
+        <div style={{ marginLeft: 20, paddingLeft: 12, marginTop: 8, borderLeft: '2px solid var(--sh-border)' }}>
           {/* Collapse/expand toggle */}
           <button
             type="button"
@@ -328,16 +419,14 @@ function CommentItem({ comment, user, isNoteOwner, noteContent, noteId, onResolv
             >
               <polyline points="6 9 12 15 18 9" />
             </svg>
-            {repliesCollapsed ? `Show ${replies.length} ${replies.length === 1 ? 'reply' : 'replies'}` : `Hide ${replies.length} ${replies.length === 1 ? 'reply' : 'replies'}`}
+            {repliesCollapsed
+              ? `Show ${replies.length} ${replies.length === 1 ? 'reply' : 'replies'}`
+              : `Hide ${replies.length} ${replies.length === 1 ? 'reply' : 'replies'}`}
           </button>
 
           {!repliesCollapsed && (
-            <div style={{
-              display: 'flex', flexDirection: 'column', gap: 8,
-              borderLeft: '2px solid var(--sh-border)',
-              paddingLeft: 14,
-            }}>
-              {replies.map((reply) => (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {visibleReplies.map((reply) => (
                 <CommentItem
                   key={reply.id}
                   comment={reply}
@@ -345,13 +434,27 @@ function CommentItem({ comment, user, isNoteOwner, noteContent, noteId, onResolv
                   isNoteOwner={isNoteOwner}
                   noteContent={noteContent}
                   noteId={noteId}
+                  depth={depth + 1}
                   onResolve={onResolve}
                   onDelete={onDelete}
+                  onEdit={onEdit}
                   onReact={onReact}
-                  onReply={null}
-                  isReply
+                  onReply={onReply}
                 />
               ))}
+              {!showAllReplies && hiddenCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowAllReplies(true)}
+                  style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    fontSize: 12, fontWeight: 600, color: 'var(--sh-brand)',
+                    fontFamily: PAGE_FONT, padding: '4px 0', textAlign: 'left',
+                  }}
+                >
+                  Show {hiddenCount} more {hiddenCount === 1 ? 'reply' : 'replies'}
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -366,7 +469,7 @@ export default function NoteCommentSection({ noteId, isOwner, user, noteContent,
   const [expanded, setExpanded] = useState(false)
   const {
     comments, total, loading, posting,
-    loadComments, postComment, resolveComment, deleteComment,
+    loadComments, postComment, resolveComment, deleteComment, editComment,
   } = useNoteComments(noteId)
 
   const handleToggle = () => {
@@ -381,6 +484,10 @@ export default function NoteCommentSection({ noteId, isOwner, user, noteContent,
 
   const handleReply = async (text, parentId) => {
     return postComment(text, { parentId })
+  }
+
+  const handleEdit = async (commentId, newContent) => {
+    return editComment(commentId, newContent)
   }
 
   return (
@@ -427,8 +534,10 @@ export default function NoteCommentSection({ noteId, isOwner, user, noteContent,
                   isNoteOwner={isOwner}
                   noteContent={noteContent}
                   noteId={noteId}
+                  depth={0}
                   onResolve={resolveComment}
                   onDelete={deleteComment}
+                  onEdit={handleEdit}
                   onReact={user && onReactToComment ? onReactToComment : null}
                   onReply={handleReply}
                 />

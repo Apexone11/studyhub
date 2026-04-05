@@ -14,23 +14,33 @@ function CookiePolicyPage() {
     const container = containerRef.current
     if (!container) return
 
+    // Dynamically load the Termly embed SDK if not already present
+    if (!document.getElementById('termly-jssdk')) {
+      const script = document.createElement('script')
+      script.id = 'termly-jssdk'
+      script.src = 'https://app.termly.io/embed.min.js'
+      script.setAttribute('data-auto-block', 'on')
+      document.body.appendChild(script)
+    }
+
     // Create the Termly embed div
     const embed = document.createElement('div')
     embed.setAttribute('name', 'termly-embed')
     embed.setAttribute('data-id', TERMLY_UUIDS.cookies)
     container.appendChild(embed)
 
+    // Timeout fallback
+    const timer = setTimeout(() => setTimedOut(true), 10000)
+
     // Watch for Termly to populate the embed
     const observer = new MutationObserver(() => {
       if (embed.children.length > 0) {
+        clearTimeout(timer)
         setLoaded(true)
         observer.disconnect()
       }
     })
     observer.observe(embed, { childList: true, subtree: true })
-
-    // Timeout fallback
-    const timer = setTimeout(() => setTimedOut(true), 10000)
 
     return () => {
       observer.disconnect()

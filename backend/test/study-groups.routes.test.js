@@ -36,6 +36,29 @@ const mocks = vi.hoisted(() => {
       delete: vi.fn(),
       count: vi.fn(),
     },
+    groupResource: {
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      count: vi.fn(),
+    },
+    groupSession: {
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      count: vi.fn(),
+    },
+    groupSessionRsvp: {
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+      create: vi.fn(),
+      upsert: vi.fn(),
+      delete: vi.fn(),
+    },
     studyGroupSession: {
       findUnique: vi.fn(),
       findMany: vi.fn(),
@@ -73,6 +96,9 @@ const mocks = vi.hoisted(() => {
     user: {
       findUnique: vi.fn(),
     },
+    notification: {
+      createMany: vi.fn(),
+    },
   }
 
   return {
@@ -85,6 +111,12 @@ const mocks = vi.hoisted(() => {
     writeLimiter: vi.fn((_req, _res, next) => next()),
     getBlockedUserIds: vi.fn(async () => []),
     sentry: { captureError: vi.fn() },
+    socketio: {
+      getIO: vi.fn(() => ({ to: vi.fn().mockReturnThis(), emit: vi.fn() })),
+    },
+    notify: {
+      createNotification: vi.fn(),
+    },
   }
 })
 
@@ -99,6 +131,8 @@ const mockTargets = new Map([
     getBlockedUserIds: mocks.getBlockedUserIds,
   }],
   [require.resolve('../src/monitoring/sentry'), mocks.sentry],
+  [require.resolve('../src/lib/socketio'), mocks.socketio],
+  [require.resolve('../src/lib/notify'), mocks.notify],
 ])
 
 const originalModuleLoad = Module._load
@@ -610,20 +644,23 @@ describe('sessions', () => {
         role: 'member',
         status: 'active',
       })
-      mocks.prisma.studyGroupSession.findMany.mockResolvedValue([
+      mocks.prisma.groupSession.findMany.mockResolvedValue([
         {
           id: 1,
           groupId: 1,
           title: 'Study Session',
           description: 'Group study',
-          startTime: new Date(),
-          endTime: new Date(),
+          scheduledAt: new Date(),
+          durationMins: 60,
           location: 'Library',
+          recurring: false,
+          status: 'scheduled',
+          rsvps: [],
           createdAt: new Date(),
           updatedAt: new Date(),
         },
       ])
-      mocks.prisma.studyGroupSession.count.mockResolvedValue(1)
+      mocks.prisma.groupSession.count.mockResolvedValue(1)
 
       const res = await request(app).get('/1/sessions?limit=20&offset=0')
 
@@ -635,8 +672,7 @@ describe('sessions', () => {
 
   describe('POST /:id/sessions', () => {
     it('creates session (admin/mod only)', async () => {
-      const startTime = new Date(Date.now() + 86400000)
-      const endTime = new Date(startTime.getTime() + 3600000)
+      const scheduledAt = new Date(Date.now() + 86400000)
 
       mocks.prisma.studyGroup.findUnique.mockResolvedValue({
         id: 1,
@@ -656,23 +692,27 @@ describe('sessions', () => {
         role: 'admin',
         status: 'active',
       })
-      mocks.prisma.studyGroupSession.create.mockResolvedValue({
+      mocks.prisma.groupSession.create.mockResolvedValue({
         id: 20,
         groupId: 1,
         title: 'Study Session',
         description: 'Group study',
-        startTime,
-        endTime,
+        scheduledAt,
+        durationMins: 60,
         location: 'Library',
+        recurring: null,
+        status: 'scheduled',
         createdAt: new Date(),
         updatedAt: new Date(),
       })
+      // Mock member notification query
+      mocks.prisma.studyGroupMember.findMany.mockResolvedValue([])
 
       const res = await request(app).post('/1/sessions').send({
         title: 'Study Session',
         description: 'Group study',
-        startTime: startTime.toISOString(),
-        endTime: endTime.toISOString(),
+        scheduledAt: scheduledAt.toISOString(),
+        durationMins: 60,
         location: 'Library',
       })
 
@@ -683,16 +723,10 @@ describe('sessions', () => {
 
   describe('POST /:id/sessions/:sessionId/rsvp', () => {
     it('RSVPs to session', async () => {
-      mocks.prisma.studyGroupSession.findUnique.mockResolvedValue({
-        id: 20,
-        groupId: 1,
-        title: 'Study Session',
-        description: 'Group study',
-        startTime: new Date(),
-        endTime: new Date(),
-        location: 'Library',
-        createdAt: new Date(),
-        updatedAt: new Date(),
+      mocks.prisma.studyGroup.findUnique.mockResolvedValue({
+        id: 1,
+        name: 'Study Group',
+        privacy: 'public',
       })
       mocks.prisma.studyGroupMember.findUnique.mockResolvedValue({
         groupId: 1,
@@ -700,21 +734,31 @@ describe('sessions', () => {
         role: 'member',
         status: 'active',
       })
-      mocks.prisma.studyGroupSessionRsvp.upsert.mockResolvedValue({
-        id: 200,
-        sessionId: 20,
-        userId: 42,
-        status: 'attending',
+      mocks.prisma.groupSession.findUnique.mockResolvedValue({
+        id: 20,
+        groupId: 1,
+        title: 'Study Session',
+        description: 'Group study',
+        scheduledAt: new Date(),
+        durationMins: 60,
+        location: 'Library',
         createdAt: new Date(),
         updatedAt: new Date(),
       })
+      mocks.prisma.groupSessionRsvp.upsert.mockResolvedValue({
+        id: 200,
+        sessionId: 20,
+        userId: 42,
+        status: 'going',
+        createdAt: new Date(),
+      })
 
       const res = await request(app).post('/1/sessions/20/rsvp').send({
-        status: 'attending',
+        status: 'going',
       })
 
       expect(res.status).toBe(200)
-      expect(res.body.status).toBe('attending')
+      expect(res.body.status).toBe('going')
     })
   })
 })
@@ -748,11 +792,14 @@ describe('discussions', () => {
           id: 1,
           groupId: 1,
           userId: 42,
+          author: { id: 42, username: 'test_user', avatarUrl: null },
           title: 'Question about calculus',
           content: 'Can someone explain derivatives?',
           type: 'question',
           pinned: false,
           resolved: false,
+          replies: [],
+          upvotes: [],
           createdAt: new Date(),
           updatedAt: new Date(),
         },

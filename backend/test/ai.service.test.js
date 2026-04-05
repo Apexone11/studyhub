@@ -173,24 +173,24 @@ const baseUser = {
 // ── Tests ──────────────────────────────────────────────────────────
 
 describe('getDailyLimit', () => {
-  it('returns 30 for regular users', () => {
-    expect(aiService.getDailyLimit({ role: 'student' })).toBe(30)
+  it('returns 30 for regular users', async () => {
+    expect(await aiService.getDailyLimit({ role: 'student' })).toBe(30)
   })
 
-  it('returns 60 for verified users', () => {
-    expect(aiService.getDailyLimit({ role: 'student', emailVerified: true })).toBe(60)
+  it('returns 60 for verified users', async () => {
+    expect(await aiService.getDailyLimit({ role: 'student', emailVerified: true })).toBe(60)
   })
 
-  it('returns 60 for staff-verified users', () => {
-    expect(aiService.getDailyLimit({ role: 'student', isStaffVerified: true })).toBe(60)
+  it('returns 60 for staff-verified users', async () => {
+    expect(await aiService.getDailyLimit({ role: 'student', isStaffVerified: true })).toBe(60)
   })
 
-  it('returns 120 for admins', () => {
-    expect(aiService.getDailyLimit({ role: 'admin' })).toBe(120)
+  it('returns 200 for admins', async () => {
+    expect(await aiService.getDailyLimit({ role: 'admin' })).toBe(200)
   })
 
-  it('admin limit takes precedence over verified status', () => {
-    expect(aiService.getDailyLimit({ role: 'admin', emailVerified: true })).toBe(120)
+  it('admin limit takes precedence over verified status', async () => {
+    expect(await aiService.getDailyLimit({ role: 'admin', emailVerified: true })).toBe(200)
   })
 })
 
@@ -497,7 +497,7 @@ describe('streamMessage', () => {
     expect(mocks.streamCalls).toHaveLength(1)
     expect(mocks.streamCalls[0][0]).toEqual(
       expect.objectContaining({
-        max_tokens: 8192,
+        max_tokens: 16384,
       })
     )
   })

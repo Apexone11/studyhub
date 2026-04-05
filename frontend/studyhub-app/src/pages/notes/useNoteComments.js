@@ -128,6 +128,32 @@ export function useNoteComments(noteId) {
     } catch { /* silent */ }
   }, [noteId])
 
+  const editComment = useCallback(async (commentId, newContent) => {
+    const text = newContent.trim()
+    if (!text) return false
+    try {
+      const res = await fetch(`${API}/api/notes/${noteId}/comments/${commentId}`, {
+        method: 'PATCH',
+        headers: authHeaders(),
+        credentials: 'include',
+        body: JSON.stringify({ content: text }),
+      })
+      if (!res.ok) return false
+      const updated = await res.json()
+      // Update in top-level or nested replies
+      setComments((prev) => prev.map((c) => {
+        if (c.id === commentId) return { ...c, ...updated }
+        return {
+          ...c,
+          replies: (c.replies || []).map((r) => (r.id === commentId ? { ...r, ...updated } : r)),
+        }
+      }))
+      return true
+    } catch {
+      return false
+    }
+  }, [noteId])
+
   const reactToComment = useCallback(async (commentId, type) => {
     // Helper to update reaction in a comment
     const updateReaction = (comment) => {
@@ -171,6 +197,6 @@ export function useNoteComments(noteId) {
 
   return {
     comments, total, loading, posting, error, setError,
-    loadComments, postComment, resolveComment, deleteComment, reactToComment,
+    loadComments, postComment, resolveComment, deleteComment, editComment, reactToComment,
   }
 }

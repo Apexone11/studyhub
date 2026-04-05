@@ -247,6 +247,18 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
     }
     const excludeUserIds = new Set([userId, ...blockedIds].filter((id) => id != null && id !== undefined))
 
+    // Get followed user IDs
+    let followedUserIds = []
+    try {
+      const follows = await prisma.userFollow.findMany({
+        where: { followerId: userId, status: 'active' },
+        select: { followingId: true },
+      })
+      followedUserIds = follows.map((f) => f.followingId)
+    } catch {
+      /* table may not exist yet */
+    }
+
     // Get starred sheets
     const starredIds = await prisma.starredSheet.findMany({
       where: { userId },
@@ -273,15 +285,26 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
       trending: [],
     }
 
+    // Build sheet filter: content from enrolled courses OR from followed users
+    const sheetOrConditions = []
+    if (courseIds.length > 0) {
+      sheetOrConditions.push({ courseId: { in: courseIds } })
+    }
+    if (followedUserIds.length > 0) {
+      sheetOrConditions.push({ userId: { in: followedUserIds } })
+    }
+
+    const sheetWhereClause = {
+      status: 'published',
+      userId: { not: userId },
+      ...(sheetOrConditions.length > 0 ? { OR: sheetOrConditions } : {}),
+    }
+
     // Parallel fetch all recommendations
     const [sheetCandidates, trendingSheets, classmateRows, groupCandidates] = await Promise.all([
-      // Recommended sheets: top performers in enrolled courses
+      // Recommended sheets: top performers in enrolled courses + followed users' sheets
       prisma.studySheet.findMany({
-        where: {
-          status: 'published',
-          courseId: courseIds.length > 0 ? { in: courseIds } : undefined,
-          userId: { not: userId },
-        },
+        where: sheetWhereClause,
         select: {
           id: true,
           title: true,
@@ -371,8 +394,10 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
 
     // Score and rank sheets by weighted metrics: stars*3 + forks*5 + recencyBoost*10
     // Content from enrolled courses receives a 2x score multiplier.
+    // Content from followed users receives a 1.5x score multiplier (stacks with course boost).
     const now = Date.now()
     const enrolledCourseSet = new Set(courseIds)
+    const followedUserSet = new Set(followedUserIds)
     const scoredSheets = sheetCandidates
       .filter((s) => !starredSet.has(s.id))
       .map((sheet) => {
@@ -381,7 +406,10 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
         const baseScore =
           (sheet.stars || 0) * 3 + (sheet._count.forkChildren || 0) * 5 + recencyBoost * 10
         const isEnrolledCourse = sheet.course?.id != null && enrolledCourseSet.has(sheet.course.id)
-        const score = isEnrolledCourse ? baseScore * 2 : baseScore
+        const isFollowedAuthor = sheet.author?.id != null && followedUserSet.has(sheet.author.id)
+        let score = baseScore
+        if (isEnrolledCourse) score *= 2
+        if (isFollowedAuthor) score *= 1.5
         return { ...sheet, _score: score }
       })
       .sort((a, b) => b._score - a._score)

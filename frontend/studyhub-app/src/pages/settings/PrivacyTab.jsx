@@ -11,6 +11,57 @@ function authHeaders() {
   return { 'Content-Type': 'application/json' }
 }
 
+/* ── Download My Activity Log ─────────────────────────────────── */
+function ActivityLogDownload() {
+  const [downloading, setDownloading] = useState(false)
+
+  async function handleDownload() {
+    setDownloading(true)
+    try {
+      const res = await fetch(`${API}/api/settings/my-audit-log`, {
+        headers: authHeaders(),
+        credentials: 'include',
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        showToast(data.error || 'Could not download activity log.', 'error')
+        return
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      const disposition = res.headers.get('Content-Disposition') || ''
+      const match = disposition.match(/filename="?([^"]+)"?/)
+      a.download = match ? match[1] : `my-activity-log-${new Date().toISOString().slice(0, 10)}.json`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+      showToast('Activity log downloaded.', 'success')
+    } catch {
+      showToast('Check your connection and try again.', 'error')
+    } finally {
+      setDownloading(false)
+    }
+  }
+
+  return (
+    <SectionCard
+      title="Activity Log"
+      subtitle="Download a copy of your activity on StudyHub. This includes actions like logins, sheet creation, comments, and settings changes. No IP addresses or internal data are included."
+    >
+      <Button
+        onClick={handleDownload}
+        disabled={downloading}
+        secondary
+      >
+        {downloading ? 'Downloading...' : 'Download My Activity Log'}
+      </Button>
+    </SectionCard>
+  )
+}
+
 /* ── Private Account toggle sub-component ────────────────────────────── */
 function PrivateAccountToggle() {
   const { user, setSessionUser } = useSession()
@@ -220,6 +271,8 @@ export default function PrivacyTab() {
       )}>
         {saving ? 'Saving...' : 'Save Privacy Preferences'}
       </Button>
+
+      <ActivityLogDownload />
 
       <UserListSection
         title="Blocked Users"

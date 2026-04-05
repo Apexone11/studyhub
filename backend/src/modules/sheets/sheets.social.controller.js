@@ -13,6 +13,7 @@ const { getInitialModerationStatus } = require('../../lib/trustGate')
 const { trackActivity } = require('../../lib/activityTracker')
 const { timedSection, logTiming } = require('../../lib/requestTiming')
 const { commentReactLimiter } = require('../../lib/rateLimiters')
+const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 
 const router = express.Router()
 
@@ -430,6 +431,52 @@ router.delete('/:id/comments/:commentId', requireAuth, commentLimiter, async (re
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── PATCH /:id/comments/:commentId ── edit comment content
+router.patch('/:id/comments/:commentId', requireAuth, commentLimiter, async (req, res) => {
+  try {
+    const sheetId = Number(req.params.id)
+    const commentId = Number(req.params.commentId)
+    const { content } = req.body
+
+    if (!content || typeof content !== 'string' || content.trim().length === 0) {
+      return sendError(res, 400, 'Comment content is required.', ERROR_CODES.VALIDATION)
+    }
+    if (content.length > 500) {
+      return sendError(res, 400, 'Comment must be 500 characters or fewer.', ERROR_CODES.VALIDATION)
+    }
+
+    const comment = await prisma.comment.findUnique({
+      where: { id: commentId },
+      select: { id: true, userId: true, sheetId: true, createdAt: true },
+    })
+
+    if (!comment || comment.sheetId !== sheetId) {
+      return sendError(res, 404, 'Comment not found.', ERROR_CODES.NOT_FOUND)
+    }
+    if (comment.userId !== req.user.userId) {
+      return sendError(res, 403, 'You can only edit your own comments.', ERROR_CODES.FORBIDDEN)
+    }
+
+    const fifteenMinutes = 15 * 60 * 1000
+    if (Date.now() - new Date(comment.createdAt).getTime() > fifteenMinutes) {
+      return sendError(res, 403, 'Can only edit comments within 15 minutes.', ERROR_CODES.FORBIDDEN)
+    }
+
+    const updated = await prisma.comment.update({
+      where: { id: commentId },
+      data: { content: content.trim() },
+      include: {
+        author: { select: AUTHOR_SELECT },
+      },
+    })
+
+    res.json(updated)
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    sendError(res, 500, 'Failed to edit comment.', ERROR_CODES.INTERNAL)
   }
 })
 

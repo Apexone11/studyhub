@@ -54,7 +54,7 @@ const mockTargets = new Map([
   [require.resolve('../src/modules/ai/ai.service'), mocks.aiService],
   [require.resolve('../src/monitoring/sentry'), mocks.sentry],
   [require.resolve('../src/middleware/auth'), fakeAuth],
-  [require.resolve('../src/lib/rateLimiters'), { readLimiter: fakeRateLimiter, authLimiter: fakeRateLimiter, writeLimiter: fakeRateLimiter }],
+  [require.resolve('../src/lib/rateLimiters'), { readLimiter: fakeRateLimiter, authLimiter: fakeRateLimiter, writeLimiter: fakeRateLimiter, createAiMessageLimiter: () => fakeRateLimiter }],
   [require.resolve('express-rate-limit'), () => fakeRateLimiter],
 ])
 

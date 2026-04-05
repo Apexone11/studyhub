@@ -16,7 +16,7 @@ import { API } from '../../config'
 
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 
-export default function ForYouSection() {
+export default function ForYouSection({ onSwitchToAll }) {
   const [data, setData] = useState({ sheets: [], groups: [], people: [], trending: [] })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -143,12 +143,35 @@ export default function ForYouSection() {
             style={{
               padding: '40px 24px',
               textAlign: 'center',
-              color: 'var(--sh-muted)',
-              fontSize: 13,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 12,
             }}
           >
-            No personalized content available yet. Follow more users and join courses to see
-            recommendations.
+            <p style={{ color: 'var(--sh-muted)', fontSize: 14, margin: 0 }}>
+              No personalized content available yet. Follow more users and enroll in courses to
+              see recommendations here.
+            </p>
+            {onSwitchToAll && (
+              <button
+                type="button"
+                onClick={onSwitchToAll}
+                style={{
+                  padding: '8px 20px',
+                  borderRadius: 8,
+                  border: 'none',
+                  background: 'var(--sh-brand)',
+                  color: '#fff',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  fontFamily: FONT,
+                }}
+              >
+                Browse All Posts
+              </button>
+            )}
           </div>
         )}
     </div>

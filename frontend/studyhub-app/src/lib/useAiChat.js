@@ -124,7 +124,7 @@ export function useAiChat() {
   }, [])
 
   // ── Send a message (with SSE streaming) ──────────────────────────
-  const sendMessage = useCallback(async (content, { images } = {}) => {
+  const sendMessage = useCallback(async (content, { images, hideFromChat } = {}) => {
     if (!content.trim() || streaming) return
 
     let convId = activeConversationId
@@ -136,16 +136,18 @@ export function useAiChat() {
       convId = conv.id
     }
 
-    // Optimistically add the user message to the local list.
-    const userMsg = {
-      id: `temp-${Date.now()}`,
-      role: 'user',
-      content: content.trim(),
-      hasImage: images && images.length > 0,
-      imageDescription: images ? `${images.length} image(s)` : null,
-      createdAt: new Date().toISOString(),
+    // Optimistically add the user message to the local list (unless hidden).
+    if (!hideFromChat) {
+      const userMsg = {
+        id: `temp-${Date.now()}`,
+        role: 'user',
+        content: content.trim(),
+        hasImage: images && images.length > 0,
+        imageDescription: images ? `${images.length} image(s)` : null,
+        createdAt: new Date().toISOString(),
+      }
+      setMessages((prev) => [...prev, userMsg])
     }
-    setMessages((prev) => [...prev, userMsg])
     setStreaming(true)
     setStreamingText('')
     setError(null)
@@ -244,7 +246,7 @@ export function useAiChat() {
   const continueGeneration = useCallback(async () => {
     if (streaming || !truncated || !activeConversationId) return
     setTruncated(false)
-    await sendMessage('Continue generating from where you left off. Do not repeat what was already written -- pick up exactly where the previous response ended.')
+    await sendMessage('Continue generating from where you left off. Do not repeat what was already written -- pick up exactly where the previous response ended.', { hideFromChat: true })
   }, [streaming, truncated, activeConversationId, sendMessage])
 
   // ── Delete a conversation ────────────────────────────────────────

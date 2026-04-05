@@ -12,6 +12,7 @@ import { API } from '../config'
 function AnnouncementVideoPlayer({ video }) {
   const [streamUrl, setStreamUrl] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [buffering, setBuffering] = useState(true)
 
   useEffect(() => {
     if (!video?.id || video.status !== 'ready') return
@@ -71,17 +72,37 @@ function AnnouncementVideoPlayer({ video }) {
   }
 
   return (
-    <video
-      src={streamUrl}
-      poster={thumbnailUrl || undefined}
-      controls
-      playsInline
-      preload="metadata"
-      controlsList="nodownload nofullscreen noremoteplayback"
-      disablePictureInPicture
-      onContextMenu={(e) => e.preventDefault()}
-      style={{ width: '100%', display: 'block', borderRadius: 'var(--radius)', maxHeight: 400 }}
-    />
+    <div style={{ position: 'relative' }}>
+      {buffering && thumbnailUrl && (
+        <img
+          src={thumbnailUrl}
+          alt=""
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            borderRadius: 8,
+          }}
+        />
+      )}
+      <video
+        src={streamUrl}
+        poster={thumbnailUrl || undefined}
+        controls
+        playsInline
+        preload="metadata"
+        controlsList="nodownload nofullscreen noremoteplayback"
+        disablePictureInPicture
+        onContextMenu={(e) => e.preventDefault()}
+        onCanPlay={() => setBuffering(false)}
+        onWaiting={() => setBuffering(true)}
+        onPlaying={() => setBuffering(false)}
+        style={{ width: '100%', display: 'block', borderRadius: 'var(--radius)', maxHeight: 400, opacity: buffering ? 0 : 1, transition: 'opacity 0.2s' }}
+      />
+    </div>
   )
 }
 

@@ -8,7 +8,7 @@ import {
   groupFindingsByCategory,
   generateRiskSummary,
   generateTierExplanation,
-} from '../src/lib/htmlSecurity'
+} from '../src/lib/html/htmlSecurity'
 
 describe('htmlSecurity', () => {
   it('normalizes content format with markdown default', () => {

@@ -1,4 +1,4 @@
-import { memo, useState, useEffect } from 'react'
+import { memo, useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import MentionText from '../../components/MentionText'
 import PendingReviewBanner from '../../components/PendingReviewBanner'
@@ -7,9 +7,71 @@ import { attachmentEndpoints, attachmentPreviewKind } from './feedHelpers'
 import { popScale } from '../../lib/animations'
 import { Avatar } from './FeedWidgets'
 import CommentSection from './CommentSection'
-import { FONT, timeAgo, actionButton, linkButton, pillStyle } from './feedConstants'
+import {
+  FONT,
+  timeAgo,
+  actionButton,
+  linkButton,
+  pillStyle,
+  statsBarStyle,
+  statsCountStyle,
+  statsLinkStyle,
+  actionBarStyle,
+  actionBarButton,
+  shareToastStyle,
+} from './feedConstants'
 import { API } from '../../config'
 import ProBadge from '../../components/ProBadge'
+
+/* ── SVG icon components for post actions ──────────────────────────────── */
+
+function ThumbUpIcon({ size = 20, filled = false }) {
+  if (filled) {
+    return (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+        <path d="M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z" />
+      </svg>
+    )
+  }
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
+    </svg>
+  )
+}
+
+function ThumbDownIcon({ size = 20, filled = false }) {
+  if (filled) {
+    return (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+        <path d="M15 3H6c-.83 0-1.54.5-1.84 1.22l-3.02 7.05c-.09.23-.14.47-.14.73v2c0 1.1.9 2 2 2h6.31l-.95 4.57-.03.32c0 .41.17.79.44 1.06l1.06 1.05 6.57-6.59C16.78 14.95 17 14.45 17 14V5c0-1.1-.9-2-2-2zm4 0v12h4V3h-4z" />
+      </svg>
+    )
+  }
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10 15V19a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10zM17 2h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3" />
+    </svg>
+  )
+}
+
+function CommentIcon({ size = 20 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  )
+}
+
+function ShareIcon({ size = 20 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+      <polyline points="16 6 12 2 8 6" />
+      <line x1="12" y1="2" x2="12" y2="15" />
+    </svg>
+  )
+}
 
 /* ── Inline feed video player (lazy loaded) ────────────────────────────── */
 
@@ -17,6 +79,7 @@ function FeedVideoPlayer({ video }) {
   const [streamUrl, setStreamUrl] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [buffering, setBuffering] = useState(true)
 
   useEffect(() => {
     if (!video?.id || video.status !== 'ready') return
@@ -170,17 +233,37 @@ function FeedVideoPlayer({ video }) {
         background: '#000',
       }}
     >
-      <video
-        src={streamUrl}
-        poster={thumbnailUrl || undefined}
-        controls
-        playsInline
-        preload="metadata"
-        controlsList={video.downloadable === false ? 'nodownload nofullscreen noremoteplayback' : undefined}
-        disablePictureInPicture={video.downloadable === false}
-        onContextMenu={video.downloadable === false ? (e) => e.preventDefault() : undefined}
-        style={{ width: '100%', display: 'block', maxHeight: 500 }}
-      />
+      <div style={{ position: 'relative' }}>
+        {buffering && thumbnailUrl && (
+          <img
+            src={thumbnailUrl}
+            alt=""
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              borderRadius: 8,
+            }}
+          />
+        )}
+        <video
+          src={streamUrl}
+          poster={thumbnailUrl || undefined}
+          controls
+          playsInline
+          preload="metadata"
+          controlsList={video.downloadable === false ? 'nodownload nofullscreen noremoteplayback' : undefined}
+          disablePictureInPicture={video.downloadable === false}
+          onContextMenu={video.downloadable === false ? (e) => e.preventDefault() : undefined}
+          onCanPlay={() => setBuffering(false)}
+          onWaiting={() => setBuffering(true)}
+          onPlaying={() => setBuffering(false)}
+          style={{ width: '100%', display: 'block', maxHeight: 500, opacity: buffering ? 0 : 1, transition: 'opacity 0.2s' }}
+        />
+      </div>
       <div
         style={{
           padding: '8px 12px',
@@ -283,6 +366,17 @@ function FeedCardInner({
   const reaction = item.reactions || { likes: 0, dislikes: 0, userReaction: null }
   const urls = attachmentEndpoints(item)
   const previewKind = attachmentPreviewKind(item)
+
+  const [showComments, setShowComments] = useState(!!targetCommentId)
+  const [showShareToast, setShowShareToast] = useState(false)
+
+  const handleShare = useCallback(() => {
+    const url = `${window.location.origin}/feed?post=${item.id}`
+    navigator.clipboard.writeText(url).then(() => {
+      setShowShareToast(true)
+      setTimeout(() => setShowShareToast(false), 2000)
+    })
+  }, [item.id])
 
   return (
     <article className="sh-card" data-post-id={item.id} style={{ padding: '20px 24px', transition: 'box-shadow 0.2s ease' }}>
@@ -629,30 +723,6 @@ function FeedCardInner({
                 View sheet
               </Link>
             ) : null}
-            {isPost ? (
-              <button
-                type="button"
-                onClick={(e) => {
-                  popScale(e.currentTarget)
-                  onReact(item, 'like')
-                }}
-                style={actionButton(reaction.userReaction === 'like' ? 'var(--sh-success)' : 'var(--sh-slate-600)')}
-              >
-                Like {reaction.likes || 0}
-              </button>
-            ) : null}
-            {isPost ? (
-              <button
-                type="button"
-                onClick={(e) => {
-                  popScale(e.currentTarget)
-                  onReact(item, 'dislike')
-                }}
-                style={actionButton(reaction.userReaction === 'dislike' ? 'var(--sh-danger)' : 'var(--sh-slate-600)')}
-              >
-                Dislike {reaction.dislikes || 0}
-              </button>
-            ) : null}
             {isSheet ? (
               <button
                 type="button"
@@ -696,14 +766,86 @@ function FeedCardInner({
             ) : null}
           </div>
 
-          {/* Comment section for posts */}
+          {/* Post stats bar + action bar (Facebook-style) */}
           {isPost && (
-            <CommentSection
-              postId={item.id}
-              commentCount={item.commentCount || 0}
-              user={currentUser}
-              targetCommentId={targetCommentId}
-            />
+            <>
+              {(reaction.likes > 0 || reaction.dislikes > 0 || (item.commentCount || 0) > 0) && (
+                <div style={statsBarStyle}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    {(reaction.likes > 0 || reaction.dislikes > 0) && (
+                      <span style={statsCountStyle}>
+                        <ThumbUpIcon size={15} filled={reaction.likes > 0} />
+                        {reaction.likes + reaction.dislikes}
+                      </span>
+                    )}
+                  </div>
+                  {(item.commentCount || 0) > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowComments((v) => !v)}
+                      style={statsLinkStyle}
+                    >
+                      {item.commentCount} {item.commentCount === 1 ? 'comment' : 'comments'}
+                    </button>
+                  )}
+                </div>
+              )}
+
+              <div style={actionBarStyle}>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    popScale(e.currentTarget)
+                    onReact(item, 'like')
+                  }}
+                  style={actionBarButton(reaction.userReaction === 'like', 'var(--sh-success)')}
+                >
+                  <ThumbUpIcon size={18} filled={reaction.userReaction === 'like'} />
+                  Like
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    popScale(e.currentTarget)
+                    onReact(item, 'dislike')
+                  }}
+                  style={actionBarButton(reaction.userReaction === 'dislike', 'var(--sh-danger)')}
+                >
+                  <ThumbDownIcon size={18} filled={reaction.userReaction === 'dislike'} />
+                  Dislike
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowComments((v) => !v)}
+                  style={actionBarButton(showComments, 'var(--sh-brand)')}
+                >
+                  <CommentIcon size={18} />
+                  Comment
+                </button>
+                <button
+                  type="button"
+                  onClick={handleShare}
+                  style={actionBarButton(false, 'var(--sh-muted)')}
+                >
+                  <ShareIcon size={18} />
+                  Share
+                </button>
+              </div>
+
+              {showComments && (
+                <CommentSection
+                  postId={item.id}
+                  commentCount={item.commentCount || 0}
+                  user={currentUser}
+                  targetCommentId={targetCommentId}
+                />
+              )}
+            </>
+          )}
+
+          {/* Share toast */}
+          {showShareToast && (
+            <div style={shareToastStyle}>Link copied</div>
           )}
         </div>
       </div>

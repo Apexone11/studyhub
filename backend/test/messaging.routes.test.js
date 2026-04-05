@@ -55,6 +55,9 @@ const mocks = vi.hoisted(() => {
     user: {
       findUnique: vi.fn(),
     },
+    userFollow: {
+      findUnique: vi.fn(),
+    },
     $transaction: vi.fn((fn) => fn(prisma)),
   }
 
@@ -80,9 +83,11 @@ const mocks = vi.hoisted(() => {
     },
     rateLimiters: {
       readLimiter: (_req, _res, next) => next(),
+      messagingWriteLimiter: (_req, _res, next) => next(),
     },
     blockFilter: {
       getBlockedUserIds: vi.fn().mockResolvedValue([]),
+      isBlockedEitherWay: vi.fn().mockResolvedValue(false),
     },
   }
 })
@@ -481,7 +486,7 @@ describe('messaging routes', () => {
       })
 
       const res = await request(app)
-        .patch('/messages/100')
+        .patch('/100')
         .send({ content: 'Edited content' })
 
       expect(res.status).toBe(200)
@@ -503,7 +508,7 @@ describe('messaging routes', () => {
       })
 
       const res = await request(app)
-        .patch('/messages/100')
+        .patch('/100')
         .send({ content: 'Too late' })
 
       expect(res.status).toBe(403)
@@ -524,7 +529,7 @@ describe('messaging routes', () => {
       })
 
       const res = await request(app)
-        .patch('/messages/100')
+        .patch('/100')
         .send({ content: 'Not my message' })
 
       expect(res.status).toBe(403)
@@ -552,7 +557,7 @@ describe('messaging routes', () => {
         sender: { id: 42, username: 'test_user' },
       })
 
-      const res = await request(app).delete('/messages/100')
+      const res = await request(app).delete('/100')
 
       expect(res.status).toBe(204)
       expect(mocks.prisma.message.update).toHaveBeenCalledWith(
@@ -567,7 +572,7 @@ describe('messaging routes', () => {
     it('returns 404 for non-existent message', async () => {
       mocks.prisma.message.findUnique.mockResolvedValue(null)
 
-      const res = await request(app).delete('/messages/999')
+      const res = await request(app).delete('/999')
 
       expect(res.status).toBe(404)
     })
@@ -602,7 +607,7 @@ describe('messaging routes', () => {
       })
 
       const res = await request(app)
-        .post('/messages/100/reactions')
+        .post('/100/reactions')
         .send({ emoji: 'thumbsup' })
 
       expect(res.status).toBe(201)
@@ -611,7 +616,7 @@ describe('messaging routes', () => {
 
     it('rejects missing emoji', async () => {
       const res = await request(app)
-        .post('/messages/100/reactions')
+        .post('/100/reactions')
         .send({})
 
       expect(res.status).toBe(400)

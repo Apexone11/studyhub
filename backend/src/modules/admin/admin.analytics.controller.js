@@ -453,4 +453,38 @@ router.get('/active-users', async (req, res) => {
   }
 })
 
+// ── GET /analytics/user-roles ── user count by role
+router.get('/analytics/user-roles', async (req, res) => {
+  try {
+    const groups = await prisma.user.groupBy({
+      by: ['role'],
+      _count: true,
+    })
+    const roles = groups.map((g) => ({ role: g.role, count: g._count }))
+    res.json({ roles })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Failed to fetch user roles.' })
+  }
+})
+
+// ── GET /analytics/engagement-totals ── aggregate engagement counts for pie chart
+router.get('/analytics/engagement-totals', async (req, res) => {
+  try {
+    const start = periodStartDate(req.query.period)
+
+    const [likes, comments, stars, follows] = await Promise.all([
+      prisma.reaction.count({ where: { createdAt: { gte: start } } }),
+      prisma.feedPostComment.count({ where: { createdAt: { gte: start } } }),
+      prisma.starredSheet.count({ where: { createdAt: { gte: start } } }),
+      prisma.follow.count({ where: { createdAt: { gte: start } } }),
+    ])
+
+    res.json({ totals: { likes, comments, stars, follows } })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Failed to fetch engagement totals.' })
+  }
+})
+
 module.exports = router

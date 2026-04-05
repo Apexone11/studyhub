@@ -7,7 +7,7 @@ import {
   resendSignupChallenge,
   sendOrRefreshLoginChallenge,
   verifyChallengeCode,
-} from '../src/lib/verificationChallenges'
+} from '../src/lib/verification/verificationChallenges'
 
 function createVerificationDb() {
   let rows = []

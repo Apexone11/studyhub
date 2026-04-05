@@ -243,7 +243,7 @@ export default function FeedPage() {
               </div>
 
               {activeFilter === 'for-you' ? (
-                <ForYouSection />
+                <ForYouSection onSwitchToAll={() => setQueryParam('filter', '')} />
               ) : (
                 <>
                   {feedState.partial ? (
