@@ -21,6 +21,10 @@ router.get('/', async (req, res) => {
   const take = limit + offset + 8
   const announcementTake = Math.min(6, Math.max(2, Math.ceil((limit + offset) / 3)))
   const search = typeof req.query.search === 'string' ? req.query.search.trim() : ''
+  const filterUserId = req.query.userId ? Number.parseInt(req.query.userId, 10) : null
+  const userIdFilter = filterUserId && Number.isInteger(filterUserId) && filterUserId > 0
+    ? { userId: filterUserId }
+    : {}
 
   /* Feed cards display text-only previews (summarizeText), never rendered
    * HTML, so filtering by htmlRiskTier here is unnecessary and hides valid
@@ -144,7 +148,7 @@ router.get('/', async (req, res) => {
       ),
       settleSection('posts', () =>
         prisma.feedPost.findMany({
-          where: { ...postWhere, ...userFilter },
+          where: { ...postWhere, ...userFilter, ...userIdFilter },
           select: {
             id: true,
             content: true,

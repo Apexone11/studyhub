@@ -63,11 +63,13 @@ const aiRoutes = require('./modules/ai')
 const libraryRoutes = require('./modules/library')
 const videoRoutes = require('./modules/video')
 const paymentsRoutes = require('./modules/payments')
+const reviewsRoutes = require('./modules/reviews')
 const crypto = require('node:crypto')
 const log = require('./lib/logger')
 const { httpLogger } = require('./lib/httpLogger')
 const { initSocketIO } = require('./lib/socketio')
 const { featureFlagMiddleware } = require('./lib/featureFlags')
+const { trackActiveUser } = require('./lib/activeTracking')
 
 if (sentryEnabled) {
   log.info('Sentry monitoring enabled for backend.')
@@ -305,6 +307,10 @@ app.use((req, _res, next) => {
 // Skips GET/HEAD/OPTIONS, unauthenticated requests, and admin users.
 app.use(checkRestrictions)
 
+// Track user activity for active-users metrics.
+// Runs after auth decode so req.user is available. Throttled internally.
+app.use(trackActiveUser)
+
 // Audit logging for security-relevant write operations. Hooks into res 'finish'
 // event — zero impact on response latency. Requires req.user from auth decode above.
 app.use(auditMiddleware)
@@ -447,6 +453,9 @@ app.use('/api/video', videoRoutes)
 
 // Payments module endpoints under /api/payments (webhook handled above).
 app.use('/api/payments', paymentsRoutes)
+
+// Reviews module endpoints under /api/reviews.
+app.use('/api/reviews', reviewsRoutes)
 
 // Waitlist (simple inline route for pricing page)
 app.post('/api/waitlist', express.json(), async (req, res) => {

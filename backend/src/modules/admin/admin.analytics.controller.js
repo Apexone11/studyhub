@@ -428,4 +428,29 @@ router.get('/analytics/top-content', async (req, res) => {
   }
 })
 
+// ── GET /api/admin/active-users ─────────────────────────────────
+// Currently online users (lastActiveAt within 15 minutes)
+router.get('/active-users', async (req, res) => {
+  try {
+    const fifteenMinAgo = new Date(Date.now() - 15 * 60 * 1000)
+
+    const users = await prisma.user.findMany({
+      where: { lastActiveAt: { gte: fifteenMinAgo } },
+      select: {
+        id: true,
+        username: true,
+        avatarUrl: true,
+        role: true,
+        lastActiveAt: true,
+      },
+      orderBy: { lastActiveAt: 'desc' },
+    })
+
+    res.json({ count: users.length, users })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
 module.exports = router

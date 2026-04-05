@@ -59,6 +59,7 @@ import {
 } from '../dashboard/DashboardWidgets'
 import ProfileStatsWidget from './ProfileStatsWidget'
 import FollowSuggestions from './FollowSuggestions'
+import FeedCard from '../feed/FeedCard'
 
 /* ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -590,6 +591,10 @@ export default function UserProfilePage() {
             />
           )}
 
+          {activeTab === 'posts' && (
+            <PostsTab profileId={profile?.id} />
+          )}
+
           {activeTab === 'achievements' && (
             <AchievementsTab
               activityData={activityData}
@@ -705,6 +710,75 @@ function SheetsTab({ profile, isOwnProfile }) {
       <RecentSheetsSection sheets={profile.recentSheets} />
       <StarredSheetsSection sheets={profile.starredSheets} isOwnProfile={isOwnProfile} />
       <SharedNotesSection notes={profile.sharedNotes} />
+    </div>
+  )
+}
+
+/* ── Posts tab (both modes) ──────────────────────────────────────────────── */
+function PostsTab({ profileId }) {
+  const [posts, setPosts] = useState([])
+  const [postsLoading, setPostsLoading] = useState(true)
+  const { user: currentUser } = useSession()
+
+  useEffect(() => {
+    if (!profileId) return
+    let cancelled = false
+    fetch(`${API}/api/feed?userId=${profileId}`, { headers: authHeaders(), credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : { items: [] }))
+      .then((data) => {
+        if (!cancelled) setPosts(data.items || data.posts || [])
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setPostsLoading(false) })
+    return () => { cancelled = true }
+  }, [profileId])
+
+  if (postsLoading) {
+    return (
+      <div className="profile-columns">
+        {[1, 2, 3].map((n) => (
+          <div key={n} style={{ ...cardStyle, padding: '20px 24px' }}>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 14 }}>
+              <div className="sh-skeleton" style={{ width: 40, height: 40, borderRadius: '50%' }} />
+              <div style={{ flex: 1 }}>
+                <div className="sh-skeleton" style={{ width: '50%', height: 13, borderRadius: 6, marginBottom: 6 }} />
+                <div className="sh-skeleton" style={{ width: '30%', height: 10, borderRadius: 6 }} />
+              </div>
+            </div>
+            <div className="sh-skeleton" style={{ width: '80%', height: 14, borderRadius: 6, marginBottom: 8 }} />
+            <div className="sh-skeleton" style={{ width: '100%', height: 12, borderRadius: 6, marginBottom: 6 }} />
+            <div className="sh-skeleton" style={{ width: '60%', height: 12, borderRadius: 6 }} />
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  if (!posts.length) {
+    return (
+      <div style={{ ...cardStyle, textAlign: 'center', padding: '48px 24px' }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--sh-heading)', marginBottom: 6 }}>No posts yet</div>
+        <div style={{ fontSize: 13, color: 'var(--sh-muted)' }}>This user has not posted anything to the feed.</div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="profile-columns" style={{ gap: 12 }}>
+      {posts.map((item) => (
+        <FeedCard
+          key={item.id}
+          item={item}
+          currentUser={currentUser}
+          onReact={() => {}}
+          onStar={() => {}}
+          onDeletePost={() => {}}
+          canDeletePost={false}
+          isPostMenuOpen={false}
+          onTogglePostMenu={() => {}}
+          isDeletingPost={false}
+        />
+      ))}
     </div>
   )
 }

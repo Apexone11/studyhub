@@ -113,9 +113,12 @@ model User {
   giftsSent                  GiftSubscription[]    @relation("GiftsSent")
   giftsReceived              GiftSubscription[]    @relation("GiftsReceived")
   subscriptionPauses         SubscriptionPause[]
+  lastActiveAt               DateTime?
+  userReviews                UserReview[]
 
   @@index([role])
   @@index([emailHash])
+  @@index([lastActiveAt])
 }
 
 model ShareLink {
@@ -1653,4 +1656,25 @@ model SubscriptionPause {
 
   @@index([userId])
   @@index([status])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// User Reviews — Public testimonials shown on homepage
+// ═══════════════════════════════════════════════════════════════════════════
+
+model UserReview {
+  id               Int      @id @default(autoincrement())
+  userId           Int
+  stars            Int      // 1-5
+  text             String   @db.VarChar(500)
+  status           String   @default("pending") // "pending", "approved", "rejected"
+  aiClassification String?  // "positive", "negative", "neutral"
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId]) // one review per user
+  @@index([status, stars])
+  @@index([createdAt])
 }

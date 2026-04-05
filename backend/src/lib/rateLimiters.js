@@ -669,6 +669,31 @@ const paymentReadLimiter = rateLimit({
   message: { error: 'Too many payment requests. Please slow down.' },
 })
 
+// ── CATEGORY: Reviews Module ─────────────────────────────────────────────
+
+/**
+ * Review submissions — 1 request per 24 hours per user.
+ */
+const reviewSubmitLimiter = rateLimit({
+  windowMs: WINDOW_1_DAY,
+  max: 1,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'You can only submit one review per day. Please try again tomorrow.' },
+  keyGenerator: (req) => `review-submit-${req.user?.userId || 'anon'}`,
+})
+
+/**
+ * Review read operations — 60 requests per minute per IP.
+ */
+const reviewReadLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many review requests. Please slow down.' },
+})
+
 // ── Exports ────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -768,4 +793,8 @@ module.exports = {
   paymentCheckoutLimiter,
   paymentPortalLimiter,
   paymentReadLimiter,
+
+  // Reviews module
+  reviewSubmitLimiter,
+  reviewReadLimiter,
 }

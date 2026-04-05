@@ -49,6 +49,7 @@ const LibraryPage = lazy(() => import('./pages/library/LibraryPage'))
 const BookDetailPage = lazy(() => import('./pages/library/BookDetailPage'))
 const BookReaderPage = lazy(() => import('./pages/library/BookReaderPage'))
 const PlaygroundPage = lazy(() => import('./pages/playground/PlaygroundPage'))
+const ReviewPage = lazy(() => import('./pages/review/ReviewPage'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 
 import ScrollToTop from './components/ScrollToTop'
@@ -117,6 +118,7 @@ const ROUTE_TITLES = {
   '/pricing': 'Pricing',
   '/library': 'Library',
   '/playground': 'Code Playground',
+  '/review': 'Leave a Review',
   '/forgot-password': 'Forgot Password',
   '/reset-password': 'Reset Password',
 }
@@ -522,6 +524,14 @@ function AppRoutes() {
                 element={
                   <PrivateRoute>
                     <MyCoursesPage />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/review"
+                element={
+                  <PrivateRoute>
+                    <ReviewPage />
                   </PrivateRoute>
                 }
               />
