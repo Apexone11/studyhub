@@ -503,13 +503,28 @@ async function getUserSubscription(userId) {
     },
   })
 
+  // Check donor status for free-tier users
+  let donorInfo = { isDonor: false, donorLevel: null }
+  try {
+    const donorResult = await prisma.donation.aggregate({
+      where: { userId, status: 'completed' },
+      _sum: { amount: true },
+    })
+    const totalCents = donorResult._sum.amount || 0
+    if (totalCents >= 10000) donorInfo = { isDonor: true, donorLevel: 'gold' }
+    else if (totalCents >= 2500) donorInfo = { isDonor: true, donorLevel: 'silver' }
+    else if (totalCents >= 100) donorInfo = { isDonor: true, donorLevel: 'bronze' }
+  } catch { /* graceful */ }
+
   // No subscription or fully inactive
   if (!sub || sub.status === 'canceled' || sub.status === 'incomplete_expired') {
-    return { plan: 'free', status: 'active', features: PLANS.free }
+    const effectiveFeatures = donorInfo.isDonor ? PLANS.donor : PLANS.free
+    return { plan: donorInfo.isDonor ? 'donor' : 'free', status: 'active', features: effectiveFeatures, ...donorInfo }
   }
   // Incomplete (payment pending) - treat as free until confirmed
   if (sub.status === 'incomplete') {
-    return { plan: 'free', status: 'incomplete', features: PLANS.free }
+    const effectiveFeatures = donorInfo.isDonor ? PLANS.donor : PLANS.free
+    return { plan: donorInfo.isDonor ? 'donor' : 'free', status: 'incomplete', features: effectiveFeatures, ...donorInfo }
   }
 
   return {
@@ -520,6 +535,7 @@ async function getUserSubscription(userId) {
     canceledAt: sub.canceledAt,
     createdAt: sub.createdAt,
     features: PLANS[sub.plan] || PLANS.free,
+    ...donorInfo,
   }
 }
 
