@@ -1,18 +1,45 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import LegalPageLayout, { LegalSection } from '../../components/LegalPageLayout'
 import { IconShield } from '../../components/Icons'
 import { LEGAL_EMAILS } from '../../lib/legalConstants'
-import { POLICY_URLS } from '../../lib/legalVersions'
+import { TERMLY_UUIDS, POLICY_URLS } from '../../lib/legalVersions'
 
 function CookiePolicyPage() {
+  const containerRef = useRef(null)
   const [loaded, setLoaded] = useState(false)
   const [timedOut, setTimedOut] = useState(false)
 
+  // Use Termly's code snippet embed instead of iframe
   useEffect(() => {
-    if (loaded) return
+    const container = containerRef.current
+    if (!container) return
+
+    // Create the Termly embed div
+    const embed = document.createElement('div')
+    embed.setAttribute('name', 'termly-embed')
+    embed.setAttribute('data-id', TERMLY_UUIDS.cookies)
+    container.appendChild(embed)
+
+    // Watch for Termly to populate the embed
+    const observer = new MutationObserver(() => {
+      if (embed.children.length > 0) {
+        setLoaded(true)
+        observer.disconnect()
+      }
+    })
+    observer.observe(embed, { childList: true, subtree: true })
+
+    // Timeout fallback
     const timer = setTimeout(() => setTimedOut(true), 10000)
-    return () => clearTimeout(timer)
-  }, [loaded])
+
+    return () => {
+      observer.disconnect()
+      clearTimeout(timer)
+      if (container && embed.parentNode === container) {
+        container.removeChild(embed)
+      }
+    }
+  }, [])
 
   return (
     <LegalPageLayout
@@ -32,24 +59,22 @@ function CookiePolicyPage() {
           For cookie-related questions, contact{' '}
           <a href={`mailto:${LEGAL_EMAILS.privacy}`} style={{ color: 'var(--sh-brand)', textDecoration: 'none' }}>{LEGAL_EMAILS.privacy}</a>.
         </p>
-        <div style={{ position: 'relative', minHeight: 600 }}>
+        <div style={{ position: 'relative', minHeight: 400 }}>
           {!loaded && !timedOut && (
             <div style={{
-              position: 'absolute', inset: 0, display: 'flex', alignItems: 'center',
-              justifyContent: 'center', background: 'var(--sh-soft)', borderRadius: 8,
-              color: 'var(--sh-muted)', fontSize: 14,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              minHeight: 200, color: 'var(--sh-muted)', fontSize: 14,
             }}>
               Loading cookie policy...
             </div>
           )}
           {timedOut && !loaded && (
             <div style={{
-              position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
-              alignItems: 'center', justifyContent: 'center', background: 'var(--sh-soft)',
-              borderRadius: 8, gap: 12, padding: 20,
+              display: 'flex', flexDirection: 'column', alignItems: 'center',
+              justifyContent: 'center', minHeight: 200, gap: 12, padding: 20,
             }}>
               <p style={{ color: 'var(--sh-muted)', fontSize: 14, margin: 0, textAlign: 'center' }}>
-                The cookie policy failed to load. You can view it directly on Termly:
+                The cookie policy could not be loaded inline. You can view it directly:
               </p>
               <a
                 href={POLICY_URLS.cookies}
@@ -61,15 +86,9 @@ function CookiePolicyPage() {
               </a>
             </div>
           )}
-          <iframe
-            src={POLICY_URLS.cookies}
-            style={{
-              width: '100%', minHeight: 600, border: 'none', borderRadius: 8,
-              opacity: loaded ? 1 : 0, transition: 'opacity 0.3s ease',
-            }}
-            title="Cookie Policy"
-            loading="lazy"
-            onLoad={() => setLoaded(true)}
+          <div
+            ref={containerRef}
+            style={{ opacity: loaded ? 1 : 0, transition: 'opacity 0.3s ease' }}
           />
         </div>
       </LegalSection>

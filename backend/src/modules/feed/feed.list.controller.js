@@ -18,14 +18,32 @@ const router = express.Router()
  * Score a feed item by weighted engagement signals + recency.
  * Higher score = shown higher in feed.
  */
-function scoreFeedItem(item) {
+function scoreFeedItem(item, userContext = null) {
   const likes = item.reactionSummary?.likes || item.stars || 0
   const dislikes = item.reactionSummary?.dislikes || 0
   const comments = item.commentCount || 0
   const forks = item.forkCount || 0
   const ageHours = (Date.now() - new Date(item.createdAt).getTime()) / (1000 * 60 * 60)
   const recencyBoost = Math.max(0, 1 - ageHours / 720) * 15
-  return (likes * 3) + (dislikes * -1) + (comments * 5) + (forks * 8) + recencyBoost
+  let score = (likes * 3) + (dislikes * -1) + (comments * 5) + (forks * 8) + recencyBoost
+
+  // Personalization boosts when user context is available
+  if (userContext) {
+    // Boost content from user's enrolled courses
+    if (userContext.courseIds && item.courseId && userContext.courseIds.has(item.courseId)) {
+      score *= 1.4
+    }
+    // Boost content from followed users
+    if (userContext.followingIds && item.authorId && userContext.followingIds.has(item.authorId)) {
+      score *= 1.3
+    }
+    // Slightly deprioritize content the user has already interacted with
+    if (userContext.interactedPostIds && userContext.interactedPostIds.has(item.id)) {
+      score *= 0.7
+    }
+  }
+
+  return score
 }
 
 router.get('/', async (req, res) => {
@@ -390,6 +408,29 @@ router.get('/', async (req, res) => {
       ...notes.map((note) => formatNote(note, noteCommentCounts)),
     ]
 
+    // Build personalization context for authenticated users
+    let userContext = null
+    if (req.user?.userId) {
+      try {
+        const [enrollments, follows] = await Promise.all([
+          prisma.enrollment.findMany({
+            where: { userId: req.user.userId },
+            select: { courseId: true },
+          }),
+          prisma.userFollow.findMany({
+            where: { followerId: req.user.userId, status: 'active' },
+            select: { followingId: true },
+          }),
+        ])
+        userContext = {
+          courseIds: new Set(enrollments.map((e) => e.courseId)),
+          followingIds: new Set(follows.map((f) => f.followingId)),
+        }
+      } catch {
+        // Non-fatal - proceed without personalization
+      }
+    }
+
     merged.sort((a, b) => {
       // Pinned announcements always float to the top
       if (a.type === 'announcement' && b.type === 'announcement') {
@@ -400,7 +441,7 @@ router.get('/', async (req, res) => {
         return 1
       }
 
-      return scoreFeedItem(b) - scoreFeedItem(a)
+      return scoreFeedItem(b, userContext) - scoreFeedItem(a, userContext)
     })
 
     const items = merged
