@@ -103,10 +103,12 @@ export default function AiPage() {
                   messages={chat.messages}
                   streaming={chat.streaming}
                   streamingText={chat.streamingText}
+                  truncated={chat.truncated}
                   loading={chat.loading}
                   error={chat.error}
                   onSend={chat.sendMessage}
                   onStop={chat.stopStreaming}
+                  onContinue={chat.continueGeneration}
                   onBack={isCompact ? () => chat.selectConversation(null) : null}
                   activeConversationId={chat.activeConversationId}
                   onNewChat={chat.startNewConversation}
@@ -280,7 +282,7 @@ function ConversationSidebar({ conversations, activeId, onSelect, onNew, onDelet
 /* ═══════════════════════════════════════════════════════════════════════════
  * Chat Area
  * ═══════════════════════════════════════════════════════════════════════════ */
-function ChatArea({ messages, streaming, streamingText, loading, error, onSend, onStop, onBack, activeConversationId, onNewChat }) {
+function ChatArea({ messages, streaming, streamingText, truncated, loading, error, onSend, onStop, onContinue, onBack, activeConversationId, onNewChat }) {
   const [input, setInput] = useState('')
   const [pendingImages, setPendingImages] = useState([])
   const messagesEndRef = useRef(null)
@@ -452,6 +454,27 @@ function ChatArea({ messages, streaming, streamingText, loading, error, onSend, 
             border: '1px solid var(--sh-danger-border)',
           }}>
             {error}
+          </div>
+        )}
+
+        {truncated && !streaming && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px',
+            background: 'var(--sh-warning-bg)', border: '1px solid var(--sh-warning-border)',
+            borderRadius: 8, fontSize: 13, color: 'var(--sh-warning-text)', marginTop: 8,
+          }}>
+            <span style={{ flex: 1 }}>Response was cut off due to length.</span>
+            <button
+              type="button"
+              onClick={onContinue}
+              style={{
+                padding: '6px 14px', borderRadius: 6, border: 'none',
+                background: 'var(--sh-brand)', color: '#fff', fontSize: 12,
+                fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)',
+              }}
+            >
+              Continue
+            </button>
           </div>
         )}
 

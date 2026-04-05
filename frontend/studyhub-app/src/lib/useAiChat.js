@@ -240,6 +240,13 @@ export function useAiChat() {
     }
   }, [activeConversationId, streaming, location.pathname, startNewConversation])
 
+  // ── Continue a truncated generation ──────────────────────────────
+  const continueGeneration = useCallback(async () => {
+    if (streaming || !truncated || !activeConversationId) return
+    setTruncated(false)
+    await sendMessage('Continue generating from where you left off. Do not repeat what was already written -- pick up exactly where the previous response ended.')
+  }, [streaming, truncated, activeConversationId, sendMessage])
+
   // ── Delete a conversation ────────────────────────────────────────
   const removeConversation = useCallback(async (id) => {
     try {
@@ -306,6 +313,7 @@ export function useAiChat() {
     selectConversation,
     startNewConversation,
     sendMessage,
+    continueGeneration,
     removeConversation,
     editConversationTitle,
     stopStreaming,
