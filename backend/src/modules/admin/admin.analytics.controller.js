@@ -458,9 +458,12 @@ router.get('/analytics/user-roles', async (req, res) => {
   try {
     const groups = await prisma.user.groupBy({
       by: ['role'],
-      _count: true,
+      _count: { _all: true },
     })
-    const roles = groups.map((g) => ({ role: g.role, count: g._count }))
+    const roles = groups.map((group) => ({
+      role: group.role,
+      count: typeof group._count === 'number' ? group._count : group._count?._all || 0,
+    }))
     res.json({ roles })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
@@ -477,7 +480,7 @@ router.get('/analytics/engagement-totals', async (req, res) => {
       prisma.reaction.count({ where: { createdAt: { gte: start } } }),
       prisma.feedPostComment.count({ where: { createdAt: { gte: start } } }),
       prisma.starredSheet.count({ where: { createdAt: { gte: start } } }),
-      prisma.follow.count({ where: { createdAt: { gte: start } } }),
+      prisma.userFollow.count({ where: { createdAt: { gte: start }, status: 'active' } }),
     ])
 
     res.json({ totals: { likes, comments, stars, follows } })

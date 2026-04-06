@@ -60,6 +60,7 @@ export default function AuditLogSubTab({ apiJson }) {
   const [exporting, setExporting] = useState(false)
   const userSearchRef = useRef(null)
   const searchTimerRef = useRef(null)
+  const userSearchAbortRef = useRef(null)
 
   // Close user search dropdown on outside click
   useEffect(() => {
@@ -70,6 +71,11 @@ export default function AuditLogSubTab({ apiJson }) {
     }
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  useEffect(() => () => {
+    clearTimeout(searchTimerRef.current)
+    userSearchAbortRef.current?.abort()
   }, [])
 
   const load = useCallback(async (p = 1) => {
@@ -99,21 +105,31 @@ export default function AuditLogSubTab({ apiJson }) {
     const val = e.target.value
     setUserSearchQuery(val)
     clearTimeout(searchTimerRef.current)
+    userSearchAbortRef.current?.abort()
     if (val.length < 2) {
       setUserSearchResults([])
       setUserSearchOpen(false)
       return
     }
     searchTimerRef.current = setTimeout(async () => {
+      const controller = new AbortController()
+      userSearchAbortRef.current = controller
       try {
         const res = await fetch(`${API}/api/admin/users/search?q=${encodeURIComponent(val)}&limit=8`, {
           credentials: 'include',
+          signal: controller.signal,
         })
         const data = await res.json()
         setUserSearchResults(Array.isArray(data) ? data : [])
         setUserSearchOpen(true)
-      } catch {
+      } catch (err) {
+        if (err?.name === 'AbortError') return
         setUserSearchResults([])
+        setUserSearchOpen(false)
+      } finally {
+        if (userSearchAbortRef.current === controller) {
+          userSearchAbortRef.current = null
+        }
       }
     }, 300)
   }

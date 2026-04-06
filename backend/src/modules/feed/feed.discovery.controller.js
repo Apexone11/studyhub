@@ -40,6 +40,13 @@ function optionalAuth(req, _res, next) {
   next()
 }
 
+function isMissingTableError(error) {
+  return (
+    error?.code === 'P2021' ||
+    (typeof error?.message === 'string' && error.message.includes('does not exist'))
+  )
+}
+
 /**
  * GET /api/feed/trending — Trending sheets.
  *
@@ -255,8 +262,11 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
         select: { followingId: true },
       })
       followedUserIds = follows.map((f) => f.followingId)
-    } catch {
-      /* table may not exist yet */
+    } catch (err) {
+      if (!isMissingTableError(err)) {
+        captureError(err, { route: req.originalUrl, method: req.method, source: 'for-you.userFollow' })
+        throw err
+      }
     }
 
     // Get starred sheets
@@ -274,8 +284,11 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
         select: { groupId: true },
       })
       joinedGroupIds = new Set(joinedGroups.map((g) => g.groupId))
-    } catch {
-      /* table may not exist yet */
+    } catch (err) {
+      if (!isMissingTableError(err)) {
+        captureError(err, { route: req.originalUrl, method: req.method, source: 'for-you.studyGroupMember' })
+        throw err
+      }
     }
 
     const results = {
@@ -368,7 +381,7 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
 
       // Recommended groups: public groups in enrolled courses, not yet joined
       // Wrapped in catch for graceful degradation if tables not yet migrated
-      (courseIds.length > 0
+      courseIds.length > 0
         ? prisma.studyGroup.findMany({
             where: {
               courseId: { in: courseIds },
@@ -387,9 +400,14 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
             },
             orderBy: [{ updatedAt: 'desc' }],
             take: 50,
+          }).catch((err) => {
+            if (!isMissingTableError(err)) {
+              captureError(err, { route: req.originalUrl, method: req.method, source: 'for-you.studyGroup' })
+              throw err
+            }
+            return []
           })
-        : Promise.resolve([])
-      ).catch(() => []),
+        : Promise.resolve([]),
     ])
 
     // Score and rank sheets by weighted metrics: stars*3 + forks*5 + recencyBoost*10
@@ -486,7 +504,6 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
     res.json(results)
   } catch (err) {
     captureError(err, { route: req.originalUrl })
-    console.error('[for-you] Feed error:', err.message)
     res.status(500).json({ error: 'Could not load personalized content. Please try again.' })
   }
 })
@@ -525,8 +542,11 @@ router.get('/recommended-groups', discoveryLimiter, optionalAuth, async (req, re
         select: { groupId: true },
       })
       joinedGroupIds = new Set(joinedGroups.map((g) => g.groupId))
-    } catch {
-      /* table may not exist yet */
+    } catch (err) {
+      if (!isMissingTableError(err)) {
+        captureError(err, { route: req.originalUrl, method: req.method, source: 'recommended-groups.studyGroupMember' })
+        throw err
+      }
     }
 
     // Fetch public groups in user's courses that user hasn't joined
@@ -553,8 +573,11 @@ router.get('/recommended-groups', discoveryLimiter, optionalAuth, async (req, re
         orderBy: [{ updatedAt: 'desc' }],
         take: 10,
       })
-    } catch {
-      /* StudyGroup table may not exist yet */
+    } catch (err) {
+      if (!isMissingTableError(err)) {
+        captureError(err, { route: req.originalUrl, method: req.method, source: 'recommended-groups.studyGroup' })
+        throw err
+      }
     }
 
     const result = groups

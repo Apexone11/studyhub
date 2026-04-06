@@ -94,6 +94,20 @@ function normalizeLegalBodyText(value) {
     .replace(/â€¦/g, '...')
     .replace(/\r/g, '')
     .replace(/[ \t]+\n/g, '\n')
+    .replace(/([A-Z][A-Z &'"/(),:;-]{6,})(Last updated\s+[A-Z][a-z]+\s+\d{2},\s+\d{4})/g, '$1\n$2')
+    .replace(/(Last updated\s+[A-Z][a-z]+\s+\d{2},\s+\d{4})([A-Z])/g, '$1\n\n$2')
+    .replace(/(TABLE OF CONTENTS)(\d+\.\s+)/g, '$1\n$2')
+    .replace(/([^\n])(\d+\.\s+[A-Z])/g, '$1\n$2')
+    .replace(/([a-z0-9)\]])\.([A-Z])/g, '$1.\n\n$2')
+    .replace(/([a-z0-9,)])([A-Z]{2,}(?:\s+[A-Z0-9][A-Z0-9'"/&(),:;-]{2,}){1,})(?=[A-Z][a-z])/g, '$1\n\n$2')
+    .replace(/(In Short:)([A-Z])/g, '$1 $2')
+    .replace(/(following:)([A-Za-z])/gi, '$1\n$2')
+    .replace(
+      /(The personal information we collect may include the following:)\s*names\s*email addresses\s*usernames\s*passwords\s*debit\/credit card numbers/gi,
+      '$1\n- names\n- email addresses\n- usernames\n- passwords\n- debit/credit card numbers',
+    )
+    .replace(/(These rights include:)\s*Right to/gi, '$1\n- Right to')
+    .replace(/(Category [A-Z] - [^.]+)(Category [A-Z] - )/g, '$1\n$2')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
 }

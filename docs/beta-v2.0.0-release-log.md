@@ -38,6 +38,32 @@
 - `npm --prefix frontend/studyhub-app run build`: passes
 - `npm --prefix backend test`: still failing in pre-existing/unrelated suites including `test/notes.routes.test.js`, `test/security.headers.test.js`, and `test/sheet.workflow.integration.test.js`; no failure output referenced the new legal module or `/api/legal` routes
 
+**Follow-up Validation (2026-04-05)**
+- Applied `npm --prefix backend run db:migrate` locally and confirmed `20260405110000_add_legal_documents_and_acceptances` deployed to the local PostgreSQL instance
+- Regenerated the backend Prisma client with `Set-Location backend; npx prisma generate`; local backend boot initially failed until the new `prisma.legalDocument` and `prisma.legalAcceptance` delegates were generated
+- Added focused backend coverage in `backend/test/legal.routes.test.js` and `backend/test/auth.google.routes.test.js`
+- `npm --prefix backend run test -- test/legal.routes.test.js test/auth.google.routes.test.js`: passes (8 tests)
+- Live HTTP smoke passed against the running app stack on alternate local ports:
+	- backend `GET /api/legal/current` and `GET /api/legal/current/terms` succeeded on `http://localhost:4001`
+	- frontend public routes `/terms` and `/guidelines` returned `200` from Vite on `http://localhost:5174`
+- Attempted a browser-level Playwright smoke for the fallback UI, but the local install is missing the underlying `playwright` package required by `@playwright/test`, so browser execution was not available in this environment
+
+**Legal Modal Presentation Follow-up (2026-04-05)**
+- Reworked the shared fallback legal renderer in `frontend/studyhub-app/src/components/LegalDocumentText.jsx` so flattened backup text is normalized into clearer titles, update metadata, section headings, callouts, lists, and table-of-contents blocks instead of rendering as a dense text wall
+- Refined the signup legal review modal in `frontend/studyhub-app/src/pages/auth/LegalAcceptanceModal.jsx` with a wider card, stronger header hierarchy, better tab spacing, polished fallback document framing, and clearer hosted-copy fallback messaging
+- Community Guidelines now render inside the same polished shell as the other required documents so the modal feels consistent across all three tabs
+- `Set-Location frontend/studyhub-app; npx eslint src/components/LegalDocumentText.jsx src/pages/auth/LegalAcceptanceModal.jsx`: passes
+- `npm --prefix frontend/studyhub-app run build`: passes
+
+**PR #191 Review Follow-up (2026-04-05)**
+- Fixed `frontend/studyhub-app/src/pages/settings/LegalTab.jsx` so refetches triggered by session changes reset `loading` and clear stale errors before calling `fetchMyLegalStatus()`, preventing the Settings > Legal view from getting stuck in an old error state after recovery
+- Fixed `frontend/studyhub-app/src/pages/auth/LegalAcceptanceModal.jsx` so Terms and Privacy fallback branches are marked reviewed when the non-Termly backup content is displayed, which prevents `Accept All` from remaining disabled when embeds are intentionally absent or time out
+- Fixed `frontend/studyhub-app/src/pages/legal/LegalDocumentPage.jsx` so the “StudyHub Backup Copy” badge only appears when a hosted Termly document timed out, not for internal-only documents like Community Guidelines
+- Strengthened `backend/src/modules/legal/legal.seed.js` normalization so flattened legal source files regain clearer line breaks around titles, updated dates, table-of-contents sections, numbered headings, and known list blocks before being seeded into the database
+- `Set-Location frontend/studyhub-app; npx eslint src/pages/settings/LegalTab.jsx src/pages/auth/LegalAcceptanceModal.jsx src/pages/legal/LegalDocumentPage.jsx`: passes
+- `npm --prefix backend run lint`: passes with the repo's existing warning-only baseline (67 pre-existing `no-console` warnings outside this change set)
+- `npm --prefix frontend/studyhub-app run build`: passes
+
 ### Subscription System Overhaul
 
 **Root Cause Fixed: Invalid Date in Prisma upsert**
@@ -94,6 +120,25 @@
 - Added `.filter(Boolean)` to exclude undefined/null from blocked user IDs
 - Error messages now surface actual backend error instead of generic "Could not load"
 - Fixed follow button bug (was setting isFollowing=true in error handler)
+
+**PR #190 Follow-up Hardening (2026-04-06)**
+- Fixed admin analytics aggregation bugs in `backend/src/modules/admin/admin.analytics.controller.js`:
+	- `/analytics/user-roles` now returns numeric counts from Prisma `groupBy(... _count._all)`
+	- `/analytics/engagement-totals` now counts `UserFollow` records instead of the nonexistent `follow` delegate and only includes `status: 'active'`
+- Hardened admin audit exports in `backend/src/modules/admin/admin.audit.controller.js` so nested arrays and objects redact sensitive keys recursively and mask nested email addresses instead of only sanitizing the top-level object
+- Tightened feed discovery degradation in `backend/src/modules/feed/feed.discovery.controller.js` so missing-table cases still degrade gracefully, but unexpected Prisma/database errors are captured and rethrown instead of being silently swallowed
+- Updated note and feed comment editing UI so the Edit action disappears after the 15-minute edit window instead of remaining visible with a no-op click
+- Hardened feed-card sharing with clipboard failure handling, manual copy fallback, and toast-timer cleanup to avoid stale timers on unmount
+- Added abort/cleanup handling to the admin audit-log user search debounce flow to prevent stale requests and post-unmount state updates
+- Ignored `.superpowers/**/state/` runtime artifacts and removed tracked local state files from the repo
+
+**Validation**
+- `npm --prefix backend run test -- admin.routes.test.js`: passes (11 tests)
+- `npm --prefix backend run lint`: passes with the repo's existing warning-only baseline (67 pre-existing `no-console` warnings outside this change set)
+- `Set-Location frontend/studyhub-app; npx eslint src/pages/feed/FeedCard.jsx src/pages/feed/CommentSection.jsx src/pages/notes/NoteCommentSection.jsx src/pages/admin/moderation/AuditLogSubTab.jsx`: passes
+
+**Deferred Risk Notes**
+- No dedicated automated regression test was added yet for feed discovery missing-table/error propagation paths; the controller logic is hardened, but route-level coverage for `/api/feed/for-you` and `/api/feed/recommended-groups` is still a gap
 
 ### Block/Mute System
 

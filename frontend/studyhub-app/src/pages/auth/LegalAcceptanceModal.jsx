@@ -11,6 +11,149 @@ const TABS = [
   { key: 'guidelines', label: LEGAL_DOCUMENT_LABELS.guidelines },
 ]
 
+const styles = {
+  overlay: {
+    position: 'fixed',
+    inset: 0,
+    zIndex: 10000,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'rgba(7, 16, 34, 0.62)',
+    backdropFilter: 'blur(8px)',
+    padding: 20,
+  },
+  modal: {
+    background: 'var(--sh-surface)',
+    borderRadius: 24,
+    boxShadow: '0 30px 80px rgba(9, 17, 34, 0.34)',
+    border: '1px solid rgba(148, 163, 184, 0.18)',
+    width: '100%',
+    maxWidth: 920,
+    maxHeight: '82vh',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+    animation: 'legalModalIn 0.24s ease-out',
+  },
+  header: {
+    padding: '24px 28px 18px',
+    borderBottom: '1px solid var(--sh-border)',
+    background: 'linear-gradient(180deg, var(--sh-surface) 0%, var(--sh-soft) 100%)',
+  },
+  overline: {
+    margin: '0 0 8px',
+    fontSize: 11,
+    fontWeight: 800,
+    color: 'var(--sh-brand)',
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase',
+    fontFamily: 'var(--font)',
+  },
+  title: {
+    fontSize: 26,
+    fontWeight: 800,
+    color: 'var(--sh-heading)',
+    margin: 0,
+    fontFamily: 'var(--font)',
+    letterSpacing: '-0.02em',
+  },
+  subtitle: {
+    margin: '10px 0 18px',
+    fontSize: 14,
+    color: 'var(--sh-muted)',
+    lineHeight: 1.65,
+    fontFamily: 'var(--font)',
+    maxWidth: 620,
+  },
+  tabBar: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+    gap: 10,
+  },
+  content: {
+    flex: 1,
+    overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column',
+    minHeight: 0,
+    background: 'var(--sh-bg)',
+  },
+  scrollRegion: {
+    position: 'relative',
+    flex: 1,
+    minHeight: 340,
+    overflowY: 'auto',
+    padding: '24px 28px',
+  },
+  loading: {
+    position: 'absolute',
+    inset: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'var(--sh-soft)',
+    color: 'var(--sh-muted)',
+    fontSize: 13,
+  },
+  fallbackPanel: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 16,
+    padding: '22px 24px',
+    borderRadius: 22,
+    border: '1px solid var(--sh-border)',
+    background: 'linear-gradient(180deg, rgba(255,255,255,0.96) 0%, var(--sh-surface) 100%)',
+    boxShadow: 'var(--shadow-md)',
+  },
+  fallbackHeader: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 14,
+    flexWrap: 'wrap',
+  },
+  fallbackBadge: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    padding: '7px 11px',
+    borderRadius: 999,
+    background: 'var(--sh-info-bg)',
+    border: '1px solid var(--sh-info-border)',
+    color: 'var(--sh-info-text)',
+    fontSize: 11,
+    fontWeight: 800,
+    letterSpacing: '0.05em',
+    textTransform: 'uppercase',
+  },
+  fallbackNote: {
+    margin: 0,
+    maxWidth: 420,
+    color: 'var(--sh-muted)',
+    fontSize: 12.5,
+    lineHeight: 1.65,
+  },
+  fallbackLink: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 8,
+    color: 'var(--sh-brand)',
+    fontSize: 13,
+    fontWeight: 700,
+    textDecoration: 'none',
+  },
+  footer: {
+    padding: '18px 28px',
+    borderTop: '1px solid var(--sh-border)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 16,
+    flexWrap: 'wrap',
+    background: 'var(--sh-surface)',
+  },
+}
+
 /* ── Small checkmark SVG ───────────────────────────────────────────────── */
 function CheckIcon({ size = 14 }) {
   return (
@@ -34,6 +177,43 @@ function DotIcon({ size = 8 }) {
         flexShrink: 0,
       }}
     />
+  )
+}
+
+function HostedLinkArrow() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M5 11L11 5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      <path d="M6 5h5v5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function FallbackDocumentPanel({ bodyText, linkUrl, showBackupBadge = false, note }) {
+  return (
+    <div style={styles.fallbackPanel}>
+      {(showBackupBadge || note) && (
+        <div style={styles.fallbackHeader}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {showBackupBadge ? <span style={styles.fallbackBadge}>StudyHub Backup Copy</span> : null}
+            {note ? <p style={styles.fallbackNote}>{note}</p> : null}
+          </div>
+          {linkUrl ? (
+            <a
+              href={linkUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={styles.fallbackLink}
+            >
+              Open hosted version
+              <HostedLinkArrow />
+            </a>
+          ) : null}
+        </div>
+      )}
+
+      <LegalDocumentText bodyText={bodyText} variant="modal" />
+    </div>
   )
 }
 
@@ -83,6 +263,42 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
     return () => window.cancelAnimationFrame(frameId)
   }, [open])
 
+  useEffect(() => {
+    if (!open || activeTab !== 'terms') return
+
+    const shouldMarkTermsViewed = Boolean(
+      termsDocument.document?.bodyText
+      && (!termsDocument.document?.termlyEmbedId || termsEmbed.timedOut),
+    )
+
+    if (shouldMarkTermsViewed) {
+      const frameId = window.requestAnimationFrame(() => {
+        markViewed('terms')
+      })
+      return () => window.cancelAnimationFrame(frameId)
+    }
+
+    return undefined
+  }, [activeTab, markViewed, open, termsDocument.document?.bodyText, termsDocument.document?.termlyEmbedId, termsEmbed.timedOut])
+
+  useEffect(() => {
+    if (!open || activeTab !== 'privacy') return
+
+    const shouldMarkPrivacyViewed = Boolean(
+      privacyDocument.document?.bodyText
+      && (!privacyDocument.document?.termlyEmbedId || privacyEmbed.timedOut),
+    )
+
+    if (shouldMarkPrivacyViewed) {
+      const frameId = window.requestAnimationFrame(() => {
+        markViewed('privacy')
+      })
+      return () => window.cancelAnimationFrame(frameId)
+    }
+
+    return undefined
+  }, [activeTab, markViewed, open, privacyDocument.document?.bodyText, privacyDocument.document?.termlyEmbedId, privacyEmbed.timedOut])
+
   const handleGuidelinesScroll = useCallback(
     (e) => {
       const el = e.target
@@ -100,57 +316,31 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
 
   const overlay = (
     <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 10000,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'rgba(0,0,0,0.5)',
-        padding: 16,
-      }}
+      style={styles.overlay}
       onClick={() => {
         // Backdrop click does nothing -- user must explicitly Accept or Decline
       }}
     >
       {/* Modal card */}
       <div
-        style={{
-          background: 'var(--sh-surface)',
-          borderRadius: 16,
-          boxShadow: 'var(--shadow-lg)',
-          width: '100%',
-          maxWidth: 700,
-          maxHeight: '75vh',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-          animation: 'legalModalIn 0.2s ease-out',
-        }}
+        style={styles.modal}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div
-          style={{
-            padding: '20px 24px 0',
-            borderBottom: '1px solid var(--sh-border)',
-          }}
-        >
+        <div style={styles.header}>
+          <p style={styles.overline}>Required Before Signup</p>
           <h2
-            style={{
-              fontSize: 18,
-              fontWeight: 700,
-              color: 'var(--sh-heading)',
-              marginBottom: 16,
-              fontFamily: 'var(--font)',
-            }}
+            style={styles.title}
           >
             Review Our Policies
           </h2>
+          <p style={styles.subtitle}>
+            Read each required document before creating your account. If the hosted Termly document is unavailable,
+            StudyHub will show the current backup copy stored with the same legal version.
+          </p>
 
           {/* Tab bar */}
-          <div style={{ display: 'flex', gap: 0 }}>
+          <div style={styles.tabBar}>
             {TABS.map((tab) => {
               const isActive = activeTab === tab.key
               const isViewed = viewedTabs.has(tab.key)
@@ -161,23 +351,21 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
                   type="button"
                   onClick={() => setActiveTab(tab.key)}
                   style={{
-                    flex: 1,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: 6,
-                    padding: '10px 8px 12px',
-                    border: 'none',
-                    background: 'none',
+                    padding: '12px 14px',
+                    borderRadius: 14,
+                    border: isActive ? '1px solid var(--sh-brand)' : '1px solid var(--sh-border)',
+                    background: isActive ? 'var(--sh-surface)' : 'rgba(255,255,255,0.35)',
                     cursor: 'pointer',
                     fontFamily: 'var(--font)',
                     fontSize: 13,
                     fontWeight: isActive ? 700 : 500,
                     color: isActive ? 'var(--sh-brand)' : 'var(--sh-muted)',
-                    borderBottom: isActive
-                      ? '2px solid var(--sh-brand)'
-                      : '2px solid transparent',
-                    transition: 'color 0.15s, border-color 0.15s',
+                    boxShadow: isActive ? 'var(--shadow-sm)' : 'none',
+                    transition: 'color 0.15s, border-color 0.15s, background 0.15s, box-shadow 0.15s',
                   }}
                 >
                   {isViewed ? <CheckIcon size={14} /> : <DotIcon size={8} />}
@@ -189,51 +377,35 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
         </div>
 
         {/* Content area */}
-        <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        <div style={styles.content}>
           {/* Terms embed */}
           {activeTab === 'terms' && (
-            <div style={{ position: 'relative', flex: 1, minHeight: 300, overflowY: 'auto' }}>
+            <div style={styles.scrollRegion}>
               {termsDocument.loading && !termsDocument.document && (
-                <div style={{
-                  position: 'absolute', inset: 0, display: 'flex', alignItems: 'center',
-                  justifyContent: 'center', background: 'var(--sh-soft)',
-                  color: 'var(--sh-muted)', fontSize: 13,
-                }}>
+                <div style={styles.loading}>
                   Loading Terms of Use...
                 </div>
               )}
               {termsDocument.document && !termsDocument.document.termlyEmbedId && (
-                <div style={{
-                  padding: 20,
-                  background: 'var(--sh-bg)',
-                }}>
-                  <LegalDocumentText bodyText={termsDocument.document.bodyText} />
-                </div>
+                <FallbackDocumentPanel
+                  bodyText={termsDocument.document.bodyText}
+                  linkUrl={termsDocument.document.termlyUrl || POLICY_URLS.terms}
+                  showBackupBadge={false}
+                  note="This version is served directly from StudyHub because no hosted Termly embed is configured for the current Terms of Use document."
+                />
               )}
               {termsDocument.document?.termlyEmbedId && !termsEmbed.loaded && !termsEmbed.timedOut && !termsDocument.loading && (
-                <div style={{
-                  position: 'absolute', inset: 0, display: 'flex', alignItems: 'center',
-                  justifyContent: 'center', background: 'var(--sh-soft)',
-                  color: 'var(--sh-muted)', fontSize: 13,
-                }}>
+                <div style={styles.loading}>
                   Loading Terms of Use...
                 </div>
               )}
               {termsEmbed.timedOut && termsDocument.document?.bodyText && (
-                <div style={{ padding: 20, background: 'var(--sh-bg)' }}>
-                  <div style={{ marginBottom: 12, fontSize: 11, fontWeight: 800, color: 'var(--sh-info-text)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-                    StudyHub Backup Copy
-                  </div>
-                  <LegalDocumentText bodyText={termsDocument.document.bodyText} />
-                  <a
-                    href={termsDocument.document.termlyUrl || POLICY_URLS.terms}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ display: 'inline-block', marginTop: 14, color: 'var(--sh-brand)', fontSize: 13, fontWeight: 700 }}
-                  >
-                    Open the hosted Termly version
-                  </a>
-                </div>
+                <FallbackDocumentPanel
+                  bodyText={termsDocument.document.bodyText}
+                  linkUrl={termsDocument.document.termlyUrl || POLICY_URLS.terms}
+                  showBackupBadge
+                  note="The hosted Terms of Use viewer did not load in time, so StudyHub is showing the matching backup copy for this legal version."
+                />
               )}
               {termsDocument.error && !termsDocument.document && (
                 <div style={{ padding: 20, color: 'var(--sh-warning-text)', fontSize: 13, lineHeight: 1.6 }}>
@@ -243,7 +415,7 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
               <div
                 ref={termsContainerRef}
                 style={{
-                  padding: 16,
+                  minHeight: 320,
                   opacity: termsEmbed.loaded ? 1 : 0,
                   transition: 'opacity 0.3s ease',
                   display: termsEmbed.timedOut || !termsDocument.document?.termlyEmbedId ? 'none' : 'block',
@@ -254,48 +426,32 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
 
           {/* Privacy embed */}
           {activeTab === 'privacy' && (
-            <div style={{ position: 'relative', flex: 1, minHeight: 300, overflowY: 'auto' }}>
+            <div style={styles.scrollRegion}>
               {privacyDocument.loading && !privacyDocument.document && (
-                <div style={{
-                  position: 'absolute', inset: 0, display: 'flex', alignItems: 'center',
-                  justifyContent: 'center', background: 'var(--sh-soft)',
-                  color: 'var(--sh-muted)', fontSize: 13,
-                }}>
+                <div style={styles.loading}>
                   Loading Privacy Policy...
                 </div>
               )}
               {privacyDocument.document && !privacyDocument.document.termlyEmbedId && (
-                <div style={{
-                  padding: 20,
-                  background: 'var(--sh-bg)',
-                }}>
-                  <LegalDocumentText bodyText={privacyDocument.document.bodyText} />
-                </div>
+                <FallbackDocumentPanel
+                  bodyText={privacyDocument.document.bodyText}
+                  linkUrl={privacyDocument.document.termlyUrl || POLICY_URLS.privacy}
+                  showBackupBadge={false}
+                  note="This version is served directly from StudyHub because no hosted Termly embed is configured for the current Privacy Policy document."
+                />
               )}
               {privacyDocument.document?.termlyEmbedId && !privacyEmbed.loaded && !privacyEmbed.timedOut && !privacyDocument.loading && (
-                <div style={{
-                  position: 'absolute', inset: 0, display: 'flex', alignItems: 'center',
-                  justifyContent: 'center', background: 'var(--sh-soft)',
-                  color: 'var(--sh-muted)', fontSize: 13,
-                }}>
+                <div style={styles.loading}>
                   Loading Privacy Policy...
                 </div>
               )}
               {privacyEmbed.timedOut && privacyDocument.document?.bodyText && (
-                <div style={{ padding: 20, background: 'var(--sh-bg)' }}>
-                  <div style={{ marginBottom: 12, fontSize: 11, fontWeight: 800, color: 'var(--sh-info-text)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-                    StudyHub Backup Copy
-                  </div>
-                  <LegalDocumentText bodyText={privacyDocument.document.bodyText} />
-                  <a
-                    href={privacyDocument.document.termlyUrl || POLICY_URLS.privacy}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ display: 'inline-block', marginTop: 14, color: 'var(--sh-brand)', fontSize: 13, fontWeight: 700 }}
-                  >
-                    Open the hosted Termly version
-                  </a>
-                </div>
+                <FallbackDocumentPanel
+                  bodyText={privacyDocument.document.bodyText}
+                  linkUrl={privacyDocument.document.termlyUrl || POLICY_URLS.privacy}
+                  showBackupBadge
+                  note="The hosted Privacy Policy viewer did not load in time, so StudyHub is showing the matching backup copy for this legal version."
+                />
               )}
               {privacyDocument.error && !privacyDocument.document && (
                 <div style={{ padding: 20, color: 'var(--sh-warning-text)', fontSize: 13, lineHeight: 1.6 }}>
@@ -305,7 +461,7 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
               <div
                 ref={privacyContainerRef}
                 style={{
-                  padding: 16,
+                  minHeight: 320,
                   opacity: privacyEmbed.loaded ? 1 : 0,
                   transition: 'opacity 0.3s ease',
                   display: privacyEmbed.timedOut || !privacyDocument.document?.termlyEmbedId ? 'none' : 'block',
@@ -319,16 +475,15 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
             <div
               ref={guidelinesRef}
               onScroll={handleGuidelinesScroll}
-              style={{
-                flex: 1,
-                overflowY: 'auto',
-                padding: 24,
-              }}
+              style={styles.scrollRegion}
             >
               {guidelinesDocument.loading && !guidelinesDocument.document ? (
                 <div style={{ color: 'var(--sh-muted)', fontSize: 13 }}>Loading Community Guidelines...</div>
               ) : guidelinesDocument.document?.bodyText ? (
-                <LegalDocumentText bodyText={guidelinesDocument.document.bodyText} />
+                <FallbackDocumentPanel
+                  bodyText={guidelinesDocument.document.bodyText}
+                  note="Community Guidelines are served directly from StudyHub so you always review the current moderation and conduct rules during signup."
+                />
               ) : (
                 <div style={{ color: 'var(--sh-warning-text)', fontSize: 13, lineHeight: 1.6 }}>
                   {guidelinesDocument.error || 'Could not load the Community Guidelines.'}
@@ -339,17 +494,7 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
         </div>
 
         {/* Footer */}
-        <div
-          style={{
-            padding: '16px 24px',
-            borderTop: '1px solid var(--sh-border)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 12,
-            flexWrap: 'wrap',
-          }}
-        >
+        <div style={styles.footer}>
           <span
             style={{
               fontSize: 12,
@@ -359,8 +504,8 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
           >
             {viewedCount} of 3 reviewed
             {!allViewed && (
-              <span style={{ marginLeft: 6, color: 'var(--sh-warning-text)', fontSize: 11 }}>
-                -- Please review all documents
+              <span style={{ marginLeft: 6, color: 'var(--sh-warning-text)', fontSize: 11.5, fontWeight: 700 }}>
+                Please review all documents before accepting
               </span>
             )}
           </span>

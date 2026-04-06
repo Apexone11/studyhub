@@ -81,6 +81,7 @@ export default function LegalDocumentPage({
   const updated = legalDocument?.updatedLabel || fallbackUpdated
   const policyUrl = legalDocument?.termlyUrl || POLICY_URLS[slug] || null
   const showFallback = Boolean(legalDocument && (!legalDocument.termlyEmbedId || termlyEmbed.timedOut))
+  const showFallbackBadge = Boolean(legalDocument?.termlyEmbedId && termlyEmbed.timedOut)
 
   let content = null
 
@@ -89,7 +90,7 @@ export default function LegalDocumentPage({
   } else if (showFallback && legalDocument?.bodyText) {
     content = (
       <div style={styles.fallbackWrap}>
-        <span style={styles.fallbackBadge}>StudyHub Backup Copy</span>
+        {showFallbackBadge ? <span style={styles.fallbackBadge}>StudyHub Backup Copy</span> : null}
         <LegalDocumentText bodyText={legalDocument.bodyText} />
         {policyUrl && (
           <a href={policyUrl} target="_blank" rel="noopener noreferrer" style={styles.fallbackLink}>

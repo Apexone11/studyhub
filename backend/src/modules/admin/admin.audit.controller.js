@@ -242,23 +242,48 @@ function maskIpForAdmin(ip) {
   return ip
 }
 
+const SENSITIVE_DETAIL_KEYS = new Set([
+  'password',
+  'passwordhash',
+  'token',
+  'secret',
+  'apikey',
+  'accesstoken',
+  'refreshtoken',
+])
+
+function maskAuditEmail(value) {
+  return typeof value === 'string' ? maskEmail(value) : '[REDACTED]'
+}
+
 /**
  * Sanitize details JSON: remove password hashes, tokens, mask emails.
  */
-function sanitizeDetails(details) {
-  if (!details || typeof details !== 'object') return details
-  const sanitized = { ...details }
-  const sensitiveKeys = ['password', 'passwordHash', 'token', 'secret', 'apiKey', 'accessToken', 'refreshToken']
-  for (const key of sensitiveKeys) {
-    if (key in sanitized) {
+function sanitizeDetails(details, parentKey = '') {
+  const normalizedParentKey = String(parentKey || '').toLowerCase()
+
+  if (normalizedParentKey === 'email') {
+    return maskAuditEmail(details)
+  }
+
+  if (Array.isArray(details)) {
+    return details.map((item) => sanitizeDetails(item, parentKey))
+  }
+
+  if (!details || typeof details !== 'object') {
+    return details
+  }
+
+  const sanitized = {}
+  for (const [key, value] of Object.entries(details)) {
+    const normalizedKey = key.toLowerCase()
+    if (SENSITIVE_DETAIL_KEYS.has(normalizedKey)) {
       sanitized[key] = '[REDACTED]'
+      continue
     }
+    sanitized[key] = sanitizeDetails(value, key)
   }
-  if (sanitized.email && typeof sanitized.email === 'string') {
-    sanitized.email = sanitized.email.includes('@')
-      ? sanitized.email[0] + '***@' + sanitized.email.split('@')[1]
-      : '[REDACTED]'
-  }
+
   return sanitized
 }
 
