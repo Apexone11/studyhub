@@ -1,4 +1,4 @@
-import { memo, useState, useEffect, useCallback } from 'react'
+import { memo, useState, useEffect, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import MentionText from '../../components/MentionText'
 import PendingReviewBanner from '../../components/PendingReviewBanner'
@@ -368,15 +368,41 @@ function FeedCardInner({
   const previewKind = attachmentPreviewKind(item)
 
   const [showComments, setShowComments] = useState(!!targetCommentId)
-  const [showShareToast, setShowShareToast] = useState(false)
+  const [shareToastMessage, setShareToastMessage] = useState('')
+  const shareToastTimerRef = useRef(null)
 
-  const handleShare = useCallback(() => {
+  const flashShareToast = useCallback((message) => {
+    window.clearTimeout(shareToastTimerRef.current)
+    setShareToastMessage(message)
+    shareToastTimerRef.current = window.setTimeout(() => {
+      setShareToastMessage('')
+    }, 2000)
+  }, [])
+
+  useEffect(() => () => {
+    window.clearTimeout(shareToastTimerRef.current)
+  }, [])
+
+  const handleShare = useCallback(async () => {
     const url = `${window.location.origin}/feed?post=${item.id}`
-    navigator.clipboard.writeText(url).then(() => {
-      setShowShareToast(true)
-      setTimeout(() => setShowShareToast(false), 2000)
-    })
-  }, [item.id])
+    if (navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(url)
+        flashShareToast('Link copied')
+        return
+      } catch {
+        // Fall back to a manual copy flow below.
+      }
+    }
+
+    if (typeof window.prompt === 'function') {
+      window.prompt('Copy this link', url)
+      flashShareToast('Copy link shown')
+      return
+    }
+
+    flashShareToast('Could not copy link')
+  }, [flashShareToast, item.id])
 
   return (
     <article className="sh-card" data-post-id={item.id} style={{ padding: '20px 24px', transition: 'box-shadow 0.2s ease' }}>
@@ -844,8 +870,8 @@ function FeedCardInner({
           )}
 
           {/* Share toast */}
-          {showShareToast && (
-            <div style={shareToastStyle}>Link copied</div>
+          {shareToastMessage && (
+            <div style={shareToastStyle}>{shareToastMessage}</div>
           )}
         </div>
       </div>

@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => {
     user: {
       count: vi.fn(),
       findUnique: vi.fn(),
+      groupBy: vi.fn(),
     },
     studySheet: {
       count: vi.fn(),
@@ -20,6 +21,12 @@ const mocks = vi.hoisted(() => {
       update: vi.fn(),
     },
     feedPost: {
+      count: vi.fn(),
+    },
+    feedPostComment: {
+      count: vi.fn(),
+    },
+    starredSheet: {
       count: vi.fn(),
     },
     comment: {
@@ -35,6 +42,10 @@ const mocks = vi.hoisted(() => {
       count: vi.fn(),
     },
     reaction: {
+      count: vi.fn(),
+    },
+    auditLog: {
+      findMany: vi.fn(),
       count: vi.fn(),
     },
     moderationCase: {
@@ -127,14 +138,19 @@ beforeEach(() => {
     id: 42,
     role: mocks.state.role,
   }))
+  mocks.prisma.user.groupBy.mockResolvedValue([])
   mocks.prisma.user.count.mockResolvedValue(36)
   mocks.prisma.studySheet.count.mockResolvedValue(19)
   mocks.prisma.studySheet.aggregate.mockResolvedValue({ _sum: { stars: 78 } })
   mocks.prisma.comment.count.mockResolvedValue(14)
+  mocks.prisma.feedPostComment.count.mockResolvedValue(9)
+  mocks.prisma.starredSheet.count.mockResolvedValue(11)
   mocks.prisma.requestedCourse.count.mockResolvedValue(4)
   mocks.prisma.note.count.mockResolvedValue(0)
   mocks.prisma.userFollow.count.mockResolvedValue(28)
   mocks.prisma.reaction.count.mockResolvedValue(4)
+  mocks.prisma.auditLog.findMany.mockResolvedValue([])
+  mocks.prisma.auditLog.count.mockResolvedValue(0)
   mocks.prisma.feedPost.count.mockResolvedValue(6)
   mocks.prisma.moderationCase.count.mockResolvedValue(2)
   mocks.prisma.strike.count.mockResolvedValue(1)
@@ -369,5 +385,109 @@ describe('admin routes', () => {
         }),
       }),
     )
+  })
+
+  it('returns numeric role counts for /analytics/user-roles', async () => {
+    mocks.state.role = 'admin'
+    mocks.prisma.user.groupBy.mockResolvedValue([
+      { role: 'admin', _count: { _all: 2 } },
+      { role: 'student', _count: { _all: 34 } },
+    ])
+
+    const response = await request(app).get('/analytics/user-roles')
+
+    expect(response.status).toBe(200)
+    expect(response.body).toEqual({
+      roles: [
+        { role: 'admin', count: 2 },
+        { role: 'student', count: 34 },
+      ],
+    })
+  })
+
+  it('uses active user follows when building /analytics/engagement-totals', async () => {
+    mocks.state.role = 'admin'
+    mocks.prisma.reaction.count.mockResolvedValue(12)
+    mocks.prisma.feedPostComment.count.mockResolvedValue(7)
+    mocks.prisma.starredSheet.count.mockResolvedValue(19)
+    mocks.prisma.userFollow.count.mockResolvedValue(5)
+
+    const response = await request(app).get('/analytics/engagement-totals?period=30d')
+
+    expect(response.status).toBe(200)
+    expect(response.body).toEqual({
+      totals: {
+        likes: 12,
+        comments: 7,
+        stars: 19,
+        follows: 5,
+      },
+    })
+    expect(mocks.prisma.userFollow.count).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        createdAt: expect.any(Object),
+        status: 'active',
+      }),
+    })
+  })
+
+  it('recursively redacts nested audit export details', async () => {
+    mocks.state.role = 'admin'
+    mocks.prisma.user.findUnique
+      .mockResolvedValueOnce({ id: 42, role: 'admin' })
+      .mockResolvedValueOnce({
+        id: 7,
+        username: 'audit_target',
+        email: 'audit_target@studyhub.test',
+      })
+    mocks.prisma.auditLog.findMany.mockResolvedValue([
+      {
+        id: 91,
+        event: 'auth.login',
+        resource: 'session',
+        resourceId: 'session_123',
+        details: {
+          email: 'nested@studyhub.test',
+          request: {
+            token: 'secret-token',
+            profile: {
+              email: 'person@example.com',
+            },
+          },
+          attempts: [{ refreshToken: 'refresh-secret' }],
+        },
+        route: '/api/auth/login',
+        method: 'POST',
+        ipAddress: '192.168.1.45',
+        createdAt: new Date('2026-04-05T12:00:00.000Z'),
+      },
+    ])
+
+    const response = await request(app).get('/audit-log/export?userId=7')
+
+    expect(response.status).toBe(200)
+    expect(response.body.user).toMatchObject({
+      id: 7,
+      username: 'audit_target',
+      email: 'a***@studyhub.test',
+    })
+    expect(response.body.entries).toHaveLength(1)
+    expect(response.body.entries[0]).toMatchObject({
+      resource: 'session',
+      resourceId: 'session_123',
+      ipAddress: '192.168.x.x',
+      details: {
+        email: 'n***@studyhub.test',
+        request: {
+          token: '[REDACTED]',
+          profile: {
+            email: 'p***@example.com',
+          },
+        },
+        attempts: [
+          { refreshToken: '[REDACTED]' },
+        ],
+      },
+    })
   })
 })

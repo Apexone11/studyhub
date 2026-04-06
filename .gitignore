@@ -28,5 +28,8 @@ frontend/studyhub-app/tests/screenshots/
 # Claude Code local settings
 .claude/settings.local.json
 
+# Local brainstorming/runtime state
+.superpowers/**/state/
+
 # Nested repos / experiments
 mission-control/

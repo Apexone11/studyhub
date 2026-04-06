@@ -4,7 +4,7 @@
  * Features: expand/collapse, 3-level nesting, pill bubble style, inline
  * editing, anchor badges, resolve/unresolve, UserAvatar, text-link reactions.
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import MentionText from '../../components/MentionText'
 import UserAvatar from '../../components/UserAvatar'
@@ -12,6 +12,7 @@ import { PAGE_FONT, timeAgo } from '../shared/pageUtils'
 import { useNoteComments } from './useNoteComments'
 
 const EDIT_WINDOW_MS = 15 * 60 * 1000 // 15 minutes
+const EDIT_STATUS_POLL_MS = 30 * 1000
 const AVATAR_SIZES = [34, 28, 24]
 const MAX_VISIBLE_REPLIES = 2
 
@@ -202,15 +203,14 @@ function InlineEditor({ initialContent, onSave, onCancel }) {
 
 function CommentItem({
   comment, user, isNoteOwner, noteContent, noteId, depth = 0,
-  onResolve, onDelete, onEdit, onReact, onReply,
+  onResolve, onDelete, onEdit, onReact, onReply, currentTime,
 }) {
   const anchorStatus = depth === 0 ? resolveAnchorStatus(comment, noteContent) : 'found'
   const isOwn = user && user.id === comment.author?.id
   const canDelete = user && (isOwn || isNoteOwner || user.role === 'admin')
   const canResolve = depth === 0 && (isNoteOwner || (user && user.role === 'admin'))
   const createdMs = comment.createdAt ? new Date(comment.createdAt).getTime() : 0
-  const editDeadlineRef = useRef(createdMs + EDIT_WINDOW_MS)
-  const showEditBtn = isOwn
+  const canEdit = isOwn && createdMs > 0 && currentTime < createdMs + EDIT_WINDOW_MS
   const wasEdited = comment.updatedAt && comment.createdAt && comment.updatedAt !== comment.createdAt
 
   const [showReplyInput, setShowReplyInput] = useState(false)
@@ -352,10 +352,10 @@ function CommentItem({
                   </button>
                 </>
               )}
-              {showEditBtn && (
+              {canEdit && (
                 <>
                   <span style={{ color: 'var(--sh-border)' }}>|</span>
-                  <button type="button" onClick={() => { if (Date.now() < editDeadlineRef.current) setEditing(true) }} style={actionStyle()}>
+                  <button type="button" onClick={() => setEditing(true)} style={actionStyle()}>
                     Edit
                   </button>
                 </>
@@ -440,6 +440,7 @@ function CommentItem({
                   onEdit={onEdit}
                   onReact={onReact}
                   onReply={onReply}
+                  currentTime={currentTime}
                 />
               ))}
               {!showAllReplies && hiddenCount > 0 && (
@@ -467,13 +468,29 @@ function CommentItem({
 
 export default function NoteCommentSection({ noteId, isOwner, user, noteContent, onReactToComment }) {
   const [expanded, setExpanded] = useState(false)
+  const [currentTime, setCurrentTime] = useState(() => Date.now())
   const {
     comments, total, loading, posting,
     loadComments, postComment, resolveComment, deleteComment, editComment,
   } = useNoteComments(noteId)
 
+  useEffect(() => {
+    if (!expanded) {
+      return undefined
+    }
+
+    const intervalId = window.setInterval(() => {
+      setCurrentTime(Date.now())
+    }, EDIT_STATUS_POLL_MS)
+
+    return () => window.clearInterval(intervalId)
+  }, [expanded])
+
   const handleToggle = () => {
     const next = !expanded
+    if (next) {
+      setCurrentTime(Date.now())
+    }
     setExpanded(next)
     if (next) loadComments()
   }
@@ -540,6 +557,7 @@ export default function NoteCommentSection({ noteId, isOwner, user, noteContent,
                   onEdit={handleEdit}
                   onReact={user && onReactToComment ? onReactToComment : null}
                   onReply={handleReply}
+                  currentTime={currentTime}
                 />
               ))}
             </div>

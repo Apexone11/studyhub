@@ -44,9 +44,16 @@ export default function LegalTab() {
 
   useEffect(() => {
     let active = true
+
+    setLoading(true)
+    setError('')
+
     fetchMyLegalStatus()
       .then((data) => {
-        if (active) setTermsStatus(data)
+        if (active) {
+          setTermsStatus(data)
+          setError('')
+        }
       })
       .catch((nextError) => {
         if (active) setError(nextError.message || 'Could not load terms acceptance status.')

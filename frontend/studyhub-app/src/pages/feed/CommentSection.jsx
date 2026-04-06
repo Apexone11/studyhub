@@ -20,6 +20,8 @@ import {
 
 /* ── Avatar sizes per nesting depth ──────────────────────────────────── */
 const AVATAR_SIZES = [34, 28, 24]
+const EDIT_WINDOW_MS = 15 * 60 * 1000
+const EDIT_STATUS_POLL_MS = 30 * 1000
 
 /* ── Shared action-link base style ───────────────────────────────────── */
 const actionLinkBase = {
@@ -666,7 +668,7 @@ function CommentReactions({ commentId, reactionCounts = {}, userReaction = null,
 
 /* ── CommentItem (recursive, 3-level nesting) ────────────────────────── */
 
-function CommentItem({ comment, user, onDelete, onReact, onReply, onEdit, depth = 0 }) {
+function CommentItem({ comment, user, onDelete, onReact, onReply, onEdit, depth = 0, currentTime }) {
   const [showReplyInput, setShowReplyInput] = useState(false)
   const [showReplies, setShowReplies] = useState(true)
   const [editing, setEditing] = useState(false)
@@ -676,6 +678,8 @@ function CommentItem({ comment, user, onDelete, onReact, onReply, onEdit, depth 
   const isOwn = comment.author?.id === user?.id
   const isAdmin = user?.role === 'admin'
   const wasEdited = comment.updatedAt && comment.updatedAt !== comment.createdAt
+  const createdMs = comment.createdAt ? new Date(comment.createdAt).getTime() : 0
+  const canEdit = isOwn && createdMs > 0 && currentTime < createdMs + EDIT_WINDOW_MS
 
   const avatarSize = AVATAR_SIZES[Math.min(depth, 2)]
   const replies = comment.replies || []
@@ -832,12 +836,10 @@ function CommentItem({ comment, user, onDelete, onReact, onReply, onEdit, depth 
               )}
 
               {/* Edit (15-min window, checked on click) */}
-              {isOwn && onEdit && (
+              {canEdit && onEdit && (
                 <button
                   type="button"
                   onClick={() => {
-                    const ageMs = Date.now() - new Date(comment.createdAt).getTime()
-                    if (ageMs >= 15 * 60 * 1000) return
                     setEditValue(comment.content || '')
                     setEditing(true)
                   }}
@@ -909,6 +911,7 @@ function CommentItem({ comment, user, onDelete, onReact, onReply, onEdit, depth 
               onReply={onReply}
               onEdit={onEdit}
               depth={depth + 1}
+              currentTime={currentTime}
             />
           ))}
         </div>
@@ -919,7 +922,7 @@ function CommentItem({ comment, user, onDelete, onReact, onReply, onEdit, depth 
 
 /* ── CommentList ─────────────────────────────────────────────────────── */
 
-function CommentList({ comments, loading, user, onDelete, onReact, onReply, onEdit }) {
+function CommentList({ comments, loading, user, onDelete, onReact, onReply, onEdit, currentTime }) {
   if (loading) {
     return <div style={commentMetaTextStyle}>Loading comments...</div>
   }
@@ -939,6 +942,7 @@ function CommentList({ comments, loading, user, onDelete, onReact, onReply, onEd
           onReact={onReact}
           onReply={onReply}
           onEdit={onEdit}
+          currentTime={currentTime}
         />
       ))}
     </div>
@@ -951,6 +955,7 @@ export default function CommentSection({ postId, commentCount, user, targetComme
   const [expanded, setExpanded] = useState(() => Boolean(targetCommentId))
   const [newComment, setNewComment] = useState('')
   const [attachments, setAttachments] = useState([])
+  const [currentTime, setCurrentTime] = useState(() => Date.now())
   const {
     comments,
     total,
@@ -972,6 +977,18 @@ export default function CommentSection({ postId, commentCount, user, targetComme
   }, [targetCommentId, loadComments])
 
   useEffect(() => {
+    if (!expanded) {
+      return undefined
+    }
+
+    const intervalId = window.setInterval(() => {
+      setCurrentTime(Date.now())
+    }, EDIT_STATUS_POLL_MS)
+
+    return () => window.clearInterval(intervalId)
+  }, [expanded])
+
+  useEffect(() => {
     if (!targetCommentId || loading) return
     const el = document.querySelector(`[data-comment-id="${targetCommentId}"]`)
     if (el) {
@@ -984,6 +1001,9 @@ export default function CommentSection({ postId, commentCount, user, targetComme
 
   const handleToggle = () => {
     const next = !expanded
+    if (next) {
+      setCurrentTime(Date.now())
+    }
     setExpanded(next)
     if (next) {
       loadComments()
@@ -1048,6 +1068,7 @@ export default function CommentSection({ postId, commentCount, user, targetComme
             onReact={user ? reactToComment : null}
             onReply={user ? handleReply : null}
             onEdit={user ? editComment : null}
+            currentTime={currentTime}
           />
         </div>
       )}
