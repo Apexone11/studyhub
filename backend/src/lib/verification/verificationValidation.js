@@ -59,7 +59,7 @@ async function verifyChallengeCode(token, purpose, code, db = prisma) {
   })
 }
 
-async function createSignupChallenge({ username, email, passwordHash, accountType }, db = prisma) {
+async function createSignupChallenge({ username, email, passwordHash, accountType, payload }, db = prisma) {
   const normalizedUsername = String(username || '').trim()
   const normalizedEmail = String(email || '').trim().toLowerCase()
   if (!normalizedUsername || !normalizedEmail || !passwordHash) {
@@ -85,7 +85,10 @@ async function createSignupChallenge({ username, email, passwordHash, accountTyp
       username: normalizedUsername,
       email: normalizedEmail,
       passwordHash,
-      payload: { accountType: accountType || 'student' },
+      payload: {
+        accountType: accountType || payload?.accountType || 'student',
+        ...(payload && typeof payload === 'object' ? payload : {}),
+      },
       codeHash: nextCode.codeHash,
       expiresAt: nextCode.expiresAt,
       lastSentAt: nextCode.lastSentAt,

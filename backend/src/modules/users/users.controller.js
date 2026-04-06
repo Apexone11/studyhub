@@ -5,6 +5,11 @@ const prisma = require('../../lib/prisma')
 const { checkAndAwardBadges } = require('../../lib/badges')
 const { getUserStreak, getWeeklyActivity } = require('../../lib/streaks')
 const { enrichUserWithBadges } = require('../../lib/userBadges')
+const {
+  CURRENT_LEGAL_VERSION,
+  acceptCurrentLegalDocuments,
+  getUserLegalStatus,
+} = require('../legal/legal.service')
 
 // ── GET /api/users/me/activity ─────────────────────────
 const getMyActivity = async (req, res) => {
@@ -954,20 +959,16 @@ const updatePrivacy = async (req, res) => {
   }
 }
 
-// ── GET /api/users/me/terms-status ──────────────────────────────
-const CURRENT_TERMS_VERSION = '2026-04-04'
-
 const getTermsStatus = async (req, res) => {
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: req.user.userId },
-      select: { termsAcceptedVersion: true, termsAcceptedAt: true },
-    })
+    const status = await getUserLegalStatus(req.user.userId)
     res.json({
-      acceptedVersion: user?.termsAcceptedVersion || null,
-      acceptedAt: user?.termsAcceptedAt || null,
-      currentVersion: CURRENT_TERMS_VERSION,
-      needsUpdate: !user?.termsAcceptedVersion || user.termsAcceptedVersion < CURRENT_TERMS_VERSION,
+      acceptedVersion: status?.acceptedVersion || null,
+      acceptedAt: status?.acceptedAt || null,
+      currentVersion: CURRENT_LEGAL_VERSION,
+      needsUpdate: Boolean(status?.needsAcceptance),
+      missingRequiredDocuments: status?.missingRequiredDocuments || [],
+      acceptedDocuments: status?.acceptedDocuments || [],
     })
   } catch (err) {
     captureError(err, { route: req.originalUrl })
@@ -978,20 +979,14 @@ const getTermsStatus = async (req, res) => {
 // ── POST /api/users/me/terms-accept ─────────────────────────────
 const acceptTerms = async (req, res) => {
   try {
-    // Always use server's current version -- ignore client-provided version to prevent bypass
-    const acceptedAt = new Date()
-    await prisma.user.update({
-      where: { id: req.user.userId },
-      data: {
-        termsAcceptedVersion: CURRENT_TERMS_VERSION,
-        termsAcceptedAt: acceptedAt,
-      },
-    })
+    const status = await acceptCurrentLegalDocuments(req.user.userId)
     res.json({
-      acceptedVersion: CURRENT_TERMS_VERSION,
-      acceptedAt,
-      currentVersion: CURRENT_TERMS_VERSION,
+      acceptedVersion: status.acceptedVersion,
+      acceptedAt: status.acceptedAt,
+      currentVersion: CURRENT_LEGAL_VERSION,
       needsUpdate: false,
+      missingRequiredDocuments: [],
+      acceptedDocuments: status.acceptedDocuments,
     })
   } catch (err) {
     captureError(err, { route: req.originalUrl })

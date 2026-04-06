@@ -64,6 +64,7 @@ export function StepIndicator({ steps, step }) {
  * ══════════════════════════════════════════════════════════════════════════ */
 export function AccountStep({ form, setField, loading, onSubmit, onGoogleSuccess, setError }) {
   const [showLegalModal, setShowLegalModal] = useState(false)
+  const [pendingGoogleCredential, setPendingGoogleCredential] = useState(null)
 
   return (
     <form onSubmit={onSubmit}>
@@ -82,7 +83,16 @@ export function AccountStep({ form, setField, loading, onSubmit, onGoogleSuccess
         <>
           <div className="register-google-wrap">
             <GoogleLogin
-              onSuccess={onGoogleSuccess}
+              onSuccess={(credentialResponse) => {
+                if (form.termsAccepted) {
+                  void onGoogleSuccess(credentialResponse, { legalAccepted: true })
+                  return
+                }
+
+                setPendingGoogleCredential(credentialResponse)
+                setShowLegalModal(true)
+                setError('Review and accept the legal documents to continue with Google sign-up.')
+              }}
               onError={() => setError('Google sign-up was cancelled or failed.')}
               size="large"
               width="300"
@@ -210,8 +220,14 @@ export function AccountStep({ form, setField, loading, onSubmit, onGoogleSuccess
           setError('')
           setField('termsAccepted', true)
           setShowLegalModal(false)
+          if (pendingGoogleCredential) {
+            const credentialResponse = pendingGoogleCredential
+            setPendingGoogleCredential(null)
+            void onGoogleSuccess(credentialResponse, { legalAccepted: true })
+          }
         }}
         onDecline={() => {
+          setPendingGoogleCredential(null)
           setShowLegalModal(false)
           setError('You must accept the Terms of Use, Privacy Policy, and Community Guidelines to register.')
         }}

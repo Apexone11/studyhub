@@ -64,6 +64,7 @@ const libraryRoutes = require('./modules/library')
 const videoRoutes = require('./modules/video')
 const paymentsRoutes = require('./modules/payments')
 const reviewsRoutes = require('./modules/reviews')
+const legalRoutes = require('./modules/legal')
 const crypto = require('node:crypto')
 const log = require('./lib/logger')
 const { httpLogger } = require('./lib/httpLogger')
@@ -420,6 +421,9 @@ app.use('/api/notifications', notificationsRoutes)
 
 // Mount user profile endpoints under /api/users.
 app.use('/api/users', usersRoutes)
+
+// Mount legal document and acceptance endpoints under /api/legal.
+app.use('/api/legal', legalRoutes)
 
 // Mount unified search endpoints under /api/search.
 app.use('/api/search', searchRoutes)

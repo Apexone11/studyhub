@@ -2,6 +2,42 @@
 
 ## Date: 2026-04-04
 
+### Legal Backup and Acceptance Enforcement
+
+**Root Cause Fixed: Termly-only legal loading left registration and legal pages without an internal fallback**
+- Added database-backed `LegalDocument` and `LegalAcceptance` models plus migration `20260405110000_add_legal_documents_and_acceptances`
+- Seeded canonical backup copies of Terms, Privacy, Cookie Policy, Disclaimer, and Community Guidelines from the Word-document source of truth
+- New backend legal module exposes:
+	- `GET /api/legal/current`
+	- `GET /api/legal/current/:slug`
+	- `GET /api/legal/me/status`
+	- `POST /api/legal/me/accept-current`
+- Current required signup documents are versioned under `2026-04-04` and stored centrally so fallback rendering and acceptance records point to the same data
+
+**Acceptance Persistence and Legacy Backfill**
+- Local signup now records current required-document acceptances for both direct register and verified-email completion flows
+- Google signup now requires legal acceptance for new accounts before account creation proceeds
+- Existing users with legacy `termsAcceptedVersion` data are backfilled into per-document `LegalAcceptance` rows when the current version is already on file
+- Session payloads now include `user.legalAcceptance` with `needsAcceptance`, missing document slugs, current version, and the remediation path
+
+**Google Bypass Enforcement**
+- Existing Google-authenticated users who previously bypassed acceptance are no longer silently ignored
+- Backend now creates a one-time in-app notification linking directly to `/settings?tab=legal` when current required acceptance is missing
+- Frontend now shows a blocking legal-enforcement modal on authenticated pages, except when the user is already on Settings > Legal so they can resolve the issue there
+- Modal only offers two actions: go to Settings > Legal or sign out
+
+**Frontend Legal Surface Consolidation**
+- Public legal pages now load the current legal document from `/api/legal/current/:slug`
+- Termly remains the first attempt for hosted documents, but on timeout the UI now renders the StudyHub backup copy inline instead of only linking away
+- Registration `LegalAcceptanceModal` now uses the same backup source for Terms and Privacy fallbacks instead of external-link-only behavior
+- Settings > Legal now shows document-aware status, required-document coverage, per-document acceptance state, and writes through the new legal API
+
+**Validation**
+- `npm --prefix backend run lint`: passes with the repo's existing warning-only baseline (67 pre-existing `no-console` warnings outside this change set)
+- `npm --prefix frontend/studyhub-app run lint`: passes
+- `npm --prefix frontend/studyhub-app run build`: passes
+- `npm --prefix backend test`: still failing in pre-existing/unrelated suites including `test/notes.routes.test.js`, `test/security.headers.test.js`, and `test/sheet.workflow.integration.test.js`; no failure output referenced the new legal module or `/api/legal` routes
+
 ### Subscription System Overhaul
 
 **Root Cause Fixed: Invalid Date in Prisma upsert**

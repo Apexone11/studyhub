@@ -55,6 +55,7 @@ const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 import ScrollToTop from './components/ScrollToTop'
 import ToastContainer from './components/Toast'
 import OfflineIndicator from './components/OfflineIndicator'
+import LegalAcceptanceEnforcementModal from './components/LegalAcceptanceEnforcementModal'
 
 const AiBubble = lazy(() => import('./components/ai/AiBubble'))
 const AiChatProviderModule = lazy(() =>
@@ -301,6 +302,7 @@ function AppRoutes() {
         <RouteAnnouncer />
         <RouteTelemetry />
         <PreferencesBootstrap />
+        <LegalAcceptanceEnforcementModal />
         <AuthenticatedAiProvider>
           <Suspense fallback={<RouteFallback />}>
             <Routes>

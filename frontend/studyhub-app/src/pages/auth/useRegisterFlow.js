@@ -141,7 +141,7 @@ export default function useRegisterFlow() {
   }
 
   /* ── Google OAuth success handler ──────────────────────────────────── */
-  async function handleGoogleSuccess(credentialResponse) {
+  async function handleGoogleSuccess(credentialResponse, options = {}) {
     if (!credentialResponse?.credential) {
       setError('Google sign-up did not return a valid credential.')
       return
@@ -151,7 +151,7 @@ export default function useRegisterFlow() {
     setError('')
 
     try {
-      const result = await apiGoogleAuth(credentialResponse.credential)
+      const result = await apiGoogleAuth(credentialResponse.credential, options)
       if (!result.ok) { setError(result.error); return }
 
       // Google creates the user immediately — no extra steps

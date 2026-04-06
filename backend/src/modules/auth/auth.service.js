@@ -14,6 +14,7 @@ const { isValidEmailAddress } = require('../../lib/email/emailValidation')
 const prisma = require('../../lib/prisma')
 const { enrichUserWithBadges } = require('../../lib/userBadges')
 const { USERNAME_REGEX, PASSWORD_MIN_LENGTH, COURSE_CODE_REGEX } = require('./auth.constants')
+const { getSessionLegalAcceptanceState } = require('../legal/legal.service')
 
 class AppError extends Error {
   constructor(statusCode, message) {
@@ -222,6 +223,20 @@ function buildAuthenticatedUserPayload(user, extraFields = {}) {
   }
 }
 
+async function buildSessionUserPayload(user) {
+  const [badges, legalAcceptance] = await Promise.all([
+    enrichUserWithBadges(user),
+    getSessionLegalAcceptanceState(user.id),
+  ])
+
+  return buildAuthenticatedUserPayload(user, {
+    plan: badges.plan || 'free',
+    isDonor: badges.isDonor || false,
+    donorLevel: badges.donorLevel || null,
+    legalAcceptance,
+  })
+}
+
 async function sendVerificationCodeEmail(email, username, code, metadata = {}) {
   try {
     await sendEmailVerification(email, username, code)
@@ -241,13 +256,7 @@ async function issueAuthenticatedSession(res, userId) {
   const token = signAuthToken(user)
   setAuthCookie(res, token)
 
-  // Enrich with subscription/donor badge data
-  const badges = await enrichUserWithBadges(user)
-  return buildAuthenticatedUserPayload(user, {
-    plan: badges.plan || 'free',
-    isDonor: badges.isDonor || false,
-    donorLevel: badges.donorLevel || null,
-  })
+  return buildSessionUserPayload(user)
 }
 
 function loginVerificationResponse(challenge, overrides = {}) {
@@ -282,6 +291,7 @@ module.exports = {
   validateRegistrationInput,
   getAuthenticatedUser,
   buildAuthenticatedUserPayload,
+  buildSessionUserPayload,
   sendVerificationCodeEmail,
   issueAuthenticatedSession,
   loginVerificationResponse,

@@ -1,182 +1,15 @@
-/* ═══════════════════════════════════════════════════════════════════════════
- * LegalAcceptanceModal.jsx — Full-screen modal for reviewing and accepting
- * Terms of Use, Privacy Policy, and Community Guidelines during registration.
- * Uses createPortal to escape the animated register card's transform context.
- * ═══════════════════════════════════════════════════════════════════════════ */
-
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { TERMLY_UUIDS, POLICY_URLS } from '../../lib/legalVersions'
+import LegalDocumentText from '../../components/LegalDocumentText'
+import { LEGAL_DOCUMENT_LABELS, POLICY_URLS } from '../../lib/legalVersions'
+import { useCurrentLegalDocument } from '../../lib/legalService'
+import useTermlyEmbed from '../../lib/useTermlyEmbed'
 
 const TABS = [
-  { key: 'terms', label: 'Terms of Use', type: 'embed' },
-  { key: 'privacy', label: 'Privacy Policy', type: 'embed' },
-  { key: 'guidelines', label: 'Community Guidelines', type: 'scroll' },
+  { key: 'terms', label: LEGAL_DOCUMENT_LABELS.terms },
+  { key: 'privacy', label: LEGAL_DOCUMENT_LABELS.privacy },
+  { key: 'guidelines', label: LEGAL_DOCUMENT_LABELS.guidelines },
 ]
-
-const TERMLY_EMBED_SCRIPT = 'https://app.termly.io/embed.min.js'
-
-/**
- * Hook that manages a Termly embed div inside a container ref.
- * Injects the Termly SDK script once, creates the embed div,
- * and uses a MutationObserver to detect when content loads.
- * Calls onLoad when the embed content appears.
- */
-function useTermlyEmbed(containerRef, dataId, { enabled, timeout = 15000, onLoad }) {
-  const [loaded, setLoaded] = useState(false)
-  const [timedOut, setTimedOut] = useState(false)
-  const onLoadRef = useRef(onLoad)
-  useEffect(() => { onLoadRef.current = onLoad })
-
-  useEffect(() => {
-    if (!enabled) return
-    const container = containerRef.current
-    if (!container) return
-
-    // Inject the Termly SDK script once globally
-    if (!document.getElementById('termly-jssdk')) {
-      const script = document.createElement('script')
-      script.id = 'termly-jssdk'
-      script.src = TERMLY_EMBED_SCRIPT
-      script.setAttribute('data-auto-block', 'on')
-      document.body.appendChild(script)
-    }
-
-    // Create the embed placeholder
-    const embed = document.createElement('div')
-    embed.setAttribute('name', 'termly-embed')
-    embed.setAttribute('data-id', dataId)
-    container.appendChild(embed)
-
-    // Timeout fallback
-    const timer = setTimeout(() => setTimedOut(true), timeout)
-
-    // Watch for Termly to populate the embed
-    const observer = new MutationObserver(() => {
-      if (embed.children.length > 0) {
-        clearTimeout(timer)
-        setLoaded(true)
-        onLoadRef.current?.()
-        observer.disconnect()
-      }
-    })
-    observer.observe(embed, { childList: true, subtree: true })
-
-    return () => {
-      observer.disconnect()
-      clearTimeout(timer)
-      if (container && embed.parentNode === container) {
-        container.removeChild(embed)
-      }
-    }
-  }, [enabled, dataId, containerRef, timeout])
-
-  return { loaded, timedOut }
-}
-
-/* ── Inline guidelines content (matches GuidelinesPage.jsx text) ───────── */
-function GuidelinesContent() {
-  const sectionStyle = { marginBottom: 20 }
-  const headingStyle = {
-    fontSize: 15,
-    fontWeight: 700,
-    color: 'var(--sh-heading)',
-    marginBottom: 8,
-  }
-  const listStyle = {
-    paddingLeft: 20,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 4,
-    color: 'var(--sh-text)',
-    fontSize: 13,
-    lineHeight: 1.7,
-  }
-  const pStyle = { color: 'var(--sh-text)', fontSize: 13, lineHeight: 1.7, marginBottom: 6 }
-
-  return (
-    <>
-      <div style={sectionStyle}>
-        <h3 style={headingStyle}>What We Expect</h3>
-        <p style={pStyle}>You agree to:</p>
-        <ul style={listStyle}>
-          <li>Be respectful and constructive.</li>
-          <li>Avoid plagiarism or harmful content.</li>
-          <li>Report suspicious content when seen.</li>
-          <li>Follow school guidelines and honor codes.</li>
-        </ul>
-      </div>
-
-      <div style={sectionStyle}>
-        <h3 style={headingStyle}>What We Encourage</h3>
-        <ul style={listStyle}>
-          <li>Uploading original study guides and notes for your courses.</li>
-          <li>Forking and improving existing study materials.</li>
-          <li>Writing clear, well-organized practice test questions.</li>
-          <li>Leaving constructive comments on study materials.</li>
-          <li>Helping classmates understand difficult concepts.</li>
-          <li>Contributing to courses at your school and beyond.</li>
-        </ul>
-      </div>
-
-      <div style={sectionStyle}>
-        <h3 style={headingStyle}>What Is Not Allowed</h3>
-        <ul style={listStyle}>
-          <li>Uploading copyrighted textbook content or publisher materials.</li>
-          <li>Posting answers to graded exams or assignments.</li>
-          <li>Uploading fake, misleading, or intentionally wrong study content.</li>
-          <li>Harassing, bullying, or disrespecting other users.</li>
-          <li>Spamming the platform with duplicate or low-quality content.</li>
-          <li>Uploading malicious HTML files or files designed to harm users.</li>
-          <li>Creating fake accounts or impersonating others.</li>
-          <li>Using the platform for anything unrelated to studying and learning.</li>
-        </ul>
-      </div>
-
-      <div style={sectionStyle}>
-        <h3 style={headingStyle}>Content Quality Standards</h3>
-        <p style={pStyle}>Good study content on StudyHub should:</p>
-        <ul style={listStyle}>
-          <li>Be clearly titled with the course and topic.</li>
-          <li>Use your own words rather than copied textbook passages.</li>
-          <li>Include examples where possible.</li>
-          <li>Be organized with headings and sections.</li>
-          <li>Be accurate to the best of your knowledge.</li>
-        </ul>
-      </div>
-
-      <div style={sectionStyle}>
-        <h3 style={headingStyle}>Forking and Attribution</h3>
-        <p style={pStyle}>When you fork someone else's study sheet:</p>
-        <ul style={listStyle}>
-          <li>The original author is automatically credited.</li>
-          <li>You can improve, expand, or adapt the content freely.</li>
-          <li>Do not remove attribution from forked content.</li>
-          <li>If you make major improvements, consider contributing them back.</li>
-        </ul>
-      </div>
-
-      <div style={sectionStyle}>
-        <h3 style={headingStyle}>Enforcement</h3>
-        <p style={pStyle}>Violations may result in content removal or account suspension. Enforcement follows a progressive approach:</p>
-        <ul style={listStyle}>
-          <li><strong>First offense:</strong> content removed and warning issued.</li>
-          <li><strong>Second offense:</strong> temporary upload restriction.</li>
-          <li><strong>Severe or repeated violations:</strong> account suspension.</li>
-        </ul>
-      </div>
-
-      <div style={sectionStyle}>
-        <h3 style={headingStyle}>Reporting</h3>
-        <ul style={listStyle}>
-          <li>Use the Report button on the relevant study sheet or post.</li>
-          <li>Email support@studyhub.academy with details and a link to the content.</li>
-        </ul>
-        <p style={pStyle}>False or malicious reports are themselves a violation of these guidelines.</p>
-      </div>
-    </>
-  )
-}
 
 /* ── Small checkmark SVG ───────────────────────────────────────────────── */
 function CheckIcon({ size = 14 }) {
@@ -211,10 +44,12 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
   const [activeTab, setActiveTab] = useState('terms')
   const [viewedTabs, setViewedTabs] = useState(new Set())
   const guidelinesRef = useRef(null)
-
-  // Termly embed refs and hooks for Terms and Privacy
   const termsContainerRef = useRef(null)
   const privacyContainerRef = useRef(null)
+
+  const termsDocument = useCurrentLegalDocument('terms', { enabled: open })
+  const privacyDocument = useCurrentLegalDocument('privacy', { enabled: open })
+  const guidelinesDocument = useCurrentLegalDocument('guidelines', { enabled: open })
 
   const markViewed = useCallback((key) => {
     setViewedTabs((prev) => {
@@ -228,14 +63,25 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
   const markTermsViewed = useCallback(() => markViewed('terms'), [markViewed])
   const markPrivacyViewed = useCallback(() => markViewed('privacy'), [markViewed])
 
-  const termsEmbed = useTermlyEmbed(termsContainerRef, TERMLY_UUIDS.terms, {
-    enabled: open,
+  const termsEmbed = useTermlyEmbed(termsContainerRef, termsDocument.document?.termlyEmbedId, {
+    enabled: open && activeTab === 'terms' && Boolean(termsDocument.document?.termlyEmbedId),
     onLoad: markTermsViewed,
+    onTimeout: markTermsViewed,
   })
-  const privacyEmbed = useTermlyEmbed(privacyContainerRef, TERMLY_UUIDS.privacy, {
-    enabled: open,
+  const privacyEmbed = useTermlyEmbed(privacyContainerRef, privacyDocument.document?.termlyEmbedId, {
+    enabled: open && activeTab === 'privacy' && Boolean(privacyDocument.document?.termlyEmbedId),
     onLoad: markPrivacyViewed,
+    onTimeout: markPrivacyViewed,
   })
+
+  useEffect(() => {
+    if (!open) return
+    const frameId = window.requestAnimationFrame(() => {
+      setActiveTab('terms')
+      setViewedTabs(new Set())
+    })
+    return () => window.cancelAnimationFrame(frameId)
+  }, [open])
 
   const handleGuidelinesScroll = useCallback(
     (e) => {
@@ -347,7 +193,7 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
           {/* Terms embed */}
           {activeTab === 'terms' && (
             <div style={{ position: 'relative', flex: 1, minHeight: 300, overflowY: 'auto' }}>
-              {!termsEmbed.loaded && !termsEmbed.timedOut && (
+              {termsDocument.loading && !termsDocument.document && (
                 <div style={{
                   position: 'absolute', inset: 0, display: 'flex', alignItems: 'center',
                   justifyContent: 'center', background: 'var(--sh-soft)',
@@ -356,18 +202,42 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
                   Loading Terms of Use...
                 </div>
               )}
-              {termsEmbed.timedOut && !termsEmbed.loaded && (
+              {termsDocument.document && !termsDocument.document.termlyEmbedId && (
+                <div style={{
+                  padding: 20,
+                  background: 'var(--sh-bg)',
+                }}>
+                  <LegalDocumentText bodyText={termsDocument.document.bodyText} />
+                </div>
+              )}
+              {termsDocument.document?.termlyEmbedId && !termsEmbed.loaded && !termsEmbed.timedOut && !termsDocument.loading && (
                 <div style={{
                   position: 'absolute', inset: 0, display: 'flex', alignItems: 'center',
                   justifyContent: 'center', background: 'var(--sh-soft)',
+                  color: 'var(--sh-muted)', fontSize: 13,
                 }}>
-                  <div style={{ textAlign: 'center' }}>
-                    <p style={{ margin: '0 0 8px', color: 'var(--sh-muted)', fontSize: 13 }}>Could not load inline. </p>
-                    <a href={POLICY_URLS.terms} target="_blank" rel="noopener noreferrer"
-                      style={{ color: 'var(--sh-brand)', fontSize: 13, fontWeight: 600 }}
-                      onClick={() => markViewed('terms')}
-                    >View Terms of Use externally</a>
+                  Loading Terms of Use...
+                </div>
+              )}
+              {termsEmbed.timedOut && termsDocument.document?.bodyText && (
+                <div style={{ padding: 20, background: 'var(--sh-bg)' }}>
+                  <div style={{ marginBottom: 12, fontSize: 11, fontWeight: 800, color: 'var(--sh-info-text)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                    StudyHub Backup Copy
                   </div>
+                  <LegalDocumentText bodyText={termsDocument.document.bodyText} />
+                  <a
+                    href={termsDocument.document.termlyUrl || POLICY_URLS.terms}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ display: 'inline-block', marginTop: 14, color: 'var(--sh-brand)', fontSize: 13, fontWeight: 700 }}
+                  >
+                    Open the hosted Termly version
+                  </a>
+                </div>
+              )}
+              {termsDocument.error && !termsDocument.document && (
+                <div style={{ padding: 20, color: 'var(--sh-warning-text)', fontSize: 13, lineHeight: 1.6 }}>
+                  {termsDocument.error}
                 </div>
               )}
               <div
@@ -376,6 +246,7 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
                   padding: 16,
                   opacity: termsEmbed.loaded ? 1 : 0,
                   transition: 'opacity 0.3s ease',
+                  display: termsEmbed.timedOut || !termsDocument.document?.termlyEmbedId ? 'none' : 'block',
                 }}
               />
             </div>
@@ -384,7 +255,7 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
           {/* Privacy embed */}
           {activeTab === 'privacy' && (
             <div style={{ position: 'relative', flex: 1, minHeight: 300, overflowY: 'auto' }}>
-              {!privacyEmbed.loaded && !privacyEmbed.timedOut && (
+              {privacyDocument.loading && !privacyDocument.document && (
                 <div style={{
                   position: 'absolute', inset: 0, display: 'flex', alignItems: 'center',
                   justifyContent: 'center', background: 'var(--sh-soft)',
@@ -393,18 +264,42 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
                   Loading Privacy Policy...
                 </div>
               )}
-              {privacyEmbed.timedOut && !privacyEmbed.loaded && (
+              {privacyDocument.document && !privacyDocument.document.termlyEmbedId && (
+                <div style={{
+                  padding: 20,
+                  background: 'var(--sh-bg)',
+                }}>
+                  <LegalDocumentText bodyText={privacyDocument.document.bodyText} />
+                </div>
+              )}
+              {privacyDocument.document?.termlyEmbedId && !privacyEmbed.loaded && !privacyEmbed.timedOut && !privacyDocument.loading && (
                 <div style={{
                   position: 'absolute', inset: 0, display: 'flex', alignItems: 'center',
                   justifyContent: 'center', background: 'var(--sh-soft)',
+                  color: 'var(--sh-muted)', fontSize: 13,
                 }}>
-                  <div style={{ textAlign: 'center' }}>
-                    <p style={{ margin: '0 0 8px', color: 'var(--sh-muted)', fontSize: 13 }}>Could not load inline. </p>
-                    <a href={POLICY_URLS.privacy} target="_blank" rel="noopener noreferrer"
-                      style={{ color: 'var(--sh-brand)', fontSize: 13, fontWeight: 600 }}
-                      onClick={() => markViewed('privacy')}
-                    >View Privacy Policy externally</a>
+                  Loading Privacy Policy...
+                </div>
+              )}
+              {privacyEmbed.timedOut && privacyDocument.document?.bodyText && (
+                <div style={{ padding: 20, background: 'var(--sh-bg)' }}>
+                  <div style={{ marginBottom: 12, fontSize: 11, fontWeight: 800, color: 'var(--sh-info-text)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                    StudyHub Backup Copy
                   </div>
+                  <LegalDocumentText bodyText={privacyDocument.document.bodyText} />
+                  <a
+                    href={privacyDocument.document.termlyUrl || POLICY_URLS.privacy}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ display: 'inline-block', marginTop: 14, color: 'var(--sh-brand)', fontSize: 13, fontWeight: 700 }}
+                  >
+                    Open the hosted Termly version
+                  </a>
+                </div>
+              )}
+              {privacyDocument.error && !privacyDocument.document && (
+                <div style={{ padding: 20, color: 'var(--sh-warning-text)', fontSize: 13, lineHeight: 1.6 }}>
+                  {privacyDocument.error}
                 </div>
               )}
               <div
@@ -413,6 +308,7 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
                   padding: 16,
                   opacity: privacyEmbed.loaded ? 1 : 0,
                   transition: 'opacity 0.3s ease',
+                  display: privacyEmbed.timedOut || !privacyDocument.document?.termlyEmbedId ? 'none' : 'block',
                 }}
               />
             </div>
@@ -429,7 +325,15 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
                 padding: 24,
               }}
             >
-              <GuidelinesContent />
+              {guidelinesDocument.loading && !guidelinesDocument.document ? (
+                <div style={{ color: 'var(--sh-muted)', fontSize: 13 }}>Loading Community Guidelines...</div>
+              ) : guidelinesDocument.document?.bodyText ? (
+                <LegalDocumentText bodyText={guidelinesDocument.document.bodyText} />
+              ) : (
+                <div style={{ color: 'var(--sh-warning-text)', fontSize: 13, lineHeight: 1.6 }}>
+                  {guidelinesDocument.error || 'Could not load the Community Guidelines.'}
+                </div>
+              )}
             </div>
           )}
         </div>
