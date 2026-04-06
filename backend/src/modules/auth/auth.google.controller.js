@@ -14,6 +14,11 @@ const {
   issueAuthenticatedSession,
   handleAuthError,
 } = require('./auth.service')
+const {
+  CURRENT_LEGAL_VERSION,
+  LEGAL_ACCEPTANCE_SOURCES,
+  recordCurrentRequiredLegalAcceptancesTx,
+} = require('../legal/legal.service')
 
 const router = express.Router()
 
@@ -24,7 +29,7 @@ const router = express.Router()
  * personalize later via /my-courses.
  */
 router.post('/google', googleLimiter, async (req, res) => {
-  const { credential } = req.body || {}
+  const { credential, legalAccepted, legalVersion } = req.body || {}
 
   if (!credential) {
     return res.status(400).json({ error: 'Google credential is required.' })
@@ -60,6 +65,10 @@ router.post('/google', googleLimiter, async (req, res) => {
       return res.status(409).json({ error: msg })
     }
 
+    if (!legalAccepted || legalVersion !== CURRENT_LEGAL_VERSION) {
+      throw new AppError(400, 'Please review and accept the latest StudyHub legal documents before creating your Google account.')
+    }
+
     // New user → create immediately with zero enrollments
     const baseUsername = (googlePayload.name || googlePayload.email.split('@')[0])
       .replace(/[^a-zA-Z0-9_]/g, '')
@@ -75,18 +84,30 @@ router.post('/google', googleLimiter, async (req, res) => {
 
     const randomPassword = crypto.randomBytes(32).toString('hex')
     const passwordHash = await bcrypt.hash(randomPassword, 12)
+    const acceptedAt = new Date()
 
-    const createdUser = await prisma.user.create({
-      data: {
-        username,
-        passwordHash,
-        email: googlePayload.email,
-        emailVerified: true,
-        googleId: googlePayload.googleId,
-        authProvider: 'google',
-        avatarUrl: googlePayload.picture || null,
-      },
-      select: { id: true },
+    const createdUser = await prisma.$transaction(async (tx) => {
+      const createdUserRecord = await tx.user.create({
+        data: {
+          username,
+          passwordHash,
+          email: googlePayload.email,
+          emailVerified: true,
+          googleId: googlePayload.googleId,
+          authProvider: 'google',
+          avatarUrl: googlePayload.picture || null,
+          termsAcceptedVersion: CURRENT_LEGAL_VERSION,
+          termsAcceptedAt: acceptedAt,
+        },
+        select: { id: true },
+      })
+
+      await recordCurrentRequiredLegalAcceptancesTx(tx, createdUserRecord.id, {
+        acceptedAt,
+        source: LEGAL_ACCEPTANCE_SOURCES.GOOGLE_SIGNUP,
+      })
+
+      return createdUserRecord
     })
 
     const authenticatedUser = await issueAuthenticatedSession(res, createdUser.id)

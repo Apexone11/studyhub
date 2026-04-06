@@ -6,25 +6,37 @@
  */
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { API } from '../../config'
-import { CURRENT_TERMS_VERSION } from '../../lib/legalVersions'
+import { CURRENT_LEGAL_VERSION, LEGAL_DOCUMENT_LABELS } from '../../lib/legalVersions'
 import { LEGAL_EMAILS } from '../../lib/legalConstants'
+import { acceptCurrentLegalDocuments, fetchMyLegalStatus } from '../../lib/legalService'
+import { useSession } from '../../lib/session-context'
 import { SectionCard, Button, Message } from './settingsShared'
 import { FONT } from './settingsState'
 
-/* ── Legal documents config ─────────────────────────────────────────── */
+const LEGAL_DOC_ROUTES = {
+  terms: '/terms',
+  privacy: '/privacy',
+  cookies: '/cookies',
+  guidelines: '/guidelines',
+  disclaimer: '/disclaimer',
+}
 
-const LEGAL_DOCS = [
-  { title: 'Terms of Use', description: 'Rules governing your use of StudyHub.', to: '/terms' },
-  { title: 'Privacy Policy', description: 'How we collect, use, and protect your data.', to: '/privacy' },
-  { title: 'Cookie Policy', description: 'How StudyHub uses cookies and tracking technologies.', to: '/cookies' },
-  { title: 'Community Guidelines', description: 'Standards for respectful collaboration.', to: '/guidelines' },
-  { title: 'Disclaimer', description: 'Limitations of liability for StudyHub content.', to: '/disclaimer' },
-]
+function formatDateTime(value) {
+  if (!value) return 'Not yet accepted'
+  try {
+    return new Intl.DateTimeFormat('en-US', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(new Date(value))
+  } catch {
+    return value
+  }
+}
 
 /* ── Main Component ─────────────────────────────────────────────────── */
 
 export default function LegalTab() {
+  const { refreshSession, user } = useSession()
   const [termsStatus, setTermsStatus] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -32,27 +44,22 @@ export default function LegalTab() {
 
   useEffect(() => {
     let active = true
-    fetch(`${API}/api/users/me/terms-status`, {
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-    })
-      .then(async (r) => {
-        if (!r.ok) throw new Error('Failed to load terms status.')
-        return r.json()
-      })
+    fetchMyLegalStatus()
       .then((data) => {
         if (active) setTermsStatus(data)
       })
-      .catch(() => {
-        if (active) setError('Could not load terms acceptance status.')
+      .catch((nextError) => {
+        if (active) setError(nextError.message || 'Could not load terms acceptance status.')
       })
       .finally(() => {
         if (active) setLoading(false)
       })
     return () => { active = false }
-  }, [])
+  }, [user?.id])
 
-  const isTermsCurrent = termsStatus?.acceptedVersion === CURRENT_TERMS_VERSION
+  const isTermsCurrent = Boolean(termsStatus && !termsStatus.needsAcceptance)
+  const currentDocuments = termsStatus?.documents || []
+  const missingRequiredDocuments = termsStatus?.missingRequiredDocuments || []
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -75,7 +82,7 @@ export default function LegalTab() {
             fontSize: 13,
             lineHeight: 1.6,
           }}>
-            <strong>Up to date</strong> -- Your terms acceptance is current (version {termsStatus.acceptedVersion}).
+            <strong>Up to date</strong> -- Your required legal acceptance is current (version {termsStatus.acceptedVersion || CURRENT_LEGAL_VERSION}). Last confirmed {formatDateTime(termsStatus.lastAcceptedAt || termsStatus.acceptedAt)}.
           </div>
         ) : (
           <>
@@ -89,32 +96,27 @@ export default function LegalTab() {
               lineHeight: 1.6,
               marginBottom: 12,
             }}>
-              <strong>Update required</strong> -- Our terms have been updated. Please review and accept the latest version.
+              <strong>Update required</strong> -- Review and accept the latest required legal documents to keep using StudyHub. Missing: {missingRequiredDocuments.map((slug) => LEGAL_DOCUMENT_LABELS[slug] || slug).join(', ')}.
             </div>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              <Link to="/terms" style={{ textDecoration: 'none' }}>
-                <Button secondary>Review Terms</Button>
+              <Link to="/settings?tab=legal" style={{ textDecoration: 'none' }}>
+                <Button secondary>Review in Settings</Button>
               </Link>
               <Button
                 disabled={accepting}
                 onClick={async () => {
                   setAccepting(true)
+                  setError('')
                   try {
-                    const res = await fetch(`${API}/api/users/me/terms-accept`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      credentials: 'include',
-                      body: JSON.stringify({ version: CURRENT_TERMS_VERSION }),
-                    })
-                    if (res.ok) {
-                      const data = await res.json()
-                      setTermsStatus(data)
-                    }
-                  } catch { /* silent */ }
-                  finally { setAccepting(false) }
+                    const data = await acceptCurrentLegalDocuments()
+                    setTermsStatus(data)
+                    await refreshSession()
+                  } catch (nextError) {
+                    setError(nextError.message || 'Could not save your legal acceptance.')
+                  } finally { setAccepting(false) }
                 }}
               >
-                {accepting ? 'Accepting...' : 'Accept Current Terms'}
+                {accepting ? 'Accepting...' : 'Accept Current Documents'}
               </Button>
             </div>
           </>
@@ -128,9 +130,9 @@ export default function LegalTab() {
           gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
           gap: 12,
         }}>
-          {LEGAL_DOCS.map((doc) => (
+          {currentDocuments.map((doc) => (
             <div
-              key={doc.to}
+              key={doc.slug}
               style={{
                 background: 'var(--sh-bg)',
                 border: '1px solid var(--sh-border)',
@@ -141,13 +143,31 @@ export default function LegalTab() {
                 gap: 8,
               }}
             >
-              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--sh-heading)' }}>
-                {doc.title}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--sh-heading)' }}>
+                  {doc.title}
+                </div>
+                <span style={{
+                  padding: '4px 8px',
+                  borderRadius: 999,
+                  fontSize: 11,
+                  fontWeight: 800,
+                  background: doc.requiredAtSignup && !doc.isAccepted ? 'var(--sh-warning-bg)' : doc.isAccepted ? 'var(--sh-success-bg)' : 'var(--sh-soft)',
+                  border: `1px solid ${doc.requiredAtSignup && !doc.isAccepted ? 'var(--sh-warning-border)' : doc.isAccepted ? 'var(--sh-success-border)' : 'var(--sh-border)'}`,
+                  color: doc.requiredAtSignup && !doc.isAccepted ? 'var(--sh-warning-text)' : doc.isAccepted ? 'var(--sh-success-text)' : 'var(--sh-muted)',
+                  whiteSpace: 'nowrap',
+                }}>
+                  {doc.requiredAtSignup && !doc.isAccepted ? 'Required' : doc.isAccepted ? 'Accepted' : 'Optional'}
+                </span>
               </div>
               <div style={{ fontSize: 12, color: 'var(--sh-muted)', lineHeight: 1.5, flex: 1 }}>
-                {doc.description}
+                {doc.summary}
               </div>
-              <Link to={doc.to} style={{ textDecoration: 'none', marginTop: 4 }}>
+              <div style={{ fontSize: 11, color: 'var(--sh-muted)' }}>
+                {doc.updatedLabel}
+                {doc.acceptedAt ? ` · Accepted ${formatDateTime(doc.acceptedAt)}` : ''}
+              </div>
+              <Link to={LEGAL_DOC_ROUTES[doc.slug] || '/terms'} style={{ textDecoration: 'none', marginTop: 4 }}>
                 <Button secondary style={{ fontSize: 12, padding: '7px 14px', width: '100%' }}>
                   View Document
                 </Button>

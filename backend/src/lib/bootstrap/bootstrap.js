@@ -5,6 +5,7 @@ const { ensureSchools } = require('./bootstrapSchools')
 const { ensureCourses } = require('./bootstrapCourses')
 const { DEFAULT_ADMIN_EMAIL, ensureAdminUser } = require('./bootstrapAdmin')
 const { seedBadgeCatalog } = require('../badges')
+const { ensureLegalDocumentsSeeded } = require('../../modules/legal/legal.service')
 
 /**
  * Combined catalog seeder — delegates to ensureSchools + ensureCourses
@@ -29,6 +30,7 @@ async function bootstrapRuntime() {
     await ensureCatalogData(prisma)
     await ensureAdminUser(prisma)
     await seedBadgeCatalog(prisma)
+    await ensureLegalDocumentsSeeded(prisma)
   } catch (error) {
     captureError(error, { source: 'bootstrapRuntime' })
     throw error

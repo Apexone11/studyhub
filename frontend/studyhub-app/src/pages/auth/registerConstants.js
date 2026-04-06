@@ -3,7 +3,7 @@
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 import { API } from '../../config'
-import { CURRENT_TERMS_VERSION } from '../../lib/legalVersions'
+import { CURRENT_LEGAL_VERSION } from '../../lib/legalVersions'
 
 /* ── Validation rules ──────────────────────────────────────────────────── */
 export const RULES = {
@@ -57,7 +57,7 @@ export async function apiStartRegistration(form) {
       confirmPassword: form.confirmPassword,
       accountType: form.accountType || 'student',
       termsAccepted: form.termsAccepted,
-      termsVersion: CURRENT_TERMS_VERSION,
+      termsVersion: CURRENT_LEGAL_VERSION,
     }),
   })
   const data = await response.json()
@@ -89,12 +89,16 @@ export async function apiResendCode(verificationToken) {
   return { ok: true, data }
 }
 
-export async function apiGoogleAuth(credential) {
+export async function apiGoogleAuth(credential, options = {}) {
   const response = await fetch(`${API}/api/auth/google`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify({ credential }),
+    body: JSON.stringify({
+      credential,
+      legalAccepted: Boolean(options.legalAccepted),
+      legalVersion: options.legalAccepted ? CURRENT_LEGAL_VERSION : null,
+    }),
   })
   const data = await response.json()
   if (!response.ok) return { ok: false, error: data.error || 'Google sign-up failed.' }

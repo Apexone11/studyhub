@@ -19,6 +19,11 @@ const {
   issueAuthenticatedSession,
   handleAuthError,
 } = require('./auth.service')
+const {
+  CURRENT_LEGAL_VERSION,
+  LEGAL_ACCEPTANCE_SOURCES,
+  recordCurrentRequiredLegalAcceptancesTx,
+} = require('../legal/legal.service')
 
 const router = express.Router()
 
@@ -44,24 +49,31 @@ router.post('/register', registerLimiter, async (req, res) => {
 
     const passwordHash = await bcrypt.hash(password, 12)
 
-    // Always store the server's current terms version -- never trust client-provided version
-    const CURRENT_TERMS_VERSION = '2026-04-04'
+    const acceptedAt = new Date()
+    const createdUser = await prisma.$transaction(async (tx) => {
+      const createdUserRecord = await tx.user.create({
+        data: {
+          username,
+          passwordHash,
+          email,
+          accountType,
+          emailVerified: true,
+          emailVerificationCode: null,
+          emailVerificationExpiry: null,
+          trustLevel: TRUST_LEVELS.TRUSTED,
+          trustedAt: new Date(),
+          termsAcceptedVersion: CURRENT_LEGAL_VERSION,
+          termsAcceptedAt: acceptedAt,
+        },
+        select: { id: true },
+      })
 
-    const createdUser = await prisma.user.create({
-      data: {
-        username,
-        passwordHash,
-        email,
-        accountType,
-        emailVerified: true,
-        emailVerificationCode: null,
-        emailVerificationExpiry: null,
-        trustLevel: TRUST_LEVELS.TRUSTED,
-        trustedAt: new Date(),
-        termsAcceptedVersion: CURRENT_TERMS_VERSION,
-        termsAcceptedAt: new Date(),
-      },
-      select: { id: true },
+      await recordCurrentRequiredLegalAcceptancesTx(tx, createdUserRecord.id, {
+        acceptedAt,
+        source: LEGAL_ACCEPTANCE_SOURCES.REGISTER,
+      })
+
+      return createdUserRecord
     })
 
     const user = await issueAuthenticatedSession(res, createdUser.id)
@@ -95,7 +107,15 @@ router.post('/register/start', registerLimiter, async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 12)
-    const { challenge, code } = await createSignupChallenge({ username, email, passwordHash, accountType })
+    const { challenge, code } = await createSignupChallenge({
+      username,
+      email,
+      passwordHash,
+      payload: {
+        accountType,
+        acceptedLegalVersion: CURRENT_LEGAL_VERSION,
+      },
+    })
 
     try {
       await sendVerificationCodeEmail(challenge.email, challenge.username, code, {
@@ -161,6 +181,9 @@ router.post('/register/complete', registerLimiter, async (req, res) => {
     if (!challenge.verifiedAt) {
       throw new AppError(400, 'Verify your email before completing registration.')
     }
+    if (challenge.payload?.acceptedLegalVersion !== CURRENT_LEGAL_VERSION) {
+      throw new AppError(409, 'Our legal documents were updated. Please restart registration and review the latest version.')
+    }
 
     // School/course selection is no longer part of registration.
     // Users can personalize later via /my-courses.
@@ -183,6 +206,7 @@ router.post('/register/complete', registerLimiter, async (req, res) => {
         throw new AppError(409, 'That email is already in use.')
       }
 
+      const acceptedAt = new Date()
       const createdUser = await tx.user.create({
         data: {
           username: challenge.username,
@@ -194,8 +218,15 @@ router.post('/register/complete', registerLimiter, async (req, res) => {
           emailVerificationExpiry: null,
           trustLevel: TRUST_LEVELS.TRUSTED,
           trustedAt: new Date(),
+          termsAcceptedVersion: CURRENT_LEGAL_VERSION,
+          termsAcceptedAt: acceptedAt,
         },
         select: { id: true },
+      })
+
+      await recordCurrentRequiredLegalAcceptancesTx(tx, createdUser.id, {
+        acceptedAt,
+        source: LEGAL_ACCEPTANCE_SOURCES.REGISTER,
       })
 
       await tx.verificationChallenge.deleteMany({
