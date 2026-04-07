@@ -7,6 +7,11 @@ const {
   getUserActiveChallenge,
   mapChallengeForClient,
 } = require('../../lib/verification/verificationChallenges')
+const { getUserPII } = require('../../lib/piiVault')
+const {
+  getProfileFieldVisibility,
+  normalizeProfileLinks,
+} = require('../../lib/profileMetadata')
 const prisma = require('../../lib/prisma')
 
 const { COURSE_CODE_REGEX } = require('./settings.constants')
@@ -147,7 +152,7 @@ async function sendSettingsVerificationEmail(email, username, code, metadata = {
 }
 
 async function getSettingsUser(userId) {
-  const [user, pendingChallenge] = await Promise.all([
+  const [user, pendingChallenge, pii] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -156,13 +161,21 @@ async function getSettingsUser(userId) {
         role: true,
         email: true,
         emailVerified: true,
+        displayName: true,
+        bio: true,
         avatarUrl: true,
         coverImageUrl: true,
+        profileLinks: true,
         isPrivate: true,
         authProvider: true,
         accountType: true,
         googleId: true,
         createdAt: true,
+        preferences: {
+          select: {
+            profileFieldVisibility: true,
+          },
+        },
         enrollments: {
           include: { course: { include: { school: true } } },
         },
@@ -170,12 +183,21 @@ async function getSettingsUser(userId) {
       },
     }),
     getUserActiveChallenge(userId, VERIFICATION_PURPOSE.SETTINGS_EMAIL),
+    getUserPII(userId).catch(() => null),
   ])
 
   if (!user) return null
 
+  const { preferences, ...userData } = user
+
   return {
-    ...user,
+    ...userData,
+    displayName: user.displayName || '',
+    bio: user.bio || '',
+    profileLinks: normalizeProfileLinks(user.profileLinks),
+    profileFieldVisibility: getProfileFieldVisibility(preferences?.profileFieldVisibility),
+    age: Number.isInteger(pii?.age) ? pii.age : null,
+    location: typeof pii?.location === 'string' ? pii.location : '',
     pendingEmailVerification: serializePendingEmailVerification(pendingChallenge),
   }
 }

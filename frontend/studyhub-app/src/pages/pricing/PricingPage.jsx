@@ -157,7 +157,7 @@ export default function PricingPage() {
       {successFromUrl && (
         <div style={p.successBanner}>
           <p style={p.successText}>
-            Success! Your subscription is now active. Thank you for supporting StudyHub.
+            Success! Your payment is complete. Thank you for supporting StudyHub. Receipts and payment history are available in your subscription settings.
           </p>
         </div>
       )}
@@ -869,12 +869,15 @@ function DonationSection() {
           <input type="checkbox" checked={anonymous} onChange={(e) => setAnonymous(e.target.checked)} style={d.anonCheck} />
           <span style={d.anonText}>Donate anonymously</span>
         </label>
+        <div style={d.privacyNote}>
+          Anonymous donations stay off the public supporters list. Your contribution is still counted in the anonymous community total.
+        </div>
         <button style={d.donateBtn} onClick={handleDonate} disabled={loading || amount < 1}>
           {loading ? 'Redirecting to checkout...' : `Donate $${amount}`}
         </button>
         {error && <div style={d.error}>{error}</div>}
         <p style={d.footnote}>
-          Donations are processed securely through Stripe. All donors are featured on our supporters page.
+          Donations are processed securely through Stripe. After checkout, we email a thank-you and receipt, and your transaction appears in Settings payment history.
         </p>
       </div>
     </section>
@@ -1447,6 +1450,16 @@ const d = {
   },
   anonCheck: { width: 16, height: 16, accentColor: 'var(--sh-brand)', cursor: 'pointer' },
   anonText: { fontSize: 13, color: 'var(--sh-subtext)', fontWeight: 500 },
+  privacyNote: {
+    marginBottom: 16,
+    padding: '12px 14px',
+    borderRadius: 14,
+    background: 'var(--sh-soft)',
+    border: '1px solid var(--sh-border)',
+    color: 'var(--sh-muted)',
+    fontSize: 13,
+    lineHeight: 1.6,
+  },
   donateBtn: {
     background: 'var(--sh-brand)',
     color: '#ffffff',

@@ -1,0 +1,7 @@
+ALTER TABLE "User"
+  ADD COLUMN IF NOT EXISTS "displayName" TEXT,
+  ADD COLUMN IF NOT EXISTS "bio" VARCHAR(500),
+  ADD COLUMN IF NOT EXISTS "profileLinks" JSONB NOT NULL DEFAULT '[]'::jsonb;
+
+ALTER TABLE "UserPreferences"
+  ADD COLUMN IF NOT EXISTS "profileFieldVisibility" JSONB NOT NULL DEFAULT '{}'::jsonb;

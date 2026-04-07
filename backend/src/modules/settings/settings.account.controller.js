@@ -3,8 +3,17 @@ const bcrypt = require('bcryptjs')
 const prisma = require('../../lib/prisma')
 const { signAuthToken, setAuthCookie } = require('../../lib/authTokens')
 const { deleteUserAccount } = require('../../lib/deleteUserAccount')
+const { getUserPII, setUserPII } = require('../../lib/piiVault')
+const {
+  sanitizeAge,
+  sanitizeBio,
+  sanitizeDisplayName,
+  sanitizeLocation,
+  sanitizeProfileFieldVisibility,
+  sanitizeProfileLinks,
+} = require('../../lib/profileMetadata')
 const { twoFaLimiter, USERNAME_REGEX } = require('./settings.constants')
-const { getSettingsUser, handleSettingsError } = require('./settings.service')
+const { AppError, getSettingsUser, handleSettingsError } = require('./settings.service')
 
 const router = express.Router()
 
@@ -85,6 +94,109 @@ router.patch('/username', async (req, res) => {
       user: updated,
     })
   } catch (error) {
+    return handleSettingsError(req, res, error)
+  }
+})
+
+router.patch('/profile', async (req, res) => {
+  const body = req.body || {}
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: { id: true },
+    })
+    if (!user) return res.status(404).json({ error: 'User not found.' })
+
+    const userUpdates = {}
+
+    if (Object.hasOwn(body, 'displayName')) {
+      userUpdates.displayName = sanitizeDisplayName(body.displayName)
+    }
+    if (Object.hasOwn(body, 'bio')) {
+      userUpdates.bio = sanitizeBio(body.bio)
+    }
+    if (Object.hasOwn(body, 'profileLinks')) {
+      userUpdates.profileLinks = sanitizeProfileLinks(body.profileLinks)
+    }
+
+    const hasVisibilityUpdate = Object.hasOwn(body, 'profileFieldVisibility')
+    const profileFieldVisibility = hasVisibilityUpdate
+      ? sanitizeProfileFieldVisibility(body.profileFieldVisibility)
+      : null
+
+    const hasAgeUpdate = Object.hasOwn(body, 'age')
+    const hasLocationUpdate = Object.hasOwn(body, 'location')
+    const hasSensitiveProfileUpdate = hasAgeUpdate || hasLocationUpdate
+
+    if (!hasVisibilityUpdate && !hasSensitiveProfileUpdate && Object.keys(userUpdates).length === 0) {
+      throw new AppError(400, 'No valid profile fields were provided.')
+    }
+
+    if (hasSensitiveProfileUpdate) {
+      const keyArn = process.env.KMS_KEY_ARN || ''
+      if (!keyArn.startsWith('arn:aws:kms:')) {
+        throw new AppError(
+          503,
+          'Sensitive profile fields are unavailable until AWS KMS is configured.',
+        )
+      }
+
+      const existingPii = (await getUserPII(user.id, {
+        id: req.user.userId,
+        role: req.user.role,
+        route: req.originalUrl,
+        method: req.method,
+      }).catch(() => null)) || {}
+
+      const nextPii = { ...existingPii }
+      if (hasAgeUpdate) nextPii.age = sanitizeAge(body.age)
+      if (hasLocationUpdate) nextPii.location = sanitizeLocation(body.location)
+
+      await setUserPII(user.id, nextPii, {
+        id: req.user.userId,
+        role: req.user.role,
+        route: req.originalUrl,
+        method: req.method,
+      }).catch(() => {
+        throw new AppError(
+          503,
+          'Sensitive profile fields could not be saved securely right now. Please try again later.',
+        )
+      })
+    }
+
+    await prisma.$transaction(async (tx) => {
+      if (Object.keys(userUpdates).length > 0) {
+        await tx.user.update({
+          where: { id: user.id },
+          data: userUpdates,
+        })
+      }
+
+      if (hasVisibilityUpdate) {
+        await tx.userPreferences.upsert({
+          where: { userId: user.id },
+          create: {
+            userId: user.id,
+            profileFieldVisibility,
+          },
+          update: {
+            profileFieldVisibility,
+          },
+        })
+      }
+    })
+
+    const updated = await getSettingsUser(user.id)
+    return res.json({
+      message: 'Profile updated successfully.',
+      user: updated,
+    })
+  } catch (error) {
+    if (!(error instanceof AppError) && error?.message) {
+      return handleSettingsError(req, res, new AppError(400, error.message))
+    }
     return handleSettingsError(req, res, error)
   }
 })

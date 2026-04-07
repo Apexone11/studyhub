@@ -395,9 +395,70 @@ export default function UserProfilePage() {
                     )
                   })()}
                 </div>
+                {profile.displayName && profile.displayName !== profile.username && (
+                  <div style={{ fontSize: 15, fontWeight: 700, color: 'rgba(255,255,255,0.86)', marginBottom: 6 }}>
+                    {profile.displayName}
+                  </div>
+                )}
                 <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', marginBottom: 10 }}>
                   Joined {fmtDate(profile.createdAt)}
                 </div>
+                {profile.bio && (
+                  <div
+                    data-testid="user-bio"
+                    className="bio"
+                    style={{
+                      maxWidth: 720,
+                      fontSize: 14,
+                      lineHeight: 1.7,
+                      color: 'rgba(255,255,255,0.86)',
+                      marginBottom: 12,
+                    }}
+                  >
+                    {profile.bio}
+                  </div>
+                )}
+                {(profile.location || Number.isInteger(profile.age)) && (
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                    {profile.location && (
+                      <span style={{ fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 99, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.86)' }}>
+                        {profile.location}
+                      </span>
+                    )}
+                    {Number.isInteger(profile.age) && (
+                      <span style={{ fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 99, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.86)' }}>
+                        Age {profile.age}
+                      </span>
+                    )}
+                  </div>
+                )}
+                {Array.isArray(profile.profileLinks) && profile.profileLinks.length > 0 && (
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+                    {profile.profileLinks.map((link) => (
+                      <a
+                        key={`${link.label}-${link.url}`}
+                        href={link.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          padding: '6px 12px',
+                          borderRadius: 999,
+                          border: '1px solid rgba(255,255,255,0.2)',
+                          background: 'rgba(255,255,255,0.1)',
+                          color: 'var(--sh-nav-text)',
+                          fontSize: 12,
+                          fontWeight: 700,
+                          textDecoration: 'none',
+                          backdropFilter: 'blur(6px)',
+                        }}
+                      >
+                        {link.label}
+                      </a>
+                    ))}
+                  </div>
+                )}
 
                 {/* Follower / following stats */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
@@ -598,7 +659,10 @@ export default function UserProfilePage() {
               This account is private
             </div>
             <div style={{ fontSize: 14, color: 'var(--sh-muted)', maxWidth: 400, margin: '0 auto', lineHeight: 1.6 }}>
-              Follow this account to see their posts, sheets, and activity.
+              {profile.bio || 'Follow this account to see their posts, sheets, and activity.'}
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--sh-muted)', maxWidth: 420, margin: '12px auto 0', lineHeight: 1.6 }}>
+              Send a follow request to unlock their sheets, posts, and study activity.
             </div>
           </div>
         ) : (

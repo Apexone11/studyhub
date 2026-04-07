@@ -1,6 +1,11 @@
 const { captureError } = require('../../monitoring/sentry')
 const { createNotification } = require('../../lib/notify')
 const { getProfileAccessDecision, PROFILE_VISIBILITY } = require('../../lib/profileVisibility')
+const { getUserPII } = require('../../lib/piiVault')
+const {
+  buildProfilePresentation,
+  getProfileFieldVisibility,
+} = require('../../lib/profileMetadata')
 const prisma = require('../../lib/prisma')
 const { checkAndAwardBadges } = require('../../lib/badges')
 const { getUserStreak, getWeeklyActivity } = require('../../lib/streaks')
@@ -10,6 +15,19 @@ const {
   acceptCurrentLegalDocuments,
   getUserLegalStatus,
 } = require('../legal/legal.service')
+
+function getPrimarySchoolId(enrollments = []) {
+  return enrollments?.[0]?.course?.school?.id || null
+}
+
+async function loadProfilePii(userId, req) {
+  return getUserPII(userId, {
+    id: req.user?.userId || null,
+    role: req.user?.role || null,
+    route: req.originalUrl,
+    method: req.method,
+  }).catch(() => null)
+}
 
 // ── GET /api/users/me/activity ─────────────────────────
 const getMyActivity = async (req, res) => {
@@ -226,11 +244,20 @@ const getUserByUsername = async (req, res) => {
       select: {
         id: true,
         username: true,
+        displayName: true,
+        bio: true,
         role: true,
+        accountType: true,
         avatarUrl: true,
         coverImageUrl: true,
+        profileLinks: true,
         isPrivate: true,
         createdAt: true,
+        preferences: {
+          select: {
+            profileFieldVisibility: true,
+          },
+        },
         enrollments: {
           include: { course: { include: { school: true } } },
         },
@@ -279,15 +306,25 @@ const getUserByUsername = async (req, res) => {
       }
     }
 
+    const fieldVisibility = getProfileFieldVisibility(user.preferences?.profileFieldVisibility)
+
     // Private account gate: if private and viewer is not owner and not active follower
     if (user.isPrivate && !isOwner && !isFollowing) {
       // Enrich with Pro/Donor badge info
       const badges = await enrichUserWithBadges(user)
+      const privatePreview = buildProfilePresentation({
+        user,
+        pii: null,
+        profileFieldVisibility: fieldVisibility,
+        isOwner,
+        privatePreview: true,
+      })
 
       return res.json({
         id: user.id,
         username: user.username,
         role: user.role,
+        accountType: user.accountType,
         avatarUrl: user.avatarUrl || null,
         coverImageUrl: user.coverImageUrl || null,
         isPrivate: true,
@@ -301,8 +338,20 @@ const getUserByUsername = async (req, res) => {
         sheetCount,
         isFollowing: false,
         followStatus,
+        ...privatePreview,
       })
     }
+
+    const shouldLoadPii =
+      isOwner || fieldVisibility.age === 'public' || fieldVisibility.location === 'public'
+    const pii = shouldLoadPii ? await loadProfilePii(user.id, req) : null
+    const visibleProfile = buildProfilePresentation({
+      user,
+      pii,
+      profileFieldVisibility: fieldVisibility,
+      isOwner,
+      privatePreview: false,
+    })
 
     /* Fetch shared (non-private) notes for profile display */
     let sharedNotes = []
@@ -411,6 +460,7 @@ const getUserByUsername = async (req, res) => {
       id: user.id,
       username: user.username,
       role: user.role,
+      accountType: user.accountType,
       avatarUrl: user.avatarUrl || null,
       coverImageUrl: user.coverImageUrl || null,
       isPrivate: user.isPrivate || false,
@@ -423,6 +473,7 @@ const getUserByUsername = async (req, res) => {
       followingCount,
       isFollowing,
       followStatus,
+      ...visibleProfile,
       recentSheets: user.studySheets,
       enrollments: user.enrollments,
       pinnedSheets,
@@ -610,14 +661,24 @@ const getMe = async (req, res) => {
         username: true,
         displayName: true,
         email: true,
+        accountType: true,
         avatarUrl: true,
         role: true,
-        verified: true,
+        emailVerified: true,
+        isStaffVerified: true,
         bio: true,
+        profileLinks: true,
         isPrivate: true,
         createdAt: true,
-        schoolId: true,
-        school: { select: { id: true, name: true } },
+        preferences: {
+          select: {
+            profileFieldVisibility: true,
+          },
+        },
+        enrollments: {
+          take: 1,
+          include: { course: { include: { school: true } } },
+        },
         _count: {
           select: {
             studySheets: true,
@@ -630,7 +691,31 @@ const getMe = async (req, res) => {
     })
 
     if (!user) return res.status(404).json({ error: 'User not found.' })
-    res.json(user)
+
+    const pii = await loadProfilePii(user.id, req)
+    const profilePresentation = buildProfilePresentation({
+      user,
+      pii,
+      profileFieldVisibility: user.preferences?.profileFieldVisibility,
+      isOwner: true,
+    })
+    const school = user.enrollments?.[0]?.course?.school || null
+
+    res.json({
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      avatarUrl: user.avatarUrl,
+      role: user.role,
+      accountType: user.accountType,
+      verified: Boolean(user.emailVerified || user.isStaffVerified),
+      isPrivate: user.isPrivate,
+      createdAt: user.createdAt,
+      schoolId: school?.id || null,
+      school,
+      _count: user._count,
+      ...profilePresentation,
+    })
   } catch (err) {
     captureError(err, { route: req.originalUrl })
     res.status(500).json({ error: 'Server error.' })
@@ -663,14 +748,29 @@ const getFollowSuggestions = async (req, res) => {
     // Get current user for school-based suggestions
     const currentUser = await prisma.user.findUnique({
       where: { id: req.user.userId },
-      select: { schoolId: true },
+      select: {
+        enrollments: {
+          take: 1,
+          select: {
+            course: {
+              select: {
+                school: { select: { id: true } },
+              },
+            },
+          },
+        },
+      },
     })
+    const currentSchoolId = getPrimarySchoolId(currentUser?.enrollments)
 
     // Prefer users from the same school, then by sheet count
     const suggestions = await prisma.user.findMany({
       where: {
         id: { notIn: excludeIds },
-        verified: true,
+        OR: [
+          { emailVerified: true },
+          { isStaffVerified: true },
+        ],
       },
       select: {
         id: true,
@@ -678,7 +778,16 @@ const getFollowSuggestions = async (req, res) => {
         displayName: true,
         avatarUrl: true,
         bio: true,
-        schoolId: true,
+        enrollments: {
+          take: 1,
+          select: {
+            course: {
+              select: {
+                school: { select: { id: true } },
+              },
+            },
+          },
+        },
         _count: { select: { studySheets: true, followers: true } },
       },
       orderBy: [{ followers: { _count: 'desc' } }],
@@ -687,13 +796,18 @@ const getFollowSuggestions = async (req, res) => {
 
     // Sort: same school first, then by follower count
     const sorted = suggestions.sort((a, b) => {
-      const aSchool = currentUser?.schoolId && a.schoolId === currentUser.schoolId ? 1 : 0
-      const bSchool = currentUser?.schoolId && b.schoolId === currentUser.schoolId ? 1 : 0
+      const aSchool = currentSchoolId && getPrimarySchoolId(a.enrollments) === currentSchoolId ? 1 : 0
+      const bSchool = currentSchoolId && getPrimarySchoolId(b.enrollments) === currentSchoolId ? 1 : 0
       if (bSchool !== aSchool) return bSchool - aSchool
       return (b._count?.followers || 0) - (a._count?.followers || 0)
     })
 
-    res.json(sorted.slice(0, 8))
+    res.json(
+      sorted.slice(0, 8).map(({ enrollments, ...suggestion }) => ({
+        ...suggestion,
+        schoolId: getPrimarySchoolId(enrollments),
+      }))
+    )
   } catch (err) {
     captureError(err, { route: req.originalUrl })
     res.status(500).json({ error: 'Server error.' })
@@ -870,7 +984,14 @@ const getFollowRequests = async (req, res) => {
       select: {
         createdAt: true,
         follower: {
-          select: { id: true, username: true, avatarUrl: true, accountType: true },
+          select: {
+            id: true,
+            username: true,
+            displayName: true,
+            bio: true,
+            avatarUrl: true,
+            accountType: true,
+          },
         },
       },
     })

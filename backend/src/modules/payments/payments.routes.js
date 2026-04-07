@@ -61,6 +61,13 @@ function requireAdmin(req, res, next) {
   next()
 }
 
+function escapeCsvValue(value) {
+  if (value === null || value === undefined) return ''
+  const text = String(value)
+  if (!/[",\n]/.test(text)) return text
+  return `"${text.replace(/"/g, '""')}"`
+}
+
 // ── POST /checkout/subscription ──────────────────────────────────────────
 
 router.post('/checkout/subscription', paymentCheckoutLimiter, requireAuth, async (req, res) => {
@@ -266,7 +273,7 @@ router.get('/subscription/debug', paymentReadLimiter, requireAuth, async (req, r
       envStatus: planFromEnv,
       userId: req.user.userId,
       tableExists,
-      migrationHint: !tableExists ? 'Subscription table does not exist. Run: npx prisma migrate deploy' : null,
+      migrationHint: tableExists ? null : 'Subscription table does not exist. Run: npx prisma migrate deploy',
     })
   } catch (error) {
     res.status(500).json({ error: error.message })
@@ -311,12 +318,49 @@ router.get('/history', paymentReadLimiter, requireAuth, async (req, res) => {
   }
 })
 
+router.get('/history/export', paymentReadLimiter, requireAuth, async (req, res) => {
+  try {
+    const format = String(req.query.format || 'csv').toLowerCase()
+    if (format !== 'csv') {
+      return sendError(res, 400, 'Only csv export is supported.', ERROR_CODES.VALIDATION)
+    }
+
+    const rows = await service.getUserPaymentExportRows(req.user.userId)
+    const header = ['Date', 'Type', 'Status', 'Description', 'Amount', 'Currency', 'Receipt URL']
+    const csvRows = rows.map((row) => [
+      new Date(row.createdAt).toISOString(),
+      row.type,
+      row.status,
+      row.description || '',
+      (Number(row.amount || 0) / 100).toFixed(2),
+      String(row.currency || 'usd').toUpperCase(),
+      row.receiptUrl || '',
+    ])
+
+    const csv = [header, ...csvRows]
+      .map((line) => line.map(escapeCsvValue).join(','))
+      .join('\n')
+
+    const filename = `studyhub-payments-${req.user.userId}-${new Date().toISOString().slice(0, 10)}.csv`
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+    res.send(csv)
+  } catch (error) {
+    captureError(error, { context: 'payments.history.export' })
+    log.error({ err: error }, 'Failed to export payment history')
+    sendError(res, 500, 'Failed to export payment history.', ERROR_CODES.INTERNAL)
+  }
+})
+
 // ── GET /donations/leaderboard ───────────────────────────────────────────
 
 router.get('/donations/leaderboard', paymentReadLimiter, async (_req, res) => {
   try {
-    const leaderboard = await service.getDonationLeaderboard({ limit: 50 })
-    res.json({ donors: leaderboard })
+    const [leaderboard, anonymousSupport] = await Promise.all([
+      service.getDonationLeaderboard({ limit: 50 }),
+      service.getAnonymousDonationSummary(),
+    ])
+    res.json({ donors: leaderboard, anonymousSupport })
   } catch (error) {
     captureError(error, { context: 'payments.leaderboard' })
     log.error({ err: error }, 'Failed to get donation leaderboard')

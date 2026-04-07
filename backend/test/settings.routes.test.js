@@ -89,6 +89,10 @@ const mocks = vi.hoisted(() => {
       unlinkGoogleFromUser: vi.fn(),
       isGoogleOAuthEnabled: vi.fn(() => false),
     },
+    piiVault: {
+      getUserPII: vi.fn(),
+      setUserPII: vi.fn(),
+    },
   }
 })
 
@@ -102,6 +106,7 @@ const mockTargets = new Map([
   [require.resolve('../src/lib/verification/verificationChallenges'), mocks.verification],
   [require.resolve('../src/lib/email/emailValidation'), mocks.emailValidation],
   [require.resolve('../src/lib/googleAuth'), mocks.googleAuth],
+  [require.resolve('../src/lib/piiVault'), mocks.piiVault],
 ])
 
 const originalModuleLoad = Module._load
@@ -141,6 +146,8 @@ beforeEach(() => {
   vi.clearAllMocks()
 
   mocks.verification.getUserActiveChallenge.mockResolvedValue(null)
+  mocks.piiVault.getUserPII.mockResolvedValue(null)
+  mocks.piiVault.setUserPII.mockResolvedValue(undefined)
   mocks.prisma.$transaction.mockImplementation(async (fn) => fn(mocks.prisma))
 })
 
@@ -254,6 +261,101 @@ describe('settings routes', () => {
 
       expect(response.status).toBe(401)
       expect(response.body).toMatchObject({ error: 'Current password is incorrect.' })
+    })
+  })
+
+  describe('PATCH /profile', () => {
+    it('updates public profile metadata and visibility settings', async () => {
+      mocks.prisma.user.findUnique
+        .mockResolvedValueOnce({ id: 42 })
+        .mockResolvedValueOnce({
+          id: 42,
+          username: 'test_user',
+          role: 'student',
+          email: 'test@studyhub.test',
+          emailVerified: true,
+          displayName: 'Study Hero',
+          bio: 'Building better notes every week.',
+          avatarUrl: null,
+          coverImageUrl: null,
+          profileLinks: [{ label: 'Instagram', url: 'https://instagram.com/studyhub' }],
+          isPrivate: false,
+          authProvider: 'local',
+          accountType: 'student',
+          googleId: null,
+          createdAt: new Date('2026-01-01T00:00:00.000Z'),
+          preferences: {
+            profileFieldVisibility: {
+              displayName: 'public',
+              age: 'private',
+              location: 'private',
+              socialLinks: 'public',
+            },
+          },
+          enrollments: [],
+          _count: { studySheets: 5, enrollments: 2 },
+        })
+
+      mocks.prisma.user.update.mockResolvedValue({ id: 42 })
+      mocks.prisma.userPreferences.upsert.mockResolvedValue({ userId: 42 })
+
+      const response = await request(app)
+        .patch('/profile')
+        .send({
+          displayName: 'Study Hero',
+          bio: 'Building better notes every week.',
+          profileLinks: [{ label: 'Instagram', url: 'https://instagram.com/studyhub' }],
+          profileFieldVisibility: {
+            displayName: 'public',
+            age: 'private',
+            location: 'private',
+            socialLinks: 'public',
+          },
+        })
+
+      expect(response.status).toBe(200)
+      expect(mocks.prisma.user.update).toHaveBeenCalledWith({
+        where: { id: 42 },
+        data: {
+          displayName: 'Study Hero',
+          bio: 'Building better notes every week.',
+          profileLinks: [{ label: 'Instagram', url: 'https://instagram.com/studyhub' }],
+        },
+      })
+      expect(mocks.prisma.userPreferences.upsert).toHaveBeenCalledWith({
+        where: { userId: 42 },
+        create: {
+          userId: 42,
+          profileFieldVisibility: {
+            displayName: 'public',
+            age: 'private',
+            location: 'private',
+            socialLinks: 'public',
+          },
+        },
+        update: {
+          profileFieldVisibility: {
+            displayName: 'public',
+            age: 'private',
+            location: 'private',
+            socialLinks: 'public',
+          },
+        },
+      })
+      expect(response.body).toMatchObject({
+        message: 'Profile updated successfully.',
+        user: {
+          displayName: 'Study Hero',
+          bio: 'Building better notes every week.',
+          profileLinks: [{ label: 'Instagram', url: 'https://instagram.com/studyhub' }],
+          profileFieldVisibility: {
+            displayName: 'public',
+            age: 'private',
+            location: 'private',
+            socialLinks: 'public',
+          },
+        },
+      })
     })
   })
 

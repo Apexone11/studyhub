@@ -240,6 +240,7 @@ export default function SettingsPage() {
             <ProfileTab
               user={user}
               sessionUser={sessionUser}
+              onUserChange={syncUser}
               onAvatarChange={(url) => {
                 setUser((u) => (u ? { ...u, avatarUrl: url } : u))
                 setSessionUser((u) => (u ? { ...u, avatarUrl: url } : u))

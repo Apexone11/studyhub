@@ -75,6 +75,7 @@ export default function SupportersPage() {
 
   const [searchParams, setSearchParams] = useSearchParams()
   const [donors, setDonors] = useState([])
+  const [anonymousSupport, setAnonymousSupport] = useState({ donorCount: 0, totalAmount: 0 })
   const [subscribers, setSubscribers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -104,6 +105,7 @@ export default function SupportersPage() {
           if (donorsRes.ok) {
             const d = await donorsRes.json()
             setDonors(d.donors || [])
+            setAnonymousSupport(d.anonymousSupport || { donorCount: 0, totalAmount: 0 })
           }
           if (subsRes.ok) {
             const s = await subsRes.json()
@@ -132,7 +134,7 @@ export default function SupportersPage() {
       {paymentStatus === 'success' && (
         <div style={s.successBanner}>
           Thank you for your donation! Your support helps keep StudyHub free for students
-          everywhere.
+          everywhere. Anonymous donations stay private and are counted in the community total.
         </div>
       )}
 
@@ -184,11 +186,44 @@ export default function SupportersPage() {
                 These generous individuals have donated to help keep StudyHub free for students.
               </p>
 
-              {donors.length === 0 ? (
+              {anonymousSupport.donorCount > 0 && (
+                <div style={{
+                  marginBottom: 20,
+                  padding: '16px 18px',
+                  borderRadius: 18,
+                  border: '1px solid var(--sh-border)',
+                  background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.04), rgba(14, 165, 233, 0.08))',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                }}>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--sh-muted)', marginBottom: 4 }}>
+                      Anonymous Support
+                    </div>
+                    <div style={{ fontSize: 15, color: 'var(--sh-text)', lineHeight: 1.5 }}>
+                      {anonymousSupport.donorCount} {anonymousSupport.donorCount === 1 ? 'supporter has' : 'supporters have'} chosen to stay private.
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--sh-heading)' }}>
+                    ${(anonymousSupport.totalAmount / 100).toFixed(2)}
+                  </div>
+                </div>
+              )}
+
+              {donors.length === 0 && anonymousSupport.donorCount === 0 ? (
                 <EmptyState
                   message="No donations yet. Be the first to support StudyHub!"
                   ctaTo="/pricing"
                   ctaLabel="Donate Now"
+                />
+              ) : donors.length === 0 ? (
+                <EmptyState
+                  message="Support is already coming in, but every donor so far chose to stay anonymous."
+                  ctaTo="/pricing#donate"
+                  ctaLabel="Join In"
                 />
               ) : (
                 <div style={s.leaderboardGrid}>

@@ -102,6 +102,7 @@ const mocks = vi.hoisted(() => {
     email: {
       sendSubscriptionWelcome: vi.fn(),
       sendDonationThankYou: vi.fn(),
+      sendPaymentReceipt: vi.fn(),
     },
     notify: {
       createNotification: vi.fn(),
@@ -360,7 +361,7 @@ describe('payments.service — Webhook Handlers', () => {
   })
 
   describe('handleCheckoutCompleted() — donation', () => {
-    it('updates donation record as completed', async () => {
+    it('updates donation record as completed and creates a payment-history row', async () => {
       const session = {
         id: 'sess_123',
         payment_intent: 'pi_123',
@@ -374,6 +375,14 @@ describe('payments.service — Webhook Handlers', () => {
       }
 
       mocks.prisma.donation.updateMany.mockResolvedValue({ count: 1 })
+      mocks.prisma.donation.findUnique.mockResolvedValue({
+        userId: 42,
+        amount: 5000,
+        currency: 'usd',
+        donorMessage: 'Great work!',
+        anonymous: false,
+      })
+      mocks.prisma.payment.findUnique.mockResolvedValue(null)
       mocks.prisma.user.findUnique.mockResolvedValue({
         id: 42,
         email: 'donor@test.com',
@@ -391,6 +400,18 @@ describe('payments.service — Webhook Handlers', () => {
           },
         })
       )
+      expect(mocks.prisma.payment.create).toHaveBeenCalledWith({
+        data: {
+          userId: 42,
+          amount: 5000,
+          currency: 'usd',
+          status: 'succeeded',
+          description: 'StudyHub donation',
+          receiptUrl: null,
+          stripePaymentIntentId: 'pi_123',
+          type: 'donation',
+        },
+      })
     })
 
     it('handles anonymous donation without email/notification', async () => {
@@ -619,6 +640,38 @@ describe('payments.service — Webhook Handlers', () => {
       await paymentsService.handleInvoicePaymentSucceeded(invoice)
 
       expect(mocks.prisma.payment.create).not.toHaveBeenCalled()
+    })
+
+    it('emails a receipt when the customer has an account email', async () => {
+      const invoice = {
+        id: 'inv_456',
+        customer: 'cus_456',
+        amount_paid: 499,
+        currency: 'usd',
+        payment_intent: 'pi_456',
+        hosted_invoice_url: 'https://stripe.com/invoice/456',
+        lines: { data: [{ description: 'Pro Plan — Monthly' }] },
+      }
+
+      mocks.prisma.subscription.findFirst.mockResolvedValue({ id: 'sub_rec_456', userId: 42 })
+      mocks.prisma.payment.findUnique.mockResolvedValue(null)
+      mocks.prisma.payment.create.mockResolvedValue({ id: 'pay_456' })
+      mocks.prisma.user.findUnique.mockResolvedValue({
+        email: 'member@test.com',
+        username: 'member42',
+      })
+
+      await paymentsService.handleInvoicePaymentSucceeded(invoice)
+
+      expect(mocks.email.sendPaymentReceipt).toHaveBeenCalledWith(
+        expect.objectContaining({
+          toEmail: 'member@test.com',
+          username: 'member42',
+          amountCents: 499,
+          description: 'Pro Plan — Monthly',
+          receiptUrl: 'https://stripe.com/invoice/456',
+        })
+      )
     })
   })
 

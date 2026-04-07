@@ -4,6 +4,25 @@
 
 ## Date: 2026-04-07
 
+### Profile Privacy, Supporter Receipts, and Payment History Export
+
+**Profiles now support richer public metadata with tighter privacy controls**
+- Added migration-backed profile fields for `displayName`, `bio`, labeled social links, and per-field visibility preferences so users can manage more than just avatar and cover state from Settings
+- Added a dedicated settings profile update route that validates profile metadata, persists public fields in the core user record, and routes sensitive age/location storage through the existing encrypted PII vault with an explicit AWS KMS readiness check
+- Updated the profile page so bios, display names, social links, and optional location/age surface when allowed, while private accounts now keep the requested limited-preview behavior by still showing the profile description before access is granted
+
+**Payments now expose clearer donor privacy and better receipt/history flows**
+- Donation completion now writes a payment-history record for authenticated donors, sends thank-you mail, and keeps anonymous donations off the public leaderboard while still aggregating them into a separate anonymous-support total
+- Added payment receipt email delivery for successful subscription invoices and surfaced payment-history CSV export from Settings so users can download their transaction history directly
+- Updated Pricing and Supporters copy so anonymous-donation behavior is explicit: private donors stay hidden from the named supporter list, but their contribution still counts toward the community total
+
+**Validation**
+- `Set-Location -LiteralPath backend; npm test -- test/settings.routes.test.js test/payments.test.js`: passes (63 tests)
+- `Set-Location -LiteralPath backend; npx eslint src/lib/profileMetadata.js src/modules/settings/settings.service.js src/modules/settings/settings.account.controller.js src/modules/users/users.controller.js src/lib/email/emailTemplates.js src/lib/email/email.js src/modules/payments/payments.service.js src/modules/payments/payments.routes.js test/settings.routes.test.js test/payments.test.js`: passes
+- `Set-Location -LiteralPath backend; npx prisma validate`: passes
+- `Set-Location -LiteralPath frontend/studyhub-app; npx eslint src/pages/settings/SettingsPage.jsx src/pages/settings/ProfileTab.jsx src/pages/profile/UserProfilePage.jsx src/pages/settings/SubscriptionTab.jsx src/pages/supporters/SupportersPage.jsx src/pages/pricing/PricingPage.jsx`: passes
+- `npm --prefix frontend/studyhub-app run build`: passes
+
 ### PR #195 Review Fixes for Auth and Middleware Hardening
 
 **Auth and request-context handling now match the active session contract more closely**

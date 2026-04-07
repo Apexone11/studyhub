@@ -22,8 +22,11 @@ model User {
   emailVerificationExpiry DateTime?
   failedAttempts          Int       @default(0)
   lockedUntil             DateTime?
+  displayName             String?
+  bio                     String?   @db.VarChar(500)
   avatarUrl               String?
   coverImageUrl           String?
+  profileLinks            Json      @default("[]")
   twoFaEnabled            Boolean   @default(false)
   twoFaCode               String?
   twoFaExpiry             DateTime?
@@ -708,6 +711,7 @@ model UserPreferences {
   emailContributions   Boolean @default(true)
   inAppNotifications   Boolean @default(true)
   profileVisibility    String  @default("public")
+  profileFieldVisibility Json   @default("{}")
   defaultDownloads     Boolean @default(true)
   defaultContributions Boolean @default(true)
   theme                String  @default("system")

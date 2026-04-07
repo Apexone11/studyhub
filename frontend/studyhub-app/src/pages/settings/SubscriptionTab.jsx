@@ -132,6 +132,7 @@ export default function SubscriptionTab() {
   const [portalLoading, setPortalLoading] = useState(false)
   const [cancelLoading, setCancelLoading] = useState(false)
   const [reactivateLoading, setReactivateLoading] = useState(false)
+  const [exportLoading, setExportLoading] = useState(false)
   const [showConfirmCancel, setShowConfirmCancel] = useState(false)
   const [syncMsg, setSyncMsg] = useState(null)
   const [syncLoading, setSyncLoading] = useState(false)
@@ -318,6 +319,34 @@ export default function SubscriptionTab() {
     }
   }
 
+  async function handleExportHistory() {
+    setExportLoading(true)
+    setError('')
+    try {
+      const res = await fetch(`${API}/api/payments/history/export`, {
+        credentials: 'include',
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setError(data.error || 'Could not download payment history.')
+        return
+      }
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'studyhub-payment-history.csv'
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+    } catch {
+      setError('Network error while downloading payment history.')
+    } finally {
+      setExportLoading(false)
+    }
+  }
+
   /* ── History pagination ────────────────────────────────────────── */
 
   function handleHistoryPage(page) {
@@ -459,6 +488,14 @@ export default function SubscriptionTab() {
 
       {/* Section 4: Payment History */}
       <SectionCard title="Payment History" subtitle="Your recent transactions and receipts.">
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 14 }}>
+          <div style={{ fontSize: 12, color: 'var(--sh-muted)', lineHeight: 1.6 }}>
+            Download a CSV copy of your payment history. Receipt emails are also sent automatically for successful charges.
+          </div>
+          <Button secondary onClick={handleExportHistory} disabled={exportLoading || payments.length === 0}>
+            {exportLoading ? 'Preparing...' : 'Download CSV'}
+          </Button>
+        </div>
         {payments.length === 0 ? (
           <div style={{ fontSize: 13, color: 'var(--sh-muted)', padding: '12px 0' }}>
             No payments yet.
