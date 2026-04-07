@@ -203,7 +203,7 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, onMute, o
 
   return (
     <div
-      style={{ position: 'relative' }}
+      style={{ position: 'relative', padding: '0 14px 10px' }}
       role="listitem"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -212,22 +212,32 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, onMute, o
         onClick={onClick}
         style={{
           width: '100%',
-          padding: '12px 12px',
-          background: isActive ? 'var(--sh-brand-soft)' : 'transparent',
-          border: 'none',
-          borderLeft: isActive ? '3px solid var(--sh-brand)' : '3px solid transparent',
+          padding: '14px 14px',
+          background: isActive ? 'linear-gradient(135deg, rgba(37, 99, 235, 0.14), rgba(124, 58, 237, 0.1))' : 'var(--sh-surface)',
+          border: isActive ? '1px solid var(--sh-brand-border)' : '1px solid var(--sh-border)',
+          borderLeft: 'none',
+          borderRadius: 18,
           cursor: 'pointer',
           display: 'flex',
           gap: 10,
           alignItems: 'flex-start',
           fontFamily: PAGE_FONT,
-          transition: 'background 0.15s',
+          boxShadow: isActive ? '0 16px 32px rgba(37, 99, 235, 0.08)' : 'var(--shadow-sm)',
+          transition: 'background 0.15s, border-color 0.15s, transform 0.15s, box-shadow 0.15s',
         }}
         onMouseEnter={(e) => {
-          if (!isActive) e.currentTarget.style.background = 'var(--sh-soft)'
+          if (!isActive) {
+            e.currentTarget.style.background = 'var(--sh-soft)'
+            e.currentTarget.style.borderColor = 'var(--sh-border-strong)'
+            e.currentTarget.style.transform = 'translateY(-1px)'
+          }
         }}
         onMouseLeave={(e) => {
-          if (!isActive) e.currentTarget.style.background = 'transparent'
+          if (!isActive) {
+            e.currentTarget.style.background = 'var(--sh-surface)'
+            e.currentTarget.style.borderColor = 'var(--sh-border)'
+            e.currentTarget.style.transform = 'translateY(0)'
+          }
         }}
       >
         <div style={{ position: 'relative', flexShrink: 0 }}>
@@ -307,8 +317,8 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, onMute, o
             padding: '2px 4px',
             cursor: 'pointer',
             color: 'var(--sh-muted)',
-            borderRadius: 4,
-            background: 'none',
+            borderRadius: 999,
+            background: showMenu ? 'var(--sh-soft)' : 'transparent',
             border: 'none',
             opacity: hovered || showMenu ? 1 : 0,
             transition: 'opacity 0.15s',
@@ -323,14 +333,14 @@ function ConversationItem({ conversation, isActive, onClick, onDelete, onMute, o
           ref={menuRef}
           style={{
             position: 'absolute',
-            top: 8,
-            right: 8,
+            top: 12,
+            right: 24,
             background: 'var(--sh-surface)',
             border: '1px solid var(--sh-border)',
-            borderRadius: 8,
-            boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+            borderRadius: 12,
+            boxShadow: '0 18px 36px rgba(15, 23, 42, 0.16)',
             zIndex: 100,
-            padding: 4,
+            padding: 6,
             minWidth: 160,
           }}
         >
@@ -437,8 +447,8 @@ export function ConversationList({
   /* ── Requests view ──────────────────────────────────────────── */
   if (view === 'requests') {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-        <div style={{ padding: 16, borderBottom: '1px solid var(--sh-border)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--sh-bg)' }}>
+        <div style={{ padding: 18, borderBottom: '1px solid var(--sh-border)', display: 'grid', gap: 10, background: 'linear-gradient(180deg, rgba(37, 99, 235, 0.06), transparent)' }}>
           <button
             onClick={() => setView('main')}
             style={{
@@ -450,9 +460,12 @@ export function ConversationList({
           >
             <BackArrowIcon /> Back to Messages
           </button>
-          <h2 style={{ fontSize: 16, fontWeight: 800, color: 'var(--sh-heading)', margin: 0 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--sh-heading)', margin: 0 }}>
             Message Requests
           </h2>
+          <p style={{ margin: 0, fontSize: 12, lineHeight: 1.6, color: 'var(--sh-muted)' }}>
+            Review who wants to start a conversation before they enter your main inbox.
+          </p>
         </div>
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {messageRequests.length === 0 ? (
@@ -478,8 +491,8 @@ export function ConversationList({
   /* ── Archived view ──────────────────────────────────────────── */
   if (view === 'archived') {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-        <div style={{ padding: 16, borderBottom: '1px solid var(--sh-border)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--sh-bg)' }}>
+        <div style={{ padding: 18, borderBottom: '1px solid var(--sh-border)', display: 'grid', gap: 10, background: 'linear-gradient(180deg, rgba(15, 23, 42, 0.04), transparent)' }}>
           <button
             onClick={() => setView('main')}
             style={{
@@ -491,9 +504,12 @@ export function ConversationList({
           >
             <BackArrowIcon /> Back to Messages
           </button>
-          <h2 style={{ fontSize: 16, fontWeight: 800, color: 'var(--sh-heading)', margin: 0 }}>
+          <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--sh-heading)', margin: 0 }}>
             Archived
           </h2>
+          <p style={{ margin: 0, fontSize: 12, lineHeight: 1.6, color: 'var(--sh-muted)' }}>
+            Bring older threads back whenever you need the context again.
+          </p>
         </div>
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {archivedConversations.length === 0 ? (
@@ -517,27 +533,35 @@ export function ConversationList({
 
   /* ── Main conversation list view ────────────────────────────── */
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ padding: 16, borderBottom: '1px solid var(--sh-border)' }}>
-        <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--sh-heading)', marginBottom: 12 }}>Messages</h2>
-        <button
-          onClick={onNewClick}
-          style={{
-            width: '100%',
-            padding: '8px 16px',
-            background: 'var(--sh-brand)',
-            color: 'var(--sh-surface)',
-            border: 'none',
-            borderRadius: 'var(--radius-control)',
-            fontSize: 13,
-            fontWeight: 700,
-            cursor: 'pointer',
-            fontFamily: PAGE_FONT,
-          }}
-          aria-label="Start new conversation"
-        >
-          New
-        </button>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--sh-bg)' }}>
+      <div style={{ padding: 18, borderBottom: '1px solid var(--sh-border)', display: 'grid', gap: 12, background: 'linear-gradient(180deg, rgba(37, 99, 235, 0.06), transparent)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+          <div>
+            <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--sh-heading)', margin: 0 }}>Messages</h2>
+            <p style={{ margin: '4px 0 0', fontSize: 12, lineHeight: 1.6, color: 'var(--sh-muted)' }}>
+              Jump between DMs, groups, requests, and archived threads from one place.
+            </p>
+          </div>
+          <button
+            onClick={onNewClick}
+            style={{
+              padding: '10px 16px',
+              background: 'linear-gradient(135deg, var(--sh-brand), var(--sh-brand-hover))',
+              color: 'var(--sh-surface)',
+              border: 'none',
+              borderRadius: 999,
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: 'pointer',
+              fontFamily: PAGE_FONT,
+              boxShadow: '0 12px 24px rgba(37, 99, 235, 0.18)',
+              whiteSpace: 'nowrap',
+            }}
+            aria-label="Start new conversation"
+          >
+            New Chat
+          </button>
+        </div>
         <input
           type="text"
           placeholder="Search conversations..."
@@ -545,51 +569,66 @@ export function ConversationList({
           onChange={(e) => setSearchQuery(e.target.value)}
           style={{
             width: '100%',
-            marginTop: 10,
-            padding: '8px 12px',
+            padding: '10px 12px',
             background: 'var(--sh-input-bg)',
             color: 'var(--sh-input-text)',
             border: '1px solid var(--sh-input-border)',
-            borderRadius: 'var(--radius-control)',
+            borderRadius: 14,
             fontSize: 13,
             fontFamily: PAGE_FONT,
           }}
           aria-label="Search conversations"
         />
-      </div>
 
-      {/* Message Requests banner */}
-      {totalPending > 0 && (
-        <button
-          onClick={() => setView('requests')}
-          style={{
-            width: '100%',
-            padding: '10px 16px',
-            background: 'var(--sh-info-bg)',
-            border: 'none',
-            borderBottom: '1px solid var(--sh-info-border)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            fontFamily: PAGE_FONT,
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--sh-brand-soft)' }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--sh-info-bg)' }}
-        >
-          <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--sh-info-text)' }}>
-            Message Requests
-          </span>
-          <span style={{
-            minWidth: 20, height: 20, borderRadius: 99,
-            background: 'var(--sh-brand)', color: '#fff',
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 11, fontWeight: 700, padding: '0 6px',
-          }}>
-            {totalPending > 99 ? '99+' : totalPending}
-          </span>
-        </button>
-      )}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => totalPending > 0 && setView('requests')}
+            disabled={totalPending === 0}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '8px 12px',
+              borderRadius: 999,
+              border: '1px solid var(--sh-border)',
+              background: totalPending > 0 ? 'var(--sh-info-bg)' : 'var(--sh-surface)',
+              color: totalPending > 0 ? 'var(--sh-info-text)' : 'var(--sh-muted)',
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: totalPending > 0 ? 'pointer' : 'default',
+              fontFamily: PAGE_FONT,
+            }}
+          >
+            Requests
+            <span style={{ minWidth: 20, height: 20, borderRadius: 99, background: totalPending > 0 ? 'var(--sh-brand)' : 'var(--sh-soft)', color: totalPending > 0 ? '#fff' : 'var(--sh-muted)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, padding: '0 6px' }}>
+              {totalPending}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => archivedCount > 0 && setView('archived')}
+            disabled={archivedCount === 0}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '8px 12px',
+              borderRadius: 999,
+              border: '1px solid var(--sh-border)',
+              background: 'var(--sh-surface)',
+              color: archivedCount > 0 ? 'var(--sh-text)' : 'var(--sh-muted)',
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: archivedCount > 0 ? 'pointer' : 'default',
+              fontFamily: PAGE_FONT,
+            }}
+          >
+            <ArchiveIcon /> Archived ({archivedCount})
+          </button>
+        </div>
+      </div>
 
       {loading ? (
         <div style={{ padding: 24, textAlign: 'center', color: 'var(--sh-muted)', fontSize: 13 }}>
@@ -600,7 +639,7 @@ export function ConversationList({
           {conversations.length === 0 ? 'No conversations yet. Start a chat!' : 'No conversations match your search.'}
         </div>
       ) : (
-        <div style={{ flex: 1, overflowY: 'auto' }} role="list">
+        <div style={{ flex: 1, overflowY: 'auto', paddingTop: 12 }} role="list">
           {filtered.map((conv) => (
             <ConversationItem
               key={conv.id}
@@ -615,34 +654,6 @@ export function ConversationList({
             />
           ))}
         </div>
-      )}
-
-      {/* Archived link at bottom */}
-      {archivedCount > 0 && (
-        <button
-          onClick={() => setView('archived')}
-          style={{
-            width: '100%',
-            padding: '12px 16px',
-            background: 'transparent',
-            border: 'none',
-            borderTop: '1px solid var(--sh-border)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 6,
-            fontFamily: PAGE_FONT,
-            color: 'var(--sh-muted)',
-            fontSize: 13,
-            fontWeight: 600,
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--sh-brand)' }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--sh-muted)' }}
-        >
-          <ArchiveIcon />
-          Archived ({archivedCount})
-        </button>
       )}
     </div>
   )

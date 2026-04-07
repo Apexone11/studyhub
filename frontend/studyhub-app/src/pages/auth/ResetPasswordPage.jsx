@@ -49,7 +49,7 @@ function ResetPasswordPage() {
   }
 
   return (
-    <div className="sh-public-page sh-public-page--auth" style={styles.page}>
+    <div style={styles.page}>
       <Navbar variant="landing" />
       <div style={styles.center}>
         <div style={styles.card}>

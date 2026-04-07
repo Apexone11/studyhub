@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import UserAvatar from '../../../components/UserAvatar'
 import {
   IconCheck,
   IconDownload,
@@ -86,25 +87,39 @@ export default function SheetViewerSidebar({ sheet, canEdit, previewKind, attach
     <aside style={{ display: 'grid', gap: 16 }}>
       <section style={panelStyle()}>
         <h2 style={{ margin: '0 0 10px', fontSize: 15, color: 'var(--sh-heading)' }}>About</h2>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{
-            width: 32, height: 32, borderRadius: '50%',
-            background: 'var(--sh-avatar-bg)', color: 'var(--sh-avatar-text)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 13, fontWeight: 800, textTransform: 'uppercase', flexShrink: 0,
-          }}>
-            {(sheet.author?.username || '?')[0]}
-          </div>
-          <div>
+        <div style={{ display: 'grid', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <UserAvatar
+              username={sheet.author?.username}
+              avatarUrl={sheet.author?.avatarUrl}
+              role={sheet.author?.role}
+              plan={sheet.author?.plan}
+              isDonor={sheet.author?.isDonor}
+              donorLevel={sheet.author?.donorLevel}
+              size={40}
+            />
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <Link to={`/users/${sheet.author?.username}`} style={{ fontSize: 13, fontWeight: 700, color: 'var(--sh-heading)', textDecoration: 'none' }}>
-                {sheet.author?.username || 'Unknown'}
-              </Link>
-              <VerificationBadge user={sheet.author} size={13} />
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--sh-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 2 }}>
+                  Created by
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <Link to={`/users/${sheet.author?.username}`} style={{ fontSize: 13, fontWeight: 700, color: 'var(--sh-heading)', textDecoration: 'none' }}>
+                    {sheet.author?.username || 'Unknown'}
+                  </Link>
+                  <VerificationBadge user={sheet.author} size={13} />
+                </div>
+                {sheet.course?.code && (
+                  <div style={{ fontSize: 11, color: 'var(--sh-muted)', marginTop: 2 }}>
+                    {sheet.course.code}{sheet.course.school?.short ? ` \u2022 ${sheet.course.school.short}` : ''}
+                  </div>
+                )}
+              </div>
             </div>
-            {sheet.course?.code && (
-              <div style={{ fontSize: 11, color: 'var(--sh-muted)' }}>{sheet.course.code}{sheet.course.school?.short ? ` \u2022 ${sheet.course.school.short}` : ''}</div>
-            )}
+          </div>
+
+          <div style={{ fontSize: 12, color: 'var(--sh-subtext)', lineHeight: 1.7 }}>
+            Review the sheet details, preview attachments, and jump into version history without leaving the viewer.
           </div>
         </div>
       </section>

@@ -71,6 +71,7 @@ A new top-level page at `/library` where users can browse, search, and read publ
 #### 2.3.1 Library Main Page (`/library`)
 
 **Layout:**
+
 - Hero section with search bar and category quick-filters (Fiction, Science, History, Philosophy, etc.).
 - Three tabbed sections: "Discover" (trending/popular), "My Bookshelf" (saved/bookmarked/downloaded), "Recently Read."
 - Book grid with cover image, title, author, and download count.
@@ -78,6 +79,7 @@ A new top-level page at `/library` where users can browse, search, and read publ
 - Sidebar filters: language, subject, author, year range, sort by (popular, newest, title A-Z).
 
 **What makes it unique:**
+
 - "Study Shelf" concept -- users can organize books into custom shelves (e.g., "HIST 101 Reading List," "Philosophy Electives").
 - Course-linked recommendations: if a user is enrolled in a History course, suggest relevant public domain history texts.
 - Community reading stats: "247 StudyHub students are reading this book" social proof badges.
@@ -86,6 +88,7 @@ A new top-level page at `/library` where users can browse, search, and read publ
 #### 2.3.2 Book Detail Page (`/library/:gutenbergId`)
 
 **Layout:**
+
 - Large, high-quality cover image (Open Library L-size or Gutendex JPEG).
 - Full metadata panel: title, author(s) with birth/death years, subjects, bookshelves, language, download count, Project Gutenberg ID, copyright status.
 - Book summary section (pulled from Open Library description field, or Gutendex subjects as fallback).

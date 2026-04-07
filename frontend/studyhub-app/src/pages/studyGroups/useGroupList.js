@@ -71,9 +71,10 @@ export function useGroupList() {
         body: JSON.stringify(groupData),
       });
 
-      if (!response.ok) throw new Error('Failed to create group');
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data?.error || 'Failed to create group')
 
-      const newGroup = await response.json();
+      const newGroup = data;
       setGroups((prev) => [newGroup, ...prev]);
       showToast('Study group created successfully', 'success');
       return newGroup;

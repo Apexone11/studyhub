@@ -4,22 +4,34 @@
 
 ### Dark-Mode Public Surface Polish and Live Visual Smoke Coverage
 
-**Home-linked public pages now carry the enhanced dark presentation, while private app pages stay cleaner**
-- Scoped the stronger dark-mode FX back to the home-connected public routes only, so landing, auth, pricing, supporters, and legal pages keep the atmospheric treatment while feed and the rest of the signed-in product no longer inherit it
-- Kept the shared public-page shell for login, register, forgot/reset password, pricing, supporters, and legal pages so those surfaces still feel cohesive, readable, and visually integrated without forcing the same treatment onto authorized pages
-- Toned down Pricing by replacing the louder purple-heavy emphasis with the app's primary blue, quieter panel surfaces, and subtler dark section bands so the page feels premium without overpowering the rest of the UI
+**Only the homepage and selected public information pages now carry the enhanced dark presentation**
+- Scoped the stronger dark-mode FX to the exact pages intended for the redesign: `/`, `/about`, `/terms`, `/privacy`, and `/guidelines`
+- Removed the overscoped dark-mode treatment from feed, the rest of the authenticated app shell, and unrelated public pages so those routes keep their existing dark-mode presentation instead of inheriting the new ambient look
+- Narrowed the final regression coverage to the same exact page list so future dark-mode checks protect only the homepage and selected legal/about surfaces
 
 **Live localhost dark-mode regression checks are now committed**
-- Added `frontend/studyhub-app/tests/dark-mode.beta-live.spec.js`, a Playwright beta-live snapshot suite that boots dark mode the same way as the successful localhost capture flow, disables tutorials, hides transient UI like the service-worker update banner, waits for legal documents to finish loading, and snapshots the home-connected public surfaces only
+- Added `frontend/studyhub-app/tests/dark-mode.beta-live.spec.js`, a Playwright beta-live snapshot suite that boots dark mode the same way as the successful localhost capture flow, disables tutorials, hides transient UI like the service-worker update banner, waits for legal documents to finish loading, and snapshots only the homepage hero/CTA plus the About, Terms, Privacy, and Guidelines pages
 - Added dedicated frontend scripts for the new pass so the live dark visual check can be run directly with `test:e2e:dark:beta`, regenerated intentionally with `test:e2e:dark:beta:update`, or invoked under the visual alias `visual:dark:beta`
 - Because the new spec uses the existing beta-live naming/config pattern, it is also picked up automatically by the repo's broader beta validation workflow
 
 **Validation**
 - Editor diagnostics for `frontend/studyhub-app/src/index.css`: no new errors; existing browser-support warnings only
-- `Set-Location frontend/studyhub-app; npx eslint src/App.jsx tests/dark-mode.beta-live.spec.js`: passes
+- `Set-Location frontend/studyhub-app; npx eslint src/App.jsx src/pages/auth/LoginPage.jsx src/pages/auth/RegisterScreen.jsx src/pages/auth/ForgotPasswordPage.jsx src/pages/auth/ResetPasswordPage.jsx src/pages/pricing/PricingPage.jsx tests/dark-mode.beta-live.spec.js`: passes
 - `Set-Location frontend/studyhub-app; npm run build`: passes
-- `Set-Location frontend/studyhub-app; npm run test:e2e:dark:beta:update`: passes (1 test, public surfaces)
-- `Set-Location frontend/studyhub-app; npm run test:e2e:dark:beta`: passes (1 test, public surfaces)
+- `Set-Location frontend/studyhub-app; npm run test:e2e:dark:beta:update`: passes (1 test, homepage/about/legal surfaces)
+- `Set-Location frontend/studyhub-app; npm run test:e2e:dark:beta`: passes (1 test, homepage/about/legal surfaces)
+
+### Home Hero and CTA Backdrop Continuity
+
+**Homepage dark backgrounds now share the same atmosphere instead of breaking into a flat slab**
+- Added a dedicated homepage backdrop token and applied it to both the hero and bottom CTA so the dark-mode landing page keeps the same blue-violet atmosphere across both snapshots instead of dropping the CTA into a separate charcoal block
+- Moved the homepage backdrop to a fixed canvas on the page shell, which keeps the visual field stable behind the landing experience while lighter middle sections and the footer continue to use their own explicit surfaces
+
+**Validation**
+- Editor diagnostics for `frontend/studyhub-app/src/index.css`: no new errors; existing browser-support warnings only
+- `Set-Location frontend/studyhub-app; npm run build`: passes
+- `Set-Location frontend/studyhub-app; npm run test:e2e:dark:beta:update`: passes (1 test, refreshed homepage/about/legal baselines)
+- `Set-Location frontend/studyhub-app; npm run test:e2e:dark:beta`: passes (1 test)
 
 ### Beta Stack Runtime Hardening and Live Study-Group Verification
 

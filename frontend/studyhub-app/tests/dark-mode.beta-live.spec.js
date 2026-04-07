@@ -6,42 +6,22 @@ const VIEWPORT = { width: 1365, height: 900 }
 
 const PUBLIC_SURFACES = [
   {
-    route: '/login',
-    snapshot: 'dark-public-login.png',
-    ready: (page) => page.getByRole('button', { name: 'Sign In', exact: true }),
+    route: '/',
+    snapshot: 'dark-public-home-hero.png',
+    ready: (page) => page.getByRole('heading', { name: /The GitHub of/i }),
   },
   {
-    route: '/register',
-    snapshot: 'dark-public-register.png',
-    ready: (page) => page.getByRole('button', { name: 'Create Account' }),
-  },
-  {
-    route: '/forgot-password',
-    snapshot: 'dark-public-forgot-password.png',
-    ready: (page) => page.getByRole('button', { name: 'Send Reset Link' }),
-  },
-  {
-    route: '/reset-password?token=beta-reset-token',
-    snapshot: 'dark-public-reset-password.png',
-    ready: (page) => page.getByRole('button', { name: 'Set New Password' }),
-  },
-  {
-    route: '/pricing',
-    snapshot: 'dark-public-pricing-top.png',
-    ready: (page) => page.getByRole('heading', { name: 'StudyHub Pro' }),
-  },
-  {
-    route: '/pricing',
-    snapshot: 'dark-public-pricing-donation.png',
-    ready: (page) => page.getByRole('heading', { name: 'Support StudyHub' }),
+    route: '/',
+    snapshot: 'dark-public-home-cta.png',
+    ready: (page) => page.getByRole('heading', { name: /The GitHub of/i }),
     beforeCapture: async (page) => {
-      await page.getByRole('heading', { name: 'Support StudyHub' }).scrollIntoViewIfNeeded()
+      await page.getByRole('heading', { name: 'Ready to Study Smarter?' }).scrollIntoViewIfNeeded()
     },
   },
   {
-    route: '/supporters',
-    snapshot: 'dark-public-supporters.png',
-    ready: (page) => page.getByRole('heading', { name: 'Our Supporters' }),
+    route: '/about',
+    snapshot: 'dark-public-about.png',
+    ready: (page) => page.getByRole('heading', { name: /Built by Students/i }),
   },
   {
     route: '/terms',

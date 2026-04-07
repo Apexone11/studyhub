@@ -136,7 +136,7 @@ export default function LoginPage() {
 
   /* ── Render ────────────────────────────────────────────────────────── */
   return (
-    <div className="login-page sh-public-page sh-public-page--auth">
+    <div className="login-page">
       <Navbar variant="landing" />
 
       {/* Decorative background orbs */}

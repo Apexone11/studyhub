@@ -21,15 +21,59 @@
   grid-template-columns: minmax(220px, 250px) minmax(0, 1fr) minmax(260px, 300px);
 }
 
+.feed-page__main {
+  min-width: 0;
+}
+
+.feed-page__toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.feed-page__filters {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  flex: 1 1 440px;
+  min-width: 0;
+}
+
+.feed-page__search {
+  width: min(100%, 260px);
+  min-width: 220px;
+}
+
 @media (min-width: 768px) and (max-width: 1179px) {
   .app-three-col-grid {
     grid-template-columns: auto minmax(0, 1fr) minmax(240px, 280px);
+  }
+
+  .feed-page__toolbar {
+    align-items: stretch;
+  }
+
+  .feed-page__search {
+    width: 100%;
   }
 }
 
 @media (max-width: 767px) {
   .app-three-col-grid {
     grid-template-columns: 1fr;
+  }
+
+  .feed-page__toolbar,
+  .feed-page__filters {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .feed-page__search {
+    width: 100%;
+    min-width: 0;
   }
 
   /* On phone, right-side panels collapse into a toggleable section */

@@ -127,19 +127,10 @@ const ROUTE_TITLES = {
 
 const HOME_CONNECTED_FX_ROUTES = new Set([
   '/',
-  '/login',
-  '/register',
   '/terms',
   '/privacy',
   '/guidelines',
-  '/cookies',
-  '/disclaimer',
-  '/data-request',
   '/about',
-  '/pricing',
-  '/supporters',
-  '/forgot-password',
-  '/reset-password',
 ])
 
 function RouteVisualScope({ children }) {

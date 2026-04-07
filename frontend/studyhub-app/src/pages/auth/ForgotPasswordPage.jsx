@@ -31,7 +31,7 @@ function ForgotPasswordPage() {
   }
 
   return (
-    <div className="forgot-page sh-public-page sh-public-page--auth">
+    <div className="forgot-page">
       <Navbar variant="landing" />
       <div className="forgot-center">
         <div className="forgot-card">

@@ -99,7 +99,7 @@ async function listGroups(req, res) {
  */
 async function createGroup(req, res) {
   try {
-    const { name, description = '', courseId, privacy = 'public' } = req.body
+    const { name, description = '', courseId, privacy = 'public', avatarUrl } = req.body
 
     // Validate name
     const validName = validateGroupName(name)
@@ -159,6 +159,7 @@ async function createGroup(req, res) {
       data: {
         name: validName,
         description: validDesc,
+        avatarUrl: typeof avatarUrl === 'string' && avatarUrl.trim() ? avatarUrl.trim() : null,
         courseId: courseIdNum,
         privacy,
         createdById: req.user.userId,
@@ -259,7 +260,7 @@ async function updateGroup(req, res) {
     }
 
     if (avatarUrl !== undefined) {
-      updates.avatarUrl = avatarUrl
+      updates.avatarUrl = typeof avatarUrl === 'string' && avatarUrl.trim() ? avatarUrl.trim() : null
     }
 
     if (privacy !== undefined) {

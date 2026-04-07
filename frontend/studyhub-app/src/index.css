@@ -220,6 +220,8 @@
   --sh-home-hero-orb-violet: rgba(139, 92, 246, 0.1);
   --sh-home-hero-orb-green: rgba(16, 185, 129, 0.08);
   --sh-home-tree-glow: radial-gradient(circle, rgba(96, 165, 250, 0.15) 0%, rgba(139, 92, 246, 0.08) 40%, transparent 70%);
+  --sh-home-page-backdrop: var(--sh-surface);
+  --sh-home-hero-section-bg: var(--sh-home-hero-gradient);
   --sh-home-primary-shadow: 0 8px 30px rgba(37, 99, 235, 0.45);
   --sh-home-primary-shadow-hover: 0 12px 40px rgba(59, 130, 246, 0.6);
   --sh-home-cta-glow-shadow: 0 0 38px rgba(59, 130, 246, 0.28);
@@ -492,6 +494,12 @@
   --sh-notif-read-bg: #1c1c1c;
   --sh-notif-read-hover: #242424;
   --sh-notif-empty-icon: #3a3a3a;
+  --sh-home-page-backdrop:
+    radial-gradient(circle at 12% 16%, rgba(59, 130, 246, 0.16), transparent 28%),
+    radial-gradient(circle at 88% 20%, rgba(139, 92, 246, 0.14), transparent 26%),
+    radial-gradient(circle at 50% 88%, rgba(16, 185, 129, 0.1), transparent 20%),
+    linear-gradient(180deg, #161616 0%, #171717 42%, #111827 100%);
+  --sh-home-hero-section-bg: var(--sh-home-page-backdrop);
 
   color-scheme: dark;
 }
@@ -532,6 +540,11 @@
 [data-theme='dark'] .settings-nav-btn[style*='background: #fff'] {
   background: var(--sh-soft) !important;
   color: var(--sh-heading) !important;
+}
+
+[data-theme='dark'] .home-page .home-hero,
+[data-theme='dark'] .home-page .home-cta-section {
+  background: var(--sh-home-hero-section-bg) !important;
 }
 
 /* Nav bar override */
@@ -1649,7 +1662,18 @@ textarea.sh-input {
 
 .home-page {
   min-height: 100vh;
-  background: var(--sh-surface);
+  position: relative;
+  isolation: isolate;
+  background: transparent;
+}
+
+.home-page::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: var(--sh-home-page-backdrop);
+  pointer-events: none;
+  z-index: -1;
 }
 
 .home-shell {
@@ -1662,7 +1686,7 @@ textarea.sh-input {
 }
 
 .home-hero {
-  background: var(--sh-home-hero-gradient);
+  background: var(--sh-home-hero-section-bg);
   padding: clamp(104px, 10vw, 148px) clamp(18px, 4vw, 40px) clamp(112px, 10vw, 144px);
   position: relative;
   overflow: hidden;
@@ -2087,7 +2111,7 @@ textarea.sh-input {
 
 .home-cta-section {
   padding: clamp(84px, 8vw, 120px) clamp(18px, 4vw, 40px);
-  background: var(--sh-home-hero-gradient);
+  background: var(--sh-home-hero-section-bg);
   text-align: center;
 }
 
@@ -3685,6 +3709,12 @@ select:focus-visible {
   min-width: 0;
 }
 
+.feed-page__aside {
+  align-self: start;
+  position: sticky;
+  top: 86px;
+}
+
 /* ── Settings layout ─────────────────────────────────────────────────── */
 .settings-layout {
   display: grid;
@@ -3756,6 +3786,11 @@ select:focus-visible {
   /* Feed aside: hide on mobile, shown on demand */
   .feed-aside {
     display: none !important;
+  }
+
+  .feed-page__aside {
+    position: static;
+    top: auto;
   }
 }
 

@@ -36,7 +36,7 @@ export default function RegisterScreen() {
 
   /* ── Render ────────────────────────────────────────────────────────── */
   return (
-    <div className="register-page sh-public-page sh-public-page--auth">
+    <div className="register-page">
       <Navbar variant="landing" />
 
       {/* Decorative background orbs */}

@@ -158,7 +158,7 @@ export default function FeedPage() {
           <div className="app-three-col-grid sh-ambient-grid">
             <AppSidebar mode={layout.sidebarMode} />
 
-            <main className="sh-ambient-main" id="main-content" style={{ display: 'grid', gap: 18 }}>
+            <main className="sh-ambient-main feed-page__main" id="main-content" style={{ display: 'grid', gap: 18 }}>
               <GettingStartedCard user={user} />
               <SchoolSuggestionBanner user={user} />
               {newSinceLastVisit > 0 && activeFilter !== 'for-you' ? (
@@ -200,18 +200,8 @@ export default function FeedPage() {
                 </div>
               )}
 
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  gap: 12,
-                  flexWrap: 'wrap',
-                }}
-              >
-                <div
-                  data-tutorial="feed-filters"
-                  style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}
-                >
+              <div className="feed-page__toolbar">
+                <div className="feed-page__filters" data-tutorial="feed-filters">
                   {FILTERS.map((filter) => (
                     <button
                       key={filter}
@@ -230,13 +220,12 @@ export default function FeedPage() {
                     </label>
                     <input
                       id="feed-search"
+                      className="sh-input feed-page__search"
                       data-tutorial="feed-search"
                       aria-label="Search the feed"
                       value={localSearch}
                       onChange={(event) => handleSearchChange(event.target.value)}
                       placeholder="Search the feed..."
-                      className="sh-input"
-                      style={{ maxWidth: 240 }}
                     />
                   </>
                 )}

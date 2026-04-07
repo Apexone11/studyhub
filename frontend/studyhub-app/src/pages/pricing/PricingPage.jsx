@@ -150,7 +150,7 @@ export default function PricingPage() {
   }, [user, navigate])
 
   return (
-    <div className="sh-public-page sh-public-page--pricing" style={p.page}>
+    <div style={p.page}>
       <Navbar />
 
       {/* Success banner */}
@@ -163,7 +163,7 @@ export default function PricingPage() {
       )}
 
       {/* Hero */}
-      <section className="pricing-hero-band" style={p.hero}>
+      <section style={p.hero}>
         <div style={p.heroInner} ref={heroRef}>
           <h1 style={p.heroH1}>StudyHub Pro</h1>
           <p style={p.heroSub}>
@@ -594,6 +594,47 @@ function ReferralCard() {
     return () => { cancelled = true }
   }, [])
 
+  const getReferralStatus = (code) => {
+    const expiresAt = code.expiresAt ? new Date(code.expiresAt) : null
+    const isExpired = Boolean(expiresAt && expiresAt.getTime() < Date.now())
+    const isMaxed = code.maxUses > 0 && code.currentUses >= code.maxUses
+    const inactiveReason = code.inactiveReason || (!code.active ? 'deactivated' : isExpired ? 'expired' : isMaxed ? 'maxed_out' : null)
+
+    if (inactiveReason === 'expired') {
+      return {
+        active: false,
+        badge: 'Expired',
+        detail: expiresAt ? `Expired ${expiresAt.toLocaleDateString()}` : 'This code has expired.',
+      }
+    }
+
+    if (inactiveReason === 'maxed_out') {
+      return {
+        active: false,
+        badge: 'Limit reached',
+        detail: `Used ${code.currentUses}${code.maxUses > 0 ? ` of ${code.maxUses}` : ''} times.`,
+      }
+    }
+
+    if (inactiveReason === 'deactivated') {
+      return {
+        active: false,
+        badge: 'Inactive',
+        detail: 'This code was manually deactivated.',
+      }
+    }
+
+    return {
+      active: true,
+      badge: 'Active',
+      detail: expiresAt
+        ? `Expires ${expiresAt.toLocaleDateString()}`
+        : 'Ready to share with new members.',
+    }
+  }
+
+  const activeCodeCount = codes.filter((code) => getReferralStatus(code).active).length
+
   const createCode = async () => {
     setCreating(true)
     setMsg(null)
@@ -635,30 +676,52 @@ function ReferralCard() {
       ) : (
         <>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <button style={c.btnOutline} onClick={createCode} disabled={creating || codes.filter((co) => co.active).length >= 5}>
+            <button style={c.btnOutline} onClick={createCode} disabled={creating || activeCodeCount >= 5}>
               {creating ? 'Creating...' : 'Create Referral Code'}
             </button>
-            <span style={p.muted}>{codes.filter((co) => co.active).length}/5 active codes</span>
+            <span style={p.muted}>{activeCodeCount}/5 active codes</span>
           </div>
           {codes.length > 0 && (
             <div style={p.codeList}>
-              {codes.map((co) => (
-                <div key={co.id} style={{ ...p.codeRow, opacity: co.active ? 1 : 0.5 }}>
-                  <span style={p.codeText}>{co.code}</span>
-                  <span style={p.muted}>{co.currentUses} use{co.currentUses !== 1 ? 's' : ''}</span>
-                  {co.active && (
-                    <>
-                      <button style={p.smallBtn} onClick={() => copyCode(co.code)}>
-                        {copied === co.code ? 'Copied' : 'Copy'}
-                      </button>
-                      <button style={{ ...p.smallBtn, color: 'var(--sh-danger)' }} onClick={() => deactivateCode(co.id)}>
-                        Deactivate
-                      </button>
-                    </>
-                  )}
-                  {!co.active && <span style={{ ...p.muted, fontStyle: 'italic' }}>Inactive</span>}
-                </div>
-              ))}
+              {codes.map((co) => {
+                const status = getReferralStatus(co)
+                return (
+                  <div key={co.id} style={{ ...p.codeRow, opacity: status.active ? 1 : 0.62, alignItems: 'flex-start' }}>
+                    <div style={{ display: 'grid', gap: 4, minWidth: 0 }}>
+                      <span style={p.codeText}>{co.code}</span>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                        <span style={p.muted}>{co.currentUses} use{co.currentUses !== 1 ? 's' : ''}</span>
+                        <span
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            padding: '2px 8px',
+                            borderRadius: 999,
+                            background: status.active ? 'var(--sh-success-bg)' : 'var(--sh-soft)',
+                            border: status.active ? '1px solid var(--sh-success-border)' : '1px solid var(--sh-border)',
+                            color: status.active ? 'var(--sh-success-text)' : 'var(--sh-muted)',
+                          }}
+                        >
+                          {status.badge}
+                        </span>
+                      </div>
+                      <span style={{ ...p.muted, fontSize: 12 }}>{status.detail}</span>
+                    </div>
+                    {status.active ? (
+                      <>
+                        <button style={p.smallBtn} onClick={() => copyCode(co.code)}>
+                          {copied === co.code ? 'Copied' : 'Copy'}
+                        </button>
+                        <button style={{ ...p.smallBtn, color: 'var(--sh-danger)' }} onClick={() => deactivateCode(co.id)}>
+                          Deactivate
+                        </button>
+                      </>
+                    ) : (
+                      <span style={{ ...p.muted, fontStyle: 'italic' }}>Unavailable</span>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           )}
         </>
@@ -761,7 +824,7 @@ function DonationSection() {
   }
 
   return (
-    <section className="pricing-donation-band" style={d.section}>
+    <section style={d.section}>
       <div style={d.inner}>
         <h2 style={d.title}>Support StudyHub</h2>
         <p style={d.subtitle}>

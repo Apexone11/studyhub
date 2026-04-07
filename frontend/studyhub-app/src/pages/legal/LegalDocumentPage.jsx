@@ -109,7 +109,7 @@ export default function LegalDocumentPage({
         <div
           ref={containerRef}
           style={{
-            padding: 16,
+            minHeight: 320,
             opacity: termlyEmbed.loaded ? 1 : 0,
             transition: 'opacity 0.25s ease',
           }}

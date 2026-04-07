@@ -4,8 +4,135 @@
  * Exports CreateGroupModal (default) and EditGroupModal components.
  * Both modals use identical form structure with different titles and handlers.
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useState } from 'react'
+import { useEffect, useId, useState } from 'react'
+import { API } from '../../config'
+import { getApiErrorMessage, readJsonSafely } from '../../lib/http'
+import { resolveGroupImageUrl } from './studyGroupsHelpers'
 import { styles } from './studyGroupsStyles'
+
+async function uploadGroupImage(file) {
+  const formData = new FormData()
+  formData.append('image', file)
+
+  const response = await fetch(`${API}/api/upload/content-image`, {
+    method: 'POST',
+    credentials: 'include',
+    body: formData,
+  })
+  const data = await readJsonSafely(response, {})
+
+  if (!response.ok || !data?.url) {
+    throw new Error(getApiErrorMessage(data, 'Failed to upload group image.'))
+  }
+
+  return data.url
+}
+
+function useGroupImageUpload(initialValue) {
+  const [imageUrl, setImageUrl] = useState(initialValue || '')
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState('')
+
+  useEffect(() => {
+    setImageUrl(initialValue || '')
+    setUploadError('')
+    setUploading(false)
+  }, [initialValue])
+
+  const handleFileChange = async (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    setUploadError('')
+    setUploading(true)
+
+    try {
+      const url = await uploadGroupImage(file)
+      setImageUrl(url)
+    } catch (error) {
+      setUploadError(error.message || 'Failed to upload group image.')
+    } finally {
+      setUploading(false)
+      event.target.value = ''
+    }
+  }
+
+  const clearImage = () => {
+    setImageUrl('')
+    setUploadError('')
+  }
+
+  return {
+    imageUrl,
+    setImageUrl,
+    uploading,
+    uploadError,
+    handleFileChange,
+    clearImage,
+  }
+}
+
+function GroupImageField({ name, groupImage }) {
+  const inputId = useId()
+  const previewUrl = resolveGroupImageUrl(groupImage.imageUrl)
+  const previewInitial = (name || 'Study Group').trim().charAt(0).toUpperCase() || 'S'
+
+  return (
+    <div style={styles.formGroup}>
+      <label style={styles.label}>Group Image</label>
+      <div style={styles.imageField}>
+        <div style={styles.imagePreviewFrame}>
+          {previewUrl ? (
+            <img
+              src={previewUrl}
+              alt=""
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+            />
+          ) : (
+            <div style={styles.imagePreviewFallback}>{previewInitial}</div>
+          )}
+        </div>
+
+        <div style={styles.imageFieldBody}>
+          <div style={styles.imageFieldActions}>
+            <label
+              htmlFor={inputId}
+              style={styles.secondaryActionBtn}
+            >
+              {groupImage.uploading ? 'Uploading...' : previewUrl ? 'Replace Image' : 'Upload Image'}
+            </label>
+            {previewUrl ? (
+              <button
+                type="button"
+                onClick={groupImage.clearImage}
+                disabled={groupImage.uploading}
+                style={styles.dangerActionBtn}
+              >
+                Remove Image
+              </button>
+            ) : null}
+          </div>
+
+          <p style={styles.helperText}>
+            This image appears on the study group directory and the group detail page.
+            Use a square or landscape image for the cleanest crop.
+          </p>
+
+          <input
+            id={inputId}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            onChange={groupImage.handleFileChange}
+            style={{ display: 'none' }}
+            disabled={groupImage.uploading}
+          />
+        </div>
+      </div>
+
+      {groupImage.uploadError ? <div style={styles.inlineError}>{groupImage.uploadError}</div> : null}
+    </div>
+  )
+}
 
 function CreateGroupModal({ open, onClose, onSubmit, courses }) {
   const [name, setName] = useState('')
@@ -14,6 +141,7 @@ function CreateGroupModal({ open, onClose, onSubmit, courses }) {
   const [courseId, setCourseId] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
+  const groupImage = useGroupImageUpload('')
 
   if (!open) return null
 
@@ -31,6 +159,7 @@ function CreateGroupModal({ open, onClose, onSubmit, courses }) {
       await onSubmit({
         name: name.trim(),
         description: description.trim() || null,
+        avatarUrl: groupImage.imageUrl || null,
         privacy,
         courseId: courseId ? parseInt(courseId, 10) : null,
       })
@@ -76,6 +205,8 @@ function CreateGroupModal({ open, onClose, onSubmit, courses }) {
             />
             <span style={styles.charCount}>{description.length}/500</span>
           </div>
+
+          <GroupImageField name={name} groupImage={groupImage} />
 
           <div style={styles.formGroup}>
             <label style={styles.label}>Privacy</label>
@@ -130,6 +261,7 @@ export function EditGroupModal({ open, group, onClose, onSubmit, courses }) {
   const [maxMembers, setMaxMembers] = useState(group?.maxMembers || 50)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
+  const groupImage = useGroupImageUpload(group?.avatarUrl || '')
 
   if (!open) return null
 
@@ -147,6 +279,7 @@ export function EditGroupModal({ open, group, onClose, onSubmit, courses }) {
       await onSubmit({
         name: name.trim(),
         description: description.trim() || null,
+        avatarUrl: groupImage.imageUrl || null,
         privacy,
         courseId: courseId ? parseInt(courseId, 10) : null,
         maxMembers: parseInt(maxMembers, 10) || 50,
@@ -193,6 +326,8 @@ export function EditGroupModal({ open, group, onClose, onSubmit, courses }) {
             />
             <span style={styles.charCount}>{description.length}/500</span>
           </div>
+
+          <GroupImageField name={name} groupImage={groupImage} />
 
           <div style={styles.formGroup}>
             <label style={styles.label}>Privacy</label>
