@@ -102,10 +102,24 @@ function validateResourceUrl(url) {
  */
 async function formatGroup(group, currentUserId = null) {
   // Run aggregate queries in parallel for performance
-  const [memberCount, resourceCount, upcomingSessionCount, discussionPostCount, userMembershipResult] =
+  const [
+    memberCount,
+    pendingMemberCount,
+    invitedMemberCount,
+    resourceCount,
+    upcomingSessionCount,
+    discussionPostCount,
+    userMembershipResult,
+  ] =
     await Promise.all([
       prisma.studyGroupMember.count({
         where: { groupId: group.id, status: 'active' },
+      }),
+      prisma.studyGroupMember.count({
+        where: { groupId: group.id, status: 'pending' },
+      }),
+      prisma.studyGroupMember.count({
+        where: { groupId: group.id, status: 'invited' },
       }),
       prisma.groupResource.count({
         where: { groupId: group.id },
@@ -124,16 +138,35 @@ async function formatGroup(group, currentUserId = null) {
   // Derive convenience fields for frontend
   const isMember = userMembership && userMembership.status === 'active'
   const userRole = userMembership ? userMembership.role : null
+  const availableSeats = Math.max(0, (group.maxMembers || 0) - memberCount)
 
   // Look up course name if courseId exists
   let courseName = null
+  let courseCode = null
+  let schoolId = null
+  let schoolName = null
+  let schoolShort = null
   if (group.courseId) {
     try {
       const course = await prisma.course.findUnique({
         where: { id: group.courseId },
-        select: { name: true },
+        select: {
+          name: true,
+          code: true,
+          school: {
+            select: {
+              id: true,
+              name: true,
+              short: true,
+            },
+          },
+        },
       })
       courseName = course?.name || null
+      courseCode = course?.code || null
+      schoolId = course?.school?.id || null
+      schoolName = course?.school?.name || null
+      schoolShort = course?.school?.short || null
     } catch {
       // Non-critical, ignore
     }
@@ -146,12 +179,19 @@ async function formatGroup(group, currentUserId = null) {
     avatarUrl: group.avatarUrl,
     courseId: group.courseId,
     courseName,
+    courseCode,
+    schoolId,
+    schoolName,
+    schoolShort,
     privacy: group.privacy,
     maxMembers: group.maxMembers,
     createdById: group.createdById,
     createdAt: group.createdAt,
     updatedAt: group.updatedAt,
     memberCount,
+    pendingMemberCount,
+    invitedMemberCount,
+    availableSeats,
     resourceCount,
     upcomingSessionCount,
     discussionPostCount,

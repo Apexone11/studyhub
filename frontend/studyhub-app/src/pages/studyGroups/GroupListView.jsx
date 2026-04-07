@@ -48,6 +48,7 @@ export default function GroupListView() {
 
   // Extract URL params
   const search = searchParams.get('search') || ''
+  const schoolId = searchParams.get('schoolId') || ''
   const courseId = searchParams.get('courseId') || ''
   const mineOnly = searchParams.get('mine') === 'true'
 
@@ -55,42 +56,70 @@ export default function GroupListView() {
   const {
     groups, groupsLoading, groupsError, groupsTotal,
     createGroup, joinGroup, loadGroups,
+    schools: allSchools,
     courses: allCourses,
   } = useStudyGroupsData()
 
-  const hasActiveFilters = search || courseId || mineOnly
+  const hasActiveFilters = search || schoolId || courseId || mineOnly
 
   // Update search param
   const handleSearch = useCallback((value) => {
+    const next = new URLSearchParams(searchParams)
     if (value) {
-      searchParams.set('search', value)
+      next.set('search', value)
     } else {
-      searchParams.delete('search')
+      next.delete('search')
     }
-    searchParams.set('offset', '0') // Reset pagination
-    setSearchParams(searchParams)
+    next.set('offset', '0') // Reset pagination
+    setSearchParams(next)
   }, [searchParams, setSearchParams])
+
+  const handleSchoolFilter = useCallback((nextSchoolId) => {
+    const next = new URLSearchParams(searchParams)
+    if (nextSchoolId) {
+      next.set('schoolId', nextSchoolId)
+    } else {
+      next.delete('schoolId')
+    }
+
+    if (!nextSchoolId) {
+      next.delete('courseId')
+    } else {
+      const courseBelongsToSchool = allCourses?.some((course) => (
+        String(course.id) === String(courseId) && String(course.schoolId) === String(nextSchoolId)
+      ))
+
+      if (!courseBelongsToSchool) {
+        next.delete('courseId')
+      }
+    }
+
+    next.set('offset', '0')
+    setSearchParams(next)
+  }, [allCourses, courseId, searchParams, setSearchParams])
 
   // Toggle "My Groups" filter
   const toggleMine = useCallback(() => {
+    const next = new URLSearchParams(searchParams)
     if (mineOnly) {
-      searchParams.delete('mine')
+      next.delete('mine')
     } else {
-      searchParams.set('mine', 'true')
-      searchParams.set('offset', '0')
+      next.set('mine', 'true')
     }
-    setSearchParams(searchParams)
+    next.set('offset', '0')
+    setSearchParams(next)
   }, [mineOnly, searchParams, setSearchParams])
 
   // Filter by course
   const handleCourseFilter = useCallback((cId) => {
+    const next = new URLSearchParams(searchParams)
     if (cId) {
-      searchParams.set('courseId', cId)
+      next.set('courseId', cId)
     } else {
-      searchParams.delete('courseId')
+      next.delete('courseId')
     }
-    searchParams.set('offset', '0')
-    setSearchParams(searchParams)
+    next.set('offset', '0')
+    setSearchParams(next)
   }, [searchParams, setSearchParams])
 
   // Clear all filters
@@ -115,6 +144,7 @@ export default function GroupListView() {
     joinGroup(groupId)
   }, [joinGroup])
 
+  const selectedSchool = allSchools?.find((school) => String(school.id) === String(schoolId))
   const selectedCourse = allCourses?.find(c => c.id === parseInt(courseId, 10))
   const subtitle = mineOnly ? 'Groups you are a member of' : 'All study groups'
 
@@ -156,11 +186,14 @@ export default function GroupListView() {
               {/* Search and filter bar */}
               <GroupListFilters
                 search={search}
+                  schoolId={schoolId}
                 courseId={courseId}
                 mineOnly={mineOnly}
+                  allSchools={allSchools}
                 allCourses={allCourses}
                 onSearch={handleSearch}
                 onToggleMine={toggleMine}
+                  onSchoolFilter={handleSchoolFilter}
                 onCourseFilter={handleCourseFilter}
                 hasActiveFilters={hasActiveFilters}
                 onClearFilters={clearAllFilters}
@@ -199,7 +232,10 @@ export default function GroupListView() {
                 <GroupListEmptyState
                   search={search}
                   mineOnly={mineOnly}
-                  selectedCourse={selectedCourse}
+                  selectedCourse={selectedCourse ? {
+                    ...selectedCourse,
+                    name: selectedSchool ? `${selectedSchool.short} — ${selectedCourse.name}` : selectedCourse.name,
+                  } : null}
                   onClearFilters={clearAllFilters}
                 />
               ) : (

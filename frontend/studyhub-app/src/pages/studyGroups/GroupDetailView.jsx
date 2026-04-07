@@ -129,7 +129,11 @@ export default function GroupDetailView({ groupId }) {
   }
 
   const isAdmin = activeGroup.userRole === 'admin'
-  const isMember = activeGroup.isMember
+  const membershipStatus = activeGroup.userMembership?.status || (activeGroup.isMember ? 'active' : null)
+  const isMember = membershipStatus === 'active'
+  const isPending = membershipStatus === 'pending'
+  const isInvited = membershipStatus === 'invited'
+  const isAdminOrMod = isAdmin || activeGroup.userRole === 'moderator'
 
   const handleEdit = async (updates) => {
     try {
@@ -151,14 +155,22 @@ export default function GroupDetailView({ groupId }) {
     }
   }
 
-  const handleJoin = () => {
-    joinGroup(groupId)
+  const handleJoin = async () => {
+    try {
+      await joinGroup(groupId)
+    } catch {
+      // Error shown via toast
+    }
   }
 
-  const handleLeave = () => {
+  const handleLeave = async () => {
     if (window.confirm('Are you sure you want to leave this group?')) {
-      leaveGroup(groupId)
-      navigate('/study-groups')
+      try {
+        await leaveGroup(groupId)
+        navigate('/study-groups')
+      } catch {
+        // Error shown via toast
+      }
     }
   }
 
@@ -234,9 +246,21 @@ export default function GroupDetailView({ groupId }) {
 
           {/* Action buttons */}
           <div style={{ ...styles.actionButtons, flexDirection: 'row', flexWrap: 'wrap' }}>
-            {!isMember ? (
+            {!membershipStatus ? (
               <button onClick={handleJoin} style={styles.joinBtn}>
-                Join Group
+                {activeGroup.privacy === 'private' ? 'Request to Join' : 'Join Group'}
+              </button>
+            ) : isPending ? (
+              <button
+                type="button"
+                disabled
+                style={{ ...styles.joinBtn, opacity: 0.72, cursor: 'not-allowed' }}
+              >
+                Request Pending
+              </button>
+            ) : isInvited ? (
+              <button onClick={handleJoin} style={styles.joinBtn}>
+                Accept Invitation
               </button>
             ) : (
               <>
@@ -306,6 +330,7 @@ export default function GroupDetailView({ groupId }) {
               activities={activities}
               activitiesLoading={activitiesLoading}
               upcomingSessions={upcomingSessionsPreview}
+              isAdminOrMod={isAdminOrMod}
             />
           )}
           {activeTab === 'resources' && (
@@ -314,7 +339,7 @@ export default function GroupDetailView({ groupId }) {
               resources={resources}
               onAdd={(data) => addResource(groupId, data)}
               onDelete={(resourceId) => deleteResource(groupId, resourceId)}
-              isAdminOrMod={isAdmin || activeGroup?.userRole === 'moderator'}
+              isAdminOrMod={isAdminOrMod}
               isMember={isMember}
             />
           )}
@@ -326,7 +351,7 @@ export default function GroupDetailView({ groupId }) {
               loadSessions={loadSessions}
               onAdd={(data) => createSession(groupId, data)}
               onRsvp={(sessionId, status) => rsvpSession(groupId, sessionId, { status })}
-              isAdminOrMod={isAdmin || activeGroup?.userRole === 'moderator'}
+              isAdminOrMod={isAdminOrMod}
               isMember={isMember}
             />
           )}
@@ -342,7 +367,7 @@ export default function GroupDetailView({ groupId }) {
               onDeletePost={deletePost}
               onUpvote={(postId) => toggleUpvote(groupId, postId)}
               isMember={isMember}
-              isAdminOrMod={isAdmin || activeGroup?.userRole === 'moderator'}
+              isAdminOrMod={isAdminOrMod}
               userId={currentUserId}
             />
           )}
@@ -356,6 +381,8 @@ export default function GroupDetailView({ groupId }) {
               onUpdateMember={(userId, data) => updateMember(groupId, userId, data)}
               onInvite={(data) => inviteMember(groupId, data)}
               isAdmin={isAdmin}
+              isAdminOrMod={isAdminOrMod}
+              viewerRole={activeGroup.userRole || null}
               currentUserId={currentUserId}
             />
           )}

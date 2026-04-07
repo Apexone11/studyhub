@@ -37,10 +37,11 @@ const {
  */
 async function listGroups(req, res) {
   try {
-    const { search = '', courseId, mine = false, limit = 20, offset = 0 } = req.query
+    const { search = '', courseId, schoolId, mine = false, limit = 20, offset = 0 } = req.query
     const limitNum = Math.min(parseInt(limit, 10) || 20, 100)
     const offsetNum = Math.max(parseInt(offset, 10) || 0, 0)
     const courseIdNum = courseId ? parseId(courseId) : null
+    const schoolIdNum = schoolId ? parseId(schoolId) : null
     const isMine = mine === 'true' || mine === '1' || mine === true
 
     // Get user's group memberships
@@ -61,6 +62,7 @@ async function listGroups(req, res) {
       AND: [
         isMine ? { id: { in: userGroupIds } } : { privacy: 'public' },
         courseIdNum ? { courseId: courseIdNum } : {},
+        schoolIdNum ? { course: { is: { schoolId: schoolIdNum } } } : {},
         search
           ? {
               OR: [
@@ -368,10 +370,38 @@ async function joinGroup(req, res) {
       return res.status(404).json({ error: 'Group not found.' })
     }
 
-    // Check if user is already a member
+    // Check if user already has a membership record
     const existingMember = await requireGroupMember(groupId, req.user.userId)
     if (existingMember) {
-      return res.status(400).json({ error: 'Already a member.' })
+      if (existingMember.status === 'active') {
+        return res.status(400).json({ error: 'Already a member.' })
+      }
+
+      if (existingMember.status === 'pending') {
+        return res.status(400).json({ error: 'Your join request is already pending.' })
+      }
+
+      if (existingMember.status === 'banned') {
+        return res.status(403).json({ error: 'You are banned from this group.' })
+      }
+
+      if (existingMember.status === 'invited') {
+        const updatedMember = await prisma.studyGroupMember.update({
+          where: { id: existingMember.id },
+          data: { status: 'active' },
+        })
+
+        return res.status(200).json({
+          id: updatedMember.id,
+          groupId: updatedMember.groupId,
+          userId: updatedMember.userId,
+          role: updatedMember.role,
+          status: updatedMember.status,
+          joinedAt: updatedMember.joinedAt,
+        })
+      }
+
+      return res.status(400).json({ error: 'Unable to join this group.' })
     }
 
     // Check member count
@@ -500,6 +530,12 @@ async function listMembers(req, res) {
       return res.status(403).json({ error: 'Not authorized.' })
     }
 
+    const canManageMembers = Boolean(
+      userMember
+      && userMember.status === 'active'
+      && (userMember.role === 'admin' || userMember.role === 'moderator')
+    )
+
     const { limit = 20, offset = 0 } = req.query
     const limitNum = Math.min(parseInt(limit, 10) || 20, 100)
     const offsetNum = Math.max(parseInt(offset, 10) || 0, 0)
@@ -511,13 +547,15 @@ async function listMembers(req, res) {
       // Graceful degradation if block table doesn't exist
     }
 
+    const memberWhere = {
+      groupId,
+      ...(canManageMembers ? {} : { status: 'active' }),
+      userId: { notIn: blockedIds },
+    }
+
     const [members, total] = await Promise.all([
       prisma.studyGroupMember.findMany({
-        where: {
-          groupId,
-          status: 'active',
-          userId: { notIn: blockedIds },
-        },
+        where: memberWhere,
         include: {
           user: {
             select: {
@@ -532,11 +570,7 @@ async function listMembers(req, res) {
         take: limitNum,
       }),
       prisma.studyGroupMember.count({
-        where: {
-          groupId,
-          status: 'active',
-          userId: { notIn: blockedIds },
-        },
+        where: memberWhere,
       }),
     ])
 

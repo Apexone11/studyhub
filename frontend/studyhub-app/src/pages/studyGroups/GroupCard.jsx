@@ -8,7 +8,7 @@ import { getPrivacyLabel, truncateText } from './studyGroupsHelpers'
 import { styles } from './studyGroupsStyles'
 
 export default function GroupCard({ group, onJoin, onNavigateDetail }) {
-  const isMember = group.isMember
+  const { isMember } = group
 
   return (
     <div
@@ -67,7 +67,8 @@ export default function GroupCard({ group, onJoin, onNavigateDetail }) {
         <span style={styles.memberCountSmall}>
           {group.memberCount} member{group.memberCount === 1 ? '' : 's'}
         </span>
-        {group.courseName && <span style={styles.courseTagSmall}>{group.courseName}</span>}
+        {group.courseCode && <span style={styles.courseTagSmall}>{group.courseCode}</span>}
+        {group.schoolShort && <span style={{ fontSize: 12, color: 'var(--sh-muted)' }}>{group.schoolShort}</span>}
         {group.resourceCount > 0 && (
           <span style={{ fontSize: 12, color: 'var(--sh-muted)' }}>
             {group.resourceCount} resource{group.resourceCount === 1 ? '' : 's'}

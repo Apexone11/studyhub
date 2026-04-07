@@ -2,6 +2,30 @@
 
 ## Date: 2026-04-07
 
+### Study Groups Permission and Discovery Tightening
+
+**Membership state handling now matches the backend contract**
+- Fixed the join flow so private-group requests stay `pending`, invited users can accept their invitation instead of being blocked as "already a member", and banned users are rejected cleanly
+- Updated the study-group detail page action area to reflect membership state instead of only `isMember`, so the CTA now distinguishes join, pending, invited, and leave behavior
+- Normalized the detail hook's route-id comparisons and reloaded server truth after membership mutations so detail state does not drift after join actions
+
+**Member management now matches the actual permission model**
+- Fixed the invite flow drift between the username-based members UI and the hook payload so invites now send the backend-supported request shape
+- Fixed member-management actions to target `userId` routes instead of membership-row ids, which prevents update/remove calls from hitting the wrong identifier
+- Expanded the members list contract so admins and moderators can see pending and invited records while regular members still only see active members
+- Added moderator invite/remove controls in the members tab while keeping role changes and pending-request approval admin-only
+
+**School-aware discovery and overview context improved**
+- Added `schoolId` filtering to the study-group list API, exposed course and school metadata on formatted group responses, and wired the frontend list view to the existing `/api/courses/schools` catalog so school and course filters are both populated and scoped correctly
+- Improved group cards to show clearer course-school context, and expanded the overview tab with open-seat, pending-request, and outstanding-invite context for admins and moderators
+- Switched overview activity avatars to `UserAvatar` for consistent user rendering across the study-groups surface
+
+**Validation**
+- `Set-Location backend; npm test -- test/studyGroups.routes.test.js`: passes (8 tests)
+- `Set-Location backend; npx eslint src/modules/studyGroups/studyGroups.controller.js src/modules/studyGroups/studyGroups.helpers.js test/studyGroups.routes.test.js`: passes
+- `Set-Location frontend/studyhub-app; npx eslint src/pages/studyGroups/useGroupDetail.js src/pages/studyGroups/useGroupMembers.js src/pages/studyGroups/useGroupList.js src/pages/studyGroups/useStudyGroupsData.js src/pages/studyGroups/GroupDetailView.jsx src/pages/studyGroups/GroupOverviewTab.jsx src/pages/studyGroups/GroupMembersTab.jsx src/pages/studyGroups/GroupListView.jsx src/pages/studyGroups/GroupListFilters.jsx src/pages/studyGroups/GroupCard.jsx`: passes
+- `npm --prefix frontend/studyhub-app run build`: passes
+
 ### Notes Tag Discovery and Shareable Bookshelves
 
 **Notes now filter and surface tags in-place**

@@ -38,10 +38,13 @@ export function useStudyGroupsData() {
     groupsTotal: list.groupsTotal,
     loadGroups: list.loadGroups,
     search: list.search,
+    schoolId: list.schoolId,
     courseId: list.courseId,
     mine: list.mine,
     limit: list.limit,
     offset: list.offset,
+    schools: list.schools,
+    courses: list.courses,
 
     // Group CRUD
     createGroup: list.createGroup,
