@@ -155,6 +155,22 @@ describe('release A middleware response envelope', () => {
     expect(response.body).toEqual({ ok: true })
   })
 
+  it('keeps Google auth usable for non-admin users during guarded mode', async () => {
+    process.env.GUARDED_MODE_ENABLED = 'true'
+
+    const app = express()
+    app.use(express.json())
+    app.use(guardedMode)
+    app.post('/api/auth/google', (req, res) => res.status(200).json({ ok: true }))
+
+    const response = await request(app)
+      .post('/api/auth/google')
+      .send({ credential: 'google-token' })
+
+    expect(response.status).toBe(200)
+    expect(response.body).toEqual({ ok: true })
+  })
+
   it('allows POST /api/auth/logout without CSRF token (exempt)', async () => {
     const app = express()
     app.use(buildTestRateLimiter())

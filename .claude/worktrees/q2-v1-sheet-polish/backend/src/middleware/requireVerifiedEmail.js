@@ -9,6 +9,8 @@
  * Requires requireAuth to run first (req.user.userId must exist).
  */
 const prisma = require('../lib/prisma')
+const { captureError } = require('../monitoring/sentry')
+const { ERROR_CODES, sendError } = require('./errorEnvelope')
 
 const GRACE_PERIOD_DAYS = 3
 const GRACE_PERIOD_MS = GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000
@@ -43,9 +45,19 @@ async function requireVerifiedEmail(req, res, next) {
       code: 'EMAIL_NOT_VERIFIED',
       gracePeriodDays: GRACE_PERIOD_DAYS,
     })
-  } catch {
-    // Fail open on DB errors — don't block users due to transient issues
-    next()
+  } catch (error) {
+    captureError(error, {
+      middleware: 'requireVerifiedEmail',
+      route: req.originalUrl,
+      method: req.method,
+      userId: req.user?.userId || null,
+    })
+    return sendError(
+      res,
+      503,
+      'We could not verify your email status right now. Please try again shortly.',
+      ERROR_CODES.INTERNAL,
+    )
   }
 }
 

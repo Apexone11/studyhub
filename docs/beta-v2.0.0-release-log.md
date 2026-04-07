@@ -4,6 +4,24 @@
 
 ## Date: 2026-04-07
 
+### PR #195 Review Fixes for Auth and Middleware Hardening
+
+**Auth and request-context handling now match the active session contract more closely**
+- Normalized optional-auth request users back onto the `{ userId, username, role, trustLevel }` shape instead of leaving read paths with a raw JWT payload, and updated safe request redaction to capture `req.user.userId` instead of only the legacy `req.user.id`
+- Added `POST /api/auth/google` to guarded-mode's write allowlist so Google sign-in stays usable during maintenance windows just like the other auth entry points
+- Hardened Google OAuth account creation so new accounts only inherit verified-email state from Google's token response instead of being marked verified unconditionally
+
+**Backend fallbacks now fail more predictably**
+- Normalized unknown leaderboard periods back to the weekly window instead of accidentally collapsing to a near-empty date range
+- Wrapped auth-cookie decoding so malformed cookie values fall back to the raw value instead of throwing during request parsing
+- Changed verified-email enforcement to fail closed with Sentry capture and a retryable server response when the database lookup itself fails, instead of silently allowing writes through that middleware
+- Added a repo ignore rule for LibreOffice lock artifacts and removed the checked-in `.~lock.*#` files from the tracked Claude worktree snapshot
+
+**Validation**
+- `Set-Location backend; npx vitest run test/releaseA.stability.middleware.test.js test/core-utils.test.js`: passes (81 tests)
+- `Set-Location backend; npx eslint src/lib/redact.js src/core/auth/optionalAuth.js src/middleware/guardedMode.js src/modules/auth/auth.google.controller.js src/lib/leaderboard.js src/lib/authTokens.js src/middleware/requireVerifiedEmail.js test/releaseA.stability.middleware.test.js test/core-utils.test.js`: passes
+- Editor diagnostics for the touched root backend files and mirrored `.claude/worktrees/q2-v1-sheet-polish` copies: no new errors
+
 ### Comment GIF-Only Rollout and Live Beta Visual Pass
 
 **Comment surfaces now use GIF-only attachments instead of local image uploads**

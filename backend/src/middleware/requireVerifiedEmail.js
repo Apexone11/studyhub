@@ -8,6 +8,8 @@
  * Requires requireAuth to run first (req.user.userId must exist).
  */
 const prisma = require('../lib/prisma')
+const { captureError } = require('../monitoring/sentry')
+const { ERROR_CODES, sendError } = require('./errorEnvelope')
 
 async function requireVerifiedEmail(req, res, next) {
   if (!req.user) {
@@ -32,9 +34,19 @@ async function requireVerifiedEmail(req, res, next) {
       error: 'Please verify your email address to continue using this feature. Check your inbox or resend from Settings.',
       code: 'EMAIL_NOT_VERIFIED',
     })
-  } catch {
-    // Fail open on DB errors — don't block users due to transient issues
-    next()
+  } catch (error) {
+    captureError(error, {
+      middleware: 'requireVerifiedEmail',
+      route: req.originalUrl,
+      method: req.method,
+      userId: req.user?.userId || null,
+    })
+    return sendError(
+      res,
+      503,
+      'We could not verify your email status right now. Please try again shortly.',
+      ERROR_CODES.INTERNAL,
+    )
   }
 }
 

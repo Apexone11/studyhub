@@ -4,6 +4,7 @@ const { ERROR_CODES, sendError } = require('./errorEnvelope')
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
 const AUTH_WRITE_ALLOWLIST = new Set([
   'POST /api/auth/login',
+  'POST /api/auth/google',
   'POST /api/auth/login/verification/send',
   'POST /api/auth/login/verification/verify',
   'POST /api/auth/logout',

@@ -575,5 +575,16 @@ describe('authTokens', () => {
       const token = authTokens.getAuthCookieTokenFromRequest(req)
       expect(token).toBe('encoded value')
     })
+
+    it('falls back to the raw cookie value when decoding fails', () => {
+      const req = {
+        headers: {
+          cookie: 'studyhub_session=bad%cookie; other=data',
+        },
+      }
+
+      const token = authTokens.getAuthCookieTokenFromRequest(req)
+      expect(token).toBe('bad%cookie')
+    })
   })
 })

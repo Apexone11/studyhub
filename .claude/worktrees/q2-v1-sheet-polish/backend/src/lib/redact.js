@@ -104,7 +104,7 @@ function safeRequestContext(req) {
     url: req.originalUrl || req.url,
     ip: req.ip,
     userAgent: req.get?.('user-agent'),
-    userId: req.user?.id || null,
+    userId: req.user?.userId || req.user?.id || req.user?.sub || null,
   }
 }
 

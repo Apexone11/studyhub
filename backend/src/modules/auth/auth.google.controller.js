@@ -56,6 +56,11 @@ router.post('/google', googleLimiter, async (req, res) => {
       })
     }
 
+    const isGoogleEmailVerified = Boolean(googlePayload.emailVerified)
+    if (!isGoogleEmailVerified) {
+      throw new AppError(403, 'Google account email must be verified before you can sign in.')
+    }
+
     // Existing user by email → reject (security: no auto-link)
     const existingByEmail = await findUserByEmail(googlePayload.email)
     if (existingByEmail) {
@@ -92,7 +97,7 @@ router.post('/google', googleLimiter, async (req, res) => {
           username,
           passwordHash,
           email: googlePayload.email,
-          emailVerified: true,
+          emailVerified: isGoogleEmailVerified,
           googleId: googlePayload.googleId,
           authProvider: 'google',
           avatarUrl: googlePayload.picture || null,
