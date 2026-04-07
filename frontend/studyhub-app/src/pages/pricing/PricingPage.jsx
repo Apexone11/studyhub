@@ -150,7 +150,7 @@ export default function PricingPage() {
   }, [user, navigate])
 
   return (
-    <div style={p.page}>
+    <div className="sh-public-page sh-public-page--pricing" style={p.page}>
       <Navbar />
 
       {/* Success banner */}
@@ -163,7 +163,7 @@ export default function PricingPage() {
       )}
 
       {/* Hero */}
-      <section style={p.hero}>
+      <section className="pricing-hero-band" style={p.hero}>
         <div style={p.heroInner} ref={heroRef}>
           <h1 style={p.heroH1}>StudyHub Pro</h1>
           <p style={p.heroSub}>
@@ -319,7 +319,7 @@ function PlanCard({ tier, isFreeUser, hasActivePro, isYearly, subscription, onSu
     return (
       <div style={{ ...c.card, ...c.cardFeatured }}>
         <div style={c.popularTag}>Most Popular</div>
-        <span style={{ ...c.tierLabel, color: 'var(--sh-brand-accent)' }}>Pro</span>
+        <span style={{ ...c.tierLabel, color: 'var(--sh-brand)' }}>Pro</span>
         <div style={c.priceRow}>
           <span style={c.priceValue}>$4.99</span>
           <span style={c.pricePeriod}>/month</span>
@@ -761,7 +761,7 @@ function DonationSection() {
   }
 
   return (
-    <section style={d.section}>
+    <section className="pricing-donation-band" style={d.section}>
       <div style={d.inner}>
         <h2 style={d.title}>Support StudyHub</h2>
         <p style={d.subtitle}>
@@ -865,7 +865,7 @@ const p = {
   page: {
     minHeight: '100vh',
     fontFamily: FONT,
-    background: 'var(--sh-bg)',
+    background: 'transparent',
     color: 'var(--sh-text)',
   },
   successBanner: {
@@ -883,7 +883,7 @@ const p = {
 
   // Hero
   hero: {
-    background: 'var(--sh-ai-gradient)',
+    background: 'transparent',
     padding: '100px 20px 80px',
     textAlign: 'center',
   },
@@ -891,14 +891,14 @@ const p = {
   heroH1: {
     fontSize: 'clamp(32px, 5vw, 56px)',
     fontWeight: 800,
-    color: 'var(--sh-on-dark)',
+    color: 'var(--sh-heading)',
     margin: '0 0 12px',
     lineHeight: 1.15,
     letterSpacing: '-0.02em',
   },
   heroSub: {
     fontSize: 18,
-    color: 'var(--sh-on-dark-subtle)',
+    color: 'var(--sh-subtext)',
     margin: '0 0 24px',
     lineHeight: 1.6,
   },
@@ -906,12 +906,12 @@ const p = {
     display: 'inline-flex',
     alignItems: 'center',
     gap: 8,
-    background: 'var(--sh-glass-bg-strong)',
+    background: 'var(--sh-panel-bg)',
     backdropFilter: 'blur(8px)',
     padding: '8px 20px',
     borderRadius: 'var(--radius-full)',
-    border: '1px solid var(--sh-glass-border)',
-    color: 'var(--sh-on-dark)',
+    border: '1px solid var(--sh-panel-border)',
+    color: 'var(--sh-text)',
     fontSize: 14,
     fontWeight: 700,
   },
@@ -921,11 +921,12 @@ const p = {
   planSummaryCard: {
     maxWidth: 600,
     margin: '0 auto',
-    background: 'var(--sh-surface)',
-    border: '1px solid var(--sh-border)',
+    background: 'var(--sh-panel-bg)',
+    border: '1px solid var(--sh-panel-border)',
     borderRadius: 'var(--radius-card)',
     padding: '20px 24px',
-    boxShadow: 'var(--shadow-md)',
+    boxShadow: 'var(--sh-panel-shadow)',
+    backdropFilter: 'blur(18px)',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -987,9 +988,10 @@ const p = {
   },
   offerCard: {
     padding: 24,
-    background: 'var(--sh-surface)',
-    border: '1px solid var(--sh-border)',
+    background: 'var(--sh-panel-bg)',
+    border: '1px solid var(--sh-panel-border)',
     borderRadius: 'var(--radius-card)',
+    boxShadow: 'var(--sh-panel-shadow)',
     display: 'flex',
     flexDirection: 'column',
     gap: 12,
@@ -1006,9 +1008,10 @@ const p = {
   },
   subCard: {
     padding: 24,
-    background: 'var(--sh-surface)',
-    border: '1px solid var(--sh-border)',
+    background: 'var(--sh-panel-bg)',
+    border: '1px solid var(--sh-panel-border)',
     borderRadius: 'var(--radius-card)',
+    boxShadow: 'var(--sh-panel-shadow)',
     display: 'flex',
     flexDirection: 'column',
     gap: 12,
@@ -1030,10 +1033,10 @@ const p = {
   input: {
     padding: '9px 12px',
     fontSize: 14,
-    border: '1px solid var(--sh-border)',
+    border: '1px solid var(--sh-input-border)',
     borderRadius: 8,
-    background: 'var(--sh-bg)',
-    color: 'var(--sh-text)',
+    background: 'var(--sh-input-bg)',
+    color: 'var(--sh-input-text)',
     fontFamily: FONT,
     outline: 'none',
     width: '100%',
@@ -1048,12 +1051,12 @@ const p = {
     alignItems: 'center',
     gap: 10,
     padding: '8px 12px',
-    background: 'var(--sh-bg)',
-    border: '1px solid var(--sh-border)',
+    background: 'var(--sh-input-bg)',
+    border: '1px solid var(--sh-panel-border)',
     borderRadius: 8,
     flexWrap: 'wrap',
   },
-  codeText: { fontFamily: 'monospace', fontSize: 14, fontWeight: 700, color: 'var(--sh-brand-accent)' },
+  codeText: { fontFamily: 'monospace', fontSize: 14, fontWeight: 700, color: 'var(--sh-brand)' },
   smallBtn: {
     fontSize: 12,
     fontWeight: 600,
@@ -1084,13 +1087,14 @@ const p = {
   },
 
   // FAQ
-  faqSection: { background: 'var(--sh-surface)', padding: '60px 20px' },
+  faqSection: { background: 'transparent', padding: '60px 20px' },
   faqInner: { maxWidth: 720, margin: '0 auto' },
   faqGrid: { display: 'grid', gap: 12 },
   faqItem: {
-    background: 'var(--sh-bg)',
-    border: '1px solid var(--sh-border)',
+    background: 'var(--sh-panel-bg)',
+    border: '1px solid var(--sh-panel-border)',
     borderRadius: 'var(--radius)',
+    boxShadow: 'var(--sh-panel-shadow)',
     overflow: 'hidden',
   },
   faqSummary: {
@@ -1116,36 +1120,37 @@ const p = {
 
   // Footer
   footer: {
-    background: 'var(--sh-footer-dark-bg)',
+    background: 'transparent',
     padding: '32px 20px',
     textAlign: 'center',
+    borderTop: '1px solid var(--sh-border)',
   },
-  footerText: { color: 'var(--sh-footer-dark-copy)', fontSize: 12, margin: 0 },
+  footerText: { color: 'var(--sh-muted)', fontSize: 12, margin: 0 },
 }
 
 // ── Styles: Cards ────────────────────────────────────────────────────────
 
 const c = {
   card: {
-    background: 'var(--sh-surface)',
-    border: '1px solid var(--sh-border)',
+    background: 'var(--sh-panel-bg)',
+    border: '1px solid var(--sh-panel-border)',
     borderRadius: 'var(--radius-lg)',
     padding: '32px 28px',
     position: 'relative',
     display: 'flex',
     flexDirection: 'column',
+    boxShadow: 'var(--sh-panel-shadow)',
   },
   cardFeatured: {
-    boxShadow: 'var(--shadow-lg)',
-    border: '2px solid var(--sh-brand-accent)',
+    border: '1px solid var(--sh-brand)',
   },
   popularTag: {
     position: 'absolute',
     top: -12,
     left: '50%',
     transform: 'translateX(-50%)',
-    background: 'var(--sh-brand-accent)',
-    color: 'var(--sh-btn-primary-text)',
+    background: 'var(--sh-brand)',
+    color: '#ffffff',
     fontSize: 12,
     fontWeight: 700,
     padding: '5px 16px',
@@ -1187,8 +1192,8 @@ const c = {
   featureText: { fontSize: 14, color: 'var(--sh-text)', lineHeight: 1.5 },
   btnGroup: { display: 'flex', flexDirection: 'column', gap: 10 },
   btnPrimary: {
-    background: 'var(--sh-brand-accent)',
-    color: 'var(--sh-btn-primary-text)',
+    background: 'var(--sh-brand)',
+    color: '#ffffff',
     border: 'none',
     padding: '12px 24px',
     borderRadius: 'var(--radius-control)',
@@ -1202,8 +1207,8 @@ const c = {
   },
   btnOutline: {
     background: 'transparent',
-    color: 'var(--sh-brand-accent)',
-    border: '2px solid var(--sh-brand-accent)',
+    color: 'var(--sh-brand)',
+    border: '1px solid var(--sh-brand)',
     padding: '10px 24px',
     borderRadius: 'var(--radius-control)',
     fontWeight: 700,
@@ -1241,7 +1246,7 @@ const c = {
   subscribedLabel: { fontSize: 14, fontWeight: 700, color: 'var(--sh-success-text)' },
   renewsLabel: { fontSize: 13, color: 'var(--sh-subtext)', margin: 0 },
   manageBtn: {
-    color: 'var(--sh-brand-accent)',
+    color: 'var(--sh-brand)',
     textDecoration: 'none',
     fontSize: 14,
     fontWeight: 600,
@@ -1256,11 +1261,11 @@ const c = {
   waitlistInput: {
     padding: '10px 14px',
     borderRadius: 8,
-    border: '1px solid var(--sh-border)',
+    border: '1px solid var(--sh-input-border)',
     fontSize: 14,
     fontFamily: FONT,
-    background: 'var(--sh-bg)',
-    color: 'var(--sh-text)',
+    background: 'var(--sh-input-bg)',
+    color: 'var(--sh-input-text)',
     width: '100%',
     boxSizing: 'border-box',
     outline: 'none',
@@ -1288,19 +1293,19 @@ const c = {
 
 const d = {
   section: {
-    background: 'var(--sh-ai-gradient)',
+    background: 'transparent',
     padding: '60px 20px',
   },
   inner: { maxWidth: 520, margin: '0 auto', textAlign: 'center' },
   title: {
     fontSize: 'clamp(22px, 3vw, 32px)',
     fontWeight: 700,
-    color: 'var(--sh-on-dark)',
+    color: 'var(--sh-heading)',
     margin: '0 0 10px',
   },
   subtitle: {
     fontSize: 15,
-    color: 'var(--sh-on-dark-subtle)',
+    color: 'var(--sh-subtext)',
     margin: '0 0 28px',
     lineHeight: 1.6,
   },
@@ -1312,9 +1317,9 @@ const d = {
     marginBottom: 20,
   },
   presetBtn: {
-    background: 'var(--sh-glass-bg-strong)',
-    color: 'var(--sh-on-dark)',
-    border: '2px solid var(--sh-glass-border-strong)',
+    background: 'var(--sh-panel-bg)',
+    color: 'var(--sh-text)',
+    border: '1px solid var(--sh-panel-border)',
     padding: '8px 18px',
     borderRadius: 8,
     fontSize: 14,
@@ -1325,9 +1330,9 @@ const d = {
     minWidth: 56,
   },
   presetActive: {
-    background: 'var(--sh-on-dark)',
-    color: 'var(--sh-brand-accent)',
-    borderColor: 'var(--sh-on-dark)',
+    background: 'var(--sh-brand)',
+    color: '#ffffff',
+    borderColor: 'var(--sh-brand)',
   },
   customRow: {
     display: 'flex',
@@ -1336,20 +1341,20 @@ const d = {
     gap: 10,
     marginBottom: 16,
   },
-  customLabel: { fontSize: 13, color: 'var(--sh-on-dark-subtle)', fontWeight: 600 },
+  customLabel: { fontSize: 13, color: 'var(--sh-subtext)', fontWeight: 600 },
   customWrap: {
     display: 'flex',
     alignItems: 'center',
-    background: 'var(--sh-glass-bg-strong)',
+    background: 'var(--sh-panel-bg)',
     borderRadius: 8,
     padding: '0 12px',
-    border: '1px solid var(--sh-glass-border-strong)',
+    border: '1px solid var(--sh-panel-border)',
   },
-  dollar: { color: 'var(--sh-on-dark)', fontWeight: 700, fontSize: 15, marginRight: 4 },
+  dollar: { color: 'var(--sh-text)', fontWeight: 700, fontSize: 15, marginRight: 4 },
   customInput: {
     background: 'transparent',
     border: 'none',
-    color: 'var(--sh-on-dark)',
+    color: 'var(--sh-text)',
     fontSize: 15,
     fontWeight: 600,
     width: 72,
@@ -1361,9 +1366,9 @@ const d = {
     width: '100%',
     padding: '10px 14px',
     borderRadius: 8,
-    border: '1px solid var(--sh-glass-border-strong)',
-    background: 'var(--sh-glass-bg)',
-    color: 'var(--sh-on-dark)',
+    border: '1px solid var(--sh-input-border)',
+    background: 'var(--sh-input-bg)',
+    color: 'var(--sh-input-text)',
     fontSize: 14,
     fontFamily: FONT,
     outline: 'none',
@@ -1377,11 +1382,11 @@ const d = {
     marginBottom: 20,
     cursor: 'pointer',
   },
-  anonCheck: { width: 16, height: 16, accentColor: 'var(--sh-on-dark)', cursor: 'pointer' },
-  anonText: { fontSize: 13, color: 'var(--sh-on-dark-subtle)', fontWeight: 500 },
+  anonCheck: { width: 16, height: 16, accentColor: 'var(--sh-brand)', cursor: 'pointer' },
+  anonText: { fontSize: 13, color: 'var(--sh-subtext)', fontWeight: 500 },
   donateBtn: {
-    background: 'var(--sh-on-dark)',
-    color: 'var(--sh-brand-accent)',
+    background: 'var(--sh-brand)',
+    color: '#ffffff',
     border: 'none',
     padding: '12px 36px',
     borderRadius: 10,
@@ -1404,7 +1409,7 @@ const d = {
   },
   footnote: {
     fontSize: 12,
-    color: 'var(--sh-on-dark-soft)',
+    color: 'var(--sh-muted)',
     margin: 0,
     lineHeight: 1.5,
   },

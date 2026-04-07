@@ -2,6 +2,47 @@
 
 ## Date: 2026-04-07
 
+### Dark-Mode Public Surface Polish and Live Visual Smoke Coverage
+
+**Home-linked public pages now carry the enhanced dark presentation, while private app pages stay cleaner**
+- Scoped the stronger dark-mode FX back to the home-connected public routes only, so landing, auth, pricing, supporters, and legal pages keep the atmospheric treatment while feed and the rest of the signed-in product no longer inherit it
+- Kept the shared public-page shell for login, register, forgot/reset password, pricing, supporters, and legal pages so those surfaces still feel cohesive, readable, and visually integrated without forcing the same treatment onto authorized pages
+- Toned down Pricing by replacing the louder purple-heavy emphasis with the app's primary blue, quieter panel surfaces, and subtler dark section bands so the page feels premium without overpowering the rest of the UI
+
+**Live localhost dark-mode regression checks are now committed**
+- Added `frontend/studyhub-app/tests/dark-mode.beta-live.spec.js`, a Playwright beta-live snapshot suite that boots dark mode the same way as the successful localhost capture flow, disables tutorials, hides transient UI like the service-worker update banner, waits for legal documents to finish loading, and snapshots the home-connected public surfaces only
+- Added dedicated frontend scripts for the new pass so the live dark visual check can be run directly with `test:e2e:dark:beta`, regenerated intentionally with `test:e2e:dark:beta:update`, or invoked under the visual alias `visual:dark:beta`
+- Because the new spec uses the existing beta-live naming/config pattern, it is also picked up automatically by the repo's broader beta validation workflow
+
+**Validation**
+- Editor diagnostics for `frontend/studyhub-app/src/index.css`: no new errors; existing browser-support warnings only
+- `Set-Location frontend/studyhub-app; npx eslint src/App.jsx tests/dark-mode.beta-live.spec.js`: passes
+- `Set-Location frontend/studyhub-app; npm run build`: passes
+- `Set-Location frontend/studyhub-app; npm run test:e2e:dark:beta:update`: passes (1 test, public surfaces)
+- `Set-Location frontend/studyhub-app; npm run test:e2e:dark:beta`: passes (1 test, public surfaces)
+
+### Beta Stack Runtime Hardening and Live Study-Group Verification
+
+**Beta stack boot now survives mounted-volume permission drift**
+- Moved the backend and frontend dev-container lock state out of `node_modules/.studyhub` and stopped treating a missing hash file as a forced reinstall, so stale local volumes no longer trigger unnecessary dependency refreshes on every beta boot
+- Updated the backend dev entrypoint to skip `prisma generate` unless dependencies were freshly installed or the Prisma client is actually missing, which avoids write attempts into mounted `node_modules/.prisma` paths during normal restarts
+- Updated the frontend dev entrypoint to start Vite with `--configLoader runner`, which avoids `.vite-temp` writes under mounted `node_modules` paths in the beta container
+- Switched the local beta frontend and backend compose services to run as `root` so stale uploads paths and named volumes remain writable in the local dev stack
+
+**Live browser coverage now exists for the highest-risk study-group flows**
+- Added a dedicated live beta Playwright spec for pending approval, invite acceptance, moderator member removal rules, and school/course filtering
+- Hardened the live beta browser setup so authenticated mutations include CSRF tokens, current legal documents are accepted during session bootstrap, cookie-consent prompts do not block interactions, and seeded cleanup remains reliable after test failures
+- Confirmed the four requested study-group flows pass together on the repaired beta stack instead of only through local unit or route coverage
+
+**Standard beta seeding is restored**
+- Fixed `backend/prisma/seed.js` to load catalog data from the current `src/lib/catalog/catalogData` module instead of the removed legacy import path
+- Re-ran the standard `beta:seed` pipeline end to end and confirmed it now completes through base seed, beta-user seed, and preview-fixture generation without the earlier seed-script import failure
+
+**Validation**
+- `npm run beta:seed`: passes
+- `Set-Location frontend/studyhub-app; npx playwright test --config=playwright.beta.config.js tests/study-groups.beta-live.spec.js`: passes (4 tests)
+- Live beta backend health check on `http://localhost:4000/health`: returns `{"api":"ok","database":"ok","status":"healthy"}`
+
 ### Study Groups Permission and Discovery Tightening
 
 **Membership state handling now matches the backend contract**

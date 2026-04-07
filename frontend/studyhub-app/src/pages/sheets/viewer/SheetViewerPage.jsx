@@ -91,9 +91,10 @@ export default function SheetViewerPage() {
   return (
     <>
       <Navbar />
-      <div style={{ background: 'var(--sh-bg)', minHeight: '100vh', fontFamily: FONT }}>
-        <div style={pageShell('reading', 26, 48)}>
+      <div className="sh-app-page" style={{ background: 'var(--sh-bg)', minHeight: '100vh', fontFamily: FONT }}>
+        <div className="sh-ambient-shell sh-ambient-shell--reading" style={pageShell('reading', 26, 48)}>
           <div
+            className="sh-ambient-grid"
             style={{
               display: 'grid',
               gridTemplateColumns: layout.isCompact
@@ -105,7 +106,7 @@ export default function SheetViewerPage() {
           >
             <AppSidebar mode={layout.sidebarMode} />
 
-            <main id="main-content" style={{ display: 'grid', gap: 16 }}>
+            <main className="sh-ambient-main" id="main-content" style={{ display: 'grid', gap: 16 }}>
               <SheetHeader sheet={sheet} handleBack={handleBack} />
 
               {/* ── Navigation tab strip ──────────────────────────── */}

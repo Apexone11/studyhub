@@ -153,12 +153,12 @@ export default function FeedPage() {
   return (
     <>
       <Navbar />
-      <div style={{ background: 'var(--sh-page-bg)', minHeight: '100vh', fontFamily: FONT }}>
-        <div style={pageShell('app', 26, 48)}>
-          <div className="app-three-col-grid">
+      <div className="sh-app-page" style={{ background: 'var(--sh-page-bg)', minHeight: '100vh', fontFamily: FONT }}>
+        <div className="sh-ambient-shell" style={pageShell('app', 26, 48)}>
+          <div className="app-three-col-grid sh-ambient-grid">
             <AppSidebar mode={layout.sidebarMode} />
 
-            <main id="main-content" style={{ display: 'grid', gap: 18 }}>
+            <main className="sh-ambient-main" id="main-content" style={{ display: 'grid', gap: 18 }}>
               <GettingStartedCard user={user} />
               <SchoolSuggestionBanner user={user} />
               {newSinceLastVisit > 0 && activeFilter !== 'for-you' ? (

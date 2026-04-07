@@ -117,17 +117,15 @@ export default function ReviewPage() {
   const displayStars = hoverStar || stars
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: FONT }}>
+    <div className="sh-app-page" style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: FONT }}>
       <Navbar crumbs={[{ label: 'Leave a Review', to: '/review' }]} hideTabs actions={navActions} />
-      <div style={{
+      <div className="app-two-col-grid sh-ambient-grid sh-ambient-shell" style={{
         ...pageShell('app'),
-        display: 'grid',
-        gridTemplateColumns: layout.columns.appTwoColumn,
         gap: 20,
       }}>
         <AppSidebar mode={layout.sidebarMode} />
 
-        <main id="main-content" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, paddingTop: 8 }}>
+        <main className="sh-ambient-main" id="main-content" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, paddingTop: 8 }}>
           <div style={{
             background: 'var(--sh-surface)', borderRadius: 16, border: '1px solid var(--sh-border)',
             padding: 'clamp(24px, 4vw, 40px)', maxWidth: 600, width: '100%',

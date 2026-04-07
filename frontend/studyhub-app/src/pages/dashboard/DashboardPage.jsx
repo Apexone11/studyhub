@@ -93,14 +93,14 @@ export default function DashboardPage() {
   )
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: FONT }}>
+    <div className="sh-app-page" style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: FONT }}>
       <Navbar crumbs={[{ label: 'Dashboard', to: '/dashboard' }]} hideTabs actions={navActions} />
       {/* 2-column responsive grid: sidebar | dashboard content
        * Desktop: sidebar visible, Compact: sidebar as drawer */}
-      <div className="app-two-col-grid" style={pageShell('app')}>
+      <div className="app-two-col-grid sh-ambient-grid sh-ambient-shell" style={pageShell('app')}>
         <AppSidebar mode={layout.sidebarMode} />
 
-        <main id="main-content" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+        <main className="sh-ambient-main" id="main-content" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
           {/* Welcome banner — shown once after registration */}
           {isWelcome && !welcomeDismissed ? (
             <div

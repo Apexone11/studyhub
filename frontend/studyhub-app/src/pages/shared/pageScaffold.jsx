@@ -10,10 +10,11 @@ export function PageShell({ nav, sidebar, children }) {
     : sidebar
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: PAGE_FONT, overflowX: 'hidden' }}>
+    <div className="sh-page-shell" style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: PAGE_FONT, overflowX: 'hidden' }}>
       {nav}
-      <div style={pageShell('app')}>
+      <div className="sh-ambient-shell" style={pageShell('app')}>
         <div
+          className="sh-page-shell__grid sh-ambient-grid"
           style={{
             display: 'grid',
             gridTemplateColumns: layout.columns.appTwoColumn,
@@ -21,10 +22,10 @@ export function PageShell({ nav, sidebar, children }) {
             alignItems: 'start',
           }}
         >
-          <div style={{ position: layout.isCompact ? 'static' : 'sticky', top: layout.isCompact ? undefined : 74 }}>
+          <div className="sh-page-shell__sidebar" style={{ position: layout.isCompact ? 'static' : 'sticky', top: layout.isCompact ? undefined : 74 }}>
             {responsiveSidebar}
           </div>
-          <main id="main-content">{children}</main>
+          <main className="sh-page-shell__main sh-ambient-main" id="main-content">{children}</main>
         </div>
       </div>
     </div>

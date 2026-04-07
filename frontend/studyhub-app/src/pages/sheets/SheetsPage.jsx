@@ -61,12 +61,12 @@ export default function SheetsPage() {
   return (
     <>
       <Navbar />
-      <div className="sheets-page">
-        <div style={pageShell('app', 26, 48)}>
-          <div className="app-three-col-grid">
+      <div className="sheets-page sh-app-page">
+        <div className="sh-ambient-shell" style={pageShell('app', 26, 48)}>
+          <div className="app-three-col-grid sh-ambient-grid">
             <AppSidebar mode={layout.sidebarMode} />
 
-            <main id="main-content" className="sheets-page__main">
+            <main id="main-content" className="sheets-page__main sh-ambient-main">
               <section className="sh-card sheets-page__title-card">
                 <div className="sheets-page__title-row">
                   <div>

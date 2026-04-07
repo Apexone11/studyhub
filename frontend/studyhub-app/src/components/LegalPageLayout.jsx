@@ -42,7 +42,7 @@ export default function LegalPageLayout({
   )
 
   return (
-    <div className="legal-page">
+    <div className="legal-page sh-public-page sh-public-page--legal">
       <Navbar variant="landing" hideSearch />
 
       <main className="legal-shell">

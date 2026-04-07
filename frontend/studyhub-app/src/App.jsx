@@ -56,6 +56,7 @@ import ScrollToTop from './components/ScrollToTop'
 import ToastContainer from './components/Toast'
 import OfflineIndicator from './components/OfflineIndicator'
 import LegalAcceptanceEnforcementModal from './components/LegalAcceptanceEnforcementModal'
+import DarkModeFx from './components/DarkModeFx'
 
 const AiBubble = lazy(() => import('./components/ai/AiBubble'))
 const AiChatProviderModule = lazy(() =>
@@ -122,6 +123,35 @@ const ROUTE_TITLES = {
   '/review': 'Leave a Review',
   '/forgot-password': 'Forgot Password',
   '/reset-password': 'Reset Password',
+}
+
+const HOME_CONNECTED_FX_ROUTES = new Set([
+  '/',
+  '/login',
+  '/register',
+  '/terms',
+  '/privacy',
+  '/guidelines',
+  '/cookies',
+  '/disclaimer',
+  '/data-request',
+  '/about',
+  '/pricing',
+  '/supporters',
+  '/forgot-password',
+  '/reset-password',
+])
+
+function RouteVisualScope({ children }) {
+  const location = useLocation()
+  const enablePublicFx = HOME_CONNECTED_FX_ROUTES.has(location.pathname)
+
+  return (
+    <div className={enablePublicFx ? 'sh-public-route-fx' : undefined}>
+      {enablePublicFx ? <DarkModeFx /> : null}
+      {children}
+    </div>
+  )
 }
 
 function RouteAnnouncer() {
@@ -296,16 +326,17 @@ function AppRoutes() {
   return (
     <BrowserRouter>
       <SessionProvider>
-        <a href="#main-content" className="skip-to-content">
-          Skip to main content
-        </a>
-        <RouteAnnouncer />
-        <RouteTelemetry />
-        <PreferencesBootstrap />
-        <LegalAcceptanceEnforcementModal />
-        <AuthenticatedAiProvider>
-          <Suspense fallback={<RouteFallback />}>
-            <Routes>
+        <RouteVisualScope>
+          <a href="#main-content" className="skip-to-content">
+            Skip to main content
+          </a>
+          <RouteAnnouncer />
+          <RouteTelemetry />
+          <PreferencesBootstrap />
+          <LegalAcceptanceEnforcementModal />
+          <AuthenticatedAiProvider>
+            <Suspense fallback={<RouteFallback />}>
+              <Routes>
               {/* ── public (unauthenticated) ─────────────────────────── */}
               <Route
                 path="/"
@@ -567,18 +598,19 @@ function AppRoutes() {
 
               {/* ── catch-all ────────────────────────────────────────── */}
               <Route path="*" element={<NotFoundPage />} />
-            </Routes>
-          </Suspense>
-          <ScrollToTop />
-          <ToastContainer />
-          <OfflineIndicator />
-          <AuthenticatedBubble />
-        </AuthenticatedAiProvider>
-        {PerfOverlay && (
-          <Suspense fallback={null}>
-            <PerfOverlay />
-          </Suspense>
-        )}
+              </Routes>
+            </Suspense>
+            <ScrollToTop />
+            <ToastContainer />
+            <OfflineIndicator />
+            <AuthenticatedBubble />
+          </AuthenticatedAiProvider>
+          {PerfOverlay && (
+            <Suspense fallback={null}>
+              <PerfOverlay />
+            </Suspense>
+          )}
+        </RouteVisualScope>
       </SessionProvider>
     </BrowserRouter>
   )

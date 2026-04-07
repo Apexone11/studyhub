@@ -278,10 +278,10 @@ export default function MyCoursesPage() {
 
   /* ── Render ──────────────────────────────────────────────────────────── */
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--sh-bg)' }}>
+    <div className="sh-app-page" style={{ minHeight: '100vh', background: 'var(--sh-bg)' }}>
       <Navbar crumbs={[{ label: 'My Courses', to: '/my-courses' }]} hideTabs />
 
-      <div ref={mainRef} style={{ maxWidth: 1100, width: '100%', margin: '0 auto', padding: '24px clamp(12px, 2vw, 20px) 60px', boxSizing: 'border-box' }}>
+      <div className="sh-ambient-shell sh-ambient-main" ref={mainRef} style={{ maxWidth: 1100, width: '100%', margin: '0 auto', padding: '24px clamp(12px, 2vw, 20px) 60px', boxSizing: 'border-box' }}>
         {/* ── Hero header ─────────────────────────────────────────── */}
         <div style={{
           borderRadius: 18, overflow: 'hidden', marginBottom: 24,

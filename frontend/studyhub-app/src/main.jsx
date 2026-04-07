@@ -4,6 +4,7 @@ import './index.css'
 import './styles/responsive.css'
 import App from './App.jsx'
 import { installApiFetchShim } from './lib/http'
+import { applyGlobalTheme } from './lib/appearance'
 import { initTelemetry, captureWebVital } from './lib/telemetry'
 import { reportWebVitals } from './lib/performance'
 
@@ -15,6 +16,11 @@ try {
 }
 try {
   installApiFetchShim()
+} catch {
+  /* best-effort */
+}
+try {
+  applyGlobalTheme()
 } catch {
   /* best-effort */
 }

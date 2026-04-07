@@ -10,8 +10,9 @@ const styles = {
     position: 'relative',
     minHeight: 260,
     borderRadius: 16,
-    border: '1px solid var(--sh-border)',
-    background: 'var(--sh-bg)',
+    border: '1px solid var(--sh-panel-border)',
+    background: 'var(--sh-panel-bg)',
+    boxShadow: 'var(--sh-panel-shadow)',
     overflow: 'hidden',
   },
   loading: {

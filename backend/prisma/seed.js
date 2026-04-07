@@ -1,7 +1,7 @@
 const path = require('node:path')
 const bcrypt = require('bcryptjs')
 const crypto = require('crypto')
-const { SCHOOLS, COURSES } = require('../src/lib/catalogData')
+const { SCHOOLS, COURSES } = require('../src/lib/catalog/catalogData')
 const { createPrismaClient } = require('../src/lib/prisma')
 const { assertLocalDatabase } = require('../scripts/assertLocalDatabase')
 

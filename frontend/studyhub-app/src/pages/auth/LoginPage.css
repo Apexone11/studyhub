@@ -5,7 +5,7 @@
 
 .login-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #1e40af 100%);
+  background: transparent;
   font-family: var(--font);
   color: var(--sh-text);
   position: relative;
@@ -25,8 +25,8 @@
   left: -120px;
   width: 400px;
   height: 400px;
-  background: rgba(59, 130, 246, 0.08);
-  filter: blur(80px);
+  background: rgba(59, 130, 246, 0.05);
+  filter: blur(90px);
 }
 
 .login-orb--purple {
@@ -34,8 +34,8 @@
   right: -100px;
   width: 350px;
   height: 350px;
-  background: rgba(139, 92, 246, 0.06);
-  filter: blur(80px);
+  background: rgba(99, 102, 241, 0.045);
+  filter: blur(88px);
 }
 
 .login-orb--green {
@@ -44,14 +44,15 @@
   transform: translate(-50%, -50%);
   width: 600px;
   height: 600px;
-  background: rgba(16, 185, 129, 0.04);
-  filter: blur(100px);
+  background: rgba(20, 184, 166, 0.03);
+  filter: blur(110px);
 }
 
 /* ── Main card container ───────────────────────────────────────── */
 
 .login-main {
-  padding: 48px 20px 80px;
+  min-height: calc(100vh - 72px);
+  padding: 56px 20px 88px;
   display: grid;
   place-items: center;
   position: relative;
@@ -60,11 +61,11 @@
 
 .login-card {
   width: min(92vw, 440px);
-  background: var(--sh-surface);
-  backdrop-filter: blur(20px);
+  background: var(--sh-panel-bg);
+  backdrop-filter: blur(22px);
   border-radius: var(--radius-lg);
-  border: 1px solid var(--sh-border);
-  box-shadow: var(--elevation-3);
+  border: 1px solid var(--sh-panel-border);
+  box-shadow: var(--sh-panel-shadow);
   padding: var(--space-10) var(--space-8);
 }
 
@@ -85,6 +86,7 @@
   background: var(--sh-brand);
   box-shadow: var(--sh-btn-primary-shadow);
   margin-bottom: var(--space-4);
+  color: var(--sh-warning);
 }
 
 .login-h1 {
@@ -136,6 +138,14 @@
 .login-alert-icon {
   font-size: 18px;
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  font-weight: 800;
 }
 
 /* ── Google OAuth section ──────────────────────────────────────── */
@@ -277,7 +287,7 @@
 .login-register-section {
   margin-top: 28px;
   padding-top: var(--space-5);
-  border-top: 1px solid var(--sh-soft);
+  border-top: 1px solid var(--sh-panel-border);
   text-align: center;
   font-size: var(--type-sm);
   color: var(--sh-muted);

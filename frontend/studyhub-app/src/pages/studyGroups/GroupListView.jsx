@@ -158,12 +158,12 @@ export default function GroupListView() {
   return (
     <>
       <Navbar />
-      <div style={styles.page}>
-        <div style={pageShell('app', 26, 48)}>
-          <div style={styles.appGrid}>
+      <div className="sh-app-page" style={styles.page}>
+        <div className="sh-ambient-shell" style={pageShell('app', 26, 48)}>
+          <div className="sh-ambient-grid" style={styles.appGrid}>
             <AppSidebar mode={layout.sidebarMode} />
 
-            <main id="main-content" style={styles.main}>
+            <main className="sh-ambient-main" id="main-content" style={styles.main}>
               {/* Title section with create button */}
               <section data-tutorial="groups-list" style={styles.titleCard}>
                 <div style={styles.titleRow}>
