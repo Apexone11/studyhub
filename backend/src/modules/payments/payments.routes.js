@@ -15,7 +15,7 @@
  *   GET  /admin/revenue           — Admin revenue analytics (admin only)
  */
 const express = require('express')
-const { verifyAuthToken, getAuthTokenFromRequest } = require('../../lib/authTokens')
+const optionalAuth = require('../../core/auth/optionalAuth')
 const { captureError } = require('../../monitoring/sentry')
 const log = require('../../lib/logger')
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
@@ -40,19 +40,6 @@ const requireAuth = require('../../middleware/auth')
 const router = express.Router()
 
 // ── Auth middleware ───────────────────────────────────────────────────────
-
-function optionalAuth(req, _res, next) {
-  const token = getAuthTokenFromRequest(req)
-  if (token) {
-    try {
-      const payload = verifyAuthToken(token)
-      req.user = { userId: payload.sub, role: payload.role }
-    } catch {
-      req.user = null
-    }
-  }
-  next()
-}
 
 function requireAdmin(req, res, next) {
   if (!req.user || req.user.role !== 'admin') {

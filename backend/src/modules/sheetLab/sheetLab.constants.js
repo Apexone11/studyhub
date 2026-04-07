@@ -1,20 +1,9 @@
 const crypto = require('node:crypto')
-const { getAuthTokenFromRequest, verifyAuthToken } = require('../../lib/authTokens')
+const optionalAuth = require('../../core/auth/optionalAuth')
 
 const SHEET_STATUS = {
   DRAFT: 'draft',
   PUBLISHED: 'published',
-}
-
-function optionalAuth(req, _res, next) {
-  const token = getAuthTokenFromRequest(req)
-  if (!token) return next()
-  try {
-    req.user = verifyAuthToken(token)
-  } catch {
-    // Invalid token — proceed as unauthenticated.
-  }
-  next()
 }
 
 function canReadSheet(sheet, user) {

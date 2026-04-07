@@ -39,7 +39,7 @@ function calculateActivityScore(activity) {
 /**
  * Get the date range for a given period
  * @param {'weekly'|'monthly'|'alltime'} period
- * @returns {{start: Date, end: Date}}
+ * @returns {{start: Date|null, end: Date}}
  */
 function getDateRange(period) {
   const normalizedPeriod = SUPPORTED_PERIODS.has(period) ? period : DEFAULT_PERIOD
@@ -51,7 +51,7 @@ function getDateRange(period) {
   } else if (normalizedPeriod === 'monthly') {
     start.setMonth(end.getMonth() - 1)
   }
-  // For 'alltime', start remains undefined (no date filter)
+  // For 'alltime', the date filter is disabled by returning null.
 
   return { start: normalizedPeriod === 'alltime' ? null : start, end }
 }

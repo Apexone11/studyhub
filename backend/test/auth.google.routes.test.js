@@ -130,6 +130,7 @@ describe('auth google route', () => {
       googleId: 'google-2',
       email: 'new@studyhub.test',
       name: 'New User',
+      emailVerified: true,
     })
     mocks.googleAuth.findUserByGoogleId.mockResolvedValue(null)
     mocks.googleAuth.findUserByEmail.mockResolvedValue(null)
@@ -146,16 +147,38 @@ describe('auth google route', () => {
     expect(mocks.legalService.recordCurrentRequiredLegalAcceptancesTx).not.toHaveBeenCalled()
   })
 
+  it('rejects Google sign-in when the Google account email is not verified', async () => {
+    mocks.googleAuth.verifyGoogleIdToken.mockResolvedValue({
+      googleId: 'google-unverified',
+      email: 'new@studyhub.test',
+      emailVerified: false,
+    })
+    mocks.googleAuth.findUserByGoogleId.mockResolvedValue(null)
+
+    const response = await request(app)
+      .post('/google')
+      .send({
+        credential: 'valid-google-jwt',
+        legalAccepted: true,
+        legalVersion: '2026-04-04',
+      })
+
+    expect(response.status).toBe(403)
+    expect(response.body).toEqual({
+      error: 'Google account email must be verified before you can sign in.',
+    })
+  })
+
   it('creates a new Google account and records current legal acceptances when accepted', async () => {
     mocks.googleAuth.verifyGoogleIdToken.mockResolvedValue({
       googleId: 'google-3',
       email: 'creator@studyhub.test',
       name: 'Creator User',
+      emailVerified: true,
       picture: 'https://example.com/avatar.png',
     })
     mocks.googleAuth.findUserByGoogleId.mockResolvedValue(null)
     mocks.googleAuth.findUserByEmail.mockResolvedValue(null)
-    mocks.prisma.user.findUnique.mockResolvedValue(null)
     mocks.tx.user.create.mockResolvedValue({ id: 77 })
 
     const response = await request(app)
@@ -193,5 +216,39 @@ describe('auth google route', () => {
       }),
     )
     expect(mocks.authService.issueAuthenticatedSession).toHaveBeenCalledWith(expect.anything(), 77)
+  })
+
+  it('retries username creation when a username collision races with account creation', async () => {
+    const duplicateUsernameError = new Error('duplicate username')
+    duplicateUsernameError.code = 'P2002'
+    duplicateUsernameError.meta = { target: ['username'] }
+
+    mocks.googleAuth.verifyGoogleIdToken.mockResolvedValue({
+      googleId: 'google-4',
+      email: 'retry@studyhub.test',
+      name: 'Creator User With A Very Long Name',
+      emailVerified: true,
+    })
+    mocks.googleAuth.findUserByGoogleId.mockResolvedValue(null)
+    mocks.googleAuth.findUserByEmail.mockResolvedValue(null)
+    mocks.tx.user.create
+      .mockRejectedValueOnce(duplicateUsernameError)
+      .mockResolvedValueOnce({ id: 88 })
+
+    const response = await request(app)
+      .post('/google')
+      .send({
+        credential: 'valid-google-jwt',
+        legalAccepted: true,
+        legalVersion: '2026-04-04',
+      })
+
+    expect(response.status).toBe(201)
+    expect(mocks.prisma.$transaction).toHaveBeenCalledTimes(2)
+    expect(mocks.tx.user.create).toHaveBeenCalledTimes(2)
+    expect(mocks.tx.user.create.mock.calls[0][0].data.username.length).toBeLessThanOrEqual(20)
+    expect(mocks.tx.user.create.mock.calls[1][0].data.username.length).toBeLessThanOrEqual(20)
+    expect(mocks.tx.user.create.mock.calls[0][0].data.username).not.toBe(mocks.tx.user.create.mock.calls[1][0].data.username)
+    expect(mocks.authService.issueAuthenticatedSession).toHaveBeenCalledWith(expect.anything(), 88)
   })
 })

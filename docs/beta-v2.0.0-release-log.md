@@ -4,6 +4,26 @@
 
 ## Date: 2026-04-07
 
+### PR #195 Follow-up Review Fixes
+
+**Optional auth and maintenance middleware now behave consistently across mounted routes**
+- Centralized optional-token decoding around a shared normalized auth-user helper so optional-auth surfaces no longer attach raw JWT payloads that are missing `userId`
+- Updated guarded-mode allowlist matching to use the full mounted path instead of `req.path` alone, which keeps `/api/auth/google` and similar mounted auth routes usable during maintenance windows
+- Activated restriction checks against normalized early auth context while exempting auth/session maintenance routes such as logout so restricted users can still clear their server session
+
+**Google sign-up and verification gates were tightened**
+- Switched Google account creation to race-safe username generation that retries on username uniqueness conflicts, respects the 20-character username limit when suffixes are appended, and handles `P2002` email or Google ID conflicts cleanly
+- Standardized `requireVerifiedEmail` responses onto the shared error envelope with stable auth and verification error codes
+
+**Small correctness drifts were cleaned up**
+- Reset mention-regexp state on every extraction call so repeated mention parsing cannot skip matches
+- Aligned the HTML upload kill-switch header comment with the actual `enabled` override behavior
+- Tightened sanitized HTML previews by stripping form action targets instead of preserving submit destinations, and corrected the leaderboard helper comment so it matches the null-start all-time behavior
+
+**Validation**
+- `Set-Location -LiteralPath backend; npm test -- test/core-utils.test.js test/auth.google.routes.test.js test/releaseA.stability.middleware.test.js test/checkRestrictions.test.js test/mentions.test.js test/requireVerifiedEmail.test.js test/html.security.test.js`: passes (136 tests)
+- `Set-Location -LiteralPath backend; npx eslint src/lib/authTokens.js src/core/auth/optionalAuth.js src/index.js src/middleware/checkRestrictions.js src/middleware/guardedMode.js src/middleware/requireVerifiedEmail.js src/lib/mentions.js src/lib/html/htmlKillSwitch.js src/lib/html/htmlPreviewDocument.js src/lib/leaderboard.js src/modules/auth/auth.google.controller.js src/modules/users/users.routes.js src/modules/library/library.routes.js src/modules/search/search.routes.js src/modules/feed/feed.discovery.controller.js src/modules/sheetLab/sheetLab.constants.js src/modules/payments/payments.routes.js test/auth.google.routes.test.js test/releaseA.stability.middleware.test.js test/checkRestrictions.test.js test/mentions.test.js test/requireVerifiedEmail.test.js test/html.security.test.js`: passes
+
 ### Profile Privacy, Supporter Receipts, and Payment History Export
 
 **Profiles now support richer public metadata with tighter privacy controls**

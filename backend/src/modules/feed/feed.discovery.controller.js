@@ -13,7 +13,7 @@
 const express = require('express')
 const prisma = require('../../lib/prisma')
 const { captureError } = require('../../monitoring/sentry')
-const { getAuthTokenFromRequest, verifyAuthToken } = require('../../lib/authTokens')
+const optionalAuth = require('../../core/auth/optionalAuth')
 const { getBlockedUserIds } = require('../../lib/social/blockFilter')
 const { cache } = require('../../lib/cache')
 const { feedDiscoveryLimiter } = require('../../lib/rateLimiters')
@@ -28,17 +28,6 @@ const {
 const router = express.Router()
 
 const discoveryLimiter = feedDiscoveryLimiter
-
-function optionalAuth(req, _res, next) {
-  const token = getAuthTokenFromRequest(req)
-  if (!token) return next()
-  try {
-    req.user = verifyAuthToken(token)
-  } catch {
-    /* proceed unauthenticated */
-  }
-  next()
-}
 
 function isMissingTableError(error) {
   return (

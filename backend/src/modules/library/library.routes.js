@@ -6,7 +6,7 @@
 
 const express = require('express')
 const requireAuth = require('../../middleware/auth')
-const { getAuthTokenFromRequest, verifyAuthToken } = require('../../lib/authTokens')
+const optionalAuth = require('../../core/auth/optionalAuth')
 const { libraryWriteLimiter } = require('../../lib/rateLimiters')
 
 const {
@@ -26,21 +26,6 @@ const {
   createBookmarkHandler,
   deleteBookmarkHandler,
 } = require('./library.controller')
-
-/**
- * Optional auth -- sets req.user if a valid token is present, otherwise
- * proceeds as unauthenticated.
- */
-function optionalAuth(req, res, next) {
-  const token = getAuthTokenFromRequest(req)
-  if (!token) return next()
-  try {
-    req.user = verifyAuthToken(token)
-  } catch {
-    // Invalid/expired token -- proceed as unauthenticated
-  }
-  next()
-}
 
 const router = express.Router()
 

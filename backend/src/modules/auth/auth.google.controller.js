@@ -21,6 +21,32 @@ const {
 } = require('../legal/legal.service')
 
 const router = express.Router()
+const MAX_USERNAME_LENGTH = 20
+const MAX_GOOGLE_USERNAME_ATTEMPTS = 1000
+
+function buildGoogleUsernameBase(googlePayload) {
+  const baseUsername = (googlePayload.name || googlePayload.email.split('@')[0] || 'user')
+    .replace(/[^a-zA-Z0-9_]/g, '')
+    .slice(0, MAX_USERNAME_LENGTH)
+
+  return baseUsername || 'user'
+}
+
+function buildGoogleUsernameCandidate(baseUsername, attempt) {
+  if (attempt === 0) return baseUsername
+
+  const suffix = String(attempt)
+  const maxBaseLength = Math.max(1, MAX_USERNAME_LENGTH - suffix.length)
+  return `${baseUsername.slice(0, maxBaseLength)}${suffix}`
+}
+
+function getP2002Targets(error) {
+  const targets = Array.isArray(error?.meta?.target)
+    ? error.meta.target
+    : [error?.meta?.target].filter(Boolean)
+
+  return targets.map((target) => String(target))
+}
 
 /**
  * POST /api/auth/google
@@ -75,45 +101,65 @@ router.post('/google', googleLimiter, async (req, res) => {
     }
 
     // New user → create immediately with zero enrollments
-    const baseUsername = (googlePayload.name || googlePayload.email.split('@')[0])
-      .replace(/[^a-zA-Z0-9_]/g, '')
-      .slice(0, 16) || 'user'
-
-    let username = baseUsername
-    let suffix = 1
-    while (await prisma.user.findUnique({ where: { username }, select: { id: true } })) {
-      if (suffix > 100) throw new AppError(500, 'Unable to generate a unique username. Please try again.')
-      username = `${baseUsername.slice(0, 16)}${suffix}`
-      suffix += 1
-    }
-
     const randomPassword = crypto.randomBytes(32).toString('hex')
     const passwordHash = await bcrypt.hash(randomPassword, 12)
     const acceptedAt = new Date()
 
-    const createdUser = await prisma.$transaction(async (tx) => {
-      const createdUserRecord = await tx.user.create({
-        data: {
-          username,
-          passwordHash,
-          email: googlePayload.email,
-          emailVerified: isGoogleEmailVerified,
-          googleId: googlePayload.googleId,
-          authProvider: 'google',
-          avatarUrl: googlePayload.picture || null,
-          termsAcceptedVersion: CURRENT_LEGAL_VERSION,
-          termsAcceptedAt: acceptedAt,
-        },
-        select: { id: true },
-      })
+    const baseUsername = buildGoogleUsernameBase(googlePayload)
+    let createdUser = null
 
-      await recordCurrentRequiredLegalAcceptancesTx(tx, createdUserRecord.id, {
-        acceptedAt,
-        source: LEGAL_ACCEPTANCE_SOURCES.GOOGLE_SIGNUP,
-      })
+    for (let attempt = 0; attempt < MAX_GOOGLE_USERNAME_ATTEMPTS; attempt += 1) {
+      const username = buildGoogleUsernameCandidate(baseUsername, attempt)
 
-      return createdUserRecord
-    })
+      try {
+        createdUser = await prisma.$transaction(async (tx) => {
+          const createdUserRecord = await tx.user.create({
+            data: {
+              username,
+              passwordHash,
+              email: googlePayload.email,
+              emailVerified: isGoogleEmailVerified,
+              googleId: googlePayload.googleId,
+              authProvider: 'google',
+              avatarUrl: googlePayload.picture || null,
+              termsAcceptedVersion: CURRENT_LEGAL_VERSION,
+              termsAcceptedAt: acceptedAt,
+            },
+            select: { id: true },
+          })
+
+          await recordCurrentRequiredLegalAcceptancesTx(tx, createdUserRecord.id, {
+            acceptedAt,
+            source: LEGAL_ACCEPTANCE_SOURCES.GOOGLE_SIGNUP,
+          })
+
+          return createdUserRecord
+        })
+
+        break
+      } catch (error) {
+        if (error?.code !== 'P2002') throw error
+
+        const targets = getP2002Targets(error)
+        if (targets.includes('username')) {
+          continue
+        }
+        if (targets.includes('email')) {
+          return res.status(409).json({
+            error: 'An account with this email already exists. Try signing in with your original Google account.',
+          })
+        }
+        if (targets.includes('googleId')) {
+          throw new AppError(409, 'This Google account is already linked to another user.')
+        }
+
+        throw error
+      }
+    }
+
+    if (!createdUser) {
+      throw new AppError(500, 'Unable to generate a unique username. Please try again.')
+    }
 
     const authenticatedUser = await issueAuthenticatedSession(res, createdUser.id)
     return res.status(201).json({

@@ -34,7 +34,9 @@ function isAdminRequest(req) {
 
 function routeKey(req) {
   const method = String(req.method || '').toUpperCase()
-  const path = req.path || req.originalUrl || ''
+  const originalUrl = String(req.originalUrl || '').split('?')[0]
+  const basePath = `${String(req.baseUrl || '')}${String(req.path || '')}`.split('?')[0]
+  const path = originalUrl || basePath || ''
   return `${method} ${path}`
 }
 

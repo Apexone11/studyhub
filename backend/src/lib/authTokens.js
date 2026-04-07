@@ -44,6 +44,18 @@ function verifyAuthToken(token) {
   return jwt.verify(token, getJwtSecret())
 }
 
+function normalizeAuthUser(payload) {
+  const userId = payload?.userId || payload?.sub || payload?.id || null
+  if (!userId) return null
+
+  return {
+    userId,
+    username: payload?.username || null,
+    role: payload?.role || null,
+    trustLevel: payload?.trustLevel || null,
+  }
+}
+
 function signCsrfToken(user) {
   return jwt.sign(
     { sub: user.id, type: 'csrf' },
@@ -91,6 +103,17 @@ function getAuthTokenFromRequest(req) {
   return getAuthCookieTokenFromRequest(req)
 }
 
+function getOptionalAuthUserFromRequest(req) {
+  const token = getAuthTokenFromRequest(req)
+  if (!token) return null
+
+  try {
+    return normalizeAuthUser(verifyAuthToken(token))
+  } catch {
+    return null
+  }
+}
+
 function getAuthCookieOptions() {
   const isProd = process.env.NODE_ENV === 'production'
 
@@ -126,9 +149,11 @@ module.exports = {
   clearAuthCookie,
   getAuthCookieOptions,
   getAuthCookieTokenFromRequest,
+  getOptionalAuthUserFromRequest,
   getAuthTokenFromRequest,
   getJwtSecret,
   hashStoredSecret,
+  normalizeAuthUser,
   signCsrfToken,
   setAuthCookie,
   signAuthToken,
