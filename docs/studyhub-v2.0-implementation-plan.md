@@ -28,6 +28,8 @@
 
 This plan covers six major workstreams that transform StudyHub from a study-sheet platform into a comprehensive knowledge hub. The largest effort is the Public Domain Library ("BookHub"), which gives users access to 70,000+ free books via Project Gutenberg with an in-browser reader, AI-assisted reading, and social annotations. Supporting features include subscription groundwork, a code playground concept, admin analytics charts, and a full security hardening pass.
 
+Historical note (2026-04-07): the shipped library now uses Google Books metadata plus the embedded Google Books reader. Shelves, bookmarks, and reading progress remain active. The Gutendex, epub.js, and highlight details below are preserved as archival planning context rather than the current product contract.
+
 **Key technical decisions made during research:**
 
 - **Book data source:** Gutendex API (gutendex.com/books) for Project Gutenberg metadata and download links, Open Library Covers API for high-quality cover images.
@@ -38,6 +40,8 @@ This plan covers six major workstreams that transform StudyHub from a study-shee
 ---
 
 ## 2. Feature 1: Public Domain Library (BookHub)
+
+Superseded implementation note: the production-facing library is Google Books-based and does not ship the epub.js highlight workflow described in this planning document.
 
 ### 2.1 Overview
 

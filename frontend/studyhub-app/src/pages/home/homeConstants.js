@@ -72,7 +72,7 @@ export const FEATURES = [
   {
     Icon: IconStar,
     title: 'BookHub Library',
-    desc: 'Read free classic books with our integrated EPUB reader. Bookmark, highlight, and annotate while you study.',
+    desc: 'Browse Google Books-powered titles, open available previews, save shelves, and keep your place with bookmarks while you study.',
     toneClass: 'home-feature--indigo'
   },
   {

@@ -102,7 +102,6 @@ model User {
   bookShelves                BookShelf[]
   readingProgress            ReadingProgress[]
   bookBookmarks              BookBookmark[]
-  bookHighlights             BookHighlight[]
   videos                     Video[]                   @relation("UserVideos")
   pageViews                  PageView[]
   subscription               Subscription?
@@ -1398,24 +1397,6 @@ model BookBookmark {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, volumeId])
-}
-
-model BookHighlight {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  volumeId  String
-  cfi       String
-  text      String
-  color     String   @default("#FFEB3B")
-  note      String?
-  shared    Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, volumeId])
-  @@index([volumeId, shared])
 }
 
 // ── Waitlist ─────────────────────────────────────────────────

@@ -23,6 +23,7 @@ const {
   paymentCheckoutLimiter,
   paymentPortalLimiter,
   paymentReadLimiter,
+  paymentWebhookLimiter,
 } = require('../../lib/rateLimiters')
 const {
   DONATION_MIN_CENTS,
@@ -170,7 +171,7 @@ router.post('/checkout/donation', paymentCheckoutLimiter, optionalAuth, async (r
 // This route uses express.raw() middleware — the parent index.js mounts this
 // BEFORE express.json(), similar to the existing /api/webhooks route.
 
-router.post('/webhook', async (req, res) => {
+router.post('/webhook', paymentWebhookLimiter, async (req, res) => {
   const stripe = service.getStripe()
   const sig = req.headers['stripe-signature']
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET

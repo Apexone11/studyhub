@@ -540,7 +540,7 @@ async function startServer() {
     startHtmlArchiveScheduler()
     startModerationCleanupScheduler()
     // Pre-warm library cache with popular books (non-blocking).
-    // Also syncs to CachedBook DB table so fallback works when Gutendex is down.
+    // Also syncs to CachedBook DB table so fallback works when Google Books is unavailable.
     const {
       preloadPopularBooks,
       syncPopularBooksToDB,

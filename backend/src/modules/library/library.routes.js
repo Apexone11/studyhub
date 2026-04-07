@@ -1,7 +1,7 @@
 /**
  * library.routes.js -- Express router for the library module.
  * Handles book search (Google Books API), shelves CRUD, reading progress,
- * bookmarks, and highlights. Volume IDs are Google Books string IDs.
+ * and bookmarks. Volume IDs are Google Books string IDs.
  */
 
 const express = require('express')
@@ -25,11 +25,6 @@ const {
   listBookmarksHandler,
   createBookmarkHandler,
   deleteBookmarkHandler,
-  listHighlightsHandler,
-  createHighlightHandler,
-  updateHighlightHandler,
-  deleteHighlightHandler,
-  getSocialHighlightsHandler,
 } = require('./library.controller')
 
 /**
@@ -159,38 +154,5 @@ router.post('/bookmarks', requireAuth, libraryWriteLimiter, createBookmarkHandle
  * Delete a bookmark.
  */
 router.delete('/bookmarks/:id', requireAuth, libraryWriteLimiter, deleteBookmarkHandler)
-
-// ── HIGHLIGHTS ──────────────────────────────────────────────────────────────
-
-/**
- * GET /api/library/highlights/:volumeId
- * Get user's highlights for a book.
- */
-router.get('/highlights/:volumeId', requireAuth, listHighlightsHandler)
-
-/**
- * POST /api/library/highlights
- * Create a highlight.
- * Body: { volumeId, cfi, text, color?, note?, shared? }
- */
-router.post('/highlights', requireAuth, libraryWriteLimiter, createHighlightHandler)
-
-/**
- * PATCH /api/library/highlights/:id
- * Update a highlight (note, color, shared).
- */
-router.patch('/highlights/:id', requireAuth, libraryWriteLimiter, updateHighlightHandler)
-
-/**
- * DELETE /api/library/highlights/:id
- * Delete a highlight.
- */
-router.delete('/highlights/:id', requireAuth, libraryWriteLimiter, deleteHighlightHandler)
-
-/**
- * GET /api/library/highlights/:volumeId/social
- * Get shared highlights from other users (excluding blocked users).
- */
-router.get('/highlights/:volumeId/social', requireAuth, getSocialHighlightsHandler)
 
 module.exports = router

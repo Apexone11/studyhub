@@ -1,17 +1,15 @@
 /**
  * library.controller.js -- Handler functions for library routes.
  * Includes book search, book details, admin sync, shelves CRUD, reading progress,
- * bookmarks, and highlights management.
+ * and bookmarks management.
  */
 
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
-const { getBlockedUserIds } = require('../../lib/social/blockFilter')
 const { searchBooks, getBookDetail, syncPopularBooksToDB } = require('./library.service')
 const {
   MAX_SHELVES_PER_USER,
   MAX_BOOKMARKS_PER_USER_FREE,
-  MAX_HIGHLIGHTS_PER_BOOK,
 } = require('./library.constants')
 const { getUserPlan, isPro } = require('../../lib/getUserPlan')
 
@@ -527,200 +525,6 @@ async function deleteBookmarkHandler(req, res) {
   }
 }
 
-/**
- * GET /api/library/highlights/:volumeId
- * Get user's highlights for a book.
- */
-async function listHighlightsHandler(req, res) {
-  const { volumeId } = req.params
-
-  if (!volumeId || typeof volumeId !== 'string') {
-    return res.status(400).json({ error: 'Invalid volume ID.' })
-  }
-
-  try {
-    const highlights = await prisma.bookHighlight.findMany({
-      where: {
-        userId: req.user.userId,
-        volumeId,
-      },
-      orderBy: { createdAt: 'asc' },
-    })
-
-    res.json({ highlights })
-  } catch (err) {
-    captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
-  }
-}
-
-/**
- * POST /api/library/highlights
- * Create a highlight.
- */
-async function createHighlightHandler(req, res) {
-  const { volumeId, cfi, text, color, note, shared } = req.body
-
-  if (!volumeId || typeof volumeId !== 'string') {
-    return res.status(400).json({ error: 'Invalid volume ID.' })
-  }
-
-  if (!cfi || typeof cfi !== 'string' || !text || typeof text !== 'string') {
-    return res.status(400).json({ error: 'CFI and text are required.' })
-  }
-
-  try {
-    const count = await prisma.bookHighlight.count({
-      where: {
-        userId: req.user.userId,
-        volumeId,
-      },
-    })
-
-    if (count >= MAX_HIGHLIGHTS_PER_BOOK) {
-      return res
-        .status(403)
-        .json({ error: `Maximum of ${MAX_HIGHLIGHTS_PER_BOOK} highlights per book allowed.` })
-    }
-
-    const highlight = await prisma.bookHighlight.create({
-      data: {
-        userId: req.user.userId,
-        volumeId,
-        cfi,
-        text: text.trim(),
-        color: color || '#FFEB3B',
-        note: note ? note.trim() : null,
-        shared: shared === true,
-      },
-    })
-
-    res.status(201).json(highlight)
-  } catch (err) {
-    captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
-  }
-}
-
-/**
- * PATCH /api/library/highlights/:id
- * Update a highlight (note, color, shared).
- */
-async function updateHighlightHandler(req, res) {
-  const highlightId = parseInt(req.params.id, 10)
-  const { note, color, shared } = req.body
-
-  if (!Number.isInteger(highlightId) || highlightId < 1) {
-    return res.status(400).json({ error: 'Invalid highlight ID.' })
-  }
-
-  try {
-    const highlight = await prisma.bookHighlight.findUnique({
-      where: { id: highlightId },
-    })
-
-    if (!highlight) {
-      return res.status(404).json({ error: 'Highlight not found.' })
-    }
-
-    if (highlight.userId !== req.user.userId && req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Unauthorized.' })
-    }
-
-    const updated = await prisma.bookHighlight.update({
-      where: { id: highlightId },
-      data: {
-        ...(note !== undefined && { note: note ? note.trim() : null }),
-        ...(color !== undefined && { color }),
-        ...(shared !== undefined && { shared: shared === true }),
-      },
-    })
-
-    res.json(updated)
-  } catch (err) {
-    captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
-  }
-}
-
-/**
- * DELETE /api/library/highlights/:id
- * Delete a highlight.
- */
-async function deleteHighlightHandler(req, res) {
-  const highlightId = parseInt(req.params.id, 10)
-
-  if (!Number.isInteger(highlightId) || highlightId < 1) {
-    return res.status(400).json({ error: 'Invalid highlight ID.' })
-  }
-
-  try {
-    const highlight = await prisma.bookHighlight.findUnique({
-      where: { id: highlightId },
-    })
-
-    if (!highlight) {
-      return res.status(404).json({ error: 'Highlight not found.' })
-    }
-
-    if (highlight.userId !== req.user.userId && req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Unauthorized.' })
-    }
-
-    await prisma.bookHighlight.delete({
-      where: { id: highlightId },
-    })
-
-    res.status(204).send()
-  } catch (err) {
-    captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
-  }
-}
-
-/**
- * GET /api/library/highlights/:volumeId/social
- * Get shared highlights from other users (excluding blocked users).
- */
-async function getSocialHighlightsHandler(req, res) {
-  const { volumeId } = req.params
-
-  if (!volumeId || typeof volumeId !== 'string') {
-    return res.status(400).json({ error: 'Invalid volume ID.' })
-  }
-
-  try {
-    let blockedIds = []
-    try {
-      blockedIds = await getBlockedUserIds(prisma, req.user.userId)
-    } catch {
-      blockedIds = []
-    }
-
-    const highlights = await prisma.bookHighlight.findMany({
-      where: {
-        volumeId,
-        shared: true,
-        userId: {
-          notIn: [...blockedIds, req.user.userId],
-        },
-      },
-      include: {
-        user: {
-          select: { id: true, username: true, avatarUrl: true },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 50,
-    })
-
-    res.json(highlights)
-  } catch (err) {
-    captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
-  }
-}
-
 module.exports = {
   searchBooksHandler,
   getBookDetailsHandler,
@@ -737,9 +541,4 @@ module.exports = {
   listBookmarksHandler,
   createBookmarkHandler,
   deleteBookmarkHandler,
-  listHighlightsHandler,
-  createHighlightHandler,
-  updateHighlightHandler,
-  deleteHighlightHandler,
-  getSocialHighlightsHandler,
 }

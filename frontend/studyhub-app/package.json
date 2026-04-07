@@ -40,7 +40,6 @@
     "@tiptap/starter-kit": "^2.11.5",
     "animejs": "^4.3.6",
     "dompurify": "^3.3.3",
-    "epubjs": "^0.4.2",
     "highlight.js": "^11.11.1",
     "katex": "^0.16.21",
     "lowlight": "^3.3.0",

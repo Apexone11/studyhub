@@ -16,7 +16,6 @@ const CACHE_TTL = {
 const DEFAULT_PAGE_SIZE = 20 // Google Books max per request is 40
 const MAX_SHELVES_PER_USER = 20
 const MAX_BOOKMARKS_PER_USER_FREE = 50 // Free plan total bookmarks across all books
-const MAX_HIGHLIGHTS_PER_BOOK = 200
 
 // Google Books category mappings (for subject filter chips)
 const CATEGORIES = [
@@ -44,6 +43,5 @@ module.exports = {
   DEFAULT_PAGE_SIZE,
   MAX_SHELVES_PER_USER,
   MAX_BOOKMARKS_PER_USER_FREE,
-  MAX_HIGHLIGHTS_PER_BOOK,
   CATEGORIES,
 }

@@ -1,5 +1,31 @@
 # Beta v2.0.0 Release Log
 
+## Date: 2026-04-07
+
+### Library Reality Alignment and Payment Webhook Hardening
+
+**Google Books contract enforced**
+- Sanitized external Google Books description HTML at the backend boundary and re-sanitized on the book detail page before rendering
+- Updated the Home page BookHub card to describe the actual shipped experience: Google Books previews plus shelves and bookmarks, not EPUB highlights or annotations
+- Removed unused library highlight routes, handlers, tests, constants, and Prisma schema/model surface so the backend now matches the shipped Google Books reader contract
+- Removed the unused `epubjs` chunk wiring from the frontend build so the app no longer carries dead reader bundling logic
+
+**Payments hardening**
+- Added a dedicated `paymentWebhookLimiter` and applied it to the Stripe webhook endpoint so checkout, portal, reads, and webhook traffic are all explicitly rate limited
+
+**Docs alignment**
+- Added supersession notes to the v2.0 implementation plan so older Gutendex and epub.js details are clearly marked as archival
+- Updated the Railway deployment guide to validate the Google Books embed flow instead of an EPUB reader flow
+
+**Validation**
+- `Set-Location backend; npx eslint src/modules/library/library.service.js src/modules/library/library.controller.js src/modules/library/library.routes.js src/modules/payments/payments.routes.js src/lib/rateLimiters.js test/library.routes.test.js`: passes
+- `Set-Location backend; npm run test -- test/library.routes.test.js`: passes (16 tests)
+- `Set-Location backend; npx prisma validate`: passes
+- `npm --prefix frontend/studyhub-app run lint`: passes
+- `npm --prefix frontend/studyhub-app run build`: passes
+- `npm --prefix frontend/studyhub-app audit --omit=dev`: still reports `brace-expansion`, but `npm --prefix frontend/studyhub-app ls brace-expansion` traces it only through the dev-only ESLint toolchain, not the shipped app bundle
+- `npm --prefix backend audit --omit=dev`: still reports `defu`, but `npm --prefix backend ls defu` returns no production dependency path, so the finding appears to come from retained tooling metadata rather than an active runtime package tree
+
 ## Date: 2026-04-04
 
 ### Legal Backup and Acceptance Enforcement

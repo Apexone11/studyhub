@@ -80,7 +80,7 @@ After your `git push` in Step 1, Railway should have already started a new deplo
 ### Watch the build logs:
 
 1. Click on the active deployment to see build logs
-2. Look for `npm install` completing successfully -- this installs the new packages (`recharts`, `epubjs`)
+2. Look for `npm install` completing successfully so the frontend and backend dependency trees finish installing cleanly
 3. Look for the server starting message (e.g., "Server listening on port...")
 4. If the build fails, check the logs for errors and fix them before proceeding
 
@@ -190,7 +190,7 @@ Open your StudyHub app in the browser and check each new feature:
 - You should see the catalog page with a search bar and subject chips
 - Search for a book (e.g., "Pride and Prejudice")
 - Click a book to see its detail page
-- Click "Read" to open the EPUB reader (if the book has an EPUB format available)
+- Click "Read Online" to open the embedded Google Books reader when a preview is available
 
 ### 8d. Pricing Page (New)
 - Click **Pricing** in the sidebar
@@ -244,7 +244,7 @@ If you see plaintext emails, the encryption script from Step 6 may not have run 
 ## Troubleshooting
 
 ### Build fails with "module not found"
-- Check that `recharts` and `epubjs` are in `frontend/studyhub-app/package.json` under `dependencies`
+- Check that the frontend install completed and `recharts` is present in `frontend/studyhub-app/package.json` under `dependencies`
 - Railway runs `npm install` automatically during build
 
 ### "relation does not exist" errors
@@ -256,17 +256,17 @@ If you see plaintext emails, the encryption script from Step 6 may not have run 
 - Try running the encryption script again (Step 6)
 
 ### Library search returns no results
-- The Gutendex API (gutendex.com) is external and free -- no API key needed
-- Check Railway logs for any network errors when calling gutendex.com
+- The Google Books API is external. If you use `GOOGLE_BOOKS_API_KEY`, verify it is configured correctly in Railway Variables.
+- Check Railway logs for any network errors when calling the Google Books API
 - The first search may be slow (cache is cold), subsequent searches are cached for 1 hour
 
 ### Charts show no data on Analytics tab
 - This is normal if your database has very few records
 - The charts query by time period -- try "1y" (1 year) to capture all data
 
-### EPUB reader shows blank page
-- Not all Project Gutenberg books have EPUB formats
-- Check the book detail page -- if there is no "Read" button, the book only has text/HTML formats
+### Embedded reader is unavailable
+- Not all Google Books titles expose embeddable previews
+- Check the book detail page. If there is no "Read Online" button, open the title directly on Google Books instead.
 
 ---
 

@@ -39,14 +39,6 @@ const mocks = vi.hoisted(() => {
       delete: vi.fn(),
       count: vi.fn(),
     },
-    bookHighlight: {
-      findMany: vi.fn(),
-      findUnique: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-      count: vi.fn(),
-    },
     cachedBook: {
       findMany: vi.fn(),
       findUnique: vi.fn(),
@@ -93,8 +85,7 @@ const mocks = vi.hoisted(() => {
       CACHE_TTL: { SEARCH: 3600000, BOOK_DETAIL: 86400000, COVER: 604800000 },
       DEFAULT_PAGE_SIZE: 20,
       MAX_SHELVES_PER_USER: 20,
-      MAX_BOOKMARKS_PER_BOOK: 50,
-      MAX_HIGHLIGHTS_PER_BOOK: 200,
+      MAX_BOOKMARKS_PER_USER_FREE: 50,
       CATEGORIES: ['Fiction', 'Science'],
     },
   }
@@ -302,51 +293,6 @@ describe('DELETE /bookmarks/:id', () => {
     mocks.prisma.bookBookmark.findUnique.mockResolvedValue(null)
     const res = await request(app).delete('/bookmarks/999')
     expect(res.status).toBe(404)
-  })
-})
-
-/* ── Highlights ────────────────────────────────────────────────────────── */
-
-describe('POST /highlights', () => {
-  it('creates a highlight', async () => {
-    mocks.prisma.bookHighlight.count.mockResolvedValue(0)
-    mocks.prisma.bookHighlight.create.mockResolvedValue({
-      id: 1,
-      userId: 42,
-      volumeId: 'zyTCAlFPjgYC',
-      cfi: 'page-5',
-      text: 'It is a truth universally acknowledged',
-      color: '#FFEB3B',
-    })
-
-    const res = await request(app).post('/highlights').send({
-      volumeId: 'zyTCAlFPjgYC',
-      cfi: 'page-5',
-      text: 'It is a truth universally acknowledged',
-      color: '#ffeb3b',
-    })
-    expect(res.status).toBe(201)
-  })
-
-  it('rejects missing text or cfi', async () => {
-    const res = await request(app).post('/highlights').send({ volumeId: 'zyTCAlFPjgYC' })
-    expect(res.status).toBe(400)
-  })
-})
-
-describe('DELETE /highlights/:id', () => {
-  it('deletes own highlight', async () => {
-    mocks.prisma.bookHighlight.findUnique.mockResolvedValue({ id: 1, userId: 42 })
-    mocks.prisma.bookHighlight.delete.mockResolvedValue({ id: 1 })
-
-    const res = await request(app).delete('/highlights/1')
-    expect(res.status).toBe(204)
-  })
-
-  it('returns 403 for other users highlight', async () => {
-    mocks.prisma.bookHighlight.findUnique.mockResolvedValue({ id: 1, userId: 99 })
-    const res = await request(app).delete('/highlights/1')
-    expect(res.status).toBe(403)
   })
 })
 
