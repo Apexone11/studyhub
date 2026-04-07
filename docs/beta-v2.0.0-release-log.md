@@ -4,6 +4,15 @@
 
 ## Date: 2026-04-07
 
+### Attachment Preview Action Polish
+
+**Preview header actions now read as compact utility controls instead of oversized pills**
+- Refined the attachment preview page header actions so Back and Download original use a tighter height, smaller radius, subtler spacing, and clearer secondary-versus-primary treatment
+- Added the shared left-arrow affordance to the Back action so the header feels more directional without taking extra space
+
+**Validation**
+- `Set-Location -LiteralPath frontend/studyhub-app; npx eslint src/pages/preview/AttachmentPreviewPage.jsx`: passes
+
 ### PR #195 Follow-up Review Fixes
 
 **Optional auth and maintenance middleware now behave consistently across mounted routes**
