@@ -32,12 +32,12 @@ function useInjectedStyles() {
         100% { background-position: 200% 0; }
       }
       @keyframes pulseGlow {
-        0%, 100% { box-shadow: 0 0 20px rgba(99,102,241,0.3); }
-        50%      { box-shadow: 0 0 40px rgba(139,92,246,0.5); }
+        0%, 100% { box-shadow: var(--sh-premium-glow); }
+        50%      { box-shadow: var(--sh-premium-glow-strong); }
       }
       @keyframes goldPulse {
-        0%, 100% { box-shadow: 0 0 20px rgba(255,215,0,0.3); }
-        50%      { box-shadow: 0 0 35px rgba(255,215,0,0.5); }
+        0%, 100% { box-shadow: var(--sh-metal-gold-glow); }
+        50%      { box-shadow: var(--sh-metal-gold-glow-strong); }
       }
       @media (prefers-reduced-motion: reduce) {
         *, *::before, *::after {
@@ -149,7 +149,8 @@ export default function SupportersPage() {
               width: p.size,
               height: p.size,
               borderRadius: '50%',
-              background: `rgba(255, 255, 255, ${p.opacity})`,
+              background: 'var(--sh-on-dark)',
+              opacity: p.opacity,
               animation: `float ${p.duration} ease-in-out infinite`,
               animationDelay: p.delay,
               pointerEvents: 'none',
@@ -263,37 +264,31 @@ function DonorCard({ donor, rank }) {
 
   const glowStyles = {
     1: {
-      boxShadow: hovered
-        ? '0 0 30px rgba(255, 215, 0, 0.5), inset 0 0 25px rgba(255, 215, 0, 0.08)'
-        : '0 0 20px rgba(255, 215, 0, 0.3), inset 0 0 20px rgba(255, 215, 0, 0.05)',
+      boxShadow: hovered ? 'var(--sh-metal-gold-glow-strong)' : 'var(--sh-metal-gold-glow)',
       animation: 'goldPulse 3s ease-in-out infinite',
     },
     2: {
-      boxShadow: hovered
-        ? '0 0 30px rgba(192, 192, 192, 0.5)'
-        : '0 0 20px rgba(192, 192, 192, 0.3)',
+      boxShadow: hovered ? 'var(--sh-metal-silver-glow-strong)' : 'var(--sh-metal-silver-glow)',
     },
     3: {
-      boxShadow: hovered
-        ? '0 0 30px rgba(205, 127, 50, 0.5)'
-        : '0 0 20px rgba(205, 127, 50, 0.3)',
+      boxShadow: hovered ? 'var(--sh-metal-bronze-glow-strong)' : 'var(--sh-metal-bronze-glow)',
     },
   }
 
   const rankBadgeStyles = {
     1: {
-      background: 'linear-gradient(135deg, #ffd700, #ffaa00)',
-      color: '#1a1a2e',
+      background: 'var(--sh-metal-gold-gradient)',
+      color: 'var(--sh-metal-gold-text)',
       border: 'none',
     },
     2: {
-      background: 'linear-gradient(135deg, #c0c0c0, #e8e8e8)',
-      color: '#1a1a2e',
+      background: 'var(--sh-metal-silver-gradient)',
+      color: 'var(--sh-metal-silver-text)',
       border: 'none',
     },
     3: {
-      background: 'linear-gradient(135deg, #cd7f32, #e8a862)',
-      color: '#ffffff',
+      background: 'var(--sh-metal-bronze-gradient)',
+      color: 'var(--sh-metal-bronze-text)',
       border: 'none',
     },
   }
@@ -356,9 +351,7 @@ function SubscriberCard({ subscriber }) {
       style={{
         ...s.subCard,
         transform: hovered ? 'translateY(-4px)' : 'translateY(0)',
-        boxShadow: hovered
-          ? '0 8px 32px rgba(139, 92, 246, 0.2)'
-          : '0 2px 12px rgba(0, 0, 0, 0.04)',
+        boxShadow: hovered ? 'var(--sh-premium-glow)' : 'var(--shadow-sm)',
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -429,7 +422,7 @@ const s = {
 
   /* Hero */
   hero: {
-    background: 'linear-gradient(135deg, #6366f1, #8b5cf6, #06b6d4, #6366f1)',
+    background: 'var(--sh-premium-gradient)',
     backgroundSize: '300% 300%',
     animation: 'gradientShift 8s ease infinite',
     padding: '120px 20px 100px',
@@ -446,14 +439,14 @@ const s = {
   heroH1: {
     fontSize: 'clamp(32px, 5vw, 48px)',
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: 'var(--sh-on-dark)',
     margin: '0 0 16px',
     lineHeight: 1.2,
-    textShadow: '0 0 40px rgba(139, 92, 246, 0.5), 0 0 80px rgba(99, 102, 241, 0.3)',
+    textShadow: 'var(--sh-premium-glow-strong)',
   },
   heroSub: {
     fontSize: 17,
-    color: 'rgba(255, 255, 255, 0.85)',
+    color: 'var(--sh-on-dark-subtle)',
     margin: 0,
     lineHeight: 1.7,
     maxWidth: 560,
@@ -513,10 +506,10 @@ const s = {
     alignItems: 'center',
     gap: 16,
     padding: '16px 20px',
-    background: 'rgba(255, 255, 255, 0.05)',
+    background: 'var(--sh-glass-card-bg)',
     backdropFilter: 'blur(12px)',
     WebkitBackdropFilter: 'blur(12px)',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
+    border: '1px solid var(--sh-glass-card-border)',
     borderRadius: 14,
     transition: 'all 0.3s ease',
   },
@@ -578,10 +571,10 @@ const s = {
     alignItems: 'center',
     gap: 12,
     padding: '14px 16px',
-    background: 'rgba(255, 255, 255, 0.05)',
+    background: 'var(--sh-glass-card-bg)',
     backdropFilter: 'blur(12px)',
     WebkitBackdropFilter: 'blur(12px)',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
+    border: '1px solid var(--sh-glass-card-border)',
     borderRadius: 12,
     textDecoration: 'none',
     transition: 'all 0.3s ease',
@@ -604,7 +597,7 @@ const s = {
     fontWeight: 600,
     marginTop: 2,
     display: 'inline-block',
-    background: 'linear-gradient(90deg, #8b5cf6 0%, #06b6d4 50%, #8b5cf6 100%)',
+    background: 'var(--sh-premium-shimmer-gradient)',
     backgroundSize: '200% 100%',
     WebkitBackgroundClip: 'text',
     WebkitTextFillColor: 'transparent',
@@ -623,9 +616,9 @@ const s = {
   emptyState: {
     textAlign: 'center',
     padding: '48px 20px',
-    background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.06), rgba(139, 92, 246, 0.06))',
+    background: 'linear-gradient(135deg, var(--sh-accent-indigo-bg), var(--sh-accent-purple-bg))',
     borderRadius: 16,
-    border: '1px solid rgba(139, 92, 246, 0.15)',
+    border: '1px solid var(--sh-accent-purple-border)',
   },
   emptyText: {
     fontSize: 15,
@@ -635,8 +628,8 @@ const s = {
   },
   emptyButton: {
     display: 'inline-block',
-    background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-    color: '#ffffff',
+    background: 'var(--sh-premium-gradient)',
+    color: 'var(--sh-btn-primary-text)',
     padding: '10px 24px',
     borderRadius: 10,
     fontWeight: 600,
@@ -656,10 +649,10 @@ const s = {
     maxWidth: 560,
     margin: '0 auto',
     padding: '48px 40px',
-    background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.1))',
+    background: 'linear-gradient(135deg, var(--sh-accent-indigo-bg), var(--sh-accent-purple-bg))',
     backdropFilter: 'blur(8px)',
     WebkitBackdropFilter: 'blur(8px)',
-    border: '1px solid rgba(139, 92, 246, 0.2)',
+    border: '1px solid var(--sh-accent-purple-border)',
     borderRadius: 24,
   },
   ctaTitle: {
@@ -676,8 +669,8 @@ const s = {
   },
   ctaButton: {
     display: 'inline-block',
-    background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-    color: '#ffffff',
+    background: 'var(--sh-premium-gradient)',
+    color: 'var(--sh-btn-primary-text)',
     padding: '12px 32px',
     borderRadius: 10,
     fontWeight: 600,
@@ -691,7 +684,7 @@ const s = {
   ctaButtonOutline: {
     display: 'inline-block',
     background: 'transparent',
-    color: '#8b5cf6',
+    color: 'var(--sh-accent-purple)',
     padding: '11px 32px',
     borderRadius: 10,
     fontWeight: 600,
@@ -700,7 +693,7 @@ const s = {
     fontFamily: "'Plus Jakarta Sans', sans-serif",
     transition: 'all 0.3s ease',
     cursor: 'pointer',
-    border: '1.5px solid rgba(139, 92, 246, 0.5)',
+    border: '1.5px solid var(--sh-accent-purple-border)',
   },
 
   /* Footer */

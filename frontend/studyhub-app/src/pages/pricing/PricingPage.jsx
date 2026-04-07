@@ -171,7 +171,7 @@ export default function PricingPage() {
           </p>
           {hasActivePro && (
             <div style={p.heroBadge}>
-              <CheckIcon size={16} color="#ffffff" />
+              <CheckIcon size={16} color="var(--sh-on-dark)" />
               <span>You are on Pro {isYearly ? '(Yearly)' : '(Monthly)'}</span>
             </div>
           )}
@@ -883,7 +883,7 @@ const p = {
 
   // Hero
   hero: {
-    background: 'linear-gradient(135deg, var(--sh-brand), var(--sh-brand-accent))',
+    background: 'var(--sh-ai-gradient)',
     padding: '100px 20px 80px',
     textAlign: 'center',
   },
@@ -891,14 +891,14 @@ const p = {
   heroH1: {
     fontSize: 'clamp(32px, 5vw, 56px)',
     fontWeight: 800,
-    color: '#ffffff',
+    color: 'var(--sh-on-dark)',
     margin: '0 0 12px',
     lineHeight: 1.15,
     letterSpacing: '-0.02em',
   },
   heroSub: {
     fontSize: 18,
-    color: 'rgba(255, 255, 255, 0.85)',
+    color: 'var(--sh-on-dark-subtle)',
     margin: '0 0 24px',
     lineHeight: 1.6,
   },
@@ -906,11 +906,12 @@ const p = {
     display: 'inline-flex',
     alignItems: 'center',
     gap: 8,
-    background: 'rgba(255, 255, 255, 0.2)',
+    background: 'var(--sh-glass-bg-strong)',
     backdropFilter: 'blur(8px)',
     padding: '8px 20px',
     borderRadius: 'var(--radius-full)',
-    color: '#ffffff',
+    border: '1px solid var(--sh-glass-border)',
+    color: 'var(--sh-on-dark)',
     fontSize: 14,
     fontWeight: 700,
   },
@@ -1115,11 +1116,11 @@ const p = {
 
   // Footer
   footer: {
-    background: 'var(--sh-slate-900)',
+    background: 'var(--sh-footer-dark-bg)',
     padding: '32px 20px',
     textAlign: 'center',
   },
-  footerText: { color: 'var(--sh-slate-500)', fontSize: 12, margin: 0 },
+  footerText: { color: 'var(--sh-footer-dark-copy)', fontSize: 12, margin: 0 },
 }
 
 // ── Styles: Cards ────────────────────────────────────────────────────────
@@ -1144,7 +1145,7 @@ const c = {
     left: '50%',
     transform: 'translateX(-50%)',
     background: 'var(--sh-brand-accent)',
-    color: '#ffffff',
+    color: 'var(--sh-btn-primary-text)',
     fontSize: 12,
     fontWeight: 700,
     padding: '5px 16px',
@@ -1187,7 +1188,7 @@ const c = {
   btnGroup: { display: 'flex', flexDirection: 'column', gap: 10 },
   btnPrimary: {
     background: 'var(--sh-brand-accent)',
-    color: '#ffffff',
+    color: 'var(--sh-btn-primary-text)',
     border: 'none',
     padding: '12px 24px',
     borderRadius: 'var(--radius-control)',
@@ -1287,19 +1288,19 @@ const c = {
 
 const d = {
   section: {
-    background: 'linear-gradient(135deg, var(--sh-brand), var(--sh-brand-accent))',
+    background: 'var(--sh-ai-gradient)',
     padding: '60px 20px',
   },
   inner: { maxWidth: 520, margin: '0 auto', textAlign: 'center' },
   title: {
     fontSize: 'clamp(22px, 3vw, 32px)',
     fontWeight: 700,
-    color: '#ffffff',
+    color: 'var(--sh-on-dark)',
     margin: '0 0 10px',
   },
   subtitle: {
     fontSize: 15,
-    color: 'rgba(255, 255, 255, 0.85)',
+    color: 'var(--sh-on-dark-subtle)',
     margin: '0 0 28px',
     lineHeight: 1.6,
   },
@@ -1311,9 +1312,9 @@ const d = {
     marginBottom: 20,
   },
   presetBtn: {
-    background: 'rgba(255, 255, 255, 0.15)',
-    color: '#ffffff',
-    border: '2px solid rgba(255, 255, 255, 0.3)',
+    background: 'var(--sh-glass-bg-strong)',
+    color: 'var(--sh-on-dark)',
+    border: '2px solid var(--sh-glass-border-strong)',
     padding: '8px 18px',
     borderRadius: 8,
     fontSize: 14,
@@ -1324,9 +1325,9 @@ const d = {
     minWidth: 56,
   },
   presetActive: {
-    background: '#ffffff',
+    background: 'var(--sh-on-dark)',
     color: 'var(--sh-brand-accent)',
-    borderColor: '#ffffff',
+    borderColor: 'var(--sh-on-dark)',
   },
   customRow: {
     display: 'flex',
@@ -1335,20 +1336,20 @@ const d = {
     gap: 10,
     marginBottom: 16,
   },
-  customLabel: { fontSize: 13, color: 'rgba(255, 255, 255, 0.8)', fontWeight: 600 },
+  customLabel: { fontSize: 13, color: 'var(--sh-on-dark-subtle)', fontWeight: 600 },
   customWrap: {
     display: 'flex',
     alignItems: 'center',
-    background: 'rgba(255, 255, 255, 0.15)',
+    background: 'var(--sh-glass-bg-strong)',
     borderRadius: 8,
     padding: '0 12px',
-    border: '1px solid rgba(255, 255, 255, 0.3)',
+    border: '1px solid var(--sh-glass-border-strong)',
   },
-  dollar: { color: '#ffffff', fontWeight: 700, fontSize: 15, marginRight: 4 },
+  dollar: { color: 'var(--sh-on-dark)', fontWeight: 700, fontSize: 15, marginRight: 4 },
   customInput: {
     background: 'transparent',
     border: 'none',
-    color: '#ffffff',
+    color: 'var(--sh-on-dark)',
     fontSize: 15,
     fontWeight: 600,
     width: 72,
@@ -1360,9 +1361,9 @@ const d = {
     width: '100%',
     padding: '10px 14px',
     borderRadius: 8,
-    border: '1px solid rgba(255, 255, 255, 0.3)',
-    background: 'rgba(255, 255, 255, 0.12)',
-    color: '#ffffff',
+    border: '1px solid var(--sh-glass-border-strong)',
+    background: 'var(--sh-glass-bg)',
+    color: 'var(--sh-on-dark)',
     fontSize: 14,
     fontFamily: FONT,
     outline: 'none',
@@ -1376,10 +1377,10 @@ const d = {
     marginBottom: 20,
     cursor: 'pointer',
   },
-  anonCheck: { width: 16, height: 16, accentColor: '#ffffff', cursor: 'pointer' },
-  anonText: { fontSize: 13, color: 'rgba(255, 255, 255, 0.85)', fontWeight: 500 },
+  anonCheck: { width: 16, height: 16, accentColor: 'var(--sh-on-dark)', cursor: 'pointer' },
+  anonText: { fontSize: 13, color: 'var(--sh-on-dark-subtle)', fontWeight: 500 },
   donateBtn: {
-    background: '#ffffff',
+    background: 'var(--sh-on-dark)',
     color: 'var(--sh-brand-accent)',
     border: 'none',
     padding: '12px 36px',
@@ -1394,8 +1395,8 @@ const d = {
     maxWidth: 300,
   },
   error: {
-    background: 'rgba(239, 68, 68, 0.2)',
-    color: '#fecaca',
+    background: 'var(--sh-danger-bg)',
+    color: 'var(--sh-danger-border)',
     padding: '10px 14px',
     borderRadius: 8,
     fontSize: 13,
@@ -1403,7 +1404,7 @@ const d = {
   },
   footnote: {
     fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.5)',
+    color: 'var(--sh-on-dark-soft)',
     margin: 0,
     lineHeight: 1.5,
   },

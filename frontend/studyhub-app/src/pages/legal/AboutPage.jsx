@@ -47,6 +47,35 @@ const HOW_STEPS = [
   },
 ]
 
+const GOAL_TONES = {
+  access: {
+    background: 'var(--sh-info-bg)',
+    border: 'var(--sh-info-border)',
+    color: 'var(--sh-info)',
+  },
+  collaboration: {
+    background: 'var(--sh-accent-purple-bg)',
+    border: 'var(--sh-accent-purple-border)',
+    color: 'var(--sh-accent-purple)',
+  },
+  expansion: {
+    background: 'var(--sh-accent-cyan-bg)',
+    border: 'var(--sh-accent-cyan-border)',
+    color: 'var(--sh-accent-cyan)',
+  },
+  privacy: {
+    background: 'var(--sh-success-bg)',
+    border: 'var(--sh-success-border)',
+    color: 'var(--sh-success)',
+  },
+}
+
+const ROADMAP_TONES = {
+  current: 'var(--sh-success)',
+  next: 'var(--sh-warning)',
+  future: 'var(--sh-info)',
+}
+
 export default function AboutPage() {
   return (
     <div style={s.page}>
@@ -113,25 +142,25 @@ export default function AboutPage() {
           <div style={s.goalsGrid}>
             <GoalCard
               faIcon="fa-book-open"
-              color="#2563eb"
+              tone={GOAL_TONES.access}
               title="Open Access"
               desc="Core study tools are free to use. Share, discover, and collaborate without barriers."
             />
             <GoalCard
               faIcon="fa-users"
-              color="#7c3aed"
+              tone={GOAL_TONES.collaboration}
               title="Student Collaboration"
               desc="Notes improve when many minds work on them. Fork, edit, and build on each other's work."
             />
             <GoalCard
               faIcon="fa-map-location-dot"
-              color="#0891b2"
+              tone={GOAL_TONES.expansion}
               title="Start Local, Go National"
               desc="Maryland first. Then every university. Students everywhere deserve better study tools."
             />
             <GoalCard
               faIcon="fa-shield-halved"
-              color="#16a34a"
+              tone={GOAL_TONES.privacy}
               title="Privacy First"
               desc="We collect only what we need. Your data stays yours."
             />
@@ -165,9 +194,9 @@ export default function AboutPage() {
             </span>
           </div>
           <div style={{ ...s.roadmapGrid, gridTemplateColumns: 'repeat(3, 1fr)' }}>
-            <RoadmapColumn title="V2.0.0 — Current" color="#16a34a" items={ROADMAP_V20} />
-            <RoadmapColumn title="V2.5 — Next Up" color="#f59e0b" items={ROADMAP_V25} />
-            <RoadmapColumn title="V3.0 — Future" color="#2563eb" items={ROADMAP_V30} />
+            <RoadmapColumn title="V2.0.0 — Current" color={ROADMAP_TONES.current} items={ROADMAP_V20} />
+            <RoadmapColumn title="V2.5 — Next Up" color={ROADMAP_TONES.next} items={ROADMAP_V25} />
+            <RoadmapColumn title="V3.0 — Future" color={ROADMAP_TONES.future} items={ROADMAP_V30} />
           </div>
         </div>
       </section>
@@ -235,11 +264,11 @@ function StatCard({ value, label }) {
   )
 }
 
-function GoalCard({ faIcon, color, title, desc }) {
+function GoalCard({ faIcon, tone, title, desc }) {
   return (
     <div style={s.goalCard}>
-      <div style={{ ...s.goalIconWrap, background: color + '18', border: `1px solid ${color}33` }}>
-        <i className={`fas ${faIcon}`} style={{ color, fontSize: 18 }}></i>
+      <div style={{ ...s.goalIconWrap, background: tone.background, border: `1px solid ${tone.border}` }}>
+        <i className={`fas ${faIcon}`} style={{ color: tone.color, fontSize: 18 }}></i>
       </div>
       <h3 style={s.goalTitle}>{title}</h3>
       <p style={s.goalDesc}>{desc}</p>
@@ -274,7 +303,7 @@ const s = {
     color: 'var(--sh-text)',
   },
   hero: {
-    background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%)',
+    background: 'var(--sh-hero-gradient-primary)',
     padding: '120px 20px 80px',
   },
   heroInner: { maxWidth: 720, margin: '0 auto', textAlign: 'center' },
@@ -293,15 +322,15 @@ const s = {
   heroH1: {
     fontSize: 'clamp(32px, 5vw, 54px)',
     fontWeight: 'bold',
-    color: 'var(--sh-slate-50)',
+    color: 'var(--sh-on-dark)',
     margin: '0 0 20px',
     lineHeight: 1.15,
   },
-  heroSub: { fontSize: 18, color: 'var(--sh-slate-400)', margin: '0 0 36px', lineHeight: 1.7 },
+  heroSub: { fontSize: 18, color: 'var(--sh-on-dark-faint)', margin: '0 0 36px', lineHeight: 1.7 },
   heroCtas: { display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' },
   ctaPrimary: {
     background: 'var(--sh-brand)',
-    color: 'var(--sh-nav-text)',
+    color: 'var(--sh-btn-primary-text)',
     textDecoration: 'none',
     padding: '14px 32px',
     borderRadius: 10,
@@ -309,14 +338,14 @@ const s = {
     fontSize: 15,
   },
   ctaSecondary: {
-    background: 'transparent',
-    color: 'var(--sh-slate-400)',
+    background: 'var(--sh-glass-bg-soft)',
+    color: 'var(--sh-on-dark-faint)',
     textDecoration: 'none',
     padding: '14px 32px',
     borderRadius: 10,
     fontWeight: 'bold',
     fontSize: 15,
-    border: '1px solid var(--sh-slate-400)',
+    border: '1px solid var(--sh-glass-border)',
   },
   section: { padding: '80px 20px' },
   sectionInner: { maxWidth: 1000, margin: '0 auto' },
@@ -429,7 +458,7 @@ const s = {
   teamBio: { fontSize: 14, color: 'var(--sh-subtext)', margin: 0, lineHeight: 1.7 },
   openSourceNote: { fontSize: 14, color: 'var(--sh-muted)', textAlign: 'center' },
   link: { color: 'var(--sh-brand)', fontWeight: 'bold' },
-  footer: { background: 'var(--sh-slate-900)', padding: '40px 20px', textAlign: 'center' },
+  footer: { background: 'var(--sh-footer-dark-bg)', padding: '40px 20px', textAlign: 'center' },
   footerLinks: {
     display: 'flex',
     justifyContent: 'center',
@@ -437,6 +466,6 @@ const s = {
     marginBottom: 16,
     flexWrap: 'wrap',
   },
-  footerLink: { color: 'var(--sh-slate-400)', textDecoration: 'none', fontSize: 14 },
-  footerCopy: { color: 'var(--sh-slate-600)', fontSize: 12, margin: 0 },
+  footerLink: { color: 'var(--sh-footer-dark-muted)', textDecoration: 'none', fontSize: 14 },
+  footerCopy: { color: 'var(--sh-footer-dark-copy)', fontSize: 12, margin: 0 },
 }

@@ -2,6 +2,35 @@
 
 ## Date: 2026-04-07
 
+### Marketing, Legal, and Dashboard Token Cleanup
+
+**Shared semantics promoted beyond Home**
+- Added a broader shared token layer in the frontend stylesheet for dark-hero gradients, glass surfaces, dark-footers, premium accents, metallic supporter tiers, and reusable accent families like purple, cyan, indigo, pink, and neutral-slate
+- Collapsed several Home-specific tokens onto those broader shared semantics so the landing page, legal pages, dashboard, pricing, and supporters surfaces can now reuse the same color decisions instead of each carrying separate palette logic
+
+**Non-home surfaces aligned**
+- Reworked the legal page shell, hero panels, sidecards, links, and footer to use the shared semantic tokens instead of direct hex values and legacy alias colors in the shared stylesheet
+- Reworked the dashboard action cards, empty states, helper widgets, hero banner, quick-action accents, and summary-card color metadata to use shared semantic tokens
+- Reworked the About, Pricing, and Supporters route style objects so their hero, CTA, badge, supporter-tier, and footer surfaces read from the shared token layer instead of embedding local palette literals
+
+**Validation**
+- `Set-Location frontend/studyhub-app; npx eslint src/pages/legal/AboutPage.jsx src/pages/pricing/PricingPage.jsx src/pages/supporters/SupportersPage.jsx src/pages/dashboard/DashboardPage.jsx src/pages/dashboard/DashboardWidgets.jsx src/pages/dashboard/useDashboardData.js`: passes
+- `npm --prefix frontend/studyhub-app run lint`: passes
+- `npm --prefix frontend/studyhub-app run build`: passes
+- `rg -n "#[0-9A-Fa-f]{3,6}|rgba\([^)]*255[^)]*255[^)]*255|var\(--navy|var\(--blue|var\(--green|var\(--yellow|var\(--purple|var\(--white|var\(--border" frontend/studyhub-app/src/pages/legal/AboutPage.jsx frontend/studyhub-app/src/pages/pricing/PricingPage.jsx frontend/studyhub-app/src/pages/supporters/SupportersPage.jsx frontend/studyhub-app/src/pages/dashboard/DashboardPage.jsx frontend/studyhub-app/src/pages/dashboard/DashboardWidgets.jsx frontend/studyhub-app/src/pages/dashboard/useDashboardData.js`: no matches in the current worktree
+- `rg -n "var\(--navy|var\(--blue|var\(--green|var\(--yellow|var\(--purple|var\(--white|var\(--border" frontend/studyhub-app/src/index.css`: no matches in the current worktree
+
+### Home Page Token Cleanup
+
+**Landing-page palette centralized**
+- Added a dedicated home-page token set in the shared stylesheet for the hero gradient, CTA glow, footer colors, feature tones, proof marks, testimonial avatars, and the fork-tree illustration
+- Replaced the remaining hardcoded SVG fill and stroke values in the Home hero and setup illustration with token-backed values so the page art now reads from the same shared palette source as the rest of the landing experience
+- Moved testimonial and proof color metadata to token-backed constants and replaced the last home CTA color inline styles with semantic classes
+
+**Broader tokenization follow-through**
+- Rewired home feature cards, proof banner, testimonials, step badges, footer, and dark hero surfaces to use tokenized color decisions instead of local hex literals or legacy alias colors
+- Kept the existing Home page visual language intact while removing palette choices from the component layer
+
 ### Library Reality Alignment and Payment Webhook Hardening
 
 **Google Books contract enforced**
@@ -18,6 +47,9 @@
 - Updated the Railway deployment guide to validate the Google Books embed flow instead of an EPUB reader flow
 
 **Validation**
+- `npm --prefix frontend/studyhub-app run lint`: passes
+- `npm --prefix frontend/studyhub-app run build`: passes
+- `Set-Location frontend/studyhub-app; npx eslint src/pages/home/HomeHero.jsx src/pages/home/HomeSections.jsx src/pages/home/homeConstants.js`: passes
 - `Set-Location backend; npx eslint src/modules/library/library.service.js src/modules/library/library.controller.js src/modules/library/library.routes.js src/modules/payments/payments.routes.js src/lib/rateLimiters.js test/library.routes.test.js`: passes
 - `Set-Location backend; npm run test -- test/library.routes.test.js`: passes (16 tests)
 - `Set-Location backend; npx prisma validate`: passes
