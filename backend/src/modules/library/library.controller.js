@@ -13,6 +13,21 @@ const {
 } = require('./library.constants')
 const { getUserPlan, isPro } = require('../../lib/getUserPlan')
 
+const SHELF_VISIBILITY = new Set(['private', 'profile'])
+
+function normalizeShelfVisibility(value) {
+  if (value === undefined) {
+    return undefined
+  }
+
+  if (typeof value !== 'string') {
+    return null
+  }
+
+  const normalized = value.trim().toLowerCase()
+  return SHELF_VISIBILITY.has(normalized) ? normalized : null
+}
+
 /**
  * GET /api/library/search
  * Search and browse books from Google Books API.
@@ -116,9 +131,14 @@ async function listShelvesHandler(req, res) {
  */
 async function createShelfHandler(req, res) {
   const { name, description } = req.body
+  const visibility = normalizeShelfVisibility(req.body?.visibility)
 
   if (!name || typeof name !== 'string' || name.trim().length === 0) {
     return res.status(400).json({ error: 'Shelf name is required.' })
+  }
+
+  if (req.body?.visibility !== undefined && !visibility) {
+    return res.status(400).json({ error: 'Shelf visibility must be private or profile.' })
   }
 
   try {
@@ -135,6 +155,7 @@ async function createShelfHandler(req, res) {
         userId: req.user.userId,
         name: name.trim(),
         description: description ? description.trim() : null,
+        visibility: visibility || 'private',
       },
     })
 
@@ -155,9 +176,14 @@ async function createShelfHandler(req, res) {
 async function updateShelfHandler(req, res) {
   const shelfId = parseInt(req.params.id, 10)
   const { name, description } = req.body
+  const visibility = normalizeShelfVisibility(req.body?.visibility)
 
   if (!Number.isInteger(shelfId) || shelfId < 1) {
     return res.status(400).json({ error: 'Invalid shelf ID.' })
+  }
+
+  if (req.body?.visibility !== undefined && !visibility) {
+    return res.status(400).json({ error: 'Shelf visibility must be private or profile.' })
   }
 
   try {
@@ -178,6 +204,7 @@ async function updateShelfHandler(req, res) {
       data: {
         ...(name !== undefined && { name: name.trim() }),
         ...(description !== undefined && { description: description ? description.trim() : null }),
+        ...(visibility !== undefined && { visibility }),
       },
     })
 

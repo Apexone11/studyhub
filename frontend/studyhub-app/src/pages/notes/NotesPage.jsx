@@ -81,6 +81,12 @@ export default function NotesPage() {
               activeNote={data.activeNote}
               filterTab={data.filterTab}
               setFilterTab={data.setFilterTab}
+              searchQuery={data.searchQuery}
+              setSearchQuery={data.setSearchQuery}
+              selectedTag={data.selectedTag}
+              setSelectedTag={data.setSelectedTag}
+              clearFilters={data.clearFilters}
+              availableTags={data.availableTags}
               setActiveNote={data.setActiveNote}
               selectNote={data.selectNote}
               createNote={data.createNote}
@@ -112,6 +118,7 @@ export default function NotesPage() {
               toggleStar={data.toggleStar}
               togglePin={data.togglePin}
               handleRestore={data.handleRestore}
+              handleTagsChange={data.handleTagsChange}
               layout={layout}
             />
           </div>

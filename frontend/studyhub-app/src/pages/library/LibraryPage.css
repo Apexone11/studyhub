@@ -298,8 +298,9 @@
 .library-shelf__header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   margin-bottom: 8px;
+  gap: 16px;
 }
 
 .library-shelf__name {
@@ -313,6 +314,83 @@
   font-size: 12px;
   color: var(--sh-muted);
   font-weight: 500;
+}
+
+.library-shelf__meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.library-shelf__actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.library-shelf__visibility-wrap {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.library-shelf__control-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sh-subtext);
+}
+
+.library-shelf__visibility-select {
+  min-width: 140px;
+  border-radius: 10px;
+  border: 1px solid var(--sh-border);
+  background: var(--sh-surface);
+  color: var(--sh-heading);
+  font: inherit;
+  font-size: 12px;
+  padding: 8px 10px;
+}
+
+.library-shelf__visibility-select:disabled,
+.library-shelf__danger-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.library-shelf__danger-btn {
+  border-radius: 10px;
+  border: 1px solid var(--sh-danger-border);
+  background: var(--sh-danger-bg);
+  color: var(--sh-danger-text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.library-shelf__visibility-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid var(--sh-border);
+  background: var(--sh-surface);
+  color: var(--sh-muted);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+}
+
+.library-shelf__visibility-badge--profile {
+  border-color: var(--sh-info-border);
+  background: var(--sh-info-bg);
+  color: var(--sh-info-text);
 }
 
 .library-shelf__desc {
@@ -367,6 +445,23 @@
   border-radius: 6px;
   border: 1px solid var(--sh-border);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+@media (max-width: 720px) {
+  .library-shelf__header {
+    flex-direction: column;
+  }
+
+  .library-shelf__actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .library-shelf__visibility-wrap,
+  .library-shelf__visibility-select,
+  .library-shelf__danger-btn {
+    width: 100%;
+  }
 }
 
 .library-shelf__book-placeholder {

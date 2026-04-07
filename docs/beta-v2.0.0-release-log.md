@@ -2,6 +2,39 @@
 
 ## Date: 2026-04-07
 
+### Notes Tag Discovery and Shareable Bookshelves
+
+**Notes now filter and surface tags in-place**
+- Extended the notes API list contract so note searches can match title, body content, and serialized tags while exact tag filters can be applied with a dedicated `tag` query parameter
+- Normalized note list responses to return parsed tag arrays and current star state so the notes sidebar can render reliable tag chips and a working starred filter on first load
+- Reworked the notes page state to use URL-backed filter/search parameters, added a note search box plus tag-chip filters in the sidebar, and made tag edits update the list immediately without waiting for a full reload
+
+**Bookshelves can now be shared on profiles**
+- Added `BookShelf.visibility` with a Prisma migration so shelves can remain private or be explicitly shown on a user profile
+- Extended the existing library shelf create/update flow to validate and persist shelf visibility, and added owner controls on the library page for visibility toggles and shelf deletion
+- Extended the existing user-profile payload with `sharedShelves`, then rendered those profile-visible shelves in the profile overview without exposing reading progress or private shelf data
+
+**Validation**
+- `Set-Location backend; npm test -- test/notes.routes.test.js test/search.routes.test.js`: passes (32 tests)
+- `Set-Location backend; npx eslint src/modules/notes/notes.controller.js src/modules/search/search.routes.js test/notes.routes.test.js test/search.routes.test.js`: passes
+- `Set-Location frontend/studyhub-app; npx eslint src/pages/notes/useNotesData.js src/pages/notes/NotesPage.jsx src/pages/notes/NotesList.jsx src/pages/notes/NoteEditor.jsx src/pages/notes/NoteTagsInput.jsx`: passes
+- `npm --prefix frontend/studyhub-app run build`: passes
+
+### Legacy Alias Token Removal
+
+**Dead token bridge removed**
+- Removed the legacy alias custom properties from the shared frontend stylesheet after verifying the active React app no longer consumes `var(--navy)`, `var(--blue)`, `var(--white)`, `var(--border)`, or the related alias family
+- Confirmed the earlier marketing, legal, dashboard, and home cleanup passes were sufficient: no remaining shared utility selectors in `frontend/studyhub-app/src` still depended on the alias layer
+
+**Audit scope**
+- Scanned the active frontend source tree for live consumers across `.css`, `.js`, and `.jsx` files and found no remaining alias-variable references
+- Ran a broader workspace safety pass and found only unrelated local test-gallery CSS variables in `frontend/studyhub-app/tests/screenshots/gallery.html`, which does not depend on the app stylesheet alias block
+
+**Validation**
+- PowerShell source-tree scan for `var(--navy|--blue|--white|--border|...)` across `frontend/studyhub-app/src`: no matches
+- `npm --prefix frontend/studyhub-app run lint`: passes
+- `npm --prefix frontend/studyhub-app run build`: passes
+
 ### Marketing, Legal, and Dashboard Token Cleanup
 
 **Shared semantics promoted beyond Home**

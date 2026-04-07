@@ -234,6 +234,7 @@ router.get('/', optionalAuth, async (req, res) => {
               OR: [
                 { title: { contains: query, mode: 'insensitive' } },
                 { content: { contains: query, mode: 'insensitive' } },
+                { tags: { contains: query, mode: 'insensitive' } },
               ],
             },
             select: {

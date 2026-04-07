@@ -5,7 +5,7 @@
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { IconSheets, IconStar } from '../../components/Icons'
+import { IconBook, IconSheets, IconStar } from '../../components/Icons'
 import BadgeDisplay from '../../components/BadgeDisplay'
 import { API } from '../../config'
 import { FONT, cardStyle, sectionHeadingStyle, pillStyle } from './profileConstants'
@@ -249,6 +249,73 @@ export function SharedNotesSection({ notes }) {
           </div>
         </div>
       ))}
+    </div>
+  )
+}
+
+/* ── Shared shelves section ────────────────────────────────────────────── */
+export function SharedShelvesSection({ shelves, isOwnProfile }) {
+  if (!shelves || shelves.length === 0) return null
+
+  return (
+    <div style={cardStyle}>
+      <h2 style={sectionHeadingStyle}>
+        <IconBook size={16} style={{ color: 'var(--sh-brand)' }} />
+        {isOwnProfile ? 'Bookshelves on Your Profile' : 'Shared Bookshelves'}
+      </h2>
+      <div style={{ display: 'grid', gap: 12 }}>
+        {shelves.map((shelf) => (
+          <div key={shelf.id} style={{ borderRadius: 14, border: '1px solid var(--sh-border)', background: 'var(--sh-soft)', padding: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', marginBottom: 8, flexWrap: 'wrap' }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--sh-heading)', marginBottom: 4 }}>{shelf.name}</div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <span style={{ ...pillStyle, background: 'var(--sh-surface)', color: 'var(--sh-muted)' }}>
+                    {shelf._count?.books || 0} book{(shelf._count?.books || 0) === 1 ? '' : 's'}
+                  </span>
+                  <span style={{ ...pillStyle, background: 'var(--sh-info-bg)', color: 'var(--sh-info-text)' }}>
+                    Visible on profile
+                  </span>
+                </div>
+              </div>
+              <span style={{ fontSize: 11, color: 'var(--sh-muted)' }}>
+                Updated {new Date(shelf.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              </span>
+            </div>
+            {shelf.description ? (
+              <p style={{ margin: '0 0 12px', fontSize: 13, lineHeight: 1.6, color: 'var(--sh-muted)' }}>{shelf.description}</p>
+            ) : null}
+            {shelf.books?.length ? (
+              <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4 }}>
+                {shelf.books.map((book) => (
+                  <Link
+                    key={`${shelf.id}-${book.volumeId}`}
+                    to={`/library/${book.volumeId}`}
+                    style={{ display: 'flex', flexDirection: 'column', gap: 6, width: 92, flexShrink: 0, textDecoration: 'none', color: 'inherit' }}
+                  >
+                    {book.coverUrl ? (
+                      <img
+                        src={book.coverUrl}
+                        alt={book.title}
+                        loading="lazy"
+                        style={{ width: 84, height: 118, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--sh-border)', boxShadow: 'var(--shadow-sm, 0 2px 10px rgba(15,23,42,0.08))' }}
+                      />
+                    ) : (
+                      <div style={{ width: 84, height: 118, borderRadius: 8, border: '1px solid var(--sh-border)', background: 'var(--sh-surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--sh-muted)' }}>
+                        <IconBook size={20} />
+                      </div>
+                    )}
+                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--sh-heading)', lineHeight: 1.4 }}>{book.title}</span>
+                    <span style={{ fontSize: 10, color: 'var(--sh-muted)' }}>{book.author}</span>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div style={{ fontSize: 12, color: 'var(--sh-muted)' }}>This shelf is empty right now.</div>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

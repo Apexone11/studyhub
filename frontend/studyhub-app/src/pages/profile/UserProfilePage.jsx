@@ -43,6 +43,7 @@ import {
   PinnedSheetsSection,
   RecentSheetsSection,
   SharedNotesSection,
+  SharedShelvesSection,
   StarredSheetsSection,
   EnrolledCoursesSection,
   FollowModal,
@@ -724,6 +725,7 @@ function OwnOverviewTab({
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <ProfileStatsWidget username={profile.username} />
         <PinnedSheetsSection sheets={profile.pinnedSheets} />
+        <SharedShelvesSection shelves={profile.sharedShelves} isOwnProfile />
         {activityData.length > 0 && (
           <div style={cardStyle}>
             <ActivityHeatmap data={activityData} weeks={12} />
@@ -882,6 +884,7 @@ function OtherOverviewTab({ profile, activityData, badges }) {
     <div className="profile-columns">
       <ProfileStatsWidget username={profile.username} />
       <PinnedSheetsSection sheets={profile.pinnedSheets} />
+      <SharedShelvesSection shelves={profile.sharedShelves} isOwnProfile={false} />
       <BadgesSection badges={badges} />
       {activityData.length > 0 && (
         <div style={cardStyle}>

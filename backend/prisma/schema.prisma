@@ -1345,6 +1345,7 @@ model BookShelf {
   userId      Int
   name        String
   description String?
+  visibility  String   @default("private")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -1353,6 +1354,7 @@ model BookShelf {
 
   @@unique([userId, name])
   @@index([userId])
+  @@index([userId, visibility])
 }
 
 model ShelfBook {

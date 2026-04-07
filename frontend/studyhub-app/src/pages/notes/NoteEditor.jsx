@@ -19,6 +19,25 @@ import NoteVersionHistory from './NoteVersionHistory'
 import NoteTagsInput from './NoteTagsInput'
 import '../../components/editor/richTextEditor.css'
 
+function getNoteTags(tagsValue) {
+  if (Array.isArray(tagsValue)) {
+    return tagsValue.filter((tag) => typeof tag === 'string' && tag.trim())
+  }
+
+  if (typeof tagsValue !== 'string' || !tagsValue.trim()) {
+    return []
+  }
+
+  try {
+    const parsed = JSON.parse(tagsValue)
+    return Array.isArray(parsed)
+      ? parsed.filter((tag) => typeof tag === 'string' && tag.trim())
+      : []
+  } catch {
+    return []
+  }
+}
+
 /* ── Configure marked for backward-compat conversion ────────── */
 marked.setOptions({ breaks: true, gfm: true })
 
@@ -210,6 +229,7 @@ export default function NoteEditor({
   toggleStar,
   togglePin,
   handleRestore,
+  handleTagsChange,
   layout,
 }) {
   const [showVersions, setShowVersions] = useState(false)
@@ -347,7 +367,11 @@ export default function NoteEditor({
         background: 'var(--sh-surface)', borderRadius: 10, border: '1px solid var(--sh-border)',
         padding: '8px 14px', marginBottom: 10,
       }}>
-        <NoteTagsInput noteId={activeNote.id} initialTags={(() => { try { return JSON.parse(activeNote.tags || '[]') } catch { return [] } })()} />
+        <NoteTagsInput
+          noteId={activeNote.id}
+          initialTags={getNoteTags(activeNote.tags)}
+          onTagsChange={(tags) => handleTagsChange?.(activeNote.id, tags)}
+        />
       </div>
 
       {/* Version history panel */}

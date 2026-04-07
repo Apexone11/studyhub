@@ -291,7 +291,7 @@ describe('search routes', () => {
   // ── Notes search tests ──────────────────────────────────────────
   it('returns shared notes in search results', async () => {
     mocks.prisma.note.findMany.mockResolvedValue([
-      { id: 301, title: 'Study Guide Chapter 5', createdAt: new Date(), course: { id: 10, code: 'CMSC132', name: 'OOP II' }, author: { id: 99, username: 'note_author' } },
+      { id: 301, title: 'Study Guide Chapter 5', tags: '["exam-review"]', createdAt: new Date(), course: { id: 10, code: 'CMSC132', name: 'OOP II' }, author: { id: 99, username: 'note_author' } },
     ])
 
     const response = await request(app)
@@ -315,6 +315,13 @@ describe('search routes', () => {
 
     const noteCall = mocks.prisma.note.findMany.mock.calls[0]?.[0]
     expect(noteCall?.where?.private).toBe(false)
+    expect(noteCall?.where?.OR).toEqual(
+      expect.arrayContaining([
+        { title: { contains: 'anything', mode: 'insensitive' } },
+        { content: { contains: 'anything', mode: 'insensitive' } },
+        { tags: { contains: 'anything', mode: 'insensitive' } },
+      ])
+    )
   })
 
   it('does not return notes for unauthenticated search', async () => {

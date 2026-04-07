@@ -20,6 +20,37 @@ const NOTE_INCLUDE = {
   author: { select: { id: true, username: true, avatarUrl: true } },
 }
 
+function parseNoteTags(tagsValue) {
+  if (Array.isArray(tagsValue)) {
+    return tagsValue.filter((tag) => typeof tag === 'string' && tag.trim())
+  }
+
+  if (typeof tagsValue !== 'string' || !tagsValue.trim()) {
+    return []
+  }
+
+  try {
+    const parsed = JSON.parse(tagsValue)
+    return Array.isArray(parsed)
+      ? parsed.filter((tag) => typeof tag === 'string' && tag.trim())
+      : []
+  } catch {
+    return []
+  }
+}
+
+function serializeNote(note, extra = {}) {
+  if (!note || typeof note !== 'object') {
+    return note
+  }
+
+  return {
+    ...note,
+    tags: parseNoteTags(note.tags),
+    ...extra,
+  }
+}
+
 /**
  * Returns true if the given user can read the note (shared or owner/admin).
  */
@@ -68,15 +99,14 @@ async function getNoteById(req, res) {
 
     logTiming(req, { sections: [mainSection], extra: { noteId, isOwner: Boolean(isOwner) } })
 
-    res.json({
-      ...note,
+    res.json(serializeNote(note, {
       isOwner: Boolean(isOwner),
       starred,
       starCount,
       downloads: note.downloads || 0,
       reactionCounts: { like: likes, dislike: dislikes },
       userReaction: userReaction?.type || null,
-    })
+    }))
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
@@ -87,9 +117,11 @@ async function getNoteById(req, res) {
  * GET /api/notes — List notes (own or shared)
  */
 async function listNotes(req, res) {
-  const { q, courseId, private: priv, shared } = req.query
+  const { q, courseId, private: priv, shared, tag } = req.query
   try {
     const where = {}
+    const normalizedQuery = typeof q === 'string' ? q.trim() : ''
+    const normalizedTag = typeof tag === 'string' ? tag.trim().toLowerCase() : ''
 
     if (shared === 'true') {
       // Shared notes from all users
@@ -100,7 +132,18 @@ async function listNotes(req, res) {
       if (priv !== undefined) where.private = priv === 'true'
     }
 
-    if (q) where.title = { contains: q, mode: 'insensitive' }
+    if (normalizedQuery) {
+      where.OR = [
+        { title: { contains: normalizedQuery, mode: 'insensitive' } },
+        { content: { contains: normalizedQuery, mode: 'insensitive' } },
+        { tags: { contains: normalizedQuery, mode: 'insensitive' } },
+      ]
+    }
+
+    if (normalizedTag) {
+      where.tags = { contains: `"${normalizedTag}"`, mode: 'insensitive' }
+    }
+
     if (courseId) {
       const parsed = parseInt(courseId, 10)
       if (!Number.isNaN(parsed)) where.courseId = parsed
@@ -120,7 +163,28 @@ async function listNotes(req, res) {
       }),
       prisma.note.count({ where }),
     ])
-    res.json({ notes, total, page, limit })
+
+    const noteIds = notes.map((note) => note.id)
+    let starredIdSet = new Set()
+
+    if (req.user?.userId && noteIds.length) {
+      const noteStars = await prisma.noteStar.findMany({
+        where: {
+          userId: req.user.userId,
+          noteId: { in: noteIds },
+        },
+        select: { noteId: true },
+      })
+
+      starredIdSet = new Set(noteStars.map((row) => row.noteId))
+    }
+
+    res.json({
+      notes: notes.map((note) => serializeNote(note, { _starred: starredIdSet.has(note.id) })),
+      total,
+      page,
+      limit,
+    })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
@@ -165,7 +229,7 @@ async function createNote(req, res) {
     /* Content fingerprinting for plagiarism detection (fire-and-forget) */
     void updateFingerprint('note', note.id, contentStr)
 
-    res.status(201).json(note)
+    res.status(201).json(serializeNote(note, { _starred: false }))
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
@@ -248,7 +312,7 @@ async function updateNote(req, res) {
     /* Content fingerprinting on content changes (fire-and-forget) */
     if (data.content !== undefined) void updateFingerprint('note', noteId, updated.content)
 
-    res.json(updated)
+    res.json(serializeNote(updated))
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })

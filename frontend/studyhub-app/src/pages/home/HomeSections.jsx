@@ -320,7 +320,7 @@ export function HomeFooter({ currentYear }) {
         </div>
 
         <p className="home-footer-copy">
-          &copy; {currentYear} StudyHub &middot; Built by students, for students &middot; Open Source
+          &copy; {currentYear} StudyHub&trade; &middot; Built by students, for students &middot; Open Source
         </p>
       </div>
     </footer>

@@ -21,6 +21,9 @@ const mocks = vi.hoisted(() => {
     note: {
       findMany: vi.fn(),
     },
+    bookShelf: {
+      findMany: vi.fn(),
+    },
     starredSheet: {
       findMany: vi.fn(),
     },
@@ -125,6 +128,7 @@ beforeEach(() => {
   mocks.authTokens.getAuthTokenFromRequest.mockReturnValue(null)
 
   mocks.prisma.note.findMany.mockResolvedValue([])
+  mocks.prisma.bookShelf.findMany.mockResolvedValue([])
   mocks.prisma.starredSheet.findMany.mockResolvedValue([])
   mocks.prisma.studySheet.count.mockResolvedValue(0)
   mocks.prisma.userPinnedSheet.findMany.mockResolvedValue([])
@@ -158,6 +162,19 @@ describe('users routes', () => {
       mocks.prisma.note.findMany.mockResolvedValue([
         { id: 1, title: 'Note 1', updatedAt: new Date(), course: null },
       ])
+      mocks.prisma.bookShelf.findMany.mockResolvedValue([
+        {
+          id: 5,
+          name: 'Exam Prep',
+          description: 'Public revision stack',
+          visibility: 'profile',
+          updatedAt: new Date(),
+          _count: { books: 2 },
+          books: [
+            { id: 1, volumeId: 'vol-1', title: 'Discrete Math', author: 'Rosen', coverUrl: null },
+          ],
+        },
+      ])
       mocks.prisma.starredSheet.findMany.mockResolvedValue([
         {
           sheet: {
@@ -183,6 +200,7 @@ describe('users routes', () => {
       })
       expect(response.body.recentSheets).toHaveLength(1)
       expect(response.body.sharedNotes).toHaveLength(1)
+      expect(response.body.sharedShelves).toHaveLength(1)
       expect(response.body.starredSheets).toHaveLength(1)
     })
 

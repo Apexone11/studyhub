@@ -11,6 +11,12 @@ export default function NotesList({
   activeNote,
   filterTab,
   setFilterTab,
+  searchQuery,
+  setSearchQuery,
+  selectedTag,
+  setSelectedTag,
+  clearFilters,
+  availableTags,
   setActiveNote,
   selectNote,
   createNote,
@@ -62,6 +68,75 @@ export default function NotesList({
               </button>
             ))}
           </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search notes, content, or tags"
+              aria-label="Search notes"
+              style={{
+                minWidth: 220,
+                flex: '1 1 220px',
+                borderRadius: 10,
+                border: '1px solid var(--sh-border, #e2e8f0)',
+                background: 'var(--sh-surface, #fff)',
+                color: 'var(--sh-heading, #0f172a)',
+                padding: '9px 12px',
+                fontSize: 12,
+                fontWeight: 500,
+                fontFamily: PAGE_FONT,
+                outline: 'none',
+              }}
+            />
+            {(searchQuery || selectedTag) ? (
+              <button
+                type="button"
+                onClick={clearFilters}
+                style={{
+                  borderRadius: 10,
+                  border: '1px solid var(--sh-border, #e2e8f0)',
+                  background: 'var(--sh-surface, #fff)',
+                  color: 'var(--sh-muted, #64748b)',
+                  padding: '9px 12px',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  fontFamily: PAGE_FONT,
+                  cursor: 'pointer',
+                }}
+              >
+                Clear
+              </button>
+            ) : null}
+          </div>
+          {availableTags.length > 0 ? (
+            <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+              {availableTags.map((tag) => {
+                const isSelected = selectedTag === tag
+                return (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => setSelectedTag(isSelected ? '' : tag)}
+                    aria-pressed={isSelected}
+                    style={{
+                      padding: '5px 10px',
+                      borderRadius: 999,
+                      border: isSelected ? '1px solid var(--sh-brand, #3b82f6)' : '1px solid var(--sh-border, #e2e8f0)',
+                      background: isSelected ? 'var(--sh-brand-soft, var(--sh-info-bg, #eff6ff))' : 'var(--sh-surface, #fff)',
+                      color: isSelected ? 'var(--sh-brand, #3b82f6)' : 'var(--sh-muted, #64748b)',
+                      cursor: 'pointer',
+                      fontSize: 11,
+                      fontWeight: 700,
+                      fontFamily: PAGE_FONT,
+                    }}
+                  >
+                    #{tag}
+                  </button>
+                )
+              })}
+            </div>
+          ) : null}
         </div>
         <button
           data-tutorial="notes-create"
@@ -94,16 +169,26 @@ export default function NotesList({
             </svg>
           </div>
           <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--sh-heading, #0f172a)', marginBottom: 6 }}>
-            {filterTab === 'private' ? 'No private notes' : filterTab === 'shared' ? 'No shared notes' : filterTab === 'starred' ? 'No starred notes' : 'No notes yet'}
+            {searchQuery || selectedTag
+              ? 'No notes match these filters'
+              : filterTab === 'private'
+                ? 'No private notes'
+                : filterTab === 'shared'
+                  ? 'No shared notes'
+                  : filterTab === 'starred'
+                    ? 'No starred notes'
+                    : 'No notes yet'}
           </div>
           <div style={{ fontSize: 13, color: 'var(--sh-muted, #94a3b8)', marginBottom: 18, lineHeight: 1.6 }}>
-            {filterTab === 'private'
-              ? 'Create a note and keep the Private checkbox checked.'
-              : filterTab === 'shared'
-                ? 'Uncheck "Private" on a note to share it with classmates.'
-                : filterTab === 'starred'
-                  ? 'Click the ☆ icon on any note to star it for quick access.'
-                  : 'Create your first note to get started.'}
+            {searchQuery || selectedTag
+              ? 'Try a different keyword or remove the selected tag filter.'
+              : filterTab === 'private'
+                ? 'Create a note and keep the Private checkbox checked.'
+                : filterTab === 'shared'
+                  ? 'Uncheck "Private" on a note to share it with classmates.'
+                  : filterTab === 'starred'
+                    ? 'Click the Star control on any note to keep it in this quick-access view.'
+                    : 'Create your first note to get started.'}
           </div>
           <button
             onClick={createNote}
@@ -157,6 +242,27 @@ export default function NotesList({
                 {note.content?.trim() ? (
                   <div style={{ fontSize: 12, color: 'var(--sh-subtext, #94a3b8)', lineHeight: 1.5, marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
                     {note.content.slice(0, 80)}
+                  </div>
+                ) : null}
+                {note.tags?.length ? (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                    {note.tags.slice(0, 3).map((tag) => (
+                      <span
+                        key={tag}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          padding: '3px 8px',
+                          borderRadius: 999,
+                          background: 'var(--sh-brand-soft, var(--sh-info-bg, #eff6ff))',
+                          color: 'var(--sh-brand, #3b82f6)',
+                          fontSize: 10,
+                          fontWeight: 700,
+                        }}
+                      >
+                        #{tag}
+                      </span>
+                    ))}
                   </div>
                 ) : null}
                 <div style={{ fontSize: 11, color: 'var(--sh-subtext, #94a3b8)', display: 'flex', gap: 10 }}>

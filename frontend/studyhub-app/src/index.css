@@ -14,22 +14,6 @@
    * Warm paper surfaces · crisp ink typography · intentional blue accent
    * ══════════════════════════════════════════════════════════════════ */
 
-  /* ── Legacy aliases (keep until inline styles are fully migrated) ── */
-  --navy: #1a1a1a;
-  --navy-2: #1e293b;
-  --navy-3: #5a5a5a;
-  --blue: #2563eb;
-  --blue-dark: #1d4ed8;
-  --blue-light: #dbeafe;
-  --slate: #8a8a8a;
-  --slate-light: #f6f5f2;
-  --white: #ffffff;
-  --border: #e5e2dd;
-  --green: #16a34a;
-  --yellow: #d97706;
-  --purple: #8b5cf6;
-  --red: #dc2626;
-
   /* ── Typography ──────────────────────────────────────────────────── */
   --font: 'Plus Jakarta Sans', sans-serif;
   --font-reading: 'Inter', sans-serif;
@@ -360,16 +344,6 @@
    * Direction A — "Campus Lab" Dark Theme
    * True dark (OLED-friendly) · warm neutrals · lifted blue accent
    * ══════════════════════════════════════════════════════════════════ */
-
-  /* ── Legacy aliases ─────────────────────────────────────────────── */
-  --navy: #e8e8e8;
-  --navy-2: #c0c0c0;
-  --navy-3: #a0a0a0;
-  --slate: #a0a0a0;
-  --slate-light: #121212;
-  --white: #1c1c1c;
-  --border: #2a2a2a;
-  --blue: #60a5fa;
 
   /* ── Elevation (heavier for dark surfaces) ───────────────────────── */
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);

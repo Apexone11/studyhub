@@ -322,6 +322,37 @@ const getUserByUsername = async (req, res) => {
       // Degrade gracefully if notes query fails
     }
 
+    /* Fetch bookshelves explicitly shared on the profile */
+    let sharedShelves = []
+    try {
+      sharedShelves = await prisma.bookShelf.findMany({
+        where: { userId: user.id, visibility: 'profile' },
+        orderBy: { updatedAt: 'desc' },
+        take: 6,
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          visibility: true,
+          updatedAt: true,
+          _count: { select: { books: true } },
+          books: {
+            orderBy: { addedAt: 'desc' },
+            take: 8,
+            select: {
+              id: true,
+              volumeId: true,
+              title: true,
+              author: true,
+              coverUrl: true,
+            },
+          },
+        },
+      })
+    } catch {
+      // Degrade gracefully if bookshelves query fails
+    }
+
     /* Fetch pinned sheets for profile display */
     let pinnedSheets = []
     try {
@@ -396,6 +427,7 @@ const getUserByUsername = async (req, res) => {
       enrollments: user.enrollments,
       pinnedSheets,
       sharedNotes,
+      sharedShelves,
       starredSheets,
     })
   } catch (err) {
