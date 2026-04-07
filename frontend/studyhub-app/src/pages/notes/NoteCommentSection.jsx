@@ -6,6 +6,7 @@
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import GifSearchPanel from '../../components/GifSearchPanel'
 import MentionText from '../../components/MentionText'
 import UserAvatar from '../../components/UserAvatar'
 import { PAGE_FONT, timeAgo } from '../shared/pageUtils'
@@ -15,6 +16,39 @@ const EDIT_WINDOW_MS = 15 * 60 * 1000 // 15 minutes
 const EDIT_STATUS_POLL_MS = 30 * 1000
 const AVATAR_SIZES = [34, 28, 24]
 const MAX_VISIBLE_REPLIES = 2
+
+const composerGifCardStyle = {
+  position: 'relative',
+  width: 'min(100%, 220px)',
+  borderRadius: 12,
+  overflow: 'hidden',
+  border: '1px solid var(--sh-border)',
+  background: 'var(--sh-soft)',
+}
+
+const composerGifImageStyle = {
+  width: '100%',
+  maxHeight: 160,
+  display: 'block',
+  objectFit: 'cover',
+}
+
+const postedGifImageStyle = {
+  width: 'min(100%, 260px)',
+  maxHeight: 220,
+  display: 'block',
+  objectFit: 'cover',
+  borderRadius: 10,
+  background: 'var(--sh-soft)',
+}
+
+function createGifAttachment(gif) {
+  return {
+    url: gif.full,
+    type: 'gif',
+    name: gif.title || 'GIF',
+  }
+}
 
 /**
  * Check if an anchor still exists in the note content.
@@ -86,14 +120,27 @@ function CommentReactions({ commentId, reactionCounts = {}, userReaction = null,
 
 function CommentInput({ user, placeholder, onSubmit, posting }) {
   const [draft, setDraft] = useState('')
+  const [attachments, setAttachments] = useState([])
+  const [showGifPicker, setShowGifPicker] = useState(false)
   const [error, setError] = useState('')
+  const canSubmit = Boolean(draft.trim() || attachments.length > 0)
+
+  const handleGifSelect = (gif) => {
+    setAttachments([createGifAttachment(gif)])
+    setShowGifPicker(false)
+  }
 
   const handlePost = async () => {
     const text = draft.trim()
-    if (!text) return
+    if (!text && attachments.length === 0) return
     if (text.length > 500) { setError('Comment must be 500 characters or fewer.'); return }
-    const ok = await onSubmit(text)
-    if (ok) { setDraft(''); setError('') }
+    const ok = await onSubmit(text, attachments)
+    if (ok) {
+      setDraft('')
+      setAttachments([])
+      setShowGifPicker(false)
+      setError('')
+    }
   }
 
   if (!user) return null
@@ -115,19 +162,70 @@ function CommentInput({ user, placeholder, onSubmit, posting }) {
             background: 'var(--sh-soft)',
           }}
         />
+        {showGifPicker ? (
+          <div style={{ marginTop: 8 }}>
+            <GifSearchPanel onSelect={handleGifSelect} onClose={() => setShowGifPicker(false)} maxHeight={320} previewHeight={96} />
+          </div>
+        ) : null}
+        {attachments.length > 0 ? (
+          <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {attachments.map((attachment) => (
+              <div key={attachment.url} style={composerGifCardStyle}>
+                <img src={attachment.url} alt={attachment.name || 'GIF preview'} style={composerGifImageStyle} />
+                <button
+                  type="button"
+                  onClick={() => setAttachments([])}
+                  style={{
+                    position: 'absolute',
+                    top: 6,
+                    right: 6,
+                    width: 24,
+                    height: 24,
+                    borderRadius: '50%',
+                    border: 'none',
+                    cursor: 'pointer',
+                    background: 'rgba(0, 0, 0, 0.6)',
+                    color: '#fff',
+                    fontSize: 12,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  X
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : null}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
-          <span style={{ fontSize: 11, color: draft.length > 500 ? 'var(--sh-danger)' : 'var(--sh-muted)' }}>
-            {draft.length}/500
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 11, color: draft.length > 500 ? 'var(--sh-danger)' : 'var(--sh-muted)' }}>
+              {draft.length}/500
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowGifPicker((current) => !current)}
+              style={{
+                padding: '6px 12px', borderRadius: 8, border: '1px solid var(--sh-border)', cursor: 'pointer',
+                fontSize: 12, fontWeight: 700, fontFamily: PAGE_FONT,
+                background: 'transparent',
+                color: showGifPicker || attachments.length > 0 ? 'var(--sh-brand)' : 'var(--sh-text)',
+                transition: 'all .15s',
+              }}
+            >
+              GIF
+            </button>
+          </div>
           <button
             type="button"
             onClick={handlePost}
-            disabled={posting || !draft.trim()}
+            disabled={posting || !canSubmit}
             style={{
               padding: '6px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
               fontSize: 12, fontWeight: 700, fontFamily: PAGE_FONT,
-              background: draft.trim() && !posting ? 'var(--sh-brand)' : 'var(--sh-soft)',
-              color: draft.trim() && !posting ? '#fff' : 'var(--sh-muted)',
+              background: canSubmit && !posting ? 'var(--sh-brand)' : 'var(--sh-soft)',
+              color: canSubmit && !posting ? '#fff' : 'var(--sh-muted)',
               transition: 'all .15s',
             }}
           >
@@ -226,9 +324,9 @@ function CommentItem({
   const visibleReplies = showAllReplies ? replies : replies.slice(0, MAX_VISIBLE_REPLIES)
   const hiddenCount = replies.length - MAX_VISIBLE_REPLIES
 
-  const handleReplySubmit = async (text) => {
+  const handleReplySubmit = async (text, attachments) => {
     setReplyPosting(true)
-    const ok = await onReply(text, comment.id)
+    const ok = await onReply(text, comment.id, attachments)
     setReplyPosting(false)
     if (ok) setShowReplyInput(false)
     return ok
@@ -331,6 +429,18 @@ function CommentItem({
                 )}
               </p>
             )}
+            {!editing && comment.attachments && comment.attachments.length > 0 ? (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+                {comment.attachments.map((attachment) => (
+                  <img
+                    key={attachment.id || attachment.url}
+                    src={attachment.url}
+                    alt={attachment.name || 'Comment GIF'}
+                    style={postedGifImageStyle}
+                  />
+                ))}
+              </div>
+            ) : null}
           </div>
 
           {/* Action row: Like | Dislike | Reply | Edit | Resolve/Reopen | Delete | timestamp */}
@@ -495,12 +605,12 @@ export default function NoteCommentSection({ noteId, isOwner, user, noteContent,
     if (next) loadComments()
   }
 
-  const handlePost = async (text) => {
-    return postComment(text)
+  const handlePost = async (text, attachments) => {
+    return postComment(text, { attachments })
   }
 
-  const handleReply = async (text, parentId) => {
-    return postComment(text, { parentId })
+  const handleReply = async (text, parentId, attachments) => {
+    return postComment(text, { parentId, attachments })
   }
 
   const handleEdit = async (commentId, newContent) => {

@@ -1035,8 +1035,6 @@ textarea.sh-input {
   max-height: calc(100vh - 90px);
   overflow-y: auto;
   padding-right: 4px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--sh-border) transparent;
 }
 
 .sh-sidebar-sticky::-webkit-scrollbar {
@@ -3673,8 +3671,6 @@ select:focus-visible {
   display: flex;
   gap: 4px;
   overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
 }
 .profile-tabs::-webkit-scrollbar {
   display: none;
@@ -3768,9 +3764,7 @@ select:focus-visible {
     display: flex;
     gap: 4px;
     overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
     padding-bottom: 8px;
-    scrollbar-width: none;
   }
   .settings-nav::-webkit-scrollbar {
     display: none;

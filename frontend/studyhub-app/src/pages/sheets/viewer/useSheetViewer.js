@@ -21,6 +21,7 @@ export default function useSheetViewer() {
   const [sheetState, setSheetState] = useState({ sheet: null, loading: true, error: '' })
   const [commentsState, setCommentsState] = useState({ comments: [], total: 0, loading: true, error: '' })
   const [commentDraft, setCommentDraft] = useState('')
+  const [commentAttachments, setCommentAttachments] = useState([])
   const [commentSaving, setCommentSaving] = useState(false)
   const [forking, setForking] = useState(false)
   const [contributing, setContributing] = useState(false)
@@ -405,7 +406,8 @@ export default function useSheetViewer() {
 
   const submitComment = async (event) => {
     event.preventDefault()
-    if (!commentDraft.trim()) return
+    const trimmedComment = commentDraft.trim()
+    if (!trimmedComment && commentAttachments.length === 0) return
 
     setCommentSaving(true)
     try {
@@ -413,7 +415,7 @@ export default function useSheetViewer() {
         method: 'POST',
         headers: authHeaders(),
         credentials: 'include',
-        body: JSON.stringify({ content: commentDraft.trim() }),
+        body: JSON.stringify({ content: trimmedComment, attachments: commentAttachments }),
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
@@ -421,6 +423,7 @@ export default function useSheetViewer() {
       }
 
       setCommentDraft('')
+      setCommentAttachments([])
       setCommentsState((current) => ({
         ...current,
         comments: [data, ...current.comments],
@@ -526,6 +529,8 @@ export default function useSheetViewer() {
     commentsState,
     commentDraft,
     setCommentDraft,
+    commentAttachments,
+    setCommentAttachments,
     commentSaving,
     forking,
     contributing,

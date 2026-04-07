@@ -1,3 +1,5 @@
+<!-- markdownlint-disable MD031 MD032 MD040 MD060 -->
+
 # StudyHub v2.0 Implementation Plan
 
 **Author:** Hub AI / Abdul Fornah

@@ -1,3 +1,5 @@
+<!-- markdownlint-disable MD022 MD024 MD026 MD029 MD031 MD032 MD034 MD040 MD060 -->
+
 # StudyHub v2.0 -- Railway Deployment Guide
 
 This guide walks you through deploying all v2.0 changes (encryption, library, pricing, playground, admin analytics, AI updates) to Railway step by step.

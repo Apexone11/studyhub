@@ -8,6 +8,7 @@ const { updateFingerprint } = require('../../lib/plagiarismService')
 const { getInitialModerationStatus } = require('../../lib/trustGate')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
+const { normalizeCommentGifAttachments } = require('../../lib/commentGifAttachments')
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const { timedSection, logTiming } = require('../../lib/requestTiming')
 
@@ -462,14 +463,20 @@ async function createNoteComment(req, res) {
   const rawContent = typeof req.body.content === 'string' ? req.body.content.trim() : ''
   // Strip HTML tags from comments — comments are plain text only
   const content = rawContent.replace(/<[^>]*>/g, '')
-  if (!content) return res.status(400).json({ error: 'Comment cannot be empty.' })
+  const parentId = req.body.parentId ? Number.parseInt(req.body.parentId, 10) : null
+  const attachmentValidation = normalizeCommentGifAttachments(req.body.attachments)
+
+  if (attachmentValidation.error) {
+    return sendError(res, 400, attachmentValidation.error, ERROR_CODES.BAD_REQUEST)
+  }
+
+  const { attachments } = attachmentValidation
+
+  if (!content && attachments.length === 0) return res.status(400).json({ error: 'Comment cannot be empty.' })
   if (content.length > 500) return res.status(400).json({ error: 'Comment must be 500 characters or fewer.' })
 
-  const parentId = req.body.parentId ? Number.parseInt(req.body.parentId, 10) : null
-  const attachments = Array.isArray(req.body.attachments) ? req.body.attachments : []
-
   // Optional inline anchor fields — validated and context-enriched (only for top-level comments)
-  const anchor = !parentId ? validateAnchorInput(req.body) : null
+  const anchor = parentId ? null : validateAnchorInput(req.body)
 
   try {
     const note = await prisma.note.findUnique({

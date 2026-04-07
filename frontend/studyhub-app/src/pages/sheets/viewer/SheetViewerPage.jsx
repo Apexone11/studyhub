@@ -34,6 +34,8 @@ export default function SheetViewerPage() {
     commentsState,
     commentDraft,
     setCommentDraft,
+    commentAttachments,
+    setCommentAttachments,
     commentSaving,
     forking,
     contributing,
@@ -238,6 +240,8 @@ export default function SheetViewerPage() {
                   commentsState={commentsState}
                   commentDraft={commentDraft}
                   setCommentDraft={setCommentDraft}
+                  commentAttachments={commentAttachments}
+                  setCommentAttachments={setCommentAttachments}
                   commentSaving={commentSaving}
                   submitComment={submitComment}
                   deleteComment={deleteComment}

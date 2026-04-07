@@ -1,6 +1,57 @@
+<!-- markdownlint-disable MD007 MD010 MD022 MD032 MD036 -->
+
 # Beta v2.0.0 Release Log
 
 ## Date: 2026-04-07
+
+### Comment GIF-Only Rollout and Live Beta Visual Pass
+
+**Comment surfaces now use GIF-only attachments instead of local image uploads**
+- Replaced the feed comment and reply attachment flow with the shared Tenor GIF picker, removed the old local file-upload path from that UI, and tuned composer and posted-GIF sizing so previews stay readable without collapsing into narrow thumbnails or oversized blocks
+- Added the same GIF-only comment capability to sheet viewer comments and note comments, including reply composition for notes, so the visible comment surfaces now share the same attachment behavior instead of mixing text-only and image-upload variants
+- Consolidated the duplicated messaging/chat GIF search panels onto a single shared `GifSearchPanel` component so comment and messaging surfaces now pull from the same search experience and sizing controls
+
+**Server-side comment validation now matches the new client behavior**
+- Added a shared backend comment attachment validator that only allows one HTTPS GIF per comment and rejects non-GIF payloads even if someone bypasses the UI
+- Updated feed, sheet, and note comment creation endpoints to allow GIF-only comments without text while still enforcing the existing 500-character text limit when content is present
+
+**Editor warning noise was reduced for the touched CSS and markdown surfaces**
+- Removed the unsupported `scrollbar-width`, `scrollbar-color`, and `-webkit-overflow-scrolling` declarations that were still generating browser-compatibility warnings in the shared frontend stylesheets
+- Suppressed repetitive markdownlint noise in the active v2.0 implementation-plan document and this beta release log so the editor stops flagging known planning-log formatting patterns during normal work
+
+**Live beta screenshots were captured for the requested surfaces**
+- Added `frontend/studyhub-app/tests/polish-visual-pass.beta-live.spec.js`, a live beta Playwright pass that authenticates once, disables tutorial noise, waits for legal embeds to settle, and captures fresh screenshots for study groups, messages, supporters, feed, and the legal pages
+- The latest run saved artifacts to `frontend/studyhub-app/test-results/polish-visual-pass.beta-li-6241c-equested-beta-surfaces-beta/` with per-surface PNGs for `study-groups`, `messages`, `supporters`, `feed`, `terms`, `privacy`, and `guidelines`
+
+**Validation**
+- `Set-Location frontend/studyhub-app; npx eslint src/pages/feed/CommentSection.jsx src/pages/sheets/viewer/SheetCommentsPanel.jsx src/pages/sheets/viewer/SheetViewerPage.jsx src/pages/sheets/viewer/useSheetViewer.js src/pages/notes/NoteCommentSection.jsx src/pages/notes/useNoteComments.js tests/polish-visual-pass.beta-live.spec.js`: passes
+- `Set-Location backend; npx eslint src/lib/commentGifAttachments.js src/modules/feed/feed.social.controller.js src/modules/sheets/sheets.social.controller.js src/modules/notes/notes.controller.js`: passes
+- Editor diagnostics for `frontend/studyhub-app/src/index.css`, `frontend/studyhub-app/src/styles/responsive.css`, and `docs/studyhub-v2.0-implementation-plan.md`: no remaining errors
+- `Set-Location frontend/studyhub-app; npx playwright test -c playwright.beta.config.js tests/polish-visual-pass.beta-live.spec.js --reporter=line`: passes (1 test, 30.8s)
+
+### Cross-Surface Social, Legal, and Messaging Polish
+
+**Study groups now look more complete and support admin-managed group imagery end to end**
+- Added `avatarUrl` support to study-group creation on the backend, normalized avatar updates, and wired the create/edit modals to the existing authenticated image-upload flow so admins can add, replace, or remove group images without leaving the modal
+- Reworked study-group cards and detail headers into a more image-forward layout with better spacing, stronger action buttons, clearer stats, and more professional visual hierarchy so group imagery is visible across the directory and detail surfaces
+- Improved the shared study-group helper and create flow error handling so uploaded image URLs resolve correctly and backend validation messages surface cleanly in the UI
+
+**Feed, supporters, sheet viewer, and messaging spacing were tightened**
+- Polished the supporters page card rhythm and CTA styling, and fixed the empty-state heart icon contrast so it remains clearly visible instead of fading into the background
+- Tightened the feed toolbar and right-rail layout with dedicated responsive classes and a sticky desktop aside so filters, search, main content, and the leaderboard rail line up more cleanly across screen sizes
+- Switched the sheet viewer author/about presentation to the shared `UserAvatar` component for more consistent identity rendering and a cleaner About panel
+- Redesigned the messaging conversation sidebar with a richer header, clearer request/archive controls, and more elevated conversation cards so the left rail feels closer to the rest of the app's current visual language
+
+**Legal embeds and referral status handling are more reliable**
+- Updated the public legal document embed flow so Terms, Privacy, Cookie Policy, and Disclaimer pages reinitialize the hosted Termly snippet more reliably when the Termly script already exists on the page
+- Adjusted the legal document embed container so the hosted snippet has enough space to render cleanly without the older cramped wrapper treatment
+- Added derived referral-code inactivity handling so expired, maxed-out, or manually deactivated codes are represented accurately in both backend responses and the pricing-page referral UI instead of only relying on the raw `active` flag
+
+**Validation**
+- `Set-Location frontend/studyhub-app; npx eslint src/lib/useTermlyEmbed.js src/pages/legal/LegalDocumentPage.jsx src/pages/pricing/PricingPage.jsx src/pages/sheets/viewer/SheetHeader.jsx src/pages/sheets/viewer/SheetViewerSidebar.jsx src/pages/messages/components/ConversationList.jsx src/pages/supporters/SupportersPage.jsx src/pages/feed/FeedPage.jsx src/pages/feed/FeedAside.jsx src/pages/studyGroups/GroupModals.jsx src/pages/studyGroups/GroupCard.jsx src/pages/studyGroups/GroupDetailView.jsx src/pages/studyGroups/studyGroupsStyles.js src/pages/studyGroups/studyGroupsHelpers.js src/pages/studyGroups/useGroupList.js`: passes
+- `Set-Location backend; npx eslint src/modules/payments/sprintE.routes.js src/modules/studyGroups/studyGroups.controller.js`: passes
+- `npm --prefix frontend/studyhub-app run build`: passes
+- `Set-Location backend; npm test -- test/payments.test.js test/studyGroups.routes.test.js`: passes (52 tests)
 
 ### Dark-Mode Public Surface Polish and Live Visual Smoke Coverage
 

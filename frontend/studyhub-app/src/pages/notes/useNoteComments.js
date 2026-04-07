@@ -40,7 +40,8 @@ export function useNoteComments(noteId) {
 
   const postComment = useCallback(async (content, options = {}) => {
     const text = content.trim()
-    if (!text) return false
+    const attachments = Array.isArray(options.attachments) ? options.attachments : []
+    if (!text && attachments.length === 0) return false
     setPosting(true)
     setError('')
 
@@ -56,6 +57,10 @@ export function useNoteComments(noteId) {
       // Support replies
       if (options.parentId) {
         body.parentId = options.parentId
+      }
+
+      if (attachments.length > 0) {
+        body.attachments = attachments
       }
 
       const res = await fetch(`${API}/api/notes/${noteId}/comments`, {

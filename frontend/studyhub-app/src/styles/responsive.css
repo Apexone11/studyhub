@@ -230,8 +230,6 @@
   display: flex;
   gap: 4px;
   overflow-x: auto;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
   padding: 0 4px;
 }
 
