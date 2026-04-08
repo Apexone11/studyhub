@@ -238,10 +238,9 @@ router.delete('/:id/media/:mediaId', requireAuth, async (req, res) => {
 
     // Try to delete from R2 if it's an image with a URL
     if (media.type === 'image' && media.url && r2.isR2Configured()) {
-      // Extract R2 key from URL
-      const key = media.url.split('/').slice(-3).join('/')
+      const key = r2.extractObjectKeyFromUrl(media.url)
       try {
-        await r2.deleteObject(key)
+        if (key) await r2.deleteObject(key)
       } catch {
         /* best effort */
       }
@@ -343,9 +342,9 @@ router.delete('/:id', requireAuth, async (req, res) => {
       })
       for (const item of mediaItems) {
         if (item.url) {
-          const key = item.url.split('/').slice(-3).join('/')
+          const key = r2.extractObjectKeyFromUrl(item.url)
           try {
-            await r2.deleteObject(key)
+            if (key) await r2.deleteObject(key)
           } catch {
             /* best effort */
           }

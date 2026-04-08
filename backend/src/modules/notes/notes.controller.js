@@ -9,6 +9,7 @@ const { getInitialModerationStatus } = require('../../lib/trustGate')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
 const { normalizeCommentGifAttachments } = require('../../lib/commentGifAttachments')
+const { cleanupNoteImageIfUnused, extractNoteImageUrlsFromTexts } = require('../../lib/storage')
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const { timedSection, logTiming } = require('../../lib/requestTiming')
 
@@ -337,7 +338,37 @@ async function deleteNote(req, res) {
       targetType: 'note',
       targetId: noteId,
     })) return
+
+    const versions = await prisma.noteVersion.findMany({
+      where: { noteId },
+      select: { content: true },
+    })
+
+    const noteImageUrls = extractNoteImageUrlsFromTexts([
+      note.content,
+      ...versions.map((version) => version.content),
+    ])
+
     await prisma.note.delete({ where: { id: noteId } })
+
+    const cleanupResults = await Promise.allSettled(
+      noteImageUrls.map((imageUrl) => cleanupNoteImageIfUnused(prisma, imageUrl, {
+        source: 'deleteNote',
+        noteId,
+        userId: req.user.userId,
+      }))
+    )
+
+    cleanupResults.forEach((result) => {
+      if (result.status === 'rejected') {
+        captureError(result.reason, {
+          source: 'deleteNoteCleanup',
+          noteId,
+          userId: req.user.userId,
+        })
+      }
+    })
+
     res.json({ message: 'Note deleted.' })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })

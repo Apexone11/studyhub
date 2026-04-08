@@ -14,7 +14,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { API } from '../../../config'
 import { getApiErrorMessage, readJsonSafely } from '../../../lib/http'
 import { FONT, overlayStyle, panelStyle, closeBtnStyle } from './sheetReviewConstants'
-import { SanitizedPreview, RawHtmlView, FindingsPanel, ReviewActionBar } from './SheetReviewDetails'
+import { SanitizedPreview, InteractivePreview, RawHtmlView, FindingsPanel, ReviewActionBar } from './SheetReviewDetails'
 
 export default function SheetReviewPanel({ sheetId, onClose, onReviewComplete }) {
   const [state, setState] = useState({ loading: true, error: '', detail: null })
@@ -22,9 +22,10 @@ export default function SheetReviewPanel({ sheetId, onClose, onReviewComplete })
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const [submitEnrichedIssues, setSubmitEnrichedIssues] = useState([])
-  const [activeTab, setActiveTab] = useState('preview') // 'preview' | 'raw' | 'findings'
+  const [activeTab, setActiveTab] = useState('preview') // 'preview' | 'interactive' | 'raw' | 'findings'
   const [aiReviewing, setAiReviewing] = useState(false)
   const [scrollToLine, setScrollToLine] = useState(0)
+  const [interactiveState, setInteractiveState] = useState({ loading: false, error: '', runtimeUrl: '', attempted: false })
   const iframeRef = useRef(null)
 
   const loadDetail = useCallback(async () => {
@@ -47,8 +48,41 @@ export default function SheetReviewPanel({ sheetId, onClose, onReviewComplete })
 
   useEffect(() => {
     setState({ loading: true, error: '', detail: null })
+    setInteractiveState({ loading: false, error: '', runtimeUrl: '', attempted: false })
     void loadDetail()
   }, [loadDetail])
+
+  useEffect(() => {
+    if (!state.detail || state.detail.contentFormat !== 'html' || activeTab !== 'interactive') return
+    if (interactiveState.loading || interactiveState.runtimeUrl || interactiveState.attempted) return
+
+    let cancelled = false
+
+    async function loadInteractivePreview() {
+      setInteractiveState({ loading: true, error: '', runtimeUrl: '', attempted: true })
+
+      try {
+        const response = await fetch(`${API}/api/sheets/${sheetId}/html-runtime`, {
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+        })
+        const data = await readJsonSafely(response, {})
+
+        if (!response.ok) {
+          throw new Error(getApiErrorMessage(data, 'Could not load interactive preview.'))
+        }
+
+        if (cancelled) return
+        setInteractiveState({ loading: false, error: '', runtimeUrl: data.runtimeUrl || '', attempted: true })
+      } catch (err) {
+        if (cancelled) return
+        setInteractiveState({ loading: false, error: err.message || 'Could not load interactive preview.', runtimeUrl: '', attempted: true })
+      }
+    }
+
+    void loadInteractivePreview()
+    return () => { cancelled = true }
+  }, [activeTab, interactiveState.attempted, interactiveState.loading, interactiveState.runtimeUrl, sheetId, state.detail])
 
   async function handleReview(action, quickReason) {
     const finalReason = quickReason || reason.trim()
@@ -236,7 +270,7 @@ export default function SheetReviewPanel({ sheetId, onClose, onReviewComplete })
         {/* ── Tab bar ─────────────────────────────────────────────── */}
         {isHtml && (
           <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--sh-border)', padding: '0 20px' }}>
-            {[['preview', 'Safe Preview'], ['raw', 'Raw HTML (text)'], ['findings', `Findings (${findings.length})`]].map(([key, label]) => (
+            {[['preview', 'Safe Preview'], ['interactive', 'Interactive Preview'], ['raw', 'Raw HTML (text)'], ['findings', `Findings (${findings.length})`]].map(([key, label]) => (
               <button
                 key={key}
                 type="button"
@@ -258,6 +292,15 @@ export default function SheetReviewPanel({ sheetId, onClose, onReviewComplete })
         <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
           {(activeTab === 'preview' && isHtml) && (
             <SanitizedPreview iframeRef={iframeRef} sheetId={sheetId} />
+          )}
+
+          {(activeTab === 'interactive' && isHtml) && (
+            <InteractivePreview
+              loading={interactiveState.loading}
+              error={interactiveState.error}
+              runtimeUrl={interactiveState.runtimeUrl}
+              sheetId={sheetId}
+            />
           )}
 
           {(activeTab === 'raw' && isHtml) && (

@@ -354,6 +354,26 @@ describe('authTokens', () => {
     })
   })
 
+  describe('normalizeAuthUser', () => {
+    it('coerces numeric string ids into integers for legacy session tokens', () => {
+      expect(authTokens.normalizeAuthUser({ sub: '101', role: 'student' })).toEqual({
+        userId: 101,
+        username: null,
+        role: 'student',
+        trustLevel: null,
+      })
+    })
+
+    it('preserves non-numeric ids for generic token helpers', () => {
+      expect(authTokens.normalizeAuthUser({ sub: 'user-123', role: 'student' })).toEqual({
+        userId: 'user-123',
+        username: null,
+        role: 'student',
+        trustLevel: null,
+      })
+    })
+  })
+
   describe('signCsrfToken and verifyCsrfToken', () => {
     it('roundtrips a CSRF token', () => {
       const user = { id: 'user-789' }

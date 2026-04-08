@@ -3,6 +3,7 @@
  *
  * Extracted from SheetReviewPanel.jsx.  Contains:
  *   - SanitizedPreview  (sandboxed iframe)
+ *   - InteractivePreview (script-enabled runtime iframe)
  *   - RawHtmlView       (plain-text <pre> — never interpreted)
  *   - FindingsPanel     (scan findings + metadata)
  *   - ReviewActionBar   (approve / reject controls)
@@ -20,6 +21,46 @@ export function SanitizedPreview({ iframeRef, sheetId }) {
         ref={iframeRef}
         title={`admin-review-preview-${sheetId}`}
         sandbox=""
+        referrerPolicy="no-referrer"
+        style={{ width: '100%', height: '100%', minHeight: 400, border: 'none', background: 'var(--sh-surface)' }}
+      />
+    </div>
+  )
+}
+
+export function InteractivePreview({ loading, error, runtimeUrl, sheetId }) {
+  if (loading) {
+    return (
+      <div style={{ padding: 24, color: 'var(--sh-muted)', fontSize: 13 }}>
+        Loading interactive preview...
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div style={{ padding: 24, display: 'grid', gap: 10 }}>
+        <div style={{ color: 'var(--sh-danger)', fontSize: 13 }}>{error}</div>
+        <div style={{ fontSize: 12, color: 'var(--sh-muted)', lineHeight: 1.6 }}>
+          Interactive mode is only available when the runtime preview can be safely issued for this sheet.
+        </div>
+      </div>
+    )
+  }
+
+  if (!runtimeUrl) {
+    return null
+  }
+
+  return (
+    <div style={{ height: '100%', minHeight: 400, display: 'grid', gridTemplateRows: 'auto 1fr' }}>
+      <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--sh-border)', fontSize: 12, color: 'var(--sh-muted)', lineHeight: 1.6 }}>
+        Interactive mode runs the sheet's runtime preview inside a restricted iframe so admins can verify real behavior before approving.
+      </div>
+      <iframe
+        title={`admin-review-interactive-${sheetId}`}
+        src={runtimeUrl}
+        sandbox="allow-scripts allow-forms allow-modals allow-downloads"
         referrerPolicy="no-referrer"
         style={{ width: '100%', height: '100%', minHeight: 400, border: 'none', background: 'var(--sh-surface)' }}
       />

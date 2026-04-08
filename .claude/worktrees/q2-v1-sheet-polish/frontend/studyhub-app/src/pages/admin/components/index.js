@@ -1,7 +1,0 @@
-export { default as AdminCard } from './AdminCard'
-export { default as AdminTable } from './AdminTable'
-export { default as AdminModal } from './AdminModal'
-export { default as AdminInput } from './AdminInput'
-export { default as AdminSelect } from './AdminSelect'
-export { default as AdminPill } from './AdminPill'
-export { default as AdminSplitPanel } from './AdminSplitPanel'

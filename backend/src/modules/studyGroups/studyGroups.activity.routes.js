@@ -47,7 +47,7 @@ router.get('/', readLimiter, requireAuth, async (req, res) => {
         where: { groupId },
         orderBy: { createdAt: 'desc' },
         take: limit,
-        select: { id: true, title: true, type: true, createdAt: true, user: { select: { id: true, username: true, avatarUrl: true } } },
+        select: { id: true, title: true, resourceType: true, createdAt: true, user: { select: { id: true, username: true, avatarUrl: true } } },
       }),
       prisma.studyGroupMember.findMany({
         where: { groupId, status: 'active' },
@@ -80,7 +80,7 @@ router.get('/', readLimiter, requireAuth, async (req, res) => {
     for (const r of recentResources) {
       activities.push({
         type: 'resource',
-        subType: r.type,
+        subType: r.resourceType,
         id: r.id,
         title: r.title,
         actor: r.user,

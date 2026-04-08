@@ -167,3 +167,78 @@ export function HtmlScanModal({
     </div>
   )
 }
+
+export function HtmlReviewNoticeModal({ show, notice, onClose, onOpenMySheets, onOpenPreview }) {
+  if (!show || !notice) return null
+
+  const isQuarantined = notice.status === 'quarantined'
+  const canPreview = (notice.htmlRiskTier || 0) < 3
+  const title = isQuarantined ? 'Sheet held for review' : 'Sheet sent for review'
+  const body = isQuarantined
+    ? 'StudyHub found a higher-risk issue, so this sheet is being held for manual review. It still stays in your editor and under My Sheets while you update it.'
+    : 'Your HTML sheet is now under review. You can keep editing here while the review runs, and you can always find it again under My Sheets.'
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', display: 'grid', placeItems: 'center', zIndex: 86, padding: 20 }}>
+      <div style={{ width: 'min(620px, 100%)', background: 'var(--sh-surface)', borderRadius: 16, border: '1px solid var(--sh-border)', overflow: 'hidden' }}>
+        <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--sh-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--sh-heading)' }}>{title}</div>
+            {notice.title ? (
+              <div style={{ marginTop: 4, fontSize: 12, color: 'var(--sh-muted)' }}>{notice.title}</div>
+            ) : null}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{ background: 'none', border: 'none', color: 'var(--sh-muted)', fontSize: 18, cursor: 'pointer', lineHeight: 1 }}
+            aria-label="Close review notice"
+          >
+            &times;
+          </button>
+        </div>
+        <div style={{ padding: 16, display: 'grid', gap: 10, fontSize: 13, color: 'var(--sh-subtext)', lineHeight: 1.7 }}>
+          <div>{body}</div>
+          {notice.message ? (
+            <div style={{ fontSize: 12, fontWeight: 700, color: isQuarantined ? 'var(--sh-danger-text)' : 'var(--sh-warning-text)' }}>
+              {notice.message}
+            </div>
+          ) : null}
+          <div style={{ border: '1px solid var(--sh-info-border)', background: 'var(--sh-info-bg)', borderRadius: 10, padding: 12 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--sh-heading)', marginBottom: 4 }}>Where to find it</div>
+            <div style={{ fontSize: 12, color: 'var(--sh-subtext)' }}>
+              Open My Sheets to see the current status, or stay here to keep editing and resubmit when you are ready.
+            </div>
+          </div>
+        </div>
+        <div style={{ borderTop: '1px solid var(--sh-border)', padding: 14, display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{ background: 'var(--sh-surface)', color: 'var(--sh-muted)', border: '1px solid var(--sh-border)', borderRadius: 8, padding: '8px 12px', fontSize: 12, cursor: 'pointer', fontFamily: FONT }}
+          >
+            Keep editing
+          </button>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            {canPreview ? (
+              <button
+                type="button"
+                onClick={onOpenPreview}
+                style={{ background: 'var(--sh-soft)', color: 'var(--sh-heading)', border: '1px solid var(--sh-border)', borderRadius: 8, padding: '8px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: FONT }}
+              >
+                Open preview
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={onOpenMySheets}
+              style={{ background: 'var(--sh-brand)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: FONT }}
+            >
+              My Sheets
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}

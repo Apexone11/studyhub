@@ -2,6 +2,77 @@
 
 # Beta v2.0.0 Release Log
 
+## Date: 2026-04-08
+
+### Account Deletion Retention Hardening
+
+**Account deletion now closes the highest-risk retention gaps before the user row disappears**
+- Self-service and admin deletion now cancel an active Stripe subscription before local teardown so paid accounts cannot keep billing after their StudyHub user record is removed
+- The delete flow now removes password-reset and verification-challenge artifacts for the account identity and clears the session cookie after self-service deletion so the browser is not left holding a stale authenticated cookie
+- User-owned video-appeal rows are now cleared before owned videos are deleted, which removes the `VideoAppeal.originalVideoId` / uploader foreign-key blockers that could otherwise leave account deletion partially stuck
+
+**Owned uploads are now collected up front and cleaned after the database delete succeeds**
+- Extended local-file cleanup from avatars and sheet/feed attachments to also include profile cover images plus comment-image uploads tied to sheet, feed, and note comments that are removed as part of account deletion
+- Captured user-owned video R2 refs before deleting the rows, then removed the original object, variants, manifest, thumbnail, and captions after the transaction completes
+- Added robust R2 object-key extraction so announcement-image cleanup works whether the stored URL uses the public bucket URL or the proxied `/api/video/media/...` path
+- Added embedded note-image cleanup for `/uploads/note-images/...` references found inside `Note.content` and `NoteVersion.content`, so account deletion now removes orphaned note editor uploads instead of only structured attachment rows
+
+**The same note-image leak is now closed for ordinary note deletion as well**
+- The note delete route now snapshots embedded note-image URLs from the current note body plus saved version history before deleting the note, then removes any now-unreferenced local note images after the delete succeeds
+
+**Deep Scan Summary / Deferred Risk**
+- Confirmed that some retention surfaces remain intentional or externally managed and were not deleted in this pass: audit logs, email delivery/suppression history, and payment-processor records still persist for operational or compliance reasons
+- The previously deferred embedded-note-image cleanup gap is now closed for both account deletion and single-note deletion; audit/compliance retention remains the main intentional leftover surface
+
+**Validation**
+- `Set-Location -LiteralPath "C:\Users\Abdul PC\OneDrive\Desktop\studyhub\backend"; npx vitest run test/settings.routes.test.js test/deleteUserAccount.test.js`: passes (19 tests)
+- `Set-Location -LiteralPath "C:\Users\Abdul PC\OneDrive\Desktop\studyhub\backend"; npx eslint --quiet src/lib/deleteUserAccount.js src/lib/storage.js src/lib/r2Storage.js src/modules/video/video.service.js src/modules/announcements/announcements.routes.js src/modules/settings/settings.account.controller.js test/settings.routes.test.js test/deleteUserAccount.test.js`: passes
+- `Set-Location -LiteralPath "C:\Users\Abdul PC\OneDrive\Desktop\studyhub\backend"; npx vitest run test/deleteUserAccount.test.js test/notes-enhancements.routes.test.js test/idor.notes.test.js`: passes (33 tests)
+- `Set-Location -LiteralPath "C:\Users\Abdul PC\OneDrive\Desktop\studyhub\backend"; npx eslint --quiet src/lib/storage.js src/lib/deleteUserAccount.js src/modules/notes/notes.controller.js test/deleteUserAccount.test.js test/notes-enhancements.routes.test.js test/idor.notes.test.js`: passes
+
+### Notification Preference Expansion
+
+**Notification settings now map to the real activity categories StudyHub emits instead of a minimal flat toggle set**
+- Expanded stored user preferences with dedicated email and in-app controls for comments and replies, social activity, study-group activity, mentions, and sheet contribution activity while keeping the existing digest setting intact
+- Reworked the Settings notifications tab so the new categories are editable from one place and clearly labels moderation, billing, and legal notices as essential account alerts that remain enabled
+
+**Backend notification delivery now respects those preferences at the root helper instead of relying on callers**
+- Centralized notification category mapping inside the shared notify helper so optional in-app alerts are skipped before write time when the user has turned that category off
+- Added opt-in email delivery for medium-priority activity types such as mentions and study-group updates, while preserving the existing high-priority email flow for moderation and billing-style alerts
+- Kept account-critical types such as moderation, payment failures, legal reminders, and video-copy alerts mandatory in-app, and routed the remaining raw study-group and video notification writers through the shared helper so they use the same policy
+
+**Validation**
+- `Set-Location -LiteralPath "C:\Users\Abdul PC\OneDrive\Desktop\studyhub"; npm --prefix backend test -- --run test/settings.routes.test.js test/notify.test.js test/payments.test.js`: passes (67 tests)
+- `Set-Location -LiteralPath "C:\Users\Abdul PC\OneDrive\Desktop\studyhub"; npm --prefix backend test -- --run test/studyGroups.routes.test.js`: passes (8 tests)
+- `Set-Location -LiteralPath "C:\Users\Abdul PC\OneDrive\Desktop\studyhub\backend"; npx eslint src/lib/notify.js src/modules/settings/settings.constants.js src/modules/payments/payments.service.js src/modules/studyGroups/studyGroups.sessions.routes.js src/modules/studyGroups/studyGroups.discussions.controller.js src/modules/video/video.service.js test/settings.routes.test.js test/notify.test.js`: passes
+- `Set-Location -LiteralPath "C:\Users\Abdul PC\OneDrive\Desktop\studyhub\backend"; npx prisma validate`: passes
+- `Set-Location -LiteralPath "C:\Users\Abdul PC\OneDrive\Desktop\studyhub\frontend\studyhub-app"; npx eslint src/pages/settings/NotificationsTab.jsx`: passes
+- `Set-Location -LiteralPath "C:\Users\Abdul PC\OneDrive\Desktop\studyhub"; npm --prefix frontend/studyhub-app run build`: passes
+
+### Sheet Review Workflow, Recent Courses, and Admin Interactive Preview
+
+**Owner-only sheet states now stay inside an interactive editor flow instead of falling into dead-end viewer routes**
+- Hardened auth-token normalization and sheet-owner checks so legacy numeric-string session ids still count as the sheet owner for unpublished and under-review content
+- Kept editable sheet states (`draft`, `pending_review`, `rejected`, `quarantined`) on the HTML upload/editor workflow from My Sheets and submit-time redirects instead of sending creators to the public viewer path
+- Added direct draft-query loading on the upload page so creators can reopen a specific under-review sheet, keep editing it, and continue using preview from the same workspace
+
+**HTML scan UX is quieter during editing but clearer after submission**
+- Removed the auto-opening scan modal from background polling so scans keep running inline without interrupting editing sessions
+- Added an explicit "View scan details" action in the upload form for flagged findings and kept acknowledgement gated there for tier-1 HTML findings
+- Added a post-submit review notice modal that tells the creator the sheet is under review, keeps them in the editor, and points them to My Sheets and preview when available
+
+**Sheets/feed/admin quality-of-life behavior is tighter**
+- Recent courses on the sheets page now expire after one hour and are capped at seven entries instead of lingering indefinitely
+- Sidebar navigation now scrolls the app back to the top on click, and the floating scroll-to-top control shifts left when the AI bubble is present so the two controls no longer overlap on feed-style pages
+- The admin sheet-review window now includes an interactive preview tab powered by the existing HTML runtime endpoint so admins can inspect script-enabled behavior before approving a sheet
+
+**Validation**
+- `Set-Location -LiteralPath "C:\Users\Abdul PC\OneDrive\Desktop\studyhub"; npm --prefix backend test -- --run test/core-utils.test.js test/attachmentAccessControl.test.js`: passes (103 tests)
+- `Set-Location -LiteralPath "C:\Users\Abdul PC\OneDrive\Desktop\studyhub\frontend\studyhub-app"; npx vitest run src/pages/sheets/upload/uploadSheetWorkflow.test.jsx src/pages/sheets/recentCoursesStorage.test.js`: passes (7 tests)
+- `Set-Location -LiteralPath "C:\Users\Abdul PC\OneDrive\Desktop\studyhub\frontend\studyhub-app"; npx eslint src/components/sidebar/AppSidebar.jsx src/components/ScrollToTop.jsx src/components/sidebar/AppSidebar.responsive.test.jsx src/pages/sheets/upload/useUploadSheet.js src/pages/sheets/upload/uploadSheetActions.js src/pages/sheets/upload/UploadSheetPage.jsx src/pages/sheets/upload/UploadSheetFormFields.jsx src/pages/sheets/lab/HtmlScanModal.jsx src/pages/sheets/useSheetsData.js src/pages/sheets/recentCoursesStorage.js src/pages/sheets/recentCoursesStorage.test.js src/pages/admin/sheetReview/SheetReviewPanel.jsx src/pages/admin/sheetReview/SheetReviewDetails.jsx src/pages/sheets/SheetsPage.jsx src/pages/sheets/SheetListItem.jsx`: passes
+- `Set-Location -LiteralPath "C:\Users\Abdul PC\OneDrive\Desktop\studyhub"; npm --prefix frontend/studyhub-app run build`: passes
+- `Set-Location -LiteralPath "C:\Users\Abdul PC\OneDrive\Desktop\studyhub\frontend\studyhub-app"; npx vitest run src/components/sidebar/AppSidebar.responsive.test.jsx`: still fails in the current workspace test environment because React Testing Library resolves `react-dom` from the root workspace `node_modules`, which then cannot resolve a matching root `react` package; this is an existing test-environment/module-resolution issue, not a compile error in the sidebar change itself
+
 ## Date: 2026-04-07
 
 ### Attachment Preview Action Polish
@@ -12,6 +83,41 @@
 
 **Validation**
 - `Set-Location -LiteralPath frontend/studyhub-app; npx eslint src/pages/preview/AttachmentPreviewPage.jsx`: passes
+
+### Backend Review Cleanup, Google Books Noise Reduction, and Vite Alignment
+
+**The open backend review comments are now resolved at the root cause**
+- Reworked study-sheet full-text search to use structured Prisma SQL fragments instead of `$queryRawUnsafe`, which removes the unsafe raw-string assembly while keeping the existing ranking and filter behavior intact
+- Standardized route error fallback responses through the shared `sendError` envelope so uncoded controller failures now return stable `{ error, code }` payloads instead of a one-off raw JSON shape
+
+**Google Books failures and Prisma dev drift now behave more predictably**
+- Added HTTP-status-aware error objects in the library service so upstream `429` responses carry `statusCode` metadata into monitoring and can be filtered as expected instead of surfacing as generic server noise
+- Updated the backend Docker dev entrypoint to hash `prisma/schema.prisma` and re-run `prisma generate` when the schema changes, which closes the stale-client gap behind the recent runtime mismatch on newer Prisma fields such as `displayName`
+
+**Vite resolution is aligned where the repo actually pins it**
+- Pinned the frontend package manifests and package-locks to `vite` `8.0.5` in both the main app and the mirrored Claude worktree
+- Refreshed the standalone backend lockfiles so their Vitest-owned Vite resolution also lands on `8.0.5`
+- The workspace-root lockfiles still contain a separate hoisted `vite` `8.0.7` copy for Vitest, and the older mirrored worktree also routes plugin-react through that hoisted copy, while the frontend-scoped workspace entries are pinned to `8.0.5`; this is the resolved npm workspace graph, not a remaining invalid direct dependency pin
+
+**Validation**
+- `Set-Location -LiteralPath backend; npm test -- test/fullTextSearch.test.js test/http.errors.test.js test/library.service.test.js`: passes (6 tests)
+- `Set-Location -LiteralPath backend; npx eslint src/lib/fullTextSearch.js src/core/http/errors.js src/modules/library/library.service.js scripts/dev-entrypoint.js test/fullTextSearch.test.js test/http.errors.test.js test/library.service.test.js`: passes
+- `Set-Location -LiteralPath frontend/studyhub-app; npm run build`: passes
+
+### Prisma Runtime Cleanup and Dependabot Resolver Unblock
+
+**Additional Prisma/schema mismatches that were still surfacing in runtime monitoring are now removed from the live code path**
+- Fixed admin engagement totals so sheet reactions no longer query a nonexistent `Reaction.createdAt` field; likes remain a lifetime total until the schema stores reaction timestamps explicitly
+- Fixed the study-group activity feed to read `GroupResource.resourceType` instead of the nonexistent `type` field when building recent resource activity
+- Fixed the sheet readme route to stop selecting a nonexistent `StudySheet.visibility` field before passing the sheet through the shared read-access guard
+
+**Frontend Vite manifests are now simpler for Dependabot to resolve**
+- Removed the redundant frontend-local `vite` overrides from both the main app manifest and the mirrored Claude worktree manifest, leaving the direct `vite` dependency pinned at `8.0.5`
+- Refreshed both frontend lockfiles after the manifest cleanup so Dependabot no longer needs to reconcile a direct pin and an identical override in the same package
+
+**Validation**
+- `Set-Location -LiteralPath backend; npm test -- test/admin.routes.test.js test/sheets.read.routes.test.js test/studyGroups.activity.routes.test.js test/fullTextSearch.test.js test/http.errors.test.js test/library.service.test.js test/courses.routes.test.js`: passes (23 tests)
+- `Set-Location -LiteralPath frontend/studyhub-app; npm run build`: passes
 
 ### PR #195 Follow-up Review Fixes
 

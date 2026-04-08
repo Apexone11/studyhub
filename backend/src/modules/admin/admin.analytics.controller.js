@@ -477,7 +477,8 @@ router.get('/analytics/engagement-totals', async (req, res) => {
     const start = periodStartDate(req.query.period)
 
     const [likes, comments, stars, follows] = await Promise.all([
-      prisma.reaction.count({ where: { createdAt: { gte: start } } }),
+      // Sheet reactions currently do not store timestamps, so this remains a lifetime total.
+      prisma.reaction.count(),
       prisma.feedPostComment.count({ where: { createdAt: { gte: start } } }),
       prisma.starredSheet.count({ where: { createdAt: { gte: start } } }),
       prisma.userFollow.count({ where: { createdAt: { gte: start }, status: 'active' } }),

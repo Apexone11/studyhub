@@ -5,10 +5,18 @@ import {
   IconStar,
   IconStarFilled,
 } from '../../components/Icons'
-import { resolveSheetFormat, formatBadgeText, timeAgo, computeSignalBadge, SIGNAL_BADGE_CONFIG } from './sheetsPageConstants'
+import {
+  resolveSheetFormat,
+  formatBadgeText,
+  timeAgo,
+  computeSignalBadge,
+  SIGNAL_BADGE_CONFIG,
+  isEditableSheetStatus,
+} from './sheetsPageConstants'
 
 export default function SheetListRow({ sheet, forking, onOpen, onStar, onFork }) {
   const format = resolveSheetFormat(sheet)
+  const detailPath = isEditableSheetStatus(sheet.status) ? `/sheets/upload?draft=${sheet.id}` : `/sheets/${sheet.id}`
   const authorName = sheet.author?.username || 'Unknown author'
   const schoolLabel = sheet.course?.school?.short || sheet.course?.school?.name || 'StudyHub'
   const preview = (sheet.description || sheet.content || 'No summary available yet.').replace(/\s+/g, ' ').trim()
@@ -34,7 +42,7 @@ export default function SheetListRow({ sheet, forking, onOpen, onStar, onFork })
     >
       <div className="sheets-repo-row__main">
         <h2 className="sheets-repo-row__title">
-          <Link to={`/sheets/${sheet.id}`} onClick={(event) => event.stopPropagation()}>
+          <Link to={detailPath} onClick={(event) => event.stopPropagation()}>
             {sheet.title}
           </Link>
           {signalConfig ? (

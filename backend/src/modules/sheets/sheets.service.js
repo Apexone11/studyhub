@@ -14,8 +14,12 @@ function normalizeSheetStatus(value, fallback = SHEET_STATUS.PUBLISHED) {
   return fallback
 }
 
+function sameUserId(left, right) {
+  return Number(left) === Number(right)
+}
+
 function canModerateOrOwnSheet(sheet, user) {
-  return Boolean(user && (user.role === 'admin' || user.userId === sheet.userId))
+  return Boolean(user && (user.role === 'admin' || sameUserId(user.userId, sheet.userId)))
 }
 
 function canReadSheet(sheet, user) {
@@ -81,6 +85,7 @@ async function getUserDefaultDownloads(userId) {
 
 module.exports = {
   normalizeSheetStatus,
+  sameUserId,
   canModerateOrOwnSheet,
   canReadSheet,
   resolveNextSheetStatus,

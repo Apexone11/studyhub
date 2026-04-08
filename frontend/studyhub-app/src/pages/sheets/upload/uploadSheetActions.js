@@ -9,6 +9,7 @@ import { useCallback } from 'react'
 import { API } from '../../../config'
 import { showToast } from '../../../lib/toast'
 import { checkImageSafety, isImageFile } from '../../../lib/imageSafety'
+import { isEditableSheetStatus } from '../sheetsPageConstants'
 import { reduceScanState } from './uploadSheetWorkflow'
 import { authHeaders, validateAttachment } from './uploadSheetConstants'
 
@@ -139,6 +140,7 @@ export function makeDiscardDraft({
   setAttachFile, setAttachErr, setExistingAttachment, setRemoveExistingAttachment,
   setHasUnsavedChanges, setSaved, setError, setDraftId,
   setScanState, setDraftReloadKey, setDiscarding, setShowDiscardDialog,
+  onAfterDiscard,
 }) {
   return async function discardDraft() {
     if (!Number.isInteger(draftId)) {
@@ -193,6 +195,9 @@ export function makeDiscardDraft({
       })
 
       setDraftReloadKey((prev) => prev + 1)
+      if (typeof onAfterDiscard === 'function') {
+        onAfterDiscard()
+      }
     } catch (discardError) {
       setError(discardError.message || 'Could not discard draft.')
     } finally {
@@ -301,6 +306,26 @@ export function useHandleSubmit({
   uploadAttachment,
   setError, setLoading, setHasUnsavedChanges, setVerificationRequired,
 }) {
+  const navigateAfterHtmlSubmit = useCallback((data) => {
+    if (isEditableSheetStatus(data?.status)) {
+      navigate(`/sheets/upload?draft=${data.id}`, {
+        replace: true,
+        state: {
+          postSubmitNotice: {
+            id: data.id,
+            title: data.title || title,
+            status: data.status,
+            htmlRiskTier: data.htmlRiskTier || 0,
+            message: data.message || '',
+          },
+        },
+      })
+      return
+    }
+
+    navigate(`/sheets/${data.id}`)
+  }, [navigate, title])
+
   return useCallback(async () => {
     setError('')
     setVerificationRequired(false)
@@ -380,7 +405,7 @@ export function useHandleSubmit({
       }
 
       setHasUnsavedChanges(false)
-      navigate(`/sheets/${data.id}`)
+      navigateAfterHtmlSubmit(data)
     } catch (submitError) {
       setError(submitError.message || 'Could not submit for review.')
     } finally {
@@ -406,5 +431,6 @@ export function useHandleSubmit({
     sheetId,
     title,
     uploadAttachment,
+    navigateAfterHtmlSubmit,
   ])
 }

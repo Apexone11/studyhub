@@ -7,7 +7,18 @@ const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,20}$/
 const COURSE_CODE_REGEX = /^[A-Z0-9-]{2,20}$/
 
 const PREF_BOOLEAN_KEYS = [
-  'emailDigest', 'emailMentions', 'emailContributions', 'inAppNotifications',
+  'emailDigest',
+  'emailMentions',
+  'emailContributions',
+  'emailComments',
+  'emailSocial',
+  'emailStudyGroups',
+  'inAppNotifications',
+  'inAppMentions',
+  'inAppComments',
+  'inAppSocial',
+  'inAppContributions',
+  'inAppStudyGroups',
   'defaultDownloads', 'defaultContributions',
 ]
 const PREF_ENUM_KEYS = {

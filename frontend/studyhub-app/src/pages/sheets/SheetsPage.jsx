@@ -16,6 +16,7 @@ import SheetsFilters from './SheetsFilters'
 import SheetsEmptyState from './SheetsEmptyState'
 import SheetsAside from './SheetsAside'
 import useSheetsData from './useSheetsData'
+import { isEditableSheetStatus } from './sheetsPageConstants'
 import './SheetsPage.css'
 
 export default function SheetsPage() {
@@ -147,7 +148,7 @@ export default function SheetsPage() {
                         forking={forkingSheetId === sheet.id}
                         onOpen={(sheetId) => {
                           const s = sheetsState.sheets.find((x) => x.id === sheetId)
-                          if (s && s.status === 'draft') {
+                          if (s && isEditableSheetStatus(s.status)) {
                             navigate(`/sheets/upload?draft=${sheetId}`)
                           } else {
                             navigate(`/sheets/${sheetId}`)
