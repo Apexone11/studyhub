@@ -1,6 +1,9 @@
 import { API } from '../config'
+import { clearFetchCache } from './useFetch'
 
 let inMemoryCsrfToken = ''
+
+export const LOGGED_OUT_FLAG = 'studyhub:logged-out'
 
 export function getStoredUser() {
   const rawUser = localStorage.getItem('user')
@@ -53,10 +56,12 @@ export function clearStoredSession() {
 
 export async function logoutSession() {
   try {
-    await fetch(`${API}/api/auth/logout`, { method: 'POST' })
+    await fetch(`${API}/api/auth/logout`, { method: 'POST', credentials: 'include' })
   } catch {
     // Best effort only — always clear local cached user state.
   } finally {
     clearStoredSession()
+    clearFetchCache()
+    try { sessionStorage.setItem(LOGGED_OUT_FLAG, '1') } catch { /* private mode */ }
   }
 }

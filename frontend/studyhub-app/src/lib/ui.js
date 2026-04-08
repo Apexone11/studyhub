@@ -28,6 +28,8 @@ export function pageShell(widthKey, top = 24, bottom = 60) {
     maxWidth: pageWidths[widthKey],
     margin: '0 auto',
     padding: shellPadding(top, bottom),
+    position: 'relative',
+    zIndex: 1,
   }
 }
 

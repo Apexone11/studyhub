@@ -10,7 +10,50 @@ import {
 let fetchShimInstalled = false
 export const AUTH_SESSION_EXPIRED_EVENT = 'studyhub:auth-expired'
 
+/* Debounce auth-expired events so multiple simultaneous 401s
+   (e.g. feed + leaderboard + comments) don't flood the user. */
+let lastExpiredDispatch = 0
+const EXPIRED_DEBOUNCE_MS = 2000
+
+function dispatchAuthExpired() {
+  const now = Date.now()
+  if (now - lastExpiredDispatch < EXPIRED_DEBOUNCE_MS) return
+  lastExpiredDispatch = now
+  clearStoredSession()
+  window.dispatchEvent(new CustomEvent(AUTH_SESSION_EXPIRED_EVENT))
+}
+
 const AUTH_ERROR_CODES = new Set(['AUTH_REQUIRED', 'AUTH_EXPIRED'])
+
+/**
+ * Only trigger auth-expired logout if the user actually had an active session.
+ * 401s from optional-auth endpoints (for-you, search, etc.) should not log out
+ * users who are genuinely authenticated -- those endpoints return 401 when
+ * req.user is not set, which can happen transiently.
+ */
+function handlePossibleAuthExpiry(response) {
+  // Only log out if the user currently has a stored session.
+  // If there's no stored user, 401 is expected (not logged in).
+  if (!getStoredUser()) return
+
+  // Check for explicit session-expired header from backend
+  const expiredHeader = response.headers.get('X-Session-Expired')
+  if (expiredHeader === 'true') {
+    dispatchAuthExpired()
+    return
+  }
+
+  // For /api/users/me endpoint, 401 definitively means session expired
+  const url = typeof response.url === 'string' ? response.url : ''
+  if (url.includes('/api/users/me') || url.includes('/api/auth/')) {
+    dispatchAuthExpired()
+    return
+  }
+
+  // For other endpoints, don't auto-logout -- the 401 might be from
+  // an optional-auth endpoint where the cookie wasn't sent or expired
+  // but the user's local session state is still valid.
+}
 
 export async function readJsonSafely(response, fallback = {}) {
   try {
@@ -22,6 +65,10 @@ export async function readJsonSafely(response, fallback = {}) {
 
 export function isAuthSessionFailure(response, data = {}) {
   return response.status === 401 || AUTH_ERROR_CODES.has(data?.code)
+}
+
+export function isEmailNotVerifiedError(data) {
+  return data?.code === 'EMAIL_NOT_VERIFIED'
 }
 
 export function getApiErrorMessage(data, fallback) {
@@ -118,16 +165,14 @@ export function installApiFetchShim() {
     if (input instanceof Request) {
       const response = await nativeFetch(new Request(input, nextInit))
       if (response.status === 401) {
-        clearStoredSession()
-        window.dispatchEvent(new CustomEvent(AUTH_SESSION_EXPIRED_EVENT))
+        handlePossibleAuthExpiry(response)
       }
       return response
     }
 
     const response = await nativeFetch(input, nextInit)
     if (response.status === 401) {
-      clearStoredSession()
-      window.dispatchEvent(new CustomEvent(AUTH_SESSION_EXPIRED_EVENT))
+      handlePossibleAuthExpiry(response)
     }
     return response
   }

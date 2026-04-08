@@ -1,0 +1,35 @@
+# StudyHub robots.txt
+# Allow search engines to index public pages.
+# Block private/authenticated sections that require login.
+
+User-agent: *
+Allow: /
+Allow: /about
+Allow: /pricing
+Allow: /terms
+Allow: /privacy
+Allow: /guidelines
+Allow: /users/
+
+# Private sections -- require authentication, not useful for crawlers
+Disallow: /feed
+Disallow: /sheets
+Disallow: /notes
+Disallow: /messages
+Disallow: /study-groups
+Disallow: /ai
+Disallow: /library
+Disallow: /tests
+Disallow: /settings
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /my-courses
+Disallow: /announcements
+Disallow: /submit
+Disallow: /playground
+Disallow: /preview
+
+# Block API endpoints from being crawled
+Disallow: /api/
+
+Sitemap: https://studyhub-app.up.railway.app/sitemap.xml

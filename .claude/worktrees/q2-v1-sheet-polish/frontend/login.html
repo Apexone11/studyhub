@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StudyHub - Login</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f4f8;
+      color: #111827;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* NAVBAR */
+    nav {
+      background: #1e3a5f;
+      padding: 16px 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    nav .logo {
+      color: #ffffff;
+      font-size: 24px;
+      font-weight: bold;
+      letter-spacing: 1px;
+    }
+
+    nav .logo span { color: #60a5fa; }
+
+    nav ul {
+      list-style: none;
+      display: flex;
+      gap: 24px;
+    }
+
+    nav ul li a {
+      color: #ffffff;
+      text-decoration: none;
+      font-size: 15px;
+    }
+
+    nav ul li a:hover { color: #93c5fd; }
+
+    .nav-btn {
+      background: #2563eb;
+      color: white !important;
+      padding: 8px 20px;
+      border-radius: 6px;
+    }
+
+    /* PAGE LAYOUT */
+    .page {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 60px 20px;
+    }
+
+    /* LOGIN CARD */
+    .login-card {
+      background: white;
+      border-radius: 16px;
+      padding: 48px 40px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
+    }
+
+    .login-card .top {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .login-card .top .icon {
+      font-size: 40px;
+      color: #2563eb;
+      margin-bottom: 12px;
+    }
+
+    .login-card .top h1 {
+      font-size: 26px;
+      color: #1e3a5f;
+      margin-bottom: 6px;
+    }
+
+    .login-card .top p {
+      font-size: 14px;
+      color: #6b7280;
+    }
+
+    /* FORM */
+    .form-group { margin-bottom: 20px; }
+
+    .form-group label {
+      display: block;
+      font-size: 14px;
+      font-weight: bold;
+      color: #374151;
+      margin-bottom: 8px;
+    }
+
+    .input-wrapper { position: relative; }
+
+    .input-wrapper .input-icon {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #9ca3af;
+      font-size: 15px;
+    }
+
+    .input-wrapper input {
+      width: 100%;
+      padding: 12px 14px 12px 40px;
+      border: 2px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 15px;
+      color: #111827;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .input-wrapper input:focus { border-color: #2563eb; }
+
+    /* SHOW/HIDE PASSWORD */
+    .toggle-password {
+      position: absolute;
+      right: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      cursor: pointer;
+      color: #9ca3af;
+      font-size: 15px;
+      background: none;
+      border: none;
+    }
+
+    .toggle-password:hover { color: #2563eb; }
+
+    /* ERROR MESSAGE */
+    .error-msg {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #dc2626;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 14px;
+      margin-bottom: 20px;
+      display: none;
+    }
+
+    .error-msg i { margin-right: 8px; }
+    .error-msg.show { display: block; }
+
+    /* SUBMIT BUTTON */
+    .btn-login {
+      width: 100%;
+      background: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 14px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s;
+      margin-top: 8px;
+    }
+
+    .btn-login:hover { background: #1d4ed8; }
+    .btn-login:active { background: #1e40af; }
+
+    /* DIVIDER */
+    .divider {
+      text-align: center;
+      margin: 24px 0;
+      font-size: 13px;
+      color: #9ca3af;
+      position: relative;
+    }
+
+    .divider::before,
+    .divider::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      width: 42%;
+      height: 1px;
+      background: #e5e7eb;
+    }
+
+    .divider::before { left: 0; }
+    .divider::after { right: 0; }
+
+    /* REGISTER LINK */
+    .register-link {
+      text-align: center;
+      font-size: 14px;
+      color: #6b7280;
+    }
+
+    .register-link a {
+      color: #2563eb;
+      font-weight: bold;
+      text-decoration: none;
+    }
+
+    .register-link a:hover { text-decoration: underline; }
+
+    /* FOOTER */
+    footer {
+      background: #1e3a5f;
+      color: #94a3b8;
+      text-align: center;
+      padding: 20px;
+      font-size: 13px;
+    }
+
+    footer span { color: #60a5fa; }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="logo">Study<span>Hub</span></div>
+    <ul>
+      <li><a href="index.html">Home</a></li>
+      <li><a href="#">Study Sheets</a></li>
+      <li><a href="#">Practice Tests</a></li>
+      <li><a href="#">Syllabus</a></li>
+      <li><a href="login.html" class="nav-btn">Login</a></li>
+    </ul>
+  </nav>
+
+  <main class="page">
+    <div class="login-card">
+      <div class="top">
+        <div class="icon"><i class="fas fa-graduation-cap"></i></div>
+        <h1>Welcome Back</h1>
+        <p>Sign in to access your study materials</p>
+      </div>
+
+      <div class="error-msg" id="errorMsg" role="alert" aria-live="polite">
+        <i class="fas fa-circle-exclamation"></i>
+        <span id="errorText">Incorrect username or password. Please try again.</span>
+      </div>
+
+      <form id="loginForm" novalidate>
+        <div class="form-group">
+          <label for="username">Username</label>
+          <div class="input-wrapper">
+            <i class="far fa-user input-icon"></i>
+            <input
+              type="text"
+              id="username"
+              placeholder="Enter your username"
+              autocomplete="username"
+            />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password</label>
+          <div class="input-wrapper">
+            <i class="far fa-lock input-icon"></i>
+            <input
+              type="password"
+              id="password"
+              placeholder="Enter your password"
+              autocomplete="current-password"
+            />
+            <button
+              type="button"
+              class="toggle-password"
+              onclick="togglePassword()"
+              aria-label="Show or hide password"
+            >
+              <i class="fas fa-eye" id="eyeIcon"></i>
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" class="btn-login">
+          <i class="fas fa-arrow-right-to-bracket"></i>
+          Sign In
+        </button>
+      </form>
+
+      <div class="divider">or</div>
+
+      <div class="register-link">
+        Don't have an account? <a href="register.html">Create one here</a>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    Built by Students, For Students - <span>StudyHub</span> - Open Source on GitHub
+  </footer>
+
+  <script>
+    function togglePassword() {
+      const input = document.getElementById("password");
+      const icon = document.getElementById("eyeIcon");
+
+      if (input.type === "password") {
+        input.type = "text";
+        icon.className = "fas fa-eye-slash";
+      } else {
+        input.type = "password";
+        icon.className = "fas fa-eye";
+      }
+    }
+
+    function showError(message) {
+      const errorMsg = document.getElementById("errorMsg");
+      const errorText = document.getElementById("errorText");
+      errorText.textContent = message;
+      errorMsg.classList.add("show");
+    }
+
+    const loginForm = document.getElementById("loginForm");
+    const usernameInput = document.getElementById("username");
+    const passwordInput = document.getElementById("password");
+    const errorMsg = document.getElementById("errorMsg");
+
+    loginForm.addEventListener("submit", function (event) {
+      event.preventDefault();
+      const username = usernameInput.value.trim();
+      const password = passwordInput.value.trim();
+
+      if (!username || !password) {
+        showError("Please fill in both fields.");
+        return;
+      }
+
+      showError("No backend yet - login will be wired in a later step.");
+    });
+
+    usernameInput.addEventListener("input", function () {
+      errorMsg.classList.remove("show");
+    });
+
+    passwordInput.addEventListener("input", function () {
+      errorMsg.classList.remove("show");
+    });
+  </script>
+</body>
+</html>

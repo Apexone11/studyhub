@@ -7,11 +7,11 @@ import { SessionProvider } from '../../lib/session-context'
 import { server } from '../../test/server'
 import AdminPage from './AdminPage'
 
-vi.mock('../../components/Navbar', () => ({
+vi.mock('../../components/navbar/Navbar', () => ({
   default: ({ actions }) => <div data-testid="navbar">{actions}</div>,
 }))
 
-vi.mock('../../components/AppSidebar', () => ({
+vi.mock('../../components/sidebar/AppSidebar', () => ({
   default: () => <aside data-testid="sidebar">Sidebar</aside>,
 }))
 

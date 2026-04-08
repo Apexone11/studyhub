@@ -1,0 +1,594 @@
+/**
+ * Rich text editor styles for the TipTap WYSIWYG editor.
+ * Dark theme to match the existing SheetLab editor panel.
+ * Uses StudyHub CSS custom property tokens where applicable.
+ */
+
+/* ── Editor content area ───────────────────────────────────── */
+
+.sh-rich-editor-content {
+  padding: 16px;
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.8;
+  color: #e2e8f0;
+  outline: none;
+  min-height: 100%;
+  cursor: text;
+}
+
+/* ── Placeholder ───────────────────────────────────────────── */
+
+.sh-rich-editor-content p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #475569;
+  pointer-events: none;
+  height: 0;
+  font-style: italic;
+}
+
+/* ── Headings ──────────────────────────────────────────────── */
+
+.sh-rich-editor-content h1 {
+  font-size: 1.75em;
+  font-weight: 800;
+  margin: 1.2em 0 0.4em;
+  color: #f1f5f9;
+  line-height: 1.3;
+}
+
+.sh-rich-editor-content h2 {
+  font-size: 1.4em;
+  font-weight: 700;
+  margin: 1em 0 0.3em;
+  color: #f1f5f9;
+  line-height: 1.35;
+}
+
+.sh-rich-editor-content h3 {
+  font-size: 1.15em;
+  font-weight: 700;
+  margin: 0.8em 0 0.25em;
+  color: #e2e8f0;
+  line-height: 1.4;
+}
+
+.sh-rich-editor-content h4 {
+  font-size: 1em;
+  font-weight: 700;
+  margin: 0.7em 0 0.2em;
+  color: #cbd5e1;
+  line-height: 1.45;
+}
+
+/* ── Paragraph ─────────────────────────────────────────────── */
+
+.sh-rich-editor-content p {
+  margin: 0.5em 0;
+}
+
+/* ── Inline formatting ─────────────────────────────────────── */
+
+.sh-rich-editor-content strong {
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.sh-rich-editor-content em {
+  font-style: italic;
+}
+
+.sh-rich-editor-content u {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.sh-rich-editor-content s {
+  text-decoration: line-through;
+  opacity: 0.65;
+}
+
+.sh-rich-editor-content code {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #1e293b;
+  color: #a5b4fc;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 0.88em;
+}
+
+/* ── Links ─────────────────────────────────────────────────── */
+
+.sh-rich-editor-content a,
+.sh-editor-link {
+  color: #818cf8;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.sh-rich-editor-content a:hover {
+  color: #a5b4fc;
+}
+
+/* ── Lists ─────────────────────────────────────────────────── */
+
+.sh-rich-editor-content ul {
+  list-style-type: disc;
+  padding-left: 1.5em;
+  margin: 0.5em 0;
+}
+
+.sh-rich-editor-content ol {
+  list-style-type: decimal;
+  padding-left: 1.5em;
+  margin: 0.5em 0;
+}
+
+.sh-rich-editor-content li {
+  margin: 0.15em 0;
+}
+
+.sh-rich-editor-content li p {
+  margin: 0;
+}
+
+/* ── Blockquote ────────────────────────────────────────────── */
+
+.sh-rich-editor-content blockquote {
+  border-left: 3px solid #6366f1;
+  padding: 4px 0 4px 14px;
+  margin: 0.6em 0;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.sh-rich-editor-content blockquote p {
+  margin: 0.2em 0;
+}
+
+/* ── Code block ────────────────────────────────────────────── */
+
+.sh-rich-editor-content pre,
+.sh-editor-code-block {
+  background: #0c1222;
+  border: 1px solid #1e293b;
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin: 0.6em 0;
+  overflow-x: auto;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: #e2e8f0;
+}
+
+.sh-rich-editor-content pre code {
+  padding: 0;
+  background: none;
+  color: inherit;
+  font-size: inherit;
+}
+
+/* ── Horizontal rule ───────────────────────────────────────── */
+
+.sh-rich-editor-content hr {
+  border: none;
+  border-top: 1px solid #334155;
+  margin: 1.2em 0;
+}
+
+/* ── Images ────────────────────────────────────────────────── */
+
+.sh-rich-editor-content img,
+.sh-editor-image {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 0.6em 0;
+}
+
+/* Selected node highlight */
+.sh-rich-editor-content img.ProseMirror-selectednode {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
+
+/* ── Selection ─────────────────────────────────────────────── */
+
+.sh-rich-editor-content ::selection {
+  background: rgba(99, 102, 241, 0.35);
+}
+
+/* ── ProseMirror gapcursor ─────────────────────────────────── */
+
+.ProseMirror-gapcursor::after {
+  border-top: 1px solid #e2e8f0;
+}
+
+/* ── Viewer mode — light theme styles ──────────────────────── */
+
+.sh-richtext-viewer {
+  font-family: var(--font-reading, 'Inter', system-ui, sans-serif);
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--sh-text);
+  word-break: break-word;
+}
+
+.sh-richtext-viewer h1 {
+  font-size: 1.6em;
+  font-weight: 800;
+  margin: 1em 0 0.4em;
+  color: var(--sh-heading);
+}
+
+.sh-richtext-viewer h2 {
+  font-size: 1.3em;
+  font-weight: 700;
+  margin: 0.8em 0 0.3em;
+  color: var(--sh-heading);
+}
+
+.sh-richtext-viewer h3 {
+  font-size: 1.1em;
+  font-weight: 700;
+  margin: 0.6em 0 0.25em;
+  color: var(--sh-heading);
+}
+
+.sh-richtext-viewer p {
+  margin: 0.5em 0;
+}
+
+.sh-richtext-viewer strong {
+  font-weight: 700;
+}
+
+.sh-richtext-viewer code {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--sh-soft);
+  color: var(--sh-brand, #6366f1);
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.88em;
+}
+
+.sh-richtext-viewer pre {
+  background: var(--sh-soft);
+  border: 1px solid var(--sh-border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin: 0.6em 0;
+  overflow-x: auto;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+
+.sh-richtext-viewer pre code {
+  padding: 0;
+  background: none;
+  color: inherit;
+}
+
+.sh-richtext-viewer blockquote {
+  border-left: 3px solid var(--sh-brand, #6366f1);
+  padding: 4px 0 4px 14px;
+  margin: 0.6em 0;
+  color: var(--sh-muted);
+  font-style: italic;
+}
+
+.sh-richtext-viewer ul {
+  list-style-type: disc;
+  padding-left: 1.5em;
+}
+
+.sh-richtext-viewer ol {
+  list-style-type: decimal;
+  padding-left: 1.5em;
+}
+
+.sh-richtext-viewer a {
+  color: var(--sh-brand, #6366f1);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.sh-richtext-viewer img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 0.6em 0;
+}
+
+.sh-richtext-viewer hr {
+  border: none;
+  border-top: 1px solid var(--sh-border);
+  margin: 1.2em 0;
+}
+
+/* ── Code syntax highlighting — editor dark theme ──────────── */
+
+.sh-rich-editor-content pre code .hljs-keyword,
+.sh-rich-editor-content pre code .hljs-selector-tag {
+  color: #c084fc;
+}
+.sh-rich-editor-content pre code .hljs-string,
+.sh-rich-editor-content pre code .hljs-addition {
+  color: #86efac;
+}
+.sh-rich-editor-content pre code .hljs-number,
+.sh-rich-editor-content pre code .hljs-literal {
+  color: #fbbf24;
+}
+.sh-rich-editor-content pre code .hljs-comment,
+.sh-rich-editor-content pre code .hljs-quote {
+  color: #64748b;
+  font-style: italic;
+}
+.sh-rich-editor-content pre code .hljs-function,
+.sh-rich-editor-content pre code .hljs-title {
+  color: #60a5fa;
+}
+.sh-rich-editor-content pre code .hljs-type,
+.sh-rich-editor-content pre code .hljs-built_in {
+  color: #38bdf8;
+}
+.sh-rich-editor-content pre code .hljs-variable,
+.sh-rich-editor-content pre code .hljs-template-variable {
+  color: #fb923c;
+}
+.sh-rich-editor-content pre code .hljs-attr,
+.sh-rich-editor-content pre code .hljs-attribute {
+  color: #a5b4fc;
+}
+.sh-rich-editor-content pre code .hljs-meta,
+.sh-rich-editor-content pre code .hljs-regexp {
+  color: #f472b6;
+}
+.sh-rich-editor-content pre code .hljs-deletion {
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.1);
+}
+.sh-rich-editor-content pre code .hljs-tag {
+  color: #94a3b8;
+}
+.sh-rich-editor-content pre code .hljs-name {
+  color: #f472b6;
+}
+
+/* Code block language label */
+.sh-editor-code-block {
+  position: relative;
+}
+
+/* ── Code syntax highlighting — viewer light theme ─────────── */
+
+.sh-richtext-viewer pre code .hljs-keyword,
+.sh-richtext-viewer pre code .hljs-selector-tag {
+  color: #7c3aed;
+}
+.sh-richtext-viewer pre code .hljs-string,
+.sh-richtext-viewer pre code .hljs-addition {
+  color: #16a34a;
+}
+.sh-richtext-viewer pre code .hljs-number,
+.sh-richtext-viewer pre code .hljs-literal {
+  color: #d97706;
+}
+.sh-richtext-viewer pre code .hljs-comment,
+.sh-richtext-viewer pre code .hljs-quote {
+  color: #94a3b8;
+  font-style: italic;
+}
+.sh-richtext-viewer pre code .hljs-function,
+.sh-richtext-viewer pre code .hljs-title {
+  color: #2563eb;
+}
+.sh-richtext-viewer pre code .hljs-type,
+.sh-richtext-viewer pre code .hljs-built_in {
+  color: #0891b2;
+}
+.sh-richtext-viewer pre code .hljs-variable,
+.sh-richtext-viewer pre code .hljs-template-variable {
+  color: #ea580c;
+}
+.sh-richtext-viewer pre code .hljs-attr,
+.sh-richtext-viewer pre code .hljs-attribute {
+  color: #6366f1;
+}
+.sh-richtext-viewer pre code .hljs-meta,
+.sh-richtext-viewer pre code .hljs-regexp {
+  color: #db2777;
+}
+.sh-richtext-viewer pre code .hljs-deletion {
+  color: #dc2626;
+  background: rgba(239, 68, 68, 0.08);
+}
+.sh-richtext-viewer pre code .hljs-tag {
+  color: #64748b;
+}
+.sh-richtext-viewer pre code .hljs-name {
+  color: #db2777;
+}
+
+/* ── Math (KaTeX) — editor dark theme ──────────────────────── */
+
+.sh-math-inline {
+  display: inline-block;
+  vertical-align: middle;
+  padding: 0 2px;
+}
+
+.sh-math-inline .katex {
+  color: #a5b4fc;
+  font-size: 1em;
+}
+
+.sh-math-block {
+  text-align: center;
+  padding: 12px 16px;
+  margin: 8px 0;
+  border-radius: 8px;
+  background: #0c1222;
+  border: 1px solid #1e293b;
+}
+
+.sh-math-block .katex {
+  color: #c7d2fe;
+}
+
+.sh-math-error {
+  color: #ef4444;
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Selected math node highlight */
+.sh-rich-editor-content .sh-math-inline.ProseMirror-selectednode,
+.sh-rich-editor-content .sh-math-block.ProseMirror-selectednode {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── Math (KaTeX) — viewer light theme ─────────────────────── */
+
+.sh-richtext-viewer .sh-math-inline {
+  display: inline-block;
+  vertical-align: middle;
+  padding: 0 2px;
+}
+
+.sh-richtext-viewer .sh-math-inline .katex {
+  color: var(--sh-text);
+}
+
+.sh-richtext-viewer .sh-math-block,
+.sh-richtext-viewer div[data-math-display] {
+  text-align: center;
+  padding: 12px 16px;
+  margin: 8px 0;
+  border-radius: 8px;
+  background: var(--sh-soft);
+  border: 1px solid var(--sh-border);
+}
+
+.sh-richtext-viewer .sh-math-block .katex,
+.sh-richtext-viewer div[data-math-display] .katex {
+  color: var(--sh-text);
+}
+
+/* ══════════════════════════════════════════════════════════════
+ * Notes editor — theme-aware variant (light/dark adapts to user theme)
+ * Applied via .sh-note-editor-content class on the TipTap editor.
+ * Overrides the dark-always styles from .sh-rich-editor-content.
+ * ══════════════════════════════════════════════════════════════ */
+
+.sh-note-editor-wrap .sh-rich-editor-content {
+  color: var(--sh-text);
+  padding: 20px 22px;
+  min-height: 300px;
+}
+
+.sh-note-editor-wrap .sh-rich-editor-content p.is-editor-empty:first-child::before {
+  color: var(--sh-muted);
+}
+
+.sh-note-editor-wrap .sh-rich-editor-content h1,
+.sh-note-editor-wrap .sh-rich-editor-content h2,
+.sh-note-editor-wrap .sh-rich-editor-content h3 {
+  color: var(--sh-heading);
+}
+
+.sh-note-editor-wrap .sh-rich-editor-content h4 {
+  color: var(--sh-subtext);
+}
+
+.sh-note-editor-wrap .sh-rich-editor-content strong {
+  color: var(--sh-heading);
+}
+
+.sh-note-editor-wrap .sh-rich-editor-content code {
+  background: var(--sh-soft);
+  color: var(--sh-brand);
+}
+
+.sh-note-editor-wrap .sh-rich-editor-content a,
+.sh-note-editor-wrap .sh-editor-link {
+  color: var(--sh-brand);
+}
+
+.sh-note-editor-wrap .sh-rich-editor-content a:hover {
+  color: var(--sh-brand-hover);
+}
+
+.sh-note-editor-wrap .sh-rich-editor-content blockquote {
+  border-left-color: var(--sh-brand);
+  color: var(--sh-muted);
+}
+
+.sh-note-editor-wrap .sh-rich-editor-content pre,
+.sh-note-editor-wrap .sh-editor-code-block {
+  background: var(--sh-soft);
+  border-color: var(--sh-border);
+  color: var(--sh-text);
+}
+
+.sh-note-editor-wrap .sh-rich-editor-content hr {
+  border-top-color: var(--sh-border);
+}
+
+.sh-note-editor-wrap .sh-rich-editor-content ::selection {
+  background: rgba(37, 99, 235, 0.2);
+}
+
+/* Notes editor — code syntax highlighting (theme-aware) */
+.sh-note-editor-wrap .sh-rich-editor-content pre code .hljs-keyword,
+.sh-note-editor-wrap .sh-rich-editor-content pre code .hljs-selector-tag {
+  color: #7c3aed;
+}
+.sh-note-editor-wrap .sh-rich-editor-content pre code .hljs-string,
+.sh-note-editor-wrap .sh-rich-editor-content pre code .hljs-addition {
+  color: #16a34a;
+}
+.sh-note-editor-wrap .sh-rich-editor-content pre code .hljs-number,
+.sh-note-editor-wrap .sh-rich-editor-content pre code .hljs-literal {
+  color: #d97706;
+}
+.sh-note-editor-wrap .sh-rich-editor-content pre code .hljs-comment,
+.sh-note-editor-wrap .sh-rich-editor-content pre code .hljs-quote {
+  color: var(--sh-muted);
+  font-style: italic;
+}
+.sh-note-editor-wrap .sh-rich-editor-content pre code .hljs-function,
+.sh-note-editor-wrap .sh-rich-editor-content pre code .hljs-title {
+  color: #2563eb;
+}
+.sh-note-editor-wrap .sh-rich-editor-content pre code .hljs-type,
+.sh-note-editor-wrap .sh-rich-editor-content pre code .hljs-built_in {
+  color: #0891b2;
+}
+
+/* Notes editor — math (theme-aware) */
+.sh-note-editor-wrap .sh-math-inline .katex {
+  color: var(--sh-text);
+}
+
+.sh-note-editor-wrap .sh-math-block {
+  background: var(--sh-soft);
+  border-color: var(--sh-border);
+}
+
+.sh-note-editor-wrap .sh-math-block .katex {
+  color: var(--sh-text);
+}
+
+/* Notes editor — toolbar theme override */
+.sh-note-editor-toolbar {
+  background: var(--sh-soft) !important;
+  border-bottom: 1px solid var(--sh-border) !important;
+}

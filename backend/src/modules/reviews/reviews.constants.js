@@ -1,0 +1,5 @@
+const MAX_REVIEW_LENGTH = 500
+const MIN_STARS = 1
+const MAX_STARS = 5
+
+module.exports = { MAX_REVIEW_LENGTH, MIN_STARS, MAX_STARS }

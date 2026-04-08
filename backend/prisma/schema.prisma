@@ -8,133 +8,323 @@ datasource db {
 }
 
 model User {
-  id             Int       @id @default(autoincrement())
-  username       String    @unique
-  passwordHash   String
-  role           String    @default("student")
-  email          String?   @unique
-  emailVerified  Boolean   @default(false)
+  id                      Int       @id @default(autoincrement())
+  username                String    @unique
+  passwordHash            String
+  role                    String    @default("student")
+  trustLevel              String    @default("new")
+  trustedAt               DateTime?
+  email                   String?   @unique
+  emailHash               String?
+  emailVerified           Boolean   @default(false)
+  isStaffVerified         Boolean   @default(false)
   emailVerificationCode   String?
   emailVerificationExpiry DateTime?
-  failedAttempts Int       @default(0)
-  lockedUntil    DateTime?
-  avatarUrl      String?
-  twoFaEnabled   Boolean   @default(false)
-  twoFaCode      String?
-  twoFaExpiry    DateTime?
-  googleId       String?   @unique
-  authProvider   String    @default("local")
-  createdAt      DateTime  @default(now())
+  failedAttempts          Int       @default(0)
+  lockedUntil             DateTime?
+  displayName             String?
+  bio                     String?   @db.VarChar(500)
+  avatarUrl               String?
+  coverImageUrl           String?
+  profileLinks            Json      @default("[]")
+  twoFaEnabled            Boolean   @default(false)
+  twoFaCode               String?
+  twoFaExpiry             DateTime?
+  googleId                String?   @unique
+  authProvider            String    @default("local")
+  accountType             String    @default("student")
+  pendingAccountType      String?
+  accountTypeChangedAt    DateTime?
+  termsAcceptedVersion    String?
+  termsAcceptedAt         DateTime?
+  isPrivate               Boolean   @default(false)
+  createdAt               DateTime  @default(now())
 
-  studySheets        StudySheet[]
-  enrollments        Enrollment[]
-  comments           Comment[]
-  starredSheets      StarredSheet[]
-  passwordResetToken PasswordResetToken?
-  announcements      Announcement[]
-  notes              Note[]
-  reactions          Reaction[]
-  feedPosts          FeedPost[]
-  feedPostComments   FeedPostComment[]
-  feedPostReactions  FeedPostReaction[]
-  proposedContributions SheetContribution[] @relation("ContributionProposer")
-  reviewedContributions SheetContribution[] @relation("ContributionReviewer")
-  verificationChallenges VerificationChallenge[]
-  notificationsReceived Notification[] @relation("NotifRecipient")
-  notificationsSent     Notification[] @relation("NotifActor")
-  following          UserFollow[]   @relation("Following")
-  followers          UserFollow[]   @relation("Followers")
-  htmlVersions       SheetHtmlVersion[]
-  suppressionAuditsPerformed EmailSuppressionAudit[] @relation("EmailSuppressionAuditActor")
+  studySheets                StudySheet[]
+  enrollments                Enrollment[]
+  comments                   Comment[]
+  starredSheets              StarredSheet[]
+  passwordResetToken         PasswordResetToken?
+  announcements              Announcement[]
+  notes                      Note[]
+  noteComments               NoteComment[]
+  noteStars                  NoteStar[]
+  noteVersions               NoteVersion[]
+  reactions                  Reaction[]
+  feedPosts                  FeedPost[]
+  feedPostComments           FeedPostComment[]
+  feedPostReactions          FeedPostReaction[]
+  proposedContributions      SheetContribution[]       @relation("ContributionProposer")
+  reviewedContributions      SheetContribution[]       @relation("ContributionReviewer")
+  verificationChallenges     VerificationChallenge[]
+  notificationsReceived      Notification[]            @relation("NotifRecipient")
+  notificationsSent          Notification[]            @relation("NotifActor")
+  following                  UserFollow[]              @relation("Following")
+  followers                  UserFollow[]              @relation("Followers")
+  htmlVersions               SheetHtmlVersion[]
+  suppressionAuditsPerformed EmailSuppressionAudit[]   @relation("EmailSuppressionAuditActor")
+  preferences                UserPreferences?
+  strikes                    Strike[]
+  appeals                    Appeal[]
+  restrictions               UserRestriction[]
+  moderationCases            ModerationCase[]          @relation("ModerationCaseAuthor")
+  moderationReviews          ModerationCase[]          @relation("ModerationReviewer")
+  moderationReports          ModerationCase[]          @relation("ModerationReporter")
+  moderationClaims           ModerationCase[]          @relation("ModerationClaimer")
+  appealReviews              Appeal[]                  @relation("AppealReviewer")
+  moderationLogs             ModerationLog[]           @relation("ModerationLogUser")
+  sheetCommits               SheetCommit[]
+  webauthnCredentials        WebAuthnCredential[]
+  reviewedSheets             StudySheet[]              @relation("SheetReviewer")
+  pinnedSheets               UserPinnedSheet[]
+  dailyActivity              UserDailyActivity[]
+  badges                     UserBadge[]
+  sensitiveData              UserSensitive?
+  blockedUsers               UserBlock[]               @relation("BlockedByUser")
+  blockedByUsers             UserBlock[]               @relation("BlockedUser")
+  mutedUsers                 UserMute[]                @relation("MutedByUser")
+  mutedByUsers               UserMute[]                @relation("MutedUser")
+  conversationsCreated       Conversation[]            @relation("ConversationCreator")
+  conversationParticipants   ConversationParticipant[]
+  messagesSent               Message[]                 @relation("MessageSender")
+  messageReactions           MessageReaction[]         @relation("MessageReactionUser")
+  messagePollVotes           MessagePollVote[]
+  studyGroupsCreated         StudyGroup[]              @relation("StudyGroupCreator")
+  studyGroupMemberships      StudyGroupMember[]
+  groupResources             GroupResource[]
+  groupSessionRsvps          GroupSessionRsvp[]
+  groupDiscussionPosts       GroupDiscussionPost[]
+  groupDiscussionReplies     GroupDiscussionReply[]
+  discussionUpvotes          DiscussionUpvote[]
+  shareLinksCreated          ShareLink[]               @relation("ShareLinkCreator")
+  contentSharedBy            ContentShare[]            @relation("ContentSharedBy")
+  contentSharedWith          ContentShare[]            @relation("ContentSharedWith")
+  aiConversations            AiConversation[]
+  aiMessages                 AiMessage[]               @relation("AiMessageUser")
+  aiUsageLogs                AiUsageLog[]
+  bookShelves                BookShelf[]
+  readingProgress            ReadingProgress[]
+  bookBookmarks              BookBookmark[]
+  videos                     Video[]                   @relation("UserVideos")
+  pageViews                  PageView[]
+  subscription               Subscription?
+  payments                   Payment[]
+  donations                  Donation[]
+  commentReactions           CommentReaction[]
+  feedPostCommentReactions   FeedPostCommentReaction[]
+  noteCommentReactions       NoteCommentReaction[]
+  noteReactions              NoteReaction[]
+  legalAcceptances           LegalAcceptance[]
+  referralCodes              ReferralCode[]
+  referralRedemptions        ReferralRedemption[]
+  giftsSent                  GiftSubscription[]    @relation("GiftsSent")
+  giftsReceived              GiftSubscription[]    @relation("GiftsReceived")
+  subscriptionPauses         SubscriptionPause[]
+  lastActiveAt               DateTime?
+  userReviews                UserReview[]
+  generatedReviewReports     ReviewReport[]        @relation("ReviewReportGenerator")
+  videoAppeals               VideoAppeal[]         @relation("VideoAppealUploader")
+  videoAppealReviews         VideoAppeal[]         @relation("VideoAppealReviewer")
+
+  @@index([role])
+  @@index([emailHash])
+  @@index([lastActiveAt])
+}
+
+model LegalDocument {
+  id               Int               @id @default(autoincrement())
+  slug             String
+  version          String
+  title            String
+  summary          String            @default("")
+  intro            String            @default("")
+  updatedLabel     String            @default("")
+  bodyText         String            @db.Text
+  source           String            @default("database")
+  termlyEmbedId    String?
+  termlyUrl        String?
+  requiredAtSignup Boolean           @default(false)
+  isCurrent        Boolean           @default(false)
+  publishedAt      DateTime          @default(now())
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  acceptances      LegalAcceptance[]
+
+  @@unique([slug, version])
+  @@index([slug, isCurrent, publishedAt(sort: Desc)])
+}
+
+model LegalAcceptance {
+  id         Int           @id @default(autoincrement())
+  userId     Int
+  documentId Int
+  source     String        @default("settings")
+  acceptedAt DateTime      @default(now())
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  document   LegalDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, documentId])
+  @@index([userId, acceptedAt(sort: Desc)])
+  @@index([documentId, acceptedAt(sort: Desc)])
+}
+
+model ShareLink {
+  id          Int       @id @default(autoincrement())
+  token       String    @unique @default(uuid())
+  contentType String                          // "sheet" or "note"
+  contentId   Int
+  createdById Int
+  permission  String    @default("view")      // "view", "comment", "edit"
+  expiresAt   DateTime?                       // null = never expires
+  maxViews    Int?                            // null = unlimited
+  viewCount   Int       @default(0)
+  password    String?                         // optional password protection
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+
+  createdBy User @relation("ShareLinkCreator", fields: [createdById], references: [id])
+
+  @@index([token])
+  @@index([contentType, contentId])
+  @@index([createdById])
+}
+
+model ContentShare {
+  id          Int      @id @default(autoincrement())
+  contentType String                          // "sheet" or "note"
+  contentId   Int
+  sharedById  Int
+  sharedWithId Int
+  permission  String   @default("view")      // "view", "comment", "edit"
+  createdAt   DateTime @default(now())
+
+  sharedBy   User @relation("ContentSharedBy", fields: [sharedById], references: [id])
+  sharedWith User @relation("ContentSharedWith", fields: [sharedWithId], references: [id])
+
+  @@unique([contentType, contentId, sharedWithId])
+  @@index([sharedWithId, contentType])
 }
 
 model School {
-  id      Int      @id @default(autoincrement())
-  name    String   @unique
-  short   String
-  courses Course[]
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  short       String   @unique
+  city        String   @default("")
+  state       String   @default("MD")
+  schoolType  String   @default("public")
+  logoUrl     String?
+  emailDomain String?
+  courses     Course[]
 }
 
 model Course {
-  id           Int          @id @default(autoincrement())
-  schoolId     Int
-  name         String
-  code         String
-  school       School       @relation(fields: [schoolId], references: [id])
-  studySheets  StudySheet[]
-  enrollments  Enrollment[]
-  notes        Note[]
-  feedPosts    FeedPost[]
+  id          Int          @id @default(autoincrement())
+  schoolId    Int
+  name        String
+  code        String
+  department  String       @default("")
+  school      School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  studySheets StudySheet[]
+  enrollments Enrollment[]
+  notes       Note[]
+  feedPosts   FeedPost[]
+  studyGroups StudyGroup[]
+
+  @@unique([schoolId, code])
 }
 
 model Enrollment {
   id       Int    @id @default(autoincrement())
   userId   Int
   courseId Int
-  user     User   @relation(fields: [userId], references: [id])
-  course   Course @relation(fields: [courseId], references: [id])
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
   @@unique([userId, courseId])
 }
 
 model StudySheet {
-  id        Int      @id @default(autoincrement())
-  title     String
-  content   String
-  contentFormat String @default("markdown")
-  status    String   @default("published")
-  htmlScanStatus String @default("queued")
-  htmlScanFindings Json?
-  htmlScanUpdatedAt DateTime?
+  id                     Int          @id @default(autoincrement())
+  title                  String
+  content                String
+  contentFormat          String       @default("markdown")
+  status                 String       @default("published")
+  htmlScanStatus         String       @default("queued")
+  htmlScanFindings       Json?
+  htmlScanUpdatedAt      DateTime?
   htmlScanAcknowledgedAt DateTime?
+  htmlRiskTier           Int          @default(0)
   htmlOriginalArchivedAt DateTime?
-  courseId  Int
-  userId    Int
-  forkOf    Int?
-  stars     Int      @default(0)
-  downloads Int      @default(0)
-  forks          Int      @default(0)
-  description    String   @default("")
-  attachmentUrl  String?
-  attachmentType String?
-  attachmentName String?
-  allowDownloads Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  course    Course   @relation(fields: [courseId], references: [id])
-  author    User     @relation(fields: [userId], references: [id])
-  forkSource StudySheet? @relation("SheetForks", fields: [forkOf], references: [id])
-  forkChildren StudySheet[] @relation("SheetForks")
+  reviewedById           Int?
+  reviewedAt             DateTime?
+  reviewReason           String?
+  reviewFindingsSnapshot Json?
+  courseId               Int
+  userId                 Int
+  forkOf                 Int?
+  rootSheetId            Int?
+  stars                  Int          @default(0)
+  downloads              Int          @default(0)
+  forks                  Int          @default(0)
+  description            String       @default("")
+  attachmentUrl          String?
+  attachmentType         String?
+  attachmentName         String?
+  allowDownloads         Boolean      @default(true)
+  allowEditing           Boolean      @default(false)
+  contentHash            String?
+  contentSimhash         String?
+  aiReviewDecision       String?      // "approve", "reject", "escalate", null
+  aiReviewConfidence     Int?         // 0-100
+  aiReviewScore          Int?         // 0-100 risk score
+  aiReviewFindings       String?      @db.Text // JSON findings array
+  aiReviewReasoning      String?      @db.Text // 1-3 sentence reasoning
+  aiReviewedAt           DateTime?
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+  course                 Course       @relation(fields: [courseId], references: [id])
+  author                 User         @relation(fields: [userId], references: [id])
+  reviewedBy             User?        @relation("SheetReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  forkSource             StudySheet?  @relation("SheetForks", fields: [forkOf], references: [id])
+  forkChildren           StudySheet[] @relation("SheetForks")
 
-  comments     Comment[]
-  starredBy    StarredSheet[]
-  reactions    Reaction[]
+  comments              Comment[]
+  starredBy             StarredSheet[]
+  reactions             Reaction[]
   incomingContributions SheetContribution[] @relation("ContributionTarget")
   outgoingContributions SheetContribution[] @relation("ContributionFork")
-  htmlVersions SheetHtmlVersion[]
+  htmlVersions          SheetHtmlVersion[]
+  commits               SheetCommit[]
+  provenance            ProvenanceManifest?
+  pinnedBy              UserPinnedSheet[]
+  aiReviewLogs          AiReviewLog[]
 
   @@index([createdAt(sort: Desc)])
   @@index([courseId, createdAt(sort: Desc)])
   @@index([userId, createdAt(sort: Desc)])
   @@index([status, createdAt(sort: Desc)])
   @@index([htmlScanStatus, updatedAt(sort: Desc)])
+  @@index([htmlRiskTier, status, createdAt(sort: Desc)])
+  @@index([contentHash])
+  @@index([contentSimhash])
+  @@index([aiReviewDecision])
 }
 
 model SheetHtmlVersion {
-  id               Int       @id @default(autoincrement())
-  sheetId          Int
-  userId           Int
-  kind             String
-  sourceName       String?
-  content          String
-  checksum         String
-  compressionAlgo  String?
+  id                Int        @id @default(autoincrement())
+  sheetId           Int
+  userId            Int
+  kind              String
+  sourceName        String?
+  content           String
+  checksum          String
+  compressionAlgo   String?
   compressedContent Bytes?
-  archivedAt       DateTime?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  sheet            StudySheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
-  author           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  archivedAt        DateTime?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  sheet             StudySheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  author            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([sheetId, kind])
   @@index([kind, updatedAt(sort: Desc)])
@@ -155,15 +345,34 @@ model RequestedCourse {
 }
 
 model Comment {
-  id        Int        @id @default(autoincrement())
-  content   String
-  sheetId   Int
-  userId    Int
-  createdAt DateTime   @default(now())
-  sheet     StudySheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
-  author    User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id               Int        @id @default(autoincrement())
+  content          String
+  sheetId          Int
+  userId           Int
+  parentId         Int?
+  moderationStatus String     @default("clean")
+  createdAt        DateTime   @default(now())
+  sheet            StudySheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  author           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent           Comment?   @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies          Comment[]  @relation("CommentReplies")
+  reactions        CommentReaction[]
+  attachments      CommentAttachment[]
 
   @@index([sheetId, createdAt(sort: Desc)])
+  @@index([parentId])
+}
+
+model CommentAttachment {
+  id        Int      @id @default(autoincrement())
+  commentId Int
+  url       String
+  type      String
+  name      String   @default("")
+  createdAt DateTime @default(now())
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@index([commentId])
 }
 
 model StarredSheet {
@@ -185,28 +394,100 @@ model PasswordResetToken {
 }
 
 model Announcement {
-  id        Int      @id @default(autoincrement())
+  id        Int                 @id @default(autoincrement())
   title     String
   body      String
   authorId  Int
-  pinned    Boolean  @default(false)
-  createdAt DateTime @default(now())
-  author    User     @relation(fields: [authorId], references: [id])
+  pinned    Boolean             @default(false)
+  createdAt DateTime            @default(now())
+  author    User                @relation(fields: [authorId], references: [id])
+  media     AnnouncementMedia[]
 
   @@index([pinned, createdAt(sort: Desc)])
 }
 
 model Note {
-  id        Int      @id @default(autoincrement())
-  title     String
-  content   String   @default("")
+  id               Int           @id @default(autoincrement())
+  title            String
+  content          String        @default("")
+  userId           Int
+  courseId         Int?
+  private          Boolean       @default(true)
+  allowDownloads   Boolean       @default(false)
+  pinned           Boolean       @default(false)
+  tags             String        @default("[]")
+  moderationStatus String        @default("clean")
+  contentHash      String?
+  contentSimhash   String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  author           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course           Course?       @relation(fields: [courseId], references: [id])
+  downloads        Int           @default(0)
+  noteComments     NoteComment[]
+  noteStars        NoteStar[]
+  noteVersions     NoteVersion[]
+  noteReactions    NoteReaction[]
+}
+
+model NoteComment {
+  id               Int      @id @default(autoincrement())
+  content          String
+  noteId           Int
+  userId           Int
+  parentId         Int?
+  anchorText       String?
+  anchorOffset     Int?
+  anchorContext    String?
+  resolved         Boolean  @default(false)
+  moderationStatus String   @default("clean")
+  createdAt        DateTime @default(now())
+  note             Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  author           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent           NoteComment?  @relation("NoteCommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies          NoteComment[] @relation("NoteCommentReplies")
+  reactions        NoteCommentReaction[]
+  attachments      NoteCommentAttachment[]
+
+  @@index([noteId, createdAt(sort: Desc)])
+  @@index([parentId])
+}
+
+model NoteCommentAttachment {
+  id        Int         @id @default(autoincrement())
+  commentId Int
+  url       String
+  type      String
+  name      String      @default("")
+  createdAt DateTime    @default(now())
+  comment   NoteComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@index([commentId])
+}
+
+model NoteStar {
   userId    Int
-  courseId  Int?
-  private   Boolean  @default(true)
+  noteId    Int
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  note      Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@id([userId, noteId])
+  @@index([noteId])
+}
+
+model NoteVersion {
+  id        Int      @id @default(autoincrement())
+  noteId    Int
+  userId    Int
+  title     String
+  content   String
+  message   String?
+  createdAt DateTime @default(now())
+  note      Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
   author    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  course    Course?  @relation(fields: [courseId], references: [id])
+
+  @@index([noteId, createdAt(sort: Desc)])
 }
 
 model Notification {
@@ -215,6 +496,7 @@ model Notification {
   type      String
   message   String
   read      Boolean  @default(false)
+  priority  String   @default("medium")
   actorId   Int?
   sheetId   Int?
   linkPath  String?
@@ -228,11 +510,13 @@ model Notification {
 model UserFollow {
   followerId  Int
   followingId Int
+  status      String   @default("active") // "active" or "pending" (for private accounts)
   createdAt   DateTime @default(now())
   follower    User     @relation("Following", fields: [followerId], references: [id], onDelete: Cascade)
   following   User     @relation("Followers", fields: [followingId], references: [id], onDelete: Cascade)
 
   @@id([followerId, followingId])
+  @@index([followingId, status])
 }
 
 model Reaction {
@@ -254,20 +538,23 @@ model DeletionReason {
 }
 
 model FeedPost {
-  id             Int                @id @default(autoincrement())
-  content        String
-  userId         Int
-  courseId       Int?
-  attachmentUrl  String?
-  attachmentType String?
-  attachmentName String?
-  allowDownloads Boolean            @default(true)
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
-  author         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  course         Course?            @relation(fields: [courseId], references: [id], onDelete: SetNull)
-  comments       FeedPostComment[]
-  reactions      FeedPostReaction[]
+  id               Int                @id @default(autoincrement())
+  content          String
+  userId           Int
+  courseId         Int?
+  attachmentUrl    String?
+  attachmentType   String?
+  attachmentName   String?
+  allowDownloads   Boolean            @default(true)
+  videoId          Int?
+  moderationStatus String             @default("clean")
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  author           User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course           Course?            @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  video            Video?             @relation("FeedPostVideo", fields: [videoId], references: [id], onDelete: SetNull)
+  comments         FeedPostComment[]
+  reactions        FeedPostReaction[]
 
   @@index([createdAt(sort: Desc)])
   @@index([userId, createdAt(sort: Desc)])
@@ -275,15 +562,34 @@ model FeedPost {
 }
 
 model FeedPostComment {
-  id        Int      @id @default(autoincrement())
-  content   String
-  postId    Int
-  userId    Int
-  createdAt DateTime @default(now())
-  post      FeedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
-  author    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id               Int      @id @default(autoincrement())
+  content          String
+  postId           Int
+  userId           Int
+  parentId         Int?
+  moderationStatus String   @default("clean")
+  createdAt        DateTime @default(now())
+  post             FeedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent           FeedPostComment?  @relation("FeedPostCommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies          FeedPostComment[] @relation("FeedPostCommentReplies")
+  reactions        FeedPostCommentReaction[]
+  attachments      FeedPostCommentAttachment[]
 
   @@index([postId, createdAt(sort: Desc)])
+  @@index([parentId])
+}
+
+model FeedPostCommentAttachment {
+  id        Int             @id @default(autoincrement())
+  commentId Int
+  url       String
+  type      String
+  name      String          @default("")
+  createdAt DateTime        @default(now())
+  comment   FeedPostComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@index([commentId])
 }
 
 model FeedPostReaction {
@@ -298,20 +604,22 @@ model FeedPostReaction {
 }
 
 model SheetContribution {
-  id           Int       @id @default(autoincrement())
+  id            Int        @id @default(autoincrement())
   targetSheetId Int
   forkSheetId   Int
   proposerId    Int
   reviewerId    Int?
-  status        String   @default("pending")
-  message       String   @default("")
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  status        String     @default("pending")
+  message       String     @default("")
+  reviewComment String     @default("")
+  baseChecksum  String     @default("")
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
   reviewedAt    DateTime?
   targetSheet   StudySheet @relation("ContributionTarget", fields: [targetSheetId], references: [id], onDelete: Cascade)
   forkSheet     StudySheet @relation("ContributionFork", fields: [forkSheetId], references: [id], onDelete: Cascade)
-  proposer      User      @relation("ContributionProposer", fields: [proposerId], references: [id], onDelete: Cascade)
-  reviewer      User?     @relation("ContributionReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  proposer      User       @relation("ContributionProposer", fields: [proposerId], references: [id], onDelete: Cascade)
+  reviewer      User?      @relation("ContributionReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
 
   @@index([targetSheetId, status])
   @@index([proposerId, status])
@@ -343,16 +651,16 @@ model VerificationChallenge {
 }
 
 model EmailDeliveryEvent {
-  id                Int      @id @default(autoincrement())
+  id                Int       @id @default(autoincrement())
   provider          String
   eventType         String
-  providerWebhookId String?  @unique
+  providerWebhookId String?   @unique
   providerMessageId String?
   recipient         String?
   subject           String?
   eventCreatedAt    DateTime?
   payload           Json
-  receivedAt        DateTime @default(now())
+  receivedAt        DateTime  @default(now())
 
   @@index([provider, eventType, receivedAt(sort: Desc)])
   @@index([providerMessageId, receivedAt(sort: Desc)])
@@ -360,19 +668,19 @@ model EmailDeliveryEvent {
 }
 
 model EmailSuppression {
-  id                Int      @id @default(autoincrement())
-  email             String   @unique
-  active            Boolean  @default(true)
+  id                Int                     @id @default(autoincrement())
+  email             String                  @unique
+  active            Boolean                 @default(true)
   reason            String
   provider          String
   sourceEventType   String
   sourceEventId     String?
   sourceMessageId   String?
   details           Json?
-  firstSuppressedAt DateTime @default(now())
-  lastSuppressedAt  DateTime @default(now())
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  firstSuppressedAt DateTime                @default(now())
+  lastSuppressedAt  DateTime                @default(now())
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
   audits            EmailSuppressionAudit[]
 
   @@index([active, updatedAt(sort: Desc)])
@@ -380,17 +688,1129 @@ model EmailSuppression {
 }
 
 model EmailSuppressionAudit {
-  id                Int      @id @default(autoincrement())
+  id                Int              @id @default(autoincrement())
   suppressionId     Int
   action            String
   reason            String
   performedByUserId Int?
   context           Json?
-  createdAt         DateTime @default(now())
+  createdAt         DateTime         @default(now())
   suppression       EmailSuppression @relation(fields: [suppressionId], references: [id], onDelete: Cascade)
-  performedBy       User?    @relation("EmailSuppressionAuditActor", fields: [performedByUserId], references: [id], onDelete: SetNull)
+  performedBy       User?            @relation("EmailSuppressionAuditActor", fields: [performedByUserId], references: [id], onDelete: SetNull)
 
   @@index([suppressionId, createdAt(sort: Desc)])
   @@index([performedByUserId, createdAt(sort: Desc)])
   @@index([action, createdAt(sort: Desc)])
+}
+
+model UserPreferences {
+  id                   Int     @id @default(autoincrement())
+  userId               Int     @unique
+  emailDigest          Boolean @default(true)
+  emailMentions        Boolean @default(true)
+  emailContributions   Boolean @default(true)
+  inAppNotifications   Boolean @default(true)
+  profileVisibility    String  @default("public")
+  profileFieldVisibility Json   @default("{}")
+  defaultDownloads     Boolean @default(true)
+  defaultContributions Boolean @default(true)
+  theme                String  @default("system")
+  fontSize             String  @default("medium")
+  user                 User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ModerationCase {
+  id               Int                  @id @default(autoincrement())
+  contentType      String
+  contentId        Int
+  userId           Int?
+  status           String               @default("pending")
+  confidence       Float?
+  category         String?
+  provider         String?
+  evidence         Json?
+  reviewedBy       Int?
+  reviewNote       String?
+  source           String               @default("auto")
+  reporterUserId   Int?
+  reasonCategory   String?
+  excerpt          String?
+  claimedByAdminId Int?
+  claimedAt        DateTime?
+  contentPurged    Boolean              @default(false)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  user             User?                @relation("ModerationCaseAuthor", fields: [userId], references: [id], onDelete: SetNull)
+  reviewer         User?                @relation("ModerationReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  reporter         User?                @relation("ModerationReporter", fields: [reporterUserId], references: [id], onDelete: SetNull)
+  claimedBy        User?                @relation("ModerationClaimer", fields: [claimedByAdminId], references: [id], onDelete: SetNull)
+  strikes          Strike[]
+  appeals          Appeal[]
+  snapshots        ModerationSnapshot[]
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([contentType, contentId])
+  @@index([userId])
+  @@index([source, status])
+  @@index([claimedByAdminId])
+}
+
+model Strike {
+  id        Int             @id @default(autoincrement())
+  userId    Int
+  reason    String
+  caseId    Int?
+  issuedAt  DateTime        @default(now())
+  expiresAt DateTime
+  decayedAt DateTime?
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  case      ModerationCase? @relation(fields: [caseId], references: [id], onDelete: SetNull)
+
+  @@index([userId, decayedAt, expiresAt])
+}
+
+model Appeal {
+  id             Int            @id @default(autoincrement())
+  caseId         Int
+  userId         Int
+  reasonCategory String?
+  reason         String
+  status         String         @default("pending")
+  reviewedBy     Int?
+  reviewNote     String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  case           ModerationCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewer       User?          @relation("AppealReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+
+  @@index([caseId])
+  @@index([userId, status])
+}
+
+model ModerationSnapshot {
+  id                   Int            @id @default(autoincrement())
+  caseId               Int
+  targetType           String
+  targetId             Int
+  ownerId              Int?
+  contentJson          Json
+  attachmentUrl        String?
+  createdAt            DateTime       @default(now())
+  restoredAt           DateTime?
+  permanentlyDeletedAt DateTime?
+  case                 ModerationCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+  @@index([targetType, targetId])
+}
+
+model ModerationLog {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  action      String
+  caseId      Int?
+  strikeId    Int?
+  appealId    Int?
+  contentType String?
+  contentId   Int?
+  reason      String?
+  performedBy Int?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  user User @relation("ModerationLogUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([caseId])
+}
+
+model UserRestriction {
+  id       Int       @id @default(autoincrement())
+  userId   Int
+  type     String
+  startsAt DateTime  @default(now())
+  endsAt   DateTime?
+  reason   String?
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, endsAt])
+}
+
+// ── Sheet Lab: version control commits ──────────────────────
+model SheetCommit {
+  id            Int           @id @default(autoincrement())
+  sheetId       Int
+  userId        Int
+  kind          String        @default("snapshot")
+  message       String        @default("")
+  content       String
+  contentFormat String        @default("markdown")
+  checksum      String
+  parentId      Int?
+  createdAt     DateTime      @default(now())
+  sheet         StudySheet    @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  author        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent        SheetCommit?  @relation("CommitHistory", fields: [parentId], references: [id])
+  children      SheetCommit[] @relation("CommitHistory")
+
+  @@index([sheetId, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+// ── Provenance: encrypted origin manifests ──────────────────
+model ProvenanceManifest {
+  id             Int        @id @default(autoincrement())
+  sheetId        Int        @unique
+  originHash     String
+  encryptedToken String
+  algorithm      String     @default("aes-256-gcm")
+  iv             String
+  authTag        String
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  sheet          StudySheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+}
+
+// ── Profile: pinned sheets ──────────────────────────────────
+model UserPinnedSheet {
+  id       Int        @id @default(autoincrement())
+  userId   Int
+  sheetId  Int
+  position Int        @default(0)
+  pinnedAt DateTime   @default(now())
+  user     User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sheet    StudySheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, sheetId])
+  @@index([userId, position])
+}
+
+// ── Profile: daily activity for contribution graph ──────────
+model UserDailyActivity {
+  id       Int      @id @default(autoincrement())
+  userId   Int
+  date     DateTime @db.Date
+  commits  Int      @default(0)
+  sheets   Int      @default(0)
+  reviews  Int      @default(0)
+  comments Int      @default(0)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId, date(sort: Desc)])
+}
+
+// ── Achievements: badge catalog & unlocks ───────────────────
+model Badge {
+  id          Int         @id @default(autoincrement())
+  slug        String      @unique
+  name        String
+  description String
+  category    String
+  tier        String      @default("bronze")
+  iconUrl     String?
+  threshold   Int         @default(1)
+  createdAt   DateTime    @default(now())
+  unlocks     UserBadge[]
+}
+
+model UserBadge {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  badgeId    Int
+  unlockedAt DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge      Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeId])
+  @@index([userId, unlockedAt(sort: Desc)])
+}
+
+// ── Feature flags ───────────────────────────────────────────
+model FeatureFlag {
+  id                Int      @id @default(autoincrement())
+  name              String   @unique
+  description       String   @default("")
+  enabled           Boolean  @default(false)
+  rolloutPercentage Int      @default(0)
+  conditions        Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+// ── Audit Log (sensitive operations) ────────────────────────
+model AuditLog {
+  id           Int      @id @default(autoincrement())
+  event        String
+  actorId      Int?
+  actorRole    String?
+  targetUserId Int?
+  route        String?
+  method       String?
+  resource     String?
+  resourceId   Int?
+  details      Json?
+  ipAddress    String?
+  createdAt    DateTime @default(now())
+
+  @@index([event])
+  @@index([actorId])
+  @@index([targetUserId])
+  @@index([createdAt])
+  @@index([resource])
+}
+
+// ── PII Vault (envelope-encrypted sensitive data) ───────────
+model UserSensitive {
+  id               Int      @id @default(autoincrement())
+  userId           Int      @unique
+  ciphertext       String
+  encryptedDataKey String
+  keyArn           String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ── WebAuthn passkey credentials ────────────────────────────
+model WebAuthnCredential {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  credentialId String   @unique
+  publicKey    Bytes
+  counter      Int      @default(0)
+  deviceType   String?
+  backedUp     Boolean  @default(false)
+  transports   String?
+  name         String   @default("Passkey")
+  createdAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model UserBlock {
+  blockerId Int
+  blockedId Int
+  reason    String?
+  createdAt DateTime @default(now())
+  blocker   User     @relation("BlockedByUser", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked   User     @relation("BlockedUser", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@id([blockerId, blockedId])
+  @@index([blockedId])
+}
+
+model UserMute {
+  muterId   Int
+  mutedId   Int
+  createdAt DateTime @default(now())
+  muter     User     @relation("MutedByUser", fields: [muterId], references: [id], onDelete: Cascade)
+  muted     User     @relation("MutedUser", fields: [mutedId], references: [id], onDelete: Cascade)
+
+  @@id([muterId, mutedId])
+  @@index([mutedId])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// StudyHub Connect — Real-time Messaging
+// ═══════════════════════════════════════════════════════════════════════════
+
+model Conversation {
+  id          Int      @id @default(autoincrement())
+  type        String   @default("dm") // "dm" or "group"
+  name        String? // display name for group chats
+  avatarUrl   String? // custom avatar for group chats
+  createdById Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  createdBy    User                      @relation("ConversationCreator", fields: [createdById], references: [id])
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@index([updatedAt(sort: Desc)])
+}
+
+model ConversationParticipant {
+  conversationId Int
+  userId         Int
+  role           String   @default("member") // "member" or "admin" (group only)
+  status         String   @default("active") // "active", "pending", "declined"
+  joinedAt       DateTime @default(now())
+  lastReadAt     DateTime @default(now()) // for read receipts
+  muted          Boolean  @default(false) // mute notifications for this convo
+  archived       Boolean  @default(false) // hide from main list
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([conversationId, userId])
+  @@index([userId, archived])
+  @@index([userId, status])
+}
+
+model Message {
+  id             Int       @id @default(autoincrement())
+  conversationId Int
+  senderId       Int
+  content        String    @db.Text
+  type           String    @default("text") // "text", "image", "system"
+  replyToId      Int? // thread replies
+  editedAt       DateTime?
+  deletedAt      DateTime? // soft delete
+  createdAt      DateTime  @default(now())
+
+  conversation  Conversation       @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender        User               @relation("MessageSender", fields: [senderId], references: [id])
+  replyTo       Message?           @relation("MessageReply", fields: [replyToId], references: [id])
+  replies       Message[]          @relation("MessageReply")
+  reactions     MessageReaction[]
+  attachments   MessageAttachment[]
+  poll          MessagePoll?
+
+  @@index([conversationId, createdAt(sort: Desc)])
+  @@index([senderId])
+}
+
+model MessageReaction {
+  id        Int      @id @default(autoincrement())
+  messageId Int
+  userId    Int
+  emoji     String   @db.VarChar(16) // e.g. "thumbsup", "heart", "laugh"
+  createdAt DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation("MessageReactionUser", fields: [userId], references: [id])
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
+}
+
+model MessageAttachment {
+  id        Int       @id @default(autoincrement())
+  messageId Int
+  type      String    @default("image") // "image", "file", "video"
+  url       String
+  fileName  String?
+  fileSize  Int?
+  mimeType  String?
+  width     Int?
+  height    Int?
+  createdAt DateTime  @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+}
+
+model MessagePoll {
+  id             Int       @id @default(autoincrement())
+  messageId      Int       @unique
+  question       String
+  allowMultiple  Boolean   @default(false)
+  closedAt       DateTime?
+  createdAt      DateTime  @default(now())
+
+  message Message                @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  options MessagePollOption[]
+  votes   MessagePollVote[]
+}
+
+model MessagePollOption {
+  id       Int    @id @default(autoincrement())
+  pollId   Int
+  text     String
+  position Int    @default(0)
+
+  poll  MessagePoll     @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  votes MessagePollVote[]
+
+  @@index([pollId])
+}
+
+model MessagePollVote {
+  pollId   Int
+  optionId Int
+  userId   Int
+  createdAt DateTime @default(now())
+
+  poll   MessagePoll      @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  option MessagePollOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  user   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([pollId, optionId, userId])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Study Groups — Collaborative study sessions and resource sharing
+// ═══════════════════════════════════════════════════════════════════════════
+
+model StudyGroup {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String   @default("")
+  avatarUrl   String?
+  courseId    Int? // null = freeform group
+  privacy     String   @default("public") // "public", "private", "invite_only"
+  maxMembers  Int      @default(50)
+  createdById Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  course    Course?               @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  createdBy User                  @relation("StudyGroupCreator", fields: [createdById], references: [id])
+  members   StudyGroupMember[]
+  resources GroupResource[]
+  sessions  GroupSession[]
+  posts     GroupDiscussionPost[]
+
+  @@index([courseId])
+  @@index([privacy, updatedAt(sort: Desc)])
+  @@index([createdById])
+}
+
+model StudyGroupMember {
+  id       Int      @id @default(autoincrement())
+  groupId  Int
+  userId   Int
+  role     String   @default("member") // "admin", "moderator", "member"
+  status   String   @default("active") // "active", "pending", "invited", "banned"
+  joinedAt DateTime @default(now())
+
+  group StudyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+  @@index([userId, status])
+  @@index([groupId, status])
+}
+
+model GroupResource {
+  id           Int      @id @default(autoincrement())
+  groupId      Int
+  userId       Int // who added it
+  title        String
+  description  String   @default("")
+  resourceType String   @default("link") // "link", "sheet", "note", "file"
+  resourceUrl  String? // external link or file path
+  sheetId      Int? // linked StudySheet
+  noteId       Int? // linked Note
+  pinned       Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  group StudyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([groupId, pinned, createdAt(sort: Desc)])
+}
+
+model GroupSession {
+  id           Int      @id @default(autoincrement())
+  groupId      Int
+  title        String
+  description  String   @default("")
+  location     String   @default("") // room, zoom link, etc.
+  scheduledAt  DateTime
+  durationMins Int      @default(60)
+  recurring    String? // "weekly", "biweekly", null
+  status       String   @default("upcoming") // "upcoming", "in_progress", "completed", "cancelled"
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  group StudyGroup         @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  rsvps GroupSessionRsvp[]
+
+  @@index([groupId, scheduledAt(sort: Desc)])
+  @@index([scheduledAt])
+}
+
+model GroupSessionRsvp {
+  id        Int      @id @default(autoincrement())
+  sessionId Int
+  userId    Int
+  status    String   @default("going") // "going", "maybe", "not_going"
+  createdAt DateTime @default(now())
+
+  session GroupSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, userId])
+  @@index([sessionId, status])
+}
+
+model GroupDiscussionPost {
+  id        Int      @id @default(autoincrement())
+  groupId   Int
+  userId    Int
+  title     String
+  content   String   @db.Text
+  type      String   @default("discussion") // "discussion", "question", "announcement", "poll"
+  pinned    Boolean  @default(false)
+  resolved  Boolean  @default(false) // for Q&A threads
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  group   StudyGroup             @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  author  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  replies GroupDiscussionReply[]
+  upvotes DiscussionUpvote[]
+
+  @@index([groupId, pinned, createdAt(sort: Desc)])
+  @@index([groupId, type, createdAt(sort: Desc)])
+}
+
+model GroupDiscussionReply {
+  id        Int      @id @default(autoincrement())
+  postId    Int
+  userId    Int
+  content   String   @db.Text
+  isAnswer  Boolean  @default(false) // mark as accepted answer for Q&A
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  post    GroupDiscussionPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author  User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  upvotes DiscussionUpvote[]
+
+  @@index([postId, createdAt])
+}
+
+model DiscussionUpvote {
+  id        Int      @id @default(autoincrement())
+  postId    Int?
+  replyId   Int?
+  userId    Int
+  createdAt DateTime @default(now())
+
+  post  GroupDiscussionPost?  @relation(fields: [postId], references: [id], onDelete: Cascade)
+  reply GroupDiscussionReply? @relation(fields: [replyId], references: [id], onDelete: Cascade)
+  user  User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@unique([replyId, userId])
+  @@index([postId])
+  @@index([replyId])
+}
+
+// ── Hub AI ──────────────────────────────────────────────────────────
+
+model AiConversation {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  title     String?
+  model     String   @default("claude-sonnet-4-20250514")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages AiMessage[]
+
+  @@index([userId, updatedAt(sort: Desc)])
+}
+
+model AiMessage {
+  id               Int      @id @default(autoincrement())
+  conversationId   Int
+  role             String   // "user" or "assistant"
+  content          String
+  hasImage         Boolean  @default(false)
+  imageDescription String?
+  tokenCount       Int?
+  model            String?
+  metadata         Json?
+  createdAt        DateTime @default(now())
+
+  conversation AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User?          @relation("AiMessageUser", fields: [userId], references: [id], onDelete: Cascade)
+  userId       Int?
+
+  @@index([conversationId, createdAt])
+}
+
+model AiUsageLog {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  date         DateTime @db.Date
+  messageCount Int      @default(0)
+  tokenCount   Int      @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId])
+}
+
+// ── Library / BookHub models ──────────────────────────────────
+
+model BookShelf {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  name        String
+  description String?
+  visibility  String   @default("private")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  books ShelfBook[]
+
+  @@unique([userId, name])
+  @@index([userId])
+  @@index([userId, visibility])
+}
+
+model ShelfBook {
+  id       Int      @id @default(autoincrement())
+  shelfId  Int
+  volumeId String
+  title    String
+  author   String
+  coverUrl String?
+  addedAt  DateTime @default(now())
+
+  shelf BookShelf @relation(fields: [shelfId], references: [id], onDelete: Cascade)
+
+  @@unique([shelfId, volumeId])
+  @@index([shelfId])
+}
+
+model ReadingProgress {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  volumeId   String
+  cfi        String?
+  percentage Float    @default(0)
+  lastReadAt DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, volumeId])
+  @@index([userId])
+}
+
+model BookBookmark {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  volumeId    String
+  cfi         String
+  label       String?
+  pageSnippet String?
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, volumeId])
+}
+
+// ── Waitlist ─────────────────────────────────────────────────
+
+model Waitlist {
+  id        Int      @id @default(autoincrement())
+  email     String
+  tier      String
+  createdAt DateTime @default(now())
+
+  @@unique([email, tier])
+  @@index([email])
+  @@index([tier])
+}
+
+// ── Library Catalog Cache ────────────────────────────────────
+
+model CachedBook {
+  id          Int      @id @default(autoincrement())
+  volumeId    String   @unique
+  title       String
+  authors     Json     @default("[]")
+  categories  Json     @default("[]")
+  language    String   @default("en")
+  pageCount   Int      @default(0)
+  coverUrl    String?
+  previewLink String?
+  description String?
+  publishedDate String?
+  syncedAt    DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([pageCount(sort: Desc)])
+  @@index([language])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Video — Upload, transcode, and stream user videos (feed posts, announcements)
+// ═══════════════════════════════════════════════════════════════════════════
+
+model Video {
+  id            Int       @id @default(autoincrement())
+  userId        Int
+  title         String?
+  description   String?
+  r2Key         String    @unique
+  status        String    @default("processing") // processing, ready, failed
+  duration      Float?
+  width         Int?
+  height        Int?
+  fileSize      Int?
+  mimeType      String?
+  thumbnailR2Key String?
+  variants      Json?     // { "360p": { key, width, height }, "720p": {...}, "1080p": {...} }
+  hlsManifestR2Key String?
+  processingStep   String?   // Current step: downloading, analyzing, thumbnail, transcoding, finalizing
+  processingProgress Int?    // 0-100 percentage
+  downloadable     Boolean   @default(true) // Whether viewers can download this video
+  contentHash       String?
+  watermarkPosition String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user              User                @relation("UserVideos", fields: [userId], references: [id], onDelete: Cascade)
+  captions          VideoCaption[]
+  feedPosts         FeedPost[]          @relation("FeedPostVideo")
+  announcementMedia AnnouncementMedia[]
+  appeals           VideoAppeal[]       @relation("VideoAppealVideo")
+  appealOriginals   VideoAppeal[]       @relation("VideoAppealOriginal")
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status])
+  @@index([contentHash])
+}
+
+model VideoCaption {
+  id        Int      @id @default(autoincrement())
+  videoId   Int
+  language  String   @db.VarChar(10)
+  label     String
+  vttR2Key  String
+  createdAt DateTime @default(now())
+
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@unique([videoId, language])
+  @@index([videoId])
+}
+
+model VideoAppeal {
+  id              Int      @id @default(autoincrement())
+  videoId         Int
+  uploaderId      Int
+  originalVideoId Int
+  status          String   @default("pending")
+  reason          String?
+  reviewedBy      Int?
+  reviewNote      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  video           Video    @relation("VideoAppealVideo", fields: [videoId], references: [id], onDelete: Cascade)
+  uploader        User     @relation("VideoAppealUploader", fields: [uploaderId], references: [id])
+  originalVideo   Video    @relation("VideoAppealOriginal", fields: [originalVideoId], references: [id])
+  reviewer        User?    @relation("VideoAppealReviewer", fields: [reviewedBy], references: [id])
+
+  @@index([videoId])
+  @@index([uploaderId])
+  @@index([status])
+}
+
+model AnnouncementMedia {
+  id              Int      @id @default(autoincrement())
+  announcementId  Int
+  type            String   // "image" or "video"
+  url             String
+  position        Int      @default(0)
+  videoId         Int?
+  fileName        String?
+  fileSize        Int?
+  width           Int?
+  height          Int?
+  createdAt       DateTime @default(now())
+
+  announcement    Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  video           Video?       @relation(fields: [videoId], references: [id], onDelete: SetNull)
+
+  @@index([announcementId, position])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Analytics — Track page views and user activity for admin dashboard
+// ═══════════════════════════════════════════════════════════════════════════
+
+model PageView {
+  id        Int      @id @default(autoincrement())
+  userId    Int?
+  path      String
+  country   String?  @db.VarChar(2)
+  device    String?  @db.VarChar(20)
+  browser   String?  @db.VarChar(50)
+  os        String?  @db.VarChar(50)
+  sessionId String?  @db.VarChar(64)
+  duration  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@index([path])
+  @@index([sessionId])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Payments — Stripe subscriptions, payments, and donations
+// ═══════════════════════════════════════════════════════════════════════════
+
+model Subscription {
+  id                   Int       @id @default(autoincrement())
+  userId               Int
+  stripeCustomerId     String
+  stripeSubscriptionId String    @unique
+  stripePriceId        String
+  plan                 String    @default("free") // "free", "pro_monthly", "pro_yearly"
+  status               String    @default("active") // "active", "past_due", "canceled", "incomplete", "trialing"
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean   @default(false)
+  canceledAt           DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payments Payment[]
+
+  @@unique([userId])
+  @@index([stripeCustomerId])
+  @@index([status])
+}
+
+model Payment {
+  id                   Int      @id @default(autoincrement())
+  userId               Int
+  subscriptionId       Int?
+  stripePaymentIntentId String? @unique
+  stripeInvoiceId      String?  @unique
+  amount               Int      // cents
+  currency             String   @default("usd") @db.VarChar(3)
+  status               String   // "succeeded", "failed", "pending", "refunded"
+  description          String?
+  receiptUrl           String?
+  type                 String   @default("subscription") // "subscription", "donation"
+  createdAt            DateTime @default(now())
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([type])
+  @@index([status])
+}
+
+model Donation {
+  id                    Int       @id @default(autoincrement())
+  userId                Int?
+  stripeSessionId       String    @unique
+  stripePaymentIntentId String?   @unique
+  amount                Int       // cents
+  currency              String    @default("usd") @db.VarChar(3)
+  status                String    @default("pending") // "pending", "completed", "failed"
+  donorName             String?
+  donorMessage          String?   @db.VarChar(500)
+  anonymous             Boolean   @default(false)
+  createdAt             DateTime  @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([status, createdAt])
+  @@index([createdAt])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Comment Reactions — Like/dislike system for sheet, feed post, and note comments
+// ═══════════════════════════════════════════════════════════════════════════
+
+model CommentReaction {
+  userId    Int
+  commentId Int
+  type      String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comment   Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@id([userId, commentId])
+  @@index([commentId, type])
+}
+
+model FeedPostCommentReaction {
+  userId    Int
+  commentId Int
+  type      String
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comment   FeedPostComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@id([userId, commentId])
+  @@index([commentId, type])
+}
+
+model NoteCommentReaction {
+  userId    Int
+  commentId Int
+  type      String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comment   NoteComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@id([userId, commentId])
+  @@index([commentId, type])
+}
+
+model NoteReaction {
+  userId Int
+  noteId Int
+  type   String // "like" or "dislike"
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  note   Note   @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@id([userId, noteId])
+  @@index([noteId, type])
+}
+
+// ── Sprint E: Pro-level payment features ────────────────────────────────
+
+model ReferralCode {
+  id            Int       @id @default(autoincrement())
+  code          String    @unique
+  ownerId       Int
+  rewardType    String    @default("trial_extension") // "trial_extension", "discount_percent", "credit"
+  rewardValue   Int       @default(7) // days for trial_extension, percent for discount, cents for credit
+  maxUses       Int       @default(0) // 0 = unlimited
+  currentUses   Int       @default(0)
+  expiresAt     DateTime?
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+
+  owner    User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  redemptions ReferralRedemption[]
+
+  @@index([ownerId])
+  @@index([code])
+}
+
+model ReferralRedemption {
+  id             Int       @id @default(autoincrement())
+  referralCodeId Int
+  redeemedById   Int
+  redeemedAt     DateTime  @default(now())
+
+  referralCode ReferralCode @relation(fields: [referralCodeId], references: [id], onDelete: Cascade)
+  redeemedBy   User         @relation(fields: [redeemedById], references: [id], onDelete: Cascade)
+
+  @@unique([referralCodeId, redeemedById])
+  @@index([redeemedById])
+}
+
+model GiftSubscription {
+  id              Int       @id @default(autoincrement())
+  gifterId        Int
+  recipientEmail  String
+  recipientId     Int?
+  plan            String    @default("pro_monthly")
+  durationMonths  Int       @default(1)
+  message         String?
+  stripeSessionId String?   @unique
+  status          String    @default("pending") // "pending", "paid", "redeemed", "expired"
+  giftCode        String    @unique
+  expiresAt       DateTime?
+  redeemedAt      DateTime?
+  createdAt       DateTime  @default(now())
+
+  gifter    User  @relation("GiftsSent", fields: [gifterId], references: [id], onDelete: Cascade)
+  recipient User? @relation("GiftsReceived", fields: [recipientId], references: [id], onDelete: SetNull)
+
+  @@index([gifterId])
+  @@index([recipientId])
+  @@index([giftCode])
+  @@index([recipientEmail])
+}
+
+model SubscriptionPause {
+  id           Int       @id @default(autoincrement())
+  userId       Int
+  reason       String?
+  pausedAt     DateTime  @default(now())
+  resumeAt     DateTime
+  resumedAt    DateTime?
+  status       String    @default("active") // "active", "resumed", "expired"
+  createdAt    DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// User Reviews — Public testimonials shown on homepage
+// ═══════════════════════════════════════════════════════════════════════════
+
+model UserReview {
+  id               Int      @id @default(autoincrement())
+  userId           Int
+  stars            Int      // 1-5
+  text             String   @db.VarChar(500)
+  status           String   @default("pending") // "pending", "approved", "rejected"
+  aiClassification String?  // "positive", "negative", "neutral"
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId]) // one review per user
+  @@index([status, stars])
+  @@index([createdAt])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Review Reports — AI-generated weekly analysis of user reviews
+// ═══════════════════════════════════════════════════════════════════════════
+
+model ReviewReport {
+  id             Int      @id @default(autoincrement())
+  periodStart    DateTime // start of the review period
+  periodEnd      DateTime // end of the review period
+  reviewCount    Int      // number of reviews analyzed
+  averageStars   Float    // average star rating in the period
+  strengths      String   @db.Text // AI-identified strengths (JSON array)
+  weaknesses     String   @db.Text // AI-identified weaknesses (JSON array)
+  improvements   String   @db.Text // AI-suggested actionable improvements (JSON array)
+  rawAnalysis    String   @db.Text // full AI analysis text
+  generatedBy    Int?     // admin user who triggered generation
+  createdAt      DateTime @default(now())
+
+  generatedByUser User? @relation("ReviewReportGenerator", fields: [generatedBy], references: [id], onDelete: SetNull)
+
+  @@index([periodEnd])
+  @@index([createdAt])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AI Review Log — Audit trail for AI-powered sheet reviews
+// ═══════════════════════════════════════════════════════════════════════════
+
+model AiReviewLog {
+  id         String     @id @default(cuid())
+  sheetId    Int
+  decision   String     // "approve", "reject", "escalate"
+  confidence Int        // 0-100
+  riskScore  Int        // 0-100
+  findings   String     @db.Text // JSON array of findings
+  reasoning  String     @db.Text
+  model      String     // which Claude model was used
+  inputTier  Int        // what tier the scanner assigned (1 or 2)
+  createdAt  DateTime   @default(now())
+
+  sheet StudySheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+
+  @@index([sheetId])
+  @@index([decision])
+  @@index([createdAt])
 }

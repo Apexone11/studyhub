@@ -4,7 +4,7 @@ import request from 'supertest'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const require = createRequire(import.meta.url)
-const previewRoutePath = require.resolve('../src/routes/preview')
+const previewRoutePath = require.resolve('../src/modules/preview')
 
 const mocks = vi.hoisted(() => {
   const state = {
@@ -43,7 +43,7 @@ const mocks = vi.hoisted(() => {
 const mockTargets = new Map([
   [require.resolve('../src/lib/prisma'), mocks.prisma],
   [require.resolve('../src/lib/previewTokens'), { verifyHtmlPreviewToken: mocks.verifyHtmlPreviewToken }],
-  [require.resolve('../src/lib/htmlSecurity'), { validateHtmlForSubmission: mocks.validateHtmlForSubmission }],
+  [require.resolve('../src/lib/html/htmlSecurity'), { validateHtmlForSubmission: mocks.validateHtmlForSubmission, RISK_TIER: { CLEAN: 0, FLAGGED: 1, HIGH_RISK: 2, QUARANTINED: 3 } }],
   [require.resolve('../src/monitoring/sentry'), mocks.sentry],
 ])
 
@@ -86,6 +86,7 @@ beforeEach(() => {
     status: 'published',
     content: '<main><h1>Safe Preview</h1></main>',
     contentFormat: 'html',
+    htmlRiskTier: 0,
     updatedAt,
   }
   mocks.state.payload = {
@@ -158,7 +159,7 @@ describe('preview routes', () => {
     mocks.state.sheet.status = 'draft'
     mocks.state.sheet.userId = 101
     mocks.state.payload.userId = 101
-    mocks.state.payload.allowUnpublished = false
+    mocks.state.payload.allowUnpublished = true
 
     const response = await request(app)
       .get('/html')
@@ -169,21 +170,15 @@ describe('preview routes', () => {
     expect(response.text).toContain('Safe Preview')
   })
 
-  it('returns PREVIEW_HTML_BLOCKED with validation issues when html fails policy', async () => {
-    mocks.state.validationResult = {
-      ok: false,
-      issues: ['Disallowed <script> tag.'],
-    }
+  it('rejects quarantined sheets (Tier 3)', async () => {
+    mocks.state.sheet.htmlRiskTier = 3
+    mocks.state.payload.tier = 3
 
     const response = await request(app)
       .get('/html')
-      .query({ token: 'blocked-content-token' })
+      .query({ token: 'quarantined-token' })
 
-    expect(response.status).toBe(400)
-    expect(response.body).toMatchObject({
-      error: 'HTML preview blocked by security checks.',
-      code: 'PREVIEW_HTML_BLOCKED',
-      issues: ['Disallowed <script> tag.'],
-    })
+    expect(response.status).toBe(403)
+    expect(response.body.error).toMatch(/quarantined/i)
   })
 })

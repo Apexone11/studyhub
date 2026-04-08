@@ -5,7 +5,7 @@ import request from 'supertest'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const require = createRequire(import.meta.url)
-const authRoutePath = require.resolve('../src/routes/auth')
+const authRoutePath = require.resolve('../src/modules/auth')
 
 const mocks = vi.hoisted(() => {
   class MockVerificationError extends Error {
@@ -79,15 +79,19 @@ const mocks = vi.hoisted(() => {
     sentry: {
       captureError: vi.fn(),
     },
+    trustGate: {
+      checkAndPromoteTrust: vi.fn().mockResolvedValue({ promoted: false, trustLevel: 'new' }),
+    },
   }
 })
 
 const mockTargets = new Map([
   [require.resolve('../src/lib/prisma'), mocks.prisma],
-  [require.resolve('../src/lib/email'), mocks.email],
+  [require.resolve('../src/lib/email/email'), mocks.email],
   [require.resolve('../src/lib/authTokens'), mocks.authTokens],
-  [require.resolve('../src/lib/verificationChallenges'), mocks.verification],
+  [require.resolve('../src/lib/verification/verificationChallenges'), mocks.verification],
   [require.resolve('../src/monitoring/sentry'), mocks.sentry],
+  [require.resolve('../src/lib/trustGate'), mocks.trustGate],
 ])
 
 const originalModuleLoad = Module._load
@@ -107,7 +111,7 @@ beforeAll(() => {
   }
 
   delete require.cache[authRoutePath]
-  const authRouterModule = require(authRoutePath)
+  const authRouterModule = require('../src/modules/auth')
   const authRouter = authRouterModule.default || authRouterModule
 
   app = express()
@@ -129,10 +133,10 @@ beforeEach(() => {
 })
 
 describe('auth routes', () => {
-  it('returns 503 when login verification email cannot be delivered', async () => {
+  it('logs in unverified users without sending a login verification email', async () => {
     const passwordHash = await bcrypt.hash('Password123', 4)
 
-    mocks.prisma.user.findUnique.mockResolvedValue({
+    const loginUser = {
       id: 11,
       username: 'delivery_down',
       passwordHash,
@@ -141,17 +145,11 @@ describe('auth routes', () => {
       failedAttempts: 0,
       lockedUntil: null,
       twoFaEnabled: false,
-    })
+      role: 'student',
+    }
 
-    mocks.verification.createOrRefreshLoginChallenge.mockResolvedValue({
-      challenge: {
-        id: 801,
-        token: 'delivery-down-token',
-        email: 'delivery_down@studyhub.test',
-        expiresAt: new Date('2026-03-16T12:15:00.000Z'),
-      },
-      code: '123456',
-      didSend: true,
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      ...loginUser,
     })
 
     const deliveryError = new Error('smtp unavailable')
@@ -161,17 +159,23 @@ describe('auth routes', () => {
       .post('/login')
       .send({ username: 'delivery_down', password: 'Password123' })
 
-    expect(response.status).toBe(503)
-    expect(response.body).toEqual({
-      error: 'We could not send your verification code right now. Please try again later.',
+    expect(response.status).toBe(200)
+    expect(response.body).toMatchObject({
+      message: 'Login successful!',
+      user: {
+        id: loginUser.id,
+        username: loginUser.username,
+        email: loginUser.email,
+        emailVerified: false,
+      },
     })
-    expect(mocks.sentry.captureError).toHaveBeenCalledWith(deliveryError, expect.objectContaining({
-      source: 'sendEmailVerification',
-      purpose: 'login-email',
-    }))
+    expect(response.headers['set-cookie']).toBeDefined()
+    expect(mocks.email.sendEmailVerification).not.toHaveBeenCalled()
+    expect(mocks.verification.createOrRefreshLoginChallenge).not.toHaveBeenCalled()
+    expect(mocks.sentry.captureError).not.toHaveBeenCalled()
   })
 
-  it('gates unverified users behind email verification before creating a session', async () => {
+  it('creates a session for legacy users instead of returning a verification gate', async () => {
     const passwordHash = await bcrypt.hash('Password123', 4)
 
     mocks.prisma.user.findUnique.mockResolvedValue({
@@ -183,17 +187,7 @@ describe('auth routes', () => {
       failedAttempts: 0,
       lockedUntil: null,
       twoFaEnabled: false,
-    })
-    mocks.verification.createOrRefreshLoginChallenge.mockResolvedValue({
-      challenge: {
-        id: 77,
-        token: 'login-token',
-        email: 'legacy_user@studyhub.test',
-        expiresAt: new Date('2026-03-16T12:15:00.000Z'),
-        deliveryHint: 'le***@studyhub.test',
-      },
-      code: '654321',
-      didSend: true,
+      role: 'student',
     })
 
     const response = await request(app)
@@ -202,17 +196,16 @@ describe('auth routes', () => {
 
     expect(response.status).toBe(200)
     expect(response.body).toMatchObject({
-      requiresEmailVerification: true,
-      verificationToken: 'login-token',
-      emailRequired: false,
-      codeSent: true,
+      message: 'Login successful!',
+      user: {
+        username: 'legacy_user',
+        email: 'legacy_user@studyhub.test',
+        emailVerified: false,
+      },
     })
-    expect(response.headers['set-cookie']).toBeUndefined()
-    expect(mocks.email.sendEmailVerification).toHaveBeenCalledWith(
-      'legacy_user@studyhub.test',
-      'legacy_user',
-      '654321',
-    )
+    expect(response.body.requiresEmailVerification).toBeUndefined()
+    expect(response.headers['set-cookie']).toBeDefined()
+    expect(mocks.email.sendEmailVerification).not.toHaveBeenCalled()
   })
 
   it('cleans up signup challenge when verification email delivery fails', async () => {
@@ -254,7 +247,7 @@ describe('auth routes', () => {
     }))
   })
 
-  it('returns an email-required verification gate for legacy users without an email address', async () => {
+  it('creates a session for legacy users even when no email is stored', async () => {
     const passwordHash = await bcrypt.hash('Password123', 4)
 
     mocks.prisma.user.findUnique.mockResolvedValue({
@@ -266,16 +259,7 @@ describe('auth routes', () => {
       failedAttempts: 0,
       lockedUntil: null,
       twoFaEnabled: false,
-    })
-    mocks.verification.createOrRefreshLoginChallenge.mockResolvedValue({
-      challenge: {
-        id: 78,
-        token: 'email-required-token',
-        email: null,
-        expiresAt: new Date('2026-03-16T12:15:00.000Z'),
-      },
-      code: null,
-      didSend: false,
+      role: 'student',
     })
 
     const response = await request(app)
@@ -284,15 +268,19 @@ describe('auth routes', () => {
 
     expect(response.status).toBe(200)
     expect(response.body).toMatchObject({
-      requiresEmailVerification: true,
-      verificationToken: 'email-required-token',
-      emailRequired: true,
-      codeSent: false,
+      message: 'Login successful!',
+      user: {
+        username: 'missing_email',
+        email: null,
+        emailVerified: false,
+      },
     })
+    expect(response.body.requiresEmailVerification).toBeUndefined()
+    expect(response.headers['set-cookie']).toBeDefined()
     expect(mocks.email.sendEmailVerification).not.toHaveBeenCalled()
   })
 
-  it('returns 2FA only after verified-email checks already pass', async () => {
+  it('creates a session without a 2FA gate when the user has 2FA enabled', async () => {
     const passwordHash = await bcrypt.hash('Password123', 4)
 
     mocks.prisma.user.findUnique.mockResolvedValue({
@@ -304,6 +292,7 @@ describe('auth routes', () => {
       failedAttempts: 0,
       lockedUntil: null,
       twoFaEnabled: true,
+      role: 'student',
     })
 
     const response = await request(app)
@@ -312,15 +301,19 @@ describe('auth routes', () => {
 
     expect(response.status).toBe(200)
     expect(response.body).toMatchObject({
-      requires2fa: true,
-      username: 'secure_user',
-      deliveryHint: expect.any(String),
+      message: 'Login successful!',
+      user: {
+        username: 'secure_user',
+        email: 'secure_user@studyhub.test',
+        emailVerified: true,
+      },
     })
-    expect(response.headers['set-cookie']).toBeUndefined()
-    expect(mocks.email.sendTwoFaCode).toHaveBeenCalledTimes(1)
+    expect(response.body.requires2fa).toBeUndefined()
+    expect(response.headers['set-cookie']).toBeDefined()
+    expect(mocks.email.sendTwoFaCode).not.toHaveBeenCalled()
   })
 
-  it('keeps forgot-password restricted to verified emails', async () => {
+  it('sends forgot-password email to any user with an email address', async () => {
     mocks.prisma.user.findUnique.mockResolvedValue({
       id: 4,
       username: 'unverified_user',
@@ -334,7 +327,30 @@ describe('auth routes', () => {
 
     expect(response.status).toBe(200)
     expect(response.body).toEqual({
-      message: 'If we have a verified email on file for that account, a reset link has been sent.',
+      message: 'If an account exists with that username or email, a reset link has been sent.',
+    })
+    expect(mocks.email.sendPasswordReset).toHaveBeenCalledWith(
+      'unverified_user@studyhub.test',
+      'unverified_user',
+      expect.stringContaining('/reset-password?token='),
+    )
+  })
+
+  it('returns generic message for forgot-password when user has no email', async () => {
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      id: 5,
+      username: 'no_email_user',
+      email: null,
+      emailVerified: false,
+    })
+
+    const response = await request(app)
+      .post('/forgot-password')
+      .send({ username: 'no_email_user' })
+
+    expect(response.status).toBe(200)
+    expect(response.body).toEqual({
+      message: 'If an account exists with that username or email, a reset link has been sent.',
     })
     expect(mocks.email.sendPasswordReset).not.toHaveBeenCalled()
   })

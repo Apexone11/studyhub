@@ -37,4 +37,9 @@ export const GOOGLE_CLIENT_ID =
   import.meta.env.VITE_GOOGLE_CLIENT_ID ||
   ''
 
+export const TENOR_API_KEY =
+  runtimeConfig.TENOR_API_KEY ||
+  import.meta.env.VITE_TENOR_API_KEY ||
+  'AIzaSyAyimkuYQYF_FXVALexPuGQctUWRURdCYQ'
+
 export const SUPPORT_MAILTO = `mailto:${SUPPORT_EMAIL}`

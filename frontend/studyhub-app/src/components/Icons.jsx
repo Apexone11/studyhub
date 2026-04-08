@@ -95,6 +95,22 @@ export function IconNotes({ size, ...p }) {
   )
 }
 
+// Messages — speech bubble with node accent
+export function IconMessages({ size, ...p }) {
+  return (
+    <Svg size={size} {...p}>
+      {/* speech bubble */}
+      <path
+        d="M4 6 Q4 4 6 4 L18 4 Q20 4 20 6 L20 14 Q20 16 18 16 L8 16 L5 19 L5 16 L6 16 Q4 16 4 14 Z"
+        stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"
+      />
+      {/* message lines */}
+      <line x1="8" y1="8" x2="16" y2="8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      <line x1="8" y1="12" x2="13" y2="12" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    </Svg>
+  )
+}
+
 // Announcements — megaphone / bullhorn
 export function IconAnnouncements({ size, ...p }) {
   return (
@@ -450,6 +466,35 @@ export function IconCamera({ size, ...p }) {
   )
 }
 
+// Git Pull Request — contribute changes back
+export function IconGitPullRequest({ size, ...p }) {
+  return (
+    <Svg size={size} {...p}>
+      <circle cx="18" cy="18" r="3" stroke="currentColor" strokeWidth="2" fill="none" />
+      <circle cx="6" cy="6" r="3" stroke="currentColor" strokeWidth="2" fill="none" />
+      <path d="M13 6H16A2 2 0 0 1 18 8V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <line x1="6" y1="9" x2="6" y2="21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </Svg>
+  )
+}
+
+export function IconComment({ size, ...p }) {
+  return (
+    <Svg size={size} {...p}>
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  )
+}
+
+export function IconClock({ size, ...p }) {
+  return (
+    <Svg size={size} {...p}>
+      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none" />
+      <polyline points="12 6 12 12 16 14" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  )
+}
+
 // ─── LOGO MARK ────────────────────────────────────────────────────
 // Inline logo mark — exact fork tree proportions from logo-dark.svg
 // scaled to a 24x24 container. Use for nav wordmark.
@@ -500,5 +545,76 @@ export function LogoWordmark({ height = 32 }) {
         Study<span style={{ color: '#3b82f6' }}>Hub</span>
       </span>
     </div>
+  )
+}
+
+// ─── BADGE / UTILITY ICONS ──────────────────────────────────────
+
+// More (horizontal dots) — secondary actions menu trigger
+export function IconMoreHorizontal({ size, ...p }) {
+  return (
+    <Svg size={size} {...p}>
+      <circle cx="5" cy="12" r="1.5" fill="currentColor" />
+      <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+      <circle cx="19" cy="12" r="1.5" fill="currentColor" />
+    </Svg>
+  )
+}
+
+// Shield check — staff verified badge
+export function IconShieldCheck({ size, ...p }) {
+  return (
+    <Svg size={size} {...p}>
+      <path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.25C17.25 22.15 21 17.25 21 12V7l-9-5z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M8.5 12.5l2.5 2.5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  )
+}
+
+// Mail check — email verified badge
+export function IconMailCheck({ size, ...p }) {
+  return (
+    <Svg size={size} {...p}>
+      <path d="M3 7a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M3 7l9 6 9-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  )
+}
+
+export function IconBook({ size, ...p }) {
+  return (
+    <Svg size={size} {...p}>
+      <path d="M4 19.5A2.5 2.5 0 016.5 17H20" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M8 7h8M8 11h6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </Svg>
+  )
+}
+
+export function IconCode({ size, ...p }) {
+  return (
+    <Svg size={size} {...p}>
+      <polyline points="16 18 22 12 16 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <polyline points="8 6 2 12 8 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <line x1="14" y1="4" x2="10" y2="20" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </Svg>
+  )
+}
+
+export function IconTag({ size, ...p }) {
+  return (
+    <Svg size={size} {...p}>
+      <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="7" cy="7" r="1.5" fill="currentColor" />
+    </Svg>
+  )
+}
+
+// Heart — supporters / donate
+export function IconHeart({ size, ...p }) {
+  return (
+    <Svg size={size} {...p}>
+      <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 000-7.78z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
   )
 }

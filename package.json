@@ -5,8 +5,26 @@
     "backend",
     "frontend/studyhub-app"
   ],
+  "devDependencies": {
+    "eslint-config-prettier": "^10.1.5",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.1",
+    "magic-string": "^0.30.21",
+    "prettier": "^3.8.1"
+  },
+  "lint-staged": {
+    "*.{js,jsx}": [
+      "prettier --write",
+      "eslint --fix --no-warn-ignored"
+    ],
+    "*.{json,css,md,html}": [
+      "prettier --write"
+    ]
+  },
   "scripts": {
     "lint": "npm --prefix backend run lint && npm --prefix frontend/studyhub-app run lint",
+    "format": "prettier --write \"backend/src/**/*.js\" \"frontend/studyhub-app/src/**/*.{js,jsx}\"",
+    "format:check": "prettier --check \"backend/src/**/*.js\" \"frontend/studyhub-app/src/**/*.{js,jsx}\"",
     "build": "npm --prefix backend run build && npm --prefix frontend/studyhub-app run build",
     "test": "npm --prefix backend run test && npm --prefix frontend/studyhub-app run test",
     "test:e2e:smoke": "npm --prefix frontend/studyhub-app run test:e2e:smoke",
@@ -16,8 +34,8 @@
     "verify:nightly": "npm run lint && npm run build && npm run test && npm run test:e2e && npm run test:perf",
     "beta:up": "docker compose up -d --build db backend frontend pgadmin",
     "beta:down": "docker compose down",
-    "beta:seed": "docker compose exec -T backend npm run migrate:readiness:deploy && docker compose exec -T backend npm run seed && docker compose exec -T backend npm run seed:beta && docker compose exec -T backend npm run preview:fixture",
-    "beta:validate": "docker compose exec -T backend npm run test && npm --prefix frontend/studyhub-app run test && npm --prefix frontend/studyhub-app run test:e2e:smoke && docker compose exec -T backend npm run smoke:routes",
+    "beta:seed": "docker compose exec -T backend npx prisma generate && docker compose exec -T backend npm run migrate:readiness:deploy && docker compose exec -T backend npm run seed && docker compose exec -T backend npm run seed:beta && docker compose exec -T backend npm run preview:fixture",
+    "beta:validate": "docker compose exec -T backend npm run test && npm --prefix frontend/studyhub-app run test && npm --prefix frontend/studyhub-app run test:e2e:smoke && npm --prefix frontend/studyhub-app run test:e2e:beta && docker compose exec -T backend npm run smoke:routes",
     "beta:capture:feed": "node scripts/betaCaptureFeedDiagnostics.js",
     "beta:check": "npm run beta:capture:feed && npm run beta:validate",
     "beta:bootstrap": "npm run beta:up && npm run beta:seed",
@@ -27,6 +45,14 @@
     "beta:cycle5": "npm run beta:check && npm --prefix frontend/studyhub-app run test:e2e:smoke -- tests/sheets.upload-html-workflow.smoke.spec.js tests/sheets.html-preview.sandbox.smoke.spec.js && docker compose exec -T backend npm run archive:html-originals",
     "beta:cycle6": "docker compose exec -T backend npm run migrate:readiness:smoke && npm run beta:check && npm run beta:snapshots && npm run beta:load:synthetic",
     "beta:start:oneclick": "npm run beta:bootstrap",
-    "beta:validate:oneclick": "npm run beta:cycle6"
+    "beta:validate:oneclick": "npm run beta:cycle6",
+    "ci:lighthouse": "npm --prefix frontend/studyhub-app run build && npx --yes @lhci/cli@latest autorun --config frontend/studyhub-app/lighthouse.config.js",
+    "ci:a11y": "echo 'Run a11y audit with: npx axe-cli http://localhost:4173'",
+    "ci:quality": "npm run lint && npm run build && npm run test",
+    "prepare": "husky"
+  },
+  "overrides": {
+    "effect": "~3.21.0",
+    "@xmldom/xmldom": ">=0.9.9"
   }
 }

@@ -1,470 +1,962 @@
-// UserProfilePage loads a public profile while preserving the authenticated user's follow controls.
-import { useState, useEffect } from 'react'
-import { Link, useParams, useNavigate } from 'react-router-dom'
+/* ═══════════════════════════════════════════════════════════════════════════
+ * UserProfilePage.jsx — Unified profile: public showcase + student cockpit
+ *
+ * Routes:  /users/:username?tab=overview|study|sheets|achievements
+ *
+ * Own profile tabs:   Overview | Study | Sheets | Achievements
+ * Other profile tabs: Overview | Sheets | Achievements
+ *
+ * The Overview tab for own profile is the "Student Cockpit" — a two-column
+ * layout merging former DashboardPage widgets with profile identity.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+import { useState, useEffect, useRef, useMemo } from 'react'
+import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom'
+import Navbar from '../../components/navbar/Navbar'
+import { IconShield, IconProfile, IconStar, IconSchool } from '../../components/Icons'
+import ReportModal from '../../components/ReportModal'
+import SafeJoyride from '../../components/SafeJoyride'
+import { SkeletonProfile } from '../../components/Skeleton'
 import { API } from '../../config'
 import { useSession } from '../../lib/session-context'
+import { useTutorial } from '../../lib/useTutorial'
+import { PROFILE_STEPS, TUTORIAL_VERSIONS } from '../../lib/tutorialSteps'
+import { fadeInUp, staggerEntrance } from '../../lib/animations'
+import { useRecentlyViewed } from '../../lib/useRecentlyViewed'
+import { useAllStudyStatuses } from '../../lib/useStudyStatus'
+import AvatarCropModal from '../../components/AvatarCropModal'
+import ActivityHeatmap from '../../components/ActivityHeatmap'
+import { showToast } from '../../lib/toast'
+import { usePageTitle } from '../../lib/usePageTitle'
+import { readJsonSafely } from '../../lib/http'
+import VerificationBadge from '../../components/verification/VerificationBadge'
+import ProBadge from '../../components/ProBadge'
+import DonorBadge from '../../components/DonorBadge'
 
-const authHeaders = () => ({
-  'Content-Type': 'application/json',
-})
+import {
+  authHeaders, fmtDate, pageWrapStyle, containerStyle, cardStyle, sectionHeadingStyle,
+  OWN_TABS, OTHER_TABS, DEFAULT_TAB, isValidTab,
+} from './profileConstants'
+import {
+  ProfileAvatar,
+  ProfileStatsRow,
+  BadgesSection,
+  PinnedSheetsSection,
+  RecentSheetsSection,
+  SharedNotesSection,
+  SharedShelvesSection,
+  StarredSheetsSection,
+  EnrolledCoursesSection,
+  FollowModal,
+} from './ProfileWidgets'
+
+/* Re-use dashboard widgets directly */
+import {
+  ResumeStudying,
+  StudyQueue,
+  QuickActions,
+  StudyActivity,
+  ActivationChecklist,
+  RecentSheets as DashboardRecentSheets,
+} from '../dashboard/DashboardWidgets'
+import ProfileStatsWidget from './ProfileStatsWidget'
+import FollowSuggestions from './FollowSuggestions'
+import FeedCard from '../feed/FeedCard'
+import FollowRequestsList from './FollowRequestsList'
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
 
 export default function UserProfilePage() {
   const { username } = useParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
-  const { user: currentUser, isAuthenticated } = useSession()
+  const { user: currentUser, isAuthenticated, setSessionUser } = useSession()
 
-  const [profile,   setProfile]   = useState(null)
-  const [loading,   setLoading]   = useState(true)
-  const [error,     setError]     = useState(null)
-  const [following, setFollowing] = useState(false)
-  const [followers, setFollowers] = useState(0)
-  const [toggling,  setToggling]  = useState(false)
+  usePageTitle(username ? `${username}'s Profile` : 'Profile')
 
   const isOwnProfile = currentUser?.username === username
 
+  /* ── Tab state (URL-driven) ────────────────────────────────────────── */
+  const rawTab = searchParams.get('tab') || DEFAULT_TAB
+  const activeTab = isValidTab(rawTab, isOwnProfile) ? rawTab : DEFAULT_TAB
+  const tabs = isOwnProfile ? OWN_TABS : OTHER_TABS
+
+  function setTab(key) {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      next.set('tab', key)
+      return next
+    }, { replace: true })
+  }
+
+  // If other-user visits with own-only tab, redirect to default
   useEffect(() => {
-    setLoading(true); setError(null)
-    fetch(`${API}/api/users/${username}`, { headers: authHeaders() })
-      .then(r => { if (!r.ok) throw new Error(`${r.status}`); return r.json() })
-      .then(data => {
-        setProfile(data)
-        setFollowing(data.isFollowing || false)
-        setFollowers(data.followerCount || 0)
+    if (!isOwnProfile && rawTab === 'study') {
+      setTab(DEFAULT_TAB)
+    }
+  }, [isOwnProfile, rawTab]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* ── Profile state ─────────────────────────────────────────────────── */
+  const [profile, setProfile] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [following, setFollowing] = useState(false)
+  const [followStatus, setFollowStatus] = useState(null) // 'active' | 'pending' | null
+  const [followers, setFollowers] = useState(0)
+  const [toggling, setToggling] = useState(false)
+  const [reportOpen, setReportOpen] = useState(false)
+  const [isBlocked, setIsBlocked] = useState(false)
+  const [isMuted, setIsMuted] = useState(false)
+  const [blockToggling, setBlockToggling] = useState(false)
+  const [muteToggling, setMuteToggling] = useState(false)
+  const [followModal, setFollowModal] = useState(null)
+  const [followList, setFollowList] = useState([])
+  const [followListLoading, setFollowListLoading] = useState(false)
+  const [activityData, setActivityData] = useState([])
+  const [badges, setBadges] = useState([])
+  const [showAvatarCrop, setShowAvatarCrop] = useState(false)
+  const [coverImgError, setCoverImgError] = useState(false)
+
+  /* ── Dashboard state (own profile only) ────────────────────────────── */
+  const [dashboardSummary, setDashboardSummary] = useState(null)
+  const { recentlyViewed } = useRecentlyViewed()
+  const { counts: studyQueueCounts, toReview: studyToReview, studying: studyStudying } = useAllStudyStatuses()
+
+  const studyActivity = useMemo(() => {
+    if (!recentlyViewed || recentlyViewed.length === 0) return null
+    const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
+    const thisWeek = recentlyViewed.filter((e) => new Date(e.viewedAt).getTime() > weekAgo)
+    return { weeklyCount: thisWeek.length, lastStudied: recentlyViewed[0]?.viewedAt || null }
+  }, [recentlyViewed])
+
+  const dashboardRecentSheets = useMemo(() => dashboardSummary?.recentSheets || [], [dashboardSummary])
+
+  /* ── Refs & animation ──────────────────────────────────────────────── */
+  const tutorial = useTutorial('profile', PROFILE_STEPS, { version: TUTORIAL_VERSIONS.profile })
+  const heroRef = useRef(null)
+  const contentRef = useRef(null)
+  const animatedRef = useRef(false)
+
+  useEffect(() => {
+    if (loading || !profile || animatedRef.current) return
+    animatedRef.current = true
+    if (heroRef.current) fadeInUp(heroRef.current, { duration: 400, y: 16 })
+    if (contentRef.current) staggerEntrance(contentRef.current.children, { staggerMs: 80, duration: 450, y: 14 })
+  }, [loading, profile])
+
+  /* ── Load follow list ──────────────────────────────────────────────── */
+  async function loadFollowList(type) {
+    setFollowModal(type)
+    setFollowListLoading(true)
+    try {
+      const res = await fetch(`${API}/api/users/${username}/${type}`, {
+        headers: authHeaders(), credentials: 'include',
       })
-      .catch(err => setError(err.message))
+      if (res.ok) setFollowList(await res.json())
+    } catch { /* ignore */ }
+    finally { setFollowListLoading(false) }
+  }
+
+  /* ── Load profile data ─────────────────────────────────────────────── */
+  useEffect(() => {
+    setLoading(true)
+    setError(null)
+    setCoverImgError(false)
+    animatedRef.current = false
+    fetch(`${API}/api/users/${username}`, { headers: authHeaders(), credentials: 'include' })
+      .then(async (r) => {
+        if (!r.ok) {
+          const body = await r.json().catch(() => ({}))
+          throw new Error(body.error || (r.status === 404 ? 'User not found.' : 'Could not load this profile. Please try again.'))
+        }
+        return r.json()
+      })
+      .then((data) => {
+        setProfile(data)
+        setFollowing(data.isFollowing || data.followStatus === 'active' || false)
+        setFollowStatus(data.followStatus || null)
+        setFollowers(data.followerCount || 0)
+        setIsBlocked(data.isBlocked || false)
+        setIsMuted(data.isMuted || false)
+      })
+      .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
   }, [username])
 
+  /* ── Load activity + badges ────────────────────────────────────────── */
+  useEffect(() => {
+    if (!profile) return
+    fetch(`${API}/api/users/${username}/activity?weeks=12`, { headers: authHeaders(), credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => { if (Array.isArray(data)) setActivityData(data) })
+      .catch(() => {})
+
+    fetch(`${API}/api/users/${username}/badges`, { headers: authHeaders(), credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => { if (Array.isArray(data)) setBadges(data) })
+      .catch(() => {})
+  }, [profile, username])
+
+  /* ── Load dashboard summary (own profile only) ─────────────────────── */
+  useEffect(() => {
+    if (!isOwnProfile || !profile) return
+    fetch(`${API}/api/dashboard/summary`, { headers: authHeaders(), credentials: 'include' })
+      .then((r) => readJsonSafely(r, {}))
+      .then((data) => setDashboardSummary(data))
+      .catch(() => {})
+  }, [isOwnProfile, profile])
+
+  /* ── Follow toggle ─────────────────────────────────────────────────── */
   async function handleFollowToggle() {
     if (!isAuthenticated) { navigate('/login'); return }
+    // If pending, clicking again should cancel (unfollow)
+    const isUnfollow = following || followStatus === 'pending'
     setToggling(true)
     try {
-      const method = following ? 'DELETE' : 'POST'
+      const method = isUnfollow ? 'DELETE' : 'POST'
       const res = await fetch(`${API}/api/users/${username}/follow`, {
-        method, headers: authHeaders(),
+        method, headers: authHeaders(), credentials: 'include',
       })
+      const data = await res.json()
       if (res.ok) {
-        const data = await res.json()
-        setFollowing(data.following)
-        setFollowers(data.followerCount)
+        if (data.requested) {
+          // Follow request sent to a private account
+          setFollowing(false)
+          setFollowStatus('pending')
+          showToast(`Follow request sent to ${username}`, 'success')
+        } else {
+          setFollowing(data.following)
+          setFollowStatus(data.following ? 'active' : null)
+          if (data.followerCount != null) setFollowers(data.followerCount)
+          showToast(data.following ? `Following ${username}` : `Unfollowed ${username}`, 'success')
+        }
+      } else {
+        showToast(data.error || 'Could not update follow status.', 'error')
       }
-    } catch { /* ignore */ }
+    } catch { showToast('Check your connection and try again.', 'error') }
     finally { setToggling(false) }
   }
 
-  const fmtDate = d => d ? new Date(d).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : ''
+  /* ── Block toggle ───────────────────────────────────────────────────── */
+  async function handleBlockToggle() {
+    if (!isAuthenticated) { navigate('/login'); return }
+    setBlockToggling(true)
+    try {
+      const method = isBlocked ? 'DELETE' : 'POST'
+      const res = await fetch(`${API}/api/users/${username}/block`, {
+        method, headers: authHeaders(), credentials: 'include',
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setIsBlocked(data.blocked)
+        if (data.blocked) {
+          setFollowing(false)
+          setFollowStatus(null)
+          showToast(`Blocked ${username}`, 'success')
+        } else {
+          showToast(`Unblocked ${username}`, 'success')
+        }
+      } else {
+        showToast(data.error || 'Could not update block status.', 'error')
+      }
+    } catch { showToast('Check your connection and try again.', 'error') }
+    finally { setBlockToggling(false) }
+  }
+
+  /* ── Mute toggle ───────────────────────────────────────────────────── */
+  async function handleMuteToggle() {
+    if (!isAuthenticated) { navigate('/login'); return }
+    setMuteToggling(true)
+    try {
+      const method = isMuted ? 'DELETE' : 'POST'
+      const res = await fetch(`${API}/api/users/${username}/mute`, {
+        method, headers: authHeaders(), credentials: 'include',
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setIsMuted(data.muted)
+        showToast(data.muted ? `Muted ${username}` : `Unmuted ${username}`, 'success')
+      } else {
+        showToast(data.error || 'Could not update mute status.', 'error')
+      }
+    } catch { showToast('Check your connection and try again.', 'error') }
+    finally { setMuteToggling(false) }
+  }
+
+  /* ── Helpers ────────────────────────────────────────────────────────── */
   const initials = username ? username.slice(0, 2).toUpperCase() : '??'
 
+  /* ── Loading ────────────────────────────────────────────────────────── */
   if (loading) return (
-    <div style={styles.page}>
-      <header style={styles.header}>
-        <Link to="/feed" style={styles.logoLink}>
-          <span style={styles.logoText}>Study<span style={{ color: '#3b82f6' }}>Hub</span></span>
-        </Link>
-      </header>
-      <div style={styles.shell}>
-        <div style={{ ...styles.card, textAlign: 'center', padding: 48, color: '#94a3b8' }}>
-          <i className="fas fa-circle-notch fa-spin" style={{ fontSize: 28, marginBottom: 12, display: 'block' }}></i>
-          Loading profile…
-        </div>
-      </div>
+    <div style={pageWrapStyle}>
+      <Navbar crumbs={[{ label: username, to: `/users/${username}` }]} hideTabs />
+      <div style={containerStyle}><SkeletonProfile /></div>
     </div>
   )
 
+  /* ── Error ──────────────────────────────────────────────────────────── */
   if (error) return (
-    <div style={styles.page}>
-      <header style={styles.header}>
-        <Link to="/feed" style={styles.logoLink}>
-          <span style={styles.logoText}>Study<span style={{ color: '#3b82f6' }}>Hub</span></span>
-        </Link>
-      </header>
-      <div style={styles.shell}>
-        <div style={{ ...styles.card, textAlign: 'center', padding: 48 }}>
-          <i className="fas fa-user-slash" style={{ fontSize: 36, color: '#cbd5e1', marginBottom: 14, display: 'block' }}></i>
-          <div style={{ fontWeight: 700, fontSize: 18, color: '#1e3a5f', marginBottom: 8 }}>User not found</div>
-          <div style={{ fontSize: 14, color: '#94a3b8', marginBottom: 20 }}>
-            {error === '404' ? 'This user does not exist.' : `Error ${error}`}
+    <div style={pageWrapStyle}>
+      <Navbar crumbs={[{ label: 'Profile', to: '#' }]} hideTabs />
+      <div style={containerStyle}>
+        <div style={{ background: 'var(--sh-surface)', borderRadius: 18, border: '1px solid var(--sh-border)', padding: 48, textAlign: 'center' }}>
+          <div style={{ fontSize: 36, color: 'var(--sh-muted)', marginBottom: 14 }}>{/private|classmates/i.test(error) ? <IconShield size={36} /> : <IconProfile size={36} />}</div>
+          <div style={{ fontWeight: 700, fontSize: 18, color: 'var(--sh-heading)', marginBottom: 8 }}>
+            {/private|classmates/i.test(error) ? 'Profile not available' : 'User not found'}
           </div>
-          <Link to="/sheets" style={styles.btnPrimary}>Browse Sheets</Link>
+          <div style={{ fontSize: 14, color: 'var(--sh-muted)', marginBottom: 20 }}>{error}</div>
+          <Link to="/sheets" style={{ display: 'inline-flex', padding: '10px 22px', borderRadius: 10, background: 'var(--sh-brand)', color: '#fff', fontWeight: 700, fontSize: 14, textDecoration: 'none' }}>
+            Browse Sheets
+          </Link>
         </div>
       </div>
     </div>
   )
 
+  /* ═══════════════════════════════════════════════════════════════════════
+   * MAIN PROFILE VIEW
+   * ═══════════════════════════════════════════════════════════════════════ */
   return (
-    <div style={styles.page}>
-      <header style={styles.header}>
-        <Link to="/feed" style={styles.logoLink}>
-          <span style={styles.logoText}>Study<span style={{ color: '#3b82f6' }}>Hub</span></span>
-        </Link>
-        <Link to="/feed" style={styles.backLink}>
-          <i className="fas fa-arrow-left" style={{ marginRight: 6 }}></i>Back to Feed
-        </Link>
-      </header>
+    <div style={pageWrapStyle}>
+      <Navbar crumbs={[{ label: profile.username, to: `/users/${username}` }]} hideTabs />
 
-      <div style={styles.shell}>
-        {/* Profile Card */}
-        <div style={{ ...styles.card, marginBottom: 20 }}>
-          <div style={styles.profileHeader}>
-            {/* Avatar */}
-            <div style={styles.avatar}>
-              {profile.avatarUrl
-                ? <img src={profile.avatarUrl.startsWith('http') ? profile.avatarUrl : `${API}${profile.avatarUrl}`} alt={profile.username} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
-                : <span style={styles.avatarInitials}>{initials}</span>
-              }
-            </div>
+      <div style={containerStyle}>
+        {/* ── HERO ──────────────────────────────────────────────────────── */}
+        <div ref={heroRef} style={{ borderRadius: 18, overflow: 'hidden', marginBottom: 20, border: '1px solid var(--sh-border)', boxShadow: 'var(--shadow-sm, 0 2px 10px rgba(15,23,42,0.05))' }}>
+          {/* Cover image */}
+          <div className="profile-hero" style={{
+            background: (profile.coverImageUrl && !coverImgError)
+              ? 'var(--sh-slate-900)'
+              : 'linear-gradient(135deg, var(--sh-slate-800), var(--sh-brand))',
+          }}>
+            {profile.coverImageUrl && !coverImgError && (
+              <img
+                src={profile.coverImageUrl.startsWith('http') ? profile.coverImageUrl : `${API}${profile.coverImageUrl}`}
+                alt=""
+                loading="lazy"
+                onError={() => setCoverImgError(true)}
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              />
+            )}
+            {/* Gradient overlay — always present for readability */}
+            <div style={{
+              position: 'absolute', inset: 0,
+              background: 'linear-gradient(to top, rgba(15,23,42,0.85) 0%, rgba(15,23,42,0.4) 40%, rgba(15,23,42,0.1) 70%, transparent 100%)',
+              pointerEvents: 'none',
+            }} />
 
-            {/* Info */}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
-                <h1 style={styles.username}>{profile.username}</h1>
-                {profile.role === 'admin'
-                  ? <span style={styles.adminBadge}>
-                      <i className="fas fa-crown" style={{ color: '#f59e0b', marginRight: 4 }}></i>Admin
-                    </span>
-                  : <span style={styles.studentBadge}>
-                      <i className="fas fa-graduation-cap" style={{ color: '#3b82f6', marginRight: 4 }}></i>Student
-                    </span>
-                }
+            {/* Hero content positioned at bottom */}
+            <div style={{
+              position: 'absolute', bottom: 0, left: 0, right: 0,
+              padding: 'clamp(16px, 2vw, 28px) clamp(20px, 3vw, 32px)',
+              display: 'flex', alignItems: 'flex-end', gap: 'clamp(14px, 2vw, 22px)',
+              flexWrap: 'wrap',
+            }}>
+              {/* Avatar */}
+              <div style={{ border: '3px solid var(--sh-surface)', borderRadius: '50%', lineHeight: 0, flexShrink: 0 }}>
+                <ProfileAvatar
+                  profile={profile}
+                  initials={initials}
+                  isOwnProfile={isOwnProfile}
+                  onAvatarClick={() => setShowAvatarCrop(true)}
+                />
               </div>
-              <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 16 }}>
-                Joined {fmtDate(profile.createdAt)}
+
+              {/* Identity */}
+              <div style={{ flex: 1, minWidth: 200 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
+                  <h1 style={{ margin: 0, fontSize: 'clamp(20px, 2.5vw, 26px)', fontWeight: 800, color: 'var(--sh-nav-text)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    {profile.username}
+                    {profile.isPrivate && (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.7 }} aria-label="Private account">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                      </svg>
+                    )}
+                    <VerificationBadge user={profile} size={18} />
+                  </h1>
+                  {profile.role === 'admin'
+                    ? <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 99, background: 'var(--sh-warning-light-bg)', color: 'var(--sh-warning-text)', border: '1px solid var(--sh-warning-border)' }}>Admin</span>
+                    : <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 99, background: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.8)', border: '1px solid rgba(255,255,255,0.2)' }}>{profile.accountType === 'teacher' ? 'Teacher' : profile.accountType === 'other' ? 'Member' : 'Student'}</span>
+                  }
+                  <ProBadge plan={profile.plan} size="sm" />
+                  <DonorBadge isDonor={profile.isDonor} donorLevel={profile.donorLevel} size="sm" />
+                  {(() => {
+                    const school = profile.enrollments?.[0]?.course?.school
+                    if (!school) return null
+                    return (
+                      <span style={{
+                        fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 99,
+                        background: 'rgba(14,165,233,0.18)', color: 'var(--sh-info-text)',
+                        border: '1px solid rgba(14,165,233,0.3)',
+                        display: 'inline-flex', alignItems: 'center', gap: 4,
+                      }}>
+                        <IconSchool size={11} />
+                        {school.short}
+                      </span>
+                    )
+                  })()}
+                </div>
+                {profile.displayName && profile.displayName !== profile.username && (
+                  <div style={{ fontSize: 15, fontWeight: 700, color: 'rgba(255,255,255,0.86)', marginBottom: 6 }}>
+                    {profile.displayName}
+                  </div>
+                )}
+                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', marginBottom: 10 }}>
+                  Joined {fmtDate(profile.createdAt)}
+                </div>
+                {profile.bio && (
+                  <div
+                    data-testid="user-bio"
+                    className="bio"
+                    style={{
+                      maxWidth: 720,
+                      fontSize: 14,
+                      lineHeight: 1.7,
+                      color: 'rgba(255,255,255,0.86)',
+                      marginBottom: 12,
+                    }}
+                  >
+                    {profile.bio}
+                  </div>
+                )}
+                {(profile.location || Number.isInteger(profile.age)) && (
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                    {profile.location && (
+                      <span style={{ fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 99, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.86)' }}>
+                        {profile.location}
+                      </span>
+                    )}
+                    {Number.isInteger(profile.age) && (
+                      <span style={{ fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 99, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.86)' }}>
+                        Age {profile.age}
+                      </span>
+                    )}
+                  </div>
+                )}
+                {Array.isArray(profile.profileLinks) && profile.profileLinks.length > 0 && (
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+                    {profile.profileLinks.map((link) => (
+                      <a
+                        key={`${link.label}-${link.url}`}
+                        href={link.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          padding: '6px 12px',
+                          borderRadius: 999,
+                          border: '1px solid rgba(255,255,255,0.2)',
+                          background: 'rgba(255,255,255,0.1)',
+                          color: 'var(--sh-nav-text)',
+                          fontSize: 12,
+                          fontWeight: 700,
+                          textDecoration: 'none',
+                          backdropFilter: 'blur(6px)',
+                        }}
+                      >
+                        {link.label}
+                      </a>
+                    ))}
+                  </div>
+                )}
+
+                {/* Follower / following stats */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 14, color: 'var(--sh-nav-text)' }}>
+                    <strong>{profile.sheetCount || 0}</strong>{' '}
+                    <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>sheets</span>
+                  </span>
+                  <button
+                    onClick={() => loadFollowList('followers')}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit', fontSize: 14, color: 'var(--sh-nav-text)' }}
+                  >
+                    <strong>{followers}</strong>{' '}
+                    <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>followers</span>
+                  </button>
+                  <button
+                    onClick={() => loadFollowList('following')}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit', fontSize: 14, color: 'var(--sh-nav-text)' }}
+                  >
+                    <strong>{profile.followingCount || 0}</strong>{' '}
+                    <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>following</span>
+                  </button>
+                </div>
               </div>
 
-              {/* Stats */}
-              <div style={styles.statsRow}>
-                <div style={styles.stat}>
-                  <div style={styles.statValue}>{profile.sheetCount || 0}</div>
-                  <div style={styles.statLabel}>Sheets</div>
-                </div>
-                <div style={styles.statDivider} />
-                <div style={styles.stat}>
-                  <div style={styles.statValue}>{followers}</div>
-                  <div style={styles.statLabel}>Followers</div>
-                </div>
-                <div style={styles.statDivider} />
-                <div style={styles.stat}>
-                  <div style={styles.statValue}>{profile.followingCount || 0}</div>
-                  <div style={styles.statLabel}>Following</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Action buttons */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignSelf: 'flex-start' }}>
-              {isOwnProfile
-                ? <Link to="/settings" style={styles.btnGhost}>
-                    <i className="fas fa-pen" style={{ marginRight: 6 }}></i>Edit Profile
+              {/* Action buttons */}
+              <div style={{ display: 'flex', gap: 8, alignSelf: 'flex-end', flexWrap: 'wrap' }}>
+                {isOwnProfile ? (
+                  <Link to="/settings" style={{
+                    display: 'inline-flex', alignItems: 'center', padding: '8px 16px', borderRadius: 10,
+                    background: 'rgba(255,255,255,0.15)', color: 'var(--sh-nav-text)', fontWeight: 700, fontSize: 13,
+                    textDecoration: 'none', border: '1px solid rgba(255,255,255,0.25)',
+                    backdropFilter: 'blur(6px)',
+                  }}>
+                    Edit Profile
                   </Link>
-                : currentUser && (
+                ) : currentUser ? (
+                  <>
+                    {/* Follow button — hidden when user is blocked */}
+                    {!isBlocked && (
+                      <button
+                        onClick={handleFollowToggle}
+                        disabled={toggling}
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', padding: '8px 18px', borderRadius: 10,
+                          fontWeight: 700, fontSize: 13, fontFamily: 'inherit',
+                          border: followStatus === 'active'
+                            ? '1px solid rgba(16,185,129,0.5)'
+                            : followStatus === 'pending'
+                              ? '1px solid var(--sh-border)'
+                              : '1px solid rgba(255,255,255,0.25)',
+                          background: followStatus === 'active'
+                            ? 'rgba(16,185,129,0.2)'
+                            : followStatus === 'pending'
+                              ? 'rgba(255,255,255,0.1)'
+                              : 'var(--sh-brand)',
+                          color: followStatus === 'active'
+                            ? 'var(--sh-success)'
+                            : followStatus === 'pending'
+                              ? 'rgba(255,255,255,0.6)'
+                              : 'var(--sh-nav-text)',
+                          cursor: toggling ? 'wait' : 'pointer',
+                          backdropFilter: 'blur(6px)',
+                        }}
+                      >
+                        {toggling ? '...' : followStatus === 'active' ? 'Following' : followStatus === 'pending' ? 'Requested' : 'Follow'}
+                      </button>
+                    )}
+
+                    {/* Message button — hidden when user is blocked */}
+                    {!isBlocked && (
+                      <button
+                        onClick={() => navigate(`/messages?dm=${profile.id}`)}
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10,
+                          fontWeight: 600, fontSize: 12, fontFamily: 'inherit',
+                          border: '1px solid rgba(255,255,255,0.25)',
+                          background: 'rgba(255,255,255,0.12)',
+                          color: 'var(--sh-nav-text)',
+                          cursor: 'pointer',
+                          backdropFilter: 'blur(6px)',
+                        }}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                        </svg>
+                        Message
+                      </button>
+                    )}
+
+                    {/* Mute button */}
                     <button
-                      onClick={handleFollowToggle}
-                      disabled={toggling}
-                      style={following ? styles.btnFollowing : styles.btnFollow}
+                      onClick={handleMuteToggle}
+                      disabled={muteToggling}
+                      title={isMuted ? 'Unmute this user' : 'Mute this user'}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10,
+                        fontWeight: 600, fontSize: 12, fontFamily: 'inherit',
+                        border: isMuted ? '1px solid var(--sh-warning-border)' : '1px solid var(--sh-border)',
+                        background: isMuted ? 'var(--sh-warning-bg)' : 'var(--sh-soft)',
+                        color: isMuted ? 'var(--sh-warning-text)' : 'var(--sh-subtext)',
+                        cursor: muteToggling ? 'wait' : 'pointer',
+                        backdropFilter: 'blur(6px)',
+                      }}
                     >
-                      {toggling
-                        ? <i className="fas fa-circle-notch fa-spin"></i>
-                        : following
-                          ? <><i className="fas fa-user-check" style={{ marginRight: 6 }}></i>Following</>
-                          : <><i className="fas fa-user-plus" style={{ marginRight: 6 }}></i>Follow</>
-                      }
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        {isMuted
+                          ? <><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></>
+                          : <><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></>
+                        }
+                      </svg>
+                      {muteToggling ? '...' : isMuted ? 'Muted' : 'Mute'}
                     </button>
-                  )
-              }
+
+                    {/* Block button */}
+                    <button
+                      onClick={handleBlockToggle}
+                      disabled={blockToggling}
+                      title={isBlocked ? 'Unblock this user' : 'Block this user'}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10,
+                        fontWeight: 600, fontSize: 12, fontFamily: 'inherit',
+                        border: isBlocked ? '1px solid var(--sh-danger-border)' : '1px solid var(--sh-border)',
+                        background: isBlocked ? 'var(--sh-danger-bg)' : 'var(--sh-soft)',
+                        color: isBlocked ? 'var(--sh-danger-text)' : 'var(--sh-subtext)',
+                        cursor: blockToggling ? 'wait' : 'pointer',
+                        backdropFilter: 'blur(6px)',
+                      }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+                      </svg>
+                      {blockToggling ? '...' : isBlocked ? 'Blocked' : 'Block'}
+                    </button>
+
+                    {/* Report button */}
+                    <button
+                      onClick={() => setReportOpen(true)}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10,
+                        fontWeight: 600, fontSize: 12, fontFamily: 'inherit',
+                        border: '1px solid rgba(255,255,255,0.15)',
+                        background: 'rgba(255,255,255,0.08)',
+                        color: 'rgba(255,255,255,0.7)',
+                        cursor: 'pointer',
+                        backdropFilter: 'blur(6px)',
+                      }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+                      Report
+                    </button>
+                  </>
+                ) : null}
+              </div>
             </div>
           </div>
+
+          {/* ── Own profile: Hero CTA row ────────────────────────────────── */}
+          {isOwnProfile && (
+            <div style={{
+              padding: '14px clamp(20px, 3vw, 32px)',
+              background: 'var(--sh-surface)',
+              borderTop: '1px solid var(--sh-border)',
+            }}>
+              <div className="profile-hero-ctas">
+                <Link to="/sheets" className="sh-btn sh-btn--primary sh-btn--sm" style={{ gap: 6 }}>
+                  Resume Studying
+                </Link>
+                <Link to="/sheets?starred=1" className="sh-btn sh-btn--secondary sh-btn--sm" style={{ gap: 6 }}>
+                  Study Queue
+                </Link>
+                <Link to="/sheets/upload" className="sh-btn sh-btn--secondary sh-btn--sm" style={{ gap: 6 }}>
+                  Upload Sheet
+                </Link>
+                <Link to="/settings" className="sh-btn sh-btn--secondary sh-btn--sm" style={{ gap: 6 }}>
+                  Settings
+                </Link>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Two-column layout */}
-        <div style={styles.columns}>
-          {/* Recent Sheets */}
-          <div style={{ flex: 2, minWidth: 0 }}>
-            <div style={styles.card}>
-              <h2 style={styles.sectionTitle}>
-                <i className="fas fa-file-lines" style={{ marginRight: 8, color: '#3b82f6' }}></i>
-                Recent Sheets
-              </h2>
-              {profile.recentSheets && profile.recentSheets.length > 0
-                ? profile.recentSheets.map(sheet => (
-                    <Link key={sheet.id} to={`/sheets/${sheet.id}`} style={styles.sheetRow}>
-                      <div style={styles.sheetRowTitle}>{sheet.title}</div>
-                      <div style={styles.sheetRowMeta}>
-                        {sheet.course?.code && (
-                          <span style={styles.courseChip}>{sheet.course.code}</span>
-                        )}
-                        <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 'auto' }}>
-                          <i className="fas fa-star" style={{ marginRight: 4, color: '#f59e0b' }}></i>{sheet.stars || 0}
-                          <i className="fas fa-code-fork" style={{ marginLeft: 10, marginRight: 4, color: '#10b981' }}></i>{sheet.forks || 0}
-                        </span>
-                      </div>
-                    </Link>
-                  ))
-                : (
-                    <div style={styles.emptyState}>
-                      <i className="fas fa-file-lines" style={{ fontSize: 28, color: '#cbd5e1', marginBottom: 10, display: 'block' }}></i>
-                      No public sheets yet
-                    </div>
-                  )
-              }
+        {/* ── Follow Requests (own profile) ─────────────────────────────── */}
+        {isOwnProfile && <FollowRequestsList />}
+
+        {/* ── Private profile gate ─────────────────────────────────────── */}
+        {profile.isPrivateProfile && !isOwnProfile ? (
+          <div style={{
+            ...cardStyle,
+            textAlign: 'center',
+            padding: '48px 24px',
+          }}>
+            <div style={{ marginBottom: 16, color: 'var(--sh-muted)' }}>
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+            </div>
+            <div style={{ fontWeight: 700, fontSize: 18, color: 'var(--sh-heading)', marginBottom: 8 }}>
+              This account is private
+            </div>
+            <div style={{ fontSize: 14, color: 'var(--sh-muted)', maxWidth: 400, margin: '0 auto', lineHeight: 1.6 }}>
+              {profile.bio || 'Follow this account to see their posts, sheets, and activity.'}
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--sh-muted)', maxWidth: 420, margin: '12px auto 0', lineHeight: 1.6 }}>
+              Send a follow request to unlock their sheets, posts, and study activity.
             </div>
           </div>
-
-          {/* Courses */}
-          <div style={{ flex: 1, minWidth: 240 }}>
-            <div style={styles.card}>
-              <h2 style={styles.sectionTitle}>
-                <i className="fas fa-book" style={{ marginRight: 8, color: '#8b5cf6' }}></i>
-                Enrolled Courses
-              </h2>
-              {profile.enrollments && profile.enrollments.length > 0
-                ? (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                      {profile.enrollments.map(e => (
-                        <span key={e.id} style={styles.enrollChip}>
-                          <span style={{ fontWeight: 700 }}>{e.course?.code}</span>
-                          {e.course?.school?.name && (
-                            <span style={{ color: '#94a3b8', marginLeft: 4, fontSize: 11 }}>· {e.course.school.name}</span>
-                          )}
-                        </span>
-                      ))}
-                    </div>
-                  )
-                : (
-                    <div style={styles.emptyState}>
-                      <i className="fas fa-book-open" style={{ fontSize: 24, color: '#cbd5e1', marginBottom: 8, display: 'block' }}></i>
-                      No enrolled courses
-                    </div>
-                  )
-              }
+        ) : (
+          <>
+            {/* ── TABS ──────────────────────────────────────────────────────── */}
+            <div style={{ marginBottom: 20 }}>
+              <div className="profile-tabs" role="tablist" aria-label="Profile sections">
+                {tabs.map((tab) => (
+                  <button
+                    key={tab.key}
+                    role="tab"
+                    aria-selected={activeTab === tab.key}
+                    className={`profile-tab-btn${activeTab === tab.key ? ' profile-tab-btn--active' : ''}`}
+                    onClick={() => setTab(tab.key)}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
             </div>
+
+            {/* ── TAB CONTENT ───────────────────────────────────────────────── */}
+            <div ref={contentRef} role="tabpanel" aria-label={activeTab}>
+              {activeTab === 'overview' && (
+                isOwnProfile
+                  ? <OwnOverviewTab
+                      profile={profile}
+                      dashboardSummary={dashboardSummary}
+                      recentlyViewed={recentlyViewed}
+                      studyQueueCounts={studyQueueCounts}
+                      studyToReview={studyToReview}
+                      studyStudying={studyStudying}
+                      dashboardRecentSheets={dashboardRecentSheets}
+                      activityData={activityData}
+                      badges={badges}
+                      followers={followers}
+                      loadFollowList={loadFollowList}
+                    />
+                  : <OtherOverviewTab
+                      profile={profile}
+                      activityData={activityData}
+                      badges={badges}
+                    />
+              )}
+
+              {activeTab === 'study' && isOwnProfile && (
+                <StudyTab
+                  recentlyViewed={recentlyViewed}
+                  studyActivity={studyActivity}
+                  studyQueueCounts={studyQueueCounts}
+                  studyToReview={studyToReview}
+                  studyStudying={studyStudying}
+                  dashboardRecentSheets={dashboardRecentSheets}
+                />
+              )}
+
+              {activeTab === 'sheets' && (
+                <SheetsTab
+                  profile={profile}
+                  isOwnProfile={isOwnProfile}
+                />
+              )}
+
+              {activeTab === 'posts' && (
+                <PostsTab profileId={profile?.id} />
+              )}
+
+              {activeTab === 'achievements' && (
+                <AchievementsTab
+                  activityData={activityData}
+                  badges={badges}
+                />
+              )}
+            </div>
+          </>
+        )}
+      </div>
+
+      <SafeJoyride {...tutorial.joyrideProps} />
+
+      <FollowModal
+        followModal={followModal}
+        followList={followList}
+        followListLoading={followListLoading}
+        onClose={() => setFollowModal(null)}
+      />
+
+      {showAvatarCrop && (
+        <AvatarCropModal
+          onClose={() => setShowAvatarCrop(false)}
+          onUploaded={(avatarUrl) => {
+            setProfile((p) => ({ ...p, avatarUrl }))
+            setSessionUser((u) => u ? { ...u, avatarUrl } : u)
+          }}
+        />
+      )}
+
+      {profile && <ReportModal open={reportOpen} targetType="user" targetId={profile.id} onClose={() => setReportOpen(false)} />}
+    </div>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * TAB CONTENT COMPONENTS
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Own profile Overview: "Student Cockpit" ─────────────────────────────── */
+function OwnOverviewTab({
+  profile, dashboardSummary, recentlyViewed,
+  studyQueueCounts, studyToReview, studyStudying,
+  dashboardRecentSheets, activityData, badges, followers, loadFollowList,
+}) {
+  return (
+    <div className="profile-cockpit">
+      {/* Left column: action / study */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <ResumeStudying entries={recentlyViewed} />
+        <StudyQueue counts={studyQueueCounts} toReview={studyToReview} studying={studyStudying} />
+        <DashboardRecentSheets recentSheets={dashboardRecentSheets} />
+        <QuickActions />
+      </div>
+
+      {/* Right column: identity / progress */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <ProfileStatsWidget username={profile.username} />
+        <PinnedSheetsSection sheets={profile.pinnedSheets} />
+        <SharedShelvesSection shelves={profile.sharedShelves} isOwnProfile />
+        {activityData.length > 0 && (
+          <div style={cardStyle}>
+            <ActivityHeatmap data={activityData} weeks={12} />
+          </div>
+        )}
+        <BadgesSection badges={badges} />
+        <FollowSuggestions />
+        {/* Followers / Following summary */}
+        <div style={cardStyle}>
+          <h2 style={{ ...sectionHeadingStyle, marginBottom: 12 }}>Community</h2>
+          <div style={{ display: 'flex', gap: 16 }}>
+            <button
+              onClick={() => loadFollowList('followers')}
+              style={{ flex: 1, background: 'var(--sh-soft)', border: '1px solid var(--sh-border)', borderRadius: 12, padding: '14px 12px', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'center' }}
+            >
+              <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--sh-heading)' }}>{followers}</div>
+              <div style={{ fontSize: 12, color: 'var(--sh-muted)' }}>Followers</div>
+            </button>
+            <button
+              onClick={() => loadFollowList('following')}
+              style={{ flex: 1, background: 'var(--sh-soft)', border: '1px solid var(--sh-border)', borderRadius: 12, padding: '14px 12px', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'center' }}
+            >
+              <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--sh-heading)' }}>{profile.followingCount || 0}</div>
+              <div style={{ fontSize: 12, color: 'var(--sh-muted)' }}>Following</div>
+            </button>
           </div>
         </div>
+        {dashboardSummary?.activation && (
+          <ActivationChecklist activation={dashboardSummary.activation} />
+        )}
       </div>
     </div>
   )
 }
 
-const styles = {
-  page: {
-    minHeight: '100vh',
-    background: '#edf0f5',
-    fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
-  },
-  header: {
-    background: '#0f172a',
-    height: 62,
-    display: 'flex',
-    alignItems: 'center',
-    padding: '0 clamp(16px, 2.5vw, 40px)',
-    gap: 16,
-    borderBottom: '1px solid #1e293b',
-    position: 'sticky',
-    top: 0,
-    zIndex: 100,
-  },
-  logoLink: { textDecoration: 'none' },
-  logoText: { fontWeight: 800, fontSize: 18, color: '#fff' },
-  backLink: {
-    marginLeft: 'auto',
-    fontSize: 13,
-    color: '#94a3b8',
-    textDecoration: 'none',
-  },
-  shell: {
-    maxWidth: 860,
-    margin: '0 auto',
-    padding: 'clamp(20px, 3vw, 40px) clamp(16px, 2vw, 24px)',
-  },
-  card: {
-    background: '#fff',
-    borderRadius: 14,
-    border: '1px solid #e8ecf0',
-    padding: '24px 28px',
-    boxShadow: '0 2px 10px rgba(15,23,42,0.05)',
-  },
-  profileHeader: {
-    display: 'flex',
-    alignItems: 'flex-start',
-    gap: 20,
-    flexWrap: 'wrap',
-  },
-  avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: '50%',
-    background: '#0f172a',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-    overflow: 'hidden',
-  },
-  avatarInitials: {
-    fontSize: 26,
-    fontWeight: 800,
-    color: '#fff',
-  },
-  username: {
-    margin: 0,
-    fontSize: 22,
-    fontWeight: 800,
-    color: '#0f172a',
-  },
-  adminBadge: {
-    fontSize: 12,
-    fontWeight: 700,
-    padding: '3px 10px',
-    borderRadius: 99,
-    background: '#fef9ec',
-    color: '#92400e',
-    border: '1px solid #fde68a',
-    display: 'flex',
-    alignItems: 'center',
-  },
-  studentBadge: {
-    fontSize: 12,
-    fontWeight: 700,
-    padding: '3px 10px',
-    borderRadius: 99,
-    background: '#eff6ff',
-    color: '#1d4ed8',
-    border: '1px solid #bfdbfe',
-    display: 'flex',
-    alignItems: 'center',
-  },
-  statsRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 0,
-  },
-  stat: {
-    textAlign: 'center',
-    padding: '8px 20px',
-  },
-  statValue: {
-    fontSize: 20,
-    fontWeight: 800,
-    color: '#0f172a',
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#94a3b8',
-    fontWeight: 500,
-  },
-  statDivider: {
-    width: 1,
-    height: 36,
-    background: '#e8ecf0',
-  },
-  btnPrimary: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    padding: '10px 22px',
-    borderRadius: 9,
-    background: '#3b82f6',
-    color: '#fff',
-    fontWeight: 700,
-    fontSize: 14,
-    textDecoration: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    fontFamily: 'inherit',
-  },
-  btnGhost: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    padding: '8px 16px',
-    borderRadius: 9,
-    background: '#fff',
-    color: '#475569',
-    fontWeight: 700,
-    fontSize: 13,
-    textDecoration: 'none',
-    border: '1px solid #e2e8f0',
-    cursor: 'pointer',
-    fontFamily: 'inherit',
-  },
-  btnFollow: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    padding: '8px 18px',
-    borderRadius: 9,
-    background: '#3b82f6',
-    color: '#fff',
-    fontWeight: 700,
-    fontSize: 13,
-    border: 'none',
-    cursor: 'pointer',
-    fontFamily: 'inherit',
-  },
-  btnFollowing: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    padding: '8px 18px',
-    borderRadius: 9,
-    background: '#f0fdf4',
-    color: '#166534',
-    fontWeight: 700,
-    fontSize: 13,
-    border: '1px solid #bbf7d0',
-    cursor: 'pointer',
-    fontFamily: 'inherit',
-  },
-  columns: {
-    display: 'flex',
-    gap: 16,
-    alignItems: 'flex-start',
-    flexWrap: 'wrap',
-  },
-  sectionTitle: {
-    margin: '0 0 16px',
-    fontSize: 15,
-    fontWeight: 700,
-    color: '#1e3a5f',
-    display: 'flex',
-    alignItems: 'center',
-  },
-  sheetRow: {
-    display: 'block',
-    padding: '12px 0',
-    borderBottom: '1px solid #f1f5f9',
-    textDecoration: 'none',
-    cursor: 'pointer',
-  },
-  sheetRowTitle: {
-    fontSize: 14,
-    fontWeight: 600,
-    color: '#0f172a',
-    marginBottom: 6,
-  },
-  sheetRowMeta: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-  },
-  courseChip: {
-    fontSize: 11,
-    fontWeight: 700,
-    padding: '2px 8px',
-    borderRadius: 99,
-    background: '#eff6ff',
-    color: '#1d4ed8',
-    border: '1px solid #bfdbfe',
-  },
-  emptyState: {
-    textAlign: 'center',
-    padding: '28px 0',
-    fontSize: 14,
-    color: '#94a3b8',
-  },
-  enrollChip: {
-    fontSize: 12,
-    padding: '4px 12px',
-    borderRadius: 99,
-    background: '#f8fafc',
-    border: '1px solid #e2e8f0',
-    color: '#334155',
-    display: 'inline-flex',
-    alignItems: 'center',
-  },
+/* ── Own profile Study tab ───────────────────────────────────────────────── */
+function StudyTab({
+  recentlyViewed, studyActivity,
+  studyQueueCounts, studyToReview, studyStudying, dashboardRecentSheets,
+}) {
+  return (
+    <div className="profile-columns">
+      <StudyActivity activity={studyActivity} />
+      <ResumeStudying entries={recentlyViewed} />
+      <StudyQueue counts={studyQueueCounts} toReview={studyToReview} studying={studyStudying} />
+      <DashboardRecentSheets recentSheets={dashboardRecentSheets} />
+      <QuickActions />
+    </div>
+  )
+}
+
+/* ── Sheets tab (both modes) ─────────────────────────────────────────────── */
+function SheetsTab({ profile, isOwnProfile }) {
+  return (
+    <div className="profile-columns">
+      <RecentSheetsSection sheets={profile.recentSheets} />
+      <StarredSheetsSection sheets={profile.starredSheets} isOwnProfile={isOwnProfile} />
+      <SharedNotesSection notes={profile.sharedNotes} />
+    </div>
+  )
+}
+
+/* ── Posts tab (both modes) ──────────────────────────────────────────────── */
+function PostsTab({ profileId }) {
+  const [posts, setPosts] = useState([])
+  const [postsLoading, setPostsLoading] = useState(true)
+  const { user: currentUser } = useSession()
+
+  useEffect(() => {
+    if (!profileId) return
+    let cancelled = false
+    fetch(`${API}/api/feed?userId=${profileId}`, { headers: authHeaders(), credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : { items: [] }))
+      .then((data) => {
+        if (!cancelled) setPosts(data.items || data.posts || [])
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setPostsLoading(false) })
+    return () => { cancelled = true }
+  }, [profileId])
+
+  if (postsLoading) {
+    return (
+      <div className="profile-columns">
+        {[1, 2, 3].map((n) => (
+          <div key={n} style={{ ...cardStyle, padding: '20px 24px' }}>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 14 }}>
+              <div className="sh-skeleton" style={{ width: 40, height: 40, borderRadius: '50%' }} />
+              <div style={{ flex: 1 }}>
+                <div className="sh-skeleton" style={{ width: '50%', height: 13, borderRadius: 6, marginBottom: 6 }} />
+                <div className="sh-skeleton" style={{ width: '30%', height: 10, borderRadius: 6 }} />
+              </div>
+            </div>
+            <div className="sh-skeleton" style={{ width: '80%', height: 14, borderRadius: 6, marginBottom: 8 }} />
+            <div className="sh-skeleton" style={{ width: '100%', height: 12, borderRadius: 6, marginBottom: 6 }} />
+            <div className="sh-skeleton" style={{ width: '60%', height: 12, borderRadius: 6 }} />
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  if (!posts.length) {
+    return (
+      <div style={{ ...cardStyle, textAlign: 'center', padding: '48px 24px' }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--sh-heading)', marginBottom: 6 }}>No posts yet</div>
+        <div style={{ fontSize: 13, color: 'var(--sh-muted)' }}>This user has not posted anything to the feed.</div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="profile-columns" style={{ gap: 12 }}>
+      {posts.map((item) => (
+        <FeedCard
+          key={item.id}
+          item={item}
+          currentUser={currentUser}
+          onReact={() => {}}
+          onStar={() => {}}
+          onDeletePost={() => {}}
+          canDeletePost={false}
+          isPostMenuOpen={false}
+          onTogglePostMenu={() => {}}
+          isDeletingPost={false}
+        />
+      ))}
+    </div>
+  )
+}
+
+/* ── Achievements tab (both modes) ───────────────────────────────────────── */
+function AchievementsTab({ activityData, badges }) {
+  return (
+    <div className="profile-columns">
+      {activityData.length > 0 && (
+        <div style={cardStyle}>
+          <ActivityHeatmap data={activityData} weeks={12} />
+        </div>
+      )}
+      <BadgesSection badges={badges} />
+      {activityData.length === 0 && badges.length === 0 && (
+        <div style={{ ...cardStyle, textAlign: 'center', padding: '48px 24px' }}>
+          <div style={{ fontSize: 36, marginBottom: 12, color: 'var(--sh-muted)' }}><IconStar size={36} /></div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--sh-heading)', marginBottom: 6 }}>No achievements yet</div>
+          <div style={{ fontSize: 13, color: 'var(--sh-muted)' }}>Start studying and contributing to unlock badges.</div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ── Other user Overview: "Showcase" ─────────────────────────────────────── */
+function OtherOverviewTab({ profile, activityData, badges }) {
+  return (
+    <div className="profile-columns">
+      <ProfileStatsWidget username={profile.username} />
+      <PinnedSheetsSection sheets={profile.pinnedSheets} />
+      <SharedShelvesSection shelves={profile.sharedShelves} isOwnProfile={false} />
+      <BadgesSection badges={badges} />
+      {activityData.length > 0 && (
+        <div style={cardStyle}>
+          <ActivityHeatmap data={activityData} weeks={12} />
+        </div>
+      )}
+      <RecentSheetsSection sheets={profile.recentSheets} />
+      <EnrolledCoursesSection enrollments={profile.enrollments} />
+    </div>
+  )
 }

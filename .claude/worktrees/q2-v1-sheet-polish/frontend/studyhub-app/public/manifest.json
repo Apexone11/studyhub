@@ -1,0 +1,16 @@
+{
+  "name": "StudyHub",
+  "short_name": "StudyHub",
+  "description": "Collaborative study platform for college students",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#2563eb",
+  "orientation": "any",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "/icon-256.png", "sizes": "256x256", "type": "image/png" },
+    { "src": "/icon-256.png", "sizes": "256x256", "type": "image/png", "purpose": "maskable" }
+  ],
+  "categories": ["education", "productivity"]
+}

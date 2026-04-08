@@ -19,7 +19,7 @@ export async function syncProtectedUser() {
   }
 
   try {
-    const response = await fetch(`${API}/api/auth/me`, { headers: authJsonHeaders() })
+    const response = await fetch(`${API}/api/auth/me`, { headers: authJsonHeaders(), credentials: 'include' })
     const data = response.ok
       ? await readJsonSafely(response, null)
       : await readJsonSafely(response, {})

@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken')
 
 const AUTH_COOKIE_NAME = 'studyhub_session'
 const TOKEN_EXPIRES_IN = '24h'
+const MIN_SECRET_LENGTH = 32
 
 function getJwtSecret() {
   if (!process.env.JWT_SECRET) {
@@ -12,9 +13,28 @@ function getJwtSecret() {
   return process.env.JWT_SECRET
 }
 
+/**
+ * Validate JWT_SECRET at startup — crashes early if missing or too short.
+ * Call once from the server bootstrap path so misconfiguration is caught
+ * before the process starts serving traffic.
+ */
+function validateSecrets() {
+  const secret = process.env.JWT_SECRET
+  if (!secret) {
+    throw new Error(
+      'FATAL: JWT_SECRET environment variable is not set. The server cannot start without it.'
+    )
+  }
+  if (secret.length < MIN_SECRET_LENGTH) {
+    throw new Error(
+      `FATAL: JWT_SECRET is too short (${secret.length} chars). Minimum ${MIN_SECRET_LENGTH} characters required for production safety.`
+    )
+  }
+}
+
 function signAuthToken(user) {
   return jwt.sign(
-    { userId: user.id, username: user.username, role: user.role },
+    { sub: user.id, role: user.role },
     getJwtSecret(),
     { expiresIn: TOKEN_EXPIRES_IN }
   )
@@ -24,9 +44,21 @@ function verifyAuthToken(token) {
   return jwt.verify(token, getJwtSecret())
 }
 
+function normalizeAuthUser(payload) {
+  const userId = payload?.userId || payload?.sub || payload?.id || null
+  if (!userId) return null
+
+  return {
+    userId,
+    username: payload?.username || null,
+    role: payload?.role || null,
+    trustLevel: payload?.trustLevel || null,
+  }
+}
+
 function signCsrfToken(user) {
   return jwt.sign(
-    { userId: user.id, type: 'csrf' },
+    { sub: user.id, type: 'csrf' },
     getJwtSecret(),
     { expiresIn: TOKEN_EXPIRES_IN }
   )
@@ -47,7 +79,11 @@ function parseCookies(cookieHeader = '') {
 
       const key = cookie.slice(0, separatorIndex).trim()
       const value = cookie.slice(separatorIndex + 1).trim()
-      cookies[key] = decodeURIComponent(value)
+      try {
+        cookies[key] = decodeURIComponent(value)
+      } catch {
+        cookies[key] = value
+      }
       return cookies
     }, {})
 }
@@ -67,6 +103,17 @@ function getAuthTokenFromRequest(req) {
   return getAuthCookieTokenFromRequest(req)
 }
 
+function getOptionalAuthUserFromRequest(req) {
+  const token = getAuthTokenFromRequest(req)
+  if (!token) return null
+
+  try {
+    return normalizeAuthUser(verifyAuthToken(token))
+  } catch {
+    return null
+  }
+}
+
 function getAuthCookieOptions() {
   const isProd = process.env.NODE_ENV === 'production'
 
@@ -74,9 +121,9 @@ function getAuthCookieOptions() {
     httpOnly: true,
     secure: isProd,
     sameSite: isProd ? 'none' : 'lax',
-    // Restrict the browser cookie to authenticated API routes so non-API
-    // preview surfaces can run on the backend origin without receiving it.
-    path: '/api',
+    // Use root path so the cookie is sent on both /api/* routes and
+    // /socket.io/* WebSocket handshake requests.
+    path: '/',
     maxAge: 24 * 60 * 60 * 1000,
   }
 }
@@ -102,12 +149,15 @@ module.exports = {
   clearAuthCookie,
   getAuthCookieOptions,
   getAuthCookieTokenFromRequest,
+  getOptionalAuthUserFromRequest,
   getAuthTokenFromRequest,
   getJwtSecret,
   hashStoredSecret,
+  normalizeAuthUser,
   signCsrfToken,
   setAuthCookie,
   signAuthToken,
+  validateSecrets,
   verifyCsrfToken,
   verifyAuthToken,
 }

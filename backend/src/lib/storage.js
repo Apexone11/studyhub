@@ -32,10 +32,14 @@ function resolveUploadsDir(candidate) {
 const autoDetectedUploadsDir = detectPersistentUploadsDir()
 const UPLOADS_DIR = resolveUploadsDir(process.env.UPLOADS_DIR || autoDetectedUploadsDir)
 const AVATARS_DIR = path.join(UPLOADS_DIR, 'avatars')
+const COVERS_DIR = path.join(UPLOADS_DIR, 'covers')
 const ATTACHMENTS_DIR = path.join(UPLOADS_DIR, 'attachments')
+const SCHOOL_LOGOS_DIR = path.join(UPLOADS_DIR, 'school-logos')
+const CONTENT_IMAGES_DIR = path.join(UPLOADS_DIR, 'content-images')
+const NOTE_IMAGES_DIR = path.join(UPLOADS_DIR, 'note-images')
 
 function ensureUploadDirectories() {
-  for (const directory of [UPLOADS_DIR, AVATARS_DIR, ATTACHMENTS_DIR]) {
+  for (const directory of [UPLOADS_DIR, AVATARS_DIR, COVERS_DIR, ATTACHMENTS_DIR, SCHOOL_LOGOS_DIR, CONTENT_IMAGES_DIR, NOTE_IMAGES_DIR]) {
     fs.mkdirSync(directory, { recursive: true })
     fs.accessSync(directory, fs.constants.R_OK | fs.constants.W_OK)
   }
@@ -72,8 +76,16 @@ function buildAvatarUrl(fileName) {
   return buildUploadUrl('avatars', fileName)
 }
 
+function buildCoverUrl(fileName) {
+  return buildUploadUrl('covers', fileName)
+}
+
 function buildAttachmentUrl(fileName) {
   return `${PRIVATE_ATTACHMENT_PREFIX}${fileName}`
+}
+
+function buildContentImageUrl(fileName) {
+  return buildUploadUrl('content-images', fileName)
 }
 
 function isPathWithinRoot(candidatePath, rootDirectory) {
@@ -95,6 +107,7 @@ function resolveManagedUploadPath(uploadUrl) {
   const normalizedUrl = String(uploadUrl || '')
   const prefixes = [
     { prefix: `${UPLOADS_URL_PREFIX}/avatars/`, directory: AVATARS_DIR },
+    { prefix: `${UPLOADS_URL_PREFIX}/covers/`, directory: COVERS_DIR },
     { prefix: `${UPLOADS_URL_PREFIX}/attachments/`, directory: ATTACHMENTS_DIR },
     { prefix: PRIVATE_ATTACHMENT_PREFIX, directory: ATTACHMENTS_DIR },
   ]
@@ -114,6 +127,11 @@ function resolveManagedUploadPath(uploadUrl) {
   }
 
   return null
+}
+
+function resolveCoverPath(coverUrl) {
+  if (!String(coverUrl || '').startsWith(`${UPLOADS_URL_PREFIX}/covers/`)) return null
+  return resolveManagedUploadPath(coverUrl)
 }
 
 function resolveAvatarPath(avatarUrl) {
@@ -136,7 +154,7 @@ function resolveManagedFilePath(filePath) {
   if (!filePath) return null
 
   const resolved = path.resolve(String(filePath))
-  const managedRoots = [AVATARS_DIR, ATTACHMENTS_DIR]
+  const managedRoots = [AVATARS_DIR, COVERS_DIR, ATTACHMENTS_DIR]
   const isManagedPath = managedRoots.some(
     (rootDirectory) => isPathWithinRoot(resolved, rootDirectory) && resolved !== path.resolve(rootDirectory)
   )
@@ -185,6 +203,29 @@ async function deleteAvatarIfUnused(prisma, avatarUrl) {
   return safeUnlinkFile(resolvedPath)
 }
 
+async function deleteCoverIfUnused(prisma, coverUrl) {
+  const resolvedPath = resolveCoverPath(coverUrl)
+  if (!resolvedPath) return false
+
+  const refs = await prisma.user.count({ where: { coverImageUrl: coverUrl } })
+  if (refs > 0) return false
+
+  return safeUnlinkFile(resolvedPath)
+}
+
+async function cleanupCoverIfUnused(prisma, coverUrl, context = {}) {
+  try {
+    return await deleteCoverIfUnused(prisma, coverUrl)
+  } catch (error) {
+    captureError(error, {
+      source: 'cleanupCoverIfUnused',
+      coverUrl,
+      ...context,
+    })
+    return false
+  }
+}
+
 async function cleanupAttachmentIfUnused(prisma, attachmentUrl, context = {}) {
   try {
     return await deleteAttachmentIfUnused(prisma, attachmentUrl)
@@ -214,16 +255,26 @@ async function cleanupAvatarIfUnused(prisma, avatarUrl, context = {}) {
 module.exports = {
   ATTACHMENTS_DIR,
   AVATARS_DIR,
+  CONTENT_IMAGES_DIR,
+  COVERS_DIR,
+  NOTE_IMAGES_DIR,
+  SCHOOL_LOGOS_DIR,
   PRIVATE_ATTACHMENT_PREFIX,
   UPLOADS_DIR,
   buildAttachmentUrl,
   buildAvatarUrl,
+  buildContentImageUrl,
+  buildCoverUrl,
   cleanupAttachmentIfUnused,
   cleanupAvatarIfUnused,
+  cleanupCoverIfUnused,
   ensureUploadDirectories,
   resolveAttachmentPath,
   resolveAvatarPath,
+  resolveCoverPath,
   resolveManagedUploadPath,
+  isManagedLeafFileName,
+  isPathWithinRoot,
   safeUnlinkFile,
   validateUploadStorage,
 }

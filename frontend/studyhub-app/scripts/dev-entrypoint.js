@@ -9,7 +9,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const appRoot = path.resolve(__dirname, '..')
 const packageLockPath = path.join(appRoot, 'package-lock.json')
 const nodeModulesDir = path.join(appRoot, 'node_modules')
-const stateDir = path.join(nodeModulesDir, '.studyhub')
+const stateDir = path.join(appRoot, '.studyhub')
 const lockHashPath = path.join(stateDir, 'package-lock.sha256')
 const host = '0.0.0.0'
 const port = String(process.env.PORT || 5173)
@@ -37,7 +37,7 @@ function needsInstall() {
   if (!existsSync(packageLockPath)) return false
   if (!existsSync(nodeModulesDir)) return true
   if (!hasRequiredPackages()) return true
-  if (!existsSync(lockHashPath)) return true
+  if (!existsSync(lockHashPath)) return false
 
   const savedHash = readFileSync(lockHashPath, 'utf8').trim()
   return savedHash !== packageLockHash()
@@ -57,9 +57,9 @@ function runOrExit(command, args) {
 
 if (needsInstall()) {
   console.log('Refreshing frontend dependencies for the Docker dev container...')
-  runOrExit(npmCommand(), ['ci', '--include=dev'])
+  runOrExit(npmCommand(), ['ci', '--include=dev', '--legacy-peer-deps'])
   mkdirSync(stateDir, { recursive: true })
   writeFileSync(lockHashPath, `${packageLockHash()}\n`, 'utf8')
 }
 
-runOrExit(npmCommand(), ['run', 'dev', '--', '--host', host, '--port', port])
+runOrExit(npmCommand(), ['run', 'dev', '--', '--configLoader', 'runner', '--host', host, '--port', port])

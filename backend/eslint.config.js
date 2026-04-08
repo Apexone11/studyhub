@@ -1,11 +1,13 @@
 const js = require('@eslint/js')
 const globals = require('globals')
+const eslintConfigPrettier = require('eslint-config-prettier')
 
 module.exports = [
   {
     ignores: ['node_modules/**', 'uploads/**', 'prisma/migrations/**'],
   },
   js.configs.recommended,
+  eslintConfigPrettier,
   {
     files: ['**/*.js'],
     languageOptions: {
@@ -17,7 +19,7 @@ module.exports = [
     },
     rules: {
       'no-empty': ['error', { allowEmptyCatch: true }],
-      'no-console': 'off',
+      'no-console': ['warn', { allow: ['error', 'warn'] }],
       'no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
     },
   },

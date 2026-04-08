@@ -1,0 +1,611 @@
+/* ═══════════════════════════════════════════════════════════════════
+ * RegisterScreen — Token-based styles (Direction A: Campus Lab)
+ * Shares the dark gradient auth page template with LoginPage.
+ * ═══════════════════════════════════════════════════════════════════ */
+
+.register-page {
+  min-height: 100vh;
+  background: transparent;
+  font-family: var(--font);
+  color: var(--sh-text);
+  position: relative;
+  overflow: hidden;
+}
+
+/* ── Decorative background orbs ────────────────────────────────── */
+
+.register-orb {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.register-orb--blue {
+  top: -120px;
+  right: -120px;
+  width: 400px;
+  height: 400px;
+  background: rgba(59, 130, 246, 0.05);
+  filter: blur(90px);
+}
+
+.register-orb--purple {
+  bottom: -100px;
+  left: -100px;
+  width: 350px;
+  height: 350px;
+  background: rgba(99, 102, 241, 0.045);
+  filter: blur(88px);
+}
+
+/* ── Main card container ───────────────────────────────────────── */
+
+.register-main {
+  min-height: calc(100vh - 72px);
+  padding: 56px 20px 88px;
+  display: grid;
+  place-items: center;
+  position: relative;
+  z-index: 1;
+}
+
+.register-card {
+  width: min(92vw, 580px);
+  background: var(--sh-panel-bg);
+  backdrop-filter: blur(22px);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--sh-panel-border);
+  box-shadow: var(--sh-panel-shadow);
+  padding: var(--space-10) var(--space-8);
+}
+
+/* ── Step indicator ────────────────────────────────────────────── */
+
+.register-steps {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: 28px;
+}
+
+.register-step {
+  flex: 1;
+}
+
+.register-step-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.register-step-number {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: var(--type-xs);
+  font-weight: 700;
+  transition: all 0.2s ease;
+}
+
+.register-step-number--active,
+.register-step-number--complete {
+  background: var(--sh-brand);
+  color: #ffffff;
+  box-shadow: var(--sh-btn-primary-shadow);
+}
+
+.register-step-number--inactive {
+  background: var(--sh-neutral-soft-bg);
+  color: var(--sh-muted);
+}
+
+.register-step-label {
+  font-size: var(--type-xs);
+  font-weight: 700;
+}
+
+.register-step-label--active {
+  color: var(--sh-heading);
+}
+
+.register-step-label--inactive {
+  color: var(--sh-muted);
+}
+
+.register-step-bar {
+  margin-top: var(--space-2);
+  height: 3px;
+  border-radius: 999px;
+  transition: background 0.3s ease;
+}
+
+.register-step-bar--active {
+  background: linear-gradient(90deg, var(--sh-brand), var(--sh-brand-soft));
+}
+
+.register-step-bar--inactive {
+  background: var(--sh-panel-border);
+}
+
+/* ── Shared section heading ────────────────────────────────────── */
+
+.register-section-header {
+  text-align: center;
+  margin-bottom: var(--space-6);
+}
+
+.register-logo-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  margin-bottom: 14px;
+}
+
+.register-logo-mark--brand {
+  background: var(--sh-brand);
+  box-shadow: var(--sh-btn-primary-shadow);
+}
+
+.register-logo-mark--verify {
+  border-radius: 50%;
+  background: var(--sh-pill-bg);
+  border: 2px solid var(--sh-border);
+}
+
+.register-logo-mark--courses {
+  border-radius: 50%;
+  background: var(--sh-success-bg);
+  border: 2px solid var(--sh-success-border);
+}
+
+.register-h1 {
+  margin: 0 0 6px;
+  font-size: var(--type-xl);
+  font-weight: 800;
+  color: var(--sh-heading);
+}
+
+.register-subtitle {
+  margin: 0;
+  font-size: var(--type-sm);
+  color: var(--sh-muted);
+  line-height: 1.7;
+}
+
+/* ── Alert boxes ───────────────────────────────────────────────── */
+
+.register-alert {
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  font-size: var(--type-xs);
+  line-height: 1.6;
+}
+
+.register-alert--danger {
+  border: 1px solid var(--sh-danger-border);
+  background: var(--sh-danger-bg);
+  color: var(--sh-danger-text);
+}
+
+.register-alert--success {
+  border: 1px solid var(--sh-success-border);
+  background: var(--sh-success-bg);
+  color: var(--sh-success-text);
+}
+
+.register-alert--danger-row {
+  border: 1px solid var(--sh-danger-border);
+  background: var(--sh-danger-bg);
+  color: var(--sh-danger);
+  font-size: var(--type-xs);
+  line-height: 1.6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+}
+
+/* ── Google OAuth section ──────────────────────────────────────── */
+
+.register-google-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--space-5);
+}
+
+.register-divider {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: var(--space-5);
+}
+
+.register-divider-line {
+  flex: 1;
+  height: 1px;
+}
+
+.register-divider-line--left {
+  background: linear-gradient(90deg, transparent, var(--sh-border));
+}
+
+.register-divider-line--right {
+  background: linear-gradient(90deg, var(--sh-border), transparent);
+}
+
+.register-divider-text {
+  font-size: var(--type-xs);
+  color: var(--sh-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ── Form fields ───────────────────────────────────────────────── */
+
+.register-field {
+  margin-bottom: var(--space-4);
+}
+
+.register-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: var(--type-xs);
+  font-weight: 700;
+  color: var(--sh-subtext);
+}
+
+.register-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 13px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--sh-input-border);
+  font-size: var(--type-sm);
+  color: var(--sh-input-text);
+  outline: none;
+  background: var(--sh-input-bg);
+  font-family: var(--font);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.register-input:focus {
+  border-color: var(--sh-brand);
+  box-shadow: var(--sh-focus-ring);
+  background: var(--sh-surface);
+}
+
+.register-input--code {
+  text-align: center;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 8px;
+  padding: 16px 20px;
+}
+
+.register-hint {
+  margin-top: 4px;
+  font-size: var(--type-xs);
+  color: var(--sh-muted);
+}
+
+.register-select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 13px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--sh-input-border);
+  font-size: var(--type-sm);
+  color: var(--sh-input-text);
+  outline: none;
+  background: var(--sh-input-bg);
+  font-family: var(--font);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  cursor: pointer;
+}
+
+.register-select:focus {
+  border-color: var(--sh-brand);
+  box-shadow: var(--sh-focus-ring);
+}
+
+/* ── Password grid ─────────────────────────────────────────────── */
+
+.register-pw-grid {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+@media (min-width: 480px) {
+  .register-pw-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* ── Password hints ────────────────────────────────────────────── */
+
+.password-hints-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.password-hint {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+  font-size: var(--type-xs);
+  font-weight: 600;
+}
+
+.password-hint--pass {
+  background: var(--sh-success-bg);
+  border: 1px solid var(--sh-success-border);
+  color: var(--sh-success-text);
+}
+
+.password-hint--fail {
+  background: var(--sh-input-bg);
+  border: 1px solid var(--sh-input-border);
+  color: var(--sh-muted);
+}
+
+/* ── Terms checkbox ────────────────────────────────────────────── */
+
+.register-terms {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  font-size: var(--type-xs);
+  color: var(--sh-muted);
+  line-height: 1.7;
+  margin-top: 18px;
+  margin-bottom: var(--space-5);
+}
+
+.register-terms input[type="checkbox"] {
+  margin-top: 3px;
+  accent-color: var(--sh-brand);
+}
+
+/* ── Buttons ───────────────────────────────────────────────────── */
+
+.register-btn-primary {
+  width: 100%;
+  padding: 14px 18px;
+  border-radius: var(--radius);
+  border: none;
+  background: var(--sh-brand);
+  color: #ffffff;
+  font-size: var(--type-base);
+  font-weight: 700;
+  cursor: pointer;
+  font-family: var(--font);
+  box-shadow: var(--sh-btn-primary-shadow);
+  transition: all 0.15s ease;
+}
+
+.register-btn-primary:hover:not(:disabled) {
+  background: var(--sh-brand-hover);
+}
+
+.register-btn-primary:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.register-btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.register-btn-success {
+  padding: 13px 24px;
+  border-radius: var(--radius);
+  border: none;
+  background: var(--sh-success);
+  color: #ffffff;
+  font-size: var(--type-sm);
+  font-weight: 700;
+  cursor: pointer;
+  font-family: var(--font);
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);
+  transition: all 0.15s ease;
+}
+
+.register-btn-success:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.register-btn-success:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.register-btn-secondary {
+  padding: 13px 24px;
+  border-radius: var(--radius);
+  border: 1px solid var(--sh-btn-secondary-border);
+  background: var(--sh-btn-secondary-bg);
+  color: var(--sh-btn-secondary-text);
+  font-size: var(--type-sm);
+  font-weight: 700;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: all 0.15s ease;
+}
+
+.register-btn-secondary:hover:not(:disabled) {
+  border-color: var(--sh-border-strong);
+}
+
+.register-btn-secondary:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.register-btn-small {
+  background: var(--sh-brand);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 5px 12px;
+  font-size: var(--type-xs);
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: var(--font);
+}
+
+.register-btn-ghost {
+  background: none;
+  border: none;
+  color: var(--sh-link);
+  font-size: var(--type-xs);
+  font-weight: 700;
+  cursor: pointer;
+  font-family: var(--font);
+  text-decoration: underline;
+}
+
+.register-btn-add {
+  padding: 12px 18px;
+  border-radius: var(--radius);
+  border: 1px solid var(--sh-btn-secondary-border);
+  background: var(--sh-btn-secondary-bg);
+  color: var(--sh-btn-secondary-text);
+  font-size: var(--type-sm);
+  font-weight: 700;
+  cursor: pointer;
+  font-family: var(--font);
+}
+
+/* ── Action button row ─────────────────────────────────────────── */
+
+.register-actions {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+/* ── Resend + hint text ────────────────────────────────────────── */
+
+.register-center-text {
+  text-align: center;
+  font-size: var(--type-xs);
+  color: var(--sh-muted);
+}
+
+/* ── Custom course section ─────────────────────────────────────── */
+
+.register-custom-course-box {
+  margin-bottom: 18px;
+  padding: 14px;
+  border-radius: var(--radius-card);
+  border: 1px dashed var(--sh-panel-border);
+  background: var(--sh-input-bg);
+}
+
+.register-custom-course-grid {
+  display: grid;
+  gap: var(--space-2);
+}
+
+@media (min-width: 480px) {
+  .register-custom-course-grid {
+    grid-template-columns: auto 1fr auto;
+  }
+}
+
+/* ── Custom course pills ───────────────────────────────────────── */
+
+.register-pills {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-top: var(--space-3);
+}
+
+.register-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--radius-full);
+  background: var(--sh-pill-bg);
+  color: var(--sh-pill-text);
+  font-size: var(--type-xs);
+  font-weight: 700;
+}
+
+.register-pill-remove {
+  background: none;
+  border: none;
+  color: var(--sh-pill-text);
+  cursor: pointer;
+  padding: 0;
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* ── Sign in footer ────────────────────────────────────────────── */
+
+.register-footer {
+  margin-top: 28px;
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--sh-soft);
+  text-align: center;
+  font-size: var(--type-sm);
+  color: var(--sh-muted);
+}
+
+.register-link {
+  color: var(--sh-link);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.register-link:hover {
+  text-decoration: underline;
+}
+
+/* ── Loading state ─────────────────────────────────────────────── */
+
+.register-loading {
+  margin-bottom: var(--space-4);
+  font-size: var(--type-xs);
+  color: var(--sh-muted);
+}
+
+/* ── Course catalog label ──────────────────────────────────────── */
+
+.register-catalog-label {
+  margin-bottom: var(--space-2);
+  font-size: var(--type-xs);
+  font-weight: 700;
+  color: var(--sh-subtext);
+}
+
+/* ── Mobile responsive ───────────────────────────────────────── */
+
+@media (max-width: 480px) {
+  .register-orb--blue {
+    width: 200px;
+    height: 200px;
+  }
+  .register-orb--purple {
+    width: 180px;
+    height: 180px;
+  }
+  .register-main {
+    padding: 24px 12px 60px;
+  }
+}
