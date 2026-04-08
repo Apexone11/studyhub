@@ -57,7 +57,7 @@ import ToastContainer from './components/Toast'
 import OfflineIndicator from './components/OfflineIndicator'
 import LegalAcceptanceEnforcementModal from './components/LegalAcceptanceEnforcementModal'
 import DarkModeFx from './components/DarkModeFx'
-import { ChatPanelProvider } from './lib/chatPanelContext'
+import { ChatPanelProvider } from './lib/chatPanelContext.jsx'
 
 const AiBubble = lazy(() => import('./components/ai/AiBubble'))
 const AiChatProviderModule = lazy(() =>

@@ -24,6 +24,10 @@ export default function SheetLabContribute({ sheet, onContributed }) {
   const [submitStep, setSubmitStep] = useState('compose') // 'compose' | 'review'
   const [previewDiff, setPreviewDiff] = useState(null)
   const [loadingPreview, setLoadingPreview] = useState(false)
+  /* Pre-submit checklist: all three must be checked before submit is enabled.
+   * Reset every time the user re-enters the review step so it stays intentional. */
+  const [checklist, setChecklist] = useState({ reviewed: false, guidelines: false, original: false })
+  const checklistReady = checklist.reviewed && checklist.guidelines && checklist.original
 
   const outgoing = sheet?.outgoingContributions || []
   const hasPending = outgoing.some((c) => c.status === 'pending')
@@ -99,6 +103,7 @@ export default function SheetLabContribute({ sheet, onContributed }) {
 
   const handleBackToCompose = () => {
     setSubmitStep('compose')
+    setChecklist({ reviewed: false, guidelines: false, original: false })
   }
 
   const handleSubmit = async () => {
@@ -117,6 +122,7 @@ export default function SheetLabContribute({ sheet, onContributed }) {
       setMessage('')
       setSubmitStep('compose')
       setPreviewDiff(null)
+      setChecklist({ reviewed: false, guidelines: false, original: false })
       if (onContributed) onContributed()
     } catch (err) {
       showToast(err.message, 'error')
@@ -276,12 +282,51 @@ export default function SheetLabContribute({ sheet, onContributed }) {
               <p style={{ margin: 0, fontSize: 12, color: 'var(--sh-muted)', fontStyle: 'italic' }}>No message attached.</p>
             )}
 
+            {/* Pre-submit checklist — all three must be ticked */}
+            <fieldset style={checklistStyle}>
+              <legend style={checklistLegendStyle}>Before you submit</legend>
+              <label style={checklistItemStyle}>
+                <input
+                  type="checkbox"
+                  checked={checklist.reviewed}
+                  onChange={(e) => setChecklist((c) => ({ ...c, reviewed: e.target.checked }))}
+                />
+                <span>I reviewed the diff above and the changes look correct.</span>
+              </label>
+              <label style={checklistItemStyle}>
+                <input
+                  type="checkbox"
+                  checked={checklist.guidelines}
+                  onChange={(e) => setChecklist((c) => ({ ...c, guidelines: e.target.checked }))}
+                />
+                <span>
+                  My contribution follows the{' '}
+                  <Link to="/guidelines" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--sh-brand)', fontWeight: 600 }}>
+                    Community Guidelines
+                  </Link>
+                  .
+                </span>
+              </label>
+              <label style={checklistItemStyle}>
+                <input
+                  type="checkbox"
+                  checked={checklist.original}
+                  onChange={(e) => setChecklist((c) => ({ ...c, original: e.target.checked }))}
+                />
+                <span>My changes do not include copyrighted textbook content.</span>
+              </label>
+            </fieldset>
+
             <div style={{ display: 'flex', gap: 10 }}>
               <button
                 type="button"
                 onClick={handleSubmit}
-                disabled={submitting}
-                style={submitButtonStyle}
+                disabled={submitting || !checklistReady}
+                style={{
+                  ...submitButtonStyle,
+                  opacity: (submitting || !checklistReady) ? 0.5 : 1,
+                  cursor: (submitting || !checklistReady) ? 'not-allowed' : 'pointer',
+                }}
               >
                 {submitting ? 'Submitting...' : 'Confirm & submit contribution'}
               </button>
@@ -461,4 +506,24 @@ const emptyStyle = {
   textAlign: 'center', padding: '40px 24px',
   background: 'var(--sh-surface)', border: '1px dashed var(--sh-border)',
   borderRadius: 14,
+}
+
+const checklistStyle = {
+  display: 'grid', gap: 10,
+  padding: '12px 14px', borderRadius: 12,
+  background: 'var(--sh-soft)', border: '1px solid var(--sh-border)',
+  margin: 0,
+}
+
+const checklistLegendStyle = {
+  padding: '0 6px',
+  fontSize: 11, fontWeight: 800,
+  color: 'var(--sh-muted)',
+  textTransform: 'uppercase', letterSpacing: '0.3px',
+}
+
+const checklistItemStyle = {
+  display: 'flex', alignItems: 'flex-start', gap: 8,
+  fontSize: 13, color: 'var(--sh-heading)', lineHeight: 1.5,
+  cursor: 'pointer',
 }

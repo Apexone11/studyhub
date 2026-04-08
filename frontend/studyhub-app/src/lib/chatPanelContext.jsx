@@ -12,7 +12,7 @@
  * sibling .js file to satisfy react-refresh/only-export-components.
  */
 import { useCallback, useMemo, useState } from 'react'
-import { ChatPanelContext } from './chatPanelContext'
+import { ChatPanelContext } from './chatPanelContext.js'
 
 export function ChatPanelProvider({ children }) {
   const [isOpen, setIsOpen] = useState(false)

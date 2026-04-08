@@ -9,14 +9,19 @@ import { API } from '../../../config'
 import { authHeaders } from './sheetLabConstants'
 import { getApiErrorMessage, readJsonSafely } from '../../../lib/http'
 import { showToast } from '../../../lib/toast'
+import { useSession } from '../../../lib/session-context'
 import { DiffViewer } from './SheetLabPanels'
+import ContributionCommentsPanel from './ContributionCommentsPanel'
 
 export default function SheetLabReviews({ sheet, onReviewed }) {
+  const { user: currentUser } = useSession()
   const [reviewing, setReviewing] = useState(null)
   const [diffData, setDiffData] = useState({})       // { [contributionId]: diff }
   const [conflictFlags, setConflictFlags] = useState({}) // { [contributionId]: boolean }
   const [loadingDiff, setLoadingDiff] = useState(null)
   const [reviewComments, setReviewComments] = useState({}) // { [contributionId]: string }
+  // Per-contribution selected line for inline commenting: { [contributionId]: { hunkIndex, lineOffset, side } | null }
+  const [selectedLines, setSelectedLines] = useState({})
 
   const incoming = sheet?.incomingContributions || []
   const pending = incoming.filter((c) => c.status === 'pending')
@@ -128,6 +133,9 @@ export default function SheetLabReviews({ sheet, onReviewed }) {
               hasConflict={conflictFlags[c.id] || false}
               reviewComment={reviewComments[c.id] || ''}
               onReviewCommentChange={(val) => setReviewComments((prev) => ({ ...prev, [c.id]: val }))}
+              currentUser={currentUser}
+              selectedLine={selectedLines[c.id] || null}
+              onSelectLine={(coord) => setSelectedLines((prev) => ({ ...prev, [c.id]: coord }))}
             />
           ))}
         </div>
@@ -149,6 +157,9 @@ export default function SheetLabReviews({ sheet, onReviewed }) {
               diffData={diffData}
               loadingDiff={loadingDiff}
               onToggleDiff={toggleDiff}
+              currentUser={currentUser}
+              selectedLine={selectedLines[c.id] || null}
+              onSelectLine={(coord) => setSelectedLines((prev) => ({ ...prev, [c.id]: coord }))}
             />
           ))}
         </div>
@@ -159,7 +170,21 @@ export default function SheetLabReviews({ sheet, onReviewed }) {
 
 /* ── Contribution card ────────────────────────────────────── */
 
-function ContributionCard({ contribution: c, showActions, reviewing, onReview, diffData, loadingDiff, onToggleDiff, hasConflict, reviewComment, onReviewCommentChange }) {
+function ContributionCard({
+  contribution: c,
+  showActions,
+  reviewing,
+  onReview,
+  diffData,
+  loadingDiff,
+  onToggleDiff,
+  hasConflict,
+  reviewComment,
+  onReviewCommentChange,
+  currentUser,
+  selectedLine,
+  onSelectLine,
+}) {
   return (
     <div style={cardStyle}>
       {/* Conflict warning banner */}
@@ -285,16 +310,27 @@ function ContributionCard({ contribution: c, showActions, reviewing, onReview, d
         </div>
       ) : null}
 
-      {/* Diff viewer */}
+      {/* Diff viewer + inline comments */}
       {diffData[c.id] ? (
         <div style={{ marginTop: 12 }}>
           {diffData[c.id].additions != null ? (
             <div style={{ display: 'flex', gap: 12, marginBottom: 8, fontSize: 12, fontWeight: 700 }}>
-              <span style={{ color: '#16a34a' }}>+{diffData[c.id].additions} additions</span>
-              <span style={{ color: '#dc2626' }}>&minus;{diffData[c.id].deletions} deletions</span>
+              <span style={{ color: 'var(--sh-success)' }}>+{diffData[c.id].additions} additions</span>
+              <span style={{ color: 'var(--sh-danger)' }}>&minus;{diffData[c.id].deletions} deletions</span>
             </div>
           ) : null}
-          <DiffViewer diff={diffData[c.id]} title={`Changes from ${c.proposer?.username || 'fork'}`} />
+          <DiffViewer
+            diff={diffData[c.id]}
+            title={`Changes from ${c.proposer?.username || 'fork'}`}
+            onSelectLine={onSelectLine}
+            selected={selectedLine}
+          />
+          <ContributionCommentsPanel
+            contributionId={c.id}
+            currentUser={currentUser}
+            selected={selectedLine}
+            onClearSelected={() => onSelectLine?.(null)}
+          />
         </div>
       ) : null}
     </div>
