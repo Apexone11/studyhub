@@ -56,6 +56,7 @@ model User {
   feedPostReactions          FeedPostReaction[]
   proposedContributions      SheetContribution[]       @relation("ContributionProposer")
   reviewedContributions      SheetContribution[]       @relation("ContributionReviewer")
+  contributionComments       ContributionComment[]     @relation("ContributionCommentAuthor")
   verificationChallenges     VerificationChallenge[]
   notificationsReceived      Notification[]            @relation("NotifRecipient")
   notificationsSent          Notification[]            @relation("NotifActor")
@@ -620,9 +621,27 @@ model SheetContribution {
   forkSheet     StudySheet @relation("ContributionFork", fields: [forkSheetId], references: [id], onDelete: Cascade)
   proposer      User       @relation("ContributionProposer", fields: [proposerId], references: [id], onDelete: Cascade)
   reviewer      User?      @relation("ContributionReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  comments      ContributionComment[]
 
   @@index([targetSheetId, status])
   @@index([proposerId, status])
+}
+
+model ContributionComment {
+  id             Int               @id @default(autoincrement())
+  contributionId Int
+  userId         Int
+  hunkIndex      Int
+  lineOffset     Int
+  side           String            @default("new")
+  body           String
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  contribution   SheetContribution @relation(fields: [contributionId], references: [id], onDelete: Cascade)
+  author         User              @relation("ContributionCommentAuthor", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([contributionId, hunkIndex])
+  @@index([userId, createdAt])
 }
 
 model VerificationChallenge {
