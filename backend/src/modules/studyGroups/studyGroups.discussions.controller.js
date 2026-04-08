@@ -5,6 +5,7 @@
  */
 
 const { captureError } = require('../../monitoring/sentry')
+const { createNotifications } = require('../../lib/notify')
 const prisma = require('../../lib/prisma')
 const { getIO } = require('../../lib/socketio')
 const SOCKET_EVENTS = require('../../lib/socketEvents')
@@ -159,16 +160,13 @@ async function createDiscussion(req, res) {
       })
 
       if (members.length > 0 && groupData) {
-        await prisma.notification.createMany({
-          data: members.map((member) => ({
+        await createNotifications(prisma, members.map((member) => ({
             userId: member.userId,
             type: 'group_post',
             message: `${req.user.username} posted in ${groupData.name}: ${validTitle}`,
             actorId: req.user.userId,
             linkPath: `/study-groups/${groupId}`,
-          })),
-          skipDuplicates: true,
-        })
+          })))
       }
     } catch (notifErr) {
       // Fire-and-forget: don't fail the request

@@ -1,7 +1,7 @@
 const express = require('express')
 const bcrypt = require('bcryptjs')
 const prisma = require('../../lib/prisma')
-const { signAuthToken, setAuthCookie } = require('../../lib/authTokens')
+const { clearAuthCookie, signAuthToken, setAuthCookie } = require('../../lib/authTokens')
 const { deleteUserAccount } = require('../../lib/deleteUserAccount')
 const { getUserPII, setUserPII } = require('../../lib/piiVault')
 const {
@@ -241,6 +241,7 @@ router.delete('/account', twoFaLimiter, async (req, res) => {
       details,
     })
 
+    clearAuthCookie(res)
     return res.json({ message: 'Account deleted.' })
   } catch (error) {
     return handleSettingsError(req, res, error)

@@ -619,6 +619,7 @@ async function handleInvoicePaymentFailed(invoice) {
         type: 'payment_failed',
         message: 'We could not process your StudyHub subscription payment. Update billing to keep Pro active.',
         linkPath: '/settings?tab=subscription',
+        priority: 'high',
       })
     } catch (err) {
       log.warn({ err: err.message, userId: subscription.userId }, 'Failed to create payment failure notification')

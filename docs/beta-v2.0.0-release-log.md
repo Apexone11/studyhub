@@ -4,6 +4,51 @@
 
 ## Date: 2026-04-08
 
+### Account Deletion Retention Hardening
+
+**Account deletion now closes the highest-risk retention gaps before the user row disappears**
+- Self-service and admin deletion now cancel an active Stripe subscription before local teardown so paid accounts cannot keep billing after their StudyHub user record is removed
+- The delete flow now removes password-reset and verification-challenge artifacts for the account identity and clears the session cookie after self-service deletion so the browser is not left holding a stale authenticated cookie
+- User-owned video-appeal rows are now cleared before owned videos are deleted, which removes the `VideoAppeal.originalVideoId` / uploader foreign-key blockers that could otherwise leave account deletion partially stuck
+
+**Owned uploads are now collected up front and cleaned after the database delete succeeds**
+- Extended local-file cleanup from avatars and sheet/feed attachments to also include profile cover images plus comment-image uploads tied to sheet, feed, and note comments that are removed as part of account deletion
+- Captured user-owned video R2 refs before deleting the rows, then removed the original object, variants, manifest, thumbnail, and captions after the transaction completes
+- Added robust R2 object-key extraction so announcement-image cleanup works whether the stored URL uses the public bucket URL or the proxied `/api/video/media/...` path
+- Added embedded note-image cleanup for `/uploads/note-images/...` references found inside `Note.content` and `NoteVersion.content`, so account deletion now removes orphaned note editor uploads instead of only structured attachment rows
+
+**The same note-image leak is now closed for ordinary note deletion as well**
+- The note delete route now snapshots embedded note-image URLs from the current note body plus saved version history before deleting the note, then removes any now-unreferenced local note images after the delete succeeds
+
+**Deep Scan Summary / Deferred Risk**
+- Confirmed that some retention surfaces remain intentional or externally managed and were not deleted in this pass: audit logs, email delivery/suppression history, and payment-processor records still persist for operational or compliance reasons
+- The previously deferred embedded-note-image cleanup gap is now closed for both account deletion and single-note deletion; audit/compliance retention remains the main intentional leftover surface
+
+**Validation**
+- `Set-Location -LiteralPath "C:\Users\Abdul PC\OneDrive\Desktop\studyhub\backend"; npx vitest run test/settings.routes.test.js test/deleteUserAccount.test.js`: passes (19 tests)
+- `Set-Location -LiteralPath "C:\Users\Abdul PC\OneDrive\Desktop\studyhub\backend"; npx eslint --quiet src/lib/deleteUserAccount.js src/lib/storage.js src/lib/r2Storage.js src/modules/video/video.service.js src/modules/announcements/announcements.routes.js src/modules/settings/settings.account.controller.js test/settings.routes.test.js test/deleteUserAccount.test.js`: passes
+- `Set-Location -LiteralPath "C:\Users\Abdul PC\OneDrive\Desktop\studyhub\backend"; npx vitest run test/deleteUserAccount.test.js test/notes-enhancements.routes.test.js test/idor.notes.test.js`: passes (33 tests)
+- `Set-Location -LiteralPath "C:\Users\Abdul PC\OneDrive\Desktop\studyhub\backend"; npx eslint --quiet src/lib/storage.js src/lib/deleteUserAccount.js src/modules/notes/notes.controller.js test/deleteUserAccount.test.js test/notes-enhancements.routes.test.js test/idor.notes.test.js`: passes
+
+### Notification Preference Expansion
+
+**Notification settings now map to the real activity categories StudyHub emits instead of a minimal flat toggle set**
+- Expanded stored user preferences with dedicated email and in-app controls for comments and replies, social activity, study-group activity, mentions, and sheet contribution activity while keeping the existing digest setting intact
+- Reworked the Settings notifications tab so the new categories are editable from one place and clearly labels moderation, billing, and legal notices as essential account alerts that remain enabled
+
+**Backend notification delivery now respects those preferences at the root helper instead of relying on callers**
+- Centralized notification category mapping inside the shared notify helper so optional in-app alerts are skipped before write time when the user has turned that category off
+- Added opt-in email delivery for medium-priority activity types such as mentions and study-group updates, while preserving the existing high-priority email flow for moderation and billing-style alerts
+- Kept account-critical types such as moderation, payment failures, legal reminders, and video-copy alerts mandatory in-app, and routed the remaining raw study-group and video notification writers through the shared helper so they use the same policy
+
+**Validation**
+- `Set-Location -LiteralPath "C:\Users\Abdul PC\OneDrive\Desktop\studyhub"; npm --prefix backend test -- --run test/settings.routes.test.js test/notify.test.js test/payments.test.js`: passes (67 tests)
+- `Set-Location -LiteralPath "C:\Users\Abdul PC\OneDrive\Desktop\studyhub"; npm --prefix backend test -- --run test/studyGroups.routes.test.js`: passes (8 tests)
+- `Set-Location -LiteralPath "C:\Users\Abdul PC\OneDrive\Desktop\studyhub\backend"; npx eslint src/lib/notify.js src/modules/settings/settings.constants.js src/modules/payments/payments.service.js src/modules/studyGroups/studyGroups.sessions.routes.js src/modules/studyGroups/studyGroups.discussions.controller.js src/modules/video/video.service.js test/settings.routes.test.js test/notify.test.js`: passes
+- `Set-Location -LiteralPath "C:\Users\Abdul PC\OneDrive\Desktop\studyhub\backend"; npx prisma validate`: passes
+- `Set-Location -LiteralPath "C:\Users\Abdul PC\OneDrive\Desktop\studyhub\frontend\studyhub-app"; npx eslint src/pages/settings/NotificationsTab.jsx`: passes
+- `Set-Location -LiteralPath "C:\Users\Abdul PC\OneDrive\Desktop\studyhub"; npm --prefix frontend/studyhub-app run build`: passes
+
 ### Sheet Review Workflow, Recent Courses, and Admin Interactive Preview
 
 **Owner-only sheet states now stay inside an interactive editor flow instead of falling into dead-end viewer routes**

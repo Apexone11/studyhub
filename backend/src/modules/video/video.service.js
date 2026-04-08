@@ -19,6 +19,7 @@ const fs = require('fs')
 const path = require('path')
 const os = require('os')
 const { captureError } = require('../../monitoring/sentry')
+const { createNotification } = require('../../lib/notify')
 const r2 = require('../../lib/r2Storage')
 const prisma = require('../../lib/prisma')
 const {
@@ -419,15 +420,13 @@ async function processVideo(videoId) {
 
         // Notify the original creator
         try {
-          await prisma.notification.create({
-            data: {
-              userId: duplicate.userId,
-              type: 'video_copy_detected',
-              message: `Someone attempted to upload a copy of your video "${duplicate.title || 'Untitled'}"`,
-              actorId: video.userId,
-              linkPath: '/feed?filter=videos',
-              priority: 'high',
-            },
+          await createNotification(prisma, {
+            userId: duplicate.userId,
+            type: 'video_copy_detected',
+            message: `Someone attempted to upload a copy of your video "${duplicate.title || 'Untitled'}"`,
+            actorId: video.userId,
+            linkPath: '/feed?filter=videos',
+            priority: 'high',
           })
         } catch {
           // Non-fatal
@@ -601,28 +600,34 @@ async function deleteVideoAssets(videoId) {
     })
     if (!video) return
 
-    // Delete original
-    if (video.r2Key) await r2.deleteObject(video.r2Key)
-
-    // Delete thumbnail
-    if (video.thumbnailR2Key) await r2.deleteObject(video.thumbnailR2Key)
-
-    // Delete HLS manifest
-    if (video.hlsManifestR2Key) await r2.deleteObject(video.hlsManifestR2Key)
-
-    // Delete variants
-    if (video.variants && typeof video.variants === 'object') {
-      for (const info of Object.values(video.variants)) {
-        if (info?.key) await r2.deleteObject(info.key)
-      }
-    }
-
-    // Delete captions
-    for (const caption of video.captions) {
-      if (caption.vttR2Key) await r2.deleteObject(caption.vttR2Key)
-    }
+    await deleteVideoAssetRefs(video)
   } catch (err) {
     captureError(err, { context: 'video-delete-assets', videoId })
+  }
+}
+
+async function deleteVideoAssetRefs(video) {
+  if (!video) return
+
+  // Delete original
+  if (video.r2Key) await r2.deleteObject(video.r2Key)
+
+  // Delete thumbnail
+  if (video.thumbnailR2Key) await r2.deleteObject(video.thumbnailR2Key)
+
+  // Delete HLS manifest
+  if (video.hlsManifestR2Key) await r2.deleteObject(video.hlsManifestR2Key)
+
+  // Delete variants
+  if (video.variants && typeof video.variants === 'object') {
+    for (const info of Object.values(video.variants)) {
+      if (info?.key) await r2.deleteObject(info.key)
+    }
+  }
+
+  // Delete captions
+  for (const caption of video.captions || []) {
+    if (caption.vttR2Key) await r2.deleteObject(caption.vttR2Key)
   }
 }
 
@@ -644,4 +649,5 @@ module.exports = {
   generateHlsManifest,
   processVideo,
   deleteVideoAssets,
+  deleteVideoAssetRefs,
 }

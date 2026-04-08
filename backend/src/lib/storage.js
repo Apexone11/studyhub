@@ -7,6 +7,7 @@ const DEFAULT_UPLOADS_DIR = path.join(BACKEND_ROOT, 'uploads')
 const RAILWAY_VOLUME_ROOT = '/data'
 const UPLOADS_URL_PREFIX = '/uploads'
 const PRIVATE_ATTACHMENT_PREFIX = 'attachment://'
+const NOTE_IMAGE_URL_PATTERN = /\/uploads\/note-images\/[A-Za-z0-9._-]+/g
 
 function detectPersistentUploadsDir() {
   if (process.platform === 'win32') return null
@@ -88,6 +89,10 @@ function buildContentImageUrl(fileName) {
   return buildUploadUrl('content-images', fileName)
 }
 
+function buildNoteImageUrl(fileName) {
+  return buildUploadUrl('note-images', fileName)
+}
+
 function isPathWithinRoot(candidatePath, rootDirectory) {
   const resolvedCandidate = path.resolve(candidatePath)
   const resolvedRoot = path.resolve(rootDirectory)
@@ -109,6 +114,8 @@ function resolveManagedUploadPath(uploadUrl) {
     { prefix: `${UPLOADS_URL_PREFIX}/avatars/`, directory: AVATARS_DIR },
     { prefix: `${UPLOADS_URL_PREFIX}/covers/`, directory: COVERS_DIR },
     { prefix: `${UPLOADS_URL_PREFIX}/attachments/`, directory: ATTACHMENTS_DIR },
+    { prefix: `${UPLOADS_URL_PREFIX}/content-images/`, directory: CONTENT_IMAGES_DIR },
+    { prefix: `${UPLOADS_URL_PREFIX}/note-images/`, directory: NOTE_IMAGES_DIR },
     { prefix: PRIVATE_ATTACHMENT_PREFIX, directory: ATTACHMENTS_DIR },
   ]
 
@@ -150,11 +157,21 @@ function resolveAttachmentPath(attachmentUrl) {
   return resolveManagedUploadPath(attachmentUrl)
 }
 
+function resolveContentImagePath(imageUrl) {
+  if (!String(imageUrl || '').startsWith(`${UPLOADS_URL_PREFIX}/content-images/`)) return null
+  return resolveManagedUploadPath(imageUrl)
+}
+
+function resolveNoteImagePath(imageUrl) {
+  if (!String(imageUrl || '').startsWith(`${UPLOADS_URL_PREFIX}/note-images/`)) return null
+  return resolveManagedUploadPath(imageUrl)
+}
+
 function resolveManagedFilePath(filePath) {
   if (!filePath) return null
 
   const resolved = path.resolve(String(filePath))
-  const managedRoots = [AVATARS_DIR, COVERS_DIR, ATTACHMENTS_DIR]
+  const managedRoots = [AVATARS_DIR, COVERS_DIR, ATTACHMENTS_DIR, CONTENT_IMAGES_DIR, NOTE_IMAGES_DIR]
   const isManagedPath = managedRoots.some(
     (rootDirectory) => isPathWithinRoot(resolved, rootDirectory) && resolved !== path.resolve(rootDirectory)
   )
@@ -191,6 +208,50 @@ async function deleteAttachmentIfUnused(prisma, attachmentUrl) {
 
   if (sheetRefs > 0 || postRefs > 0) return false
   return safeUnlinkFile(resolvedPath)
+}
+
+async function deleteContentImageIfUnused(prisma, imageUrl) {
+  const resolvedPath = resolveContentImagePath(imageUrl)
+  if (!resolvedPath) return false
+
+  const [sheetCommentRefs, feedCommentRefs, noteCommentRefs] = await Promise.all([
+    prisma.commentAttachment.count({ where: { url: imageUrl } }),
+    prisma.feedPostCommentAttachment.count({ where: { url: imageUrl } }),
+    prisma.noteCommentAttachment.count({ where: { url: imageUrl } }),
+  ])
+
+  if (sheetCommentRefs > 0 || feedCommentRefs > 0 || noteCommentRefs > 0) return false
+  return safeUnlinkFile(resolvedPath)
+}
+
+async function deleteNoteImageIfUnused(prisma, imageUrl) {
+  const resolvedPath = resolveNoteImagePath(imageUrl)
+  if (!resolvedPath) return false
+
+  const [noteRefs, noteVersionRefs] = await Promise.all([
+    prisma.note.count({ where: { content: { contains: imageUrl } } }),
+    prisma.noteVersion.count({ where: { content: { contains: imageUrl } } }),
+  ])
+
+  if (noteRefs > 0 || noteVersionRefs > 0) return false
+  return safeUnlinkFile(resolvedPath)
+}
+
+function extractNoteImageUrlsFromTexts(texts) {
+  const urls = new Set()
+
+  for (const text of texts || []) {
+    if (typeof text !== 'string' || !text) continue
+
+    const matches = text.match(NOTE_IMAGE_URL_PATTERN) || []
+    for (const match of matches) {
+      if (resolveNoteImagePath(match)) {
+        urls.add(match)
+      }
+    }
+  }
+
+  return [...urls]
 }
 
 async function deleteAvatarIfUnused(prisma, avatarUrl) {
@@ -239,6 +300,32 @@ async function cleanupAttachmentIfUnused(prisma, attachmentUrl, context = {}) {
   }
 }
 
+async function cleanupContentImageIfUnused(prisma, imageUrl, context = {}) {
+  try {
+    return await deleteContentImageIfUnused(prisma, imageUrl)
+  } catch (error) {
+    captureError(error, {
+      source: 'cleanupContentImageIfUnused',
+      imageUrl,
+      ...context,
+    })
+    return false
+  }
+}
+
+async function cleanupNoteImageIfUnused(prisma, imageUrl, context = {}) {
+  try {
+    return await deleteNoteImageIfUnused(prisma, imageUrl)
+  } catch (error) {
+    captureError(error, {
+      source: 'cleanupNoteImageIfUnused',
+      imageUrl,
+      ...context,
+    })
+    return false
+  }
+}
+
 async function cleanupAvatarIfUnused(prisma, avatarUrl, context = {}) {
   try {
     return await deleteAvatarIfUnused(prisma, avatarUrl)
@@ -265,14 +352,20 @@ module.exports = {
   buildAvatarUrl,
   buildContentImageUrl,
   buildCoverUrl,
+  buildNoteImageUrl,
   cleanupAttachmentIfUnused,
   cleanupAvatarIfUnused,
+  cleanupContentImageIfUnused,
   cleanupCoverIfUnused,
+  cleanupNoteImageIfUnused,
   ensureUploadDirectories,
+  extractNoteImageUrlsFromTexts,
   resolveAttachmentPath,
   resolveAvatarPath,
+  resolveContentImagePath,
   resolveCoverPath,
   resolveManagedUploadPath,
+  resolveNoteImagePath,
   isManagedLeafFileName,
   isPathWithinRoot,
   safeUnlinkFile,

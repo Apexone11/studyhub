@@ -10,6 +10,7 @@
 const express = require('express')
 const requireAuth = require('../../middleware/auth')
 const { captureError } = require('../../monitoring/sentry')
+const { createNotifications } = require('../../lib/notify')
 const prisma = require('../../lib/prisma')
 const { readLimiter, writeLimiter } = require('../../lib/rateLimiters')
 const {
@@ -168,16 +169,13 @@ router.post('/', writeLimiter, requireAuth, async (req, res) => {
       })
 
       if (members.length > 0 && groupData) {
-        await prisma.notification.createMany({
-          data: members.map(member => ({
+        await createNotifications(prisma, members.map((member) => ({
             userId: member.userId,
             type: 'group_session',
             message: `${req.user.username} scheduled a session in ${groupData.name}: ${validTitle}`,
             actorId: req.user.userId,
             linkPath: `/study-groups/${groupId}`,
-          })),
-          skipDuplicates: true,
-        })
+          })))
       }
     } catch (notifErr) {
       // Fire-and-forget: don't fail the request

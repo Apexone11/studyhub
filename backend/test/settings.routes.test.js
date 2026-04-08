@@ -46,6 +46,7 @@ const mocks = vi.hoisted(() => {
     authTokens: {
       signAuthToken: vi.fn(() => 'new-token'),
       setAuthCookie: vi.fn((res, token) => res.cookie('studyhub_session', token)),
+      clearAuthCookie: vi.fn((res) => res.clearCookie('studyhub_session')),
     },
     email: {
       sendEmailVerification: vi.fn(),
@@ -367,7 +368,9 @@ describe('settings routes', () => {
         profileVisibility: 'public',
         theme: 'system',
         emailDigest: true,
+        emailComments: true,
         inAppNotifications: true,
+        inAppStudyGroups: true,
       })
 
       const response = await request(app).get('/preferences')
@@ -390,6 +393,8 @@ describe('settings routes', () => {
         profileVisibility: 'public',
         theme: 'system',
         emailDigest: true,
+        emailComments: true,
+        emailSocial: true,
       })
 
       const response = await request(app).get('/preferences')
@@ -409,11 +414,23 @@ describe('settings routes', () => {
         profileVisibility: 'private',
         theme: 'dark',
         emailDigest: false,
+        emailComments: false,
+        emailSocial: false,
+        inAppMentions: false,
+        inAppStudyGroups: false,
       })
 
       const response = await request(app)
         .patch('/preferences')
-        .send({ profileVisibility: 'private', theme: 'dark', emailDigest: false })
+        .send({
+          profileVisibility: 'private',
+          theme: 'dark',
+          emailDigest: false,
+          emailComments: false,
+          emailSocial: false,
+          inAppMentions: false,
+          inAppStudyGroups: false,
+        })
 
       expect(response.status).toBe(200)
       expect(response.body).toMatchObject({
@@ -421,7 +438,33 @@ describe('settings routes', () => {
         preferences: expect.objectContaining({
           profileVisibility: 'private',
           theme: 'dark',
+          emailComments: false,
+          emailSocial: false,
+          inAppMentions: false,
+          inAppStudyGroups: false,
         }),
+      })
+      expect(mocks.prisma.userPreferences.upsert).toHaveBeenCalledWith({
+        where: { userId: 42 },
+        create: {
+          userId: 42,
+          profileVisibility: 'private',
+          theme: 'dark',
+          emailDigest: false,
+          emailComments: false,
+          emailSocial: false,
+          inAppMentions: false,
+          inAppStudyGroups: false,
+        },
+        update: {
+          profileVisibility: 'private',
+          theme: 'dark',
+          emailDigest: false,
+          emailComments: false,
+          emailSocial: false,
+          inAppMentions: false,
+          inAppStudyGroups: false,
+        },
       })
     })
 
@@ -463,6 +506,8 @@ describe('settings routes', () => {
 
       expect(response.status).toBe(200)
       expect(response.body).toMatchObject({ message: 'Account deleted.' })
+      expect(response.headers['set-cookie']).toBeDefined()
+      expect(mocks.authTokens.clearAuthCookie).toHaveBeenCalledTimes(1)
       expect(mocks.deleteUserAccount.deleteUserAccount).toHaveBeenCalledWith(
         mocks.prisma,
         expect.objectContaining({

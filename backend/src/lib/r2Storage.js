@@ -295,6 +295,30 @@ function getPublicUrl(key) {
   return `/api/video/media/${encodeURIComponent(key)}`
 }
 
+function extractObjectKeyFromUrl(url) {
+  const value = String(url || '').trim()
+  if (!value) return null
+
+  if (R2_PUBLIC_URL) {
+    const prefix = `${R2_PUBLIC_URL.replace(/\/$/, '')}/`
+    if (value.startsWith(prefix)) {
+      return value.slice(prefix.length) || null
+    }
+  }
+
+  try {
+    const parsed = new URL(value, 'http://studyhub.local')
+    const proxyPrefix = '/api/video/media/'
+    if (parsed.pathname.startsWith(proxyPrefix)) {
+      return decodeURIComponent(parsed.pathname.slice(proxyPrefix.length)) || null
+    }
+  } catch {
+    return null
+  }
+
+  return null
+}
+
 /**
  * Generate a unique R2 key for a video file.
  * Format: videos/{userId}/{timestamp}-{random}.{ext}
@@ -365,6 +389,7 @@ module.exports = {
   uploadPart,
   completeMultipartUpload,
   abortMultipartUpload,
+  extractObjectKeyFromUrl,
   getPublicUrl,
   generateVideoKey,
   generateVariantKey,
