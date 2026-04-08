@@ -1,7 +1,7 @@
 const fs = require('node:fs')
 const path = require('node:path')
 
-const CURRENT_LEGAL_VERSION = '2026-04-04'
+const CURRENT_LEGAL_VERSION = '2026-04-08'
 const TERMLY_POLICY_BASE = 'https://app.termly.io/policy-viewer/policy.html?policyUUID='
 
 const LEGAL_REQUIRED_SIGNUP_SLUGS = ['terms', 'privacy', 'guidelines']
@@ -14,11 +14,11 @@ const LEGAL_DOCUMENT_SEEDS = [
     title: 'Terms and Conditions',
     summary: 'The legal terms that govern your access to and use of StudyHub.',
     intro: 'These legal terms explain how StudyHub works, what is expected from users, and the rules that apply when you use the platform.',
-    updatedLabel: 'Last updated April 04, 2026',
+    updatedLabel: 'Last updated April 08, 2026',
     requiredAtSignup: true,
     termlyEmbedId: '84ea6e72-ac97-4827-ba6d-c34900aea542',
     termlyUrl: `${TERMLY_POLICY_BASE}84ea6e72-ac97-4827-ba6d-c34900aea542`,
-    fileName: 'terms-2026-04-04.txt',
+    fileName: 'terms-2026-04-08.txt',
   },
   {
     slug: 'privacy',
@@ -26,11 +26,11 @@ const LEGAL_DOCUMENT_SEEDS = [
     title: 'Privacy Policy',
     summary: 'How StudyHub collects, uses, stores, and protects personal information.',
     intro: 'This privacy notice explains what data StudyHub collects, why it is processed, and the rights users have over their information.',
-    updatedLabel: 'Last updated April 04, 2026',
+    updatedLabel: 'Last updated April 08, 2026',
     requiredAtSignup: true,
     termlyEmbedId: 'af795fa7-a5b0-41e4-b342-8797a0194d55',
     termlyUrl: `${TERMLY_POLICY_BASE}af795fa7-a5b0-41e4-b342-8797a0194d55`,
-    fileName: 'privacy-2026-04-04.txt',
+    fileName: 'privacy-2026-04-08.txt',
   },
   {
     slug: 'guidelines',
@@ -38,11 +38,11 @@ const LEGAL_DOCUMENT_SEEDS = [
     title: 'Community Guidelines',
     summary: 'The shared standards that keep StudyHub useful, respectful, and safe for students.',
     intro: 'StudyHub is built for students. These guidelines define the platform norms that apply to publishing, collaboration, and communication.',
-    updatedLabel: 'Last updated April 04, 2026',
+    updatedLabel: 'Last updated April 08, 2026',
     requiredAtSignup: true,
     termlyEmbedId: null,
     termlyUrl: null,
-    fileName: 'guidelines-2026-04-04.txt',
+    fileName: 'guidelines-2026-04-08.txt',
   },
   {
     slug: 'cookies',
@@ -50,11 +50,11 @@ const LEGAL_DOCUMENT_SEEDS = [
     title: 'Cookie Policy',
     summary: 'How StudyHub uses cookies, analytics, advertising technologies, and related preference controls.',
     intro: 'This cookie policy explains the cookies and similar technologies used across StudyHub and how users can manage their choices.',
-    updatedLabel: 'Last updated April 04, 2026',
+    updatedLabel: 'Last updated April 08, 2026',
     requiredAtSignup: false,
     termlyEmbedId: '49c5d88c-ee36-4bbb-bde7-6c641a540268',
     termlyUrl: `${TERMLY_POLICY_BASE}49c5d88c-ee36-4bbb-bde7-6c641a540268`,
-    fileName: 'cookie-2026-04-04.txt',
+    fileName: 'cookie-2026-04-08.txt',
   },
   {
     slug: 'disclaimer',
@@ -62,11 +62,11 @@ const LEGAL_DOCUMENT_SEEDS = [
     title: 'Disclaimer',
     summary: 'Important limitations and liability notices for the StudyHub website and services.',
     intro: 'This disclaimer explains the limits of the information published on StudyHub and the extent of our liability for its use.',
-    updatedLabel: 'Last updated April 04, 2026',
+    updatedLabel: 'Last updated April 08, 2026',
     requiredAtSignup: false,
     termlyEmbedId: '55c02c39-21be-41cf-a1aa-a8ae0181e69b',
     termlyUrl: `${TERMLY_POLICY_BASE}55c02c39-21be-41cf-a1aa-a8ae0181e69b`,
-    fileName: 'disclaimer-2026-04-04.txt',
+    fileName: 'disclaimer-2026-04-08.txt',
   },
 ]
 

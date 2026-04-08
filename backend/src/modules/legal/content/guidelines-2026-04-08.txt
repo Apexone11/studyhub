@@ -1,0 +1,67 @@
+COMMUNITY GUIDELINES
+Last updated April 08, 2026
+
+These Community Guidelines ("Guidelines") describe the standards of behavior, content quality, and collaboration expected of every person who accesses or uses StudyHub, operated by Abdul Rahman Fornah ("StudyHub," "we," "us," or "our"). They apply in addition to our Terms and Conditions and Privacy Policy and form part of the agreement between you and StudyHub. By using the Services, you agree to follow these Guidelines. Violations may result in content removal, feature restrictions, suspension, or termination of your account, in accordance with Section 10 of the Terms and Conditions.
+
+1. OUR MISSION AND THE SPIRIT OF STUDYHUB
+
+StudyHub exists to help students learn faster and more collaboratively by sharing high-quality study materials, forking and improving each other's work, and discussing course content in a respectful, focused environment. Every interaction on StudyHub should advance that mission. When in doubt, ask whether what you are about to post would help a fellow student understand a concept better. If the answer is no, reconsider.
+
+2. GENERAL EXPECTATIONS
+
+You agree to (a) be respectful and constructive in every interaction; (b) avoid plagiarism and any form of academic dishonesty; (c) report content that appears to violate these Guidelines or applicable law; (d) follow your school's academic integrity policies, honor codes, and applicable institutional rules; (e) treat other users with the same courtesy you would expect from them; and (f) accept that StudyHub moderators may remove content or take action against accounts that do not meet these standards.
+
+3. WHAT WE ENCOURAGE
+
+We encourage you to upload original study guides, notes, outlines, flashcard sets, and practice problems for your courses; to fork and improve existing study materials and contribute meaningful changes back to the community; to write clear, accurate, well-organized practice questions with explanations; to leave constructive comments that help other authors improve their work; to help classmates understand difficult concepts in StudyHub Connect, study groups, and discussion boards; and to contribute to courses at your school and to courses at other schools when you have relevant expertise.
+
+4. PROHIBITED CONTENT AND CONDUCT
+
+You may not (a) upload copyrighted textbook content, publisher test banks, instructor solution manuals, or other materials you do not have the right to share; (b) post answers to active graded exams, quizzes, or assignments in a way that enables cheating; (c) upload fake, deliberately misleading, or intentionally incorrect study content; (d) harass, bully, threaten, dox, intimidate, or otherwise mistreat other users; (e) post hateful content targeting any person or group based on race, ethnicity, national origin, religion, gender, gender identity, sexual orientation, disability, age, or any other protected characteristic; (f) spam the platform with duplicate, low-effort, automated, or commercially promotional content; (g) upload malicious HTML, JavaScript, executable files, or anything designed to harm users, exfiltrate data, or compromise the Services; (h) create fake accounts, impersonate another person or institution, or operate multiple accounts to evade enforcement; (i) post sexually explicit content, content depicting minors in any sexualized context, or graphic violence; (j) attempt to use StudyHub for activity unrelated to studying, learning, or supporting other learners; (k) attempt to circumvent rate limits, paywalls, security controls, or moderation tools; (l) use the Hub AI study assistant to generate content that violates these Guidelines; or (m) violate any applicable law in your use of the Services.
+
+5. CONTENT QUALITY STANDARDS
+
+Good study content on StudyHub should be clearly titled with the course code and topic; written in your own words rather than copied directly from textbook passages; supported by examples, diagrams, or worked solutions where appropriate; organized with headings, sections, and a logical flow; and accurate to the best of your knowledge at the time you publish. Content that consistently fails to meet these standards may be removed, demoted in search and recommendations, or marked for revision.
+
+6. FORKING, ATTRIBUTION, AND COLLABORATION
+
+StudyHub is built around a collaborative editing model inspired by open-source software. When you fork another user's study sheet, the original author is automatically credited and the contribution lineage is preserved. You may improve, expand, condense, reorganize, or adapt forked content freely, but you may not remove or obscure attribution to the original author or to prior contributors. If you make substantial improvements, you are encouraged to submit them back to the original sheet as a contribution so that everyone benefits. Repeatedly forking content solely to strip attribution, claim authorship, or republish without changes is a violation of these Guidelines.
+
+7. ACADEMIC INTEGRITY
+
+StudyHub is a study and learning tool. It is not a service for completing graded work on a student's behalf, and it must not be used to circumvent your school's academic integrity rules. You are solely responsible for understanding and following the academic integrity policies of your institution, including the rules of any specific course or instructor. Posting solutions to graded work that another student is currently expected to complete independently is not permitted. The Hub AI study assistant is designed to explain concepts, help you study, and improve your own work. It is not designed to replace your effort, and we discourage any use of Hub AI that would violate your school's policies.
+
+8. PRIVACY AND RESPECT FOR OTHERS
+
+Do not post personal information about other people without their consent. This includes names, photos, contact information, schedules, grades, or any other detail that could identify or expose someone. Do not record or share private conversations, including direct messages or study group discussions, without permission from the other participants. Treat content shared in private groups as private.
+
+9. MINORS
+
+StudyHub is intended for users aged thirteen (13) and older, and certain features are restricted to users who are at least eighteen (18) years of age. Users between thirteen and seventeen should use the Services with the involvement of a parent or guardian. Content sexualizing minors, soliciting minors, or otherwise endangering minors is strictly prohibited and will be reported to the appropriate authorities, including the National Center for Missing & Exploited Children where required by law.
+
+10. ENFORCEMENT
+
+We enforce these Guidelines using a tiered, progressive approach calibrated to the severity and frequency of violations. A first minor offense typically results in content removal and a warning. A second offense may result in temporary loss of upload, messaging, or commenting privileges. Repeated or severe violations may result in suspension or permanent termination of your account, removal of associated content, and forfeiture of any unused subscription credits. Severe violations involving illegal content, threats to safety, or large-scale abuse may result in immediate termination without prior warning and may be reported to law enforcement. Decisions are made by the StudyHub moderation team with input from automated detection systems where appropriate.
+
+11. APPEALS
+
+If your content has been removed or your account has been actioned and you believe the decision was made in error, you may appeal by replying to the enforcement notice we sent you or by emailing abdulrfornah@getstudyhub.org. Appeals are reviewed by a different reviewer where practical, and we will respond within a reasonable time. Submitting repeated frivolous appeals, or attempting to evade enforcement by creating new accounts, is itself a violation of these Guidelines.
+
+12. REPORTING VIOLATIONS
+
+If you encounter content or behavior that violates these Guidelines, please use the Report button on the relevant study sheet, comment, message, post, or profile, or email abdulrfornah@getstudyhub.org with a description of the issue and a link to the content. Reports are confidential to the extent permitted by law. False or malicious reports are themselves a violation of these Guidelines and may result in enforcement action against the reporter.
+
+13. CHANGES TO THESE GUIDELINES
+
+We may update these Guidelines from time to time to reflect changes in the Services, the community, applicable law, or our enforcement experience. When we make material changes, we will revise the "Last updated" date and, where appropriate, notify users through the Services. Your continued use of StudyHub after the updated Guidelines take effect constitutes your acceptance of the updated Guidelines.
+
+14. CONTACT
+
+Questions about these Guidelines, or concerns about content or conduct on StudyHub, may be directed to:
+
+StudyHub
+Attention: Trust & Safety
+2809 Diamond Ridge Road,
+Milford Mill, Maryland 21244
+United States
+Email: abdulrfornah@getstudyhub.org

@@ -52,22 +52,44 @@ export default function useSheetLab() {
   const isOwner = user && sheet && (user.role === 'admin' || user.id === sheet.userId)
   const isFork = Boolean(sheet?.forkOf)
 
-  // Load sheet info
+  // Load sheet info. Retries once on 404 to absorb the brief race that happens
+  // immediately after a fork is created and the user is redirected here.
   const reloadSheet = useCallback(async () => {
     if (!Number.isInteger(sheetId)) return
-    try {
+    const fetchOnce = async () => {
       const response = await fetch(`${API}/api/sheets/${sheetId}`, {
         headers: authHeaders(),
         credentials: 'include',
       })
       const data = await readJsonSafely(response, {})
+      return { response, data }
+    }
+    try {
+      let { response, data } = await fetchOnce()
       if (isAuthSessionFailure(response, data)) {
         clearSession()
         navigate('/login', { replace: true })
         return
       }
-      if (!response.ok) throw new Error(getApiErrorMessage(data, 'Could not load sheet.'))
+      if (response.status === 404) {
+        // Race after fork: wait briefly and retry once before surfacing an error.
+        await new Promise((resolve) => setTimeout(resolve, 800))
+        ;({ response, data } = await fetchOnce())
+        if (isAuthSessionFailure(response, data)) {
+          clearSession()
+          navigate('/login', { replace: true })
+          return
+        }
+      }
+      if (!response.ok) {
+        throw new Error(
+          response.status === 404
+            ? 'Hang tight — this sheet is still loading. If it does not appear in a moment, it may have been removed.'
+            : getApiErrorMessage(data, 'Could not load sheet.'),
+        )
+      }
       setSheet(data)
+      setError('')
     } catch (err) {
       setError(err.message)
     }

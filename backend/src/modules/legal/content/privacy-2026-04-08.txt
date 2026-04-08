@@ -1,0 +1,153 @@
+PRIVACY POLICY
+Last updated April 08, 2026
+
+This Privacy Policy ("Policy") describes how StudyHub ("StudyHub," "we," "us," or "our") collects, uses, discloses, retains, and protects personal information when you visit, interact with, or use our website at https://www.getstudyhub.org, our mobile-responsive web application, our application programming interfaces, and any other product, feature, or service that links to or references this Policy (collectively, the "Services"). By accessing or using the Services, you acknowledge that you have read, understood, and agree to the practices described in this Policy. If you do not agree with any part of this Policy, you must not access or use the Services.
+
+StudyHub is operated by Abdul Rahman Fornah, conducting business as StudyHub, with a principal place of business at 2809 Diamond Ridge Road, Apartment 102, Milford Mill, Maryland 21244, United States. For any privacy-related question, request, or concern, you may contact us at abdulrfornah@getstudyhub.org or by mail at the address above.
+
+1. SCOPE AND APPLICABILITY
+
+This Policy applies to personal information that StudyHub processes as a "controller" or "business" under applicable data-protection law, including the California Consumer Privacy Act as amended by the California Privacy Rights Act ("CCPA/CPRA"), the Virginia Consumer Data Protection Act, the Colorado Privacy Act, the Connecticut Data Privacy Act, the Utah Consumer Privacy Act, the European Union General Data Protection Regulation ("GDPR"), and the United Kingdom General Data Protection Regulation ("UK GDPR"), where applicable. This Policy does not apply to information you provide to or receive from third parties who operate outside of StudyHub, even if you access those third parties through the Services.
+
+2. SUMMARY OF KEY POINTS
+
+The following summary highlights the most important points of this Policy. It is not a substitute for reading the full Policy.
+
+- Information we collect: We collect the information you provide when you create an account, upload or contribute study materials, communicate with other users, participate in study groups, interact with our AI study assistant, subscribe to a paid plan, or contact us. We also collect technical information about your device and how you use the Services.
+- How we use it: We use personal information to provide and operate the Services, personalize your experience, facilitate collaboration, process payments, maintain security, comply with legal obligations, and communicate with you about the Services.
+- Who we share it with: We share personal information only with service providers that help us operate the Services, with other users when you choose to make content public, and when required by law. We do not sell personal information in exchange for monetary compensation.
+- Your rights: Depending on where you live, you may have the right to access, correct, delete, port, or restrict the processing of your personal information, and to withdraw consent or opt out of certain uses. You can exercise most rights directly from your StudyHub account settings.
+- Children: The Services are intended for users aged 13 and older. We do not knowingly collect personal information from children under 13.
+- Contact: You can reach us at any time at abdulrfornah@getstudyhub.org.
+
+3. INFORMATION WE COLLECT
+
+3.1 Information you provide directly
+When you create a StudyHub account, we collect your email address, a password (stored only as a one-way cryptographic hash), your chosen username, and, optionally, your school, display name, profile picture, biography, academic program, and graduation year. If you sign in using a third-party identity provider such as Google, we receive your name, email address, profile picture, and a unique identifier from that provider in accordance with your settings with that provider.
+
+When you use the Services, we collect the content you create or submit, including study sheets, notes, comments, discussion posts, messages sent through StudyHub Connect, announcements, group resources, session RSVPs, starred items, and forks you create of other users' content. When you interact with our AI study assistant ("Hub AI"), we collect the prompts you enter and any files or images you upload to generate a response.
+
+When you purchase a paid subscription or make a donation, our payment processor (Stripe, Inc.) collects your name, billing address, payment card number, card expiration date, card verification value, and email address in order to process the transaction. StudyHub does not receive or store full payment card numbers. We receive a tokenized reference, the last four digits of the card, the brand, an expiration month and year, the billing country, and the transaction amount.
+
+When you contact us by email, fill out a support form, or communicate with us in any other way, we collect the contents of your communication and any information you choose to include.
+
+3.2 Information collected automatically
+When you use the Services, we automatically collect certain information about your device and your interactions with the Services, including your Internet Protocol (IP) address (which we retain in full for security logging and may truncate for analytics), browser type and version, operating system, device type and identifier, referring and exit pages, the pages or features you access, the date and time of each request, crash logs, and performance telemetry. This information is collected through server logs, cookies, and similar technologies described in our Cookie Policy.
+
+3.3 Information from third parties
+We may receive information about you from third parties, including identity providers you use to sign in (such as Google), payment processors who confirm transaction status, analytics and error-monitoring providers (such as PostHog and Sentry), and, where applicable, schools or educational institutions that partner with StudyHub. We may also receive information from publicly available sources when it is necessary to verify an account or investigate a violation of our Terms.
+
+3.4 Sensitive personal information
+We do not intentionally collect personal information that reveals your racial or ethnic origin, political opinions, religious or philosophical beliefs, trade-union membership, genetic or biometric data, health, sex life, or sexual orientation, and we ask that you do not upload or transmit such information through the Services. If you choose to include such information in content you upload, you do so at your own risk.
+
+4. HOW WE USE YOUR INFORMATION
+
+We process personal information for the following purposes:
+
+(a) to create and administer your account, authenticate you when you sign in, and provide the features you request;
+(b) to store, display, and facilitate collaboration on the content you create, share, fork, or contribute to;
+(c) to operate StudyHub Connect messaging, study groups, announcements, notifications, and the Hub AI study assistant;
+(d) to process payments and donations, prevent fraudulent charges, and honor refund and cancellation requests;
+(e) to personalize your experience, recommend relevant courses, sheets, and groups, and remember your preferences;
+(f) to send you transactional messages about your account, your activity, or the Services, including security alerts, legal updates, and subscription notices;
+(g) to send you marketing communications if you have opted in, which you can opt out of at any time from your settings or by using the unsubscribe link in any marketing email;
+(h) to monitor, debug, and improve the performance, reliability, and security of the Services;
+(i) to detect, investigate, prevent, and respond to fraud, abuse, security incidents, violations of our Terms, and violations of applicable law;
+(j) to comply with legal obligations, respond to lawful requests from public authorities, enforce our agreements, and protect the rights, property, and safety of StudyHub, our users, and the public;
+(k) to train and fine-tune internal quality models (not third-party foundation models) using de-identified or aggregated data, where permitted by law; and
+(l) for any other purpose disclosed to you at the time we collect the information or to which you consent.
+
+5. LEGAL BASES FOR PROCESSING (EEA, UK, AND SWITZERLAND)
+
+If you are located in the European Economic Area, the United Kingdom, or Switzerland, we process your personal information only where we have a valid legal basis under Article 6 of the GDPR. Those bases are: (i) the performance of a contract with you, including providing the Services you request; (ii) your consent, which you may withdraw at any time; (iii) compliance with a legal obligation to which we are subject; (iv) the protection of your vital interests or those of another person; and (v) our legitimate interests or those of a third party, provided those interests are not overridden by your rights and freedoms. Our legitimate interests include operating and improving the Services, preventing fraud and abuse, securing our systems, and understanding how users interact with the Services.
+
+6. HOW WE SHARE INFORMATION
+
+We share personal information only in the following circumstances:
+
+6.1 With other users. When you publish a study sheet, post in a public feed, join a public group, or send a direct message, the content and associated metadata are visible to the users you intend to reach. Profile information you choose to display (username, avatar, school, biography) is visible to other users according to your privacy settings.
+
+6.2 With service providers. We share personal information with vendors, consultants, and other service providers who perform services on our behalf and are contractually bound to use that information only to provide those services. Current categories of service providers include: cloud infrastructure and hosting (Railway, Cloudflare R2); payment processing (Stripe, Inc.); transactional email delivery (Resend and/or SendGrid); error monitoring (Sentry); product analytics (PostHog); AI inference (Anthropic, PBC, for Hub AI responses); and customer support tooling.
+
+6.3 With Hub AI providers. When you interact with Hub AI, your prompts and any files or images you upload are transmitted to Anthropic, PBC for processing. Anthropic processes those inputs in accordance with its own commercial terms and does not use StudyHub API inputs or outputs to train its models. We never transmit your full account credentials, payment information, private messages, or contents of private study groups to Hub AI providers unless you explicitly include that information in a prompt.
+
+6.4 For legal reasons. We may disclose personal information if we believe in good faith that disclosure is necessary to (a) comply with a law, regulation, legal process, or governmental request; (b) enforce our Terms or other agreements; (c) detect, prevent, or address fraud, security, or technical issues; or (d) protect the rights, property, or safety of StudyHub, our users, or the public.
+
+6.5 In a business transfer. If StudyHub is involved in a merger, acquisition, financing, reorganization, bankruptcy, or sale of some or all of its assets, personal information may be transferred as part of that transaction, subject to standard confidentiality arrangements and continued protection under this Policy or a successor policy.
+
+6.6 With your consent. We will share personal information in any other situation only with your consent or at your direction.
+
+We do not sell personal information in exchange for monetary consideration. Certain disclosures to analytics or advertising providers may constitute "sharing" or "sale" under certain state privacy laws; see Section 12 for details on how to opt out.
+
+7. INTERNATIONAL DATA TRANSFERS
+
+StudyHub is based in the United States. If you access the Services from outside the United States, the personal information you provide will be transferred to, stored in, and processed in the United States, where data-protection laws may differ from those of your jurisdiction. Where we transfer personal information of EEA, UK, or Swiss residents to the United States, we rely on the European Commission's Standard Contractual Clauses, the UK International Data Transfer Addendum, or an equivalent lawful transfer mechanism.
+
+8. DATA RETENTION
+
+We retain personal information only for as long as necessary for the purposes set out in this Policy or for legitimate business, legal, tax, accounting, or regulatory reasons. Specific retention periods include:
+
+- Account records: for the life of the account plus a reasonable post-closure period not to exceed ninety (90) days, after which the account is permanently deleted or anonymized. Some records may be retained longer if legally required.
+- User-generated content: until deleted by the author or by StudyHub for policy enforcement. Forks and contributions are retained independently of the original author's deletion for integrity of the contribution history.
+- Direct messages: soft-deleted messages are retained for fifteen (15) days before permanent deletion. The edit window for a sent message is fifteen (15) minutes.
+- Payment records: for seven (7) years for tax and accounting purposes, as required by the Internal Revenue Service and applicable state law.
+- Security and server logs: up to ninety (90) days in full-fidelity form, and longer in aggregated or anonymized form.
+- AI assistant conversation logs: up to thirty (30) days for abuse prevention and quality assurance, after which they are anonymized or deleted.
+
+When personal information is no longer needed, we will either delete it or anonymize it so that it can no longer be associated with you.
+
+9. HOW WE PROTECT YOUR INFORMATION
+
+We implement administrative, technical, and physical safeguards designed to protect personal information, including transport-layer encryption for all traffic between your browser and our servers, encryption at rest for sensitive data stores, one-way hashed passwords using industry-standard algorithms, HTTP-only session cookies, access controls limited to authorized personnel, regular dependency patching, automated vulnerability scanning, and logging and monitoring of access to production systems. Despite these measures, no method of transmission over the Internet or storage is one hundred percent secure, and we cannot guarantee absolute security. You are responsible for maintaining the confidentiality of your account credentials and for any activity that occurs under your account.
+
+10. YOUR PRIVACY RIGHTS
+
+Depending on your location, you may have some or all of the following rights with respect to the personal information we hold about you:
+
+- Right to access: to confirm whether we process your personal information and to obtain a copy of that information.
+- Right to correction: to correct inaccurate or incomplete personal information.
+- Right to deletion: to have your personal information deleted, subject to certain exceptions.
+- Right to portability: to receive a copy of your personal information in a structured, commonly used, and machine-readable format.
+- Right to restrict or object: to restrict or object to certain processing of your personal information, including processing based on our legitimate interests.
+- Right to withdraw consent: where processing is based on consent, to withdraw that consent at any time without affecting the lawfulness of processing carried out before withdrawal.
+- Right against automated decision-making: not to be subject to a decision based solely on automated processing that produces legal or similarly significant effects, except where permitted by law.
+- Right to lodge a complaint: to file a complaint with your local data-protection authority.
+
+To exercise any of these rights, please sign in to your account and use the Data Request page at https://www.getstudyhub.org/data-request, or contact us at abdulrfornah@getstudyhub.org. We will respond within the time period required by applicable law, typically within thirty (30) days for GDPR requests and forty-five (45) days for CCPA/CPRA requests. We may need to verify your identity before fulfilling a request. You will not be discriminated against for exercising any privacy right.
+
+11. CHILDREN'S PRIVACY
+
+The Services are intended for users who are at least thirteen (13) years of age, and some features are intended for users who are at least eighteen (18) years of age or the age of majority in their jurisdiction. We do not knowingly collect personal information from children under 13. If we learn that we have collected personal information from a child under 13 without verifiable parental consent, we will promptly delete that information. If you are a parent or guardian and believe your child has provided personal information to us, please contact us at abdulrfornah@getstudyhub.org so we can take appropriate action. Users between 13 and 17 should only use the Services with the involvement of a parent or guardian.
+
+12. UNITED STATES STATE PRIVACY RIGHTS
+
+12.1 California (CCPA/CPRA). If you are a California resident, you have the right to know what personal information we collect, use, disclose, and share; the right to delete personal information, subject to exceptions; the right to correct inaccurate personal information; the right to opt out of the sale or sharing of personal information; the right to limit the use and disclosure of sensitive personal information; and the right to non-discrimination for exercising your rights. Categories of personal information we collect are identifiers, commercial information, Internet or other electronic network activity information, geolocation data (IP-derived, city-level), professional or education-related information, and inferences drawn from the foregoing. We do not sell personal information for monetary consideration. We may "share" identifiers and network activity information with analytics providers as defined under the CPRA; you can opt out of this sharing from your cookie preferences or by using a Global Privacy Control ("GPC") signal, which we honor as a valid opt-out request. To exercise any California right, please use the Data Request page or contact us at abdulrfornah@getstudyhub.org.
+
+12.2 Virginia, Colorado, Connecticut, and Utah. If you are a resident of Virginia, Colorado, Connecticut, or Utah, you have rights under the applicable state consumer privacy law similar to the California rights described above, including the right to access, correct, delete, and port personal information, and the right to opt out of targeted advertising, the sale of personal information, and certain profiling. To exercise any such right, please use the Data Request page or contact us at abdulrfornah@getstudyhub.org. If we deny a request, you may appeal the decision by replying to our response email, and we will respond to the appeal within the time period required by law.
+
+12.3 Other states. As additional state privacy laws take effect, we will update this Policy to describe the additional rights available to residents of those states.
+
+13. DO-NOT-TRACK SIGNALS
+
+Most web browsers offer a "Do Not Track" ("DNT") setting. Because no uniform industry standard has been adopted for DNT, StudyHub does not currently respond to DNT browser signals. However, we honor the Global Privacy Control ("GPC") signal where applicable as an opt-out of the sale or sharing of personal information under state privacy laws.
+
+14. THIRD-PARTY LINKS
+
+The Services may contain links to third-party websites, services, and applications that are not operated by StudyHub. This Policy does not apply to those third parties. We encourage you to review the privacy policies of any third party before providing personal information to it.
+
+15. CHANGES TO THIS POLICY
+
+We may update this Policy from time to time to reflect changes to our practices, the Services, applicable law, or for other operational, legal, or regulatory reasons. When we update this Policy, we will revise the "Last updated" date at the top and, for material changes, take additional steps required by law, which may include posting a prominent notice on the Services or sending you an email. Your continued use of the Services after an updated Policy takes effect constitutes acceptance of the updated Policy.
+
+16. CONTACT US
+
+If you have any question, concern, request, or complaint regarding this Policy or our privacy practices, please contact:
+
+StudyHub
+Attention: Privacy
+2809 Diamond Ridge Road,
+Milford Mill, Maryland 21244
+United States
+Email: abdulrfornah@getstudyhub.org
+
+If you are not satisfied with our response, you have the right to lodge a complaint with your local data-protection authority.

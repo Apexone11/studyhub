@@ -279,7 +279,7 @@ export default function SheetLabEditor({ sheet, onContentSaved }) {
             type="button"
             onClick={handleTogglePublish}
             disabled={publishing || saving}
-            aria-label={isDraft ? 'Publish this sheet to make it visible to others' : 'Revert this sheet back to draft status'}
+            aria-label={isDraft ? (sheet?.forkOf ? 'Contribute your changes back to the original sheet' : 'Publish this sheet to make it visible to others') : 'Revert this sheet back to draft status'}
             style={{
               borderRadius: 8, padding: '6px 14px',
               background: isDraft ? 'var(--sh-success, #16a34a)' : 'var(--sh-warning-bg, #fffbeb)',
@@ -290,7 +290,12 @@ export default function SheetLabEditor({ sheet, onContentSaved }) {
               border: isDraft ? 'none' : '1px solid var(--sh-warning-border, #fde68a)',
             }}
           >
-            {publishing ? (isDraft ? 'Publishing…' : 'Saving…') : isDraft ? 'Publish' : 'Revert to draft'}
+            {(() => {
+              const isFork = Boolean(sheet?.forkOf)
+              if (publishing) return isDraft ? (isFork ? 'Contributing…' : 'Publishing…') : 'Saving…'
+              if (!isDraft) return 'Revert to draft'
+              return isFork ? 'Contribute' : 'Publish'
+            })()}
           </button>
         </div>
       </div>
