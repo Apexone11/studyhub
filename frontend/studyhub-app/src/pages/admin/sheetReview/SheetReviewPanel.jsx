@@ -25,7 +25,11 @@ export default function SheetReviewPanel({ sheetId, onClose, onReviewComplete })
   const [activeTab, setActiveTab] = useState('preview') // 'preview' | 'interactive' | 'raw' | 'findings'
   const [aiReviewing, setAiReviewing] = useState(false)
   const [scrollToLine, setScrollToLine] = useState(0)
-  const [interactiveState, setInteractiveState] = useState({ loading: false, error: '', runtimeUrl: '', attempted: false })
+  const [interactiveState, setInteractiveState] = useState({ loading: false, error: '', runtimeUrl: '' })
+  // `attempted` tracked via ref so mutating it does not re-fire the effect
+  // and cancel its own in-flight fetch (the bug that left the tab stuck on
+  // "Loading interactive preview...").
+  const interactiveAttemptedRef = useRef(false)
   const iframeRef = useRef(null)
 
   const loadDetail = useCallback(async () => {
@@ -48,18 +52,20 @@ export default function SheetReviewPanel({ sheetId, onClose, onReviewComplete })
 
   useEffect(() => {
     setState({ loading: true, error: '', detail: null })
-    setInteractiveState({ loading: false, error: '', runtimeUrl: '', attempted: false })
+    setInteractiveState({ loading: false, error: '', runtimeUrl: '' })
+    interactiveAttemptedRef.current = false
     void loadDetail()
   }, [loadDetail])
 
   useEffect(() => {
     if (!state.detail || state.detail.contentFormat !== 'html' || activeTab !== 'interactive') return
-    if (interactiveState.loading || interactiveState.runtimeUrl || interactiveState.attempted) return
+    if (interactiveAttemptedRef.current) return
 
+    interactiveAttemptedRef.current = true
     let cancelled = false
 
     async function loadInteractivePreview() {
-      setInteractiveState({ loading: true, error: '', runtimeUrl: '', attempted: true })
+      setInteractiveState({ loading: true, error: '', runtimeUrl: '' })
 
       try {
         const response = await fetch(`${API}/api/sheets/${sheetId}/html-runtime`, {
@@ -73,16 +79,18 @@ export default function SheetReviewPanel({ sheetId, onClose, onReviewComplete })
         }
 
         if (cancelled) return
-        setInteractiveState({ loading: false, error: '', runtimeUrl: data.runtimeUrl || '', attempted: true })
+        setInteractiveState({ loading: false, error: '', runtimeUrl: data.runtimeUrl || '' })
       } catch (err) {
         if (cancelled) return
-        setInteractiveState({ loading: false, error: err.message || 'Could not load interactive preview.', runtimeUrl: '', attempted: true })
+        setInteractiveState({ loading: false, error: err.message || 'Could not load interactive preview.', runtimeUrl: '' })
+        // Reset so user can retry by flipping tabs
+        interactiveAttemptedRef.current = false
       }
     }
 
     void loadInteractivePreview()
     return () => { cancelled = true }
-  }, [activeTab, interactiveState.attempted, interactiveState.loading, interactiveState.runtimeUrl, sheetId, state.detail])
+  }, [activeTab, sheetId, state.detail])
 
   async function handleReview(action, quickReason) {
     const finalReason = quickReason || reason.trim()

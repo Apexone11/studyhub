@@ -57,6 +57,7 @@ import ToastContainer from './components/Toast'
 import OfflineIndicator from './components/OfflineIndicator'
 import LegalAcceptanceEnforcementModal from './components/LegalAcceptanceEnforcementModal'
 import DarkModeFx from './components/DarkModeFx'
+import { ChatPanelProvider } from './lib/chatPanelContext'
 
 const AiBubble = lazy(() => import('./components/ai/AiBubble'))
 const AiChatProviderModule = lazy(() =>
@@ -326,6 +327,7 @@ function AppRoutes() {
           <PreferencesBootstrap />
           <LegalAcceptanceEnforcementModal />
           <AuthenticatedAiProvider>
+            <ChatPanelProvider>
             <Suspense fallback={<RouteFallback />}>
               <Routes>
               {/* ── public (unauthenticated) ─────────────────────────── */}
@@ -595,6 +597,7 @@ function AppRoutes() {
             <ToastContainer />
             <OfflineIndicator />
             <AuthenticatedBubble />
+            </ChatPanelProvider>
           </AuthenticatedAiProvider>
           {PerfOverlay && (
             <Suspense fallback={null}>
