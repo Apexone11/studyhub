@@ -133,15 +133,22 @@ router.patch('/profile', async (req, res) => {
       throw new AppError(400, 'No valid profile fields were provided.')
     }
 
-    if (hasSensitiveProfileUpdate) {
-      const keyArn = process.env.KMS_KEY_ARN || ''
-      if (!keyArn.startsWith('arn:aws:kms:')) {
+    const keyArn = process.env.KMS_KEY_ARN || ''
+    const kmsConfigured = keyArn.startsWith('arn:aws:kms:')
+
+    if (hasSensitiveProfileUpdate && !kmsConfigured) {
+      // KMS not configured: skip sensitive fields silently so routine edits
+      // (display name, bio, links, visibility) still succeed. Only fail hard
+      // if sensitive fields are the ONLY thing the caller is trying to update.
+      if (!hasVisibilityUpdate && Object.keys(userUpdates).length === 0) {
         throw new AppError(
           503,
           'Sensitive profile fields are unavailable until AWS KMS is configured.',
         )
       }
+    }
 
+    if (hasSensitiveProfileUpdate && kmsConfigured) {
       const existingPii = (await getUserPII(user.id, {
         id: req.user.userId,
         role: req.user.role,

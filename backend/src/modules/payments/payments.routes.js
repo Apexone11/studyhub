@@ -50,7 +50,12 @@ function requireAdmin(req, res, next) {
 
 function escapeCsvValue(value) {
   if (value === null || value === undefined) return ''
-  const text = String(value)
+  let text = String(value)
+  // Mitigate CSV formula injection: prefix a leading formula trigger with a
+  // single quote so Excel/Sheets treat the cell as text instead of a formula.
+  if (/^[=+\-@\t\r]/.test(text)) {
+    text = `'${text}`
+  }
   if (!/[",\n]/.test(text)) return text
   return `"${text.replace(/"/g, '""')}"`
 }

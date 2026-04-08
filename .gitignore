@@ -27,6 +27,7 @@ frontend/studyhub-app/tests/screenshots/
 
 # Claude Code local settings
 .claude/settings.local.json
+.claude/worktrees/
 .~lock.*#
 
 # Local brainstorming/runtime state

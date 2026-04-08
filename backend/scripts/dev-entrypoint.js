@@ -38,7 +38,7 @@ function needsInstall() {
   if (!fs.existsSync(packageLockPath)) return false
   if (!fs.existsSync(nodeModulesDir)) return true
   if (!hasRequiredPackages()) return true
-  if (!fs.existsSync(lockHashPath)) return false
+  if (!fs.existsSync(lockHashPath)) return true
 
   const savedHash = fs.readFileSync(lockHashPath, 'utf8').trim()
   return savedHash !== packageLockHash()
