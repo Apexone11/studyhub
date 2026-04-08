@@ -20,8 +20,14 @@ export const STATUS_OPTIONS = [
   { value: 'rejected', label: 'Rejected' },
 ]
 
+const EDITABLE_SHEET_STATUSES = new Set(['draft', 'pending_review', 'rejected', 'quarantined'])
+
 export function authHeaders() {
   return { 'Content-Type': 'application/json' }
+}
+
+export function isEditableSheetStatus(status) {
+  return EDITABLE_SHEET_STATUSES.has(String(status || '').trim().toLowerCase())
 }
 
 export function timeAgo(value) {

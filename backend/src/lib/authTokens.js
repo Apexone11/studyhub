@@ -44,8 +44,23 @@ function verifyAuthToken(token) {
   return jwt.verify(token, getJwtSecret())
 }
 
+function normalizeAuthUserId(value) {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (/^\d+$/.test(trimmed)) {
+      const parsed = Number.parseInt(trimmed, 10)
+      if (Number.isSafeInteger(parsed)) return parsed
+    }
+    return trimmed || null
+  }
+
+  return null
+}
+
 function normalizeAuthUser(payload) {
-  const userId = payload?.userId || payload?.sub || payload?.id || null
+  const userId = normalizeAuthUserId(payload?.userId ?? payload?.sub ?? payload?.id ?? null)
   if (!userId) return null
 
   return {
@@ -153,6 +168,7 @@ module.exports = {
   getAuthTokenFromRequest,
   getJwtSecret,
   hashStoredSecret,
+  normalizeAuthUserId,
   normalizeAuthUser,
   signCsrfToken,
   setAuthCookie,

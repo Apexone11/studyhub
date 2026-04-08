@@ -131,8 +131,8 @@ function serializeSheet(sheet, { starred = false, reactions = null, commentCount
 }
 
 async function fetchContributionCollections(sheet, currentUser) {
-  const canReviewIncoming = currentUser && (currentUser.role === 'admin' || currentUser.userId === sheet.userId)
-  const canSeeOutgoing = currentUser && (currentUser.role === 'admin' || currentUser.userId === sheet.userId)
+  const canReviewIncoming = canModerateOrOwnSheet(sheet, currentUser)
+  const canSeeOutgoing = canModerateOrOwnSheet(sheet, currentUser)
 
   const contributionInclude = {
     proposer: { select: AUTHOR_SELECT },

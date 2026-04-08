@@ -39,6 +39,15 @@ export default function AppSidebar({ mode = 'fixed' }) {
 
   if (!user) return null
 
+  const handleNavClick = () => {
+    if (drawerOpen) {
+      setDrawerOpen(false)
+    }
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }
+
   const enrollments = user.enrollments || []
   const courseEntries = enrollments
     .filter((e) => e.course?.code && e.course?.id)
@@ -117,6 +126,7 @@ export default function AppSidebar({ mode = 'fixed' }) {
               to={to}
               className={`sh-sidebar-nav-link${isActive ? ' sh-sidebar-nav-link--active' : ''}`}
               aria-current={isActive ? 'page' : undefined}
+              onClick={handleNavClick}
               onMouseEnter={() =>
                 prefetchForRoute(link.to === '__MY_PROFILE__' ? '/users/:username' : link.to)
               }
@@ -134,11 +144,11 @@ export default function AppSidebar({ mode = 'fixed' }) {
           <div className="sh-label" style={{ marginBottom: 8, paddingLeft: 2 }}>
             MY TEACHING
           </div>
-          <Link to="/sheets?mine=true" className="sh-sidebar-nav-link">
+          <Link to="/sheets?mine=true" className="sh-sidebar-nav-link" onClick={handleNavClick}>
             <IconSheets size={15} />
             My Materials
           </Link>
-          <Link to="/study-groups?mine=true" className="sh-sidebar-nav-link">
+          <Link to="/study-groups?mine=true" className="sh-sidebar-nav-link" onClick={handleNavClick}>
             <IconUsers size={15} />
             My Study Groups
           </Link>
@@ -154,6 +164,7 @@ export default function AppSidebar({ mode = 'fixed' }) {
           {courseEntries.length === 0 ? (
             <Link
               to="/my-courses"
+              onClick={handleNavClick}
               style={{
                 fontSize: 'var(--type-xs)',
                 color: 'var(--sh-brand)',
@@ -168,6 +179,7 @@ export default function AppSidebar({ mode = 'fixed' }) {
               <Link
                 key={entry.id}
                 to={`/sheets?courseId=${entry.id}`}
+                onClick={handleNavClick}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -199,7 +211,10 @@ export default function AppSidebar({ mode = 'fixed' }) {
             ))
           )}
           <button
-            onClick={() => navigate('/my-courses')}
+            onClick={() => {
+              handleNavClick()
+              navigate('/my-courses')
+            }}
             className="sh-btn sh-btn--secondary sh-btn--sm"
             style={{ marginTop: 10, width: '100%', justifyContent: 'center', gap: 5 }}
             aria-label="Add course"
@@ -214,6 +229,7 @@ export default function AppSidebar({ mode = 'fixed' }) {
       {user.role === 'admin' && (
         <Link
           to="/admin"
+          onClick={handleNavClick}
           className="sh-sidebar-nav-link"
           style={{
             background: 'var(--sh-warning-bg)',

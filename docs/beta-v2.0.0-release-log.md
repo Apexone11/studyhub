@@ -2,6 +2,32 @@
 
 # Beta v2.0.0 Release Log
 
+## Date: 2026-04-08
+
+### Sheet Review Workflow, Recent Courses, and Admin Interactive Preview
+
+**Owner-only sheet states now stay inside an interactive editor flow instead of falling into dead-end viewer routes**
+- Hardened auth-token normalization and sheet-owner checks so legacy numeric-string session ids still count as the sheet owner for unpublished and under-review content
+- Kept editable sheet states (`draft`, `pending_review`, `rejected`, `quarantined`) on the HTML upload/editor workflow from My Sheets and submit-time redirects instead of sending creators to the public viewer path
+- Added direct draft-query loading on the upload page so creators can reopen a specific under-review sheet, keep editing it, and continue using preview from the same workspace
+
+**HTML scan UX is quieter during editing but clearer after submission**
+- Removed the auto-opening scan modal from background polling so scans keep running inline without interrupting editing sessions
+- Added an explicit "View scan details" action in the upload form for flagged findings and kept acknowledgement gated there for tier-1 HTML findings
+- Added a post-submit review notice modal that tells the creator the sheet is under review, keeps them in the editor, and points them to My Sheets and preview when available
+
+**Sheets/feed/admin quality-of-life behavior is tighter**
+- Recent courses on the sheets page now expire after one hour and are capped at seven entries instead of lingering indefinitely
+- Sidebar navigation now scrolls the app back to the top on click, and the floating scroll-to-top control shifts left when the AI bubble is present so the two controls no longer overlap on feed-style pages
+- The admin sheet-review window now includes an interactive preview tab powered by the existing HTML runtime endpoint so admins can inspect script-enabled behavior before approving a sheet
+
+**Validation**
+- `Set-Location -LiteralPath "C:\Users\Abdul PC\OneDrive\Desktop\studyhub"; npm --prefix backend test -- --run test/core-utils.test.js test/attachmentAccessControl.test.js`: passes (103 tests)
+- `Set-Location -LiteralPath "C:\Users\Abdul PC\OneDrive\Desktop\studyhub\frontend\studyhub-app"; npx vitest run src/pages/sheets/upload/uploadSheetWorkflow.test.jsx src/pages/sheets/recentCoursesStorage.test.js`: passes (7 tests)
+- `Set-Location -LiteralPath "C:\Users\Abdul PC\OneDrive\Desktop\studyhub\frontend\studyhub-app"; npx eslint src/components/sidebar/AppSidebar.jsx src/components/ScrollToTop.jsx src/components/sidebar/AppSidebar.responsive.test.jsx src/pages/sheets/upload/useUploadSheet.js src/pages/sheets/upload/uploadSheetActions.js src/pages/sheets/upload/UploadSheetPage.jsx src/pages/sheets/upload/UploadSheetFormFields.jsx src/pages/sheets/lab/HtmlScanModal.jsx src/pages/sheets/useSheetsData.js src/pages/sheets/recentCoursesStorage.js src/pages/sheets/recentCoursesStorage.test.js src/pages/admin/sheetReview/SheetReviewPanel.jsx src/pages/admin/sheetReview/SheetReviewDetails.jsx src/pages/sheets/SheetsPage.jsx src/pages/sheets/SheetListItem.jsx`: passes
+- `Set-Location -LiteralPath "C:\Users\Abdul PC\OneDrive\Desktop\studyhub"; npm --prefix frontend/studyhub-app run build`: passes
+- `Set-Location -LiteralPath "C:\Users\Abdul PC\OneDrive\Desktop\studyhub\frontend\studyhub-app"; npx vitest run src/components/sidebar/AppSidebar.responsive.test.jsx`: still fails in the current workspace test environment because React Testing Library resolves `react-dom` from the root workspace `node_modules`, which then cannot resolve a matching root `react` package; this is an existing test-environment/module-resolution issue, not a compile error in the sidebar change itself
+
 ## Date: 2026-04-07
 
 ### Attachment Preview Action Polish

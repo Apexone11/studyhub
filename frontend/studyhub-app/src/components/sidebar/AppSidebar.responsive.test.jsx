@@ -34,4 +34,21 @@ describe('AppSidebar responsive mode', () => {
     await user.click(screen.getByRole('button', { name: 'Close' }))
     expect(screen.queryByRole('dialog', { name: 'Sidebar navigation' })).not.toBeInTheDocument()
   })
+
+  it('scrolls to the top when a sidebar link is clicked', async () => {
+    const user = userEvent.setup()
+    const scrollSpy = vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+
+    render(
+      <MemoryRouter initialEntries={['/feed']}>
+        <AppSidebar mode="fixed" />
+      </MemoryRouter>,
+    )
+
+    await user.click(screen.getByRole('link', { name: 'Study Sheets' }))
+
+    expect(scrollSpy).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' })
+
+    scrollSpy.mockRestore()
+  })
 })

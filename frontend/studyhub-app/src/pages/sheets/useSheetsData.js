@@ -7,6 +7,7 @@ import { useLivePolling } from '../../lib/useLivePolling'
 import { staggerEntrance } from '../../lib/animations'
 import { showToast } from '../../lib/toast'
 import { SORT_OPTIONS, FORMAT_OPTIONS, authHeaders } from './sheetsPageConstants'
+import { RECENT_COURSES_KEY, parseRecentCourses, recordRecentCourse } from './recentCoursesStorage'
 
 export default function useSheetsData() {
   const navigate = useNavigate()
@@ -92,23 +93,28 @@ export default function useSheetsData() {
 
   const [recentCourses, setRecentCourses] = useState(() => {
     try {
-      const raw = localStorage.getItem('studyhub.sheets.recentCourses')
-      return raw ? JSON.parse(raw) : []
+      return parseRecentCourses(localStorage.getItem(RECENT_COURSES_KEY))
     } catch {
       return []
     }
   })
 
   useEffect(() => {
+    try {
+      if (recentCourses.length === 0) {
+        localStorage.removeItem(RECENT_COURSES_KEY)
+        return
+      }
+      localStorage.setItem(RECENT_COURSES_KEY, JSON.stringify(recentCourses))
+    } catch {
+      /* localStorage unavailable */
+    }
+  }, [recentCourses])
+
+  useEffect(() => {
     if (!courseId || !selectedCourse) return
     try {
-      const raw = localStorage.getItem('studyhub.sheets.recentCourses')
-      const list = raw ? JSON.parse(raw) : []
-      const filtered = list.filter((entry) => String(entry.id) !== String(courseId))
-      const schoolLabel = selectedCourse.school?.short || selectedCourse.school?.name || ''
-      const updated = [{ id: selectedCourse.id, code: selectedCourse.code, schoolId: selectedCourse.school?.id || '', schoolLabel }, ...filtered].slice(0, 5)
-      localStorage.setItem('studyhub.sheets.recentCourses', JSON.stringify(updated))
-      setRecentCourses(updated)
+      setRecentCourses((current) => recordRecentCourse(current, selectedCourse))
     } catch { /* localStorage unavailable */ }
   }, [courseId, selectedCourse])
 
