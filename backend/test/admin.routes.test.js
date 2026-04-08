@@ -423,6 +423,7 @@ describe('admin routes', () => {
         follows: 5,
       },
     })
+    expect(mocks.prisma.reaction.count).toHaveBeenCalledWith()
     expect(mocks.prisma.userFollow.count).toHaveBeenCalledWith({
       where: expect.objectContaining({
         createdAt: expect.any(Object),

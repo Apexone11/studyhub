@@ -33,6 +33,21 @@
 - `Set-Location -LiteralPath backend; npx eslint src/lib/fullTextSearch.js src/core/http/errors.js src/modules/library/library.service.js scripts/dev-entrypoint.js test/fullTextSearch.test.js test/http.errors.test.js test/library.service.test.js`: passes
 - `Set-Location -LiteralPath frontend/studyhub-app; npm run build`: passes
 
+### Prisma Runtime Cleanup and Dependabot Resolver Unblock
+
+**Additional Prisma/schema mismatches that were still surfacing in runtime monitoring are now removed from the live code path**
+- Fixed admin engagement totals so sheet reactions no longer query a nonexistent `Reaction.createdAt` field; likes remain a lifetime total until the schema stores reaction timestamps explicitly
+- Fixed the study-group activity feed to read `GroupResource.resourceType` instead of the nonexistent `type` field when building recent resource activity
+- Fixed the sheet readme route to stop selecting a nonexistent `StudySheet.visibility` field before passing the sheet through the shared read-access guard
+
+**Frontend Vite manifests are now simpler for Dependabot to resolve**
+- Removed the redundant frontend-local `vite` overrides from both the main app manifest and the mirrored Claude worktree manifest, leaving the direct `vite` dependency pinned at `8.0.5`
+- Refreshed both frontend lockfiles after the manifest cleanup so Dependabot no longer needs to reconcile a direct pin and an identical override in the same package
+
+**Validation**
+- `Set-Location -LiteralPath backend; npm test -- test/admin.routes.test.js test/sheets.read.routes.test.js test/studyGroups.activity.routes.test.js test/fullTextSearch.test.js test/http.errors.test.js test/library.service.test.js test/courses.routes.test.js`: passes (23 tests)
+- `Set-Location -LiteralPath frontend/studyhub-app; npm run build`: passes
+
 ### PR #195 Follow-up Review Fixes
 
 **Optional auth and maintenance middleware now behave consistently across mounted routes**
