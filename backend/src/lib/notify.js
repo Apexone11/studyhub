@@ -13,6 +13,95 @@
  *      within BURST_WINDOW → queue and send one digest email instead.
  */
 const VALID_PRIORITIES = ['high', 'medium', 'low']
+const DEFAULT_NOTIFICATION_PREFERENCES = Object.freeze({
+  emailDigest: true,
+  emailMentions: true,
+  emailContributions: true,
+  emailComments: true,
+  emailSocial: true,
+  emailStudyGroups: true,
+  inAppNotifications: true,
+  inAppMentions: true,
+  inAppComments: true,
+  inAppSocial: true,
+  inAppContributions: true,
+  inAppStudyGroups: true,
+})
+const NOTIFICATION_PREFERENCE_SELECT = Object.freeze({
+  emailDigest: true,
+  emailMentions: true,
+  emailContributions: true,
+  emailComments: true,
+  emailSocial: true,
+  emailStudyGroups: true,
+  inAppNotifications: true,
+  inAppMentions: true,
+  inAppComments: true,
+  inAppSocial: true,
+  inAppContributions: true,
+  inAppStudyGroups: true,
+})
+const ESSENTIAL_NOTIFICATION_TYPES = new Set([
+  'legal_acceptance_required',
+  'moderation',
+  'payment_failed',
+  'video_copy_detected',
+])
+const OPTIONAL_EMAIL_PREFERENCE_BY_TYPE = Object.freeze({
+  mention: 'emailMentions',
+  contribution: 'emailContributions',
+  upstream_change: 'emailContributions',
+  comment: 'emailComments',
+  reply: 'emailComments',
+  follow_request: 'emailSocial',
+  follow: 'emailSocial',
+  follow_accepted: 'emailSocial',
+  star: 'emailSocial',
+  fork: 'emailSocial',
+  group_join: 'emailStudyGroups',
+  group_approved: 'emailStudyGroups',
+  group_invite: 'emailStudyGroups',
+  group_session: 'emailStudyGroups',
+  group_post: 'emailStudyGroups',
+})
+const OPTIONAL_IN_APP_PREFERENCE_BY_TYPE = Object.freeze({
+  mention: 'inAppMentions',
+  contribution: 'inAppContributions',
+  upstream_change: 'inAppContributions',
+  comment: 'inAppComments',
+  reply: 'inAppComments',
+  follow_request: 'inAppSocial',
+  follow: 'inAppSocial',
+  follow_accepted: 'inAppSocial',
+  star: 'inAppSocial',
+  fork: 'inAppSocial',
+  group_join: 'inAppStudyGroups',
+  group_approved: 'inAppStudyGroups',
+  group_invite: 'inAppStudyGroups',
+  group_session: 'inAppStudyGroups',
+  group_post: 'inAppStudyGroups',
+})
+const EMAIL_TYPE_LABELS = Object.freeze({
+  mention: 'You Were Mentioned',
+  contribution: 'Contribution Update',
+  upstream_change: 'Sheet Update',
+  comment: 'New Comment Activity',
+  reply: 'New Reply Activity',
+  follow_request: 'New Follow Request',
+  follow: 'New Follower',
+  follow_accepted: 'Follow Request Approved',
+  star: 'New Sheet Star',
+  fork: 'New Sheet Fork',
+  group_join: 'Study Group Update',
+  group_approved: 'Study Group Update',
+  group_invite: 'Study Group Invitation',
+  group_session: 'Study Group Session',
+  group_post: 'Study Group Discussion',
+  legal_acceptance_required: 'Legal Reminder',
+  moderation: 'Moderation Notice',
+  payment_failed: 'Payment Update',
+  video_copy_detected: 'Video Copy Alert',
+})
 
 /* ── Anti-spam configuration ──────────────────────────────────── */
 const DEDUP_WINDOW_MS = 60 * 60 * 1000          // 1 hour
@@ -47,6 +136,51 @@ function _recordSent(userId, type, key) {
   }
 }
 
+async function _loadNotificationPreferences(prisma, userId) {
+  if (!prisma?.userPreferences?.findUnique || !Number.isInteger(userId)) {
+    return DEFAULT_NOTIFICATION_PREFERENCES
+  }
+
+  try {
+    const prefs = await prisma.userPreferences.findUnique({
+      where: { userId },
+      select: NOTIFICATION_PREFERENCE_SELECT,
+    })
+
+    return { ...DEFAULT_NOTIFICATION_PREFERENCES, ...(prefs || {}) }
+  } catch {
+    return DEFAULT_NOTIFICATION_PREFERENCES
+  }
+}
+
+function _isEssentialNotification(type) {
+  return ESSENTIAL_NOTIFICATION_TYPES.has(type)
+}
+
+function _shouldCreateInAppNotification(preferences, type) {
+  if (_isEssentialNotification(type)) return true
+
+  const prefKey = OPTIONAL_IN_APP_PREFERENCE_BY_TYPE[type]
+  if (!prefKey) return true
+
+  return Boolean(preferences.inAppNotifications && preferences[prefKey])
+}
+
+function _shouldSendEmailNotification(preferences, type, priority) {
+  if (_isEssentialNotification(type)) {
+    return priority === 'high'
+  }
+
+  const prefKey = OPTIONAL_EMAIL_PREFERENCE_BY_TYPE[type]
+  if (!prefKey) return false
+
+  return Boolean(preferences[prefKey])
+}
+
+function _getEmailTypeLabel(type, priority) {
+  return EMAIL_TYPE_LABELS[type] || (priority === 'high' ? 'Important Update' : 'New Activity')
+}
+
 /**
  * @param {object}  prisma
  * @param {object}  opts
@@ -66,6 +200,12 @@ async function createNotification(prisma, {
 }) {
   if (userId === actorId) return // never notify yourself
   const safePriority = VALID_PRIORITIES.includes(priority) ? priority : 'medium'
+  const preferences = await _loadNotificationPreferences(prisma, userId)
+
+  if (!_shouldCreateInAppNotification(preferences, type)) {
+    return null
+  }
+
   try {
     const notif = await prisma.notification.create({
       data: {
@@ -79,10 +219,15 @@ async function createNotification(prisma, {
       }
     })
 
-    /* Fire-and-forget: send email for high-priority notifications */
-    if (safePriority === 'high') {
-      void _maybeEmailHighPriority(prisma, {
-        userId, type, message, linkPath, dedupKey, performerUserId,
+    if (_shouldSendEmailNotification(preferences, type, safePriority)) {
+      void _maybeSendNotificationEmail(prisma, {
+        userId,
+        type,
+        message,
+        linkPath,
+        dedupKey,
+        performerUserId,
+        priority: safePriority,
       }).catch(() => {})
     }
 
@@ -93,17 +238,33 @@ async function createNotification(prisma, {
   }
 }
 
+async function createNotifications(prisma, notifications = []) {
+  return Promise.allSettled(notifications.map((notification) => createNotification(prisma, notification)))
+}
+
 /**
  * Anti-spam gate before sending email.
  */
-async function _maybeEmailHighPriority(prisma, { userId, type, message, linkPath, dedupKey, performerUserId }) {
-  /* Rule 1: No self-notify — if admin performed this action on themselves, skip email */
+async function _maybeSendNotificationEmail(prisma, {
+  userId,
+  type,
+  message,
+  linkPath,
+  dedupKey,
+  performerUserId,
+  priority,
+}) {
   if (performerUserId && performerUserId === userId) return
 
-  /* Rule 2: Dedup — same target reported repeatedly → one email per target per hour */
+  if (priority !== 'high') {
+    if (dedupKey && _isDuplicate(userId, type, dedupKey)) return
+    if (dedupKey) _recordSent(userId, type, dedupKey)
+    await sendNotificationEmail(prisma, { userId, type, message, linkPath, priority })
+    return
+  }
+
   if (dedupKey && _isDuplicate(userId, type, dedupKey)) return
 
-  /* Rule 3: Burst bundling — ≥ 3 high events within 2 min → digest */
   const now = Date.now()
   let queue = _burstQueues.get(userId)
   if (!queue) {
@@ -116,18 +277,21 @@ async function _maybeEmailHighPriority(prisma, { userId, type, message, linkPath
   queue.items.push({ ts: now, type, message, linkPath })
 
   if (queue.items.length >= BURST_THRESHOLD) {
-    /* Already in burst mode — the digest timer will flush everything */
     if (!queue.timer) {
       queue.timer = setTimeout(() => _flushBurstDigest(prisma, userId), BURST_FLUSH_DELAY_MS)
     }
-    /* Record dedup so individual sends don't fire later */
     if (dedupKey) _recordSent(userId, type, dedupKey)
     return
   }
 
-  /* Below burst threshold — send immediately */
   if (dedupKey) _recordSent(userId, type, dedupKey)
-  await sendHighPriorityEmail(prisma, { userId, type, message, linkPath })
+  await sendNotificationEmail(prisma, {
+    userId,
+    type,
+    message,
+    linkPath,
+    priority,
+  })
 }
 
 /**
@@ -210,10 +374,15 @@ async function _flushBurstDigest(prisma, userId) {
 }
 
 /**
- * Sends an email for a single high-priority notification.
- * Looks up the user's email; only sends if they have a verified email.
+ * Sends an email for a single notification.
  */
-async function sendHighPriorityEmail(prisma, { userId, type, message, linkPath }) {
+async function sendNotificationEmail(prisma, {
+  userId,
+  type,
+  message,
+  linkPath,
+  priority = 'medium',
+}) {
   let deliverMail, getFromAddress, getPublicAppUrl, escapeHtml
   try {
     const transport = require('./email/emailTransport')
@@ -233,7 +402,10 @@ async function sendHighPriorityEmail(prisma, { userId, type, message, linkPath }
 
   const appUrl = getPublicAppUrl()
   const actionUrl = linkPath ? `${appUrl}${linkPath}` : appUrl
-  const typeLabel = type === 'moderation' ? 'Moderation Notice' : 'Important Update'
+  const typeLabel = _getEmailTypeLabel(type, priority)
+  const footerText = priority === 'high'
+    ? 'You received this because of an important account event on your StudyHub account.'
+    : 'You received this because this activity email is enabled in your StudyHub settings.'
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -255,7 +427,7 @@ async function sendHighPriorityEmail(prisma, { userId, type, message, linkPath }
           </a>
         </td></tr>
         <tr><td style="padding:16px 40px;background:#f8fafc;text-align:center;border-top:1px solid #e2e8f0;">
-          <p style="margin:0;color:#9ca3af;font-size:12px;">You received this because of a high-priority event on your StudyHub account.</p>
+          <p style="margin:0;color:#9ca3af;font-size:12px;">${escapeHtml(footerText)}</p>
         </td></tr>
       </table>
     </td></tr>
@@ -269,14 +441,25 @@ async function sendHighPriorityEmail(prisma, { userId, type, message, linkPath }
     subject: `StudyHub — ${typeLabel}`,
     text: `${typeLabel}: ${message}\n\nView details: ${actionUrl}`,
     html,
-  }, 'high-priority-notification')
+  }, priority === 'high' ? 'high-priority-notification' : 'notification-preference-email')
+}
+
+async function sendHighPriorityEmail(prisma, options) {
+  return sendNotificationEmail(prisma, { ...options, priority: 'high' })
 }
 
 /* Exported for testing */
 module.exports = {
   createNotification,
+  createNotifications,
+  sendNotificationEmail,
   sendHighPriorityEmail,
   VALID_PRIORITIES,
+  DEFAULT_NOTIFICATION_PREFERENCES,
+  NOTIFICATION_PREFERENCE_SELECT,
+  OPTIONAL_EMAIL_PREFERENCE_BY_TYPE,
+  OPTIONAL_IN_APP_PREFERENCE_BY_TYPE,
+  ESSENTIAL_NOTIFICATION_TYPES,
   DEDUP_WINDOW_MS,
   BURST_THRESHOLD,
   BURST_WINDOW_MS,

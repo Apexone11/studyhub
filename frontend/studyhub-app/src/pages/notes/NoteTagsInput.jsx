@@ -1,11 +1,15 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { API } from '../../config'
 import { showToast } from '../../lib/toast'
 
-export default function NoteTagsInput({ noteId, initialTags = [] }) {
+export default function NoteTagsInput({ noteId, initialTags = [], onTagsChange }) {
   const [tags, setTags] = useState(initialTags)
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    setTags(Array.isArray(initialTags) ? initialTags : [])
+  }, [initialTags, noteId])
 
   const updateTags = async (newTags) => {
     setLoading(true)
@@ -21,7 +25,10 @@ export default function NoteTagsInput({ noteId, initialTags = [] }) {
         throw new Error('Failed to update tags')
       }
 
-      setTags(newTags)
+      const data = await response.json().catch(() => ({}))
+      const savedTags = Array.isArray(data.tags) ? data.tags : newTags
+      setTags(savedTags)
+      onTagsChange?.(savedTags)
       showToast('Tags updated', 'success')
     } catch (err) {
       console.error('Error updating tags:', err)

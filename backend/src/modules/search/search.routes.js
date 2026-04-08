@@ -1,5 +1,5 @@
 const express = require('express')
-const { getAuthTokenFromRequest, verifyAuthToken } = require('../../lib/authTokens')
+const optionalAuth = require('../../core/auth/optionalAuth')
 const { getVisibleProfileIds } = require('../../lib/profileVisibility')
 const { buildSheetTextSearchClauses } = require('../../lib/sheetSearch')
 const { searchSheetsFTS, searchCoursesFTS, searchUsersFTS } = require('../../lib/fullTextSearch')
@@ -16,19 +16,6 @@ const router = express.Router()
 router.use(searchLimiter)
 
 const VALID_TYPES = ['all', 'sheets', 'courses', 'users', 'notes', 'groups']
-
-// Optional auth — attach user if token present, but don't require it
-function optionalAuth(req, _res, next) {
-  const token = getAuthTokenFromRequest(req)
-  if (token) {
-    try {
-      req.user = verifyAuthToken(token)
-    } catch {
-      // ignore — unauthenticated search is fine
-    }
-  }
-  next()
-}
 
 router.get('/', optionalAuth, async (req, res) => {
   req._timingStart = Date.now()
@@ -234,6 +221,7 @@ router.get('/', optionalAuth, async (req, res) => {
               OR: [
                 { title: { contains: query, mode: 'insensitive' } },
                 { content: { contains: query, mode: 'insensitive' } },
+                { tags: { contains: query, mode: 'insensitive' } },
               ],
             },
             select: {

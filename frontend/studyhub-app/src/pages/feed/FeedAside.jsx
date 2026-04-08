@@ -12,7 +12,7 @@ import { StreakWidget, WeeklyProgressWidget, LeaderboardWidget } from './Gamific
 
 export default function FeedAside({ leaderboards, starredUpdates, recentlyViewed = [] }) {
   return (
-    <aside className="feed-aside" data-tutorial="feed-leaderboards" style={{ display: 'grid', gap: 16 }}>
+    <aside className="feed-aside feed-page__aside" data-tutorial="feed-leaderboards" style={{ display: 'grid', gap: 16 }}>
       <StreakWidget />
       <WeeklyProgressWidget />
       <LeaderboardWidget />

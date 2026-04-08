@@ -7,8 +7,48 @@ import { API } from '../../config'
 import { authHeaders } from '../shared/pageUtils'
 import { showToast } from '../../lib/toast'
 
+const NOTE_FILTER_TABS = new Set(['all', 'private', 'shared', 'starred'])
+
+function parseNoteTags(tagsValue) {
+  if (Array.isArray(tagsValue)) {
+    return tagsValue.filter((tag) => typeof tag === 'string' && tag.trim())
+  }
+
+  if (typeof tagsValue !== 'string' || !tagsValue.trim()) {
+    return []
+  }
+
+  try {
+    const parsed = JSON.parse(tagsValue)
+    return Array.isArray(parsed)
+      ? parsed.filter((tag) => typeof tag === 'string' && tag.trim())
+      : []
+  } catch {
+    return []
+  }
+}
+
+function normalizeNote(note) {
+  if (!note || typeof note !== 'object') {
+    return note
+  }
+
+  return {
+    ...note,
+    tags: parseNoteTags(note.tags),
+    _starred: Boolean(note._starred ?? note.starred ?? false),
+  }
+}
+
+function stripHtml(html) {
+  return typeof html === 'string' ? html.replace(/<[^>]+>/g, ' ') : ''
+}
+
 export function useNotesData() {
   const [searchParams, setSearchParams] = useSearchParams()
+  const filterTab = NOTE_FILTER_TABS.has(searchParams.get('tab')) ? searchParams.get('tab') : 'all'
+  const searchQuery = searchParams.get('q') || ''
+  const selectedTag = (searchParams.get('tag') || '').trim().toLowerCase()
   /* ── State ───────────────────────────────────────────────────────────── */
   const [notes, setNotes] = useState([])
   const [activeNote, setActiveNote] = useState(null)
@@ -18,12 +58,41 @@ export function useNotesData() {
   const [editorCourseId, setEditorCourseId] = useState('')
   const [editorAllowDownloads, setEditorAllowDownloads] = useState(false)
   const [courses, setCourses] = useState([])
-  const [filterTab, setFilterTab] = useState('all')
   const [saving, setSaving] = useState(false)
   const [creating, setCreating] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [loadingNotes, setLoadingNotes] = useState(true)
   const saveTimer = useRef()
+
+  const updateSearchParam = useCallback((key, value) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      if (value) next.set(key, value)
+      else next.delete(key)
+      return next
+    }, { replace: true })
+  }, [setSearchParams])
+
+  const setFilterTab = useCallback((value) => {
+    updateSearchParam('tab', NOTE_FILTER_TABS.has(value) ? value : 'all')
+  }, [updateSearchParam])
+
+  const setSearchQuery = useCallback((value) => {
+    updateSearchParam('q', value)
+  }, [updateSearchParam])
+
+  const setSelectedTag = useCallback((value) => {
+    updateSearchParam('tag', value ? value.toLowerCase() : '')
+  }, [updateSearchParam])
+
+  const clearFilters = useCallback(() => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      next.delete('q')
+      next.delete('tag')
+      return next
+    }, { replace: true })
+  }, [setSearchParams])
 
   /* ── Data loading (with abort cleanup to prevent state updates after unmount) */
   useEffect(() => {
@@ -34,7 +103,8 @@ export function useNotesData() {
       .then((data) => {
         if (active) {
           const list = Array.isArray(data) ? data : (Array.isArray(data?.notes) ? data.notes : [])
-          setNotes(list)
+          const normalized = list.map(normalizeNote)
+          setNotes(normalized)
           setLoadingNotes(false)
         }
       })
@@ -69,11 +139,14 @@ export function useNotesData() {
     if (target) {
       selectNote(target)
       // Clean up the URL param after selecting
-      searchParams.delete('select')
-      setSearchParams(searchParams, { replace: true })
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete('select')
+        return next
+      }, { replace: true })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadingNotes, notes])
+  }, [loadingNotes, notes, setSearchParams])
 
   /* ── Note selection ──────────────────────────────────────────────────── */
   function selectNote(note) {
@@ -100,9 +173,13 @@ export function useNotesData() {
           body: JSON.stringify({ title, content, private: isPrivate, courseId: courseId || null, allowDownloads }),
         })
         if (response.ok) {
-          const updated = await response.json()
-          setNotes((prev) => prev.map((n) => (n.id === noteId ? updated : n)))
-          setActiveNote(updated)
+          const updated = normalizeNote(await response.json())
+          setNotes((prev) => prev.map((note) => (
+            note.id === noteId ? { ...updated, _starred: note._starred } : note
+          )))
+          setActiveNote((prev) => (
+            prev?.id === noteId ? { ...updated, _starred: prev._starred } : prev
+          ))
         }
       } finally {
         setSaving(false)
@@ -150,7 +227,7 @@ export function useNotesData() {
         showToast(errData.error || 'Failed to create note', 'error')
         return
       }
-      const note = await response.json()
+      const note = normalizeNote(await response.json())
       setNotes((prev) => [note, ...prev])
       selectNote(note)
     } finally {
@@ -242,18 +319,54 @@ export function useNotesData() {
 
   /* ── Restore version ────────────────────────────────────────────────── */
   function handleRestore(restoredNote) {
-    setNotes((prev) => prev.map((n) => n.id === restoredNote.id ? restoredNote : n))
-    selectNote(restoredNote)
+    const normalized = normalizeNote(restoredNote)
+    setNotes((prev) => prev.map((note) => (
+      note.id === normalized.id ? { ...normalized, _starred: note._starred } : note
+    )))
+    selectNote({
+      ...normalized,
+      _starred: activeNote?.id === normalized.id ? activeNote._starred : normalized._starred,
+    })
     showToast('Version restored', 'success')
   }
 
+  const handleTagsChange = useCallback((noteId, nextTags) => {
+    setNotes((prev) => prev.map((note) => (
+      note.id === noteId ? { ...note, tags: nextTags } : note
+    )))
+    setActiveNote((prev) => (
+      prev?.id === noteId ? { ...prev, tags: nextTags } : prev
+    ))
+  }, [])
+
+  const notesByTab = notes.filter((note) => {
+    if (filterTab === 'private') return note.private !== false
+    if (filterTab === 'shared') return note.private === false
+    if (filterTab === 'starred') return note._starred
+    return true
+  })
+
+  const availableTags = [...new Set(notesByTab.flatMap((note) => note.tags || []))].sort((left, right) => left.localeCompare(right))
+
   /* ── Filtered notes list ─────────────────────────────────────────────── */
-  const visibleNotes = notes
+  const visibleNotes = notesByTab
     .filter((note) => {
-      if (filterTab === 'private') return note.private !== false
-      if (filterTab === 'shared') return note.private === false
-      if (filterTab === 'starred') return note._starred
-      return true
+      const matchesTag = !selectedTag || note.tags?.includes(selectedTag)
+      if (!matchesTag) return false
+
+      if (!searchQuery.trim()) return true
+
+      const haystack = [
+        note.title,
+        stripHtml(note.content),
+        note.course?.code,
+        ...(note.tags || []),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+
+      return haystack.includes(searchQuery.trim().toLowerCase())
     })
     .sort((a, b) => {
       // Pinned notes always float to top
@@ -275,6 +388,12 @@ export function useNotesData() {
     courses,
     filterTab,
     setFilterTab,
+    searchQuery,
+    setSearchQuery,
+    selectedTag,
+    setSelectedTag,
+    clearFilters,
+    availableTags,
     saving,
     creating,
     confirmDelete,
@@ -294,5 +413,6 @@ export function useNotesData() {
     toggleStar,
     togglePin,
     handleRestore,
+    handleTagsChange,
   }
 }

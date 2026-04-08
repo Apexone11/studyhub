@@ -1,9 +1,43 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import GifSearchPanel from '../../../components/GifSearchPanel'
 import MentionText from '../../../components/MentionText'
 import { SkeletonCard } from '../../../components/Skeleton'
 import UserAvatar from '../../../components/UserAvatar'
 import { FONT, panelStyle, timeAgo } from './sheetViewerConstants'
+
+const composerGifCardStyle = {
+  position: 'relative',
+  width: 'min(100%, 220px)',
+  borderRadius: 12,
+  overflow: 'hidden',
+  border: '1px solid var(--sh-border)',
+  background: 'var(--sh-soft)',
+}
+
+const composerGifImageStyle = {
+  width: '100%',
+  maxHeight: 160,
+  display: 'block',
+  objectFit: 'cover',
+}
+
+const postedGifImageStyle = {
+  width: 'min(100%, 260px)',
+  maxHeight: 220,
+  display: 'block',
+  objectFit: 'cover',
+  borderRadius: 10,
+  background: 'var(--sh-soft)',
+}
+
+function createGifAttachment(gif) {
+  return {
+    url: gif.full,
+    type: 'gif',
+    name: gif.title || 'GIF',
+  }
+}
 
 function CommentReactionsSheet({ commentId, reactionCounts = {}, userReaction = null, onReact }) {
   const likes = reactionCounts.like || 0
@@ -51,12 +85,21 @@ export default function SheetCommentsPanel({
   commentsState,
   commentDraft,
   setCommentDraft,
+  commentAttachments,
+  setCommentAttachments,
   commentSaving,
   submitComment,
   deleteComment,
   onReactToComment,
 }) {
   const [commentsExpanded, setCommentsExpanded] = useState(commentsState.total <= 3)
+  const [showGifPicker, setShowGifPicker] = useState(false)
+  const canSubmit = Boolean(commentDraft.trim() || commentAttachments.length > 0)
+
+  const handleGifSelect = (gif) => {
+    setCommentAttachments([createGifAttachment(gif)])
+    setShowGifPicker(false)
+  }
 
   return (
     <section data-tutorial="viewer-comments" style={panelStyle()}>
@@ -79,27 +122,7 @@ export default function SheetCommentsPanel({
 
       {commentsExpanded && (
         <>
-          {!user ? (
-            <div style={{
-              textAlign: 'center', padding: '16px 12px',
-              borderRadius: 12, border: '1px solid var(--sh-border)',
-              background: 'var(--sh-soft)', marginBottom: 16,
-            }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--sh-heading)', marginBottom: 4 }}>
-                Join the conversation
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--sh-muted)', lineHeight: 1.5, marginBottom: 10 }}>
-                Sign in to leave comments, corrections, and study tips.
-              </div>
-              <Link to="/login" style={{
-                display: 'inline-block', padding: '7px 16px', borderRadius: 8,
-                background: 'var(--sh-brand)', color: 'var(--sh-btn-primary-text)',
-                fontSize: 12, fontWeight: 700, textDecoration: 'none',
-              }}>
-                Sign in
-              </Link>
-            </div>
-          ) : (
+          {user ? (
             <form onSubmit={submitComment} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 16 }}>
               <UserAvatar
                 username={user.username}
@@ -126,15 +149,67 @@ export default function SheetCommentsPanel({
                     fontSize: 13,
                   }}
                 />
+                {showGifPicker ? (
+                  <GifSearchPanel onSelect={handleGifSelect} onClose={() => setShowGifPicker(false)} maxHeight={320} previewHeight={96} />
+                ) : null}
+                {commentAttachments.length > 0 ? (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {commentAttachments.map((attachment) => (
+                      <div key={attachment.url} style={composerGifCardStyle}>
+                        <img src={attachment.url} alt={attachment.name || 'GIF preview'} style={composerGifImageStyle} />
+                        <button
+                          type="button"
+                          onClick={() => setCommentAttachments([])}
+                          style={{
+                            position: 'absolute',
+                            top: 6,
+                            right: 6,
+                            width: 24,
+                            height: 24,
+                            borderRadius: '50%',
+                            background: 'rgba(0, 0, 0, 0.6)',
+                            color: '#fff',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontSize: 12,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          X
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
                 <div>
                   <button
+                    type="button"
+                    onClick={() => setShowGifPicker((current) => !current)}
+                    style={{
+                      borderRadius: 10,
+                      border: '1px solid var(--sh-border)',
+                      background: 'transparent',
+                      color: showGifPicker || commentAttachments.length > 0 ? 'var(--sh-brand)' : 'var(--sh-text)',
+                      fontWeight: 700,
+                      fontSize: 12,
+                      padding: '9px 12px',
+                      cursor: 'pointer',
+                      fontFamily: FONT,
+                      marginRight: 8,
+                    }}
+                  >
+                    GIF
+                  </button>
+                  <button
                     type="submit"
-                    disabled={commentSaving}
+                    disabled={commentSaving || !canSubmit}
                     style={{
                       borderRadius: 10,
                       border: 'none',
-                      background: 'var(--sh-btn-primary-bg)',
-                      color: 'var(--sh-btn-primary-text)',
+                      background: canSubmit && !commentSaving ? 'var(--sh-btn-primary-bg)' : 'var(--sh-soft)',
+                      color: canSubmit && !commentSaving ? 'var(--sh-btn-primary-text)' : 'var(--sh-muted)',
                       fontWeight: 800,
                       fontSize: 13,
                       padding: '10px 14px',
@@ -145,8 +220,33 @@ export default function SheetCommentsPanel({
                     {commentSaving ? 'Posting...' : 'Post comment'}
                   </button>
                 </div>
+                {commentsState.error ? (
+                  <div style={{ fontSize: 12, color: 'var(--sh-danger)', lineHeight: 1.5 }}>
+                    {commentsState.error}
+                  </div>
+                ) : null}
               </div>
             </form>
+          ) : (
+            <div style={{
+              textAlign: 'center', padding: '16px 12px',
+              borderRadius: 12, border: '1px solid var(--sh-border)',
+              background: 'var(--sh-soft)', marginBottom: 16,
+            }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--sh-heading)', marginBottom: 4 }}>
+                Join the conversation
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--sh-muted)', lineHeight: 1.5, marginBottom: 10 }}>
+                Sign in to leave comments, corrections, and study tips.
+              </div>
+              <Link to="/login" style={{
+                display: 'inline-block', padding: '7px 16px', borderRadius: 8,
+                background: 'var(--sh-brand)', color: 'var(--sh-btn-primary-text)',
+                fontSize: 12, fontWeight: 700, textDecoration: 'none',
+              }}>
+                Sign in
+              </Link>
+            </div>
           )}
 
           {commentsState.loading ? (
@@ -198,6 +298,18 @@ export default function SheetCommentsPanel({
                       }}>
                         <MentionText text={comment.content} />
                       </div>
+                      {comment.attachments && comment.attachments.length > 0 ? (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+                          {comment.attachments.map((attachment) => (
+                            <img
+                              key={attachment.id || attachment.url}
+                              src={attachment.url}
+                              alt={attachment.name || 'Comment GIF'}
+                              style={postedGifImageStyle}
+                            />
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
                     <div style={{
                       display: 'flex',

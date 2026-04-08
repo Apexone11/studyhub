@@ -12,6 +12,7 @@
 
 import { useParams, useNavigate } from 'react-router-dom'
 import { useState, useRef, useEffect } from 'react'
+import DOMPurify from 'dompurify'
 import Navbar from '../../components/navbar/Navbar'
 import { IconArrowLeft } from '../../components/Icons'
 import { SkeletonCard } from '../../components/Skeleton'
@@ -31,6 +32,9 @@ export default function BookDetailPage() {
 
   const { book, loading, error, shelves, progress, addToShelf, createShelf } =
     useBookDetail(volumeId)
+  const descriptionHtml = DOMPurify.sanitize(book?.description || '', {
+    USE_PROFILES: { html: true },
+  }).trim() || 'No description available for this book.'
 
   const handleAddToShelf = async (shelfId) => {
     const success = await addToShelf(shelfId)
@@ -135,7 +139,7 @@ export default function BookDetailPage() {
                     <div
                       className="book-detail__cover-fallback"
                       style={{
-                        background: 'linear-gradient(135deg, var(--sh-brand), #7c3aed)',
+                        background: 'linear-gradient(135deg, var(--sh-brand), var(--sh-brand-accent))',
                       }}
                     >
                       <div className="book-detail__cover-fallback-text">{book.title}</div>
@@ -204,7 +208,7 @@ export default function BookDetailPage() {
                   <p
                     className="book-detail__description"
                     dangerouslySetInnerHTML={{
-                      __html: book.description || 'No description available for this book.',
+                      __html: descriptionHtml,
                     }}
                   />
                 </div>

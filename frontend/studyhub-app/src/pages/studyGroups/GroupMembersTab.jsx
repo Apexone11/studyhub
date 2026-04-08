@@ -5,12 +5,13 @@ import { formatRelativeTime, getRoleLabel } from './studyGroupsHelpers'
 import { styles } from './GroupDetailTabs.styles'
 
 export function GroupMembersTab({
-  groupId,
   members,
   onUpdateMember,
   onRemoveMember,
   onInvite,
   isAdmin,
+  isAdminOrMod,
+  viewerRole,
   currentUserId,
 }) {
   const [inviteModalOpen, setInviteModalOpen] = useState(false)
@@ -38,7 +39,6 @@ export function GroupMembersTab({
     try {
       await onInvite({
         username: formData.username.trim(),
-        groupId,
       })
       setInviteModalOpen(false)
       setFormData({ username: '' })
@@ -56,9 +56,9 @@ export function GroupMembersTab({
           <div style={styles.emptyIcon} aria-label="People icon">Members</div>
           <div style={styles.emptyTitle}>No Members</div>
           <p style={styles.emptyText}>
-            {isAdmin ? 'Invite your first member!' : 'No members yet'}
+            {isAdminOrMod ? 'Invite your first member!' : 'No members yet'}
           </p>
-          {isAdmin && (
+          {isAdminOrMod && (
             <button
               onClick={handleInviteClick}
               style={{ ...styles.button, ...styles.buttonPrimary, marginTop: 'var(--space-4)' }}
@@ -134,7 +134,7 @@ export function GroupMembersTab({
     <div style={styles.tabContainer}>
       {/* Top bar: invite + search */}
       <div style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-4)', alignItems: 'center', flexWrap: 'wrap' }}>
-        {isAdmin && (
+        {isAdminOrMod && (
           <button
             onClick={handleInviteClick}
             style={{ ...styles.button, ...styles.buttonPrimary }}
@@ -167,6 +167,11 @@ export function GroupMembersTab({
             </h3>
             <div style={styles.memberGrid}>
               {group.list.map((member) => {
+                const canUpdateRole = isAdmin && member.userId !== currentUserId
+                const canApproveMember = isAdmin && member.status === 'pending'
+                const canRemoveMember = isAdminOrMod
+                  && member.userId !== currentUserId
+                  && !(viewerRole === 'moderator' && member.role === 'admin')
                 const statusBadge = member.status === 'invited'
                   ? { label: 'Invited', style: styles.badgeOrange }
                   : member.status === 'pending'
@@ -195,36 +200,53 @@ export function GroupMembersTab({
                       Joined {formatRelativeTime(member.joinedAt)}
                     </div>
 
-                    {isAdmin && (member.id || member.userId) !== currentUserId && (
+                    {(canUpdateRole || canApproveMember || canRemoveMember) && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                        <select
-                          value={member.role}
-                          onChange={(e) => onUpdateMember(member.id || member.userId, { role: e.target.value })}
-                          style={{
-                            ...styles.select,
-                            fontSize: 'var(--type-xs)',
-                            padding: '0.375rem',
-                          }}
-                        >
-                          <option value="member">Member</option>
-                          <option value="moderator">Moderator</option>
-                          <option value="admin">Admin</option>
-                        </select>
-                        <button
-                          onClick={() => {
-                            if (window.confirm('Remove this member?')) {
-                              onRemoveMember(member.id || member.userId)
-                            }
-                          }}
-                          style={{
-                            ...styles.button,
-                            ...styles.buttonDanger,
-                            ...styles.buttonSmall,
-                            fontSize: 'var(--type-xs)',
-                          }}
-                        >
-                          Remove
-                        </button>
+                        {canUpdateRole ? (
+                          <select
+                            value={member.role}
+                            onChange={(e) => onUpdateMember(member.userId, { role: e.target.value })}
+                            style={{
+                              ...styles.select,
+                              fontSize: 'var(--type-xs)',
+                              padding: '0.375rem',
+                            }}
+                          >
+                            <option value="member">Member</option>
+                            <option value="moderator">Moderator</option>
+                            <option value="admin">Admin</option>
+                          </select>
+                        ) : null}
+                        {canApproveMember ? (
+                          <button
+                            onClick={() => onUpdateMember(member.userId, { status: 'active' })}
+                            style={{
+                              ...styles.button,
+                              ...styles.buttonPrimary,
+                              ...styles.buttonSmall,
+                              fontSize: 'var(--type-xs)',
+                            }}
+                          >
+                            Approve
+                          </button>
+                        ) : null}
+                        {canRemoveMember ? (
+                          <button
+                            onClick={() => {
+                              if (window.confirm('Remove this member?')) {
+                                onRemoveMember(member.userId)
+                              }
+                            }}
+                            style={{
+                              ...styles.button,
+                              ...styles.buttonDanger,
+                              ...styles.buttonSmall,
+                              fontSize: 'var(--type-xs)',
+                            }}
+                          >
+                            Remove
+                          </button>
+                        ) : null}
                       </div>
                     )}
                   </div>

@@ -44,6 +44,33 @@ function verifyAuthToken(token) {
   return jwt.verify(token, getJwtSecret())
 }
 
+function normalizeAuthUserId(value) {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (/^\d+$/.test(trimmed)) {
+      const parsed = Number.parseInt(trimmed, 10)
+      if (Number.isSafeInteger(parsed)) return parsed
+    }
+    return trimmed || null
+  }
+
+  return null
+}
+
+function normalizeAuthUser(payload) {
+  const userId = normalizeAuthUserId(payload?.userId ?? payload?.sub ?? payload?.id ?? null)
+  if (!userId) return null
+
+  return {
+    userId,
+    username: payload?.username || null,
+    role: payload?.role || null,
+    trustLevel: payload?.trustLevel || null,
+  }
+}
+
 function signCsrfToken(user) {
   return jwt.sign(
     { sub: user.id, type: 'csrf' },
@@ -67,7 +94,11 @@ function parseCookies(cookieHeader = '') {
 
       const key = cookie.slice(0, separatorIndex).trim()
       const value = cookie.slice(separatorIndex + 1).trim()
-      cookies[key] = decodeURIComponent(value)
+      try {
+        cookies[key] = decodeURIComponent(value)
+      } catch {
+        cookies[key] = value
+      }
       return cookies
     }, {})
 }
@@ -85,6 +116,17 @@ function getAuthTokenFromRequest(req) {
   }
 
   return getAuthCookieTokenFromRequest(req)
+}
+
+function getOptionalAuthUserFromRequest(req) {
+  const token = getAuthTokenFromRequest(req)
+  if (!token) return null
+
+  try {
+    return normalizeAuthUser(verifyAuthToken(token))
+  } catch {
+    return null
+  }
 }
 
 function getAuthCookieOptions() {
@@ -122,9 +164,12 @@ module.exports = {
   clearAuthCookie,
   getAuthCookieOptions,
   getAuthCookieTokenFromRequest,
+  getOptionalAuthUserFromRequest,
   getAuthTokenFromRequest,
   getJwtSecret,
   hashStoredSecret,
+  normalizeAuthUserId,
+  normalizeAuthUser,
   signCsrfToken,
   setAuthCookie,
   signAuthToken,

@@ -23,6 +23,9 @@ const mocks = vi.hoisted(() => {
       delete: vi.fn(),
       count: vi.fn(),
     },
+    noteVersion: {
+      findMany: vi.fn(),
+    },
   }
 
   return {
@@ -35,6 +38,10 @@ const mocks = vi.hoisted(() => {
     verifiedEmail: vi.fn((_req, _res, next) => next()),
     sentry: { captureError: vi.fn() },
     securityEvents: { logSecurityEvent: vi.fn() },
+    storage: {
+      cleanupNoteImageIfUnused: vi.fn(async () => true),
+      extractNoteImageUrlsFromTexts: vi.fn(() => []),
+    },
   }
 })
 
@@ -44,6 +51,7 @@ const mockTargets = new Map([
   [require.resolve('../src/middleware/requireVerifiedEmail'), mocks.verifiedEmail],
   [require.resolve('../src/monitoring/sentry'), mocks.sentry],
   [require.resolve('../src/lib/securityEvents'), mocks.securityEvents],
+  [require.resolve('../src/lib/storage'), mocks.storage],
 ])
 
 const originalModuleLoad = Module._load
@@ -76,6 +84,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   mocks.state.userId = 42
   mocks.state.role = 'student'
+  mocks.prisma.noteVersion.findMany.mockResolvedValue([])
 })
 
 const OWNER_ID = 100
@@ -150,12 +159,22 @@ describe('DELETE /api/notes/:id — ownership enforcement', () => {
 
   it('returns 200 when owner deletes their own note', async () => {
     mocks.state.userId = OWNER_ID
-    mocks.prisma.note.findUnique.mockResolvedValue(noteFixture())
+    mocks.prisma.note.findUnique.mockResolvedValue(
+      noteFixture({ content: '![image](/uploads/note-images/owner-note.png)' })
+    )
     mocks.prisma.note.delete.mockResolvedValue({})
+    mocks.prisma.noteVersion.findMany.mockResolvedValue([
+      { content: '![image](/uploads/note-images/version-note.png)' },
+    ])
+    mocks.storage.extractNoteImageUrlsFromTexts.mockReturnValue([
+      '/uploads/note-images/owner-note.png',
+      '/uploads/note-images/version-note.png',
+    ])
 
     const res = await request(app).delete('/api/notes/1')
 
     expect(res.status).toBe(200)
     expect(mocks.prisma.note.delete).toHaveBeenCalledWith({ where: { id: 1 } })
+    expect(mocks.storage.cleanupNoteImageIfUnused).toHaveBeenCalledTimes(2)
   })
 })

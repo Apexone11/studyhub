@@ -32,7 +32,7 @@ function ForgotPasswordPage() {
 
   return (
     <div className="forgot-page">
-      <Navbar />
+      <Navbar variant="landing" />
       <div className="forgot-center">
         <div className="forgot-card">
           <div className="forgot-top">

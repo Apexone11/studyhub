@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import UserAvatar from '../../../components/UserAvatar'
 import VerificationBadge from '../../../components/verification/VerificationBadge'
 import { IconFork, IconStar, IconArrowLeft } from '../../../components/Icons'
 import { FONT, statusPill, timeAgo } from './sheetViewerConstants'
@@ -45,17 +46,16 @@ export default function SheetHeader({ sheet, handleBack }) {
 
       {/* Row 3: Author + verification + metadata */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', fontSize: 13, color: 'var(--sh-subtext)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <div
-            style={{
-              width: 24, height: 24, borderRadius: '50%',
-              background: 'var(--sh-avatar-bg)', color: 'var(--sh-avatar-text)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 11, fontWeight: 800, textTransform: 'uppercase', flexShrink: 0,
-            }}
-          >
-            {(sheet.author?.username || '?')[0]}
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <UserAvatar
+            username={sheet.author?.username}
+            avatarUrl={sheet.author?.avatarUrl}
+            role={sheet.author?.role}
+            plan={sheet.author?.plan}
+            isDonor={sheet.author?.isDonor}
+            donorLevel={sheet.author?.donorLevel}
+            size={28}
+          />
           <Link
             to={`/users/${sheet.author?.username}`}
             style={{ color: 'var(--sh-heading)', fontWeight: 700, textDecoration: 'none' }}

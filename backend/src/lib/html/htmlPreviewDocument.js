@@ -38,7 +38,7 @@ const DEFAULT_ALLOWED_ATTRIBUTES = {
   '*': ['id', 'class', 'title', 'aria-*', 'role', 'style'],
   a: ['href', 'name', 'target', 'rel'],
   img: ['src', 'srcset', 'alt', 'width', 'height', 'loading'],
-  form: ['action', 'method', 'autocomplete'],
+  form: ['method', 'autocomplete'],
   input: ['type', 'name', 'value', 'placeholder', 'checked', 'disabled', 'readonly', 'maxlength'],
   textarea: ['name', 'rows', 'cols', 'placeholder', 'maxlength', 'readonly', 'disabled'],
   select: ['name', 'multiple', 'disabled'],
@@ -56,7 +56,7 @@ function sanitizePreviewHtml(value) {
     allowedTags: DEFAULT_ALLOWED_TAGS,
     allowedAttributes: DEFAULT_ALLOWED_ATTRIBUTES,
     allowedSchemes: ['data', 'blob'],
-    allowedSchemesAppliedToAttributes: ['href', 'src', 'srcset', 'action'],
+    allowedSchemesAppliedToAttributes: ['href', 'src', 'srcset'],
     allowProtocolRelative: false,
     parseStyleAttributes: true,
   })

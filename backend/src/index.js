@@ -22,7 +22,8 @@ const csrfProtection = require('./middleware/csrf')
 const { guardedMode, isGuardedModeEnabled } = require('./middleware/guardedMode')
 const checkRestrictions = require('./middleware/checkRestrictions')
 const auditMiddleware = require('./middleware/auditMiddleware')
-const { getAuthTokenFromRequest, validateSecrets, verifyAuthToken } = require('./lib/authTokens')
+const optionalAuth = require('./core/auth/optionalAuth')
+const { validateSecrets } = require('./lib/authTokens')
 const { ERROR_CODES, sendError } = require('./middleware/errorEnvelope')
 const prisma = require('./lib/prisma')
 
@@ -292,17 +293,7 @@ app.use(csrfProtection)
 // Attempt to decode auth token early so downstream global middleware
 // (checkRestrictions) can see req.user. Non-fatal — if no valid token is
 // present the request continues as unauthenticated.
-app.use((req, _res, next) => {
-  if (req.user) return next()
-  const token = getAuthTokenFromRequest(req)
-  if (!token) return next()
-  try {
-    req.user = verifyAuthToken(token)
-  } catch {
-    /* invalid/expired — proceed unauthenticated */
-  }
-  next()
-})
+app.use(optionalAuth)
 
 // Block restricted users from write operations (posting, commenting, uploading).
 // Skips GET/HEAD/OPTIONS, unauthenticated requests, and admin users.
@@ -540,7 +531,7 @@ async function startServer() {
     startHtmlArchiveScheduler()
     startModerationCleanupScheduler()
     // Pre-warm library cache with popular books (non-blocking).
-    // Also syncs to CachedBook DB table so fallback works when Gutendex is down.
+    // Also syncs to CachedBook DB table so fallback works when Google Books is unavailable.
     const {
       preloadPopularBooks,
       syncPopularBooksToDB,

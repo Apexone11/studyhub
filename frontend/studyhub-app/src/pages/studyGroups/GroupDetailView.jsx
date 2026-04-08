@@ -9,7 +9,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import { useSession } from '../../lib/session-context'
 import { useStudyGroupsData } from './useStudyGroupsData'
-import { getPrivacyLabel } from './studyGroupsHelpers'
+import { getPrivacyLabel, resolveGroupImageUrl } from './studyGroupsHelpers'
 import {
   GroupOverviewTab,
   GroupResourcesTab,
@@ -129,7 +129,13 @@ export default function GroupDetailView({ groupId }) {
   }
 
   const isAdmin = activeGroup.userRole === 'admin'
-  const isMember = activeGroup.isMember
+  const membershipStatus = activeGroup.userMembership?.status || (activeGroup.isMember ? 'active' : null)
+  const isMember = membershipStatus === 'active'
+  const isPending = membershipStatus === 'pending'
+  const isInvited = membershipStatus === 'invited'
+  const isAdminOrMod = isAdmin || activeGroup.userRole === 'moderator'
+  const groupImageUrl = resolveGroupImageUrl(activeGroup.avatarUrl)
+  const detailDescription = activeGroup.description || 'Use this space to coordinate sessions, share resources, and keep your study rhythm together.'
 
   const handleEdit = async (updates) => {
     try {
@@ -151,14 +157,22 @@ export default function GroupDetailView({ groupId }) {
     }
   }
 
-  const handleJoin = () => {
-    joinGroup(groupId)
+  const handleJoin = async () => {
+    try {
+      await joinGroup(groupId)
+    } catch {
+      // Error shown via toast
+    }
   }
 
-  const handleLeave = () => {
+  const handleLeave = async () => {
     if (window.confirm('Are you sure you want to leave this group?')) {
-      leaveGroup(groupId)
-      navigate('/study-groups')
+      try {
+        await leaveGroup(groupId)
+        navigate('/study-groups')
+      } catch {
+        // Error shown via toast
+      }
     }
   }
 
@@ -175,86 +189,192 @@ export default function GroupDetailView({ groupId }) {
 
         {/* Group header */}
         <section style={styles.detailHeader}>
-          <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-            {/* Group avatar */}
+          <div
+            style={{
+              position: 'relative',
+              minHeight: 220,
+              background: groupImageUrl
+                ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.18), rgba(15, 23, 42, 0.48))'
+                : 'linear-gradient(135deg, rgba(37, 99, 235, 0.92), rgba(124, 58, 237, 0.9))',
+            }}
+          >
+            {groupImageUrl ? (
+              <img
+                src={groupImageUrl}
+                alt={activeGroup.name}
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                }}
+              />
+            ) : null}
+
             <div
               style={{
-                width: 56,
-                height: 56,
-                borderRadius: 14,
-                background: activeGroup.avatarUrl
-                  ? 'transparent'
-                  : 'linear-gradient(135deg, var(--sh-brand), var(--sh-brand-accent))',
+                position: 'relative',
+                zIndex: 1,
                 display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-                overflow: 'hidden',
-                border: '2px solid var(--sh-border)',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                gap: 20,
+                minHeight: 220,
+                padding: '24px',
+                background: groupImageUrl
+                  ? 'linear-gradient(180deg, rgba(15, 23, 42, 0.16), rgba(15, 23, 42, 0.68))'
+                  : 'transparent',
               }}
             >
-              {activeGroup.avatarUrl ? (
-                <img
-                  src={activeGroup.avatarUrl}
-                  alt={activeGroup.name}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                />
-              ) : (
-                <span style={{ fontSize: 22, fontWeight: 800, color: '#fff' }}>
-                  {activeGroup.name.charAt(0).toUpperCase()}
-                </span>
-              )}
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <h1 style={styles.detailTitle}>{activeGroup.name}</h1>
-              <p style={styles.detailDesc}>{activeGroup.description}</p>
+              <div style={{ display: 'grid', gap: 14, minWidth: 0 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.72)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                  Study Group
+                </div>
+                <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                  <div
+                    style={{
+                      width: 82,
+                      height: 82,
+                      borderRadius: 24,
+                      overflow: 'hidden',
+                      border: '1px solid rgba(255,255,255,0.24)',
+                      boxShadow: '0 20px 36px rgba(15, 23, 42, 0.25)',
+                      background: groupImageUrl ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.18)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {groupImageUrl ? (
+                      <img
+                        src={groupImageUrl}
+                        alt=""
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    ) : (
+                      <span style={{ fontSize: 34, fontWeight: 800, color: '#fff' }}>
+                        {activeGroup.name.charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                  </div>
 
-              <div style={styles.detailMeta}>
-                <span style={styles.privacyBadge}>{getPrivacyLabel(activeGroup.privacy)}</span>
-                <span style={styles.memberBadge}>
-                  {activeGroup.memberCount}
-                  {activeGroup.maxMembers ? `/${activeGroup.maxMembers}` : ''} member
-                  {activeGroup.memberCount === 1 ? '' : 's'}
-                </span>
-                {activeGroup.courseId && (
-                  <span style={styles.courseBadge}>{activeGroup.courseName}</span>
-                )}
-                {activeGroup.createdAt && (
-                  <span style={{ fontSize: 12, color: 'var(--sh-muted)' }}>
-                    Created{' '}
-                    {new Date(activeGroup.createdAt).toLocaleDateString('en-US', {
-                      month: 'short',
-                      year: 'numeric',
-                    })}
-                  </span>
+                  <div style={{ flex: 1, minWidth: 0, display: 'grid', gap: 12 }}>
+                    <h1 style={{ ...styles.detailTitle, color: '#fff', marginBottom: 0 }}>{activeGroup.name}</h1>
+                    <p style={{ ...styles.detailDesc, color: 'rgba(255,255,255,0.82)', margin: 0, maxWidth: 760 }}>
+                      {detailDescription}
+                    </p>
+
+                    <div style={{ ...styles.detailMeta, gap: 10 }}>
+                      <span style={{ ...styles.privacyBadge, background: 'rgba(255,255,255,0.12)', color: '#fff' }}>
+                        {getPrivacyLabel(activeGroup.privacy)}
+                      </span>
+                      <span style={{ ...styles.memberBadge, background: 'rgba(255,255,255,0.12)', color: '#fff' }}>
+                        {activeGroup.memberCount}
+                        {activeGroup.maxMembers ? `/${activeGroup.maxMembers}` : ''} member
+                        {activeGroup.memberCount === 1 ? '' : 's'}
+                      </span>
+                      {activeGroup.courseId ? (
+                        <span style={{ ...styles.courseBadge, background: 'rgba(255,255,255,0.12)', color: '#fff' }}>
+                          {activeGroup.courseName}
+                        </span>
+                      ) : null}
+                      {activeGroup.createdAt ? (
+                        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.72)' }}>
+                          Created{' '}
+                          {new Date(activeGroup.createdAt).toLocaleDateString('en-US', {
+                            month: 'short',
+                            year: 'numeric',
+                          })}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={styles.actionButtons}>
+                {!membershipStatus ? (
+                  <button onClick={handleJoin} style={styles.joinBtn}>
+                    {activeGroup.privacy === 'private' ? 'Request to Join' : 'Join Group'}
+                  </button>
+                ) : isPending ? (
+                  <button
+                    type="button"
+                    disabled
+                    style={{ ...styles.joinBtn, opacity: 0.72, cursor: 'not-allowed' }}
+                  >
+                    Request Pending
+                  </button>
+                ) : isInvited ? (
+                  <button onClick={handleJoin} style={styles.joinBtn}>
+                    Accept Invitation
+                  </button>
+                ) : (
+                  <>
+                    {isAdmin ? (
+                      <button onClick={() => setEditModalOpen(true)} style={styles.editBtn}>
+                        Edit Group
+                      </button>
+                    ) : null}
+                    {isAdmin ? (
+                      <button onClick={handleDelete} style={styles.deleteBtn}>
+                        Delete Group
+                      </button>
+                    ) : null}
+                    <button onClick={handleLeave} style={styles.leaveBtn}>
+                      Leave Group
+                    </button>
+                  </>
                 )}
               </div>
             </div>
           </div>
 
-          {/* Action buttons */}
-          <div style={{ ...styles.actionButtons, flexDirection: 'row', flexWrap: 'wrap' }}>
-            {!isMember ? (
-              <button onClick={handleJoin} style={styles.joinBtn}>
-                Join Group
-              </button>
-            ) : (
-              <>
-                {isAdmin && (
-                  <button onClick={() => setEditModalOpen(true)} style={styles.editBtn}>
-                    Edit Group
-                  </button>
-                )}
-                {isAdmin && (
-                  <button onClick={handleDelete} style={styles.deleteBtn}>
-                    Delete Group
-                  </button>
-                )}
-                <button onClick={handleLeave} style={styles.leaveBtn}>
-                  Leave Group
-                </button>
-              </>
-            )}
+          <div style={{ padding: '24px', display: 'grid', gap: 18 }}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                gap: 12,
+              }}
+            >
+              {[
+                { label: 'Members', value: activeGroup.memberCount },
+                { label: 'Resources', value: activeGroup.resourceCount },
+                { label: 'Upcoming Sessions', value: activeGroup.upcomingSessionCount },
+                { label: 'Discussions', value: activeGroup.discussionPostCount },
+              ].map((stat) => (
+                <div
+                  key={stat.label}
+                  style={{
+                    padding: '14px 16px',
+                    borderRadius: 18,
+                    border: '1px solid var(--sh-border)',
+                    background: 'var(--sh-soft)',
+                    display: 'grid',
+                    gap: 6,
+                  }}
+                >
+                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--sh-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    {stat.label}
+                  </span>
+                  <span style={{ fontSize: 22, fontWeight: 800, color: 'var(--sh-heading)' }}>
+                    {stat.value}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+              <div style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--sh-subtext)', maxWidth: 640 }}>
+                Everything your group needs stays here: shared resources, upcoming sessions, discussion threads, and the current member roster.
+              </div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--sh-muted)' }}>
+                {isMember ? 'Member access enabled' : activeGroup.privacy === 'public' ? 'Open to all students' : 'Membership approval required'}
+              </div>
+            </div>
           </div>
         </section>
 
@@ -306,6 +426,7 @@ export default function GroupDetailView({ groupId }) {
               activities={activities}
               activitiesLoading={activitiesLoading}
               upcomingSessions={upcomingSessionsPreview}
+              isAdminOrMod={isAdminOrMod}
             />
           )}
           {activeTab === 'resources' && (
@@ -314,7 +435,7 @@ export default function GroupDetailView({ groupId }) {
               resources={resources}
               onAdd={(data) => addResource(groupId, data)}
               onDelete={(resourceId) => deleteResource(groupId, resourceId)}
-              isAdminOrMod={isAdmin || activeGroup?.userRole === 'moderator'}
+              isAdminOrMod={isAdminOrMod}
               isMember={isMember}
             />
           )}
@@ -326,7 +447,7 @@ export default function GroupDetailView({ groupId }) {
               loadSessions={loadSessions}
               onAdd={(data) => createSession(groupId, data)}
               onRsvp={(sessionId, status) => rsvpSession(groupId, sessionId, { status })}
-              isAdminOrMod={isAdmin || activeGroup?.userRole === 'moderator'}
+              isAdminOrMod={isAdminOrMod}
               isMember={isMember}
             />
           )}
@@ -342,7 +463,7 @@ export default function GroupDetailView({ groupId }) {
               onDeletePost={deletePost}
               onUpvote={(postId) => toggleUpvote(groupId, postId)}
               isMember={isMember}
-              isAdminOrMod={isAdmin || activeGroup?.userRole === 'moderator'}
+              isAdminOrMod={isAdminOrMod}
               userId={currentUserId}
             />
           )}
@@ -356,6 +477,8 @@ export default function GroupDetailView({ groupId }) {
               onUpdateMember={(userId, data) => updateMember(groupId, userId, data)}
               onInvite={(data) => inviteMember(groupId, data)}
               isAdmin={isAdmin}
+              isAdminOrMod={isAdminOrMod}
+              viewerRole={activeGroup.userRole || null}
               currentUserId={currentUserId}
             />
           )}

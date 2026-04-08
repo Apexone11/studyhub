@@ -19,6 +19,7 @@ function postAttachmentAccessible(post, user) {
 }
 
 const owner = { userId: 1, role: 'user' }
+const ownerFromLegacyToken = { userId: '1', role: 'user' }
 const admin = { userId: 99, role: 'admin' }
 const stranger = { userId: 2, role: 'user' }
 const anon = undefined
@@ -49,6 +50,10 @@ describe('Sheet attachment access control (canReadSheet)', () => {
 
     it.each(cases)('%s — owner can access', (_label, sheet) => {
       expect(canReadSheet(sheet, owner)).toBe(true)
+    })
+
+    it.each(cases)('%s — owner with legacy string id can access', (_label, sheet) => {
+      expect(canReadSheet(sheet, ownerFromLegacyToken)).toBe(true)
     })
 
     it.each(cases)('%s — admin can access', (_label, sheet) => {

@@ -22,8 +22,11 @@ model User {
   emailVerificationExpiry DateTime?
   failedAttempts          Int       @default(0)
   lockedUntil             DateTime?
+  displayName             String?
+  bio                     String?   @db.VarChar(500)
   avatarUrl               String?
   coverImageUrl           String?
+  profileLinks            Json      @default("[]")
   twoFaEnabled            Boolean   @default(false)
   twoFaCode               String?
   twoFaExpiry             DateTime?
@@ -102,7 +105,6 @@ model User {
   bookShelves                BookShelf[]
   readingProgress            ReadingProgress[]
   bookBookmarks              BookBookmark[]
-  bookHighlights             BookHighlight[]
   videos                     Video[]                   @relation("UserVideos")
   pageViews                  PageView[]
   subscription               Subscription?
@@ -707,8 +709,17 @@ model UserPreferences {
   emailDigest          Boolean @default(true)
   emailMentions        Boolean @default(true)
   emailContributions   Boolean @default(true)
+  emailComments        Boolean @default(true)
+  emailSocial          Boolean @default(true)
+  emailStudyGroups     Boolean @default(true)
   inAppNotifications   Boolean @default(true)
+  inAppMentions        Boolean @default(true)
+  inAppComments        Boolean @default(true)
+  inAppSocial          Boolean @default(true)
+  inAppContributions   Boolean @default(true)
+  inAppStudyGroups     Boolean @default(true)
   profileVisibility    String  @default("public")
+  profileFieldVisibility Json   @default("{}")
   defaultDownloads     Boolean @default(true)
   defaultContributions Boolean @default(true)
   theme                String  @default("system")
@@ -1346,6 +1357,7 @@ model BookShelf {
   userId      Int
   name        String
   description String?
+  visibility  String   @default("private")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -1354,6 +1366,7 @@ model BookShelf {
 
   @@unique([userId, name])
   @@index([userId])
+  @@index([userId, visibility])
 }
 
 model ShelfBook {
@@ -1398,24 +1411,6 @@ model BookBookmark {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, volumeId])
-}
-
-model BookHighlight {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  volumeId  String
-  cfi       String
-  text      String
-  color     String   @default("#FFEB3B")
-  note      String?
-  shared    Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, volumeId])
-  @@index([volumeId, shared])
 }
 
 // ── Waitlist ─────────────────────────────────────────────────

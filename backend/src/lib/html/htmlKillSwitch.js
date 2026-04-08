@@ -4,7 +4,7 @@
  * Priority order:
  *   1. Environment variable STUDYHUB_HTML_UPLOADS
  *      - "disabled" → always blocked, regardless of DB
- *      - "enabled"  → defer to DB flag
+ *      - "enabled"  → always allowed, regardless of DB
  *      - unset / empty → defer to DB flag
  *   2. FeatureFlag row named "html_uploads"
  *      - enabled: true  → HTML uploads allowed

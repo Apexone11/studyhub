@@ -1,3 +1,5 @@
+<!-- markdownlint-disable MD031 MD032 MD040 MD060 -->
+
 # StudyHub v2.0 Implementation Plan
 
 **Author:** Hub AI / Abdul Fornah
@@ -28,6 +30,8 @@
 
 This plan covers six major workstreams that transform StudyHub from a study-sheet platform into a comprehensive knowledge hub. The largest effort is the Public Domain Library ("BookHub"), which gives users access to 70,000+ free books via Project Gutenberg with an in-browser reader, AI-assisted reading, and social annotations. Supporting features include subscription groundwork, a code playground concept, admin analytics charts, and a full security hardening pass.
 
+Historical note (2026-04-07): the shipped library now uses Google Books metadata plus the embedded Google Books reader. Shelves, bookmarks, and reading progress remain active. The Gutendex, epub.js, and highlight details below are preserved as archival planning context rather than the current product contract.
+
 **Key technical decisions made during research:**
 
 - **Book data source:** Gutendex API (gutendex.com/books) for Project Gutenberg metadata and download links, Open Library Covers API for high-quality cover images.
@@ -38,6 +42,8 @@ This plan covers six major workstreams that transform StudyHub from a study-shee
 ---
 
 ## 2. Feature 1: Public Domain Library (BookHub)
+
+Superseded implementation note: the production-facing library is Google Books-based and does not ship the epub.js highlight workflow described in this planning document.
 
 ### 2.1 Overview
 
@@ -67,6 +73,7 @@ A new top-level page at `/library` where users can browse, search, and read publ
 #### 2.3.1 Library Main Page (`/library`)
 
 **Layout:**
+
 - Hero section with search bar and category quick-filters (Fiction, Science, History, Philosophy, etc.).
 - Three tabbed sections: "Discover" (trending/popular), "My Bookshelf" (saved/bookmarked/downloaded), "Recently Read."
 - Book grid with cover image, title, author, and download count.
@@ -74,6 +81,7 @@ A new top-level page at `/library` where users can browse, search, and read publ
 - Sidebar filters: language, subject, author, year range, sort by (popular, newest, title A-Z).
 
 **What makes it unique:**
+
 - "Study Shelf" concept -- users can organize books into custom shelves (e.g., "HIST 101 Reading List," "Philosophy Electives").
 - Course-linked recommendations: if a user is enrolled in a History course, suggest relevant public domain history texts.
 - Community reading stats: "247 StudyHub students are reading this book" social proof badges.
@@ -82,6 +90,7 @@ A new top-level page at `/library` where users can browse, search, and read publ
 #### 2.3.2 Book Detail Page (`/library/:gutenbergId`)
 
 **Layout:**
+
 - Large, high-quality cover image (Open Library L-size or Gutendex JPEG).
 - Full metadata panel: title, author(s) with birth/death years, subjects, bookshelves, language, download count, Project Gutenberg ID, copyright status.
 - Book summary section (pulled from Open Library description field, or Gutendex subjects as fallback).

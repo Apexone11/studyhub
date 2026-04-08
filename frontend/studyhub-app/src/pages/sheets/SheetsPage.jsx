@@ -16,6 +16,7 @@ import SheetsFilters from './SheetsFilters'
 import SheetsEmptyState from './SheetsEmptyState'
 import SheetsAside from './SheetsAside'
 import useSheetsData from './useSheetsData'
+import { isEditableSheetStatus } from './sheetsPageConstants'
 import './SheetsPage.css'
 
 export default function SheetsPage() {
@@ -61,12 +62,12 @@ export default function SheetsPage() {
   return (
     <>
       <Navbar />
-      <div className="sheets-page">
-        <div style={pageShell('app', 26, 48)}>
-          <div className="app-three-col-grid">
+      <div className="sheets-page sh-app-page">
+        <div className="sh-ambient-shell" style={pageShell('app', 26, 48)}>
+          <div className="app-three-col-grid sh-ambient-grid">
             <AppSidebar mode={layout.sidebarMode} />
 
-            <main id="main-content" className="sheets-page__main">
+            <main id="main-content" className="sheets-page__main sh-ambient-main">
               <section className="sh-card sheets-page__title-card">
                 <div className="sheets-page__title-row">
                   <div>
@@ -147,7 +148,7 @@ export default function SheetsPage() {
                         forking={forkingSheetId === sheet.id}
                         onOpen={(sheetId) => {
                           const s = sheetsState.sheets.find((x) => x.id === sheetId)
-                          if (s && s.status === 'draft') {
+                          if (s && isEditableSheetStatus(s.status)) {
                             navigate(`/sheets/upload?draft=${sheetId}`)
                           } else {
                             navigate(`/sheets/${sheetId}`)

@@ -13,6 +13,7 @@ const { getInitialModerationStatus } = require('../../lib/trustGate')
 const { trackActivity } = require('../../lib/activityTracker')
 const { timedSection, logTiming } = require('../../lib/requestTiming')
 const { commentReactLimiter } = require('../../lib/rateLimiters')
+const { normalizeCommentGifAttachments } = require('../../lib/commentGifAttachments')
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 
 const router = express.Router()
@@ -20,7 +21,7 @@ const router = express.Router()
 router.post('/:id/star', requireAuth, reactLimiter, async (req, res) => {
   const sheetId = Number.parseInt(req.params.id, 10)
   if (!Number.isInteger(sheetId)) return res.status(400).json({ error: 'Invalid sheet id.' })
-  const userId = req.user.userId
+  const { userId } = req.user
 
   try {
     const existing = await prisma.starredSheet.findUnique({
@@ -196,9 +197,15 @@ router.post('/:id/comments', requireAuth, requireVerifiedEmail, commentLimiter, 
   if (!Number.isInteger(sheetId)) return res.status(400).json({ error: 'Invalid sheet id.' })
   const content = typeof req.body.content === 'string' ? req.body.content.trim() : ''
   const parentId = req.body.parentId ? Number.parseInt(req.body.parentId, 10) : null
-  const attachments = Array.isArray(req.body.attachments) ? req.body.attachments : []
+  const attachmentValidation = normalizeCommentGifAttachments(req.body.attachments)
 
-  if (!content) return res.status(400).json({ error: 'Comment cannot be empty.' })
+  if (attachmentValidation.error) {
+    return sendError(res, 400, attachmentValidation.error, ERROR_CODES.BAD_REQUEST)
+  }
+
+  const { attachments } = attachmentValidation
+
+  if (!content && attachments.length === 0) return res.status(400).json({ error: 'Comment cannot be empty.' })
   if (content.length > 500) {
     return res.status(400).json({ error: 'Comment must be 500 characters or fewer.' })
   }
@@ -292,7 +299,7 @@ router.post('/:id/comments', requireAuth, requireVerifiedEmail, commentLimiter, 
 router.post('/:id/react', requireAuth, reactLimiter, async (req, res) => {
   const sheetId = Number.parseInt(req.params.id, 10)
   if (!Number.isInteger(sheetId)) return res.status(400).json({ error: 'Invalid sheet id.' })
-  const userId = req.user.userId
+  const { userId } = req.user
   const { type } = req.body || {}
 
   if (type !== null && type !== 'like' && type !== 'dislike') {
@@ -349,7 +356,7 @@ router.post('/:id/react', requireAuth, reactLimiter, async (req, res) => {
 
 router.post('/:id/comments/:commentId/react', requireAuth, commentReactLimiter, async (req, res) => {
   const commentId = Number.parseInt(req.params.commentId, 10)
-  const userId = req.user.userId
+  const { userId } = req.user
   const { type } = req.body || {}
 
   if (!type || (type !== 'like' && type !== 'dislike')) {

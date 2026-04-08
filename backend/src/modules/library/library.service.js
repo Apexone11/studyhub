@@ -10,6 +10,37 @@ const {
 } = require('./library.constants')
 const cache = require('./library.cache')
 const { captureError } = require('../../monitoring/sentry')
+const sanitizeHtml = require('sanitize-html')
+
+const BOOK_DESCRIPTION_TRANSFORM = sanitizeHtml.simpleTransform(
+  'a',
+  { rel: 'noopener noreferrer', target: '_blank' },
+  true,
+)
+
+function sanitizeBookDescription(description) {
+  if (!description || typeof description !== 'string') return null
+
+  const sanitized = sanitizeHtml(description, {
+    allowedTags: ['p', 'br', 'strong', 'em', 'b', 'i', 'u', 's', 'ul', 'ol', 'li', 'blockquote', 'a'],
+    allowedAttributes: {
+      a: ['href', 'target', 'rel'],
+    },
+    allowedSchemes: ['http', 'https', 'mailto'],
+    transformTags: {
+      a: BOOK_DESCRIPTION_TRANSFORM,
+    },
+  }).trim()
+
+  return sanitized || null
+}
+
+function createHttpStatusError(message, statusCode) {
+  const error = new Error(message)
+  error.status = statusCode
+  error.statusCode = statusCode
+  return error
+}
 
 /** Fetch with a timeout. Rejects if the response takes longer than `ms`. */
 function fetchWithTimeout(url, ms = 10000) {
@@ -50,7 +81,7 @@ function normalizeVolume(item) {
       ? info.imageLinks.thumbnail || info.imageLinks.smallThumbnail || null
       : null,
     previewLink: info.previewLink || null,
-    description: info.description || null,
+    description: sanitizeBookDescription(info.description),
     publishedDate: info.publishedDate || null,
     averageRating: info.averageRating || null,
     ratingsCount: info.ratingsCount || 0,
@@ -119,10 +150,11 @@ async function searchBooks(query, page = 1, filters = {}) {
     const response = await fetchWithRetry(url)
 
     if (!response.ok) {
-      captureError(new Error(`Google Books search failed: ${response.status}`), {
+      captureError(createHttpStatusError(`Google Books search failed: ${response.status}`, response.status), {
         context: 'searchBooks',
         query,
         page,
+        statusCode: response.status,
       })
       const fallback = await searchCachedBooks(query, page, filters)
       if (fallback && fallback.results && fallback.results.length > 0) {
@@ -170,9 +202,10 @@ async function getBookDetail(volumeId) {
     const response = await fetchWithRetry(url)
 
     if (!response.ok) {
-      captureError(new Error(`Google Books detail fetch failed: ${response.status}`), {
+      captureError(createHttpStatusError(`Google Books detail fetch failed: ${response.status}`, response.status), {
         context: 'getBookDetail',
         volumeId,
+        statusCode: response.status,
       })
       return await getCachedBookDetail(volumeId)
     }
@@ -209,7 +242,7 @@ async function getCachedBookDetail(volumeId) {
       pageCount: book.pageCount,
       coverUrl: book.coverUrl,
       previewLink: book.previewLink,
-      description: book.description,
+      description: sanitizeBookDescription(book.description),
       publishedDate: book.publishedDate,
       _source: 'cache',
     }
@@ -256,7 +289,7 @@ async function searchCachedBooks(query, page = 1, filters = {}) {
         pageCount: b.pageCount,
         coverUrl: b.coverUrl,
         previewLink: b.previewLink,
-        description: b.description,
+        description: sanitizeBookDescription(b.description),
         publishedDate: b.publishedDate,
       })),
       count,

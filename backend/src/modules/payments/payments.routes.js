@@ -15,7 +15,7 @@
  *   GET  /admin/revenue           — Admin revenue analytics (admin only)
  */
 const express = require('express')
-const { verifyAuthToken, getAuthTokenFromRequest } = require('../../lib/authTokens')
+const optionalAuth = require('../../core/auth/optionalAuth')
 const { captureError } = require('../../monitoring/sentry')
 const log = require('../../lib/logger')
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
@@ -23,6 +23,7 @@ const {
   paymentCheckoutLimiter,
   paymentPortalLimiter,
   paymentReadLimiter,
+  paymentWebhookLimiter,
 } = require('../../lib/rateLimiters')
 const {
   DONATION_MIN_CENTS,
@@ -40,24 +41,23 @@ const router = express.Router()
 
 // ── Auth middleware ───────────────────────────────────────────────────────
 
-function optionalAuth(req, _res, next) {
-  const token = getAuthTokenFromRequest(req)
-  if (token) {
-    try {
-      const payload = verifyAuthToken(token)
-      req.user = { userId: payload.sub, role: payload.role }
-    } catch {
-      req.user = null
-    }
-  }
-  next()
-}
-
 function requireAdmin(req, res, next) {
   if (!req.user || req.user.role !== 'admin') {
     return sendError(res, 403, 'Admin access required.', ERROR_CODES.FORBIDDEN)
   }
   next()
+}
+
+function escapeCsvValue(value) {
+  if (value === null || value === undefined) return ''
+  let text = String(value)
+  // Mitigate CSV formula injection: prefix a leading formula trigger with a
+  // single quote so Excel/Sheets treat the cell as text instead of a formula.
+  if (/^[=+\-@\t\r]/.test(text)) {
+    text = `'${text}`
+  }
+  if (!/[",\n]/.test(text)) return text
+  return `"${text.replace(/"/g, '""')}"`
 }
 
 // ── POST /checkout/subscription ──────────────────────────────────────────
@@ -170,7 +170,7 @@ router.post('/checkout/donation', paymentCheckoutLimiter, optionalAuth, async (r
 // This route uses express.raw() middleware — the parent index.js mounts this
 // BEFORE express.json(), similar to the existing /api/webhooks route.
 
-router.post('/webhook', async (req, res) => {
+router.post('/webhook', paymentWebhookLimiter, async (req, res) => {
   const stripe = service.getStripe()
   const sig = req.headers['stripe-signature']
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
@@ -265,7 +265,7 @@ router.get('/subscription/debug', paymentReadLimiter, requireAuth, async (req, r
       envStatus: planFromEnv,
       userId: req.user.userId,
       tableExists,
-      migrationHint: !tableExists ? 'Subscription table does not exist. Run: npx prisma migrate deploy' : null,
+      migrationHint: tableExists ? null : 'Subscription table does not exist. Run: npx prisma migrate deploy',
     })
   } catch (error) {
     res.status(500).json({ error: error.message })
@@ -310,12 +310,49 @@ router.get('/history', paymentReadLimiter, requireAuth, async (req, res) => {
   }
 })
 
+router.get('/history/export', paymentReadLimiter, requireAuth, async (req, res) => {
+  try {
+    const format = String(req.query.format || 'csv').toLowerCase()
+    if (format !== 'csv') {
+      return sendError(res, 400, 'Only csv export is supported.', ERROR_CODES.VALIDATION)
+    }
+
+    const rows = await service.getUserPaymentExportRows(req.user.userId)
+    const header = ['Date', 'Type', 'Status', 'Description', 'Amount', 'Currency', 'Receipt URL']
+    const csvRows = rows.map((row) => [
+      new Date(row.createdAt).toISOString(),
+      row.type,
+      row.status,
+      row.description || '',
+      (Number(row.amount || 0) / 100).toFixed(2),
+      String(row.currency || 'usd').toUpperCase(),
+      row.receiptUrl || '',
+    ])
+
+    const csv = [header, ...csvRows]
+      .map((line) => line.map(escapeCsvValue).join(','))
+      .join('\n')
+
+    const filename = `studyhub-payments-${req.user.userId}-${new Date().toISOString().slice(0, 10)}.csv`
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+    res.send(csv)
+  } catch (error) {
+    captureError(error, { context: 'payments.history.export' })
+    log.error({ err: error }, 'Failed to export payment history')
+    sendError(res, 500, 'Failed to export payment history.', ERROR_CODES.INTERNAL)
+  }
+})
+
 // ── GET /donations/leaderboard ───────────────────────────────────────────
 
 router.get('/donations/leaderboard', paymentReadLimiter, async (_req, res) => {
   try {
-    const leaderboard = await service.getDonationLeaderboard({ limit: 50 })
-    res.json({ donors: leaderboard })
+    const [leaderboard, anonymousSupport] = await Promise.all([
+      service.getDonationLeaderboard({ limit: 50 }),
+      service.getAnonymousDonationSummary(),
+    ])
+    res.json({ donors: leaderboard, anonymousSupport })
   } catch (error) {
     captureError(error, { context: 'payments.leaderboard' })
     log.error({ err: error }, 'Failed to get donation leaderboard')

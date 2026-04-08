@@ -82,11 +82,6 @@ export default defineConfig(async ({ mode }) => {
                 return 'editor'
               }
 
-              // EPUB reader -- only needed on BookReaderPage
-              if (id.includes('\\epubjs') || id.includes('/epubjs') || id.includes('/jszip')) {
-                return 'epub'
-              }
-
               // Charts -- only needed on feed/analytics pages
               if (id.includes('\\recharts') || id.includes('/recharts') || id.includes('/d3-')) {
                 return 'charts'

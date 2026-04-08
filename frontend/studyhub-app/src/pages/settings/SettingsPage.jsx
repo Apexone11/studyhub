@@ -240,6 +240,7 @@ export default function SettingsPage() {
             <ProfileTab
               user={user}
               sessionUser={sessionUser}
+              onUserChange={syncUser}
               onAvatarChange={(url) => {
                 setUser((u) => (u ? { ...u, avatarUrl: url } : u))
                 setSessionUser((u) => (u ? { ...u, avatarUrl: url } : u))
@@ -319,11 +320,11 @@ export default function SettingsPage() {
   )
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: FONT }}>
+    <div className="sh-app-page" style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: FONT }}>
       <Navbar crumbs={[{ label: 'Settings', to: '/settings' }]} hideTabs actions={navActions} />
 
       <div
-        className="settings-layout"
+        className="settings-layout sh-ambient-grid sh-ambient-shell"
         style={{
           maxWidth: 1180,
           width: '100%',
@@ -400,7 +401,7 @@ export default function SettingsPage() {
           </nav>
         </aside>
 
-        <main id="main-content" ref={tabContentRef}>
+        <main className="sh-ambient-main" id="main-content" ref={tabContentRef}>
           {renderTab()}
         </main>
       </div>

@@ -87,9 +87,9 @@ export function useDashboardData() {
   const cards = useMemo(() => {
     const stats = summary?.stats || {}
     return [
-      summaryCard('Courses', stats.courseCount || 0, 'Active enrollments', '#3b82f6', '/settings?tab=courses'),
-      summaryCard('Sheets', stats.sheetCount || 0, 'Sheets you uploaded', '#10b981', '/sheets?mine=1'),
-      summaryCard('Stars', stats.starCount || 0, 'Saved sheets', '#f59e0b', '/sheets?starred=1'),
+      summaryCard('Courses', stats.courseCount || 0, 'Active enrollments', 'var(--sh-info)', '/settings?tab=courses'),
+      summaryCard('Sheets', stats.sheetCount || 0, 'Sheets you uploaded', 'var(--sh-success)', '/sheets?mine=1'),
+      summaryCard('Stars', stats.starCount || 0, 'Saved sheets', 'var(--sh-warning)', '/sheets?starred=1'),
     ]
   }, [summary])
 

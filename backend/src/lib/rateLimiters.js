@@ -602,7 +602,7 @@ const sheetReadmeLimiter = rateLimit({
 // ── CATEGORY: Library Module ──────────────────────────────────────────────
 
 /**
- * Library write operations (shelves, bookmarks, highlights) — 60 requests per minute per IP.
+ * Library write operations (shelves, bookmarks, progress) — 60 requests per minute per IP.
  */
 const libraryWriteLimiter = rateLimit({
   windowMs: WINDOW_1_MIN,
@@ -667,6 +667,14 @@ const paymentReadLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many payment requests. Please slow down.' },
+})
+
+const paymentWebhookLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many webhook requests. Please slow down.' },
 })
 
 // ── CATEGORY: Reviews Module ─────────────────────────────────────────────
@@ -804,6 +812,7 @@ module.exports = {
   paymentCheckoutLimiter,
   paymentPortalLimiter,
   paymentReadLimiter,
+  paymentWebhookLimiter,
 
   // Reviews module
   reviewSubmitLimiter,

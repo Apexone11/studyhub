@@ -3,6 +3,11 @@ import { API } from '../../config';
 import { authHeaders } from '../shared/pageUtils';
 import { showToast } from '../../lib/toast';
 
+async function readResponseError(response, fallback) {
+  const data = await response.json().catch(() => ({}));
+  return data?.error || fallback;
+}
+
 /**
  * Hook for managing group members
  * Handles loading members, inviting, updating roles, and removing members
@@ -37,16 +42,18 @@ export function useGroupMembers() {
    * Invite a user to the group
    */
   const inviteMember = useCallback(
-    async (groupId, userId) => {
+    async (groupId, inviteData) => {
       try {
         const response = await fetch(`${API}/api/study-groups/${groupId}/invite`, {
           method: 'POST',
           credentials: 'include',
           headers: authHeaders(),
-          body: JSON.stringify({ userId }),
+          body: JSON.stringify(inviteData),
         });
 
-        if (!response.ok) throw new Error('Failed to invite member');
+        if (!response.ok) {
+          throw new Error(await readResponseError(response, 'Failed to invite member'));
+        }
 
         showToast('Member invited successfully', 'success');
         // Reload members to reflect the invite
@@ -74,13 +81,17 @@ export function useGroupMembers() {
         }
       );
 
-      if (!response.ok) throw new Error('Failed to update member');
+      if (!response.ok) {
+        throw new Error(await readResponseError(response, 'Failed to update member'));
+      }
 
       const updatedMember = await response.json();
 
       // Update in members list
       setMembers((prev) =>
-        prev.map((m) => (m.userId === userId ? updatedMember : m))
+        prev.map((member) => (
+          member.userId === updatedMember.userId ? { ...member, ...updatedMember } : member
+        ))
       );
 
       showToast('Member updated successfully', 'success');
@@ -105,7 +116,9 @@ export function useGroupMembers() {
         }
       );
 
-      if (!response.ok) throw new Error('Failed to remove member');
+      if (!response.ok) {
+        throw new Error(await readResponseError(response, 'Failed to remove member'));
+      }
 
       // Remove from members list
       setMembers((prev) => prev.filter((m) => m.userId !== userId));

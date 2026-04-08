@@ -17,9 +17,9 @@ export function EmptyState({ title, body, actionLabel, actionTo }) {
   return (
     <div
       style={{
-        background: 'var(--sh-surface, #fff)',
+        background: 'var(--sh-surface)',
         borderRadius: 16,
-        border: '2px dashed var(--sh-border, #cbd5e1)',
+        border: '2px dashed var(--sh-border)',
         padding: '44px 24px',
         textAlign: 'center',
       }}
@@ -55,7 +55,7 @@ export function EmptyState({ title, body, actionLabel, actionTo }) {
         style={{
           fontSize: 15,
           fontWeight: 800,
-          color: 'var(--sh-heading, #0f172a)',
+          color: 'var(--sh-heading)',
           marginBottom: 8,
         }}
       >
@@ -66,7 +66,7 @@ export function EmptyState({ title, body, actionLabel, actionTo }) {
           margin: '0 0 16px',
           fontSize: 13,
           lineHeight: 1.7,
-          color: 'var(--sh-muted, #64748b)',
+          color: 'var(--sh-muted)',
         }}
       >
         {body}
@@ -81,7 +81,7 @@ export function EmptyState({ title, body, actionLabel, actionTo }) {
             padding: '9px 16px',
             borderRadius: 10,
             background: 'var(--sh-brand)',
-            color: '#fff',
+            color: 'var(--sh-btn-primary-text)',
             fontSize: 13,
             fontWeight: 700,
             textDecoration: 'none',
@@ -299,7 +299,7 @@ export function ActivationChecklist({ activation }) {
                   height="12"
                   viewBox="0 0 24 24"
                   fill="none"
-                  stroke="#fff"
+                  stroke="var(--sh-btn-primary-text)"
                   strokeWidth="3"
                   strokeLinecap="round"
                 >
@@ -333,7 +333,7 @@ export function ActivationChecklist({ activation }) {
                   padding: '6px 12px',
                   borderRadius: 9,
                   background: 'var(--sh-brand)',
-                  color: '#fff',
+                  color: 'var(--sh-btn-primary-text)',
                   fontSize: 12,
                   fontWeight: 700,
                   textDecoration: 'none',
@@ -384,7 +384,7 @@ export function RecentSheets({ recentSheets, newCount = 0 }) {
                 padding: '2px 8px',
                 borderRadius: 999,
                 background: 'var(--sh-brand)',
-                color: '#fff',
+                color: 'var(--sh-btn-primary-text)',
                 fontSize: 11,
                 fontWeight: 800,
                 lineHeight: 1.6,
@@ -437,7 +437,7 @@ export function RecentSheets({ recentSheets, newCount = 0 }) {
                   width: 42,
                   height: 42,
                   borderRadius: 12,
-                  background: 'var(--sh-brand-soft, #eff6ff)',
+                  background: 'var(--sh-brand-soft)',
                   color: 'var(--sh-brand)',
                   display: 'grid',
                   placeItems: 'center',
@@ -537,8 +537,8 @@ export function ResumeStudying({ entries }) {
                 width: 42,
                 height: 42,
                 borderRadius: 12,
-                background: 'var(--sh-info-bg, linear-gradient(135deg, #faf5ff, #ede9fe))',
-                color: 'var(--sh-info-text, #7c3aed)',
+                background: 'var(--sh-accent-purple-bg)',
+                color: 'var(--sh-accent-purple)',
                 display: 'grid',
                 placeItems: 'center',
               }}
@@ -608,7 +608,7 @@ export function StudyQueue({ counts, toReview, studying }) {
           </span>
         ) : null}
         {counts.toReview > 0 ? (
-          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--sh-warning-text, #92400e)' }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--sh-warning-text)' }}>
             {counts.toReview} to review
           </span>
         ) : null}
@@ -662,9 +662,7 @@ export function StudyQueue({ counts, toReview, studying }) {
                   background:
                     entry.status === 'studying' ? 'var(--sh-info-bg)' : 'var(--sh-warning-bg)',
                   color:
-                    entry.status === 'studying'
-                      ? 'var(--sh-brand)'
-                      : 'var(--sh-warning-text, #92400e)',
+                    entry.status === 'studying' ? 'var(--sh-brand)' : 'var(--sh-warning-text)',
                   whiteSpace: 'nowrap',
                   flexShrink: 0,
                 }}
@@ -733,11 +731,11 @@ export function CourseFocus({ courses }) {
 
 /* ── Quick actions panel ─────────────────────────────────────────────────── */
 const QUICK_ACTIONS = [
-  { icon: IconSheets, label: 'Browse sheets', to: '/sheets', tone: '#2563eb' },
-  { icon: IconUpload, label: 'Upload a new sheet', to: '/sheets/upload', tone: '#7c3aed' },
-  { icon: IconTests, label: 'Open practice tests', to: '/tests', tone: '#059669' },
-  { icon: IconNotes, label: 'Review your notes', to: '/notes', tone: '#db2777' },
-  { icon: IconProfile, label: 'Update settings', to: '/settings', tone: '#475569' },
+  { icon: IconSheets, label: 'Browse sheets', to: '/sheets', tone: 'var(--sh-info)' },
+  { icon: IconUpload, label: 'Upload a new sheet', to: '/sheets/upload', tone: 'var(--sh-accent-purple)' },
+  { icon: IconTests, label: 'Open practice tests', to: '/tests', tone: 'var(--sh-success)' },
+  { icon: IconNotes, label: 'Review your notes', to: '/notes', tone: 'var(--sh-accent-pink)' },
+  { icon: IconProfile, label: 'Update settings', to: '/settings', tone: 'var(--sh-neutral-soft-text)' },
 ]
 
 export function QuickActions() {

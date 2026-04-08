@@ -1,4 +1,21 @@
+const { Prisma } = require('@prisma/client')
 const prisma = require('./prisma')
+
+const SHEET_SEARCH_VECTOR = Prisma.sql`to_tsvector('english', coalesce(s."title", '') || ' ' || coalesce(s."description", '') || ' ' || coalesce(s."content", ''))`
+
+function buildSheetWhereSql({ status, courseId, userId }) {
+  let whereSql = Prisma.sql`s."status" = ${status}`
+
+  if (courseId) {
+    whereSql = Prisma.sql`${whereSql} AND s."courseId" = ${Number(courseId)}`
+  }
+
+  if (userId) {
+    whereSql = Prisma.sql`${whereSql} AND s."userId" = ${Number(userId)}`
+  }
+
+  return whereSql
+}
 
 /**
  * Build a tsquery-safe search string from user input.
@@ -22,53 +39,29 @@ async function searchSheetsFTS(query, { courseId, userId, status = 'published', 
   const tsquery = sanitizeSearchQuery(query)
   if (!tsquery) return { sheets: [], total: 0, page, totalPages: 0 }
 
-  const conditions = [`s."status" = $1`]
-  const params = [status]
-  let paramIdx = 2
+  const whereSql = buildSheetWhereSql({ status, courseId, userId })
+  const searchConditionSql = Prisma.sql`${SHEET_SEARCH_VECTOR} @@ to_tsquery('english', ${tsquery})`
 
-  if (courseId) {
-    conditions.push(`s."courseId" = $${paramIdx}`)
-    params.push(Number(courseId))
-    paramIdx++
-  }
-
-  if (userId) {
-    conditions.push(`s."userId" = $${paramIdx}`)
-    params.push(Number(userId))
-    paramIdx++
-  }
-
-  const whereClause = conditions.join(' AND ')
-  const tsqueryParam = `$${paramIdx}`
-  params.push(tsquery)
-
-  const countParams = [...params]
-  const countResult = await prisma.$queryRawUnsafe(
-    `SELECT COUNT(*)::int as total FROM "StudySheet" s
-     WHERE ${whereClause}
-     AND to_tsvector('english', coalesce(s."title", '') || ' ' || coalesce(s."description", '') || ' ' || coalesce(s."content", ''))
-     @@ to_tsquery('english', ${tsqueryParam})`,
-    ...countParams
-  )
+  const countResult = await prisma.$queryRaw`
+    SELECT COUNT(*)::int as total
+    FROM "StudySheet" s
+    WHERE ${whereSql}
+      AND ${searchConditionSql}
+  `
 
   const offset = (page - 1) * limit
-  const limitParam = `$${paramIdx + 1}`
-  const offsetParam = `$${paramIdx + 2}`
-  const dataParams = [...params, limit, offset]
 
-  const sheets = await prisma.$queryRawUnsafe(
-    `SELECT s."id", s."title", s."description", s."contentFormat", s."status",
-            s."stars", s."downloads", s."forks", s."createdAt", s."updatedAt",
-            s."courseId", s."userId", s."forkOf"
-     FROM "StudySheet" s
-     WHERE ${whereClause}
-     AND to_tsvector('english', coalesce(s."title", '') || ' ' || coalesce(s."description", '') || ' ' || coalesce(s."content", ''))
-     @@ to_tsquery('english', ${tsqueryParam})
-     ORDER BY ts_rank(to_tsvector('english', coalesce(s."title", '') || ' ' || coalesce(s."description", '') || ' ' || coalesce(s."content", '')),
-                      to_tsquery('english', ${tsqueryParam})) DESC, s."createdAt" DESC
-     LIMIT ${limitParam} OFFSET ${offsetParam}`,
-    ...dataParams
-  )
+  const sheets = await prisma.$queryRaw`
+    SELECT s."id", s."title", s."description", s."contentFormat", s."status",
+           s."stars", s."downloads", s."forks", s."createdAt", s."updatedAt",
+           s."courseId", s."userId", s."forkOf"
+    FROM "StudySheet" s
+    WHERE ${whereSql}
+      AND ${searchConditionSql}
+    ORDER BY ts_rank(${SHEET_SEARCH_VECTOR}, to_tsquery('english', ${tsquery})) DESC,
+             s."createdAt" DESC
+    LIMIT ${Number(limit)} OFFSET ${Number(offset)}
+  `
 
   const total = countResult[0]?.total ?? 0
 
@@ -87,16 +80,14 @@ async function searchCoursesFTS(query, { limit = 20 } = {}) {
   const tsquery = sanitizeSearchQuery(query)
   if (!tsquery) return []
 
-  return prisma.$queryRawUnsafe(
-    `SELECT c."id", c."code", c."name", c."schoolId"
-     FROM "Course" c
-     WHERE to_tsvector('english', c."name") @@ to_tsquery('english', $1)
-        OR to_tsvector('english', c."code") @@ to_tsquery('english', $1)
-     ORDER BY c."code" ASC
-     LIMIT $2`,
-    tsquery,
-    limit
-  )
+  return prisma.$queryRaw`
+    SELECT c."id", c."code", c."name", c."schoolId"
+    FROM "Course" c
+    WHERE to_tsvector('english', c."name") @@ to_tsquery('english', ${tsquery})
+       OR to_tsvector('english', c."code") @@ to_tsquery('english', ${tsquery})
+    ORDER BY c."code" ASC
+    LIMIT ${Number(limit)}
+  `
 }
 
 /**
@@ -106,15 +97,13 @@ async function searchUsersFTS(query, { limit = 20 } = {}) {
   const tsquery = sanitizeSearchQuery(query)
   if (!tsquery) return []
 
-  return prisma.$queryRawUnsafe(
-    `SELECT u."id", u."username", u."role", u."avatarUrl", u."createdAt"
-     FROM "User" u
-     WHERE to_tsvector('english', u."username") @@ to_tsquery('english', $1)
-     ORDER BY u."username" ASC
-     LIMIT $2`,
-    tsquery,
-    limit
-  )
+  return prisma.$queryRaw`
+    SELECT u."id", u."username", u."role", u."avatarUrl", u."createdAt"
+    FROM "User" u
+    WHERE to_tsvector('english', u."username") @@ to_tsquery('english', ${tsquery})
+    ORDER BY u."username" ASC
+    LIMIT ${Number(limit)}
+  `
 }
 
 module.exports = {

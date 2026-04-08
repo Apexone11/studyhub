@@ -39,14 +39,6 @@ const mocks = vi.hoisted(() => {
       delete: vi.fn(),
       count: vi.fn(),
     },
-    bookHighlight: {
-      findMany: vi.fn(),
-      findUnique: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-      count: vi.fn(),
-    },
     cachedBook: {
       findMany: vi.fn(),
       findUnique: vi.fn(),
@@ -93,8 +85,7 @@ const mocks = vi.hoisted(() => {
       CACHE_TTL: { SEARCH: 3600000, BOOK_DETAIL: 86400000, COVER: 604800000 },
       DEFAULT_PAGE_SIZE: 20,
       MAX_SHELVES_PER_USER: 20,
-      MAX_BOOKMARKS_PER_BOOK: 50,
-      MAX_HIGHLIGHTS_PER_BOOK: 200,
+      MAX_BOOKMARKS_PER_USER_FREE: 50,
       CATEGORIES: ['Fiction', 'Science'],
     },
   }
@@ -152,7 +143,7 @@ beforeEach(() => {
 describe('GET /shelves', () => {
   it('returns user shelves', async () => {
     const shelves = [
-      { id: 1, name: 'Favorites', userId: 42, _count: { books: 3 }, createdAt: new Date() },
+      { id: 1, name: 'Favorites', userId: 42, visibility: 'private', _count: { books: 3 }, createdAt: new Date() },
     ]
     mocks.prisma.bookShelf.findMany.mockResolvedValue(shelves)
 
@@ -177,12 +168,14 @@ describe('POST /shelves', () => {
       id: 1,
       name: 'My Shelf',
       userId: 42,
+      visibility: 'profile',
       createdAt: new Date(),
     })
 
-    const res = await request(app).post('/shelves').send({ name: 'My Shelf' })
+    const res = await request(app).post('/shelves').send({ name: 'My Shelf', visibility: 'profile' })
     expect(res.status).toBe(201)
     expect(res.body.name).toBe('My Shelf')
+    expect(res.body.visibility).toBe('profile')
   })
 
   it('rejects empty shelf name', async () => {
@@ -194,6 +187,36 @@ describe('POST /shelves', () => {
   it('rejects missing shelf name', async () => {
     const res = await request(app).post('/shelves').send({})
     expect(res.status).toBe(400)
+  })
+
+  it('rejects invalid shelf visibility', async () => {
+    const res = await request(app).post('/shelves').send({ name: 'My Shelf', visibility: 'public' })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/visibility/i)
+  })
+})
+
+describe('PATCH /shelves/:id', () => {
+  it('updates shelf visibility for the owner', async () => {
+    mocks.prisma.bookShelf.findUnique.mockResolvedValue({ id: 1, userId: 42, visibility: 'private' })
+    mocks.prisma.bookShelf.update.mockResolvedValue({ id: 1, userId: 42, visibility: 'profile', name: 'Favorites' })
+
+    const res = await request(app).patch('/shelves/1').send({ visibility: 'profile' })
+
+    expect(res.status).toBe(200)
+    expect(res.body.visibility).toBe('profile')
+    expect(mocks.prisma.bookShelf.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 1 },
+        data: expect.objectContaining({ visibility: 'profile' }),
+      })
+    )
+  })
+
+  it('rejects invalid visibility updates', async () => {
+    const res = await request(app).patch('/shelves/1').send({ visibility: 'friends' })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/visibility/i)
   })
 })
 
@@ -302,51 +325,6 @@ describe('DELETE /bookmarks/:id', () => {
     mocks.prisma.bookBookmark.findUnique.mockResolvedValue(null)
     const res = await request(app).delete('/bookmarks/999')
     expect(res.status).toBe(404)
-  })
-})
-
-/* ── Highlights ────────────────────────────────────────────────────────── */
-
-describe('POST /highlights', () => {
-  it('creates a highlight', async () => {
-    mocks.prisma.bookHighlight.count.mockResolvedValue(0)
-    mocks.prisma.bookHighlight.create.mockResolvedValue({
-      id: 1,
-      userId: 42,
-      volumeId: 'zyTCAlFPjgYC',
-      cfi: 'page-5',
-      text: 'It is a truth universally acknowledged',
-      color: '#FFEB3B',
-    })
-
-    const res = await request(app).post('/highlights').send({
-      volumeId: 'zyTCAlFPjgYC',
-      cfi: 'page-5',
-      text: 'It is a truth universally acknowledged',
-      color: '#ffeb3b',
-    })
-    expect(res.status).toBe(201)
-  })
-
-  it('rejects missing text or cfi', async () => {
-    const res = await request(app).post('/highlights').send({ volumeId: 'zyTCAlFPjgYC' })
-    expect(res.status).toBe(400)
-  })
-})
-
-describe('DELETE /highlights/:id', () => {
-  it('deletes own highlight', async () => {
-    mocks.prisma.bookHighlight.findUnique.mockResolvedValue({ id: 1, userId: 42 })
-    mocks.prisma.bookHighlight.delete.mockResolvedValue({ id: 1 })
-
-    const res = await request(app).delete('/highlights/1')
-    expect(res.status).toBe(204)
-  })
-
-  it('returns 403 for other users highlight', async () => {
-    mocks.prisma.bookHighlight.findUnique.mockResolvedValue({ id: 1, userId: 99 })
-    const res = await request(app).delete('/highlights/1')
-    expect(res.status).toBe(403)
   })
 })
 

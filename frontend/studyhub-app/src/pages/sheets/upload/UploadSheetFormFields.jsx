@@ -114,8 +114,10 @@ export function DescriptionField({ description, setDescription, setHasUnsavedCha
 }
 
 /* ── HTML import section ──────────────────────────────────────────────── */
-export function HtmlImportSection({ isHtmlMode, htmlImportInputRef, handleHtmlImport, scanState, canEditHtml }) {
+export function HtmlImportSection({ isHtmlMode, htmlImportInputRef, handleHtmlImport, scanState, canEditHtml, onOpenScanDetails }) {
   if (!isHtmlMode) return null
+  const hasScanDetails = (scanState.tier || 0) >= 1 || Boolean(scanState.riskSummary) || Boolean(scanState.tierExplanation) || (scanState.findings || []).length > 0
+  const needsAcknowledgement = (scanState.tier || 0) === 1 && !scanState.acknowledgedAt
   return (
     <div style={{ background: 'var(--sh-surface)', borderRadius: 14, border: '1px solid var(--sh-border)', padding: '14px 20px', marginBottom: 12 }}>
       <label style={{ fontSize: 10, fontWeight: 700, color: 'var(--sh-slate-500)', letterSpacing: '.06em', display: 'block', marginBottom: 8 }}>
@@ -149,6 +151,32 @@ export function HtmlImportSection({ isHtmlMode, htmlImportInputRef, handleHtmlIm
           Import an HTML file to enable the editor. HTML sheets require a file import so we can run a security scan.
         </div>
       )}
+      {hasScanDetails ? (
+        <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={onOpenScanDetails}
+            style={{
+              padding: '6px 12px',
+              borderRadius: 999,
+              border: '1px solid var(--sh-border)',
+              background: 'var(--sh-soft)',
+              color: 'var(--sh-heading)',
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: 'pointer',
+              fontFamily: FONT,
+            }}
+          >
+            {needsAcknowledgement ? 'Review findings to submit' : 'View scan details'}
+          </button>
+          {needsAcknowledgement ? (
+            <span style={{ fontSize: 12, color: 'var(--sh-warning-text)' }}>
+              Acknowledge the flagged findings before you submit this HTML sheet.
+            </span>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   )
 }

@@ -14,6 +14,23 @@ import {
   IconUsers,
 } from '../../components/Icons'
 
+export const HOME_TREE_COLORS = {
+  main: 'var(--sh-home-tree-main)',
+  secondary: 'var(--sh-home-tree-secondary)',
+  tertiary: 'var(--sh-home-tree-tertiary)',
+  leaf: 'var(--sh-home-tree-leaf)',
+  study: 'var(--sh-home-tree-study)',
+}
+
+export const HOME_AVATAR_COLORS = [
+  'var(--sh-home-avatar-1)',
+  'var(--sh-home-avatar-2)',
+  'var(--sh-home-avatar-3)',
+  'var(--sh-home-avatar-4)',
+  'var(--sh-home-avatar-5)',
+  'var(--sh-home-avatar-6)',
+]
+
 export const FEATURES = [
   {
     Icon: IconSheets,
@@ -72,7 +89,7 @@ export const FEATURES = [
   {
     Icon: IconStar,
     title: 'BookHub Library',
-    desc: 'Read free classic books with our integrated EPUB reader. Bookmark, highlight, and annotate while you study.',
+    desc: 'Browse Google Books-powered titles, open available previews, save shelves, and keep your place with bookmarks while you study.',
     toneClass: 'home-feature--indigo'
   },
   {
@@ -116,27 +133,27 @@ export const TESTIMONIALS = [
     name: 'Sarah M.',
     school: 'University of Maryland',
     initial: 'S',
-    color: '#3b82f6',
+    color: HOME_AVATAR_COLORS[0],
   },
   {
     text: 'Being able to fork and improve study sheets is genius. It is like GitHub but for students.',
     name: 'James K.',
     school: 'Towson University',
     initial: 'J',
-    color: '#10b981',
+    color: HOME_AVATAR_COLORS[1],
   },
   {
     text: 'The collaborative study sheets and forking system make it stand out from every other study platform.',
     name: 'Aisha R.',
     school: 'Morgan State University',
     initial: 'A',
-    color: '#8b5cf6',
+    color: HOME_AVATAR_COLORS[2],
   }
 ]
 
 export const PROOF_ITEMS = [
-  { stroke: '#3b82f6', label: 'No credit card required' },
-  { stroke: '#10b981', label: 'Student built' },
-  { stroke: '#8b5cf6', label: 'Open source' },
-  { stroke: '#f59e0b', label: 'Sign up in 60 seconds' },
+  { stroke: 'var(--sh-home-proof-primary)', label: 'No credit card required' },
+  { stroke: 'var(--sh-home-proof-success)', label: 'Student built' },
+  { stroke: 'var(--sh-home-proof-accent)', label: 'Open source' },
+  { stroke: 'var(--sh-home-proof-warning)', label: 'Sign up in 60 seconds' },
 ]

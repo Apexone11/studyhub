@@ -6,9 +6,13 @@
 import { styles } from './studyGroupsStyles'
 
 export default function GroupListFilters({
-  search, courseId, mineOnly, allCourses,
-  onSearch, onToggleMine, onCourseFilter,
+  search, schoolId, courseId, mineOnly, allSchools, allCourses,
+  onSearch, onToggleMine, onSchoolFilter, onCourseFilter,
 }) {
+  const scopedCourses = schoolId
+    ? allCourses?.filter((course) => String(course.schoolId) === String(schoolId))
+    : allCourses
+
   return (
     <section style={styles.filterSection}>
       <input
@@ -31,14 +35,27 @@ export default function GroupListFilters({
         </button>
 
         <select
+          value={schoolId}
+          onChange={(e) => onSchoolFilter(e.target.value)}
+          style={styles.filterSelect}
+        >
+          <option value="">All Schools</option>
+          {allSchools?.map((school) => (
+            <option key={school.id} value={school.id}>
+              {school.short} — {school.name}
+            </option>
+          ))}
+        </select>
+
+        <select
           value={courseId}
           onChange={(e) => onCourseFilter(e.target.value)}
           style={styles.filterSelect}
         >
           <option value="">All Courses</option>
-          {allCourses?.map((course) => (
+          {scopedCourses?.map((course) => (
             <option key={course.id} value={course.id}>
-              {course.name}
+              {course.code} — {course.name}
             </option>
           ))}
         </select>

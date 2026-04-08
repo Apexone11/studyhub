@@ -21,6 +21,7 @@ export default function useSheetViewer() {
   const [sheetState, setSheetState] = useState({ sheet: null, loading: true, error: '' })
   const [commentsState, setCommentsState] = useState({ comments: [], total: 0, loading: true, error: '' })
   const [commentDraft, setCommentDraft] = useState('')
+  const [commentAttachments, setCommentAttachments] = useState([])
   const [commentSaving, setCommentSaving] = useState(false)
   const [forking, setForking] = useState(false)
   const [contributing, setContributing] = useState(false)
@@ -92,8 +93,21 @@ export default function useSheetViewer() {
 
       if (!response.ok) {
         if (response.status === 404) {
+          // Soft-retry once to absorb the brief race that can happen right
+          // after a fork or upload, then fall back to a friendlier message.
+          await new Promise((resolve) => setTimeout(resolve, 800))
+          const retry = await fetch(`${API}/api/sheets/${sheetId}`, {
+            headers: authHeaders(),
+            credentials: 'include',
+            signal,
+          })
+          const retryData = await readJsonSafely(retry, {})
+          if (retry.ok) {
+            apply(() => setSheetState({ sheet: retryData, loading: false, error: '' }))
+            return
+          }
           removeRecentlyViewedEntry(sheetId)
-          throw new Error(getApiErrorMessage(data, 'This sheet was removed or doesn\u2019t exist.'))
+          throw new Error(getApiErrorMessage(retryData, 'Hang tight \u2014 this sheet is still loading. If it does not appear in a moment, it may have been removed.'))
         }
         throw new Error(getApiErrorMessage(data, 'Could not load this sheet. Please try again.'))
       }
@@ -405,7 +419,8 @@ export default function useSheetViewer() {
 
   const submitComment = async (event) => {
     event.preventDefault()
-    if (!commentDraft.trim()) return
+    const trimmedComment = commentDraft.trim()
+    if (!trimmedComment && commentAttachments.length === 0) return
 
     setCommentSaving(true)
     try {
@@ -413,7 +428,7 @@ export default function useSheetViewer() {
         method: 'POST',
         headers: authHeaders(),
         credentials: 'include',
-        body: JSON.stringify({ content: commentDraft.trim() }),
+        body: JSON.stringify({ content: trimmedComment, attachments: commentAttachments }),
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
@@ -421,6 +436,7 @@ export default function useSheetViewer() {
       }
 
       setCommentDraft('')
+      setCommentAttachments([])
       setCommentsState((current) => ({
         ...current,
         comments: [data, ...current.comments],
@@ -526,6 +542,8 @@ export default function useSheetViewer() {
     commentsState,
     commentDraft,
     setCommentDraft,
+    commentAttachments,
+    setCommentAttachments,
     commentSaving,
     forking,
     contributing,

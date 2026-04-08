@@ -43,18 +43,39 @@ function generateCode(prefix, length = 8) {
   return `${prefix}-${code}`
 }
 
+function getReferralInactiveReason(referral, now = new Date()) {
+  if (!referral.active) return 'deactivated'
+  if (referral.expiresAt && referral.expiresAt < now) return 'expired'
+  if (referral.maxUses > 0 && referral.currentUses >= referral.maxUses) return 'maxed_out'
+  return null
+}
+
 // ── REFERRAL CODES ──────────────────────────────────────────────────────
 
 // POST /referral/create — Create a referral code (any authenticated user)
 router.post('/referral/create', requireAuth, paymentCheckoutLimiter, async (req, res) => {
   try {
     const userId = req.user.userId
+    const now = new Date()
 
-    // Check user doesn't have too many active codes
-    const existingCount = await prisma.referralCode.count({
+    const existingCodes = await prisma.referralCode.findMany({
       where: { ownerId: userId, active: true },
+      select: { id: true, active: true, expiresAt: true, maxUses: true, currentUses: true },
     })
-    if (existingCount >= 5) {
+
+    const staleCodeIds = existingCodes
+      .filter((code) => getReferralInactiveReason(code, now))
+      .map((code) => code.id)
+
+    if (staleCodeIds.length > 0) {
+      await prisma.referralCode.updateMany({
+        where: { id: { in: staleCodeIds } },
+        data: { active: false },
+      })
+    }
+
+    const activeCount = existingCodes.length - staleCodeIds.length
+    if (activeCount >= 5) {
       return sendError(
         res,
         400,
@@ -82,6 +103,8 @@ router.post('/referral/create', requireAuth, paymentCheckoutLimiter, async (req,
       rewardValue: referral.rewardValue,
       currentUses: 0,
       active: true,
+      isRedeemable: true,
+      inactiveReason: null,
       createdAt: referral.createdAt,
     })
   } catch (error) {
@@ -94,6 +117,7 @@ router.post('/referral/create', requireAuth, paymentCheckoutLimiter, async (req,
 // GET /referral/mine — Get current user's referral codes with stats
 router.get('/referral/mine', requireAuth, paymentReadLimiter, async (req, res) => {
   try {
+    const now = new Date()
     const codes = await prisma.referralCode.findMany({
       where: { ownerId: req.user.userId },
       orderBy: { createdAt: 'desc' },
@@ -102,18 +126,46 @@ router.get('/referral/mine', requireAuth, paymentReadLimiter, async (req, res) =
       },
     })
 
+    const normalizedCodes = codes.map((code) => {
+      const currentUses = code._count.redemptions
+      const inactiveReason = getReferralInactiveReason(
+        {
+          active: code.active,
+          expiresAt: code.expiresAt,
+          maxUses: code.maxUses,
+          currentUses,
+        },
+        now,
+      )
+
+      return {
+        id: code.id,
+        code: code.code,
+        rewardType: code.rewardType,
+        rewardValue: code.rewardValue,
+        maxUses: code.maxUses,
+        currentUses,
+        active: !inactiveReason,
+        isRedeemable: !inactiveReason,
+        inactiveReason,
+        expiresAt: code.expiresAt,
+        createdAt: code.createdAt,
+      }
+    })
+
+    const staleCodeIds = normalizedCodes
+      .filter((code) => code.inactiveReason && code.inactiveReason !== 'deactivated')
+      .map((code) => code.id)
+
+    if (staleCodeIds.length > 0) {
+      await prisma.referralCode.updateMany({
+        where: { id: { in: staleCodeIds }, active: true },
+        data: { active: false },
+      })
+    }
+
     res.json({
-      codes: codes.map((c) => ({
-        id: c.id,
-        code: c.code,
-        rewardType: c.rewardType,
-        rewardValue: c.rewardValue,
-        maxUses: c.maxUses,
-        currentUses: c._count.redemptions,
-        active: c.active,
-        expiresAt: c.expiresAt,
-        createdAt: c.createdAt,
-      })),
+      codes: normalizedCodes,
     })
   } catch (error) {
     captureError(error, { context: 'referral.mine' })
@@ -149,10 +201,18 @@ router.post('/referral/redeem', requireAuth, paymentCheckoutLimiter, async (req,
     }
 
     if (referral.expiresAt && referral.expiresAt < new Date()) {
+      await prisma.referralCode.update({
+        where: { id: referral.id },
+        data: { active: false },
+      }).catch(() => {})
       return sendError(res, 400, 'This referral code has expired.', ERROR_CODES.BAD_REQUEST)
     }
 
     if (referral.maxUses > 0 && referral.currentUses >= referral.maxUses) {
+      await prisma.referralCode.update({
+        where: { id: referral.id },
+        data: { active: false },
+      }).catch(() => {})
       return sendError(
         res,
         400,

@@ -153,7 +153,7 @@ export default function LoginPage() {
               <svg width="28" height="28" viewBox="0 0 36 36" fill="none">
                 <path
                   d="M18 6 L18 30 M10 14 L18 6 L26 14 M10 22 L18 14 L26 22"
-                  stroke="#f59e0b"
+                  stroke="var(--sh-warning)"
                   strokeWidth="2.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -167,9 +167,7 @@ export default function LoginPage() {
           {/* ── Session-expired banner ──────────────────────────────── */}
           {sessionExpired && (
             <div role="status" className="login-alert login-alert--warning">
-              <span className="login-alert-icon" aria-hidden="true">
-                &#x1f512;
-              </span>
+              <span className="login-alert-icon" aria-hidden="true">!</span>
               <span>Your session expired. Sign in again to pick up where you left off.</span>
             </div>
           )}

@@ -108,7 +108,7 @@ export default function SheetLabPage() {
                     background: '#16a34a', color: '#fff', fontFamily: 'inherit',
                   }}
                 >
-                  {publishing ? 'Publishing...' : 'Publish'}
+                  {publishing ? (isFork ? 'Contributing...' : 'Publishing...') : (isFork ? 'Contribute' : 'Publish')}
                 </button>
               ) : null}
               {isOwner && isFork ? (

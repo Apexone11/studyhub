@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import Navbar from '../../components/navbar/Navbar'
-import { IconDownload, IconEye } from '../../components/Icons'
+import { IconArrowLeft, IconDownload, IconEye } from '../../components/Icons'
 import { API } from '../../config'
 import { getApiErrorMessage, readJsonSafely } from '../../lib/http'
 import { pageShell } from '../../lib/ui'
@@ -89,14 +89,29 @@ function linkButton() {
     display: 'inline-flex',
     alignItems: 'center',
     gap: 6,
-    borderRadius: 999,
-    border: '1px solid var(--sh-info-border, #dbeafe)',
-    background: 'var(--sh-info-bg)',
-    color: 'var(--sh-info-text, #1d4ed8)',
-    padding: '8px 12px',
+    justifyContent: 'center',
+    minHeight: 34,
+    borderRadius: 12,
+    border: '1px solid var(--sh-border)',
+    background: 'var(--sh-surface)',
+    color: 'var(--sh-heading)',
+    padding: '7px 12px',
     fontSize: 12,
     fontWeight: 700,
+    letterSpacing: '0.01em',
     textDecoration: 'none',
+    whiteSpace: 'nowrap',
+    boxShadow: '0 1px 2px rgba(15, 23, 42, 0.08)',
+  }
+}
+
+function primaryLinkButton() {
+  return {
+    ...linkButton(),
+    borderColor: 'var(--sh-brand)',
+    background: 'var(--sh-brand)',
+    color: '#fff',
+    boxShadow: '0 10px 22px rgba(37, 99, 235, 0.18)',
   }
 }
 
@@ -167,10 +182,13 @@ export default function AttachmentPreviewPage() {
                     {config.label}
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                  <Link to={config.backPath} style={linkButton()}>Back</Link>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <Link to={config.backPath} style={linkButton()}>
+                    <IconArrowLeft size={14} />
+                    Back
+                  </Link>
                   {state.detail?.allowDownloads !== false ? (
-                    <a href={config.downloadUrl} style={linkButton()}>
+                    <a href={config.downloadUrl} style={primaryLinkButton()}>
                       <IconDownload size={14} />
                       Download original
                     </a>

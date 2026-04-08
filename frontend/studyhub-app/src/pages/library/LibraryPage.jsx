@@ -19,6 +19,7 @@ import { SkeletonCard } from '../../components/Skeleton'
 import { usePageTitle } from '../../lib/usePageTitle'
 import { useSession } from '../../lib/session-context'
 import { API } from '../../config'
+import { showToast } from '../../lib/toast'
 import { authHeaders } from '../shared/pageUtils'
 import BookCard from './components/BookCard'
 import useLibraryData from './useLibraryData'
@@ -52,6 +53,7 @@ export default function LibraryPage() {
   const [shelves, setShelves] = useState([])
   const [shelvesLoading, setShelvesLoading] = useState(false)
   const [showShelves, setShowShelves] = useState(false)
+  const [shelfActionId, setShelfActionId] = useState(null)
 
   // Fetch user's shelves with books
   const loadShelves = useCallback(async () => {
@@ -78,6 +80,59 @@ export default function LibraryPage() {
       loadShelves()
     }
   }, [showShelves, shelves.length, shelvesLoading, loadShelves])
+
+  const updateShelfVisibility = useCallback(async (shelfId, visibility) => {
+    setShelfActionId(shelfId)
+    try {
+      const res = await fetch(`${API}/api/library/shelves/${shelfId}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: authHeaders(),
+        body: JSON.stringify({ visibility }),
+      })
+
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(data.error || 'Could not update shelf visibility.')
+      }
+
+      setShelves((prev) => prev.map((shelf) => (
+        shelf.id === shelfId ? { ...shelf, visibility: data.visibility || visibility } : shelf
+      )))
+      showToast(visibility === 'profile' ? 'Shelf is now visible on your profile.' : 'Shelf is now private.', 'success')
+    } catch (error) {
+      showToast(error.message || 'Could not update shelf visibility.', 'error')
+    } finally {
+      setShelfActionId(null)
+    }
+  }, [])
+
+  const deleteShelf = useCallback(async (shelfId, shelfName) => {
+    if (typeof window !== 'undefined' && !window.confirm(`Delete "${shelfName}"? This removes the shelf and its saved books.`)) {
+      return
+    }
+
+    setShelfActionId(shelfId)
+    try {
+      const res = await fetch(`${API}/api/library/shelves/${shelfId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: authHeaders(),
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'Could not delete shelf.')
+      }
+
+      setShelves((prev) => prev.filter((shelf) => shelf.id !== shelfId))
+      showToast('Shelf deleted', 'success')
+    } catch (error) {
+      showToast(error.message || 'Could not delete shelf.', 'error')
+    } finally {
+      setShelfActionId(null)
+    }
+  }, [])
 
   // Auto-animate the books grid for smooth transitions
   const gridRef = useRef(null)
@@ -220,10 +275,39 @@ export default function LibraryPage() {
                     shelves.map((shelf) => (
                       <div key={shelf.id} className="library-shelf">
                         <div className="library-shelf__header">
-                          <h3 className="library-shelf__name">{shelf.name}</h3>
-                          <span className="library-shelf__count">
-                            {shelf._count?.books || 0} book{(shelf._count?.books || 0) === 1 ? '' : 's'}
-                          </span>
+                          <div>
+                            <h3 className="library-shelf__name">{shelf.name}</h3>
+                            <div className="library-shelf__meta">
+                              <span className="library-shelf__count">
+                                {shelf._count?.books || 0} book{(shelf._count?.books || 0) === 1 ? '' : 's'}
+                              </span>
+                              <span className={`library-shelf__visibility-badge ${shelf.visibility === 'profile' ? 'library-shelf__visibility-badge--profile' : ''}`}>
+                                {shelf.visibility === 'profile' ? 'Shown on profile' : 'Private'}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="library-shelf__actions">
+                            <label className="library-shelf__visibility-wrap">
+                              <span className="library-shelf__control-label">Visibility</span>
+                              <select
+                                className="library-shelf__visibility-select"
+                                value={shelf.visibility || 'private'}
+                                disabled={shelfActionId === shelf.id}
+                                onChange={(event) => updateShelfVisibility(shelf.id, event.target.value)}
+                              >
+                                <option value="private">Private</option>
+                                <option value="profile">Show on profile</option>
+                              </select>
+                            </label>
+                            <button
+                              type="button"
+                              className="library-shelf__danger-btn"
+                              disabled={shelfActionId === shelf.id}
+                              onClick={() => deleteShelf(shelf.id, shelf.name)}
+                            >
+                              Delete
+                            </button>
+                          </div>
                         </div>
                         {shelf.description && (
                           <p className="library-shelf__desc">{shelf.description}</p>

@@ -46,6 +46,7 @@ const mocks = vi.hoisted(() => {
     authTokens: {
       signAuthToken: vi.fn(() => 'new-token'),
       setAuthCookie: vi.fn((res, token) => res.cookie('studyhub_session', token)),
+      clearAuthCookie: vi.fn((res) => res.clearCookie('studyhub_session')),
     },
     email: {
       sendEmailVerification: vi.fn(),
@@ -89,6 +90,10 @@ const mocks = vi.hoisted(() => {
       unlinkGoogleFromUser: vi.fn(),
       isGoogleOAuthEnabled: vi.fn(() => false),
     },
+    piiVault: {
+      getUserPII: vi.fn(),
+      setUserPII: vi.fn(),
+    },
   }
 })
 
@@ -102,6 +107,7 @@ const mockTargets = new Map([
   [require.resolve('../src/lib/verification/verificationChallenges'), mocks.verification],
   [require.resolve('../src/lib/email/emailValidation'), mocks.emailValidation],
   [require.resolve('../src/lib/googleAuth'), mocks.googleAuth],
+  [require.resolve('../src/lib/piiVault'), mocks.piiVault],
 ])
 
 const originalModuleLoad = Module._load
@@ -141,6 +147,8 @@ beforeEach(() => {
   vi.clearAllMocks()
 
   mocks.verification.getUserActiveChallenge.mockResolvedValue(null)
+  mocks.piiVault.getUserPII.mockResolvedValue(null)
+  mocks.piiVault.setUserPII.mockResolvedValue(undefined)
   mocks.prisma.$transaction.mockImplementation(async (fn) => fn(mocks.prisma))
 })
 
@@ -257,6 +265,101 @@ describe('settings routes', () => {
     })
   })
 
+  describe('PATCH /profile', () => {
+    it('updates public profile metadata and visibility settings', async () => {
+      mocks.prisma.user.findUnique
+        .mockResolvedValueOnce({ id: 42 })
+        .mockResolvedValueOnce({
+          id: 42,
+          username: 'test_user',
+          role: 'student',
+          email: 'test@studyhub.test',
+          emailVerified: true,
+          displayName: 'Study Hero',
+          bio: 'Building better notes every week.',
+          avatarUrl: null,
+          coverImageUrl: null,
+          profileLinks: [{ label: 'Instagram', url: 'https://instagram.com/studyhub' }],
+          isPrivate: false,
+          authProvider: 'local',
+          accountType: 'student',
+          googleId: null,
+          createdAt: new Date('2026-01-01T00:00:00.000Z'),
+          preferences: {
+            profileFieldVisibility: {
+              displayName: 'public',
+              age: 'private',
+              location: 'private',
+              socialLinks: 'public',
+            },
+          },
+          enrollments: [],
+          _count: { studySheets: 5, enrollments: 2 },
+        })
+
+      mocks.prisma.user.update.mockResolvedValue({ id: 42 })
+      mocks.prisma.userPreferences.upsert.mockResolvedValue({ userId: 42 })
+
+      const response = await request(app)
+        .patch('/profile')
+        .send({
+          displayName: 'Study Hero',
+          bio: 'Building better notes every week.',
+          profileLinks: [{ label: 'Instagram', url: 'https://instagram.com/studyhub' }],
+          profileFieldVisibility: {
+            displayName: 'public',
+            age: 'private',
+            location: 'private',
+            socialLinks: 'public',
+          },
+        })
+
+      expect(response.status).toBe(200)
+      expect(mocks.prisma.user.update).toHaveBeenCalledWith({
+        where: { id: 42 },
+        data: {
+          displayName: 'Study Hero',
+          bio: 'Building better notes every week.',
+          profileLinks: [{ label: 'Instagram', url: 'https://instagram.com/studyhub' }],
+        },
+      })
+      expect(mocks.prisma.userPreferences.upsert).toHaveBeenCalledWith({
+        where: { userId: 42 },
+        create: {
+          userId: 42,
+          profileFieldVisibility: {
+            displayName: 'public',
+            age: 'private',
+            location: 'private',
+            socialLinks: 'public',
+          },
+        },
+        update: {
+          profileFieldVisibility: {
+            displayName: 'public',
+            age: 'private',
+            location: 'private',
+            socialLinks: 'public',
+          },
+        },
+      })
+      expect(response.body).toMatchObject({
+        message: 'Profile updated successfully.',
+        user: {
+          displayName: 'Study Hero',
+          bio: 'Building better notes every week.',
+          profileLinks: [{ label: 'Instagram', url: 'https://instagram.com/studyhub' }],
+          profileFieldVisibility: {
+            displayName: 'public',
+            age: 'private',
+            location: 'private',
+            socialLinks: 'public',
+          },
+        },
+      })
+    })
+  })
+
   describe('GET /preferences', () => {
     it('returns user preferences', async () => {
       mocks.prisma.userPreferences.findUnique.mockResolvedValue({
@@ -265,7 +368,9 @@ describe('settings routes', () => {
         profileVisibility: 'public',
         theme: 'system',
         emailDigest: true,
+        emailComments: true,
         inAppNotifications: true,
+        inAppStudyGroups: true,
       })
 
       const response = await request(app).get('/preferences')
@@ -288,6 +393,8 @@ describe('settings routes', () => {
         profileVisibility: 'public',
         theme: 'system',
         emailDigest: true,
+        emailComments: true,
+        emailSocial: true,
       })
 
       const response = await request(app).get('/preferences')
@@ -307,11 +414,23 @@ describe('settings routes', () => {
         profileVisibility: 'private',
         theme: 'dark',
         emailDigest: false,
+        emailComments: false,
+        emailSocial: false,
+        inAppMentions: false,
+        inAppStudyGroups: false,
       })
 
       const response = await request(app)
         .patch('/preferences')
-        .send({ profileVisibility: 'private', theme: 'dark', emailDigest: false })
+        .send({
+          profileVisibility: 'private',
+          theme: 'dark',
+          emailDigest: false,
+          emailComments: false,
+          emailSocial: false,
+          inAppMentions: false,
+          inAppStudyGroups: false,
+        })
 
       expect(response.status).toBe(200)
       expect(response.body).toMatchObject({
@@ -319,7 +438,33 @@ describe('settings routes', () => {
         preferences: expect.objectContaining({
           profileVisibility: 'private',
           theme: 'dark',
+          emailComments: false,
+          emailSocial: false,
+          inAppMentions: false,
+          inAppStudyGroups: false,
         }),
+      })
+      expect(mocks.prisma.userPreferences.upsert).toHaveBeenCalledWith({
+        where: { userId: 42 },
+        create: {
+          userId: 42,
+          profileVisibility: 'private',
+          theme: 'dark',
+          emailDigest: false,
+          emailComments: false,
+          emailSocial: false,
+          inAppMentions: false,
+          inAppStudyGroups: false,
+        },
+        update: {
+          profileVisibility: 'private',
+          theme: 'dark',
+          emailDigest: false,
+          emailComments: false,
+          emailSocial: false,
+          inAppMentions: false,
+          inAppStudyGroups: false,
+        },
       })
     })
 
@@ -361,6 +506,8 @@ describe('settings routes', () => {
 
       expect(response.status).toBe(200)
       expect(response.body).toMatchObject({ message: 'Account deleted.' })
+      expect(response.headers['set-cookie']).toBeDefined()
+      expect(mocks.authTokens.clearAuthCookie).toHaveBeenCalledTimes(1)
       expect(mocks.deleteUserAccount.deleteUserAccount).toHaveBeenCalledWith(
         mocks.prisma,
         expect.objectContaining({

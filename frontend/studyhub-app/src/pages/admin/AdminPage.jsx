@@ -149,19 +149,18 @@ export default function AdminPage() {
 
   return (
     <>
-      <div style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: FONT }}>
+      <div className="sh-app-page" style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: FONT }}>
         <Navbar crumbs={[{ label: 'Admin', to: '/admin' }]} hideTabs actions={navActions} />
         <div
+          className="app-two-col-grid sh-ambient-grid sh-ambient-shell"
           style={{
             ...pageShell('app'),
-            display: 'grid',
-            gridTemplateColumns: layout.columns.appTwoColumn,
             gap: 20,
           }}
         >
           <AppSidebar mode={layout.sidebarMode} />
 
-          <main id="main-content" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <main className="sh-ambient-main" id="main-content" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {isAdmin ? (
               <>
                 <section

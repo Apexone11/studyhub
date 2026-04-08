@@ -158,6 +158,171 @@ async function sendEmailVerification(toEmail, username, code) {
   }, 'email-verification')
 }
 
+function formatCurrency(amountCents, currency = 'usd') {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: String(currency || 'usd').toUpperCase(),
+  }).format((Number(amountCents) || 0) / 100)
+}
+
+async function sendSubscriptionWelcome({
+  toEmail,
+  username,
+  planName,
+  billingLabel,
+  historyUrl,
+  manageUrl,
+}) {
+  const safePlanName = escapeHtml(planName || 'StudyHub Pro')
+  const safeBillingLabel = escapeHtml(billingLabel || 'monthly')
+  const safeHistoryUrl = escapeHtml(historyUrl || `${getPublicAppUrl()}/settings?tab=subscription`)
+  const safeManageUrl = escapeHtml(manageUrl || `${getPublicAppUrl()}/settings?tab=subscription`)
+
+  const body = `
+    <h2 style="margin:0 0 8px;color:#1e3a5f;font-size:22px;">Welcome to ${safePlanName}</h2>
+    <p style="margin:0 0 18px;color:#6b7280;font-size:15px;line-height:1.7;">
+      Hi <strong>${escapeHtml(username)}</strong>, your StudyHub subscription is active.
+      You now have access to higher limits, Pro member benefits, and faster support.
+    </p>
+    <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px;padding:18px 20px;margin:0 0 20px;">
+      <p style="margin:0 0 10px;color:#334155;font-size:14px;"><strong>Plan:</strong> ${safePlanName}</p>
+      <p style="margin:0;color:#334155;font-size:14px;"><strong>Billing cadence:</strong> ${safeBillingLabel}</p>
+    </div>
+    <p style="margin:0 0 16px;color:#6b7280;font-size:14px;line-height:1.7;">
+      Your payment history and downloadable records live in your subscription settings.
+      You can also manage billing details there at any time.
+    </p>
+    <div style="text-align:center;margin:0 0 20px;">
+      <a href="${safeHistoryUrl}" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;padding:14px 28px;border-radius:8px;margin-right:8px;">Open Payment History</a>
+      <a href="${safeManageUrl}" style="display:inline-block;background:#f8fafc;color:#1e3a5f;text-decoration:none;font-weight:bold;font-size:15px;padding:14px 28px;border-radius:8px;border:1px solid #cbd5e1;">Manage Subscription</a>
+    </div>
+    <p style="margin:0;color:#9ca3af;font-size:13px;line-height:1.6;">
+      We will email you a receipt each time a successful payment is recorded.
+    </p>
+  `
+
+  await deliverMail({
+    from: `"StudyHub" <${getFromAddress()}>`,
+    to: toEmail,
+    subject: `Welcome to ${planName || 'StudyHub Pro'}`,
+    text: [
+      `Hi ${username},`,
+      '',
+      `Your ${planName || 'StudyHub Pro'} subscription is active.`,
+      `Billing cadence: ${billingLabel || 'monthly'}.`,
+      '',
+      `Payment history: ${historyUrl || `${getPublicAppUrl()}/settings?tab=subscription`}`,
+      `Manage subscription: ${manageUrl || `${getPublicAppUrl()}/settings?tab=subscription`}`,
+    ].join('\n'),
+    html: htmlWrap('Welcome to StudyHub Pro', body),
+  }, 'subscription-welcome')
+}
+
+async function sendDonationThankYou({
+  toEmail,
+  username,
+  amountCents,
+  currency,
+  message,
+  anonymous,
+  historyUrl,
+  supportersUrl,
+}) {
+  const formattedAmount = formatCurrency(amountCents, currency)
+  const safeHistoryUrl = escapeHtml(historyUrl || `${getPublicAppUrl()}/settings?tab=subscription`)
+  const safeSupportersUrl = escapeHtml(supportersUrl || `${getPublicAppUrl()}/supporters`)
+  const safeMessage = typeof message === 'string' && message.trim() ? escapeHtml(message.trim()) : ''
+
+  const body = `
+    <h2 style="margin:0 0 8px;color:#1e3a5f;font-size:22px;">Thank you for supporting StudyHub</h2>
+    <p style="margin:0 0 18px;color:#6b7280;font-size:15px;line-height:1.7;">
+      Hi <strong>${escapeHtml(username)}</strong>, thank you for your donation.
+      Your support helps keep StudyHub available to students who rely on shared study resources.
+    </p>
+    <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px;padding:18px 20px;margin:0 0 20px;">
+      <p style="margin:0 0 10px;color:#334155;font-size:14px;"><strong>Donation amount:</strong> ${escapeHtml(formattedAmount)}</p>
+      <p style="margin:0;color:#334155;font-size:14px;"><strong>Public display:</strong> ${anonymous ? 'Anonymous supporter' : 'Visible on supporters page'}</p>
+    </div>
+    ${safeMessage ? `<div style="background:#fff7ed;border:1px solid #fdba74;border-radius:12px;padding:16px 18px;margin:0 0 20px;"><p style="margin:0 0 6px;color:#9a3412;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;">Your note</p><p style="margin:0;color:#7c2d12;font-size:14px;line-height:1.6;">${safeMessage}</p></div>` : ''}
+    <p style="margin:0 0 16px;color:#6b7280;font-size:14px;line-height:1.7;">
+      You can review your transaction history from your account settings and revisit the supporters page whenever you want.
+    </p>
+    <div style="text-align:center;margin:0 0 20px;">
+      <a href="${safeHistoryUrl}" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;padding:14px 28px;border-radius:8px;margin-right:8px;">View Payment History</a>
+      <a href="${safeSupportersUrl}" style="display:inline-block;background:#f8fafc;color:#1e3a5f;text-decoration:none;font-weight:bold;font-size:15px;padding:14px 28px;border-radius:8px;border:1px solid #cbd5e1;">Open Supporters Page</a>
+    </div>
+    <p style="margin:0;color:#9ca3af;font-size:13px;line-height:1.6;">
+      Stripe may send a separate processor receipt depending on your checkout settings.
+    </p>
+  `
+
+  await deliverMail({
+    from: `"StudyHub" <${getFromAddress()}>`,
+    to: toEmail,
+    subject: 'Thank you for supporting StudyHub',
+    text: [
+      `Hi ${username},`,
+      '',
+      `Thank you for your donation of ${formattedAmount}.`,
+      `Public display: ${anonymous ? 'Anonymous supporter' : 'Visible on supporters page'}.`,
+      safeMessage ? `Your note: ${message.trim()}` : null,
+      '',
+      `Payment history: ${historyUrl || `${getPublicAppUrl()}/settings?tab=subscription`}`,
+      `Supporters page: ${supportersUrl || `${getPublicAppUrl()}/supporters`}`,
+    ].filter(Boolean).join('\n'),
+    html: htmlWrap('Thank You for Supporting StudyHub', body),
+  }, 'donation-thank-you')
+}
+
+async function sendPaymentReceipt({
+  toEmail,
+  username,
+  amountCents,
+  currency,
+  description,
+  receiptUrl,
+  historyUrl,
+}) {
+  const formattedAmount = formatCurrency(amountCents, currency)
+  const safeDescription = escapeHtml(description || 'StudyHub payment')
+  const safeHistoryUrl = escapeHtml(historyUrl || `${getPublicAppUrl()}/settings?tab=subscription`)
+  const safeReceiptUrl = receiptUrl ? escapeHtml(receiptUrl) : ''
+
+  const body = `
+    <h2 style="margin:0 0 8px;color:#1e3a5f;font-size:22px;">Your StudyHub receipt</h2>
+    <p style="margin:0 0 18px;color:#6b7280;font-size:15px;line-height:1.7;">
+      Hi <strong>${escapeHtml(username)}</strong>, your payment was processed successfully.
+    </p>
+    <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px;padding:18px 20px;margin:0 0 20px;">
+      <p style="margin:0 0 10px;color:#334155;font-size:14px;"><strong>Amount:</strong> ${escapeHtml(formattedAmount)}</p>
+      <p style="margin:0;color:#334155;font-size:14px;"><strong>Description:</strong> ${safeDescription}</p>
+    </div>
+    <div style="text-align:center;margin:0 0 20px;">
+      <a href="${safeHistoryUrl}" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;padding:14px 28px;border-radius:8px;margin-right:8px;">Open Payment History</a>
+      ${safeReceiptUrl ? `<a href="${safeReceiptUrl}" style="display:inline-block;background:#f8fafc;color:#1e3a5f;text-decoration:none;font-weight:bold;font-size:15px;padding:14px 28px;border-radius:8px;border:1px solid #cbd5e1;">View Hosted Receipt</a>` : ''}
+    </div>
+    <p style="margin:0;color:#9ca3af;font-size:13px;line-height:1.6;">
+      You can also download your full StudyHub payment history from settings whenever you need it.
+    </p>
+  `
+
+  await deliverMail({
+    from: `"StudyHub" <${getFromAddress()}>`,
+    to: toEmail,
+    subject: `StudyHub receipt: ${description || 'Payment received'}`,
+    text: [
+      `Hi ${username},`,
+      '',
+      `Your payment of ${formattedAmount} was processed successfully.`,
+      `Description: ${description || 'StudyHub payment'}`,
+      '',
+      `Payment history: ${historyUrl || `${getPublicAppUrl()}/settings?tab=subscription`}`,
+      receiptUrl ? `Hosted receipt: ${receiptUrl}` : null,
+    ].filter(Boolean).join('\n'),
+    html: htmlWrap('StudyHub Receipt', body),
+  }, 'payment-receipt')
+}
+
 
 /**
  * Send a course request notification to the company/admin inbox.
@@ -283,6 +448,9 @@ module.exports = {
   sendEmailSmoke,
   sendPasswordReset,
   sendEmailVerification,
+  sendSubscriptionWelcome,
+  sendDonationThankYou,
+  sendPaymentReceipt,
   sendCourseRequestNotice,
   sendHighRiskSheetAlert,
 }

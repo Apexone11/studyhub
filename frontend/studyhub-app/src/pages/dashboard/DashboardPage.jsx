@@ -93,14 +93,14 @@ export default function DashboardPage() {
   )
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: FONT }}>
+    <div className="sh-app-page" style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: FONT }}>
       <Navbar crumbs={[{ label: 'Dashboard', to: '/dashboard' }]} hideTabs actions={navActions} />
       {/* 2-column responsive grid: sidebar | dashboard content
        * Desktop: sidebar visible, Compact: sidebar as drawer */}
-      <div className="app-two-col-grid" style={pageShell('app')}>
+      <div className="app-two-col-grid sh-ambient-grid sh-ambient-shell" style={pageShell('app')}>
         <AppSidebar mode={layout.sidebarMode} />
 
-        <main id="main-content" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+        <main className="sh-ambient-main" id="main-content" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
           {/* Welcome banner — shown once after registration */}
           {isWelcome && !welcomeDismissed ? (
             <div
@@ -142,11 +142,11 @@ export default function DashboardPage() {
             ref={heroRef}
             data-tutorial="dashboard-hero"
             style={{
-              background: 'linear-gradient(135deg, var(--sh-heading) 0%, var(--sh-slate-800) 100%)',
+              background: 'var(--sh-hero-gradient-primary)',
               borderRadius: 18,
-              border: '1px solid var(--sh-slate-800)',
+              border: '1px solid var(--sh-glass-border)',
               padding: '28px 30px',
-              color: 'white',
+              color: 'var(--sh-on-dark)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
@@ -158,7 +158,7 @@ export default function DashboardPage() {
               <div
                 style={{
                   fontSize: 13,
-                  color: 'var(--sh-slate-300)',
+                  color: 'var(--sh-on-dark-faint)',
                   fontWeight: 700,
                   marginBottom: 8,
                 }}
@@ -173,7 +173,7 @@ export default function DashboardPage() {
                   margin: '10px 0 0',
                   fontSize: 14,
                   lineHeight: 1.7,
-                  color: 'var(--sh-slate-300)',
+                  color: 'var(--sh-on-dark-faint)',
                 }}
               >
                 Joined {formatJoinedDate(hero.createdAt || user?.createdAt)}. Your study sheets,
@@ -188,7 +188,7 @@ export default function DashboardPage() {
                   padding: '11px 16px',
                   borderRadius: 12,
                   background: 'var(--sh-brand)',
-                  color: '#fff',
+                  color: 'var(--sh-btn-primary-text)',
                   fontSize: 13,
                   fontWeight: 700,
                   textDecoration: 'none',
@@ -201,9 +201,9 @@ export default function DashboardPage() {
                 style={{
                   padding: '11px 16px',
                   borderRadius: 12,
-                  border: '1px solid rgba(255,255,255,0.18)',
-                  background: 'rgba(255,255,255,0.06)',
-                  color: '#fff',
+                  border: '1px solid var(--sh-glass-border)',
+                  background: 'var(--sh-glass-bg-soft)',
+                  color: 'var(--sh-on-dark)',
                   fontSize: 13,
                   fontWeight: 700,
                   textDecoration: 'none',
@@ -305,11 +305,11 @@ export default function DashboardPage() {
             borderRadius: '50%',
             border: 'none',
             background: 'var(--sh-brand)',
-            color: '#fff',
+            color: 'var(--sh-btn-primary-text)',
             fontSize: 18,
             fontWeight: 800,
             cursor: 'pointer',
-            boxShadow: '0 4px 14px rgba(59,130,246,0.4)',
+            boxShadow: 'var(--sh-btn-primary-shadow)',
             zIndex: 50,
             display: 'grid',
             placeItems: 'center',

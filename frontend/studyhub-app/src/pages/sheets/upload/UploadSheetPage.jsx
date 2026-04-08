@@ -17,7 +17,7 @@ import {
   AttachmentSection, DraftBanner, StatusBanner, ErrorBanner, EditorPanel,
   UploadHelperCard,
 } from './UploadSheetFormFields'
-import { TutorialModal, HtmlScanModal } from '../lab/HtmlScanModal'
+import { TutorialModal, HtmlReviewNoticeModal, HtmlScanModal } from '../lab/HtmlScanModal'
 import UploadNavActions from './UploadNavActions'
 import useUploadSheet from './useUploadSheet'
 
@@ -53,7 +53,7 @@ export default function UploadSheetPage() {
     <div style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: FONT }}>
       <Navbar crumbs={[{ label: 'Study Sheets', to: '/sheets' }, { label: hook.isEditing ? 'Edit Sheet' : 'New Sheet', to: null }]} hideTabs actions={navActions} hideSearch />
       <div style={pageShell('editor', 20, 60)}>
-        {!hook.isEditing ? <UploadHelperCard /> : null}
+        {hook.isEditing ? null : <UploadHelperCard />}
         <InfoFields
           title={hook.title} setTitle={hook.setTitle}
           courseId={hook.courseId} setCourseId={hook.setCourseId}
@@ -73,6 +73,7 @@ export default function UploadSheetPage() {
           handleHtmlImport={hook.handleHtmlImport}
           scanState={hook.scanState}
           canEditHtml={hook.canEditHtml}
+          onOpenScanDetails={hook.openScanModal}
         />
 
         <AttachmentSection
@@ -114,6 +115,14 @@ export default function UploadSheetPage() {
         onClose={() => hook.setShowScanModal(false)}
         onAcknowledge={hook.acknowledgeScanAndDismiss}
         onUnderstood={() => { hook.setScanModalDismissed(true); hook.setShowScanModal(false) }}
+      />
+
+      <HtmlReviewNoticeModal
+        show={Boolean(hook.postSubmitNotice)}
+        notice={hook.postSubmitNotice}
+        onClose={hook.dismissPostSubmitNotice}
+        onOpenMySheets={hook.openMySheets}
+        onOpenPreview={hook.openHtmlPreview}
       />
 
       <ConfirmDialog

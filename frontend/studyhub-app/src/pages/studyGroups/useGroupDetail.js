@@ -3,6 +3,16 @@ import { API } from '../../config';
 import { authHeaders } from '../shared/pageUtils';
 import { showToast } from '../../lib/toast';
 
+function normalizeGroupId(groupId) {
+  const parsed = Number.parseInt(groupId, 10);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+async function readResponseError(response, fallback) {
+  const data = await response.json().catch(() => ({}));
+  return data?.error || fallback;
+}
+
 /**
  * Hook for managing a single study group's detail view
  * Handles loading, updating, deleting, and membership actions
@@ -17,15 +27,18 @@ export function useGroupDetail() {
    * Load a single group's details
    */
   const loadGroupDetails = useCallback(async (groupId) => {
+    const normalizedGroupId = normalizeGroupId(groupId);
     setActiveGroupLoading(true);
     setActiveGroupError(null);
     try {
-      const response = await fetch(`${API}/api/study-groups/${groupId}`, {
+      const response = await fetch(`${API}/api/study-groups/${normalizedGroupId ?? groupId}`, {
         credentials: 'include',
         headers: authHeaders(),
       });
 
-      if (!response.ok) throw new Error('Failed to load group');
+      if (!response.ok) {
+        throw new Error(await readResponseError(response, 'Failed to load group'));
+      }
 
       const data = await response.json();
       setActiveGroup(data);
@@ -41,20 +54,23 @@ export function useGroupDetail() {
    * Update an existing group
    */
   const updateGroup = useCallback(async (groupId, updates) => {
+    const normalizedGroupId = normalizeGroupId(groupId);
     try {
-      const response = await fetch(`${API}/api/study-groups/${groupId}`, {
+      const response = await fetch(`${API}/api/study-groups/${normalizedGroupId ?? groupId}`, {
         method: 'PATCH',
         credentials: 'include',
         headers: authHeaders(),
         body: JSON.stringify(updates),
       });
 
-      if (!response.ok) throw new Error('Failed to update group');
+      if (!response.ok) {
+        throw new Error(await readResponseError(response, 'Failed to update group'));
+      }
 
       const updatedGroup = await response.json();
 
       // Update active group if it's the one being edited
-      if (activeGroup?.id === groupId) {
+      if (activeGroup?.id === normalizedGroupId) {
         setActiveGroup(updatedGroup);
       }
 
@@ -70,17 +86,20 @@ export function useGroupDetail() {
    * Delete a group
    */
   const deleteGroup = useCallback(async (groupId) => {
+    const normalizedGroupId = normalizeGroupId(groupId);
     try {
-      const response = await fetch(`${API}/api/study-groups/${groupId}`, {
+      const response = await fetch(`${API}/api/study-groups/${normalizedGroupId ?? groupId}`, {
         method: 'DELETE',
         credentials: 'include',
         headers: authHeaders(),
       });
 
-      if (!response.ok) throw new Error('Failed to delete group');
+      if (!response.ok) {
+        throw new Error(await readResponseError(response, 'Failed to delete group'));
+      }
 
       // Clear active group if it was deleted
-      if (activeGroup?.id === groupId) {
+      if (activeGroup?.id === normalizedGroupId) {
         setActiveGroup(null);
       }
 
@@ -95,75 +114,67 @@ export function useGroupDetail() {
    * Join a study group
    */
   const joinGroup = useCallback(async (groupId) => {
+    const normalizedGroupId = normalizeGroupId(groupId);
     try {
-      // Optimistic update
-      setActiveGroup((prev) => {
-        if (!prev || prev.id !== groupId) return prev;
-        return {
-          ...prev,
-          isMember: true,
-          memberCount: (prev.memberCount || 0) + 1,
-        };
-      });
-
-      const response = await fetch(`${API}/api/study-groups/${groupId}/join`, {
+      const response = await fetch(`${API}/api/study-groups/${normalizedGroupId ?? groupId}/join`, {
         method: 'POST',
         credentials: 'include',
         headers: authHeaders(),
       });
 
       if (!response.ok) {
-        // Revert optimistic update
-        setActiveGroup((prev) => {
-          if (!prev || prev.id !== groupId) return prev;
-          return {
-            ...prev,
-            isMember: false,
-            memberCount: Math.max(0, (prev.memberCount || 1) - 1),
-          };
-        });
-        throw new Error('Failed to join group');
+        throw new Error(await readResponseError(response, 'Failed to join group'));
       }
 
-      showToast('Joined group successfully', 'success');
+      const membership = await response.json();
+
+      if (activeGroup?.id === normalizedGroupId) {
+        await loadGroupDetails(normalizedGroupId);
+      }
+
+      showToast(
+        membership.status === 'pending'
+          ? 'Join request sent successfully'
+          : membership.status === 'active'
+            ? 'Joined group successfully'
+            : 'Group membership updated successfully',
+        'success'
+      );
+
+      return membership;
     } catch (error) {
       showToast(error.message, 'error');
       throw error;
     }
-  }, []);
+  }, [activeGroup?.id, loadGroupDetails]);
 
   /**
    * Leave a study group
    */
   const leaveGroup = useCallback(async (groupId) => {
+    const normalizedGroupId = normalizeGroupId(groupId);
     try {
-      // Optimistic update
-      setActiveGroup((prev) => {
-        if (!prev || prev.id !== groupId) return prev;
-        return {
-          ...prev,
-          isMember: false,
-          memberCount: Math.max(0, (prev.memberCount || 1) - 1),
-        };
-      });
-
-      const response = await fetch(`${API}/api/study-groups/${groupId}/leave`, {
+      const response = await fetch(`${API}/api/study-groups/${normalizedGroupId ?? groupId}/leave`, {
         method: 'POST',
         credentials: 'include',
         headers: authHeaders(),
       });
 
       if (!response.ok) {
-        // Revert optimistic update
+        throw new Error(await readResponseError(response, 'Failed to leave group'));
+      }
+
+      if (activeGroup?.id === normalizedGroupId) {
         setActiveGroup((prev) => {
-          if (!prev || prev.id !== groupId) return prev;
+          if (!prev || prev.id !== normalizedGroupId) return prev;
           return {
             ...prev,
-            isMember: true,
-            memberCount: (prev.memberCount || 0) + 1,
+            isMember: false,
+            userRole: null,
+            userMembership: null,
+            memberCount: Math.max(0, (prev.memberCount || 1) - 1),
           };
         });
-        throw new Error('Failed to leave group');
       }
 
       showToast('Left group successfully', 'success');
@@ -171,7 +182,7 @@ export function useGroupDetail() {
       showToast(error.message, 'error');
       throw error;
     }
-  }, []);
+  }, [activeGroup?.id]);
 
   return {
     // State

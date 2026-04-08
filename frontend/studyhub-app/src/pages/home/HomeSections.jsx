@@ -4,7 +4,7 @@ import { forwardRef, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { trackEvent } from '../../lib/telemetry'
 import { IconArrowRight, LogoMark } from '../../components/Icons'
-import { FEATURES, STEPS, TESTIMONIALS } from './homeConstants'
+import { FEATURES, HOME_AVATAR_COLORS, HOME_TREE_COLORS, STEPS, TESTIMONIALS } from './homeConstants'
 import { API } from '../../config'
 
 /* ------------------------------------------------------------------ */
@@ -45,6 +45,8 @@ export const FeaturesSection = forwardRef(function FeaturesSection(_, ref) {
 /* ------------------------------------------------------------------ */
 
 export const StepsSection = forwardRef(function StepsSection(_, ref) {
+  const { leaf, main, secondary, study, tertiary } = HOME_TREE_COLORS
+
   return (
     <section className="home-steps-section">
       <div className="home-steps-bg-art" aria-hidden="true">
@@ -56,64 +58,64 @@ export const StepsSection = forwardRef(function StepsSection(_, ref) {
         >
           {/* Glow layer */}
           <g style={{ filter: 'blur(12px)' }} opacity="0.15">
-            <circle cx="450" cy="80" r="22" fill="#3b82f6" />
-            <circle cx="290" cy="200" r="16" fill="#60a5fa" />
-            <circle cx="610" cy="200" r="16" fill="#60a5fa" />
-            <circle cx="450" cy="350" r="14" fill="#3b82f6" />
+            <circle cx="450" cy="80" r="22" fill={main} />
+            <circle cx="290" cy="200" r="16" fill={secondary} />
+            <circle cx="610" cy="200" r="16" fill={secondary} />
+            <circle cx="450" cy="350" r="14" fill={main} />
           </g>
 
           {/* Main trunk */}
-          <line x1="450" y1="420" x2="450" y2="240" stroke="#3b82f6" strokeWidth="3.5" strokeLinecap="round" opacity="0.14" />
+          <line x1="450" y1="420" x2="450" y2="240" stroke={main} strokeWidth="3.5" strokeLinecap="round" opacity="0.14" />
 
           {/* Fork split */}
-          <path d="M450 240 Q380 200 290 140" stroke="#3b82f6" strokeWidth="2.8" fill="none" strokeLinecap="round" opacity="0.14" />
-          <path d="M450 240 Q520 200 610 140" stroke="#3b82f6" strokeWidth="2.8" fill="none" strokeLinecap="round" opacity="0.14" />
+          <path d="M450 240 Q380 200 290 140" stroke={main} strokeWidth="2.8" fill="none" strokeLinecap="round" opacity="0.14" />
+          <path d="M450 240 Q520 200 610 140" stroke={main} strokeWidth="2.8" fill="none" strokeLinecap="round" opacity="0.14" />
 
           {/* Left sub-branches */}
-          <path d="M290 140 Q250 100 210 60" stroke="#60a5fa" strokeWidth="2" fill="none" strokeLinecap="round" opacity="0.12" />
-          <path d="M290 140 Q310 100 340 60" stroke="#60a5fa" strokeWidth="2" fill="none" strokeLinecap="round" opacity="0.12" />
-          <path d="M210 60 Q190 40 175 25" stroke="#93c5fd" strokeWidth="1.4" fill="none" strokeLinecap="round" opacity="0.10" />
-          <path d="M210 60 Q225 40 240 30" stroke="#93c5fd" strokeWidth="1.4" fill="none" strokeLinecap="round" opacity="0.10" />
+          <path d="M290 140 Q250 100 210 60" stroke={secondary} strokeWidth="2" fill="none" strokeLinecap="round" opacity="0.12" />
+          <path d="M290 140 Q310 100 340 60" stroke={secondary} strokeWidth="2" fill="none" strokeLinecap="round" opacity="0.12" />
+          <path d="M210 60 Q190 40 175 25" stroke={tertiary} strokeWidth="1.4" fill="none" strokeLinecap="round" opacity="0.10" />
+          <path d="M210 60 Q225 40 240 30" stroke={tertiary} strokeWidth="1.4" fill="none" strokeLinecap="round" opacity="0.10" />
 
           {/* Right sub-branches */}
-          <path d="M610 140 Q580 100 560 60" stroke="#60a5fa" strokeWidth="2" fill="none" strokeLinecap="round" opacity="0.12" />
-          <path d="M610 140 Q640 100 680 60" stroke="#60a5fa" strokeWidth="2" fill="none" strokeLinecap="round" opacity="0.12" />
-          <path d="M680 60 Q695 40 710 25" stroke="#93c5fd" strokeWidth="1.4" fill="none" strokeLinecap="round" opacity="0.10" />
-          <path d="M680 60 Q665 40 650 30" stroke="#93c5fd" strokeWidth="1.4" fill="none" strokeLinecap="round" opacity="0.10" />
+          <path d="M610 140 Q580 100 560 60" stroke={secondary} strokeWidth="2" fill="none" strokeLinecap="round" opacity="0.12" />
+          <path d="M610 140 Q640 100 680 60" stroke={secondary} strokeWidth="2" fill="none" strokeLinecap="round" opacity="0.12" />
+          <path d="M680 60 Q695 40 710 25" stroke={tertiary} strokeWidth="1.4" fill="none" strokeLinecap="round" opacity="0.10" />
+          <path d="M680 60 Q665 40 650 30" stroke={tertiary} strokeWidth="1.4" fill="none" strokeLinecap="round" opacity="0.10" />
 
           {/* Center vertical branch */}
-          <line x1="450" y1="160" x2="450" y2="80" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" opacity="0.10" />
+          <line x1="450" y1="160" x2="450" y2="80" stroke={main} strokeWidth="2" strokeLinecap="round" opacity="0.10" />
 
           {/* Junction and leaf nodes */}
-          <circle cx="450" cy="240" r="6" fill="#3b82f6" opacity="0.18" />
-          <circle cx="290" cy="140" r="5" fill="#60a5fa" opacity="0.18" />
-          <circle cx="610" cy="140" r="5" fill="#60a5fa" opacity="0.18" />
-          <circle cx="450" cy="420" r="5" fill="#3b82f6" opacity="0.12" />
-          <circle cx="210" cy="60" r="3.5" fill="#93c5fd" opacity="0.18" />
-          <circle cx="340" cy="60" r="3.5" fill="#93c5fd" opacity="0.18" />
-          <circle cx="560" cy="60" r="3.5" fill="#93c5fd" opacity="0.18" />
-          <circle cx="680" cy="60" r="3.5" fill="#93c5fd" opacity="0.18" />
-          <circle cx="450" cy="80" r="5" fill="#3b82f6" opacity="0.16" />
-          <circle cx="175" cy="25" r="2.5" fill="#bfdbfe" opacity="0.18" />
-          <circle cx="240" cy="30" r="2.5" fill="#bfdbfe" opacity="0.18" />
-          <circle cx="710" cy="25" r="2.5" fill="#bfdbfe" opacity="0.18" />
-          <circle cx="650" cy="30" r="2.5" fill="#bfdbfe" opacity="0.18" />
+          <circle cx="450" cy="240" r="6" fill={main} opacity="0.18" />
+          <circle cx="290" cy="140" r="5" fill={secondary} opacity="0.18" />
+          <circle cx="610" cy="140" r="5" fill={secondary} opacity="0.18" />
+          <circle cx="450" cy="420" r="5" fill={main} opacity="0.12" />
+          <circle cx="210" cy="60" r="3.5" fill={tertiary} opacity="0.18" />
+          <circle cx="340" cy="60" r="3.5" fill={tertiary} opacity="0.18" />
+          <circle cx="560" cy="60" r="3.5" fill={tertiary} opacity="0.18" />
+          <circle cx="680" cy="60" r="3.5" fill={tertiary} opacity="0.18" />
+          <circle cx="450" cy="80" r="5" fill={main} opacity="0.16" />
+          <circle cx="175" cy="25" r="2.5" fill={leaf} opacity="0.18" />
+          <circle cx="240" cy="30" r="2.5" fill={leaf} opacity="0.18" />
+          <circle cx="710" cy="25" r="2.5" fill={leaf} opacity="0.18" />
+          <circle cx="650" cy="30" r="2.5" fill={leaf} opacity="0.18" />
 
           {/* Animated pulse rings on key nodes */}
-          <circle cx="450" cy="240" r="12" fill="none" stroke="#3b82f6" strokeWidth="0.8" opacity="0.08">
+          <circle cx="450" cy="240" r="12" fill="none" stroke={main} strokeWidth="0.8" opacity="0.08">
             <animate attributeName="r" values="12;20;12" dur="4s" repeatCount="indefinite"/>
             <animate attributeName="opacity" values="0.08;0.02;0.08" dur="4s" repeatCount="indefinite"/>
           </circle>
 
           {/* Student figure reaching toward the tree */}
-          <ellipse cx="130" cy="390" rx="10" ry="14" fill="none" stroke="#3b82f6" strokeWidth="1.8" opacity="0.14" />
-          <circle cx="130" cy="368" r="9" fill="none" stroke="#3b82f6" strokeWidth="1.8" opacity="0.14" />
-          <path d="M138,380 Q170,340 210,290" fill="none" stroke="#60a5fa" strokeWidth="1.8" strokeLinecap="round" opacity="0.16" />
-          <path d="M122,382 Q110,390 104,400" fill="none" stroke="#60a5fa" strokeWidth="1.5" strokeLinecap="round" opacity="0.12" />
-          <line x1="126" y1="404" x2="120" y2="424" stroke="#3b82f6" strokeWidth="1.5" strokeLinecap="round" opacity="0.12" />
-          <line x1="134" y1="404" x2="138" y2="424" stroke="#3b82f6" strokeWidth="1.5" strokeLinecap="round" opacity="0.12" />
-          <rect x="120" y="357" width="20" height="3" rx="1" fill="#f59e0b" opacity="0.20" />
-          <line x1="130" y1="360" x2="136" y2="367" stroke="#f59e0b" strokeWidth="1.2" opacity="0.16" />
+          <ellipse cx="130" cy="390" rx="10" ry="14" fill="none" stroke={main} strokeWidth="1.8" opacity="0.14" />
+          <circle cx="130" cy="368" r="9" fill="none" stroke={main} strokeWidth="1.8" opacity="0.14" />
+          <path d="M138,380 Q170,340 210,290" fill="none" stroke={secondary} strokeWidth="1.8" strokeLinecap="round" opacity="0.16" />
+          <path d="M122,382 Q110,390 104,400" fill="none" stroke={secondary} strokeWidth="1.5" strokeLinecap="round" opacity="0.12" />
+          <line x1="126" y1="404" x2="120" y2="424" stroke={main} strokeWidth="1.5" strokeLinecap="round" opacity="0.12" />
+          <line x1="134" y1="404" x2="138" y2="424" stroke={main} strokeWidth="1.5" strokeLinecap="round" opacity="0.12" />
+          <rect x="120" y="357" width="20" height="3" rx="1" fill={study} opacity="0.20" />
+          <line x1="130" y1="360" x2="136" y2="367" stroke={study} strokeWidth="1.2" opacity="0.16" />
         </svg>
       </div>
 
@@ -141,15 +143,12 @@ export const StepsSection = forwardRef(function StepsSection(_, ref) {
 /*  Testimonials                                                       */
 /* ------------------------------------------------------------------ */
 
-/* Avatar color palette for dynamic reviews without explicit color */
-const AVATAR_COLORS = ['#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4']
-
 function TestimonialCard({ t, index }) {
   const isDynamic = Boolean(t.user)
   const name = isDynamic ? t.user.username : t.name
   const school = isDynamic ? (t.user.school || t.user.accountType || '') : t.school
   const initial = isDynamic ? (t.user.username?.[0]?.toUpperCase() || '?') : t.initial
-  const avatarColor = isDynamic ? AVATAR_COLORS[index % AVATAR_COLORS.length] : t.color
+  const avatarColor = isDynamic ? HOME_AVATAR_COLORS[index % HOME_AVATAR_COLORS.length] : t.color
   const starCount = isDynamic ? (t.stars || 5) : 5
   const text = isDynamic ? t.text : t.text
   const avatarUrl = isDynamic ? t.user.avatarUrl : null
@@ -176,7 +175,7 @@ function TestimonialCard({ t, index }) {
             style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
           />
         ) : (
-          <div className="home-testimonial-avatar" style={{ background: avatarColor }}>
+          <div className="home-testimonial-avatar" style={{ '--home-testimonial-avatar-bg': avatarColor }}>
             {initial}
           </div>
         )}
@@ -280,8 +279,8 @@ export function CtaSection() {
             Explore Study Sheets
           </Link>
         </div>
-        <p style={{ marginTop: '1.25rem', fontSize: '0.95rem', color: 'var(--sh-slate-400)' }}>
-          Love StudyHub? <Link to="/supporters" style={{ color: 'var(--sh-brand)', fontWeight: 600, textDecoration: 'underline' }} onClick={() => trackEvent('landing_cta_clicked', { target: 'supporters', location: 'bottom_cta' })}>Support the project</Link> or <Link to="/pricing" style={{ color: 'var(--sh-brand)', fontWeight: 600, textDecoration: 'underline' }}>go Pro</Link>.
+        <p className="home-cta-note">
+          Love StudyHub? <Link to="/supporters" className="home-cta-link" onClick={() => trackEvent('landing_cta_clicked', { target: 'supporters', location: 'bottom_cta' })}>Support the project</Link> or <Link to="/pricing" className="home-cta-link">go Pro</Link>.
         </p>
       </div>
     </section>
@@ -321,7 +320,7 @@ export function HomeFooter({ currentYear }) {
         </div>
 
         <p className="home-footer-copy">
-          &copy; {currentYear} StudyHub &middot; Built by students, for students &middot; Open Source
+          &copy; {currentYear} StudyHub&trade; &middot; Built by students, for students &middot; Open Source
         </p>
       </div>
     </footer>

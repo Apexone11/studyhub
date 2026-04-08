@@ -16,10 +16,23 @@ const { ERROR_CODES, sendError } = require('./errorEnvelope')
 const { captureError } = require('../monitoring/sentry')
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
+const EXEMPT_WRITE_PREFIXES = ['/api/auth/']
+
+function requestPath(req) {
+  return String(req.originalUrl || `${req.baseUrl || ''}${req.path || ''}`).split('?')[0]
+}
+
+function isRestrictionExempt(req) {
+  const path = requestPath(req)
+  return EXEMPT_WRITE_PREFIXES.some((prefix) => path.startsWith(prefix))
+}
 
 async function checkRestrictions(req, res, next) {
   /* Skip read-only requests */
   if (SAFE_METHODS.has(String(req.method || '').toUpperCase())) return next()
+
+  /* Skip auth/session maintenance endpoints */
+  if (isRestrictionExempt(req)) return next()
 
   /* Skip if no authenticated user (auth middleware hasn't run yet or user is anonymous) */
   if (!req.user?.userId) return next()

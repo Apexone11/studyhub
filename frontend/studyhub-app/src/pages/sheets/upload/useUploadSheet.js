@@ -5,7 +5,7 @@
  * uploadSheetActions.js to keep this file focused on state and effects.
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { API } from '../../../config'
 import { useTutorial } from '../../../lib/useTutorial'
 import { UPLOAD_STEPS, TUTORIAL_VERSIONS } from '../../../lib/tutorialSteps'
@@ -31,8 +31,13 @@ import {
 export default function useUploadSheet() {
   usePageTitle('Upload Sheet')
   const navigate = useNavigate()
+  const location = useLocation()
+  const [searchParams] = useSearchParams()
   const { id: sheetId } = useParams()
   const isEditing = Boolean(sheetId)
+  const draftQuery = searchParams.get('draft') || ''
+  const requestedDraftId = Number.parseInt(draftQuery, 10)
+  const hasRequestedDraft = Number.isInteger(requestedDraftId)
 
   /* ── Form state ────────────────────────────────────────────────────── */
   const [title, setTitle] = useState('')
@@ -63,6 +68,7 @@ export default function useUploadSheet() {
   const [showScanModal, setShowScanModal] = useState(false)
   const [scanAckChecked, setScanAckChecked] = useState(false)
   const [scanModalDismissed, setScanModalDismissed] = useState(false)
+  const [postSubmitNotice, setPostSubmitNotice] = useState(() => location.state?.postSubmitNotice || null)
 
   /* ── Tutorial state ────────────────────────────────────────────────── */
   const [showTutorial, setShowTutorial] = useState(false)
@@ -90,7 +96,9 @@ export default function useUploadSheet() {
   const autosaveTimer = useRef(null)
 
   /* ── Derived values ────────────────────────────────────────────────── */
-  const activeSheetId = isEditing ? Number.parseInt(sheetId, 10) : draftId
+  const activeSheetId = isEditing
+    ? Number.parseInt(sheetId, 10)
+    : (hasRequestedDraft ? requestedDraftId : draftId)
   const canEditHtml = canEditHtmlWorkingCopy()
   const canSubmitHtml = canSubmitHtmlReview({
     hasOriginalVersion: scanState.hasOriginalVersion,
@@ -100,6 +108,12 @@ export default function useUploadSheet() {
     title, courseId, description, html: content,
   })
   const isHtmlMode = !legacyMarkdownMode && contentFormat === 'html'
+
+  useEffect(() => {
+    if (location.state?.postSubmitNotice) {
+      setPostSubmitNotice(location.state.postSubmitNotice)
+    }
+  }, [location.state])
 
   /* ── Hydrate helper ────────────────────────────────────────────────── */
   const hydrateFromSheet = useCallback((sheet) => {
@@ -170,6 +184,18 @@ export default function useUploadSheet() {
           return
         }
 
+        if (hasRequestedDraft) {
+          const response = await fetch(`${API}/api/sheets/${requestedDraftId}`, { headers: authHeaders(), credentials: 'include' })
+          const data = await response.json().catch(() => ({}))
+          if (!response.ok) throw new Error(data.error || 'Could not load sheet.')
+          if (cancelled) return
+
+          setDraftId(data.id)
+          hydrateFromSheet(data)
+          setSaved(true)
+          return
+        }
+
         const response = await fetch(`${API}/api/sheets/drafts/latest`, { headers: authHeaders(), credentials: 'include' })
         const data = await response.json().catch(() => ({}))
         if (!response.ok) throw new Error(data.error || 'Could not load latest draft.')
@@ -198,7 +224,7 @@ export default function useUploadSheet() {
 
     void loadData()
     return () => { cancelled = true }
-  }, [hydrateFromSheet, isEditing, sheetId, draftReloadKey])
+  }, [draftReloadKey, hasRequestedDraft, hydrateFromSheet, isEditing, requestedDraftId, sheetId])
 
   /* ── Tutorial check ────────────────────────────────────────────────── */
   useEffect(() => {
@@ -256,15 +282,13 @@ export default function useUploadSheet() {
         const data = await response.json().catch(() => ({}))
         if (!response.ok || cancelled) return
         setScanState((prev) => reduceScanState(prev, data))
-        const effectiveTier = typeof data.tier === 'number' ? data.tier : 0
-        if (!scanModalDismissed && effectiveTier >= 1) setShowScanModal(true)
       } catch { /* polling is best-effort */ }
     }
 
     void pollScanStatus()
     const interval = setInterval(pollScanStatus, 2500)
     return () => { cancelled = true; clearInterval(interval) }
-  }, [activeSheetId, initializing, isHtmlMode, legacyMarkdownMode, scanModalDismissed])
+  }, [activeSheetId, initializing, isHtmlMode, legacyMarkdownMode])
 
   /* ── Autosave effect ───────────────────────────────────────────────── */
   useEffect(() => {
@@ -333,6 +357,7 @@ export default function useUploadSheet() {
     setAttachFile, setAttachErr, setExistingAttachment, setRemoveExistingAttachment,
     setHasUnsavedChanges, setSaved, setError, setDraftId,
     setScanState, setDraftReloadKey, setDiscarding, setShowDiscardDialog,
+    onAfterDiscard: hasRequestedDraft ? () => navigate('/sheets/upload', { replace: true }) : null,
   })
 
   const handleHtmlImport = makeHandleHtmlImport({
@@ -344,6 +369,10 @@ export default function useUploadSheet() {
   const acknowledgeScanAndDismiss = makeAcknowledgeScanAndDismiss({
     activeSheetId, setScanModalDismissed, setShowScanModal, setScanAckChecked,
   })
+
+  const openScanModal = useCallback(() => {
+    setShowScanModal(true)
+  }, [])
 
   const openHtmlPreview = useCallback(() => {
     if (!Number.isInteger(activeSheetId)) {
@@ -361,6 +390,15 @@ export default function useUploadSheet() {
     setError, setLoading, setHasUnsavedChanges, setVerificationRequired,
   })
 
+  const dismissPostSubmitNotice = useCallback(() => {
+    setPostSubmitNotice(null)
+  }, [])
+
+  const openMySheets = useCallback(() => {
+    setPostSubmitNotice(null)
+    navigate('/sheets?mine=1')
+  }, [navigate])
+
   /* ═══════════════════════════════════════════════════════════════════════
    * RETURN
    * ═══════════════════════════════════════════════════════════════════════ */
@@ -372,6 +410,7 @@ export default function useUploadSheet() {
     courses, error, initializing, loading, saved, draftId, verificationRequired,
     scanState, showScanModal, setShowScanModal,
     scanAckChecked, setScanAckChecked, scanModalDismissed, setScanModalDismissed,
+    postSubmitNotice, dismissPostSubmitNotice, openMySheets,
     tutorial, showTutorial, dismissTutorial,
     attachFile, attachErr, attachUploading,
     existingAttachment, removeExistingAttachment, setRemoveExistingAttachment,
@@ -379,6 +418,6 @@ export default function useUploadSheet() {
     discarding, showDiscardDialog, setShowDiscardDialog,
     hasUnsavedChanges, setHasUnsavedChanges, showLeaveDialog, confirmLeave, cancelLeave,
     saveDraftNow, handleAttachmentSelect, clearAttachFile, discardDraft,
-    handleHtmlImport, acknowledgeScanAndDismiss, openHtmlPreview, handleSubmit,
+    handleHtmlImport, acknowledgeScanAndDismiss, openScanModal, openHtmlPreview, handleSubmit,
   }
 }

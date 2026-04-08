@@ -1,6 +1,6 @@
 const express = require('express')
 const requireAuth = require('../../middleware/auth')
-const { getAuthTokenFromRequest, verifyAuthToken } = require('../../lib/authTokens')
+const optionalAuth = require('../../core/auth/optionalAuth')
 const { readLimiter, usersFollowLimiter } = require('../../lib/rateLimiters')
 const usersController = require('./users.controller')
 
@@ -13,18 +13,6 @@ router.use((req, res, next) => {
 })
 
 const followLimiter = usersFollowLimiter
-
-// Optional auth middleware
-function optionalAuth(req, res, next) {
-  const token = getAuthTokenFromRequest(req)
-  if (!token) return next()
-  try {
-    req.user = verifyAuthToken(token)
-  } catch {
-    // Invalid token — proceed as unauthenticated
-  }
-  next()
-}
 
 // ── GET /api/users/:username/activity ─────────────────────────
 router.get('/me/activity', requireAuth, usersController.getMyActivity)

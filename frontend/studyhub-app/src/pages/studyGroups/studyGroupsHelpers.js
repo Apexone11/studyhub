@@ -1,3 +1,5 @@
+import { API } from '../../config'
+
 /**
  * Study Groups Helpers
  * Utility functions for formatting, labeling, and processing Study Groups data.
@@ -167,4 +169,14 @@ export function truncateText(text, maxLen) {
   if (text.length <= maxLen) return text;
 
   return text.substring(0, maxLen) + '...';
+}
+
+/**
+ * Resolve a group image URL for split-origin environments.
+ * @param {string | null | undefined} avatarUrl
+ * @returns {string}
+ */
+export function resolveGroupImageUrl(avatarUrl) {
+  if (!avatarUrl) return ''
+  return avatarUrl.startsWith('http') ? avatarUrl : `${API}${avatarUrl}`
 }

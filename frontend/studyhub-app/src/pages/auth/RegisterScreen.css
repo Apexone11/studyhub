@@ -5,7 +5,7 @@
 
 .register-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #1e40af 100%);
+  background: transparent;
   font-family: var(--font);
   color: var(--sh-text);
   position: relative;
@@ -25,8 +25,8 @@
   right: -120px;
   width: 400px;
   height: 400px;
-  background: rgba(59, 130, 246, 0.08);
-  filter: blur(80px);
+  background: rgba(59, 130, 246, 0.05);
+  filter: blur(90px);
 }
 
 .register-orb--purple {
@@ -34,14 +34,15 @@
   left: -100px;
   width: 350px;
   height: 350px;
-  background: rgba(139, 92, 246, 0.06);
-  filter: blur(80px);
+  background: rgba(99, 102, 241, 0.045);
+  filter: blur(88px);
 }
 
 /* ── Main card container ───────────────────────────────────────── */
 
 .register-main {
-  padding: 48px 20px 80px;
+  min-height: calc(100vh - 72px);
+  padding: 56px 20px 88px;
   display: grid;
   place-items: center;
   position: relative;
@@ -50,11 +51,11 @@
 
 .register-card {
   width: min(92vw, 580px);
-  background: var(--sh-surface);
-  backdrop-filter: blur(20px);
+  background: var(--sh-panel-bg);
+  backdrop-filter: blur(22px);
   border-radius: var(--radius-lg);
-  border: 1px solid var(--sh-border);
-  box-shadow: var(--elevation-3);
+  border: 1px solid var(--sh-panel-border);
+  box-shadow: var(--sh-panel-shadow);
   padding: var(--space-10) var(--space-8);
 }
 
@@ -95,7 +96,7 @@
 }
 
 .register-step-number--inactive {
-  background: var(--sh-soft);
+  background: var(--sh-neutral-soft-bg);
   color: var(--sh-muted);
 }
 
@@ -124,7 +125,7 @@
 }
 
 .register-step-bar--inactive {
-  background: var(--sh-soft);
+  background: var(--sh-panel-border);
 }
 
 /* ── Shared section heading ────────────────────────────────────── */
@@ -509,7 +510,7 @@
   margin-bottom: 18px;
   padding: 14px;
   border-radius: var(--radius-card);
-  border: 1px dashed var(--sh-border);
+  border: 1px dashed var(--sh-panel-border);
   background: var(--sh-input-bg);
 }
 

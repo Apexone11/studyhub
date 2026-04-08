@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import GifSearchPanel from '../../components/GifSearchPanel'
 import MentionText from '../../components/MentionText'
 import UserAvatar from '../../components/UserAvatar'
 import { API } from '../../config'
@@ -83,8 +84,9 @@ function useComments(postId, initialCount = 0) {
 
   const postComment = useCallback(async (text, parentId = null, attachments = []) => {
     const content = text.trim()
+    const nextAttachments = Array.isArray(attachments) ? attachments : []
 
-    if (!content) {
+    if (!content && nextAttachments.length === 0) {
       return false
     }
 
@@ -96,7 +98,7 @@ function useComments(postId, initialCount = 0) {
         method: 'POST',
         headers: authHeaders(),
         credentials: 'include',
-        body: JSON.stringify({ content, parentId, attachments }),
+        body: JSON.stringify({ content, parentId, attachments: nextAttachments }),
       })
       const data = await readJsonSafely(response, {})
 
@@ -264,58 +266,70 @@ const pillInputStyle = {
   padding: '8px 14px',
 }
 
+const composerGifCardStyle = {
+  position: 'relative',
+  width: 'min(100%, 220px)',
+  borderRadius: 12,
+  overflow: 'hidden',
+  border: '1px solid var(--sh-border)',
+  background: 'var(--sh-soft)',
+}
+
+const composerGifImageStyle = {
+  width: '100%',
+  maxHeight: 160,
+  display: 'block',
+  objectFit: 'cover',
+}
+
+const postedGifImageStyle = {
+  width: 'min(100%, 260px)',
+  maxHeight: 220,
+  display: 'block',
+  objectFit: 'cover',
+  borderRadius: 10,
+  background: 'var(--sh-soft)',
+}
+
+function createGifAttachment(gif) {
+  return {
+    url: gif.full,
+    type: 'gif',
+    name: gif.title || 'GIF',
+  }
+}
+
 /* ── ReplyInput ──────────────────────────────────────────────────────── */
 
 function ReplyInput({ user, onReply }) {
   const [value, setValue] = useState('')
   const [attachments, setAttachments] = useState([])
   const [posting, setPosting] = useState(false)
-  const [uploading, setUploading] = useState(false)
-  const fileInputRef = useRef(null)
+  const [showGifPicker, setShowGifPicker] = useState(false)
 
   const hasValue = Boolean(value.trim())
+  const canSubmit = hasValue || attachments.length > 0
   const { length } = value
 
-  const handleImageSelect = async (event) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    setUploading(true)
-    try {
-      const formData = new FormData()
-      formData.append('image', file)
-      const response = await fetch(`${API}/api/upload/comment-image`, {
-        method: 'POST',
-        headers: authHeaders(),
-        credentials: 'include',
-        body: formData,
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setAttachments((current) => [...current, { url: data.url, type: 'image', name: file.name }])
-      }
-    } catch {
-      /* error */
-    } finally {
-      setUploading(false)
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
-      }
-    }
+  const handleGifSelect = (gif) => {
+    setAttachments([createGifAttachment(gif)])
+    setShowGifPicker(false)
   }
 
-  const handleRemoveAttachment = (index) => {
-    setAttachments((current) => current.filter((_, i) => i !== index))
+  const handleRemoveAttachment = () => {
+    setAttachments([])
   }
 
   const handleSubmit = async () => {
-    if (!hasValue || posting || uploading) return
+    if (!canSubmit || posting) return
     setPosting(true)
     try {
-      await onReply(value, attachments)
-      setValue('')
-      setAttachments([])
+      const posted = await onReply(value, attachments)
+      if (posted !== false) {
+        setValue('')
+        setAttachments([])
+        setShowGifPicker(false)
+      }
     } finally {
       setPosting(false)
     }
@@ -351,24 +365,29 @@ function ReplyInput({ user, onReply }) {
             }}
           />
         </div>
+        {showGifPicker ? (
+          <div style={{ marginTop: 8 }}>
+            <GifSearchPanel onSelect={handleGifSelect} onClose={() => setShowGifPicker(false)} maxHeight={320} previewHeight={96} />
+          </div>
+        ) : null}
         {attachments.length > 0 && (
-          <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {attachments.map((att, i) => (
-              <div key={i} style={{ position: 'relative', borderRadius: '4px', overflow: 'hidden' }}>
+              <div key={i} style={composerGifCardStyle}>
                 <img
                   src={att.url}
-                  alt="attachment"
-                  style={{ maxWidth: '100px', maxHeight: '100px', display: 'block' }}
+                  alt={att.name || 'GIF preview'}
+                  style={composerGifImageStyle}
                 />
                 <button
                   type="button"
-                  onClick={() => handleRemoveAttachment(i)}
+                  onClick={handleRemoveAttachment}
                   style={{
                     position: 'absolute',
-                    top: '2px',
-                    right: '2px',
-                    width: '20px',
-                    height: '20px',
+                    top: 6,
+                    right: 6,
+                    width: 24,
+                    height: 24,
                     borderRadius: '50%',
                     background: 'rgba(0,0,0,0.6)',
                     color: 'white',
@@ -387,53 +406,38 @@ function ReplyInput({ user, onReply }) {
           </div>
         )}
         <div style={commentInputFooterStyle}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 11, color: length > 500 ? 'var(--sh-danger)' : 'var(--sh-muted)' }}>
               {length}/500
             </span>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
-              onChange={handleImageSelect}
-              style={{ display: 'none' }}
-            />
             <button
               type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
+              onClick={() => setShowGifPicker((current) => !current)}
+              disabled={posting}
               style={{
                 background: 'none',
                 border: '1px solid var(--sh-border)',
                 borderRadius: 6,
-                cursor: uploading ? 'not-allowed' : 'pointer',
-                color: uploading ? 'var(--sh-muted)' : 'var(--sh-text)',
+                cursor: posting ? 'not-allowed' : 'pointer',
+                color: showGifPicker || attachments.length > 0 ? 'var(--sh-brand)' : 'var(--sh-text)',
                 padding: '4px 6px',
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 transition: 'background 0.15s, border-color 0.15s',
               }}
-              title="Attach image"
+              title="Add GIF"
               onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--sh-soft)'; e.currentTarget.style.borderColor = 'var(--sh-brand)' }}
               onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; e.currentTarget.style.borderColor = 'var(--sh-border)' }}
             >
-              {uploading ? (
-                <span style={{ fontSize: 12 }}>...</span>
-              ) : (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                  <circle cx="8.5" cy="8.5" r="1.5" />
-                  <polyline points="21 15 16 10 5 21" />
-                </svg>
-              )}
+              GIF
             </button>
           </div>
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={posting || uploading || !hasValue}
-            style={commentButtonStyle(hasValue && !uploading && !posting, posting)}
+            disabled={posting || !canSubmit}
+            style={commentButtonStyle(canSubmit && !posting, posting)}
           >
             {posting ? 'Posting...' : 'Reply'}
           </button>
@@ -445,69 +449,46 @@ function ReplyInput({ user, onReply }) {
 
 /* ── CommentInput ────────────────────────────────────────────────────── */
 
-function CommentInput({ user, value, onChange, onSubmit, posting, error, onAttachImage, attachments, isReply }) {
+function CommentInput({ user, value, onChange, onSubmit, posting, error, onChangeAttachments, attachments, isReply }) {
   const hasValue = Boolean(value.trim())
   const { length } = value
-  const fileInputRef = useRef(null)
-  const [uploading, setUploading] = useState(false)
+  const [showGifPicker, setShowGifPicker] = useState(false)
   const [localAttachments, setLocalAttachments] = useState([])
 
   // Track local attachments for reply inputs
   const displayAttachments = isReply ? localAttachments : attachments
+  const canSubmit = hasValue || displayAttachments.length > 0
 
-  const handleImageSelect = async (event) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    setUploading(true)
-    try {
-      const formData = new FormData()
-      formData.append('image', file)
-      const response = await fetch(`${API}/api/upload/comment-image`, {
-        method: 'POST',
-        headers: authHeaders(),
-        credentials: 'include',
-        body: formData,
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        if (isReply) {
-          setLocalAttachments((current) => [...current, { url: data.url, type: 'image', name: file.name }])
-        } else {
-          onAttachImage({
-            url: data.url,
-            type: 'image',
-            name: file.name,
-          })
-        }
-      }
-    } catch {
-      /* error */
-    } finally {
-      setUploading(false)
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
-      }
-    }
-  }
-
-  const handleRemoveAttachment = (index) => {
+  const handleGifSelect = (gif) => {
+    const nextAttachments = [createGifAttachment(gif)]
     if (isReply) {
-      setLocalAttachments((current) => current.filter((_, i) => i !== index))
+      setLocalAttachments(nextAttachments)
     } else {
-      const newAttachments = [...attachments]
-      newAttachments.splice(index, 1)
-      onAttachImage(null, true, newAttachments)
+      onChangeAttachments(nextAttachments)
     }
+    setShowGifPicker(false)
   }
 
-  const handleLocalSubmit = () => {
+  const handleRemoveAttachment = () => {
     if (isReply) {
-      onSubmit(value, null, localAttachments)
       setLocalAttachments([])
     } else {
-      onSubmit(value, null, attachments)
+      onChangeAttachments([])
+    }
+  }
+
+  const handleLocalSubmit = async () => {
+    if (isReply) {
+      const posted = await onSubmit(value, null, localAttachments)
+      if (posted !== false) {
+        setLocalAttachments([])
+        setShowGifPicker(false)
+      }
+    } else {
+      const posted = await onSubmit(value, null, attachments)
+      if (posted !== false) {
+        setShowGifPicker(false)
+      }
     }
   }
 
@@ -541,24 +522,29 @@ function CommentInput({ user, value, onChange, onSubmit, posting, error, onAttac
             }}
           />
         </div>
+        {showGifPicker ? (
+          <div style={{ marginTop: 8 }}>
+            <GifSearchPanel onSelect={handleGifSelect} onClose={() => setShowGifPicker(false)} maxHeight={320} previewHeight={96} />
+          </div>
+        ) : null}
         {displayAttachments && displayAttachments.length > 0 && (
-          <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {displayAttachments.map((att, i) => (
-              <div key={i} style={{ position: 'relative', borderRadius: '4px', overflow: 'hidden' }}>
+              <div key={i} style={composerGifCardStyle}>
                 <img
                   src={att.url}
-                  alt="attachment"
-                  style={{ maxWidth: '100px', maxHeight: '100px', display: 'block' }}
+                  alt={att.name || 'GIF preview'}
+                  style={composerGifImageStyle}
                 />
                 <button
                   type="button"
-                  onClick={() => handleRemoveAttachment(i)}
+                  onClick={handleRemoveAttachment}
                   style={{
                     position: 'absolute',
-                    top: '2px',
-                    right: '2px',
-                    width: '20px',
-                    height: '20px',
+                    top: 6,
+                    right: 6,
+                    width: 24,
+                    height: 24,
                     borderRadius: '50%',
                     background: 'rgba(0,0,0,0.6)',
                     color: 'white',
@@ -577,53 +563,38 @@ function CommentInput({ user, value, onChange, onSubmit, posting, error, onAttac
           </div>
         )}
         <div style={commentInputFooterStyle}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 11, color: length > 500 ? 'var(--sh-danger)' : 'var(--sh-muted)' }}>
               {length}/500
             </span>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
-              onChange={handleImageSelect}
-              style={{ display: 'none' }}
-            />
             <button
               type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
+              onClick={() => setShowGifPicker((current) => !current)}
+              disabled={posting}
               style={{
                 background: 'none',
                 border: '1px solid var(--sh-border)',
                 borderRadius: 6,
-                cursor: uploading ? 'not-allowed' : 'pointer',
-                color: uploading ? 'var(--sh-muted)' : 'var(--sh-text)',
+                cursor: posting ? 'not-allowed' : 'pointer',
+                color: showGifPicker || displayAttachments.length > 0 ? 'var(--sh-brand)' : 'var(--sh-text)',
                 padding: '4px 6px',
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 transition: 'background 0.15s, border-color 0.15s',
               }}
-              title="Attach image"
+              title="Add GIF"
               onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--sh-soft)'; e.currentTarget.style.borderColor = 'var(--sh-brand)' }}
               onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; e.currentTarget.style.borderColor = 'var(--sh-border)' }}
             >
-              {uploading ? (
-                <span style={{ fontSize: 12 }}>...</span>
-              ) : (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                  <circle cx="8.5" cy="8.5" r="1.5" />
-                  <polyline points="21 15 16 10 5 21" />
-                </svg>
-              )}
+              GIF
             </button>
           </div>
           <button
             type="button"
             onClick={handleLocalSubmit}
-            disabled={posting || uploading || !hasValue}
-            style={commentButtonStyle(hasValue && !uploading && !posting, posting)}
+            disabled={posting || !canSubmit}
+            style={commentButtonStyle(canSubmit && !posting, posting)}
           >
             {posting ? 'Posting...' : isReply ? 'Reply' : 'Comment'}
           </button>
@@ -803,8 +774,8 @@ function CommentItem({ comment, user, onDelete, onReact, onReply, onEdit, depth 
                   <img
                     key={att.id}
                     src={att.url}
-                    alt="attachment"
-                    style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '8px' }}
+                    alt={att.name || 'Comment GIF'}
+                    style={postedGifImageStyle}
                   />
                 ))}
               </div>
@@ -875,8 +846,12 @@ function CommentItem({ comment, user, onDelete, onReact, onReply, onEdit, depth 
           <ReplyInput
             user={user}
             onReply={(text, attachments) => {
-              onReply(text, comment.id, attachments)
-              setShowReplyInput(false)
+              return onReply(text, comment.id, attachments).then((posted) => {
+                if (posted !== false) {
+                  setShowReplyInput(false)
+                }
+                return posted
+              })
             }}
           />
         </div>
@@ -1012,10 +987,10 @@ export default function CommentSection({ postId, commentCount, user, targetComme
 
   const handlePost = async () => {
     const text = newComment.trim()
-    if (!text) return
+    if (!text && attachments.length === 0) return false
     if (text.length > 500) {
       setError('Comment must be 500 characters or fewer.')
-      return
+      return false
     }
 
     const posted = await postComment(text, null, attachments)
@@ -1023,18 +998,15 @@ export default function CommentSection({ postId, commentCount, user, targetComme
       setNewComment('')
       setAttachments([])
     }
+    return posted
   }
 
   const handleReply = async (text, parentId, replyAttachments) => {
-    await postComment(text, parentId, replyAttachments)
+    return postComment(text, parentId, replyAttachments)
   }
 
-  const handleAttachImage = (attachment, clearAll = false, newAttachments = []) => {
-    if (clearAll) {
-      setAttachments(newAttachments)
-    } else if (attachment) {
-      setAttachments((current) => [...current, attachment])
-    }
+  const handleChangeAttachments = (nextAttachments) => {
+    setAttachments(Array.isArray(nextAttachments) ? nextAttachments : [])
   }
 
   return (
@@ -1057,7 +1029,7 @@ export default function CommentSection({ postId, commentCount, user, targetComme
             onSubmit={handlePost}
             posting={posting}
             error={error}
-            onAttachImage={handleAttachImage}
+            onChangeAttachments={handleChangeAttachments}
             attachments={attachments}
           />
           <CommentList

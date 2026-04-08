@@ -1,0 +1,71 @@
+COOKIE POLICY
+Last updated April 08, 2026
+
+This Cookie Policy explains how StudyHub, operated by Abdul Rahman Fornah ("StudyHub," "we," "us," or "our"), uses cookies and similar tracking technologies when you visit or interact with https://www.getstudyhub.org and any related web application, mobile-responsive interface, or service that links to this Cookie Policy (collectively, the "Services"). It explains what these technologies are, why we use them, the specific categories we rely on, and the choices available to you. This Cookie Policy should be read together with our Privacy Policy, which describes how we handle personal information more generally.
+
+1. WHAT COOKIES AND SIMILAR TECHNOLOGIES ARE
+
+A "cookie" is a small data file that a website places on your browser or device when you visit that site. Cookies are widely used to make websites work, to make them work more efficiently, and to provide information to the operators of the site. Cookies set by the website you are visiting are called "first-party cookies." Cookies set by parties other than the website operator are called "third-party cookies." First-party cookies enable the website operator to recognize the browser across page requests and across visits. Third-party cookies enable third-party features, such as analytics, error monitoring, and embedded content, to function on the website.
+
+In addition to cookies, we may use similar technologies, including "local storage" (a browser storage mechanism that persists data on your device), "session storage" (a browser storage mechanism that persists data only for the current browser session), "pixel tags" or "web beacons" (small transparent image files that record whether content was viewed), and server-side "fingerprinting" techniques that recognize a device based on a combination of attributes. For convenience, we refer to all of these technologies collectively as "cookies" in this Policy unless otherwise specified.
+
+2. WHY WE USE COOKIES
+
+We use cookies for the following purposes: (a) to operate the Services and enable essential features, such as signing you in and keeping you signed in; (b) to remember your preferences and settings, such as theme, language, and sidebar state; (c) to secure the Services against unauthorized access, fraud, and abuse; (d) to understand how Users interact with the Services so we can improve performance, usability, and reliability; (e) to diagnose and monitor errors and crashes; and (f) to deliver aggregate statistics that help us measure how the Services are used.
+
+We do not use cookies to serve third-party advertising, and we do not participate in cross-site behavioral-advertising networks. If that changes in the future, we will update this Cookie Policy and, where required, ask for your consent.
+
+3. CATEGORIES OF COOKIES WE USE
+
+3.1 Strictly necessary cookies. These cookies are required for the Services to function and cannot be turned off in our systems. They are usually set only in response to actions you take, such as signing in, filling out a form, or setting privacy preferences. You can set your browser to block these cookies, but parts of the Services will not work. Examples include the "studyhub_session" session cookie, which authenticates your account, and our CSRF-token cookie, which protects forms against cross-site request forgery.
+
+3.2 Functional cookies. These cookies enable personalization and remember the choices you make, such as your interface theme, the last page you visited, a dismissed banner, or the state of the sidebar. They are not strictly required but make the Services easier to use. If you disable these cookies, some features will not work, and your preferences will reset on each visit.
+
+3.3 Performance and analytics cookies. These cookies allow us and our analytics providers to count visits and traffic sources, measure how Users interact with features, and identify errors and performance bottlenecks. The information collected is aggregated or pseudonymized. We currently use PostHog for product analytics and Sentry for error monitoring. You may opt out of analytics cookies at any time from the cookie preference center or by using a Global Privacy Control signal in your browser.
+
+3.4 Security cookies. These cookies help us detect malicious activity, rate-limit abusive behavior, and verify requests. They are considered strictly necessary for the secure operation of the Services.
+
+3.5 Marketing cookies. We do not currently use marketing cookies for cross-site behavioral advertising or retargeting. We may set a first-party cookie to remember that you clicked a specific link from an email or referral so that we can attribute the visit internally. If we introduce marketing cookies in the future, we will update this Policy and, where required by law, obtain your consent before setting them.
+
+4. THIRD-PARTY COOKIES
+
+Some cookies are set by third parties that provide services to us. These third parties may process your information in accordance with their own privacy policies and terms. The third parties we currently rely on include:
+
+- Stripe, Inc. (payment processing). When you visit a checkout or customer-portal page, Stripe may set cookies to detect fraudulent behavior, secure payment forms, and authenticate your session with its platform. See https://stripe.com/privacy.
+- Google LLC (sign-in with Google). When you sign in using Google, Google may set cookies on the Google sign-in page. See https://policies.google.com/privacy.
+- PostHog, Inc. (product analytics). PostHog may set a first-party cookie via our domain to collect usage and performance data. See https://posthog.com/privacy.
+- Sentry (Functional Software, Inc.) (error monitoring). Sentry may set cookies to correlate client-side errors with sessions for debugging purposes. See https://sentry.io/privacy/.
+- Anthropic, PBC (AI inference for Hub AI). Anthropic does not set cookies directly, but API requests to Anthropic are made from our servers on your behalf.
+
+We do not control these third-party cookies, and this Cookie Policy does not cover their cookies. Please review the privacy policies of those third parties for more information.
+
+5. HOW LONG COOKIES STAY ON YOUR DEVICE
+
+Cookies have a lifespan that depends on their purpose. "Session cookies" are temporary and are deleted when you close your browser. "Persistent cookies" remain on your device until they reach a set expiration date or until you delete them manually. StudyHub's authentication session cookie is a persistent cookie with an expiration typically set for thirty (30) days and is cleared automatically when you sign out. Functional preference cookies are persistent, typically for up to one (1) year. Analytics cookies are persistent, typically for up to thirteen (13) months.
+
+6. YOUR CHOICES AND HOW TO MANAGE COOKIES
+
+6.1 In-product controls. You can manage non-essential cookies from the cookie preference center, which is available from the "Consent Preferences" link in the footer of the Services and from your Settings page.
+
+6.2 Browser controls. Most web browsers allow you to control cookies through their settings preferences. You can set your browser to block or delete cookies, or to notify you when cookies are being set. Instructions for common browsers are available at: Chrome (https://support.google.com/chrome/answer/95647), Firefox (https://support.mozilla.org/en-US/kb/enhanced-tracking-protection-firefox-desktop), Safari (https://support.apple.com/en-us/HT201265), and Edge (https://support.microsoft.com/en-us/microsoft-edge/delete-cookies-in-microsoft-edge-63947406-40ac-c3b8-57b9-2a946a29ae09). If you block strictly necessary cookies, parts of the Services will not work.
+
+6.3 Global Privacy Control. StudyHub honors the Global Privacy Control (GPC) signal as a valid opt-out request under applicable United States state privacy laws. If your browser transmits a GPC signal, we will treat it as an opt-out of the sale or sharing of personal information for targeted advertising, to the extent required by law.
+
+6.4 Do Not Track. Because no uniform industry standard has been adopted for the "Do Not Track" signal, StudyHub does not currently respond to DNT browser signals.
+
+6.5 Account-based opt-outs. When you are signed in, your cookie preferences are associated with your account and applied across devices. When you are signed out, your preferences are stored in a persistent cookie on the device you used.
+
+7. CHANGES TO THIS COOKIE POLICY
+
+We may update this Cookie Policy from time to time to reflect changes in the cookies and tracking technologies we use, changes in applicable law, or other operational, legal, or regulatory reasons. When we update the Policy, we will revise the "Last updated" date and, where required, take additional steps to notify you. Your continued use of the Services after the updated Policy takes effect constitutes your acceptance of the updated Policy.
+
+8. CONTACT US
+
+If you have any question about this Cookie Policy or about our use of cookies, please contact:
+
+StudyHub
+Attention: Privacy
+2809 Diamond Ridge Road,
+Milford Mill, Maryland 21244
+United States
+Email: abdulrfornah@getstudyhub.org

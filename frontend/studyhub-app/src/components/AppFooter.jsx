@@ -82,7 +82,7 @@ export default function AppFooter() {
           </a>
         </span>
       </nav>
-      <div>2026 StudyHub</div>
+      <div>2026 StudyHub&trade;</div>
     </footer>
   )
 }

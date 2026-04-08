@@ -16,9 +16,11 @@ export function useGroupList() {
   const [groupsLoading, setGroupsLoading] = useState(false);
   const [groupsError, setGroupsError] = useState(null);
   const [groupsTotal, setGroupsTotal] = useState(0);
+  const [schools, setSchools] = useState([]);
 
   // Extract filter params from URL
   const search = searchParams.get('search') || '';
+  const schoolId = searchParams.get('schoolId') || '';
   const courseId = searchParams.get('courseId') || '';
   const mine = searchParams.get('mine') === 'true';
   const limit = parseInt(searchParams.get('limit') || '20', 10);
@@ -33,6 +35,7 @@ export function useGroupList() {
     try {
       const params = new URLSearchParams();
       if (search) params.append('search', search);
+      if (schoolId) params.append('schoolId', schoolId);
       if (courseId) params.append('courseId', courseId);
       if (mine) params.append('mine', 'true');
       params.append('limit', limit.toString());
@@ -54,7 +57,7 @@ export function useGroupList() {
     } finally {
       setGroupsLoading(false);
     }
-  }, [search, courseId, mine, limit, offset]);
+  }, [search, schoolId, courseId, mine, limit, offset]);
 
   /**
    * Create a new study group
@@ -68,9 +71,10 @@ export function useGroupList() {
         body: JSON.stringify(groupData),
       });
 
-      if (!response.ok) throw new Error('Failed to create group');
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data?.error || 'Failed to create group')
 
-      const newGroup = await response.json();
+      const newGroup = data;
       setGroups((prev) => [newGroup, ...prev]);
       showToast('Study group created successfully', 'success');
       return newGroup;
@@ -100,6 +104,14 @@ export function useGroupList() {
           newParams.set('courseId', filters.courseId);
         } else {
           newParams.delete('courseId');
+        }
+      }
+
+      if (filters.schoolId !== undefined) {
+        if (filters.schoolId) {
+          newParams.set('schoolId', filters.schoolId);
+        } else {
+          newParams.delete('schoolId');
         }
       }
 
@@ -137,6 +149,42 @@ export function useGroupList() {
     loadGroups();
   }, [loadGroups]);
 
+  useEffect(() => {
+    let active = true;
+
+    fetch(`${API}/api/courses/schools`, {
+      credentials: 'include',
+      headers: authHeaders(),
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('Failed to load schools');
+        return response.json();
+      })
+      .then((data) => {
+        if (active) {
+          setSchools(Array.isArray(data) ? data : []);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          showToast('Failed to load study-group school filters', 'error');
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const courses = schools.flatMap((school) =>
+    (school.courses || []).map((course) => ({
+      ...course,
+      schoolId: school.id,
+      schoolName: school.name,
+      schoolShort: school.short,
+    }))
+  );
+
   return {
     // State
     groups,
@@ -150,10 +198,13 @@ export function useGroupList() {
 
     // Filters and pagination
     search,
+    schoolId,
     courseId,
     mine,
     limit,
     offset,
+    schools,
+    courses,
     setFilters,
     setPagination,
   };

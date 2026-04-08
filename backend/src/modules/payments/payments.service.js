@@ -5,11 +5,25 @@ const Stripe = require('stripe')
 const prisma = require('../../lib/prisma')
 const log = require('../../lib/logger')
 const {
+  sendDonationThankYou,
+  sendPaymentReceipt,
+  sendSubscriptionWelcome,
+} = require('../../lib/email/email')
+const { createNotification } = require('../../lib/notify')
+const {
   PLANS,
   DONATION_MIN_CENTS,
   DONATION_MAX_CENTS,
   planFromPriceId,
 } = require('./payments.constants')
+
+function getFrontendAppUrl() {
+  return process.env.FRONTEND_URL || 'http://localhost:5173'
+}
+
+function getPaymentHistoryUrl() {
+  return `${getFrontendAppUrl()}/settings?tab=subscription`
+}
 
 // Stripe client — initialized lazily so the module can load even when the
 // key is not yet configured (e.g., in test environments).
@@ -78,7 +92,7 @@ async function createSubscriptionCheckout(user, plan, successUrl, cancelUrl) {
 
   const customerId = await getOrCreateCustomer(user)
 
-  const session = await stripe.checkout.sessions.create({
+  return stripe.checkout.sessions.create({
     customer: customerId,
     mode: 'subscription',
     payment_method_types: ['card'],
@@ -101,8 +115,6 @@ async function createSubscriptionCheckout(user, plan, successUrl, cancelUrl) {
       },
     },
   })
-
-  return session
 }
 
 /**
@@ -190,12 +202,10 @@ async function createPortalSession(user, returnUrl) {
     throw new Error('No active subscription found')
   }
 
-  const session = await stripe.billingPortal.sessions.create({
+  return stripe.billingPortal.sessions.create({
     customer: sub.stripeCustomerId,
     return_url: returnUrl,
   })
-
-  return session
 }
 
 // ── Webhook Handlers ─────────────────────────────────────────────────────
@@ -215,6 +225,67 @@ async function handleCheckoutCompleted(session) {
         stripePaymentIntentId: session.payment_intent || null,
       },
     })
+
+    const userId = parseInt(metadata.studyhub_user_id, 10)
+    if (userId && !isNaN(userId)) {
+      const donation = await prisma.donation.findUnique({
+        where: { stripeSessionId: session.id },
+        select: {
+          userId: true,
+          amount: true,
+          currency: true,
+          donorMessage: true,
+          anonymous: true,
+        },
+      })
+
+      if (donation?.userId && session.payment_intent) {
+        let createdDonationPayment = false
+        const existingPayment = await prisma.payment.findUnique({
+          where: { stripePaymentIntentId: session.payment_intent },
+          select: { id: true },
+        })
+
+        if (!existingPayment) {
+          await prisma.payment.create({
+            data: {
+              userId: donation.userId,
+              amount: donation.amount,
+              currency: donation.currency || 'usd',
+              status: 'succeeded',
+              description: 'StudyHub donation',
+              receiptUrl: null,
+              stripePaymentIntentId: session.payment_intent,
+              type: 'donation',
+            },
+          })
+          createdDonationPayment = true
+        }
+
+        try {
+          const donor = await prisma.user.findUnique({
+            where: { id: donation.userId },
+            select: { email: true, username: true },
+          })
+
+          if (createdDonationPayment && donor?.email) {
+            await sendDonationThankYou({
+              toEmail: donor.email,
+              username: donor.username || 'there',
+              amountCents: donation.amount,
+              currency: donation.currency,
+              message: donation.donorMessage || '',
+              anonymous: donation.anonymous,
+              historyUrl: getPaymentHistoryUrl(),
+              supportersUrl: `${getFrontendAppUrl()}/supporters`,
+            })
+          }
+        } catch (err) {
+          log.warn({ err: err.message, sessionId: session.id }, 'Failed to send donation thank-you email')
+        }
+      }
+    }
+
     log.info({ sessionId: session.id }, 'Donation completed')
     return
   }
@@ -250,6 +321,15 @@ async function handleCheckoutCompleted(session) {
 
   const stripe = getStripe()
   const stripeSub = await stripe.subscriptions.retrieve(stripeSubscriptionId)
+  let existingSubscription = null
+  try {
+    existingSubscription = await prisma.subscription.findUnique({
+      where: { userId },
+      select: { status: true },
+    })
+  } catch {
+    existingSubscription = null
+  }
 
   // Safely convert Stripe Unix timestamps to Date objects (null-safe)
   const periodStart = stripeSub.current_period_start
@@ -335,6 +415,30 @@ async function handleCheckoutCompleted(session) {
   } catch (err) {
     // Non-fatal — payment record may be created later by invoice webhook
     log.warn({ err: err.message, userId }, 'Failed to create payment record from checkout')
+  }
+
+  try {
+    const subscriber = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true, username: true },
+    })
+
+    if (
+      subscriber?.email &&
+      (!existingSubscription || ['canceled', 'incomplete', 'incomplete_expired'].includes(existingSubscription.status))
+    ) {
+      const billingLabel = plan === 'pro_yearly' ? 'yearly' : 'monthly'
+      await sendSubscriptionWelcome({
+        toEmail: subscriber.email,
+        username: subscriber.username || 'there',
+        planName: PLANS[plan]?.name || 'StudyHub Pro',
+        billingLabel,
+        historyUrl: getPaymentHistoryUrl(),
+        manageUrl: getPaymentHistoryUrl(),
+      })
+    }
+  } catch (err) {
+    log.warn({ err: err.message, userId }, 'Failed to send subscription welcome email')
   }
 }
 
@@ -468,6 +572,27 @@ async function handleInvoicePaymentSucceeded(invoice) {
     },
   })
 
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: sub.userId },
+      select: { email: true, username: true },
+    })
+
+    if (user?.email) {
+      await sendPaymentReceipt({
+        toEmail: user.email,
+        username: user.username || 'there',
+        amountCents: invoice.amount_paid || 0,
+        currency: (invoice.currency || 'usd').toLowerCase(),
+        description: invoice.lines?.data?.[0]?.description || 'Subscription payment',
+        receiptUrl: invoice.hosted_invoice_url || null,
+        historyUrl: getPaymentHistoryUrl(),
+      })
+    }
+  } catch (err) {
+    log.warn({ err: err.message, userId: sub.userId }, 'Failed to send payment receipt email')
+  }
+
   log.info({ userId: sub.userId, amount: invoice.amount_paid }, 'Invoice payment recorded')
 }
 
@@ -477,10 +602,29 @@ async function handleInvoicePaymentSucceeded(invoice) {
 async function handleInvoicePaymentFailed(invoice) {
   const customerId = invoice.customer
 
+  const subscription = await prisma.subscription.findFirst({
+    where: { stripeCustomerId: customerId },
+    select: { userId: true },
+  })
+
   await prisma.subscription.updateMany({
     where: { stripeCustomerId: customerId },
     data: { status: 'past_due' },
   })
+
+  if (subscription?.userId) {
+    try {
+      await createNotification(prisma, {
+        userId: subscription.userId,
+        type: 'payment_failed',
+        message: 'We could not process your StudyHub subscription payment. Update billing to keep Pro active.',
+        linkPath: '/settings?tab=subscription',
+        priority: 'high',
+      })
+    } catch (err) {
+      log.warn({ err: err.message, userId: subscription.userId }, 'Failed to create payment failure notification')
+    }
+  }
 
   log.warn({ customerId, invoiceId: invoice.id }, 'Invoice payment failed — subscription past_due')
 }
@@ -603,6 +747,22 @@ async function getDonationLeaderboard({ limit = 50 } = {}) {
   }))
 }
 
+async function getAnonymousDonationSummary() {
+  const result = await prisma.donation.aggregate({
+    where: {
+      status: 'completed',
+      anonymous: true,
+    },
+    _sum: { amount: true },
+    _count: { id: true },
+  })
+
+  return {
+    donorCount: result._count.id || 0,
+    totalAmount: result._sum.amount || 0,
+  }
+}
+
 /**
  * Public subscriber showcase (Pro users — username + avatar only).
  */
@@ -630,6 +790,22 @@ async function getSubscriberShowcase({ limit = 100 } = {}) {
     plan: s.plan,
     since: s.createdAt,
   }))
+}
+
+async function getUserPaymentExportRows(userId) {
+  return prisma.payment.findMany({
+    where: { userId },
+    orderBy: { createdAt: 'desc' },
+    select: {
+      amount: true,
+      currency: true,
+      status: true,
+      description: true,
+      receiptUrl: true,
+      type: true,
+      createdAt: true,
+    },
+  })
 }
 
 /**
@@ -702,6 +878,8 @@ module.exports = {
   getUserSubscription,
   getUserPayments,
   getDonationLeaderboard,
+  getAnonymousDonationSummary,
   getSubscriberShowcase,
+  getUserPaymentExportRows,
   getRevenueAnalytics,
 }

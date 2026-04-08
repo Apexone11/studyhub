@@ -24,7 +24,7 @@ services:
     build:
       context: ./backend
     restart: unless-stopped
-    user: node
+    user: root
     environment:
       NODE_ENV: development
       PORT: 4000
@@ -70,7 +70,6 @@ services:
     build:
       context: ./frontend/studyhub-app
     restart: unless-stopped
-    user: node
     environment:
       NODE_ENV: development
       PORT: 5173

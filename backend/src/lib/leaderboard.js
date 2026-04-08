@@ -19,6 +19,9 @@ const ACTIVITY_WEIGHTS = {
   comments: 1,
 }
 
+const SUPPORTED_PERIODS = new Set(['weekly', 'monthly', 'alltime'])
+const DEFAULT_PERIOD = 'weekly'
+
 /**
  * Calculate score for an activity record
  * @param {Object} activity - {commits, sheets, reviews, comments}
@@ -36,20 +39,21 @@ function calculateActivityScore(activity) {
 /**
  * Get the date range for a given period
  * @param {'weekly'|'monthly'|'alltime'} period
- * @returns {{start: Date, end: Date}}
+ * @returns {{start: Date|null, end: Date}}
  */
 function getDateRange(period) {
+  const normalizedPeriod = SUPPORTED_PERIODS.has(period) ? period : DEFAULT_PERIOD
   const end = new Date()
   const start = new Date()
 
-  if (period === 'weekly') {
+  if (normalizedPeriod === 'weekly') {
     start.setDate(end.getDate() - 7)
-  } else if (period === 'monthly') {
+  } else if (normalizedPeriod === 'monthly') {
     start.setMonth(end.getMonth() - 1)
   }
-  // For 'alltime', start remains undefined (no date filter)
+  // For 'alltime', the date filter is disabled by returning null.
 
-  return { start: period === 'alltime' ? null : start, end }
+  return { start: normalizedPeriod === 'alltime' ? null : start, end }
 }
 
 /**

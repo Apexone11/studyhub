@@ -4,6 +4,7 @@ const MENTION_PATTERN = /(^|[\s(])@([a-zA-Z0-9_]{3,20})(?=$|[\s),.!?:;])/g
 
 function extractMentionUsernames(text = '') {
   const usernames = new Set()
+  MENTION_PATTERN.lastIndex = 0
   let match = MENTION_PATTERN.exec(text)
 
   while (match) {

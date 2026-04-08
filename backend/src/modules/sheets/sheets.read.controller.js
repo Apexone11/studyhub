@@ -90,7 +90,7 @@ router.get('/:id/readme', sheetReadmeLimiter, optionalAuth, async (req, res) => 
     const sheet = await prisma.studySheet.findUnique({
       where: { id: sheetId },
       select: {
-        id: true, userId: true, status: true, visibility: true, courseId: true,
+        id: true, userId: true, status: true, courseId: true,
         author: { select: AUTHOR_SELECT },
       },
     })

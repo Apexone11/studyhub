@@ -16,6 +16,15 @@ const mocks = vi.hoisted(() => {
       delete: vi.fn(),
       count: vi.fn(),
     },
+    noteStar: {
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+      count: vi.fn(),
+    },
+    noteReaction: {
+      count: vi.fn(),
+      findUnique: vi.fn(),
+    },
     noteComment: {
       findMany: vi.fn(),
       findUnique: vi.fn(),
@@ -115,6 +124,11 @@ afterAll(() => {
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.prisma.note.count.mockResolvedValue(0)
+  mocks.prisma.noteStar.findUnique.mockResolvedValue(null)
+  mocks.prisma.noteStar.findMany.mockResolvedValue([])
+  mocks.prisma.noteStar.count.mockResolvedValue(0)
+  mocks.prisma.noteReaction.count.mockResolvedValue(0)
+  mocks.prisma.noteReaction.findUnique.mockResolvedValue(null)
   mocks.accessControl.assertOwnerOrAdmin.mockImplementation(({ user, ownerId }) => {
     return user.role === 'admin' || Number(ownerId) === Number(user.userId)
   })
@@ -130,12 +144,14 @@ describe('notes routes', () => {
           title: 'My Note',
           content: 'Note content',
           private: true,
+          tags: '["algorithms","graphs"]',
           userId: 42,
           updatedAt: new Date(),
           course: { id: 1, code: 'CS101' },
         },
       ])
       mocks.prisma.note.count.mockResolvedValue(1)
+      mocks.prisma.noteStar.findMany.mockResolvedValue([{ noteId: 1 }])
 
       const response = await request(app).get('/')
 
@@ -146,7 +162,11 @@ describe('notes routes', () => {
         page: 1,
       })
       expect(response.body.notes).toHaveLength(1)
-      expect(response.body.notes[0]).toMatchObject({ title: 'My Note' })
+      expect(response.body.notes[0]).toMatchObject({
+        title: 'My Note',
+        _starred: true,
+        tags: ['algorithms', 'graphs'],
+      })
     })
 
     it('filters notes by search query', async () => {
@@ -160,7 +180,28 @@ describe('notes routes', () => {
         expect.objectContaining({
           where: expect.objectContaining({
             userId: 42,
-            title: { contains: 'algorithms', mode: 'insensitive' },
+            OR: [
+              { title: { contains: 'algorithms', mode: 'insensitive' } },
+              { content: { contains: 'algorithms', mode: 'insensitive' } },
+              { tags: { contains: 'algorithms', mode: 'insensitive' } },
+            ],
+          }),
+        }),
+      )
+    })
+
+    it('filters notes by exact tag', async () => {
+      mocks.prisma.note.findMany.mockResolvedValue([])
+      mocks.prisma.note.count.mockResolvedValue(0)
+
+      const response = await request(app).get('/?tag=Physics')
+
+      expect(response.status).toBe(200)
+      expect(mocks.prisma.note.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            userId: 42,
+            tags: { contains: '"physics"', mode: 'insensitive' },
           }),
         }),
       )

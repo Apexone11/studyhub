@@ -18,7 +18,7 @@ export default function BookCard({ book, progress }) {
   const pages = formatPageCount(book.pageCount || 0)
   const title = truncateText(book.title, 50)
 
-  const fallbackGradient = 'linear-gradient(135deg, var(--sh-brand), #7c3aed)'
+  const fallbackGradient = 'linear-gradient(135deg, var(--sh-brand), var(--sh-brand-accent))'
 
   return (
     <Link
