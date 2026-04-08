@@ -13,6 +13,26 @@
 **Validation**
 - `Set-Location -LiteralPath frontend/studyhub-app; npx eslint src/pages/preview/AttachmentPreviewPage.jsx`: passes
 
+### Backend Review Cleanup, Google Books Noise Reduction, and Vite Alignment
+
+**The open backend review comments are now resolved at the root cause**
+- Reworked study-sheet full-text search to use structured Prisma SQL fragments instead of `$queryRawUnsafe`, which removes the unsafe raw-string assembly while keeping the existing ranking and filter behavior intact
+- Standardized route error fallback responses through the shared `sendError` envelope so uncoded controller failures now return stable `{ error, code }` payloads instead of a one-off raw JSON shape
+
+**Google Books failures and Prisma dev drift now behave more predictably**
+- Added HTTP-status-aware error objects in the library service so upstream `429` responses carry `statusCode` metadata into monitoring and can be filtered as expected instead of surfacing as generic server noise
+- Updated the backend Docker dev entrypoint to hash `prisma/schema.prisma` and re-run `prisma generate` when the schema changes, which closes the stale-client gap behind the recent runtime mismatch on newer Prisma fields such as `displayName`
+
+**Vite resolution is aligned where the repo actually pins it**
+- Pinned the frontend package manifests and package-locks to `vite` `8.0.5` in both the main app and the mirrored Claude worktree
+- Refreshed the standalone backend lockfiles so their Vitest-owned Vite resolution also lands on `8.0.5`
+- The workspace-root lockfiles still contain a separate hoisted `vite` `8.0.7` copy for Vitest, and the older mirrored worktree also routes plugin-react through that hoisted copy, while the frontend-scoped workspace entries are pinned to `8.0.5`; this is the resolved npm workspace graph, not a remaining invalid direct dependency pin
+
+**Validation**
+- `Set-Location -LiteralPath backend; npm test -- test/fullTextSearch.test.js test/http.errors.test.js test/library.service.test.js`: passes (6 tests)
+- `Set-Location -LiteralPath backend; npx eslint src/lib/fullTextSearch.js src/core/http/errors.js src/modules/library/library.service.js scripts/dev-entrypoint.js test/fullTextSearch.test.js test/http.errors.test.js test/library.service.test.js`: passes
+- `Set-Location -LiteralPath frontend/studyhub-app; npm run build`: passes
+
 ### PR #195 Follow-up Review Fixes
 
 **Optional auth and maintenance middleware now behave consistently across mounted routes**

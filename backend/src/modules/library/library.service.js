@@ -35,6 +35,13 @@ function sanitizeBookDescription(description) {
   return sanitized || null
 }
 
+function createHttpStatusError(message, statusCode) {
+  const error = new Error(message)
+  error.status = statusCode
+  error.statusCode = statusCode
+  return error
+}
+
 /** Fetch with a timeout. Rejects if the response takes longer than `ms`. */
 function fetchWithTimeout(url, ms = 10000) {
   const controller = new AbortController()
@@ -143,10 +150,11 @@ async function searchBooks(query, page = 1, filters = {}) {
     const response = await fetchWithRetry(url)
 
     if (!response.ok) {
-      captureError(new Error(`Google Books search failed: ${response.status}`), {
+      captureError(createHttpStatusError(`Google Books search failed: ${response.status}`, response.status), {
         context: 'searchBooks',
         query,
         page,
+        statusCode: response.status,
       })
       const fallback = await searchCachedBooks(query, page, filters)
       if (fallback && fallback.results && fallback.results.length > 0) {
@@ -194,9 +202,10 @@ async function getBookDetail(volumeId) {
     const response = await fetchWithRetry(url)
 
     if (!response.ok) {
-      captureError(new Error(`Google Books detail fetch failed: ${response.status}`), {
+      captureError(createHttpStatusError(`Google Books detail fetch failed: ${response.status}`, response.status), {
         context: 'getBookDetail',
         volumeId,
+        statusCode: response.status,
       })
       return await getCachedBookDetail(volumeId)
     }

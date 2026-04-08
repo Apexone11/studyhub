@@ -8,6 +8,8 @@ const packageLockPath = path.join(appRoot, 'package-lock.json')
 const nodeModulesDir = path.join(appRoot, 'node_modules')
 const stateDir = path.join(appRoot, '.studyhub')
 const lockHashPath = path.join(stateDir, 'package-lock.sha256')
+const prismaSchemaPath = path.join(appRoot, 'prisma', 'schema.prisma')
+const prismaSchemaHashPath = path.join(stateDir, 'prisma-schema.sha256')
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm'
 const npxCommand = process.platform === 'win32' ? 'npx.cmd' : 'npx'
 const requiredPackages = [
@@ -19,6 +21,12 @@ const requiredPackages = [
 function packageLockHash() {
   return createHash('sha256')
     .update(fs.readFileSync(packageLockPath))
+    .digest('hex')
+}
+
+function prismaSchemaHash() {
+  return createHash('sha256')
+    .update(fs.readFileSync(prismaSchemaPath))
     .digest('hex')
 }
 
@@ -41,6 +49,15 @@ function hasPrismaClient() {
     && fs.existsSync(path.join(nodeModulesDir, '.prisma', 'client', 'index.js'))
 }
 
+function needsPrismaGenerate() {
+  if (!fs.existsSync(prismaSchemaPath)) return false
+  if (!hasPrismaClient()) return true
+  if (!fs.existsSync(prismaSchemaHashPath)) return true
+
+  const savedHash = fs.readFileSync(prismaSchemaHashPath, 'utf8').trim()
+  return savedHash !== prismaSchemaHash()
+}
+
 function runOrExit(command, args) {
   const result = spawnSync(command, args, {
     cwd: appRoot,
@@ -54,6 +71,7 @@ function runOrExit(command, args) {
 }
 
 const installRequired = needsInstall()
+const prismaGenerateRequired = installRequired || needsPrismaGenerate()
 
 if (installRequired) {
   process.stdout.write('Refreshing backend dependencies for the Docker dev container...\n')
@@ -62,8 +80,10 @@ if (installRequired) {
   fs.writeFileSync(lockHashPath, `${packageLockHash()}\n`, 'utf8')
 }
 
-if (installRequired || !hasPrismaClient()) {
+if (prismaGenerateRequired) {
+  fs.mkdirSync(stateDir, { recursive: true })
   runOrExit(npxCommand, ['prisma', 'generate'])
+  fs.writeFileSync(prismaSchemaHashPath, `${prismaSchemaHash()}\n`, 'utf8')
 }
 
 runOrExit(npxCommand, ['prisma', 'migrate', 'deploy'])
