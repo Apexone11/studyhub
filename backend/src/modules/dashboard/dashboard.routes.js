@@ -2,6 +2,7 @@ const express = require('express')
 const { readLimiter } = require('../../lib/rateLimiters')
 const requireAuth = require('../../middleware/auth')
 const { captureError } = require('../../monitoring/sentry')
+const { cached } = require('../../lib/redis')
 const prisma = require('../../lib/prisma')
 
 const router = express.Router()
@@ -11,6 +12,9 @@ router.use(readLimiter)
 
 router.get('/summary', async (req, res) => {
   try {
+    // Phase 6: Redis cache 5min per user -- dashboard data changes slowly
+    const dashboardData = await cached(`dashboard:summary:${req.user.userId}`, async () => {
+
     const user = await prisma.user.findUnique({
       where: { id: req.user.userId },
       select: {
@@ -151,7 +155,7 @@ router.get('/summary', async (req, res) => {
     const accountAgeMs = Date.now() - new Date(user.createdAt).getTime()
     const isNewUser = accountAgeMs < 7 * 24 * 60 * 60 * 1000
 
-    res.json({
+    return {
       hero: {
         username: user.username,
         role: user.role,
@@ -174,7 +178,10 @@ router.get('/summary', async (req, res) => {
         checklist: activationChecklist,
         nextStep: nextItem,
       },
-    })
+    }
+    }, 300) // 5 min TTL
+
+    res.json(dashboardData)
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })

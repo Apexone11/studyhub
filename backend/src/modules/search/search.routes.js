@@ -9,6 +9,8 @@ const prisma = require('../../lib/prisma')
 const { timedSection, logTiming } = require('../../lib/requestTiming')
 const { getBlockedUserIds } = require('../../lib/social/blockFilter')
 const { summarizeText } = require('../feed/feed.service')
+const { cached } = require('../../lib/redis')
+const { cacheControl } = require('../../lib/cacheControl')
 const { searchLimiter } = require('../../lib/rateLimiters')
 
 const router = express.Router()
@@ -17,7 +19,122 @@ router.use(searchLimiter)
 
 const VALID_TYPES = ['all', 'sheets', 'courses', 'users', 'notes', 'groups']
 
-router.get('/', optionalAuth, async (req, res) => {
+/**
+ * Execute search queries for anonymous (unauthenticated) users.
+ * No block filtering, no notes, only public groups.
+ * Used inside the Redis `cached()` wrapper.
+ */
+async function executeSearch({ query, type, limit, useFTS }) {
+  const wantSheets = type === 'all' || type === 'sheets'
+  const wantCourses = type === 'all' || type === 'courses'
+  const wantUsers = type === 'all' || type === 'users'
+  const wantGroups = type === 'all' || type === 'groups'
+  const userSearchTake = Math.min(limit * 5, 50)
+  const sheetTextSearchClauses = buildSheetTextSearchClauses(query)
+
+  const queries = []
+
+  // Sheets
+  if (wantSheets) {
+    if (useFTS) {
+      queries.push(searchSheetsFTS(query, { status: 'published', limit }).then(async (result) => {
+        if (!result.sheets.length) return []
+        const ids = result.sheets.map((s) => Number(s.id))
+        return prisma.studySheet.findMany({
+          where: { id: { in: ids } },
+          select: { id: true, title: true, description: true, stars: true, downloads: true, createdAt: true, course: { select: { id: true, code: true, name: true } }, author: { select: { id: true, username: true } } },
+        })
+      }))
+    } else {
+      queries.push(prisma.studySheet.findMany({
+        where: { status: 'published', OR: sheetTextSearchClauses },
+        select: { id: true, title: true, description: true, stars: true, downloads: true, createdAt: true, course: { select: { id: true, code: true, name: true } }, author: { select: { id: true, username: true } } },
+        orderBy: { stars: 'desc' },
+        take: limit,
+      }))
+    }
+  } else {
+    queries.push(Promise.resolve([]))
+  }
+
+  // Courses
+  if (wantCourses) {
+    if (useFTS) {
+      queries.push(searchCoursesFTS(query, { limit }).then(async (rows) => {
+        if (!rows.length) return []
+        const ids = rows.map((c) => Number(c.id))
+        return prisma.course.findMany({
+          where: { id: { in: ids } },
+          select: { id: true, code: true, name: true, school: { select: { id: true, name: true, short: true } } },
+        })
+      }))
+    } else {
+      queries.push(prisma.course.findMany({
+        where: { OR: [{ code: { contains: query, mode: 'insensitive' } }, { name: { contains: query, mode: 'insensitive' } }] },
+        select: { id: true, code: true, name: true, school: { select: { id: true, name: true, short: true } } },
+        orderBy: { code: 'asc' },
+        take: limit,
+      }))
+    }
+  } else {
+    queries.push(Promise.resolve([]))
+  }
+
+  // Users
+  if (wantUsers) {
+    if (useFTS) {
+      queries.push(searchUsersFTS(query, { limit: userSearchTake }).then(async (rows) => {
+        if (!rows.length) return []
+        const ids = rows.map((u) => Number(u.id))
+        return prisma.user.findMany({
+          where: { id: { in: ids } },
+          select: { id: true, username: true, role: true, avatarUrl: true, createdAt: true },
+        })
+      }))
+    } else {
+      queries.push(prisma.user.findMany({
+        where: { username: { contains: query, mode: 'insensitive' } },
+        select: { id: true, username: true, role: true, avatarUrl: true, createdAt: true },
+        orderBy: { username: 'asc' },
+        take: userSearchTake,
+      }))
+    }
+  } else {
+    queries.push(Promise.resolve([]))
+  }
+
+  // Notes -- always empty for anonymous users
+  queries.push(Promise.resolve([]))
+
+  // Groups -- only public for anonymous
+  if (wantGroups) {
+    queries.push(prisma.studyGroup.findMany({
+      where: { privacy: 'public', OR: [{ name: { contains: query, mode: 'insensitive' } }, { description: { contains: query, mode: 'insensitive' } }] },
+      select: { id: true, name: true, description: true, privacy: true, courseId: true, course: { select: { id: true, code: true, name: true } }, createdAt: true, _count: { select: { members: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    }))
+  } else {
+    queries.push(Promise.resolve([]))
+  }
+
+  const [sheets, courses, users, _notes, groups] = await Promise.all(queries)
+
+  // Apply visibility filtering for anonymous users (all public profiles visible)
+  const visibleIds = await getVisibleProfileIds(prisma, null, users.map((u) => u.id))
+  const filteredUsers = users.filter((u) => visibleIds.has(u.id)).slice(0, limit)
+
+  const cleanSheets = sheets.map((s) => ({ ...s, description: s.description ? summarizeText(s.description, 200) : '' }))
+  const cleanGroups = groups.map((g) => ({ ...g, description: g.description ? summarizeText(g.description, 200) : '' }))
+
+  return {
+    results: { sheets: cleanSheets, courses, users: filteredUsers, notes: [], groups: cleanGroups },
+    query,
+    type,
+  }
+}
+
+router.get('/', optionalAuth, cacheControl(30, { staleWhileRevalidate: 60 }), async (req, res) => {
   req._timingStart = Date.now()
   const rawQ = Array.isArray(req.query.q) ? req.query.q[0] : req.query.q
   const rawType = Array.isArray(req.query.type) ? req.query.type[0] : req.query.type
@@ -57,6 +174,13 @@ router.get('/', optionalAuth, async (req, res) => {
   const useFTS = req.query.fts === 'true'
 
   try {
+    // Phase 6: cache anonymous search results 60s -- identical for all unauthenticated users
+    if (!req.user) {
+      const cacheKey = `search:anon:${type}:${limit}:${useFTS ? 1 : 0}:${query.toLowerCase()}`
+      const result = await cached(cacheKey, () => executeSearch({ query, type, limit, useFTS, user: null }), 60)
+      return res.json(result)
+    }
+
     // Hide blocked users and their content from search results
     const blockedIds = await getBlockedUserIds(prisma, req.user?.userId)
     const blockedIdSet = new Set(blockedIds)
