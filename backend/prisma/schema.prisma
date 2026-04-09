@@ -91,8 +91,17 @@ model User {
   messageReactions           MessageReaction[]         @relation("MessageReactionUser")
   messagePollVotes           MessagePollVote[]
   studyGroupsCreated         StudyGroup[]              @relation("StudyGroupCreator")
+  studyGroupsDeleted         StudyGroup[]              @relation("StudyGroupDeleter")
   studyGroupMemberships      StudyGroupMember[]
+  studyGroupMutesIssued      StudyGroupMember[]        @relation("StudyGroupMemberMutedBy")
   groupMediaUsage            GroupMediaUsage[]
+  groupReportsFiled          GroupReport[]             @relation("GroupReportReporter")
+  groupReportsResolved       GroupReport[]             @relation("GroupReportResolver")
+  groupAppealsFiled          GroupAppeal[]             @relation("GroupAppealAppealer")
+  groupAppealsResolved       GroupAppeal[]             @relation("GroupAppealResolver")
+  groupAuditActions          GroupAuditLog[]           @relation("GroupAuditActor")
+  groupBlocksReceived        GroupBlock[]              @relation("GroupBlockUser")
+  groupBlocksIssued          GroupBlock[]              @relation("GroupBlockActor")
   groupResources             GroupResource[]
   groupSessionRsvps          GroupSessionRsvp[]
   groupDiscussionPosts       GroupDiscussionPost[]
@@ -1190,20 +1199,44 @@ model StudyGroup {
   privacy          String   @default("public") // "public", "private", "invite_only"
   maxMembers       Int      @default(50)
   createdById      Int
+  // Phase 5 trust & safety:
+  //   moderationStatus: 'active' | 'warned' | 'locked' | 'deleted'
+  //   warnedUntil: auto-clears a warning banner after this timestamp
+  //   lockedAt: set when an admin locks the group (read-only mode)
+  //   deletedAt: soft-delete sentinel; a cron sweep hard-deletes after 30 days
+  //   deletedById: which admin performed the soft-delete (audit)
+  moderationStatus String    @default("active")
+  warnedUntil      DateTime?
+  lockedAt         DateTime?
+  deletedAt        DateTime?
+  deletedById      Int?
+  // Phase 5 member-list visibility: when true, non-members cannot see
+  // the member roster (admins/mods always see it regardless).
+  memberListPrivate Boolean  @default(false)
+  // Phase 5 post-approval queue: when true, new discussion posts enter
+  // status 'pending_approval' and only become visible after a mod approves.
+  requirePostApproval Boolean @default(false)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
   course    Course?               @relation(fields: [courseId], references: [id], onDelete: SetNull)
   createdBy User                  @relation("StudyGroupCreator", fields: [createdById], references: [id])
+  deletedBy User?                 @relation("StudyGroupDeleter", fields: [deletedById], references: [id], onDelete: SetNull)
   members   StudyGroupMember[]
   resources GroupResource[]
   sessions  GroupSession[]
   posts     GroupDiscussionPost[]
   mediaUsage GroupMediaUsage[]
+  reports   GroupReport[]
+  appeals   GroupAppeal[]
+  auditLog  GroupAuditLog[]
+  blocks    GroupBlock[]
 
   @@index([courseId])
   @@index([privacy, updatedAt(sort: Desc)])
   @@index([createdById])
+  @@index([moderationStatus])
+  @@index([deletedAt])
 }
 
 model StudyGroupMember {
@@ -1213,13 +1246,29 @@ model StudyGroupMember {
   role     String   @default("member") // "admin", "moderator", "member"
   status   String   @default("active") // "active", "pending", "invited", "banned"
   joinedAt DateTime @default(now())
+  // Phase 5: join-gate message. Captured when a user requests to join a
+  // private group so admins know why they want in. Cleared on approval.
+  joinMessage String @default("")
+  // Phase 5: mute window. When non-null and in the future, the user can
+  // read the group but cannot post/comment/upload. Enforced by the
+  // resources + discussions routes. `muteReason` is shown to the user.
+  mutedUntil DateTime?
+  mutedReason String   @default("")
+  mutedById   Int?
+  // Phase 5: strike counter for two-strikes auto-ban. Incremented when a
+  // mod removes the user's post/resource. Auto-ban triggers at 2+ strikes
+  // in a 30-day window (computed by service, not DB).
+  lastStrikeAt DateTime?
+  strikeCount  Int      @default(0)
 
-  group StudyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group  StudyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mutedBy User?     @relation("StudyGroupMemberMutedBy", fields: [mutedById], references: [id], onDelete: SetNull)
 
   @@unique([groupId, userId])
   @@index([userId, status])
   @@index([groupId, status])
+  @@index([mutedUntil])
 }
 
 model GroupResource {
@@ -1294,6 +1343,15 @@ model GroupDiscussionPost {
   // Phase 4: optional media attachments. JSON array of
   //   [{ url, mime, bytes, kind: 'image'|'video'|'file' }]
   attachments Json?
+  // Phase 5: moderation status.
+  //   'published'       — visible to all members (default)
+  //   'pending_approval' — created under require-approval flag, hidden
+  //                        until a mod approves; only author + mods see it
+  //   'removed'         — a mod removed it; kept for audit, shown as
+  //                        "removed by moderator" to members
+  status    String   @default("published")
+  removedAt DateTime?
+  removedById Int?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1339,6 +1397,108 @@ model GroupMediaUsage {
 
   @@unique([userId, weekStart])
   @@index([userId, weekStart])
+}
+
+// Phase 5: trust & safety — report a group for review.
+// Each user can file at most one report per group (the unique index
+// enforces this at the DB level). Reports drive the admin review queue
+// and auto-lock escalation (5 unique reporters in 24h).
+model GroupReport {
+  id           Int      @id @default(autoincrement())
+  groupId      Int
+  reporterId   Int
+  reason       String // 'spam' | 'harassment' | 'hate' | 'copyright' | 'impersonation' | 'sexual' | 'other'
+  details      String   @default("")
+  // Optional evidence attachments (JSON array, same shape as discussion post
+  // attachments — { url, mime, bytes, kind }).
+  attachments  Json?
+  status       String   @default("pending") // 'pending' | 'dismissed' | 'warned' | 'locked' | 'deleted' | 'escalated'
+  resolvedAt   DateTime?
+  resolvedById Int?
+  resolution   String   @default("") // admin internal notes (not shown to reporter or group owner)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  group      StudyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  reporter   User       @relation("GroupReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  resolvedBy User?      @relation("GroupReportResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@unique([groupId, reporterId])
+  @@index([status, createdAt])
+  @@index([groupId, status])
+  @@index([reporterId, status])
+}
+
+// Phase 5: group owner appeal after a warn / lock / delete action.
+// One appeal per (group, user) pair. Admin accepts (restore) or rejects
+// (final). No second appeals.
+model GroupAppeal {
+  id             Int      @id @default(autoincrement())
+  groupId        Int
+  appealerId     Int
+  originalAction String // 'warned' | 'locked' | 'deleted'
+  message        String   @db.Text
+  status         String   @default("pending") // 'pending' | 'accepted' | 'rejected'
+  resolvedAt     DateTime?
+  resolvedById   Int?
+  resolution     String   @default("")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  group      StudyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  appealer   User       @relation("GroupAppealAppealer", fields: [appealerId], references: [id], onDelete: Cascade)
+  resolvedBy User?      @relation("GroupAppealResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@unique([groupId, appealerId])
+  @@index([status, createdAt])
+}
+
+// Phase 5: per-group audit log. Every mod action (approve/reject post,
+// remove post, ban/mute user, change background, warn/lock/delete group,
+// approve/reject join request) writes a row here so other mods can see
+// who did what and compromised mod accounts can be investigated.
+model GroupAuditLog {
+  id         Int      @id @default(autoincrement())
+  groupId    Int
+  actorId    Int
+  action     String // e.g. 'post.remove', 'member.ban', 'group.lock', 'background.change'
+  targetType String? // 'post' | 'reply' | 'member' | 'resource' | 'group'
+  targetId   Int?
+  // Free-form JSON context: previous/next values, mod-entered reason, etc.
+  // Always redact sensitive content before writing.
+  context    Json?
+  // Session fingerprint for compromised-account forensics. Raw IPs are
+  // stored without masking; rotate/prune via a retention job.
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  group StudyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  actor User       @relation("GroupAuditActor", fields: [actorId], references: [id], onDelete: Cascade)
+
+  @@index([groupId, createdAt(sort: Desc)])
+  @@index([actorId, createdAt(sort: Desc)])
+  @@index([action])
+}
+
+// Phase 5: group-level user block. Admin/mod blocks a user from joining,
+// viewing, or interacting with a specific group. Blocked users see
+// "You can't access this group." If they try to join, the join is
+// immediately rejected without notifying mods.
+model GroupBlock {
+  id         Int      @id @default(autoincrement())
+  groupId    Int
+  userId     Int
+  blockedById Int
+  reason     String   @default("")
+  createdAt  DateTime @default(now())
+
+  group     StudyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user      User       @relation("GroupBlockUser", fields: [userId], references: [id], onDelete: Cascade)
+  blockedBy User       @relation("GroupBlockActor", fields: [blockedById], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+  @@index([userId])
 }
 
 model DiscussionUpvote {
