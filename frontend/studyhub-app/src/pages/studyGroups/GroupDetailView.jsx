@@ -21,13 +21,16 @@ import Navbar from '../../components/navbar/Navbar'
 import AppSidebar from '../../components/sidebar/AppSidebar'
 import { PageShell } from '../shared/pageScaffold'
 import { EditGroupModal } from './GroupModals'
+import GroupBackgroundPicker from './GroupBackgroundPicker'
 import { styles } from './studyGroupsStyles'
+import { IconPen } from '../../components/Icons'
 
 export default function GroupDetailView({ groupId }) {
   const navigate = useNavigate()
   const { user } = useSession()
   const currentUserId = user?.id || null
   const [editModalOpen, setEditModalOpen] = useState(false)
+  const [backgroundPickerOpen, setBackgroundPickerOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('overview')
 
   const {
@@ -135,6 +138,9 @@ export default function GroupDetailView({ groupId }) {
   const isInvited = membershipStatus === 'invited'
   const isAdminOrMod = isAdmin || activeGroup.userRole === 'moderator'
   const groupImageUrl = resolveGroupImageUrl(activeGroup.avatarUrl)
+  // Phase 4: owner-curated banner image. Falls back to the avatar image,
+  // then to the default gradient when neither is set.
+  const headerBackgroundUrl = activeGroup.backgroundUrl || groupImageUrl
   const detailDescription = activeGroup.description || 'Use this space to coordinate sessions, share resources, and keep your study rhythm together.'
 
   const handleEdit = async (updates) => {
@@ -193,15 +199,16 @@ export default function GroupDetailView({ groupId }) {
             style={{
               position: 'relative',
               minHeight: 220,
-              background: groupImageUrl
+              background: headerBackgroundUrl
                 ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.18), rgba(15, 23, 42, 0.48))'
                 : 'linear-gradient(135deg, rgba(37, 99, 235, 0.92), rgba(124, 58, 237, 0.9))',
             }}
           >
-            {groupImageUrl ? (
+            {headerBackgroundUrl ? (
               <img
-                src={groupImageUrl}
-                alt={activeGroup.name}
+                src={headerBackgroundUrl}
+                alt=""
+                aria-hidden="true"
                 style={{
                   position: 'absolute',
                   inset: 0,
@@ -210,6 +217,57 @@ export default function GroupDetailView({ groupId }) {
                   objectFit: 'cover',
                 }}
               />
+            ) : null}
+
+            {/* Phase 4: admin/mod can open the background picker */}
+            {isAdminOrMod ? (
+              <button
+                type="button"
+                onClick={() => setBackgroundPickerOpen(true)}
+                aria-label="Change group background"
+                style={{
+                  position: 'absolute',
+                  top: 12,
+                  right: 12,
+                  zIndex: 2,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '6px 12px',
+                  borderRadius: 8,
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  background: 'rgba(15, 23, 42, 0.55)',
+                  color: '#fff',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  backdropFilter: 'blur(6px)',
+                }}
+              >
+                <IconPen size={12} />
+                Change background
+              </button>
+            ) : null}
+
+            {/* Phase 4: attribution line in the bottom-right if set */}
+            {activeGroup.backgroundCredit ? (
+              <div
+                aria-label="Background attribution"
+                style={{
+                  position: 'absolute',
+                  right: 14,
+                  bottom: 10,
+                  zIndex: 2,
+                  fontSize: 11,
+                  color: 'rgba(255, 255, 255, 0.85)',
+                  textShadow: '0 1px 2px rgba(0, 0, 0, 0.55)',
+                  pointerEvents: 'none',
+                  maxWidth: '60%',
+                  textAlign: 'right',
+                }}
+              >
+                {activeGroup.backgroundCredit}
+              </div>
             ) : null}
 
             <div
@@ -222,7 +280,7 @@ export default function GroupDetailView({ groupId }) {
                 gap: 20,
                 minHeight: 220,
                 padding: '24px',
-                background: groupImageUrl
+                background: headerBackgroundUrl
                   ? 'linear-gradient(180deg, rgba(15, 23, 42, 0.16), rgba(15, 23, 42, 0.68))'
                   : 'transparent',
               }}
@@ -497,6 +555,19 @@ export default function GroupDetailView({ groupId }) {
           />,
           document.body,
         )}
+
+      {/* Phase 4: group background picker (admins/mods only) */}
+      <GroupBackgroundPicker
+        open={backgroundPickerOpen}
+        groupId={activeGroup.id}
+        currentBackgroundUrl={activeGroup.backgroundUrl}
+        currentBackgroundCredit={activeGroup.backgroundCredit}
+        onClose={() => setBackgroundPickerOpen(false)}
+        onSaved={() => {
+          setBackgroundPickerOpen(false)
+          loadGroupDetails(activeGroup.id)
+        }}
+      />
     </PageShell>
   )
 }
