@@ -1,9 +1,10 @@
 /**
- * SheetLab Editor tab — split-pane content editor with live preview.
- * Supports three content formats:
- *   - markdown: plain textarea
- *   - html: plain textarea with iframe preview
- *   - richtext: TipTap WYSIWYG editor (Track C1)
+ * SheetLab Editor tab — thin shell that owns title/description/save/publish.
+ * Delegates rendering to SheetLabEditorSurface and mode-switching to
+ * EditorModeToggle. Content formats supported:
+ *   - richtext: TipTap WYSIWYG editor (first-class)
+ *   - html:     CodeMirror code editor with live iframe preview (first-class)
+ *   - markdown: legacy textarea + plain preview (read-only migration target)
  * Handles save via PATCH /api/sheets/:id with debounced autosave.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -13,6 +14,7 @@ import { getApiErrorMessage, readJsonSafely } from '../../../lib/http'
 import { showToast } from '../../../lib/toast'
 import '../../../components/editor/richTextEditor.css'
 import SheetLabEditorSurface from './editor/SheetLabEditorSurface'
+import EditorModeToggle from '../../../components/editor/EditorModeToggle'
 
 const AUTOSAVE_DELAY = 1500
 
@@ -27,8 +29,6 @@ export default function SheetLabEditor({ sheet, onContentSaved }) {
   const [sheetStatus, setSheetStatus] = useState('draft')
   const [activeFormat, setActiveFormat] = useState('markdown')
   const autosaveTimer = useRef(null)
-  const isRichText = activeFormat === 'richtext'
-  const isHtml = activeFormat === 'html'
   const isDraft = sheetStatus === 'draft'
 
   // Hydrate from sheet
@@ -148,13 +148,19 @@ export default function SheetLabEditor({ sheet, onContentSaved }) {
     save(content, title, description, activeFormat)
   }
 
-  // Upgrade markdown → richtext format
-  const handleUpgradeToRichText = () => {
-    if (activeFormat === 'richtext') return
-    setActiveFormat('richtext')
+  // Switch editor mode. EditorModeToggle owns the lossy-detection + sanitize
+  // logic and hands us the next (format, content) pair. We just flip state
+  // and mark the sheet dirty so the new contentFormat gets persisted on the
+  // next autosave.
+  const handleFormatChange = useCallback((nextFormat, nextContent) => {
+    if (nextFormat === activeFormat && nextContent === content) return
+    setActiveFormat(nextFormat)
+    if (typeof nextContent === 'string' && nextContent !== content) {
+      setContent(nextContent)
+    }
     setDirty(true)
-    showToast('Switched to rich text editor. Save to persist.', 'success')
-  }
+    showToast(`Switched to ${nextFormat === 'richtext' ? 'Rich Text' : 'HTML/Code'} mode.`, 'success')
+  }, [activeFormat, content])
 
   return (
     <div style={{ display: 'grid', gap: 14 }}>
@@ -212,30 +218,12 @@ export default function SheetLabEditor({ sheet, onContentSaved }) {
           </span>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <span style={{
-            padding: '2px 8px', borderRadius: 6, fontWeight: 700, fontSize: 10,
-            background: isRichText ? 'var(--sh-soft)' : isHtml ? 'var(--sh-brand-soft)' : 'var(--sh-soft)',
-            color: isRichText ? 'var(--sh-brand-accent)' : isHtml ? 'var(--sh-brand)' : 'var(--sh-brand)',
-            textTransform: 'uppercase',
-          }}>
-            {activeFormat}
-          </span>
-          {/* Show upgrade button for markdown sheets that aren't yet richtext */}
-          {activeFormat === 'markdown' && (
-            <button
-              type="button"
-              onClick={handleUpgradeToRichText}
-              title="Switch to the rich text WYSIWYG editor"
-              style={{
-                border: '1px solid var(--sh-brand-accent)', borderRadius: 6, padding: '2px 8px',
-                background: 'transparent', color: 'var(--sh-brand-accent)',
-                fontWeight: 700, fontSize: 10, cursor: 'pointer',
-                fontFamily: 'inherit', textTransform: 'uppercase',
-              }}
-            >
-              Upgrade to Rich Text
-            </button>
-          )}
+          <EditorModeToggle
+            value={activeFormat}
+            currentContent={content}
+            onChange={handleFormatChange}
+            disabled={saving || publishing}
+          />
           <button
             type="button"
             onClick={handleManualSave}

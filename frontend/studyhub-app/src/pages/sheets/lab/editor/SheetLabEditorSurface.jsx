@@ -15,6 +15,7 @@
  */
 import { RichTextEditor } from '../../../../components/editor'
 import StackedEditorPane from '../../../../components/editor/StackedEditorPane'
+import HtmlCodeEditor from '../../../../components/editor/HtmlCodeEditor'
 import { IconUpload, IconEye } from '../../../../components/Icons'
 
 const textareaStyle = {
@@ -68,13 +69,19 @@ export default function SheetLabEditorSurface({
     )
   }
 
-  const editorSlot = (
+  const editorSlot = isHtml ? (
+    <HtmlCodeEditor
+      value={content}
+      onChange={onRichTextUpdate}
+      placeholder="HTML content…"
+    />
+  ) : (
     <textarea
       value={content}
       onChange={onContentChange}
       style={textareaStyle}
-      spellCheck={!isHtml}
-      placeholder={isHtml ? 'HTML content…' : 'Write your content in markdown…'}
+      spellCheck
+      placeholder="Write your content in markdown…"
     />
   )
 
