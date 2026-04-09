@@ -3,20 +3,24 @@
  *
  * The parent shell (SheetLabEditor) owns title/description/dirty/save logic.
  * This component owns nothing except which sub-editor to render based on
- * `contentFormat`. Extracted from SheetLabEditor in the Phase 3 refactor
- * (commit A) with zero behavior change — the JSX is a direct move with props
- * threaded through.
+ * `contentFormat`.
  *
- * Phase 3 commit B will replace the HTML branch with a CodeMirror-backed
- * HtmlCodeEditor and introduce an EditorModeToggle that switches between
- * Rich Text and HTML/Code.
+ * Layout: non-richtext formats (markdown, html) now use the shared
+ * StackedEditorPane — editor on top, preview on bottom, both collapsible.
+ * Richtext keeps its single-pane layout since TipTap is a WYSIWYG that
+ * renders its own preview inline.
+ *
+ * Phase 3 commit B will replace the HTML textarea with a CodeMirror-backed
+ * HtmlCodeEditor and introduce an EditorModeToggle.
  */
 import { RichTextEditor } from '../../../../components/editor'
+import StackedEditorPane from '../../../../components/editor/StackedEditorPane'
+import { IconUpload, IconEye } from '../../../../components/Icons'
 
-const editorStyle = {
+const textareaStyle = {
   width: '100%',
-  height: '100%',
-  minHeight: 400,
+  flex: 1,
+  minHeight: 320,
   resize: 'none',
   border: 'none',
   background: '#0f172a',
@@ -31,10 +35,9 @@ const editorStyle = {
 
 const previewFrameStyle = {
   width: '100%',
-  height: '100%',
-  minHeight: 400,
+  flex: 1,
+  minHeight: 320,
   border: 'none',
-  borderRadius: 0,
   background: '#fff',
 }
 
@@ -65,61 +68,43 @@ export default function SheetLabEditorSurface({
     )
   }
 
-  return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-      gap: 0,
-      borderRadius: 14,
-      overflow: 'hidden',
-      border: '1px solid var(--sh-border)',
-      minHeight: 300,
-    }}>
-      {/* Textarea editor */}
-      <div style={{ position: 'relative' }}>
-        <div style={{
-          padding: '6px 12px', background: '#1e293b', color: '#94a3b8',
-          fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px',
-          borderBottom: '1px solid #334155',
-        }}>
-          Editor
-        </div>
-        <textarea
-          value={content}
-          onChange={onContentChange}
-          style={editorStyle}
-          spellCheck={!isHtml}
-          placeholder={isHtml ? 'HTML content…' : 'Write your content in markdown…'}
-        />
-      </div>
+  const editorSlot = (
+    <textarea
+      value={content}
+      onChange={onContentChange}
+      style={textareaStyle}
+      spellCheck={!isHtml}
+      placeholder={isHtml ? 'HTML content…' : 'Write your content in markdown…'}
+    />
+  )
 
-      {/* Preview */}
-      <div style={{ borderLeft: '1px solid var(--sh-border)' }}>
-        <div style={{
-          padding: '6px 12px', background: 'var(--sh-soft)', color: 'var(--sh-muted)',
-          fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px',
-          borderBottom: '1px solid var(--sh-border)',
-        }}>
-          Preview
-        </div>
-        {isHtml ? (
-          <iframe
-            title="html-preview"
-            sandbox="allow-same-origin"
-            srcDoc={content}
-            style={previewFrameStyle}
-          />
-        ) : (
-          <div style={{
-            padding: 16, fontSize: 13, lineHeight: 1.8,
-            color: 'var(--sh-text)', background: 'var(--sh-surface)',
-            minHeight: 400, overflowY: 'auto',
-            whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-          }}>
-            {content || <span style={{ color: 'var(--sh-muted)', fontStyle: 'italic' }}>Start typing to see a live preview…</span>}
-          </div>
-        )}
-      </div>
+  const previewSlot = isHtml ? (
+    <iframe
+      title="html-preview"
+      sandbox=""
+      srcDoc={content}
+      style={previewFrameStyle}
+    />
+  ) : (
+    <div style={{
+      padding: 16, fontSize: 13, lineHeight: 1.8,
+      color: 'var(--sh-text)', background: 'var(--sh-surface)',
+      flex: 1, minHeight: 320, overflowY: 'auto',
+      whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+    }}>
+      {content || <span style={{ color: 'var(--sh-muted)', fontStyle: 'italic' }}>Start typing to see a live preview…</span>}
     </div>
+  )
+
+  return (
+    <StackedEditorPane
+      editorLabel={isHtml ? 'HTML Editor' : 'Markdown Editor'}
+      previewLabel="Live Preview"
+      editorIcon={<IconUpload size={13} style={{ color: 'var(--sh-brand)' }} />}
+      previewIcon={<IconEye size={13} style={{ color: 'var(--sh-muted)' }} />}
+      editor={editorSlot}
+      preview={previewSlot}
+      storageKey={`sheetlab:editor-pane:${contentFormat}`}
+    />
   )
 }
