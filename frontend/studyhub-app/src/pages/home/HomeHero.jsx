@@ -69,17 +69,30 @@ export function HeroSection({ platformStats }) {
       <div className="home-hero-content animate-fadeUp">
         <div className="home-pill">
           <span className="home-pill-dot" aria-hidden="true" />
-          <span>Built by students · Free forever</span>
+          <span>For every learner · Free forever</span>
         </div>
 
         <h1 className="home-hero-title">
-          The GitHub of
-          <span className="home-hero-title-accent"> Studying</span>
+          Where Human Knowledge
+          <span className="home-hero-title-accent"> Lives On</span>
         </h1>
 
         <p className="home-hero-subtitle">
-          Fork study sheets, take practice tests, and collaborate with classmates.
-          Everything you need to ace your courses, all in one place.
+          StudyHub is a home for everything you have ever learned, taught, or wondered about.
+          Share your notes, your lessons, your life experience. Because knowledge does not belong
+          to a classroom, it belongs to everyone, and no one&apos;s story should be forgotten.
+        </p>
+
+        <p className="home-hero-quote" style={{
+          maxWidth: 560,
+          margin: '0 auto 28px',
+          fontSize: 15,
+          fontStyle: 'italic',
+          color: 'var(--sh-on-dark-faint)',
+          lineHeight: 1.7,
+        }}>
+          &ldquo;The only true wisdom is in knowing you know nothing.&rdquo;
+          <span style={{ display: 'block', fontSize: 12, marginTop: 6, opacity: 0.8 }}>Socrates</span>
         </p>
 
         <div className="home-hero-actions">

@@ -15,6 +15,7 @@ export const TABS = [
   ['settings', 'Admin Settings'],
   ['revenue', 'Revenue'],
   ['reviews', 'Reviews'],
+  ['group-reports', 'Group Reports'],
 ]
 
 export function authHeaders() {

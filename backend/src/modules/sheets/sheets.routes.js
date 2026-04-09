@@ -10,6 +10,7 @@ const contributionsController = require('./sheets.contributions.controller')
 const forkController = require('./sheets.fork.controller')
 const activityController = require('./sheets.activity.controller')
 const analyticsController = require('./sheets.analytics.controller')
+const contributorsController = require('./sheets.contributors.controller')
 
 const router = express.Router()
 
@@ -31,5 +32,6 @@ router.use(socialController)         // POST /:id/star, GET/POST /:id/comments, 
 router.use(forkController)           // POST /:id/fork
 router.use(activityController)       // GET /:id/activity
 router.use(analyticsController)      // GET /:id/analytics
+router.use(contributorsController)   // GET /:id/contributors, GET /:id/fork-tree
 
 module.exports = router

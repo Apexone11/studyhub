@@ -4,6 +4,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { IconEye, IconUpload, IconPen } from '../../../components/Icons'
+import StackedEditorPane from '../../../components/editor/StackedEditorPane'
 import { FONT, MiniPreview, tierColor, tierLabel } from './uploadSheetConstants'
 
 /* ── First-upload helper card ──────────────────────────────────────────── */
@@ -367,45 +368,64 @@ export function ErrorBanner({ error, verificationRequired }) {
   )
 }
 
-/* ── Editor split panel ───────────────────────────────────────────────── */
+/* ── Editor + preview stacked panel ────────────────────────────────────── */
 export function EditorPanel({ content, setContent, isHtmlMode, canEditHtml, setHasUnsavedChanges }) {
-  return (
-    <div style={{ background: 'var(--sh-surface)', borderRadius: 14, border: '1px solid var(--sh-border)', overflow: 'hidden' }}>
-      <div className="upload-editor-split" style={{ borderBottom: '1px solid var(--sh-border)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 16px', borderRight: '1px solid var(--sh-border)' }}>
-          <IconUpload size={13} style={{ color: 'var(--sh-brand)' }} />
-          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--sh-brand)' }}>{isHtmlMode ? 'HTML Working Editor' : 'Markdown Editor'}</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 16px' }}>
-          <IconEye size={13} style={{ color: 'var(--sh-muted)' }} />
-          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--sh-muted)' }}>Live Preview</span>
-        </div>
-      </div>
+  const editorDisabled = isHtmlMode && !canEditHtml
 
-      <div className="upload-editor-split" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', minHeight: 420 }}>
-        <div style={{ borderRight: '1px solid #1e293b', background: '#0f172a' }}>
-          <textarea
-            value={content}
-            onChange={(event) => { setContent(event.target.value); setHasUnsavedChanges(true) }}
-            spellCheck={!isHtmlMode}
-            disabled={isHtmlMode && !canEditHtml}
-            placeholder={isHtmlMode && !canEditHtml ? 'Import HTML file to unlock editor...' : 'Start writing...'}
-            style={{ width: '100%', height: '100%', minHeight: 420, background: 'transparent', border: 'none', outline: 'none', resize: 'none', padding: '16px 18px', fontFamily: "'JetBrains Mono','Fira Code',monospace", fontSize: 12.5, lineHeight: 1.9, color: 'var(--sh-border)', boxSizing: 'border-box', opacity: isHtmlMode && !canEditHtml ? 0.6 : 1 }}
-          />
-        </div>
-        <div style={{ padding: '16px 20px', overflowY: 'auto', maxHeight: 600, background: 'var(--sh-surface)' }}>
-          {isHtmlMode ? (
-            <iframe
-              title="html-inline-preview"
-              sandbox="allow-forms allow-modals allow-pointer-lock allow-popups allow-scripts"
-              srcDoc={content}
-              style={{ width: '100%', minHeight: 520, border: '1px solid var(--sh-border)', borderRadius: 10, background: '#fff' }}
-            />
-          ) : (
-            <MiniPreview md={content} />
-          )}
-        </div>
-      </div>
+  const editorSlot = (
+    <div style={{ flex: 1, background: '#0f172a', minHeight: 320, display: 'flex' }}>
+      <textarea
+        value={content}
+        onChange={(event) => { setContent(event.target.value); setHasUnsavedChanges(true) }}
+        spellCheck={!isHtmlMode}
+        disabled={editorDisabled}
+        placeholder={editorDisabled ? 'Import HTML file to unlock editor...' : 'Start writing...'}
+        style={{
+          width: '100%',
+          flex: 1,
+          minHeight: 320,
+          background: 'transparent',
+          border: 'none',
+          outline: 'none',
+          resize: 'none',
+          padding: '16px 18px',
+          fontFamily: "'JetBrains Mono','Fira Code',monospace",
+          fontSize: 12.5,
+          lineHeight: 1.9,
+          color: '#e2e8f0',
+          boxSizing: 'border-box',
+          opacity: editorDisabled ? 0.6 : 1,
+        }}
+      />
     </div>
+  )
+
+  const previewSlot = (
+    <div style={{ flex: 1, minHeight: 320, padding: '16px 20px', overflowY: 'auto', background: 'var(--sh-surface)' }}>
+      {isHtmlMode ? (
+        <iframe
+          title="html-inline-preview"
+          /* Strict sandbox for untrusted HTML — matches the Phase 3 plan. No
+             same-origin, no scripts, no forms. Preview still renders HTML/CSS. */
+          sandbox=""
+          srcDoc={content}
+          style={{ width: '100%', minHeight: 520, border: '1px solid var(--sh-border)', borderRadius: 10, background: '#fff' }}
+        />
+      ) : (
+        <MiniPreview md={content} />
+      )}
+    </div>
+  )
+
+  return (
+    <StackedEditorPane
+      editorLabel={isHtmlMode ? 'HTML Working Editor' : 'Markdown Editor'}
+      previewLabel="Live Preview"
+      editorIcon={<IconUpload size={13} style={{ color: 'var(--sh-brand)' }} />}
+      previewIcon={<IconEye size={13} style={{ color: 'var(--sh-muted)' }} />}
+      editor={editorSlot}
+      preview={previewSlot}
+      storageKey={`upload:editor-pane:${isHtmlMode ? 'html' : 'markdown'}`}
+    />
   )
 }

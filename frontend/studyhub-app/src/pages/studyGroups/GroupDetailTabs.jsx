@@ -172,6 +172,7 @@ export function GroupDetailTabs({
             onRemoveMember={onRemoveMember}
             onInvite={onInvite}
             isAdmin={isAdmin}
+            isAdminOrMod={isAdminOrMod}
             currentUserId={currentUserId}
           />
         </ComponentErrorBoundary>

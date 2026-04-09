@@ -20,6 +20,7 @@ import { SheetPreviewBar } from './AiSheetPreview'
 import { extractHtmlFromMessage } from './aiSheetPreviewHelpers'
 import { useSharedAiChat } from '../../lib/aiChatContext'
 import { useAiContext } from '../../lib/useAiContext'
+import { useChatPanel } from '../../lib/chatPanelContext.js'
 import { PAGE_FONT } from '../../pages/shared/pageUtils'
 
 /* ── Isolated error boundary for the bubble ───────────────────────────────
@@ -71,6 +72,7 @@ function AiBubbleInner() {
   const location = useLocation()
   const chat = useSharedAiChat()
   const contextChips = useAiContext()
+  const { isOpen: chatPanelOpen } = useChatPanel()
   const inputRef = useRef(null)
   const messagesEndRef = useRef(null)
   const [input, setInput] = useState('')
@@ -91,10 +93,13 @@ function AiBubbleInner() {
   }, [chat.messages, chat.streamingText, isOpen])
 
   // Don't show bubble on the /ai page itself or on auth pages.
-  const hiddenPaths = ['/ai', '/login', '/register', '/forgot-password', '/reset-password']
+  const hiddenPaths = ['/ai', '/login', '/register', '/forgot-password', '/reset-password', '/messages']
   if (hiddenPaths.some((p) => location.pathname.startsWith(p))) return null
   // Hide on reader page (full-screen, has its own AI button)
   if (location.pathname.match(/^\/library\/\d+\/read/)) return null
+  // Hide while the slide-out Messages chat panel is open so the two widgets
+  // don't stack in the bottom-right corner.
+  if (chatPanelOpen) return null
 
   const toggle = () => {
     setIsOpen((prev) => !prev)

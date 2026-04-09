@@ -84,15 +84,28 @@ export default function AboutPage() {
       {/* ── HERO ─────────────────────────────────────── */}
       <section style={s.hero}>
         <div style={s.heroInner}>
-          <div style={s.heroBadge}>Open Source · Student Built · Community Driven</div>
+          <div style={s.heroBadge}>For Every Learner · Open Source · Community Driven</div>
           <h1 style={s.heroH1}>
-            Built by Students,
+            Knowledge Belongs
             <br />
-            for Students
+            to Everyone
           </h1>
           <p style={s.heroSub}>
-            StudyHub is a collaborative study platform where you can create, share, and build on
-            each other&apos;s notes — GitHub-style, but for studying.
+            StudyHub is a home for every idea, every lesson, and every story worth remembering.
+            A place where the notes of a freshman, the wisdom of a grandparent, and the craft of
+            a retired teacher can sit side by side, because learning never graduates, and no
+            one&apos;s knowledge should be lost to time.
+          </p>
+          <p style={{
+            fontSize: 15,
+            fontStyle: 'italic',
+            color: 'var(--sh-on-dark-faint)',
+            maxWidth: 560,
+            margin: '0 auto 32px',
+            lineHeight: 1.75,
+          }}>
+            &ldquo;Live as if you were to die tomorrow. Learn as if you were to live forever.&rdquo;
+            <span style={{ display: 'block', fontSize: 12, marginTop: 6, opacity: 0.85 }}>Mahatma Gandhi</span>
           </p>
           <div style={s.heroCtas}>
             <Link to="/register" style={s.ctaPrimary}>
@@ -112,18 +125,28 @@ export default function AboutPage() {
           <div className="about-story-grid">
             <div style={s.storyText}>
               <p style={s.p}>
-                Every semester, students at the University of Maryland scramble to find good study
-                materials. Notes get lost in Discord servers, Google Drive folders no one can find,
-                and group chats that die after finals.
+                It began with a simple frustration. Every semester, students scrambled to find good
+                study materials. Notes vanished into Discord servers, Google Drive folders no one
+                could find, and group chats that went quiet the day after finals.
               </p>
               <p style={s.p}>
-                We wanted something better — a place where study materials are{' '}
-                <strong>organized by course</strong>, easy to discover, and built collaboratively.
-                The same way developers share and improve code on GitHub, students should be able to
-                share and improve notes.
+                But somewhere along the way, we realized the problem was bigger than a missing PDF.
+                People carry so much inside them, lessons from their classes, lessons from their
+                jobs, lessons from raising children, from losing people they loved, from mistakes
+                they hope no one else has to make. And most of it disappears. Quietly. Without
+                anyone noticing that a whole world of knowledge just walked out of the room.
               </p>
               <p style={s.p}>
-                That&apos;s StudyHub Version 1. Start at Maryland. Scale to every campus.
+                So we built StudyHub to be a place where that does not have to happen. A place
+                where your notes are <strong>organized and easy to find</strong>, where your ideas
+                can be forked and improved by strangers who become friends, and where what you
+                know matters, whether you are studying for midterms, passing down a recipe, or
+                writing down the things your father taught you before they fade.
+              </p>
+              <p style={s.p}>
+                You do not need a diploma to teach here. You do not need to be young to learn here.
+                Life itself is the oldest classroom there is, and every single person walking
+                around on this earth is, quietly, a student of it.
               </p>
             </div>
             <div style={s.storyStats}>
@@ -165,6 +188,76 @@ export default function AboutPage() {
               desc="We collect only what we need. Your data stays yours."
             />
           </div>
+        </div>
+      </section>
+
+      {/* ── FOR EVERYONE ────────────────────────────── */}
+      <section style={s.section}>
+        <div style={s.sectionInner}>
+          <h2 style={s.sectionH2}>This Is for Everyone</h2>
+          <p style={{ ...s.p, textAlign: 'center', maxWidth: 720, margin: '0 auto 40px' }}>
+            StudyHub is not only for students in a lecture hall. It is for the eighty year old
+            who remembers how things used to be made, the single parent studying at 2am after
+            the kids are asleep, the mechanic who can fix anything but was told they were not
+            smart, the retired nurse whose hands have held more lives than any textbook, and
+            the kid in a small town with nothing but a library card and a dream. It is for
+            every color, every age, every gender, every income, every faith. If you have ever
+            learned something the world would be poorer without, this place was built for you.
+          </p>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+            gap: 20,
+            marginTop: 16,
+          }}>
+            {[
+              { q: 'Wherever you go, go with all your heart.', a: 'Confucius' },
+              { q: 'An investment in knowledge pays the best interest.', a: 'Benjamin Franklin' },
+              { q: 'The beautiful thing about learning is that nobody can take it away from you.', a: 'B.B. King' },
+              { q: 'We do not learn from experience. We learn from reflecting on experience.', a: 'John Dewey' },
+              { q: 'Tell me and I forget. Teach me and I remember. Involve me and I learn.', a: 'Benjamin Franklin' },
+              { q: 'The mind is not a vessel to be filled, but a fire to be kindled.', a: 'Plutarch' },
+            ].map((item, i) => (
+              <figure key={i} style={{
+                background: 'var(--sh-soft)',
+                border: '1px solid var(--sh-border)',
+                borderRadius: 14,
+                padding: '24px 22px',
+                margin: 0,
+              }}>
+                <blockquote style={{
+                  margin: 0,
+                  fontSize: 15,
+                  fontStyle: 'italic',
+                  color: 'var(--sh-text)',
+                  lineHeight: 1.7,
+                }}>
+                  &ldquo;{item.q}&rdquo;
+                </blockquote>
+                <figcaption style={{
+                  marginTop: 12,
+                  fontSize: 13,
+                  fontWeight: 'bold',
+                  color: 'var(--sh-brand)',
+                }}>
+                  {item.a}
+                </figcaption>
+              </figure>
+            ))}
+          </div>
+
+          <p style={{
+            ...s.p,
+            textAlign: 'center',
+            maxWidth: 680,
+            margin: '40px auto 0',
+            fontSize: 15,
+          }}>
+            School is one classroom. Life is another. Both deserve a place to keep what they
+            teach us, so the next person who needs it can find it waiting, written down with
+            care, by someone who was once exactly where they are now.
+          </p>
         </div>
       </section>
 

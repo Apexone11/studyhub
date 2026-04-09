@@ -10,12 +10,109 @@
 /* ──────────────────────────────────────────────────────────────── */
 
 .library-hero {
-  background: linear-gradient(135deg, var(--sh-brand), var(--sh-brand-accent));
+  /*
+   * Layered background: the brand gradient sits on top of Winslow Homer's
+   * "Girl Reading Under an Oak Tree" (1879, public domain). The gradient
+   * uses color-mix with transparent so the painting shows through while
+   * the existing white title/subtitle/search stay WCAG-AA legible.
+   *
+   * Raw rgba/hex in the attribution block below are an intentional
+   * "image overlay text" exception to the CSS token rule (same category
+   * as the dark-mode-always editor panels exception in CLAUDE.md) —
+   * white text on a darkened image must not depend on theme tokens.
+   */
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--sh-brand) 52%, transparent),
+      color-mix(in srgb, var(--sh-brand-accent) 42%, transparent)
+    ),
+    url('/art/winslow-homer-girl-reading-under-an-oak-tree.jpg') center 30% / cover no-repeat;
+  background-color: var(--sh-brand);
   padding: clamp(3rem, 5vw, 6rem) var(--page-gutter);
   text-align: center;
   color: white;
   position: relative;
   overflow: hidden;
+  /* Scroll-reveal: hero grows taller when user scrolls to top, controlled by JS */
+  transition: padding 0.4s ease, background-position 0.4s ease;
+}
+
+/*
+ * Dark mode: the global index.css rule [data-theme='dark'] section { background: var(--sh-surface) !important }
+ * stomps on the hero image. We need !important here to fight back. The gradient is slightly
+ * stronger than light mode (62%/52%) but much lighter than before (was 78%/68%) so the
+ * painting is clearly visible in both themes.
+ */
+[data-theme='dark'] .library-hero {
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--sh-brand) 62%, transparent),
+      color-mix(in srgb, var(--sh-brand-accent) 52%, transparent)
+    ),
+    url('/art/winslow-homer-girl-reading-under-an-oak-tree.jpg') center 30% / cover no-repeat !important;
+  background-color: var(--sh-brand) !important;
+}
+
+/* When the hero is in "art reveal" mode (user scrolled to top), fade gradient
+ * almost entirely and expand the hero to show the full painting. */
+.library-hero--art-reveal {
+  padding-top: clamp(5rem, 10vw, 12rem) !important;
+  padding-bottom: clamp(5rem, 10vw, 12rem) !important;
+}
+
+.library-hero--art-reveal::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--sh-brand) 22%, transparent),
+      color-mix(in srgb, var(--sh-brand-accent) 15%, transparent)
+    );
+  z-index: 1;
+  transition: opacity 0.5s ease;
+}
+
+[data-theme='dark'] .library-hero--art-reveal::before {
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--sh-brand) 30%, transparent),
+      color-mix(in srgb, var(--sh-brand-accent) 22%, transparent)
+    );
+}
+
+.library-hero__attribution {
+  position: absolute;
+  right: 16px;
+  bottom: 10px;
+  z-index: 2;
+  font-size: 11px;
+  line-height: 1.35;
+  /* Intentional raw rgba — see exception note on .library-hero */
+  color: rgba(255, 255, 255, 0.85);
+  text-align: right;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+  max-width: 60%;
+}
+
+.library-hero__attribution strong {
+  display: block;
+  font-weight: 700;
+  color: #fff;
+}
+
+@media (max-width: 640px) {
+  .library-hero__attribution {
+    position: static;
+    margin-top: 16px;
+    text-align: center;
+    max-width: none;
+  }
 }
 
 .library-hero__watermark {
@@ -43,7 +140,7 @@
   max-width: 680px;
   margin: 0 auto;
   position: relative;
-  z-index: 1;
+  z-index: 2;
 }
 
 .library-hero__badge {

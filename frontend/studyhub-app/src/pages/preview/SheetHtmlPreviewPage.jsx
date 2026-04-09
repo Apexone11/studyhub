@@ -29,6 +29,27 @@ export default function SheetHtmlPreviewPage() {
   const [runtimeUrl, setRuntimeUrl] = useState('')
   const [runtimeLoading, setRuntimeLoading] = useState(false)
 
+  // Escape key exits fullscreen. Only bound while fullscreen is active so
+  // the handler does not fight with modals or dropdowns on the normal view.
+  // Also locks body scroll while fullscreen is active so the background
+  // does not scroll behind the overlay.
+  useEffect(() => {
+    if (!isFullscreen) return undefined
+    const handleKey = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setIsFullscreen(false)
+      }
+    }
+    window.addEventListener('keydown', handleKey)
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      window.removeEventListener('keydown', handleKey)
+      document.body.style.overflow = previousOverflow
+    }
+  }, [isFullscreen])
+
   const loadPreview = useCallback(async () => {
     if (!Number.isInteger(sheetId)) {
       setState({ loading: false, error: 'Invalid sheet id.', preview: null })
@@ -277,17 +298,58 @@ export default function SheetHtmlPreviewPage() {
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
+                      gap: 12,
                       color: 'var(--sh-nav-text)',
                     }}
                   >
                     <div style={{ fontWeight: 800 }}>HTML Preview</div>
-                    <button
-                      type="button"
-                      onClick={() => setIsFullscreen(false)}
-                      style={{ ...buttonStyle(), borderColor: 'var(--sh-slate-700)' }}
-                    >
-                      Exit fullscreen
-                    </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span
+                        aria-hidden="true"
+                        style={{
+                          fontSize: 11,
+                          color: 'var(--sh-slate-400, #94a3b8)',
+                          fontWeight: 600,
+                        }}
+                      >
+                        Press <kbd
+                          style={{
+                            padding: '1px 6px',
+                            borderRadius: 4,
+                            background: 'var(--sh-slate-800, #1e293b)',
+                            border: '1px solid var(--sh-slate-700, #334155)',
+                            fontFamily: "'JetBrains Mono', monospace",
+                            fontSize: 10,
+                            color: 'var(--sh-slate-200, #e2e8f0)',
+                          }}
+                        >Esc</kbd> to exit
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setIsFullscreen(false)}
+                        aria-label="Exit fullscreen preview"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          padding: '8px 14px',
+                          borderRadius: 8,
+                          border: '1px solid var(--sh-slate-600, #475569)',
+                          background: 'var(--sh-slate-800, #1e293b)',
+                          color: 'var(--sh-slate-100, #f1f5f9)',
+                          fontSize: 12,
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          fontFamily: 'inherit',
+                        }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <line x1="18" y1="6" x2="6" y2="18" />
+                          <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                        Exit fullscreen
+                      </button>
+                    </div>
                   </div>
                 ) : null}
 

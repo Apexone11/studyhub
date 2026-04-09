@@ -4,6 +4,7 @@ const { captureError } = require('../../core/monitoring/sentry')
 const requireAuth = require('../../core/auth/requireAuth')
 const requireVerifiedEmail = require('../../core/auth/requireVerifiedEmail')
 const { sendForbidden } = require('../../lib/accessControl')
+const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const { createNotification } = require('../../lib/notify')
 const { validateHtmlForSubmission } = require('../../lib/html/htmlSecurity')
 const { cleanupAttachmentIfUnused } = require('../../lib/storage')
@@ -301,6 +302,196 @@ router.get('/contributions/:contributionId/diff', requireAuth, diffLimiter, asyn
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── Hunk-level review comments ─────────────────────────────────────────────
+//
+// Backing table: ContributionComment (migration 20260408000001). Only the
+// proposer, target-sheet owner, and admins can read or write comments for a
+// given contribution. Non-participants receive 404 to avoid leaking existence.
+
+const MAX_COMMENT_BODY = 1000
+
+function loadCommentContext(contributionId) {
+  return prisma.sheetContribution.findUnique({
+    where: { id: contributionId },
+    select: {
+      id: true,
+      proposerId: true,
+      targetSheetId: true,
+      targetSheet: { select: { id: true, userId: true, title: true } },
+    },
+  })
+}
+
+function canAccessContribution(contribution, user) {
+  if (!user) return false
+  if (user.role === 'admin') return true
+  if (user.userId === contribution.proposerId) return true
+  if (user.userId === contribution.targetSheet.userId) return true
+  return false
+}
+
+function serializeComment(comment) {
+  return {
+    id: comment.id,
+    contributionId: comment.contributionId,
+    hunkIndex: comment.hunkIndex,
+    lineOffset: comment.lineOffset,
+    side: comment.side,
+    body: comment.body,
+    createdAt: comment.createdAt,
+    updatedAt: comment.updatedAt,
+    author: comment.author || null,
+  }
+}
+
+router.get('/contributions/:contributionId/comments', requireAuth, async (req, res) => {
+  const contributionId = Number.parseInt(req.params.contributionId, 10)
+  if (!Number.isInteger(contributionId)) {
+    return sendError(res, 400, 'Invalid contribution id.', ERROR_CODES.BAD_REQUEST)
+  }
+
+  try {
+    const contribution = await loadCommentContext(contributionId)
+    if (!contribution) {
+      return sendError(res, 404, 'Contribution not found.', ERROR_CODES.NOT_FOUND)
+    }
+    if (!canAccessContribution(contribution, req.user)) {
+      // 404 (not 403) so non-participants cannot probe for contribution ids.
+      return sendError(res, 404, 'Contribution not found.', ERROR_CODES.NOT_FOUND)
+    }
+
+    const comments = await prisma.contributionComment.findMany({
+      where: { contributionId },
+      include: { author: { select: AUTHOR_SELECT } },
+      orderBy: [
+        { hunkIndex: 'asc' },
+        { lineOffset: 'asc' },
+        { createdAt: 'asc' },
+      ],
+    })
+
+    return res.json({ comments: comments.map(serializeComment) })
+  } catch (error) {
+    captureError(error, { route: req.originalUrl, method: req.method })
+    return sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
+  }
+})
+
+router.post(
+  '/contributions/:contributionId/comments',
+  requireAuth,
+  requireVerifiedEmail,
+  contributionReviewLimiter,
+  async (req, res) => {
+    const contributionId = Number.parseInt(req.params.contributionId, 10)
+    if (!Number.isInteger(contributionId)) {
+      return sendError(res, 400, 'Invalid contribution id.', ERROR_CODES.BAD_REQUEST)
+    }
+
+    const hunkIndex = Number.parseInt(req.body?.hunkIndex, 10)
+    const lineOffset = Number.parseInt(req.body?.lineOffset, 10)
+    const side = typeof req.body?.side === 'string' ? req.body.side.trim().toLowerCase() : 'new'
+    const body = sanitizeText(typeof req.body?.body === 'string' ? req.body.body.slice(0, MAX_COMMENT_BODY) : '')
+
+    if (!Number.isInteger(hunkIndex) || hunkIndex < 0) {
+      return sendError(res, 400, 'hunkIndex must be a non-negative integer.', ERROR_CODES.VALIDATION)
+    }
+    if (!Number.isInteger(lineOffset) || lineOffset < 0) {
+      return sendError(res, 400, 'lineOffset must be a non-negative integer.', ERROR_CODES.VALIDATION)
+    }
+    if (!['old', 'new'].includes(side)) {
+      return sendError(res, 400, 'side must be "old" or "new".', ERROR_CODES.VALIDATION)
+    }
+    if (!body) {
+      return sendError(res, 400, 'Comment body is required.', ERROR_CODES.VALIDATION)
+    }
+
+    try {
+      const contribution = await loadCommentContext(contributionId)
+      if (!contribution) {
+        return sendError(res, 404, 'Contribution not found.', ERROR_CODES.NOT_FOUND)
+      }
+      if (!canAccessContribution(contribution, req.user)) {
+        return sendError(res, 404, 'Contribution not found.', ERROR_CODES.NOT_FOUND)
+      }
+
+      const created = await prisma.contributionComment.create({
+        data: {
+          contributionId,
+          userId: req.user.userId,
+          hunkIndex,
+          lineOffset,
+          side,
+          body,
+        },
+        include: { author: { select: AUTHOR_SELECT } },
+      })
+
+      // Notify the other party (proposer <-> target owner). Admins acting as
+      // neither do not trigger a notification.
+      const ownerId = contribution.targetSheet.userId
+      const proposerId = contribution.proposerId
+      let recipientId = null
+      if (req.user.userId === proposerId) recipientId = ownerId
+      else if (req.user.userId === ownerId) recipientId = proposerId
+
+      if (recipientId && recipientId !== req.user.userId) {
+        await createNotification(prisma, {
+          userId: recipientId,
+          type: 'contribution_comment',
+          message: `${req.user.username} commented on the contribution for "${contribution.targetSheet.title}".`,
+          actorId: req.user.userId,
+          sheetId: contribution.targetSheet.id,
+          linkPath: `/sheets/${contribution.targetSheet.id}?tab=reviews`,
+        }).catch((notifyError) => {
+          captureError(notifyError, {
+            route: req.originalUrl,
+            method: req.method,
+            contributionId,
+          })
+        })
+      }
+
+      trackActivity(prisma, req.user.userId, 'contribution_comment')
+
+      return res.status(201).json({ comment: serializeComment(created) })
+    } catch (error) {
+      captureError(error, { route: req.originalUrl, method: req.method })
+      return sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
+    }
+  },
+)
+
+router.delete('/contributions/:contributionId/comments/:commentId', requireAuth, async (req, res) => {
+  const contributionId = Number.parseInt(req.params.contributionId, 10)
+  const commentId = Number.parseInt(req.params.commentId, 10)
+  if (!Number.isInteger(contributionId) || !Number.isInteger(commentId)) {
+    return sendError(res, 400, 'Invalid id.', ERROR_CODES.BAD_REQUEST)
+  }
+
+  try {
+    const comment = await prisma.contributionComment.findUnique({
+      where: { id: commentId },
+      select: { id: true, userId: true, contributionId: true },
+    })
+    if (!comment || comment.contributionId !== contributionId) {
+      return sendError(res, 404, 'Comment not found.', ERROR_CODES.NOT_FOUND)
+    }
+
+    const isAuthor = req.user.userId === comment.userId
+    const isAdmin = req.user.role === 'admin'
+    if (!isAuthor && !isAdmin) {
+      return sendError(res, 404, 'Comment not found.', ERROR_CODES.NOT_FOUND)
+    }
+
+    await prisma.contributionComment.delete({ where: { id: commentId } })
+    return res.json({ message: 'Comment deleted.' })
+  } catch (error) {
+    captureError(error, { route: req.originalUrl, method: req.method })
+    return sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 })
 

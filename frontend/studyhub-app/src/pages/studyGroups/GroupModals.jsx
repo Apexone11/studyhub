@@ -79,7 +79,7 @@ function GroupImageField({ name, groupImage }) {
 
   return (
     <div style={styles.formGroup}>
-      <label style={styles.label}>Group Image</label>
+      <label style={styles.label}>Group Avatar</label>
       <div style={styles.imageField}>
         <div style={styles.imagePreviewFrame}>
           {previewUrl ? (
@@ -114,8 +114,11 @@ function GroupImageField({ name, groupImage }) {
           </div>
 
           <p style={styles.helperText}>
-            This image appears on the study group directory and the group detail page.
-            Use a square or landscape image for the cleanest crop.
+            Square badge image — shows next to your group name on the directory
+            card and in the header. Square or near-square crops work best.
+            To change the banner behind the group header, use
+            <strong> Change background </strong>
+            on the group page.
           </p>
 
           <input

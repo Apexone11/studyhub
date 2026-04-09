@@ -476,6 +476,56 @@ const searchLimiter = rateLimit({
 // ── CATEGORY: Upload Module ───────────────────────────────────────────────
 
 /**
+ * Group media uploads — 10 requests per minute per IP.
+ * Per-user weekly quota is enforced separately by the media service.
+ */
+const groupMediaUploadLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many uploads. Please wait a moment.' },
+})
+
+/**
+ * Group reports — cheap enough to allow ~20/hour per IP but aggressive
+ * enough to stop drive-by brigading. The per-user "one report per
+ * group" rule lives in the DB unique index, not here.
+ */
+const groupReportLimiter = rateLimit({
+  windowMs: WINDOW_1_HOUR,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many reports. Please wait before filing another.' },
+})
+
+/**
+ * Group appeals — one per group, but we still IP-limit to stop
+ * scripted appeal spam.
+ */
+const groupAppealLimiter = rateLimit({
+  windowMs: WINDOW_1_HOUR,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many appeals. Please wait.' },
+})
+
+/**
+ * Group join requests — stop drive-by brigading by capping to 30/hour
+ * per IP. A single user who joins their own 30 public groups in an
+ * hour would hit this, which is acceptable.
+ */
+const groupJoinLimiter = rateLimit({
+  windowMs: WINDOW_1_HOUR,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many join requests. Please slow down.' },
+})
+
+/**
  * Avatar uploads — 20 requests per 15 minutes per IP.
  */
 const uploadAvatarLimiter = rateLimit({
@@ -781,6 +831,10 @@ module.exports = {
   searchLimiter,
 
   // Upload module
+  groupMediaUploadLimiter,
+  groupReportLimiter,
+  groupAppealLimiter,
+  groupJoinLimiter,
   uploadAvatarLimiter,
   uploadAttachmentLimiter,
   uploadCoverLimiter,

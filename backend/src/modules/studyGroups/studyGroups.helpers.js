@@ -39,6 +39,42 @@ async function isGroupAdminOrMod(groupId, userId) {
 }
 
 /**
+ * Phase 5: check if a member is currently muted. Returns true/false.
+ * A mute is active when `mutedUntil` is non-null and in the future.
+ * Graceful degradation: returns false on any error.
+ */
+async function isMutedInGroup(groupId, userId) {
+  if (!groupId || !userId) return false
+  try {
+    const member = await prisma.studyGroupMember.findUnique({
+      where: { groupId_userId: { groupId, userId } },
+      select: { mutedUntil: true, mutedReason: true },
+    })
+    if (!member || !member.mutedUntil) return false
+    return new Date(member.mutedUntil) > new Date()
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Phase 5: check if a user is blocked from a group. Returns the block
+ * row on hit, null on miss. Graceful-degradation: returns null on any
+ * DB error so a missing table never 500s the request.
+ */
+async function isBlockedFromGroup(groupId, userId) {
+  if (!groupId || !userId) return null
+  try {
+    return await prisma.groupBlock.findUnique({
+      where: { groupId_userId: { groupId, userId } },
+      select: { id: true, reason: true, createdAt: true },
+    })
+  } catch {
+    return null
+  }
+}
+
+/**
  * Strip HTML tags from user content.
  * Uses sanitize-html to strip all tags reliably (regex is bypassable).
  */
@@ -177,6 +213,9 @@ async function formatGroup(group, currentUserId = null) {
     name: group.name,
     description: group.description,
     avatarUrl: group.avatarUrl,
+    // Phase 4 header banner
+    backgroundUrl: group.backgroundUrl ?? null,
+    backgroundCredit: group.backgroundCredit ?? null,
     courseId: group.courseId,
     courseName,
     courseCode,
@@ -203,6 +242,13 @@ async function formatGroup(group, currentUserId = null) {
       status: userMembership.status,
       joinedAt: userMembership.joinedAt,
     } : null,
+    // Phase 5 trust & safety surface
+    moderationStatus: group.moderationStatus ?? 'active',
+    warnedUntil: group.warnedUntil ?? null,
+    lockedAt: group.lockedAt ?? null,
+    deletedAt: group.deletedAt ?? null,
+    memberListPrivate: group.memberListPrivate ?? false,
+    requirePostApproval: group.requirePostApproval ?? false,
   }
 }
 
@@ -211,6 +257,8 @@ module.exports = {
   requireGroupMember,
   isGroupAdmin,
   isGroupAdminOrMod,
+  isBlockedFromGroup,
+  isMutedInGroup,
   stripHtmlTags,
   validateGroupName,
   validateDescription,

@@ -68,6 +68,13 @@ export function useStudyGroupsData() {
     inviteMember: members.inviteMember,
     updateMember: members.updateMember,
     removeMember: members.removeMember,
+    blockMember: members.blockMember,
+    unblockMember: members.unblockMember,
+    muteMember: members.muteMember,
+    unmuteMember: members.unmuteMember,
+    blockedUsers: members.blockedUsers,
+    blockedLoading: members.blockedLoading,
+    loadBlockedUsers: members.loadBlockedUsers,
 
     // Resources
     resources: resources.resources,

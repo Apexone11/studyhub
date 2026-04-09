@@ -15,7 +15,8 @@ const prisma = require('../../lib/prisma')
 const { captureError } = require('../../monitoring/sentry')
 const optionalAuth = require('../../core/auth/optionalAuth')
 const { getBlockedUserIds } = require('../../lib/social/blockFilter')
-const { cache } = require('../../lib/cache')
+const { cached: redisCached } = require('../../lib/redis')
+const { cacheControl } = require('../../lib/cacheControl')
 const { feedDiscoveryLimiter } = require('../../lib/rateLimiters')
 const {
   DURATION_24H_MS,
@@ -44,16 +45,14 @@ function isMissingTableError(error) {
  * Returns up to 20 results.
  * Cached for 5 minutes per period.
  */
-router.get('/trending', discoveryLimiter, optionalAuth, async (req, res) => {
+router.get('/trending', discoveryLimiter, optionalAuth, cacheControl(120, { public: true, staleWhileRevalidate: 300 }), async (req, res) => {
   try {
     const limit = Math.min(Number.parseInt(req.query.limit, 10) || 20, 50)
     const period = req.query.period || '7d'
 
-    const cacheKey = `trending:${period}`
-    const cached = cache.get(cacheKey)
-    if (cached) {
-      return res.json(cached)
-    }
+    // Phase 6: upgraded to Redis cache 5min per period+limit
+    const cacheKey = `feed:trending:${period}:${limit}`
+    const redisCachedResult = await redisCached(cacheKey, async () => {
 
     // Determine date range
     let since
@@ -116,8 +115,10 @@ router.get('/trending', discoveryLimiter, optionalAuth, async (req, res) => {
       forkCount: sheet._count?.forkChildren || 0,
     }))
 
-    cache.set(cacheKey, result, 5 * 60 * 1000)
-    res.json(result)
+    return result
+    }, 300) // 5 min TTL
+
+    res.json(redisCachedResult)
   } catch (err) {
     captureError(err, { route: req.originalUrl })
     res.status(500).json({ error: 'Server error.' })
@@ -221,11 +222,9 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
     }
 
     const userId = req.user.userId
-    const cacheKey = `for-you:${userId}`
-    const cached = cache.get(cacheKey)
-    if (cached) {
-      return res.json(cached)
-    }
+    // Phase 6: upgraded to Redis cache 2min per user
+    const forYouCacheKey = `feed:for-you:${userId}`
+    const forYouResult = await redisCached(forYouCacheKey, async () => {
 
     // Get user's enrolled courses
     const enrollments = await prisma.enrollment.findMany({
@@ -489,8 +488,10 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
     results.people = classmatesRanked
     results.trending = scoredTrending
 
-    cache.set(cacheKey, results, 2 * 60 * 1000)
-    res.json(results)
+    return results
+    }, 120) // 2 min TTL
+
+    res.json(forYouResult)
   } catch (err) {
     captureError(err, { route: req.originalUrl })
     res.status(500).json({ error: 'Could not load personalized content. Please try again.' })
@@ -595,7 +596,7 @@ router.get('/recommended-groups', discoveryLimiter, optionalAuth, async (req, re
  *
  * Returns the top sheets for a specific course, ranked by stars and recency.
  */
-router.get('/courses/:courseId/discover', discoveryLimiter, optionalAuth, async (req, res) => {
+router.get('/courses/:courseId/discover', discoveryLimiter, optionalAuth, cacheControl(300, { public: true, staleWhileRevalidate: 600 }), async (req, res) => {
   const courseId = Number.parseInt(req.params.courseId, 10)
   if (!Number.isFinite(courseId)) return res.status(400).json({ error: 'Invalid course ID.' })
 
@@ -612,6 +613,9 @@ router.get('/courses/:courseId/discover', discoveryLimiter, optionalAuth, async 
     if (!course) return res.status(404).json({ error: 'Course not found.' })
 
     const limit = Math.min(Number.parseInt(req.query.limit, 10) || 20, 50)
+
+    // Phase 6: Redis cache 10min per course+limit
+    const discoverResult = await redisCached(`feed:course-discover:${courseId}:${limit}`, async () => {
 
     const [sheets, totalSheets, topContributors] = await Promise.all([
       prisma.studySheet.findMany({
@@ -650,7 +654,7 @@ router.get('/courses/:courseId/discover', discoveryLimiter, optionalAuth, async 
         : []
     const contribMap = Object.fromEntries(contributors.map((u) => [u.id, u]))
 
-    res.json({
+    return {
       course,
       totalSheets,
       sheets: sheets.map((s) => ({
@@ -662,7 +666,10 @@ router.get('/courses/:courseId/discover', discoveryLimiter, optionalAuth, async 
         user: contribMap[tc.userId] || { id: tc.userId, username: 'Unknown' },
         sheetCount: tc._count,
       })),
-    })
+    }
+    }, 600) // 10 min TTL
+
+    res.json(discoverResult)
   } catch (err) {
     captureError(err, { route: req.originalUrl })
     res.status(500).json({ error: 'Server error.' })

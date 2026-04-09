@@ -2,6 +2,7 @@ const express = require('express')
 const requireAuth = require('../../middleware/auth')
 const { captureError } = require('../../monitoring/sentry')
 const { cacheControl } = require('../../lib/cacheControl')
+const { cached } = require('../../lib/redis')
 const prisma = require('../../lib/prisma')
 const { schoolsLimiter, POPULAR_COURSES_LIMIT } = require('./courses.constants')
 
@@ -10,7 +11,8 @@ const router = express.Router()
 // Public endpoint for school + course dropdowns.
 router.get('/schools', cacheControl(600, { public: true, staleWhileRevalidate: 1800 }), schoolsLimiter, async (req, res) => {
   try {
-    const schools = await prisma.school.findMany({
+    // Phase 6: Redis cache 1 hour -- schools barely change
+    const schools = await cached('schools:all', () => prisma.school.findMany({
       select: {
         id: true,
         name: true,
@@ -30,7 +32,7 @@ router.get('/schools', cacheControl(600, { public: true, staleWhileRevalidate: 1
         }
       },
       orderBy: { name: 'asc' }
-    })
+    }), 3600)
 
     return res.json(schools)
   } catch (error) {
@@ -47,46 +49,47 @@ router.get('/schools', cacheControl(600, { public: true, staleWhileRevalidate: 1
 // Public endpoint for popular courses ranked by published sheet count.
 router.get('/popular', cacheControl(300, { public: true, staleWhileRevalidate: 600 }), schoolsLimiter, async (req, res) => {
   try {
-    const grouped = await prisma.studySheet.groupBy({
-      by: ['courseId'],
-      where: { status: 'published', NOT: [{ courseId: null }] },
-      _count: { _all: true },
-      orderBy: { _count: { _all: 'desc' } },
-      take: POPULAR_COURSES_LIMIT,
-    })
-
-    const courseIds = grouped.map((row) => row.courseId)
-
-    if (courseIds.length === 0) {
-      return res.json([])
-    }
-
-    const courses = await prisma.course.findMany({
-      where: { id: { in: courseIds } },
-      select: {
-        id: true,
-        code: true,
-        name: true,
-        school: { select: { id: true, name: true, short: true } },
-      },
-    })
-
-    const countMap = new Map(grouped.map((row) => [row.courseId, row._count._all]))
-    const courseMap = new Map(courses.map((course) => [course.id, course]))
-
-    const result = courseIds
-      .map((id) => {
-        const course = courseMap.get(id)
-        if (!course) return null
-        return {
-          id: course.id,
-          code: course.code,
-          name: course.name,
-          school: course.school,
-          sheetCount: countMap.get(id) || 0,
-        }
+    // Phase 6: Redis cache 10 min -- popular courses change slowly
+    const result = await cached('courses:popular', async () => {
+      const grouped = await prisma.studySheet.groupBy({
+        by: ['courseId'],
+        where: { status: 'published', NOT: [{ courseId: null }] },
+        _count: { _all: true },
+        orderBy: { _count: { _all: 'desc' } },
+        take: POPULAR_COURSES_LIMIT,
       })
-      .filter(Boolean)
+
+      const courseIds = grouped.map((row) => row.courseId)
+
+      if (courseIds.length === 0) return []
+
+      const courses = await prisma.course.findMany({
+        where: { id: { in: courseIds } },
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          school: { select: { id: true, name: true, short: true } },
+        },
+      })
+
+      const countMap = new Map(grouped.map((row) => [row.courseId, row._count._all]))
+      const courseMap = new Map(courses.map((course) => [course.id, course]))
+
+      return courseIds
+        .map((id) => {
+          const course = courseMap.get(id)
+          if (!course) return null
+          return {
+            id: course.id,
+            code: course.code,
+            name: course.name,
+            school: course.school,
+            sheetCount: countMap.get(id) || 0,
+          }
+        })
+        .filter(Boolean)
+    }, 600)
 
     return res.json(result)
   } catch (error) {

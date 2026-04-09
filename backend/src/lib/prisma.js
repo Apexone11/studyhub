@@ -14,6 +14,7 @@
 
 const { PrismaClient } = require('@prisma/client')
 const { withEncryption } = require('./prismaEncryption')
+const { attachQueryLogger } = require('./queryLogger')
 
 const globalForPrisma = globalThis
 
@@ -25,7 +26,7 @@ function createPrismaClient() {
     log: isProduction
       ? [{ emit: 'event', level: 'error' }]
       : [
-          { emit: 'stdout', level: 'query' },
+          { emit: 'event', level: 'query' },
           { emit: 'stdout', level: 'warn' },
           { emit: 'event', level: 'error' },
         ],
@@ -44,6 +45,9 @@ function createPrismaClient() {
   client.$on('error', (e) => {
     console.error('[Prisma Error]', e.message)
   })
+
+  // Phase 6: attach slow query logger (dev only, filters queries > 200ms)
+  attachQueryLogger(client)
 
   return withEncryption(client)
 }

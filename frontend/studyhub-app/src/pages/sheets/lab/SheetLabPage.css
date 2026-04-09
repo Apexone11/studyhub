@@ -596,6 +596,122 @@
   color: var(--sh-muted, #64748b);
 }
 
+.sheet-lab__diff-line--selected {
+  box-shadow: inset 3px 0 0 0 var(--sh-brand-accent, #6366f1);
+  background: var(--sh-info-bg, #eef2ff);
+}
+
+.sheet-lab__diff-line[role='button']:hover {
+  filter: brightness(0.97);
+}
+
+/* ── Contribution comments panel ───────────────────────────── */
+
+.sheet-lab__comments {
+  margin-top: 12px;
+  border: 1px solid var(--sh-border);
+  border-radius: 12px;
+  background: var(--sh-surface);
+  overflow: hidden;
+}
+
+.sheet-lab__comments-header {
+  padding: 8px 12px;
+  background: var(--sh-soft);
+  border-bottom: 1px solid var(--sh-border);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--sh-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.sheet-lab__comment {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--sh-soft);
+  font-size: 13px;
+  display: grid;
+  gap: 4px;
+}
+
+.sheet-lab__comment:last-of-type {
+  border-bottom: none;
+}
+
+.sheet-lab__comment-meta {
+  font-size: 11px;
+  color: var(--sh-muted);
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.sheet-lab__comment-anchor {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--sh-info-bg);
+  color: var(--sh-brand, #6366f1);
+  font-weight: 700;
+  font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 10px;
+}
+
+.sheet-lab__comment-body {
+  color: var(--sh-heading);
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+
+.sheet-lab__comment-delete {
+  background: none;
+  border: none;
+  color: var(--sh-muted);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.sheet-lab__comment-delete:hover {
+  color: var(--sh-danger);
+}
+
+.sheet-lab__comment-form {
+  padding: 10px 12px;
+  border-top: 1px solid var(--sh-border);
+  background: var(--sh-soft);
+  display: grid;
+  gap: 6px;
+}
+
+.sheet-lab__comment-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--sh-border);
+  background: var(--sh-surface);
+  color: var(--sh-heading);
+  font-size: 12px;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 56px;
+}
+
+.sheet-lab__comment-form-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.sheet-lab__comment-hint {
+  font-size: 11px;
+  color: var(--sh-muted);
+  font-style: italic;
+  padding: 12px;
+  text-align: center;
+}
+
 /* ── Word-level highlight segments ─────────────────────────── */
 
 .sheet-lab__word-add {

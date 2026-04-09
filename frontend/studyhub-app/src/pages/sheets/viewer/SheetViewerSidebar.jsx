@@ -11,6 +11,8 @@ import {
 import VerificationBadge from '../../../components/verification/VerificationBadge'
 import { API } from '../../../config'
 import ContributionInlineDiff from '../lab/ContributionInlineDiff'
+import TopContributorsPanel from './TopContributorsPanel'
+import ForkTreePanel from './ForkTreePanel'
 import { FONT, panelStyle, linkButton, statusBadge } from './sheetViewerConstants'
 
 function ContributionList({ title, items, canReview, onReview, reviewingId }) {
@@ -233,6 +235,8 @@ export default function SheetViewerSidebar({ sheet, canEdit, previewKind, attach
       {sheet.outgoingContributions ? (
         <ContributionList title="Outgoing contributions" items={sheet.outgoingContributions} />
       ) : null}
+      <TopContributorsPanel sheetId={sheet.id} />
+      <ForkTreePanel sheetId={sheet.id} />
     </aside>
   )
 }

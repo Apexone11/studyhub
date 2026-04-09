@@ -846,7 +846,7 @@ function FeedCardInner({
                   style={actionBarButton(showComments, 'var(--sh-brand)')}
                 >
                   <CommentIcon size={18} />
-                  Comment
+                  Comment{(item.commentCount || 0) > 0 ? ` ${item.commentCount}` : ''}
                 </button>
                 <button
                   type="button"
@@ -864,6 +864,7 @@ function FeedCardInner({
                   commentCount={item.commentCount || 0}
                   user={currentUser}
                   targetCommentId={targetCommentId}
+                  alwaysExpanded
                 />
               )}
             </>

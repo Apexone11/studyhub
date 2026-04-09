@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -56,6 +57,7 @@ model User {
   feedPostReactions          FeedPostReaction[]
   proposedContributions      SheetContribution[]       @relation("ContributionProposer")
   reviewedContributions      SheetContribution[]       @relation("ContributionReviewer")
+  contributionComments       ContributionComment[]     @relation("ContributionCommentAuthor")
   verificationChallenges     VerificationChallenge[]
   notificationsReceived      Notification[]            @relation("NotifRecipient")
   notificationsSent          Notification[]            @relation("NotifActor")
@@ -90,7 +92,17 @@ model User {
   messageReactions           MessageReaction[]         @relation("MessageReactionUser")
   messagePollVotes           MessagePollVote[]
   studyGroupsCreated         StudyGroup[]              @relation("StudyGroupCreator")
+  studyGroupsDeleted         StudyGroup[]              @relation("StudyGroupDeleter")
   studyGroupMemberships      StudyGroupMember[]
+  studyGroupMutesIssued      StudyGroupMember[]        @relation("StudyGroupMemberMutedBy")
+  groupMediaUsage            GroupMediaUsage[]
+  groupReportsFiled          GroupReport[]             @relation("GroupReportReporter")
+  groupReportsResolved       GroupReport[]             @relation("GroupReportResolver")
+  groupAppealsFiled          GroupAppeal[]             @relation("GroupAppealAppealer")
+  groupAppealsResolved       GroupAppeal[]             @relation("GroupAppealResolver")
+  groupAuditActions          GroupAuditLog[]           @relation("GroupAuditActor")
+  groupBlocksReceived        GroupBlock[]              @relation("GroupBlockUser")
+  groupBlocksIssued          GroupBlock[]              @relation("GroupBlockActor")
   groupResources             GroupResource[]
   groupSessionRsvps          GroupSessionRsvp[]
   groupDiscussionPosts       GroupDiscussionPost[]
@@ -620,9 +632,27 @@ model SheetContribution {
   forkSheet     StudySheet @relation("ContributionFork", fields: [forkSheetId], references: [id], onDelete: Cascade)
   proposer      User       @relation("ContributionProposer", fields: [proposerId], references: [id], onDelete: Cascade)
   reviewer      User?      @relation("ContributionReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  comments      ContributionComment[]
 
   @@index([targetSheetId, status])
   @@index([proposerId, status])
+}
+
+model ContributionComment {
+  id             Int               @id @default(autoincrement())
+  contributionId Int
+  userId         Int
+  hunkIndex      Int
+  lineOffset     Int
+  side           String            @default("new")
+  body           String
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  contribution   SheetContribution @relation(fields: [contributionId], references: [id], onDelete: Cascade)
+  author         User              @relation("ContributionCommentAuthor", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([contributionId, hunkIndex])
+  @@index([userId, createdAt])
 }
 
 model VerificationChallenge {
@@ -1156,27 +1186,58 @@ model MessagePollVote {
 // ═══════════════════════════════════════════════════════════════════════════
 
 model StudyGroup {
-  id          Int      @id @default(autoincrement())
-  name        String
-  description String   @default("")
-  avatarUrl   String?
-  courseId    Int? // null = freeform group
-  privacy     String   @default("public") // "public", "private", "invite_only"
-  maxMembers  Int      @default(50)
-  createdById Int
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id               Int      @id @default(autoincrement())
+  name             String
+  description      String   @default("")
+  avatarUrl        String?
+  // Phase 4: owner-curated background for the group header.
+  // `backgroundUrl` is either a relative /uploads/group-media/... path
+  // (local dev) or a curated gallery asset path; `backgroundCredit` is
+  // an optional freeform attribution line (e.g. "Pexels · Jane Doe").
+  backgroundUrl    String?
+  backgroundCredit String?
+  courseId         Int? // null = freeform group
+  privacy          String   @default("public") // "public", "private", "invite_only"
+  maxMembers       Int      @default(50)
+  createdById      Int
+  // Phase 5 trust & safety:
+  //   moderationStatus: 'active' | 'warned' | 'locked' | 'deleted'
+  //   warnedUntil: auto-clears a warning banner after this timestamp
+  //   lockedAt: set when an admin locks the group (read-only mode)
+  //   deletedAt: soft-delete sentinel; a cron sweep hard-deletes after 30 days
+  //   deletedById: which admin performed the soft-delete (audit)
+  moderationStatus String    @default("active")
+  warnedUntil      DateTime?
+  lockedAt         DateTime?
+  deletedAt        DateTime?
+  deletedById      Int?
+  // Phase 5 member-list visibility: when true, non-members cannot see
+  // the member roster (admins/mods always see it regardless).
+  memberListPrivate Boolean  @default(false)
+  // Phase 5 post-approval queue: when true, new discussion posts enter
+  // status 'pending_approval' and only become visible after a mod approves.
+  requirePostApproval Boolean @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   course    Course?               @relation(fields: [courseId], references: [id], onDelete: SetNull)
   createdBy User                  @relation("StudyGroupCreator", fields: [createdById], references: [id])
+  deletedBy User?                 @relation("StudyGroupDeleter", fields: [deletedById], references: [id], onDelete: SetNull)
   members   StudyGroupMember[]
   resources GroupResource[]
   sessions  GroupSession[]
   posts     GroupDiscussionPost[]
+  mediaUsage GroupMediaUsage[]
+  reports   GroupReport[]
+  appeals   GroupAppeal[]
+  auditLog  GroupAuditLog[]
+  blocks    GroupBlock[]
 
   @@index([courseId])
   @@index([privacy, updatedAt(sort: Desc)])
   @@index([createdById])
+  @@index([moderationStatus])
+  @@index([deletedAt])
 }
 
 model StudyGroupMember {
@@ -1186,13 +1247,29 @@ model StudyGroupMember {
   role     String   @default("member") // "admin", "moderator", "member"
   status   String   @default("active") // "active", "pending", "invited", "banned"
   joinedAt DateTime @default(now())
+  // Phase 5: join-gate message. Captured when a user requests to join a
+  // private group so admins know why they want in. Cleared on approval.
+  joinMessage String @default("")
+  // Phase 5: mute window. When non-null and in the future, the user can
+  // read the group but cannot post/comment/upload. Enforced by the
+  // resources + discussions routes. `muteReason` is shown to the user.
+  mutedUntil DateTime?
+  mutedReason String   @default("")
+  mutedById   Int?
+  // Phase 5: strike counter for two-strikes auto-ban. Incremented when a
+  // mod removes the user's post/resource. Auto-ban triggers at 2+ strikes
+  // in a 30-day window (computed by service, not DB).
+  lastStrikeAt DateTime?
+  strikeCount  Int      @default(0)
 
-  group StudyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group  StudyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mutedBy User?     @relation("StudyGroupMemberMutedBy", fields: [mutedById], references: [id], onDelete: SetNull)
 
   @@unique([groupId, userId])
   @@index([userId, status])
   @@index([groupId, status])
+  @@index([mutedUntil])
 }
 
 model GroupResource {
@@ -1201,17 +1278,24 @@ model GroupResource {
   userId       Int // who added it
   title        String
   description  String   @default("")
-  resourceType String   @default("link") // "link", "sheet", "note", "file"
+  resourceType String   @default("link") // "link", "sheet", "note", "file", "image", "video"
   resourceUrl  String? // external link or file path
   sheetId      Int? // linked StudySheet
   noteId       Int? // linked Note
   pinned       Boolean  @default(false)
+  // Phase 4: structured media metadata for direct uploads. Nullable so
+  // legacy "link"/"sheet"/"note" resources continue to work unchanged.
+  mediaType    String? // "image" | "video" | "file" | "link"
+  mediaUrl     String?
+  mediaBytes   Int?
+  mediaMime    String?
   createdAt    DateTime @default(now())
 
   group StudyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
   user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([groupId, pinned, createdAt(sort: Desc)])
+  @@index([groupId, createdAt(sort: Desc)])
 }
 
 model GroupSession {
@@ -1257,6 +1341,18 @@ model GroupDiscussionPost {
   type      String   @default("discussion") // "discussion", "question", "announcement", "poll"
   pinned    Boolean  @default(false)
   resolved  Boolean  @default(false) // for Q&A threads
+  // Phase 4: optional media attachments. JSON array of
+  //   [{ url, mime, bytes, kind: 'image'|'video'|'file' }]
+  attachments Json?
+  // Phase 5: moderation status.
+  //   'published'       — visible to all members (default)
+  //   'pending_approval' — created under require-approval flag, hidden
+  //                        until a mod approves; only author + mods see it
+  //   'removed'         — a mod removed it; kept for audit, shown as
+  //                        "removed by moderator" to members
+  status    String   @default("published")
+  removedAt DateTime?
+  removedById Int?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1283,6 +1379,129 @@ model GroupDiscussionReply {
   upvotes DiscussionUpvote[]
 
   @@index([postId, createdAt])
+}
+
+// Phase 4: per-user weekly media upload counter for study groups.
+// One row per (user, weekStart) pair. weekStart is the Monday 00:00 UTC
+// of the current ISO week. Incremented after every successful upload via
+// assertQuotaAvailable + incrementUsage in studyGroups.media.service.
+model GroupMediaUsage {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  groupId   Int?
+  weekStart DateTime @db.Date
+  count     Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  user  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group StudyGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, weekStart])
+  @@index([userId, weekStart])
+}
+
+// Phase 5: trust & safety — report a group for review.
+// Each user can file at most one report per group (the unique index
+// enforces this at the DB level). Reports drive the admin review queue
+// and auto-lock escalation (5 unique reporters in 24h).
+model GroupReport {
+  id           Int      @id @default(autoincrement())
+  groupId      Int
+  reporterId   Int
+  reason       String // 'spam' | 'harassment' | 'hate' | 'copyright' | 'impersonation' | 'sexual' | 'other'
+  details      String   @default("")
+  // Optional evidence attachments (JSON array, same shape as discussion post
+  // attachments — { url, mime, bytes, kind }).
+  attachments  Json?
+  status       String   @default("pending") // 'pending' | 'dismissed' | 'warned' | 'locked' | 'deleted' | 'escalated'
+  resolvedAt   DateTime?
+  resolvedById Int?
+  resolution   String   @default("") // admin internal notes (not shown to reporter or group owner)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  group      StudyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  reporter   User       @relation("GroupReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  resolvedBy User?      @relation("GroupReportResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@unique([groupId, reporterId])
+  @@index([status, createdAt])
+  @@index([groupId, status])
+  @@index([reporterId, status])
+}
+
+// Phase 5: group owner appeal after a warn / lock / delete action.
+// One appeal per (group, user) pair. Admin accepts (restore) or rejects
+// (final). No second appeals.
+model GroupAppeal {
+  id             Int      @id @default(autoincrement())
+  groupId        Int
+  appealerId     Int
+  originalAction String // 'warned' | 'locked' | 'deleted'
+  message        String   @db.Text
+  status         String   @default("pending") // 'pending' | 'accepted' | 'rejected'
+  resolvedAt     DateTime?
+  resolvedById   Int?
+  resolution     String   @default("")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  group      StudyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  appealer   User       @relation("GroupAppealAppealer", fields: [appealerId], references: [id], onDelete: Cascade)
+  resolvedBy User?      @relation("GroupAppealResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@unique([groupId, appealerId])
+  @@index([status, createdAt])
+}
+
+// Phase 5: per-group audit log. Every mod action (approve/reject post,
+// remove post, ban/mute user, change background, warn/lock/delete group,
+// approve/reject join request) writes a row here so other mods can see
+// who did what and compromised mod accounts can be investigated.
+model GroupAuditLog {
+  id         Int      @id @default(autoincrement())
+  groupId    Int
+  // Nullable so system-automated actions (auto-lock, auto-ban) can be
+  // recorded without a FK to a real user row.
+  actorId    Int?
+  action     String // e.g. 'post.remove', 'member.ban', 'group.lock', 'background.change'
+  targetType String? // 'post' | 'reply' | 'member' | 'resource' | 'group'
+  targetId   Int?
+  // Free-form JSON context: previous/next values, mod-entered reason, etc.
+  // Always redact sensitive content before writing.
+  context    Json?
+  // Session fingerprint for compromised-account forensics. Raw IPs are
+  // stored without masking; rotate/prune via a retention job.
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  group StudyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  actor User?      @relation("GroupAuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([groupId, createdAt(sort: Desc)])
+  @@index([actorId, createdAt(sort: Desc)])
+  @@index([action])
+}
+
+// Phase 5: group-level user block. Admin/mod blocks a user from joining,
+// viewing, or interacting with a specific group. Blocked users see
+// "You can't access this group." If they try to join, the join is
+// immediately rejected without notifying mods.
+model GroupBlock {
+  id         Int      @id @default(autoincrement())
+  groupId    Int
+  userId     Int
+  blockedById Int
+  reason     String   @default("")
+  createdAt  DateTime @default(now())
+
+  group     StudyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user      User       @relation("GroupBlockUser", fields: [userId], references: [id], onDelete: Cascade)
+  blockedBy User       @relation("GroupBlockActor", fields: [blockedById], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+  @@index([userId])
 }
 
 model DiscussionUpvote {
