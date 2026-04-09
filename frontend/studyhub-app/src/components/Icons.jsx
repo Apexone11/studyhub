@@ -610,6 +610,26 @@ export function IconTag({ size, ...p }) {
   )
 }
 
+// Flag — report content / group
+export function IconFlag({ size, ...p }) {
+  return (
+    <Svg size={size} {...p}>
+      <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      <line x1="4" y1="22" x2="4" y2="15" stroke="currentColor" strokeWidth="1.8" />
+    </Svg>
+  )
+}
+
+// Lock — locked / restricted
+export function IconLock({ size, ...p }) {
+  return (
+    <Svg size={size} {...p}>
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" stroke="currentColor" strokeWidth="1.8" fill="none" />
+      <path d="M7 11V7a5 5 0 0110 0v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    </Svg>
+  )
+}
+
 // Heart — supporters / donate
 export function IconHeart({ size, ...p }) {
   return (

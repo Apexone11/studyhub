@@ -22,8 +22,9 @@ import AppSidebar from '../../components/sidebar/AppSidebar'
 import { PageShell } from '../shared/pageScaffold'
 import { EditGroupModal } from './GroupModals'
 import GroupBackgroundPicker from './GroupBackgroundPicker'
+import ReportGroupModal from './ReportGroupModal'
 import { styles } from './studyGroupsStyles'
-import { IconPen } from '../../components/Icons'
+import { IconPen, IconFlag, IconLock } from '../../components/Icons'
 
 export default function GroupDetailView({ groupId }) {
   const navigate = useNavigate()
@@ -31,6 +32,7 @@ export default function GroupDetailView({ groupId }) {
   const currentUserId = user?.id || null
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [backgroundPickerOpen, setBackgroundPickerOpen] = useState(false)
+  const [reportModalOpen, setReportModalOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('overview')
 
   const {
@@ -384,6 +386,25 @@ export default function GroupDetailView({ groupId }) {
                     <button onClick={handleLeave} style={styles.leaveBtn}>
                       Leave Group
                     </button>
+                    {/* Report — anyone except the owner can report */}
+                    {activeGroup.createdById !== currentUserId ? (
+                      <button
+                        onClick={() => setReportModalOpen(true)}
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 6,
+                          padding: '8px 14px', borderRadius: 10,
+                          border: '1px solid var(--sh-danger-border)',
+                          background: 'var(--sh-danger-bg)',
+                          color: 'var(--sh-danger-text)',
+                          fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                          fontFamily: 'inherit',
+                        }}
+                        title="Report this group"
+                      >
+                        <IconFlag size={13} />
+                        Report
+                      </button>
+                    ) : null}
                   </>
                 )}
               </div>
@@ -391,6 +412,44 @@ export default function GroupDetailView({ groupId }) {
           </div>
 
           <div style={{ padding: '24px', display: 'grid', gap: 18 }}>
+            {/* Phase 5: moderation banners */}
+            {activeGroup.moderationStatus === 'warned' ? (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '12px 16px', borderRadius: 12,
+                background: 'var(--sh-warning-bg)', border: '1px solid var(--sh-warning-border)',
+                color: 'var(--sh-warning-text)', fontSize: 13, fontWeight: 600, lineHeight: 1.5,
+              }}>
+                <IconFlag size={16} style={{ flexShrink: 0 }} />
+                <div>
+                  This group received a warning from our review team. Please review the community guidelines to avoid further action.
+                  {activeGroup.warnedUntil ? (
+                    <span style={{ display: 'block', fontSize: 11, color: 'var(--sh-muted)', marginTop: 4 }}>
+                      Warning expires: {new Date(activeGroup.warnedUntil).toLocaleDateString()}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+            {activeGroup.moderationStatus === 'locked' ? (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '12px 16px', borderRadius: 12,
+                background: 'var(--sh-danger-bg)', border: '1px solid var(--sh-danger-border)',
+                color: 'var(--sh-danger-text)', fontSize: 13, fontWeight: 600, lineHeight: 1.5,
+              }}>
+                <IconLock size={16} style={{ flexShrink: 0 }} />
+                <div>
+                  This group has been locked (read-only) by our review team. Members can view existing content but cannot post or upload.
+                  {activeGroup.createdById === currentUserId ? (
+                    <span style={{ display: 'block', fontSize: 11, marginTop: 4 }}>
+                      You can appeal this decision using the Appeal button above.
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+
             <div
               style={{
                 display: 'grid',
@@ -566,6 +625,19 @@ export default function GroupDetailView({ groupId }) {
         onSaved={() => {
           setBackgroundPickerOpen(false)
           loadGroupDetails(activeGroup.id)
+        }}
+      />
+
+      {/* Phase 5: report group modal */}
+      <ReportGroupModal
+        open={reportModalOpen}
+        onClose={() => setReportModalOpen(false)}
+        groupId={activeGroup.id}
+        groupName={activeGroup.name}
+        onReported={() => {
+          // After reporting, navigate back to the list — the backend
+          // will now hide this group from the user's view.
+          navigate('/study-groups')
         }}
       />
     </PageShell>
