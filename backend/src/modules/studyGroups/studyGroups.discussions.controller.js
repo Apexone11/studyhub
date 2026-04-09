@@ -13,6 +13,7 @@ const {
   parseId,
   requireGroupMember,
   isGroupAdmin,
+  isGroupAdminOrMod,
   isMutedInGroup,
   stripHtmlTags,
   validateTitle,
@@ -197,7 +198,7 @@ async function createDiscussion(req, res) {
         select: { requirePostApproval: true },
       })
       if (groupRow?.requirePostApproval) {
-        const isModUser = await isGroupAdmin(groupId, req.user.userId)
+        const isModUser = await isGroupAdminOrMod(groupId, req.user.userId)
         if (!isModUser) {
           postStatus = 'pending_approval'
         }
@@ -261,6 +262,8 @@ async function createDiscussion(req, res) {
       type: post.type,
       pinned: post.pinned,
       resolved: post.resolved,
+      status: post.status || 'published',
+      attachments: post.attachments || null,
       replyCount: 0,
       createdAt: post.createdAt,
       updatedAt: post.updatedAt,
@@ -453,7 +456,7 @@ async function deleteDiscussion(req, res) {
     }
 
     // Check permission (author or admin/mod)
-    const isModOrAdmin = await isGroupAdmin(groupId, req.user.userId)
+    const isModOrAdmin = await isGroupAdminOrMod(groupId, req.user.userId)
     const isAuthor = post.userId === req.user.userId
     if (!isAuthor && !isModOrAdmin) {
       return res.status(403).json({ error: 'Not authorized.' })
@@ -499,7 +502,7 @@ async function deleteDiscussion(req, res) {
               const { writeAuditLog } = require('./studyGroups.reports.service')
               await writeAuditLog({
                 groupId,
-                actorId: 0, // system
+                actorId: null, // system-automated action
                 action: 'member.auto_ban',
                 targetType: 'member',
                 targetId: post.userId,

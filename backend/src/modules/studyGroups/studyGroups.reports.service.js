@@ -277,7 +277,7 @@ async function maybeEscalate(groupId, req) {
 
     await writeAuditLog({
       groupId,
-      actorId: 0, // system actor
+      actorId: null, // system-automated action — no human actor
       action: 'group.auto_lock',
       targetType: 'group',
       targetId: groupId,

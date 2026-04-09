@@ -149,7 +149,9 @@ export default function GroupDetailView({ groupId }) {
   const groupImageUrl = resolveGroupImageUrl(activeGroup.avatarUrl)
   // Phase 4: owner-curated banner image. Falls back to the avatar image,
   // then to the default gradient when neither is set.
-  const headerBackgroundUrl = activeGroup.backgroundUrl || groupImageUrl
+  const headerBackgroundUrl = activeGroup.backgroundUrl
+    ? resolveGroupImageUrl(activeGroup.backgroundUrl)
+    : groupImageUrl
   const detailDescription = activeGroup.description || 'Use this space to coordinate sessions, share resources, and keep your study rhythm together.'
 
   const handleEdit = async (updates) => {

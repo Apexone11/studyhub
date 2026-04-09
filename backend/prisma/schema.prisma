@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -1460,7 +1461,9 @@ model GroupAppeal {
 model GroupAuditLog {
   id         Int      @id @default(autoincrement())
   groupId    Int
-  actorId    Int
+  // Nullable so system-automated actions (auto-lock, auto-ban) can be
+  // recorded without a FK to a real user row.
+  actorId    Int?
   action     String // e.g. 'post.remove', 'member.ban', 'group.lock', 'background.change'
   targetType String? // 'post' | 'reply' | 'member' | 'resource' | 'group'
   targetId   Int?
@@ -1474,7 +1477,7 @@ model GroupAuditLog {
   createdAt  DateTime @default(now())
 
   group StudyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  actor User       @relation("GroupAuditActor", fields: [actorId], references: [id], onDelete: Cascade)
+  actor User?      @relation("GroupAuditActor", fields: [actorId], references: [id], onDelete: SetNull)
 
   @@index([groupId, createdAt(sort: Desc)])
   @@index([actorId, createdAt(sort: Desc)])

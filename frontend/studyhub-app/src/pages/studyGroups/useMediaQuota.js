@@ -25,6 +25,7 @@ export default function useMediaQuota(groupId) {
   }, [groupId])
 
   useEffect(() => {
+    if (!groupId) return
     let cancelled = false
     fetchGroupMediaQuota(groupId)
       .then((quota) => { if (!cancelled) setState({ loading: false, error: '', quota }) })

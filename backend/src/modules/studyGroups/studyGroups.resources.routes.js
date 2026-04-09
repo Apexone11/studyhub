@@ -432,6 +432,17 @@ router.patch('/:resourceId', writeLimiter, requireAuth, async (req, res) => {
       if (!isUploadPath && !isHttpUrl) {
         return res.status(400).json({ error: 'resourceUrl must be an /uploads/group-media/... path or a valid http(s) URL.' })
       }
+      // Phase 5 C.2: same link-safety check as POST — prevent bypass via
+      // create-benign-then-patch-to-phishing attack vector.
+      if (isHttpUrl) {
+        const linkCheck = checkUrl(resourceUrl)
+        if (!linkCheck.safe) {
+          return res.status(400).json({
+            error: `This URL was flagged as unsafe: ${linkCheck.reason}. If you believe this is a mistake, contact support.`,
+            code: 'UNSAFE_LINK',
+          })
+        }
+      }
       updates.resourceUrl = resourceUrl
     }
 

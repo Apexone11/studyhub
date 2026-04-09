@@ -29,8 +29,9 @@ services:
       NODE_ENV: development
       PORT: 4000
       JWT_SECRET: ${JWT_SECRET:-set_a_local_jwt_secret}
-      DATABASE_URL: ${DATABASE_URL:-postgresql://studyhub:set_a_local_postgres_password@db:5432/studyhub?schema=public}
-      SHADOW_DATABASE_URL: ${SHADOW_DATABASE_URL:-postgresql://studyhub:set_a_local_postgres_password@db:5432/studyhub_shadow?schema=public}
+      DATABASE_URL: postgresql://studyhub:${POSTGRES_PASSWORD:-set_a_local_postgres_password}@db:5432/studyhub?schema=public
+      DIRECT_URL: postgresql://studyhub:${POSTGRES_PASSWORD:-set_a_local_postgres_password}@db:5432/studyhub?schema=public
+      SHADOW_DATABASE_URL: postgresql://studyhub:${POSTGRES_PASSWORD:-set_a_local_postgres_password}@db:5432/studyhub_shadow?schema=public
       UPLOADS_DIR: ${UPLOADS_DIR:-/app/uploads}
       SENTRY_DSN: ${SENTRY_DSN:-}
       SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0.1}

@@ -66,7 +66,7 @@ router.get('/:id/contributors', optionalAuth, async (req, res) => {
         NOT: [{ kind: 'fork_base' }],
       },
       _count: { _all: true },
-      orderBy: { _count: { userId: 'desc' } },
+      orderBy: { _count: { _all: 'desc' } },
       take: 12,
     })
 
