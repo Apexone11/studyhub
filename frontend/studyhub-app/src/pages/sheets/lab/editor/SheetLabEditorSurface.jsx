@@ -37,7 +37,7 @@ const textareaStyle = {
 const previewFrameStyle = {
   width: '100%',
   flex: 1,
-  minHeight: 320,
+  minHeight: 700,
   border: 'none',
   background: '#fff',
 }
@@ -53,12 +53,14 @@ export default function SheetLabEditorSurface({
 
   if (isRichText) {
     return (
-      <div style={{
-        borderRadius: 14,
-        overflow: 'hidden',
-        border: '1px solid var(--sh-border)',
-        minHeight: 300,
-      }}>
+      <div
+        style={{
+          borderRadius: 14,
+          overflow: 'hidden',
+          border: '1px solid var(--sh-border)',
+          minHeight: 300,
+        }}
+      >
         <RichTextEditor
           content={content}
           onUpdate={onRichTextUpdate}
@@ -70,11 +72,7 @@ export default function SheetLabEditorSurface({
   }
 
   const editorSlot = isHtml ? (
-    <HtmlCodeEditor
-      value={content}
-      onChange={onRichTextUpdate}
-      placeholder="HTML content…"
-    />
+    <HtmlCodeEditor value={content} onChange={onRichTextUpdate} placeholder="HTML content…" />
   ) : (
     <textarea
       value={content}
@@ -86,20 +84,27 @@ export default function SheetLabEditorSurface({
   )
 
   const previewSlot = isHtml ? (
-    <iframe
-      title="html-preview"
-      sandbox=""
-      srcDoc={content}
-      style={previewFrameStyle}
-    />
+    <iframe title="html-preview" sandbox="" srcDoc={content} style={previewFrameStyle} />
   ) : (
-    <div style={{
-      padding: 16, fontSize: 13, lineHeight: 1.8,
-      color: 'var(--sh-text)', background: 'var(--sh-surface)',
-      flex: 1, minHeight: 320, overflowY: 'auto',
-      whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-    }}>
-      {content || <span style={{ color: 'var(--sh-muted)', fontStyle: 'italic' }}>Start typing to see a live preview…</span>}
+    <div
+      style={{
+        padding: 16,
+        fontSize: 13,
+        lineHeight: 1.8,
+        color: 'var(--sh-text)',
+        background: 'var(--sh-surface)',
+        flex: 1,
+        minHeight: 700,
+        overflowY: 'auto',
+        whiteSpace: 'pre-wrap',
+        wordBreak: 'break-word',
+      }}
+    >
+      {content || (
+        <span style={{ color: 'var(--sh-muted)', fontStyle: 'italic' }}>
+          Start typing to see a live preview…
+        </span>
+      )}
     </div>
   )
 

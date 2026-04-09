@@ -80,7 +80,7 @@ export default function StackedEditorPane({
   previewIcon = null,
   storageKey = null,
   minEditorHeight = 320,
-  minPreviewHeight = 320,
+  minPreviewHeight = 700,
 }) {
   const [{ editorCollapsed, previewCollapsed }, setState] = useState(() =>
     loadPersistedState(storageKey, { editorCollapsed: false, previewCollapsed: false }),
@@ -90,10 +90,7 @@ export default function StackedEditorPane({
   useEffect(() => {
     if (!storageKey) return
     try {
-      window.localStorage.setItem(
-        storageKey,
-        JSON.stringify({ editorCollapsed, previewCollapsed }),
-      )
+      window.localStorage.setItem(storageKey, JSON.stringify({ editorCollapsed, previewCollapsed }))
     } catch {
       // localStorage may be disabled (private mode, quota) — fail silently.
     }
