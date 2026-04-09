@@ -254,6 +254,106 @@ router.get('/:id/blocks', readLimiter, requireAuth, async (req, res) => {
   }
 })
 
+// ===== PHASE 5 B.2: GROUP MUTES =====
+
+/**
+ * POST /api/study-groups/:id/mute/:userId
+ * Mute a member for N days (admin/moderator only). Muted users can read
+ * but cannot post, reply, or upload until the window expires.
+ * Body: { days?: number (default 7, max 90), reason?: string }
+ */
+router.post('/:id/mute/:userId', writeLimiter, requireAuth, async (req, res) => {
+  try {
+    const groupId = parseId(req.params.id)
+    const targetUserId = parseId(req.params.userId)
+    if (groupId === null || targetUserId === null) {
+      return res.status(400).json({ error: 'Invalid IDs.' })
+    }
+
+    const isMod = await isGroupAdminOrMod(groupId, req.user.userId)
+    if (!isMod) return res.status(403).json({ error: 'Admin or moderator access required.' })
+
+    if (targetUserId === req.user.userId) {
+      return res.status(400).json({ error: 'You cannot mute yourself.' })
+    }
+
+    const member = await prisma.studyGroupMember.findUnique({
+      where: { groupId_userId: { groupId, userId: targetUserId } },
+    })
+    if (!member || member.status !== 'active') {
+      return res.status(404).json({ error: 'Member not found.' })
+    }
+
+    const days = Math.min(Math.max(Number.parseInt(req.body?.days, 10) || 7, 1), 90)
+    const reason = typeof req.body?.reason === 'string'
+      ? req.body.reason.replace(/<[^>]*>/g, '').trim().slice(0, 500)
+      : ''
+
+    const mutedUntil = new Date(Date.now() + days * 24 * 60 * 60 * 1000)
+
+    await prisma.studyGroupMember.update({
+      where: { id: member.id },
+      data: { mutedUntil, mutedReason: reason, mutedById: req.user.userId },
+    })
+
+    await writeAuditLog({
+      groupId,
+      actorId: req.user.userId,
+      action: 'member.mute',
+      targetType: 'member',
+      targetId: targetUserId,
+      context: { days, reason, mutedUntil: mutedUntil.toISOString() },
+      req,
+    })
+
+    res.json({ message: `User muted for ${days} day${days === 1 ? '' : 's'}.`, mutedUntil: mutedUntil.toISOString() })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+/**
+ * DELETE /api/study-groups/:id/mute/:userId
+ * Lift a mute early (admin/moderator only).
+ */
+router.delete('/:id/mute/:userId', writeLimiter, requireAuth, async (req, res) => {
+  try {
+    const groupId = parseId(req.params.id)
+    const targetUserId = parseId(req.params.userId)
+    if (groupId === null || targetUserId === null) {
+      return res.status(400).json({ error: 'Invalid IDs.' })
+    }
+
+    const isMod = await isGroupAdminOrMod(groupId, req.user.userId)
+    if (!isMod) return res.status(403).json({ error: 'Admin or moderator access required.' })
+
+    const member = await prisma.studyGroupMember.findUnique({
+      where: { groupId_userId: { groupId, userId: targetUserId } },
+    })
+    if (!member) return res.status(404).json({ error: 'Member not found.' })
+
+    await prisma.studyGroupMember.update({
+      where: { id: member.id },
+      data: { mutedUntil: null, mutedReason: '', mutedById: null },
+    })
+
+    await writeAuditLog({
+      groupId,
+      actorId: req.user.userId,
+      action: 'member.unmute',
+      targetType: 'member',
+      targetId: targetUserId,
+      req,
+    })
+
+    res.json({ message: 'User unmuted.' })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
 // ===== SUB-ROUTER MOUNTS =====
 
 // Mount sub-routers with mergeParams enabled in each sub-router

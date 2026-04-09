@@ -39,6 +39,25 @@ async function isGroupAdminOrMod(groupId, userId) {
 }
 
 /**
+ * Phase 5: check if a member is currently muted. Returns true/false.
+ * A mute is active when `mutedUntil` is non-null and in the future.
+ * Graceful degradation: returns false on any error.
+ */
+async function isMutedInGroup(groupId, userId) {
+  if (!groupId || !userId) return false
+  try {
+    const member = await prisma.studyGroupMember.findUnique({
+      where: { groupId_userId: { groupId, userId } },
+      select: { mutedUntil: true, mutedReason: true },
+    })
+    if (!member || !member.mutedUntil) return false
+    return new Date(member.mutedUntil) > new Date()
+  } catch {
+    return false
+  }
+}
+
+/**
  * Phase 5: check if a user is blocked from a group. Returns the block
  * row on hit, null on miss. Graceful-degradation: returns null on any
  * DB error so a missing table never 500s the request.
@@ -239,6 +258,7 @@ module.exports = {
   isGroupAdmin,
   isGroupAdminOrMod,
   isBlockedFromGroup,
+  isMutedInGroup,
   stripHtmlTags,
   validateGroupName,
   validateDescription,

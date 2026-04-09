@@ -13,6 +13,7 @@ const {
   parseId,
   requireGroupMember,
   isGroupAdmin,
+  isMutedInGroup,
   stripHtmlTags,
   validateTitle,
 } = require('./studyGroups.helpers')
@@ -97,6 +98,11 @@ async function createDiscussion(req, res) {
     const member = await requireGroupMember(groupId, req.user.userId)
     if (!member) {
       return res.status(404).json({ error: 'Not a member.' })
+    }
+
+    // Phase 5: muted users cannot create discussion posts.
+    if (await isMutedInGroup(groupId, req.user.userId)) {
+      return res.status(403).json({ error: 'You are currently muted in this group and cannot post.' })
     }
 
     const { title, content, type = 'discussion', attachments } = req.body
