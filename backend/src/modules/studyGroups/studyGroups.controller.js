@@ -423,13 +423,26 @@ async function deleteGroup(req, res) {
       return res.status(404).json({ error: 'Group not found.' })
     }
 
-    // Only creator can delete
-    if (group.createdById !== req.user.userId) {
+    // Only creator (or platform admin) can delete
+    if (group.createdById !== req.user.userId && req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Only creator can delete group.' })
     }
 
-    await prisma.studyGroup.delete({
+    // Phase 5 D.3: soft-delete with 30-day retention. A cron sweep
+    // will hard-delete groups where deletedAt is older than 30 days.
+    // This lets the owner appeal via the appeal endpoint during that
+    // window. If the group was already soft-deleted, just 204.
+    if (group.deletedAt) {
+      return res.status(204).send()
+    }
+
+    await prisma.studyGroup.update({
       where: { id: groupId },
+      data: {
+        moderationStatus: 'deleted',
+        deletedAt: new Date(),
+        deletedById: req.user.userId,
+      },
     })
 
     res.status(204).send()
