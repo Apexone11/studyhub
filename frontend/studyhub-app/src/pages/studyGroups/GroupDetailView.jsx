@@ -52,6 +52,13 @@ export default function GroupDetailView({ groupId }) {
     removeMember,
     updateMember,
     inviteMember,
+    blockMember,
+    unblockMember,
+    muteMember,
+    unmuteMember,
+    blockedUsers,
+    blockedLoading,
+    loadBlockedUsers,
     resources,
     addResource,
     deleteResource,
@@ -593,6 +600,13 @@ export default function GroupDetailView({ groupId }) {
               onRemoveMember={(userId) => removeMember(groupId, userId)}
               onUpdateMember={(userId, data) => updateMember(groupId, userId, data)}
               onInvite={(data) => inviteMember(groupId, data)}
+              onBlock={(userId, reason) => blockMember(groupId, userId, reason)}
+              onUnblock={(userId) => unblockMember(groupId, userId)}
+              onMute={(userId, days, reason) => muteMember(groupId, userId, days, reason)}
+              onUnmute={(userId) => unmuteMember(groupId, userId)}
+              blockedUsers={blockedUsers}
+              blockedLoading={blockedLoading}
+              onLoadBlocked={() => loadBlockedUsers(groupId)}
               isAdmin={isAdmin}
               isAdminOrMod={isAdminOrMod}
               viewerRole={activeGroup.userRole || null}

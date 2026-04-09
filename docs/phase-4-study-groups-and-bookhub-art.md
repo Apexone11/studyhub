@@ -4,6 +4,18 @@ Hand-off plan for VS Code Claude. Pick up from `local-main` after Phase 2 fronte
 
 ---
 
+## Shipped Status
+
+| Item | Commit | Status |
+|------|--------|--------|
+| Track B: BookHub background art (Winslow Homer painting + attribution) | `fade8a1` | Shipped |
+| Track A Chunk 1: Schema + migration (GroupMediaUsage, backgroundUrl, media fields) | `5e42044` | Shipped |
+| Track A Chunk 2: Backend media service + upload endpoint + quota enforcement | `5afab54` | Shipped |
+| Track A Chunk 3: Backend tests (16/16 passing) | `b28c26f` | Shipped |
+| Track A Chunks 4 through 7: Frontend composer, modals, background picker | | In progress (VS Code Claude) |
+
+---
+
 ## Track A — Study Groups Discord-inspired redesign + media paywall
 
 ### Scope

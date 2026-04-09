@@ -415,13 +415,23 @@ router.patch('/:resourceId', writeLimiter, requireAuth, async (req, res) => {
     }
 
     if (resourceType !== undefined) {
-      if (!['link', 'sheet', 'note', 'file'].includes(resourceType)) {
+      if (!['link', 'sheet', 'note', 'file', 'image', 'video'].includes(resourceType)) {
         return res.status(400).json({ error: 'Invalid resourceType.' })
       }
       updates.resourceType = resourceType
     }
 
     if (resourceUrl !== undefined) {
+      // Validate URL the same way POST does — only /uploads/group-media/ or
+      // valid http(s) links. Prevents javascript:, data:, or arbitrary URI injection.
+      if (typeof resourceUrl !== 'string') {
+        return res.status(400).json({ error: 'resourceUrl must be a string.' })
+      }
+      const isUploadPath = resourceUrl.startsWith('/uploads/group-media/')
+      const isHttpUrl = resourceUrl.startsWith('https://') || resourceUrl.startsWith('http://')
+      if (!isUploadPath && !isHttpUrl) {
+        return res.status(400).json({ error: 'resourceUrl must be an /uploads/group-media/... path or a valid http(s) URL.' })
+      }
       updates.resourceUrl = resourceUrl
     }
 

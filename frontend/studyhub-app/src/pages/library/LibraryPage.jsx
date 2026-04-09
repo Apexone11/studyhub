@@ -134,6 +134,21 @@ export default function LibraryPage() {
     }
   }, [])
 
+  // Scroll-to-reveal: when user scrolls to the very top, fade the gradient
+  // and expand the hero so the Winslow Homer painting is fully visible.
+  const heroRef = useRef(null)
+  const [artReveal, setArtReveal] = useState(false)
+
+  useEffect(() => {
+    const onScroll = () => {
+      setArtReveal(window.scrollY <= 2)
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    // Check initial position (page may already be at top)
+    onScroll()
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
   // Auto-animate the books grid for smooth transitions
   const gridRef = useRef(null)
   useEffect(() => {
@@ -163,7 +178,7 @@ export default function LibraryPage() {
       <Navbar />
       <div className="library-page">
         {/* Hero Section */}
-        <section className="library-hero">
+        <section ref={heroRef} className={`library-hero${artReveal ? ' library-hero--art-reveal' : ''}`}>
           <div className="library-hero__watermark">
             <IconBook size={280} />
           </div>

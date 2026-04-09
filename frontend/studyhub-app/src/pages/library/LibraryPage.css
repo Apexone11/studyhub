@@ -24,8 +24,8 @@
   background:
     linear-gradient(
       135deg,
-      color-mix(in srgb, var(--sh-brand) 72%, transparent),
-      color-mix(in srgb, var(--sh-brand-accent) 62%, transparent)
+      color-mix(in srgb, var(--sh-brand) 52%, transparent),
+      color-mix(in srgb, var(--sh-brand-accent) 42%, transparent)
     ),
     url('/art/winslow-homer-girl-reading-under-an-oak-tree.jpg') center 30% / cover no-repeat;
   background-color: var(--sh-brand);
@@ -34,19 +34,55 @@
   color: white;
   position: relative;
   overflow: hidden;
+  /* Scroll-reveal: hero grows taller when user scrolls to top, controlled by JS */
+  transition: padding 0.4s ease, background-position 0.4s ease;
 }
 
-/* Dark mode: push the gradient a little stronger so the painting still
- * reads well against a dark page background instead of looking washed out. */
+/*
+ * Dark mode: the global index.css rule [data-theme='dark'] section { background: var(--sh-surface) !important }
+ * stomps on the hero image. We need !important here to fight back. The gradient is slightly
+ * stronger than light mode (62%/52%) but much lighter than before (was 78%/68%) so the
+ * painting is clearly visible in both themes.
+ */
 [data-theme='dark'] .library-hero {
   background:
     linear-gradient(
       135deg,
-      color-mix(in srgb, var(--sh-brand) 82%, transparent),
-      color-mix(in srgb, var(--sh-brand-accent) 72%, transparent)
+      color-mix(in srgb, var(--sh-brand) 62%, transparent),
+      color-mix(in srgb, var(--sh-brand-accent) 52%, transparent)
     ),
-    url('/art/winslow-homer-girl-reading-under-an-oak-tree.jpg') center 30% / cover no-repeat;
-  background-color: var(--sh-brand);
+    url('/art/winslow-homer-girl-reading-under-an-oak-tree.jpg') center 30% / cover no-repeat !important;
+  background-color: var(--sh-brand) !important;
+}
+
+/* When the hero is in "art reveal" mode (user scrolled to top), fade gradient
+ * almost entirely and expand the hero to show the full painting. */
+.library-hero--art-reveal {
+  padding-top: clamp(5rem, 10vw, 12rem) !important;
+  padding-bottom: clamp(5rem, 10vw, 12rem) !important;
+}
+
+.library-hero--art-reveal::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--sh-brand) 22%, transparent),
+      color-mix(in srgb, var(--sh-brand-accent) 15%, transparent)
+    );
+  z-index: 1;
+  transition: opacity 0.5s ease;
+}
+
+[data-theme='dark'] .library-hero--art-reveal::before {
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--sh-brand) 30%, transparent),
+      color-mix(in srgb, var(--sh-brand-accent) 22%, transparent)
+    );
 }
 
 .library-hero__attribution {
@@ -104,7 +140,7 @@
   max-width: 680px;
   margin: 0 auto;
   position: relative;
-  z-index: 1;
+  z-index: 2;
 }
 
 .library-hero__badge {
