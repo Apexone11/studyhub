@@ -11,35 +11,10 @@ import { API } from '../../../config'
 import { authHeaders } from './sheetLabConstants'
 import { getApiErrorMessage, readJsonSafely } from '../../../lib/http'
 import { showToast } from '../../../lib/toast'
-import { RichTextEditor } from '../../../components/editor'
 import '../../../components/editor/richTextEditor.css'
+import SheetLabEditorSurface from './editor/SheetLabEditorSurface'
 
 const AUTOSAVE_DELAY = 1500
-
-const editorStyle = {
-  width: '100%',
-  height: '100%',
-  minHeight: 400,
-  resize: 'none',
-  border: 'none',
-  background: '#0f172a',
-  color: '#e2e8f0',
-  fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
-  fontSize: '12.5px',
-  lineHeight: 1.9,
-  padding: 16,
-  outline: 'none',
-  boxSizing: 'border-box',
-}
-
-const previewFrameStyle = {
-  width: '100%',
-  height: '100%',
-  minHeight: 400,
-  border: 'none',
-  borderRadius: 0,
-  background: '#fff',
-}
 
 export default function SheetLabEditor({ sheet, onContentSaved }) {
   const [content, setContent] = useState('')
@@ -52,8 +27,8 @@ export default function SheetLabEditor({ sheet, onContentSaved }) {
   const [sheetStatus, setSheetStatus] = useState('draft')
   const [activeFormat, setActiveFormat] = useState('markdown')
   const autosaveTimer = useRef(null)
-  const isHtml = activeFormat === 'html'
   const isRichText = activeFormat === 'richtext'
+  const isHtml = activeFormat === 'html'
   const isDraft = sheetStatus === 'draft'
 
   // Hydrate from sheet
@@ -300,78 +275,12 @@ export default function SheetLabEditor({ sheet, onContentSaved }) {
         </div>
       </div>
 
-      {/* Editor area — richtext uses TipTap WYSIWYG, others use split-pane textarea */}
-      {isRichText ? (
-        <div style={{
-          borderRadius: 14,
-          overflow: 'hidden',
-          border: '1px solid var(--sh-border)',
-          minHeight: 300,
-        }}>
-          <RichTextEditor
-            content={content}
-            onUpdate={handleRichTextUpdate}
-            placeholder="Start writing your study notes..."
-            minHeight={400}
-          />
-        </div>
-      ) : (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-          gap: 0,
-          borderRadius: 14,
-          overflow: 'hidden',
-          border: '1px solid var(--sh-border)',
-          minHeight: 300,
-        }}>
-          {/* Textarea editor */}
-          <div style={{ position: 'relative' }}>
-            <div style={{
-              padding: '6px 12px', background: '#1e293b', color: '#94a3b8',
-              fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px',
-              borderBottom: '1px solid #334155',
-            }}>
-              Editor
-            </div>
-            <textarea
-              value={content}
-              onChange={handleContentChange}
-              style={editorStyle}
-              spellCheck={!isHtml}
-              placeholder={isHtml ? 'HTML content…' : 'Write your content in markdown…'}
-            />
-          </div>
-
-          {/* Preview */}
-          <div style={{ borderLeft: '1px solid var(--sh-border)' }}>
-            <div style={{
-              padding: '6px 12px', background: 'var(--sh-soft)', color: 'var(--sh-muted)',
-              fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px',
-              borderBottom: '1px solid var(--sh-border)',
-            }}>
-              Preview
-            </div>
-            {isHtml ? (
-              <iframe
-                title="html-preview"
-                sandbox="allow-same-origin"
-                srcDoc={content}
-                style={previewFrameStyle}
-              />
-            ) : (
-              <div style={{
-                padding: 16, fontSize: 13, lineHeight: 1.8,
-                color: 'var(--sh-text)', background: 'var(--sh-surface)',
-                minHeight: 400, overflowY: 'auto',
-                whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-              }}>
-                {content || <span style={{ color: 'var(--sh-muted)', fontStyle: 'italic' }}>Start typing to see a live preview…</span>}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      <SheetLabEditorSurface
+        content={content}
+        contentFormat={activeFormat}
+        onContentChange={handleContentChange}
+        onRichTextUpdate={handleRichTextUpdate}
+      />
     </div>
   )
 }

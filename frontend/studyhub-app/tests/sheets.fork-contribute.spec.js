@@ -243,7 +243,7 @@ test.describe('SheetLab Contribute → pre-submit checklist @phase-2', () => {
 
     // The contribute tab only appears for forks (forkOf set), where the
     // current user owns the fork. Build a sheet that looks like that.
-    const { sheet, user } = await mockAuthenticatedApp(page, {
+    const { sheet } = await mockAuthenticatedApp(page, {
       sheet: {
         id: 800,
         forkOf: 500,
