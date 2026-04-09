@@ -10,12 +10,73 @@
 /* ──────────────────────────────────────────────────────────────── */
 
 .library-hero {
-  background: linear-gradient(135deg, var(--sh-brand), var(--sh-brand-accent));
+  /*
+   * Layered background: the brand gradient sits on top of Winslow Homer's
+   * "Girl Reading Under an Oak Tree" (1879, public domain). The gradient
+   * uses color-mix with transparent so the painting shows through while
+   * the existing white title/subtitle/search stay WCAG-AA legible.
+   *
+   * Raw rgba/hex in the attribution block below are an intentional
+   * "image overlay text" exception to the CSS token rule (same category
+   * as the dark-mode-always editor panels exception in CLAUDE.md) —
+   * white text on a darkened image must not depend on theme tokens.
+   */
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--sh-brand) 72%, transparent),
+      color-mix(in srgb, var(--sh-brand-accent) 62%, transparent)
+    ),
+    url('/art/winslow-homer-girl-reading-under-an-oak-tree.jpg') center 30% / cover no-repeat;
+  background-color: var(--sh-brand);
   padding: clamp(3rem, 5vw, 6rem) var(--page-gutter);
   text-align: center;
   color: white;
   position: relative;
   overflow: hidden;
+}
+
+/* Dark mode: push the gradient a little stronger so the painting still
+ * reads well against a dark page background instead of looking washed out. */
+[data-theme='dark'] .library-hero {
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--sh-brand) 82%, transparent),
+      color-mix(in srgb, var(--sh-brand-accent) 72%, transparent)
+    ),
+    url('/art/winslow-homer-girl-reading-under-an-oak-tree.jpg') center 30% / cover no-repeat;
+  background-color: var(--sh-brand);
+}
+
+.library-hero__attribution {
+  position: absolute;
+  right: 16px;
+  bottom: 10px;
+  z-index: 2;
+  font-size: 11px;
+  line-height: 1.35;
+  /* Intentional raw rgba — see exception note on .library-hero */
+  color: rgba(255, 255, 255, 0.85);
+  text-align: right;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+  max-width: 60%;
+}
+
+.library-hero__attribution strong {
+  display: block;
+  font-weight: 700;
+  color: #fff;
+}
+
+@media (max-width: 640px) {
+  .library-hero__attribution {
+    position: static;
+    margin-top: 16px;
+    text-align: center;
+    max-width: none;
+  }
 }
 
 .library-hero__watermark {

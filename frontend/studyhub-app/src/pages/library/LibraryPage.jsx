@@ -14,7 +14,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import Navbar from '../../components/navbar/Navbar'
-import { IconSearch, IconBook } from '../../components/Icons'
+import { IconSearch, IconBook, IconInfoCircle } from '../../components/Icons'
 import { SkeletonCard } from '../../components/Skeleton'
 import { usePageTitle } from '../../lib/usePageTitle'
 import { useSession } from '../../lib/session-context'
@@ -186,6 +186,20 @@ export default function LibraryPage() {
                 />
               </div>
             </form>
+          </div>
+
+          {/*
+            Background artwork attribution — Winslow Homer, public domain.
+            Kept inside the hero so it scrolls with the banner, not the page.
+            aria-label gives screen readers context; the painting itself is
+            purely decorative (CSS background, no img tag).
+          */}
+          <div className="library-hero__attribution" aria-label="Background artwork attribution">
+            <strong>
+              <IconInfoCircle size={11} style={{ verticalAlign: '-1px', marginRight: 4 }} aria-hidden="true" />
+              Girl Reading Under an Oak Tree
+            </strong>
+            Winslow Homer (1836–1910) · Public domain
           </div>
         </section>
 
