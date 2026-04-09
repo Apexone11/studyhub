@@ -452,12 +452,71 @@ async function deleteDiscussion(req, res) {
       return res.status(404).json({ error: 'Post not found.' })
     }
 
-    // Check permission (author or admin)
-    const isAdmin = await isGroupAdmin(groupId, req.user.userId)
-    if (post.userId !== req.user.userId && !isAdmin) {
+    // Check permission (author or admin/mod)
+    const isModOrAdmin = await isGroupAdmin(groupId, req.user.userId)
+    const isAuthor = post.userId === req.user.userId
+    if (!isAuthor && !isModOrAdmin) {
       return res.status(403).json({ error: 'Not authorized.' })
     }
 
+    // Phase 5 C.1: when a MOD removes someone else's post (not their own),
+    // soft-delete it, increment the author's strike counter, and auto-ban
+    // them if they've hit 2+ strikes within 30 days. Authors deleting their
+    // own posts still hard-delete normally and incur no strikes.
+    if (isModOrAdmin && !isAuthor) {
+      // Soft-delete: mark as removed instead of hard-deleting.
+      await prisma.groupDiscussionPost.update({
+        where: { id: postId },
+        data: { status: 'removed', removedAt: new Date(), removedById: req.user.userId },
+      })
+
+      // Increment the author's strike counter.
+      const now = new Date()
+      try {
+        const authorMember = await prisma.studyGroupMember.findUnique({
+          where: { groupId_userId: { groupId, userId: post.userId } },
+        })
+        if (authorMember) {
+          const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+          // Reset counter if lastStrikeAt is older than 30 days.
+          const resetCounter = !authorMember.lastStrikeAt || new Date(authorMember.lastStrikeAt) < thirtyDaysAgo
+          const nextCount = resetCounter ? 1 : (authorMember.strikeCount || 0) + 1
+
+          await prisma.studyGroupMember.update({
+            where: { id: authorMember.id },
+            data: { strikeCount: nextCount, lastStrikeAt: now },
+          })
+
+          // Auto-ban at 2 strikes in 30 days: change status to 'banned'.
+          if (nextCount >= 2) {
+            await prisma.studyGroupMember.update({
+              where: { id: authorMember.id },
+              data: { status: 'banned' },
+            })
+
+            // Audit the auto-ban.
+            try {
+              const { writeAuditLog } = require('./studyGroups.reports.service')
+              await writeAuditLog({
+                groupId,
+                actorId: 0, // system
+                action: 'member.auto_ban',
+                targetType: 'member',
+                targetId: post.userId,
+                context: { strikes: nextCount, window: '30d' },
+                req,
+              })
+            } catch { /* audit never blocks */ }
+          }
+        }
+      } catch {
+        // Non-fatal: strike tracking should not block the delete.
+      }
+
+      return res.status(204).send()
+    }
+
+    // Author self-delete: hard delete, no strikes.
     await prisma.groupDiscussionPost.delete({
       where: { id: postId },
     })
