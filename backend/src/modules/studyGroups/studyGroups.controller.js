@@ -57,6 +57,19 @@ async function listGroups(req, res) {
       userGroupIds = memberships.map((m) => m.groupId)
     }
 
+    // Phase 5: hide groups the current user has an unresolved report on,
+    // and hide groups that have been soft-deleted or locked (non-members
+    // see nothing for locked/deleted; members keep reading but the UI
+    // will render a banner). Graceful degradation via try/catch around
+    // the reports service call.
+    let hiddenGroupIds = new Set()
+    try {
+      const reportsService = require('./studyGroups.reports.service')
+      hiddenGroupIds = await reportsService.getHiddenGroupIdsForReporter(req.user.userId)
+    } catch {
+      hiddenGroupIds = new Set()
+    }
+
     // Build where clause
     const where = {
       AND: [
@@ -70,6 +83,12 @@ async function listGroups(req, res) {
                 { description: { contains: search, mode: 'insensitive' } },
               ],
             }
+          : {},
+        // Phase 5: exclude soft-deleted groups everywhere.
+        { deletedAt: null },
+        // Phase 5: exclude groups this user reported.
+        hiddenGroupIds.size > 0
+          ? { id: { notIn: Array.from(hiddenGroupIds) } }
           : {},
       ],
     }
@@ -198,6 +217,34 @@ async function getGroup(req, res) {
 
     if (!group) {
       return res.status(404).json({ error: 'Group not found.' })
+    }
+
+    // Phase 5: soft-deleted groups 404 unless the caller is the owner
+    // (owners still need detail access during their 30-day appeal
+    // window) or a platform admin.
+    if (group.deletedAt) {
+      const isOwner = group.createdById === req.user.userId
+      const isPlatformAdmin = req.user.role === 'admin'
+      if (!isOwner && !isPlatformAdmin) {
+        return res.status(404).json({ error: 'Group not found.' })
+      }
+    }
+
+    // Phase 5: hide groups the caller has an unresolved report on.
+    // Exception: platform admins and the group owner always see it.
+    try {
+      const isOwner = group.createdById === req.user.userId
+      const isPlatformAdmin = req.user.role === 'admin'
+      if (!isOwner && !isPlatformAdmin) {
+        const reportsService = require('./studyGroups.reports.service')
+        const hidden = await reportsService.getHiddenGroupIdsForReporter(req.user.userId)
+        if (hidden.has(groupId)) {
+          return res.status(404).json({ error: 'Group not found.' })
+        }
+      }
+    } catch {
+      // Graceful degradation — don't block the read if the reports
+      // table is temporarily unavailable.
     }
 
     // Check if user can see this group (public or member)

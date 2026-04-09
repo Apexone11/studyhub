@@ -177,6 +177,9 @@ async function formatGroup(group, currentUserId = null) {
     name: group.name,
     description: group.description,
     avatarUrl: group.avatarUrl,
+    // Phase 4 header banner
+    backgroundUrl: group.backgroundUrl ?? null,
+    backgroundCredit: group.backgroundCredit ?? null,
     courseId: group.courseId,
     courseName,
     courseCode,
@@ -203,6 +206,13 @@ async function formatGroup(group, currentUserId = null) {
       status: userMembership.status,
       joinedAt: userMembership.joinedAt,
     } : null,
+    // Phase 5 trust & safety surface
+    moderationStatus: group.moderationStatus ?? 'active',
+    warnedUntil: group.warnedUntil ?? null,
+    lockedAt: group.lockedAt ?? null,
+    deletedAt: group.deletedAt ?? null,
+    memberListPrivate: group.memberListPrivate ?? false,
+    requirePostApproval: group.requirePostApproval ?? false,
   }
 }
 

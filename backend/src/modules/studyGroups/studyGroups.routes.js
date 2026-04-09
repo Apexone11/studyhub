@@ -50,6 +50,7 @@ const resourcesRouter = require('./studyGroups.resources.routes')
 const sessionsRouter = require('./studyGroups.sessions.routes')
 const discussionsRouter = require('./studyGroups.discussions.routes')
 const activityRouter = require('./studyGroups.activity.routes')
+const reportsRouter = require('./studyGroups.reports.routes')
 
 const router = express.Router()
 
@@ -128,5 +129,7 @@ router.use('/:id/resources', resourcesRouter)
 router.use('/:id/sessions', sessionsRouter)
 router.use('/:id/discussions', discussionsRouter)
 router.use('/:id/activity', activityRouter)
+// Phase 5: /report, /appeal, /my-report all handled by the reports sub-router
+router.use('/:id', reportsRouter)
 
 module.exports = router
