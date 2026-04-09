@@ -926,8 +926,8 @@ function CommentList({ comments, loading, user, onDelete, onReact, onReply, onEd
 
 /* ── Main export ─────────────────────────────────────────────────────── */
 
-export default function CommentSection({ postId, commentCount, user, targetCommentId }) {
-  const [expanded, setExpanded] = useState(() => Boolean(targetCommentId))
+export default function CommentSection({ postId, commentCount, user, targetCommentId, alwaysExpanded = false }) {
+  const [expanded, setExpanded] = useState(() => Boolean(targetCommentId) || alwaysExpanded)
   const [newComment, setNewComment] = useState('')
   const [attachments, setAttachments] = useState([])
   const [currentTime, setCurrentTime] = useState(() => Date.now())
@@ -946,10 +946,10 @@ export default function CommentSection({ postId, commentCount, user, targetComme
   } = useComments(postId, commentCount || 0)
 
   useEffect(() => {
-    if (targetCommentId) {
+    if (targetCommentId || alwaysExpanded) {
       loadComments()
     }
-  }, [targetCommentId, loadComments])
+  }, [targetCommentId, alwaysExpanded, loadComments])
 
   useEffect(() => {
     if (!expanded) {
@@ -1009,41 +1009,52 @@ export default function CommentSection({ postId, commentCount, user, targetComme
     setAttachments(Array.isArray(nextAttachments) ? nextAttachments : [])
   }
 
+  const commentContent = (
+    <div style={commentExpandedContentStyle}>
+      <CommentInput
+        user={user}
+        value={newComment}
+        onChange={(value) => {
+          setNewComment(value)
+          if (error) {
+            setError('')
+          }
+        }}
+        onSubmit={handlePost}
+        posting={posting}
+        error={error}
+        onChangeAttachments={handleChangeAttachments}
+        attachments={attachments}
+      />
+      <CommentList
+        comments={comments}
+        loading={loading}
+        user={user}
+        onDelete={deleteComment}
+        onReact={user ? reactToComment : null}
+        onReply={user ? handleReply : null}
+        onEdit={user ? editComment : null}
+        currentTime={currentTime}
+      />
+    </div>
+  )
+
+  // When alwaysExpanded (opened via FeedCard Comment button), skip the
+  // redundant toggle header and show the input + comments directly.
+  if (alwaysExpanded) {
+    return (
+      <div style={commentSectionContainerStyle}>
+        {commentContent}
+      </div>
+    )
+  }
+
   return (
     <div style={commentSectionContainerStyle}>
       <button type="button" onClick={handleToggle} style={commentToggleButtonStyle}>
         {expanded ? '\u25BE' : '\u25B8'} {total} {total === 1 ? 'comment' : 'comments'}
       </button>
-
-      {expanded && (
-        <div style={commentExpandedContentStyle}>
-          <CommentInput
-            user={user}
-            value={newComment}
-            onChange={(value) => {
-              setNewComment(value)
-              if (error) {
-                setError('')
-              }
-            }}
-            onSubmit={handlePost}
-            posting={posting}
-            error={error}
-            onChangeAttachments={handleChangeAttachments}
-            attachments={attachments}
-          />
-          <CommentList
-            comments={comments}
-            loading={loading}
-            user={user}
-            onDelete={deleteComment}
-            onReact={user ? reactToComment : null}
-            onReply={user ? handleReply : null}
-            onEdit={user ? editComment : null}
-            currentTime={currentTime}
-          />
-        </div>
-      )}
+      {expanded && commentContent}
     </div>
   )
 }

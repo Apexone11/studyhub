@@ -103,6 +103,7 @@ export function WeeklyProgressWidget() {
       goalMet: false,
       dailyBreakdown: [],
     },
+    swr: 5 * 60 * 1000,
   })
 
   if (loading) {

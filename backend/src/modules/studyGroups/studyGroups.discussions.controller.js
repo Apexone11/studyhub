@@ -13,6 +13,8 @@ const {
   parseId,
   requireGroupMember,
   isGroupAdmin,
+  isGroupAdminOrMod,
+  isMutedInGroup,
   stripHtmlTags,
   validateTitle,
 } = require('./studyGroups.helpers')
@@ -38,9 +40,24 @@ async function listDiscussions(req, res) {
     const limitNum = Math.min(parseInt(limit, 10) || 50, 100)
     const offsetNum = Math.max(parseInt(offset, 10) || 0, 0)
 
+    // Phase 5 B.5: non-mods only see 'published' posts. Mods see
+    // everything (including pending_approval and removed) so they can
+    // approve/reject and audit. Authors also see their own pending posts.
+    const canModerate = member && (member.role === 'admin' || member.role === 'moderator')
+    const statusFilter = canModerate
+      ? {} // mods see all statuses
+      : {
+          OR: [
+            { status: 'published' },
+            // Authors always see their own pending posts
+            { status: 'pending_approval', userId: req.user.userId },
+          ],
+        }
+
     const where = {
       groupId,
       ...(type && { type }),
+      ...statusFilter,
     }
 
     const [posts, total] = await Promise.all([
@@ -68,6 +85,8 @@ async function listDiscussions(req, res) {
       type: p.type,
       pinned: p.pinned,
       resolved: p.resolved,
+      status: p.status || 'published',
+      attachments: p.attachments || null,
       replyCount: p.replies.length,
       upvoteCount: p.upvotes.length,
       userHasUpvoted: p.upvotes.some((u) => u.userId === req.user.userId),
@@ -99,7 +118,12 @@ async function createDiscussion(req, res) {
       return res.status(404).json({ error: 'Not a member.' })
     }
 
-    const { title, content, type = 'discussion' } = req.body
+    // Phase 5: muted users cannot create discussion posts.
+    if (await isMutedInGroup(groupId, req.user.userId)) {
+      return res.status(403).json({ error: 'You are currently muted in this group and cannot post.' })
+    }
+
+    const { title, content, type = 'discussion', attachments } = req.body
 
     // Validate title
     const validTitle = validateTitle(title)
@@ -130,6 +154,59 @@ async function createDiscussion(req, res) {
       }
     }
 
+    // Phase 4: optional attachments array. Each attachment must be an
+    // object that came from POST /resources/upload — only the internal
+    // /uploads/group-media/... url is allowed through so arbitrary URLs
+    // cannot be injected via this field. Capped at 4 per post.
+    let validatedAttachments = null
+    if (attachments != null) {
+      if (!Array.isArray(attachments)) {
+        return res.status(400).json({ error: 'attachments must be an array.' })
+      }
+      if (attachments.length > 4) {
+        return res.status(400).json({ error: 'Max 4 attachments per post.' })
+      }
+      const allowedKinds = new Set(['image', 'video', 'file'])
+      const normalized = []
+      for (const raw of attachments) {
+        if (!raw || typeof raw !== 'object') {
+          return res.status(400).json({ error: 'Each attachment must be an object.' })
+        }
+        if (typeof raw.url !== 'string' || !raw.url.startsWith('/uploads/group-media/')) {
+          return res.status(400).json({ error: 'attachment.url must be an uploaded /uploads/group-media/... path.' })
+        }
+        if (raw.kind && !allowedKinds.has(raw.kind)) {
+          return res.status(400).json({ error: 'Invalid attachment.kind.' })
+        }
+        normalized.push({
+          url: raw.url,
+          mime: typeof raw.mime === 'string' ? raw.mime.slice(0, 120) : null,
+          bytes: Number.parseInt(raw.bytes, 10) || null,
+          kind: raw.kind || 'file',
+        })
+      }
+      validatedAttachments = normalized
+    }
+
+    // Phase 5 B.5: if the group has post-approval enabled and the
+    // caller is not a mod, new posts enter 'pending_approval' status.
+    // Admins/mods bypass the queue — they ARE the moderators.
+    let postStatus = 'published'
+    try {
+      const groupRow = await prisma.studyGroup.findUnique({
+        where: { id: groupId },
+        select: { requirePostApproval: true },
+      })
+      if (groupRow?.requirePostApproval) {
+        const isModUser = await isGroupAdminOrMod(groupId, req.user.userId)
+        if (!isModUser) {
+          postStatus = 'pending_approval'
+        }
+      }
+    } catch {
+      // Graceful degradation — default to published
+    }
+
     const post = await prisma.groupDiscussionPost.create({
       data: {
         groupId,
@@ -137,6 +214,8 @@ async function createDiscussion(req, res) {
         title: validTitle,
         content: strippedContent,
         type,
+        status: postStatus,
+        ...(validatedAttachments ? { attachments: validatedAttachments } : {}),
       },
       include: {
         author: { select: { id: true, username: true, avatarUrl: true } },
@@ -183,6 +262,8 @@ async function createDiscussion(req, res) {
       type: post.type,
       pinned: post.pinned,
       resolved: post.resolved,
+      status: post.status || 'published',
+      attachments: post.attachments || null,
       replyCount: 0,
       createdAt: post.createdAt,
       updatedAt: post.updatedAt,
@@ -374,12 +455,71 @@ async function deleteDiscussion(req, res) {
       return res.status(404).json({ error: 'Post not found.' })
     }
 
-    // Check permission (author or admin)
-    const isAdmin = await isGroupAdmin(groupId, req.user.userId)
-    if (post.userId !== req.user.userId && !isAdmin) {
+    // Check permission (author or admin/mod)
+    const isModOrAdmin = await isGroupAdminOrMod(groupId, req.user.userId)
+    const isAuthor = post.userId === req.user.userId
+    if (!isAuthor && !isModOrAdmin) {
       return res.status(403).json({ error: 'Not authorized.' })
     }
 
+    // Phase 5 C.1: when a MOD removes someone else's post (not their own),
+    // soft-delete it, increment the author's strike counter, and auto-ban
+    // them if they've hit 2+ strikes within 30 days. Authors deleting their
+    // own posts still hard-delete normally and incur no strikes.
+    if (isModOrAdmin && !isAuthor) {
+      // Soft-delete: mark as removed instead of hard-deleting.
+      await prisma.groupDiscussionPost.update({
+        where: { id: postId },
+        data: { status: 'removed', removedAt: new Date(), removedById: req.user.userId },
+      })
+
+      // Increment the author's strike counter.
+      const now = new Date()
+      try {
+        const authorMember = await prisma.studyGroupMember.findUnique({
+          where: { groupId_userId: { groupId, userId: post.userId } },
+        })
+        if (authorMember) {
+          const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+          // Reset counter if lastStrikeAt is older than 30 days.
+          const resetCounter = !authorMember.lastStrikeAt || new Date(authorMember.lastStrikeAt) < thirtyDaysAgo
+          const nextCount = resetCounter ? 1 : (authorMember.strikeCount || 0) + 1
+
+          await prisma.studyGroupMember.update({
+            where: { id: authorMember.id },
+            data: { strikeCount: nextCount, lastStrikeAt: now },
+          })
+
+          // Auto-ban at 2 strikes in 30 days: change status to 'banned'.
+          if (nextCount >= 2) {
+            await prisma.studyGroupMember.update({
+              where: { id: authorMember.id },
+              data: { status: 'banned' },
+            })
+
+            // Audit the auto-ban.
+            try {
+              const { writeAuditLog } = require('./studyGroups.reports.service')
+              await writeAuditLog({
+                groupId,
+                actorId: null, // system-automated action
+                action: 'member.auto_ban',
+                targetType: 'member',
+                targetId: post.userId,
+                context: { strikes: nextCount, window: '30d' },
+                req,
+              })
+            } catch { /* audit never blocks */ }
+          }
+        }
+      } catch {
+        // Non-fatal: strike tracking should not block the delete.
+      }
+
+      return res.status(204).send()
+    }
+
+    // Author self-delete: hard delete, no strikes.
     await prisma.groupDiscussionPost.delete({
       where: { id: postId },
     })

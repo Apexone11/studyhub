@@ -1,74 +1,6 @@
 import { useEffect } from 'react'
-import { Link } from 'react-router-dom'
 import { IconFork } from '../../../components/Icons'
-import UserAvatar from '../../../components/UserAvatar'
-import { timeAgo } from './sheetLabConstants'
-
-/* ── Fork tree node (recursive) ──────────────────────────── */
-
-function TreeNode({ node, depth = 0 }) {
-  return (
-    <>
-      <div
-        className={`lineage-node${node.isCurrent ? ' lineage-node--current' : ''}`}
-        style={{ paddingLeft: depth * 24 + 12 }}
-      >
-        {depth > 0 && (
-          <span className="lineage-node__branch" aria-hidden="true">
-            <svg width="16" height="20" viewBox="0 0 16 20" fill="none">
-              <path d="M0 0 V10 H12" stroke="var(--sh-border, #cbd5e1)" strokeWidth="1.5" fill="none" />
-            </svg>
-          </span>
-        )}
-        <div className="lineage-node__card">
-          <div className="lineage-node__top">
-            <Link
-              to={`/sheets/${node.id}/lab`}
-              className="lineage-node__title"
-            >
-              {node.title || 'Untitled'}
-            </Link>
-            {node.isCurrent && (
-              <span className="lineage-node__you-badge">current</span>
-            )}
-            <span className={`sheet-lab__status-badge sheet-lab__status-badge--${node.status}`}>
-              {(node.status || '').replace('_', ' ')}
-            </span>
-          </div>
-          <div className="lineage-node__meta">
-            {node.author ? (
-              <span className="lineage-node__author">
-                <UserAvatar
-                  username={node.author.username}
-                  avatarUrl={node.author.avatarUrl}
-                  size={16}
-                />
-                {node.author.username}
-              </span>
-            ) : null}
-            {node.forks > 0 && (
-              <span className="lineage-node__stat">
-                <IconFork size={11} /> {node.forks}
-              </span>
-            )}
-            {node.stars > 0 && (
-              <span className="lineage-node__stat">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26" />
-                </svg>
-                {node.stars}
-              </span>
-            )}
-            <span className="lineage-node__time">{timeAgo(node.updatedAt)}</span>
-          </div>
-        </div>
-      </div>
-      {node.children?.length > 0 && node.children.map((child) => (
-        <TreeNode key={child.id} node={child} depth={depth + 1} />
-      ))}
-    </>
-  )
-}
+import ForkTree from '../../../components/forkTree/ForkTree'
 
 /* ── Main lineage panel ──────────────────────────────────── */
 
@@ -113,7 +45,7 @@ export default function SheetLabLineage({ lab }) {
         </span>
       </div>
       <div className="lineage-panel__tree">
-        <TreeNode node={lineage.root} depth={0} />
+        <ForkTree root={lineage.root} linkMode="lab" />
       </div>
     </div>
   )

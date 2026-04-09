@@ -1,9 +1,10 @@
 /**
- * SheetLab Editor tab — split-pane content editor with live preview.
- * Supports three content formats:
- *   - markdown: plain textarea
- *   - html: plain textarea with iframe preview
- *   - richtext: TipTap WYSIWYG editor (Track C1)
+ * SheetLab Editor tab — thin shell that owns title/description/save/publish.
+ * Delegates rendering to SheetLabEditorSurface and mode-switching to
+ * EditorModeToggle. Content formats supported:
+ *   - richtext: TipTap WYSIWYG editor (first-class)
+ *   - html:     CodeMirror code editor with live iframe preview (first-class)
+ *   - markdown: legacy textarea + plain preview (read-only migration target)
  * Handles save via PATCH /api/sheets/:id with debounced autosave.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -11,35 +12,11 @@ import { API } from '../../../config'
 import { authHeaders } from './sheetLabConstants'
 import { getApiErrorMessage, readJsonSafely } from '../../../lib/http'
 import { showToast } from '../../../lib/toast'
-import { RichTextEditor } from '../../../components/editor'
 import '../../../components/editor/richTextEditor.css'
+import SheetLabEditorSurface from './editor/SheetLabEditorSurface'
+import EditorModeToggle from '../../../components/editor/EditorModeToggle'
 
 const AUTOSAVE_DELAY = 1500
-
-const editorStyle = {
-  width: '100%',
-  height: '100%',
-  minHeight: 400,
-  resize: 'none',
-  border: 'none',
-  background: '#0f172a',
-  color: '#e2e8f0',
-  fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
-  fontSize: '12.5px',
-  lineHeight: 1.9,
-  padding: 16,
-  outline: 'none',
-  boxSizing: 'border-box',
-}
-
-const previewFrameStyle = {
-  width: '100%',
-  height: '100%',
-  minHeight: 400,
-  border: 'none',
-  borderRadius: 0,
-  background: '#fff',
-}
 
 export default function SheetLabEditor({ sheet, onContentSaved }) {
   const [content, setContent] = useState('')
@@ -52,8 +29,6 @@ export default function SheetLabEditor({ sheet, onContentSaved }) {
   const [sheetStatus, setSheetStatus] = useState('draft')
   const [activeFormat, setActiveFormat] = useState('markdown')
   const autosaveTimer = useRef(null)
-  const isHtml = activeFormat === 'html'
-  const isRichText = activeFormat === 'richtext'
   const isDraft = sheetStatus === 'draft'
 
   // Hydrate from sheet
@@ -173,13 +148,19 @@ export default function SheetLabEditor({ sheet, onContentSaved }) {
     save(content, title, description, activeFormat)
   }
 
-  // Upgrade markdown → richtext format
-  const handleUpgradeToRichText = () => {
-    if (activeFormat === 'richtext') return
-    setActiveFormat('richtext')
+  // Switch editor mode. EditorModeToggle owns the lossy-detection + sanitize
+  // logic and hands us the next (format, content) pair. We just flip state
+  // and mark the sheet dirty so the new contentFormat gets persisted on the
+  // next autosave.
+  const handleFormatChange = useCallback((nextFormat, nextContent) => {
+    if (nextFormat === activeFormat && nextContent === content) return
+    setActiveFormat(nextFormat)
+    if (typeof nextContent === 'string' && nextContent !== content) {
+      setContent(nextContent)
+    }
     setDirty(true)
-    showToast('Switched to rich text editor. Save to persist.', 'success')
-  }
+    showToast(`Switched to ${nextFormat === 'richtext' ? 'Rich Text' : 'HTML/Code'} mode.`, 'success')
+  }, [activeFormat, content])
 
   return (
     <div style={{ display: 'grid', gap: 14 }}>
@@ -237,30 +218,12 @@ export default function SheetLabEditor({ sheet, onContentSaved }) {
           </span>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <span style={{
-            padding: '2px 8px', borderRadius: 6, fontWeight: 700, fontSize: 10,
-            background: isRichText ? 'var(--sh-soft)' : isHtml ? 'var(--sh-brand-soft)' : 'var(--sh-soft)',
-            color: isRichText ? 'var(--sh-brand-accent)' : isHtml ? 'var(--sh-brand)' : 'var(--sh-brand)',
-            textTransform: 'uppercase',
-          }}>
-            {activeFormat}
-          </span>
-          {/* Show upgrade button for markdown sheets that aren't yet richtext */}
-          {activeFormat === 'markdown' && (
-            <button
-              type="button"
-              onClick={handleUpgradeToRichText}
-              title="Switch to the rich text WYSIWYG editor"
-              style={{
-                border: '1px solid var(--sh-brand-accent)', borderRadius: 6, padding: '2px 8px',
-                background: 'transparent', color: 'var(--sh-brand-accent)',
-                fontWeight: 700, fontSize: 10, cursor: 'pointer',
-                fontFamily: 'inherit', textTransform: 'uppercase',
-              }}
-            >
-              Upgrade to Rich Text
-            </button>
-          )}
+          <EditorModeToggle
+            value={activeFormat}
+            currentContent={content}
+            onChange={handleFormatChange}
+            disabled={saving || publishing}
+          />
           <button
             type="button"
             onClick={handleManualSave}
@@ -300,78 +263,12 @@ export default function SheetLabEditor({ sheet, onContentSaved }) {
         </div>
       </div>
 
-      {/* Editor area — richtext uses TipTap WYSIWYG, others use split-pane textarea */}
-      {isRichText ? (
-        <div style={{
-          borderRadius: 14,
-          overflow: 'hidden',
-          border: '1px solid var(--sh-border)',
-          minHeight: 300,
-        }}>
-          <RichTextEditor
-            content={content}
-            onUpdate={handleRichTextUpdate}
-            placeholder="Start writing your study notes..."
-            minHeight={400}
-          />
-        </div>
-      ) : (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-          gap: 0,
-          borderRadius: 14,
-          overflow: 'hidden',
-          border: '1px solid var(--sh-border)',
-          minHeight: 300,
-        }}>
-          {/* Textarea editor */}
-          <div style={{ position: 'relative' }}>
-            <div style={{
-              padding: '6px 12px', background: '#1e293b', color: '#94a3b8',
-              fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px',
-              borderBottom: '1px solid #334155',
-            }}>
-              Editor
-            </div>
-            <textarea
-              value={content}
-              onChange={handleContentChange}
-              style={editorStyle}
-              spellCheck={!isHtml}
-              placeholder={isHtml ? 'HTML content…' : 'Write your content in markdown…'}
-            />
-          </div>
-
-          {/* Preview */}
-          <div style={{ borderLeft: '1px solid var(--sh-border)' }}>
-            <div style={{
-              padding: '6px 12px', background: 'var(--sh-soft)', color: 'var(--sh-muted)',
-              fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px',
-              borderBottom: '1px solid var(--sh-border)',
-            }}>
-              Preview
-            </div>
-            {isHtml ? (
-              <iframe
-                title="html-preview"
-                sandbox="allow-same-origin"
-                srcDoc={content}
-                style={previewFrameStyle}
-              />
-            ) : (
-              <div style={{
-                padding: 16, fontSize: 13, lineHeight: 1.8,
-                color: 'var(--sh-text)', background: 'var(--sh-surface)',
-                minHeight: 400, overflowY: 'auto',
-                whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-              }}>
-                {content || <span style={{ color: 'var(--sh-muted)', fontStyle: 'italic' }}>Start typing to see a live preview…</span>}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      <SheetLabEditorSurface
+        content={content}
+        contentFormat={activeFormat}
+        onContentChange={handleContentChange}
+        onRichTextUpdate={handleRichTextUpdate}
+      />
     </div>
   )
 }

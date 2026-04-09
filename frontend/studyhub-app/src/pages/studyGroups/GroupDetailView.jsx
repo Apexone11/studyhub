@@ -21,13 +21,18 @@ import Navbar from '../../components/navbar/Navbar'
 import AppSidebar from '../../components/sidebar/AppSidebar'
 import { PageShell } from '../shared/pageScaffold'
 import { EditGroupModal } from './GroupModals'
+import GroupBackgroundPicker from './GroupBackgroundPicker'
+import ReportGroupModal from './ReportGroupModal'
 import { styles } from './studyGroupsStyles'
+import { IconPen, IconFlag, IconLock } from '../../components/Icons'
 
 export default function GroupDetailView({ groupId }) {
   const navigate = useNavigate()
   const { user } = useSession()
   const currentUserId = user?.id || null
   const [editModalOpen, setEditModalOpen] = useState(false)
+  const [backgroundPickerOpen, setBackgroundPickerOpen] = useState(false)
+  const [reportModalOpen, setReportModalOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('overview')
 
   const {
@@ -47,6 +52,13 @@ export default function GroupDetailView({ groupId }) {
     removeMember,
     updateMember,
     inviteMember,
+    blockMember,
+    unblockMember,
+    muteMember,
+    unmuteMember,
+    blockedUsers,
+    blockedLoading,
+    loadBlockedUsers,
     resources,
     addResource,
     deleteResource,
@@ -135,6 +147,11 @@ export default function GroupDetailView({ groupId }) {
   const isInvited = membershipStatus === 'invited'
   const isAdminOrMod = isAdmin || activeGroup.userRole === 'moderator'
   const groupImageUrl = resolveGroupImageUrl(activeGroup.avatarUrl)
+  // Phase 4: owner-curated banner image. Falls back to the avatar image,
+  // then to the default gradient when neither is set.
+  const headerBackgroundUrl = activeGroup.backgroundUrl
+    ? resolveGroupImageUrl(activeGroup.backgroundUrl)
+    : groupImageUrl
   const detailDescription = activeGroup.description || 'Use this space to coordinate sessions, share resources, and keep your study rhythm together.'
 
   const handleEdit = async (updates) => {
@@ -193,15 +210,16 @@ export default function GroupDetailView({ groupId }) {
             style={{
               position: 'relative',
               minHeight: 220,
-              background: groupImageUrl
+              background: headerBackgroundUrl
                 ? 'linear-gradient(135deg, rgba(15, 23, 42, 0.18), rgba(15, 23, 42, 0.48))'
                 : 'linear-gradient(135deg, rgba(37, 99, 235, 0.92), rgba(124, 58, 237, 0.9))',
             }}
           >
-            {groupImageUrl ? (
+            {headerBackgroundUrl ? (
               <img
-                src={groupImageUrl}
-                alt={activeGroup.name}
+                src={headerBackgroundUrl}
+                alt=""
+                aria-hidden="true"
                 style={{
                   position: 'absolute',
                   inset: 0,
@@ -210,6 +228,57 @@ export default function GroupDetailView({ groupId }) {
                   objectFit: 'cover',
                 }}
               />
+            ) : null}
+
+            {/* Phase 4: admin/mod can open the background picker */}
+            {isAdminOrMod ? (
+              <button
+                type="button"
+                onClick={() => setBackgroundPickerOpen(true)}
+                aria-label="Change group background"
+                style={{
+                  position: 'absolute',
+                  top: 12,
+                  right: 12,
+                  zIndex: 2,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '6px 12px',
+                  borderRadius: 8,
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  background: 'rgba(15, 23, 42, 0.55)',
+                  color: '#fff',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  backdropFilter: 'blur(6px)',
+                }}
+              >
+                <IconPen size={12} />
+                Change background
+              </button>
+            ) : null}
+
+            {/* Phase 4: attribution line in the bottom-right if set */}
+            {activeGroup.backgroundCredit ? (
+              <div
+                aria-label="Background attribution"
+                style={{
+                  position: 'absolute',
+                  right: 14,
+                  bottom: 10,
+                  zIndex: 2,
+                  fontSize: 11,
+                  color: 'rgba(255, 255, 255, 0.85)',
+                  textShadow: '0 1px 2px rgba(0, 0, 0, 0.55)',
+                  pointerEvents: 'none',
+                  maxWidth: '60%',
+                  textAlign: 'right',
+                }}
+              >
+                {activeGroup.backgroundCredit}
+              </div>
             ) : null}
 
             <div
@@ -222,7 +291,7 @@ export default function GroupDetailView({ groupId }) {
                 gap: 20,
                 minHeight: 220,
                 padding: '24px',
-                background: groupImageUrl
+                background: headerBackgroundUrl
                   ? 'linear-gradient(180deg, rgba(15, 23, 42, 0.16), rgba(15, 23, 42, 0.68))'
                   : 'transparent',
               }}
@@ -326,6 +395,25 @@ export default function GroupDetailView({ groupId }) {
                     <button onClick={handleLeave} style={styles.leaveBtn}>
                       Leave Group
                     </button>
+                    {/* Report — anyone except the owner can report */}
+                    {activeGroup.createdById !== currentUserId ? (
+                      <button
+                        onClick={() => setReportModalOpen(true)}
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 6,
+                          padding: '8px 14px', borderRadius: 10,
+                          border: '1px solid var(--sh-danger-border)',
+                          background: 'var(--sh-danger-bg)',
+                          color: 'var(--sh-danger-text)',
+                          fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                          fontFamily: 'inherit',
+                        }}
+                        title="Report this group"
+                      >
+                        <IconFlag size={13} />
+                        Report
+                      </button>
+                    ) : null}
                   </>
                 )}
               </div>
@@ -333,6 +421,44 @@ export default function GroupDetailView({ groupId }) {
           </div>
 
           <div style={{ padding: '24px', display: 'grid', gap: 18 }}>
+            {/* Phase 5: moderation banners */}
+            {activeGroup.moderationStatus === 'warned' ? (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '12px 16px', borderRadius: 12,
+                background: 'var(--sh-warning-bg)', border: '1px solid var(--sh-warning-border)',
+                color: 'var(--sh-warning-text)', fontSize: 13, fontWeight: 600, lineHeight: 1.5,
+              }}>
+                <IconFlag size={16} style={{ flexShrink: 0 }} />
+                <div>
+                  This group received a warning from our review team. Please review the community guidelines to avoid further action.
+                  {activeGroup.warnedUntil ? (
+                    <span style={{ display: 'block', fontSize: 11, color: 'var(--sh-muted)', marginTop: 4 }}>
+                      Warning expires: {new Date(activeGroup.warnedUntil).toLocaleDateString()}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+            {activeGroup.moderationStatus === 'locked' ? (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '12px 16px', borderRadius: 12,
+                background: 'var(--sh-danger-bg)', border: '1px solid var(--sh-danger-border)',
+                color: 'var(--sh-danger-text)', fontSize: 13, fontWeight: 600, lineHeight: 1.5,
+              }}>
+                <IconLock size={16} style={{ flexShrink: 0 }} />
+                <div>
+                  This group has been locked (read-only) by our review team. Members can view existing content but cannot post or upload.
+                  {activeGroup.createdById === currentUserId ? (
+                    <span style={{ display: 'block', fontSize: 11, marginTop: 4 }}>
+                      You can appeal this decision using the Appeal button above.
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+
             <div
               style={{
                 display: 'grid',
@@ -476,6 +602,13 @@ export default function GroupDetailView({ groupId }) {
               onRemoveMember={(userId) => removeMember(groupId, userId)}
               onUpdateMember={(userId, data) => updateMember(groupId, userId, data)}
               onInvite={(data) => inviteMember(groupId, data)}
+              onBlock={(userId, reason) => blockMember(groupId, userId, reason)}
+              onUnblock={(userId) => unblockMember(groupId, userId)}
+              onMute={(userId, days, reason) => muteMember(groupId, userId, days, reason)}
+              onUnmute={(userId) => unmuteMember(groupId, userId)}
+              blockedUsers={blockedUsers}
+              blockedLoading={blockedLoading}
+              onLoadBlocked={() => loadBlockedUsers(groupId)}
               isAdmin={isAdmin}
               isAdminOrMod={isAdminOrMod}
               viewerRole={activeGroup.userRole || null}
@@ -497,6 +630,32 @@ export default function GroupDetailView({ groupId }) {
           />,
           document.body,
         )}
+
+      {/* Phase 4: group background picker (admins/mods only) */}
+      <GroupBackgroundPicker
+        open={backgroundPickerOpen}
+        groupId={activeGroup.id}
+        currentBackgroundUrl={activeGroup.backgroundUrl}
+        currentBackgroundCredit={activeGroup.backgroundCredit}
+        onClose={() => setBackgroundPickerOpen(false)}
+        onSaved={() => {
+          setBackgroundPickerOpen(false)
+          loadGroupDetails(activeGroup.id)
+        }}
+      />
+
+      {/* Phase 5: report group modal */}
+      <ReportGroupModal
+        open={reportModalOpen}
+        onClose={() => setReportModalOpen(false)}
+        groupId={activeGroup.id}
+        groupName={activeGroup.name}
+        onReported={() => {
+          // After reporting, navigate back to the list — the backend
+          // will now hide this group from the user's view.
+          navigate('/study-groups')
+        }}
+      />
     </PageShell>
   )
 }

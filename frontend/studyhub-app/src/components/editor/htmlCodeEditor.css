@@ -1,0 +1,77 @@
+/**
+ * CodeMirror 6 host styling. CLAUDE.md explicitly calls out
+ * "dark-mode-always editor panels" as an exception to the
+ * CSS-custom-property-token rule, so the raw hex colors here are fine.
+ */
+
+.sh-html-code-editor {
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+.sh-html-code-editor .cm-editor {
+  height: 100%;
+  min-height: 320px;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 12.5px;
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+.sh-html-code-editor .cm-editor.cm-focused {
+  outline: none;
+}
+
+.sh-html-code-editor .cm-scroller {
+  font-family: inherit;
+  line-height: 1.6;
+}
+
+.sh-html-code-editor .cm-gutters {
+  background: #0b1220 !important;
+  color: #475569 !important;
+  border-right: 1px solid #1e293b !important;
+}
+
+.sh-html-code-editor .cm-activeLineGutter,
+.sh-html-code-editor .cm-activeLine {
+  background: rgba(56, 189, 248, 0.08) !important;
+}
+
+.sh-html-code-editor .cm-selectionBackground,
+.sh-html-code-editor .cm-editor ::selection {
+  background: rgba(59, 130, 246, 0.35) !important;
+}
+
+.sh-html-code-editor .cm-cursor {
+  border-left-color: #e2e8f0;
+}
+
+/* Syntax colors — tuned for the dark slate background */
+.sh-html-code-editor .cm-editor .tok-tagName,
+.sh-html-code-editor .cm-editor .ͼb { /* CodeMirror generates dynamic class names */
+  color: #60a5fa;
+}
+.sh-html-code-editor .cm-editor .tok-attributeName {
+  color: #a78bfa;
+}
+.sh-html-code-editor .cm-editor .tok-string,
+.sh-html-code-editor .cm-editor .tok-attributeValue {
+  color: #34d399;
+}
+.sh-html-code-editor .cm-editor .tok-comment {
+  color: #64748b;
+  font-style: italic;
+}
+
+/* Autocomplete popover — make sure it is visible above stacked pane borders */
+.sh-html-code-editor .cm-tooltip.cm-tooltip-autocomplete {
+  background: #1e293b;
+  border: 1px solid #334155;
+  color: #e2e8f0;
+  border-radius: 6px;
+}
+.sh-html-code-editor .cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected] {
+  background: #334155;
+  color: #fff;
+}

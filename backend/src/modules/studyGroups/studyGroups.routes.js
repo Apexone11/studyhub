@@ -28,7 +28,7 @@
 
 const express = require('express')
 const requireAuth = require('../../middleware/auth')
-const { readLimiter, writeLimiter } = require('../../lib/rateLimiters')
+const { readLimiter, writeLimiter, groupJoinLimiter } = require('../../lib/rateLimiters')
 
 // Import controller
 const {
@@ -50,6 +50,7 @@ const resourcesRouter = require('./studyGroups.resources.routes')
 const sessionsRouter = require('./studyGroups.sessions.routes')
 const discussionsRouter = require('./studyGroups.discussions.routes')
 const activityRouter = require('./studyGroups.activity.routes')
+const reportsRouter = require('./studyGroups.reports.routes')
 
 const router = express.Router()
 
@@ -89,7 +90,7 @@ router.delete('/:id', writeLimiter, requireAuth, deleteGroup)
  * POST /api/study-groups/:id/join
  * Join public group or request to join private group
  */
-router.post('/:id/join', writeLimiter, requireAuth, joinGroup)
+router.post('/:id/join', groupJoinLimiter, requireAuth, joinGroup)
 
 /**
  * POST /api/study-groups/:id/leave
@@ -121,6 +122,292 @@ router.delete('/:id/members/:userId', writeLimiter, requireAuth, removeMember)
  */
 router.post('/:id/invite', writeLimiter, requireAuth, inviteUser)
 
+// ===== PHASE 5: GROUP BLOCKS =====
+
+const prisma = require('../../lib/prisma')
+const { captureError } = require('../../monitoring/sentry')
+const { parseId, isGroupAdminOrMod } = require('./studyGroups.helpers')
+const { writeAuditLog } = require('./studyGroups.reports.service')
+
+/**
+ * POST /api/study-groups/:id/block/:userId
+ * Block a user from a group (admin/moderator only).
+ */
+router.post('/:id/block/:userId', writeLimiter, requireAuth, async (req, res) => {
+  try {
+    const groupId = parseId(req.params.id)
+    const targetUserId = parseId(req.params.userId)
+    if (groupId === null || targetUserId === null) {
+      return res.status(400).json({ error: 'Invalid IDs.' })
+    }
+
+    const isMod = await isGroupAdminOrMod(groupId, req.user.userId)
+    if (!isMod) return res.status(403).json({ error: 'Admin or moderator access required.' })
+
+    if (targetUserId === req.user.userId) {
+      return res.status(400).json({ error: 'You cannot block yourself.' })
+    }
+
+    const reason = typeof req.body?.reason === 'string'
+      ? req.body.reason.replace(/<[^>]*>/g, '').trim().slice(0, 500)
+      : ''
+
+    // Upsert: if already blocked, just update reason.
+    await prisma.groupBlock.upsert({
+      where: { groupId_userId: { groupId, userId: targetUserId } },
+      update: { reason, blockedById: req.user.userId },
+      create: { groupId, userId: targetUserId, blockedById: req.user.userId, reason },
+    })
+
+    // Remove any active membership so the blocked user loses access
+    // immediately. Use deleteMany to avoid errors if the row doesn't exist.
+    await prisma.studyGroupMember.deleteMany({
+      where: { groupId, userId: targetUserId },
+    })
+
+    await writeAuditLog({
+      groupId,
+      actorId: req.user.userId,
+      action: 'member.block',
+      targetType: 'member',
+      targetId: targetUserId,
+      context: { reason },
+      req,
+    })
+
+    res.json({ message: 'User blocked from group.' })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+/**
+ * DELETE /api/study-groups/:id/block/:userId
+ * Unblock a user (admin/moderator only).
+ */
+router.delete('/:id/block/:userId', writeLimiter, requireAuth, async (req, res) => {
+  try {
+    const groupId = parseId(req.params.id)
+    const targetUserId = parseId(req.params.userId)
+    if (groupId === null || targetUserId === null) {
+      return res.status(400).json({ error: 'Invalid IDs.' })
+    }
+
+    const isMod = await isGroupAdminOrMod(groupId, req.user.userId)
+    if (!isMod) return res.status(403).json({ error: 'Admin or moderator access required.' })
+
+    await prisma.groupBlock.deleteMany({
+      where: { groupId, userId: targetUserId },
+    })
+
+    await writeAuditLog({
+      groupId,
+      actorId: req.user.userId,
+      action: 'member.unblock',
+      targetType: 'member',
+      targetId: targetUserId,
+      req,
+    })
+
+    res.json({ message: 'User unblocked.' })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+/**
+ * GET /api/study-groups/:id/blocks
+ * List blocked users (admin/moderator only).
+ */
+router.get('/:id/blocks', readLimiter, requireAuth, async (req, res) => {
+  try {
+    const groupId = parseId(req.params.id)
+    if (groupId === null) return res.status(400).json({ error: 'Invalid group ID.' })
+
+    const isMod = await isGroupAdminOrMod(groupId, req.user.userId)
+    if (!isMod) return res.status(403).json({ error: 'Admin or moderator access required.' })
+
+    const blocks = await prisma.groupBlock.findMany({
+      where: { groupId },
+      include: {
+        user: { select: { id: true, username: true, avatarUrl: true } },
+        blockedBy: { select: { id: true, username: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+
+    res.json({
+      blocks: blocks.map((b) => ({
+        id: b.id,
+        userId: b.userId,
+        user: b.user,
+        blockedBy: b.blockedBy,
+        reason: b.reason,
+        createdAt: b.createdAt,
+      })),
+    })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ===== PHASE 5 B.2: GROUP MUTES =====
+
+/**
+ * POST /api/study-groups/:id/mute/:userId
+ * Mute a member for N days (admin/moderator only). Muted users can read
+ * but cannot post, reply, or upload until the window expires.
+ * Body: { days?: number (default 7, max 90), reason?: string }
+ */
+router.post('/:id/mute/:userId', writeLimiter, requireAuth, async (req, res) => {
+  try {
+    const groupId = parseId(req.params.id)
+    const targetUserId = parseId(req.params.userId)
+    if (groupId === null || targetUserId === null) {
+      return res.status(400).json({ error: 'Invalid IDs.' })
+    }
+
+    const isMod = await isGroupAdminOrMod(groupId, req.user.userId)
+    if (!isMod) return res.status(403).json({ error: 'Admin or moderator access required.' })
+
+    if (targetUserId === req.user.userId) {
+      return res.status(400).json({ error: 'You cannot mute yourself.' })
+    }
+
+    const member = await prisma.studyGroupMember.findUnique({
+      where: { groupId_userId: { groupId, userId: targetUserId } },
+    })
+    if (!member || member.status !== 'active') {
+      return res.status(404).json({ error: 'Member not found.' })
+    }
+
+    const days = Math.min(Math.max(Number.parseInt(req.body?.days, 10) || 7, 1), 90)
+    const reason = typeof req.body?.reason === 'string'
+      ? req.body.reason.replace(/<[^>]*>/g, '').trim().slice(0, 500)
+      : ''
+
+    const mutedUntil = new Date(Date.now() + days * 24 * 60 * 60 * 1000)
+
+    await prisma.studyGroupMember.update({
+      where: { id: member.id },
+      data: { mutedUntil, mutedReason: reason, mutedById: req.user.userId },
+    })
+
+    await writeAuditLog({
+      groupId,
+      actorId: req.user.userId,
+      action: 'member.mute',
+      targetType: 'member',
+      targetId: targetUserId,
+      context: { days, reason, mutedUntil: mutedUntil.toISOString() },
+      req,
+    })
+
+    res.json({ message: `User muted for ${days} day${days === 1 ? '' : 's'}.`, mutedUntil: mutedUntil.toISOString() })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+/**
+ * DELETE /api/study-groups/:id/mute/:userId
+ * Lift a mute early (admin/moderator only).
+ */
+router.delete('/:id/mute/:userId', writeLimiter, requireAuth, async (req, res) => {
+  try {
+    const groupId = parseId(req.params.id)
+    const targetUserId = parseId(req.params.userId)
+    if (groupId === null || targetUserId === null) {
+      return res.status(400).json({ error: 'Invalid IDs.' })
+    }
+
+    const isMod = await isGroupAdminOrMod(groupId, req.user.userId)
+    if (!isMod) return res.status(403).json({ error: 'Admin or moderator access required.' })
+
+    const member = await prisma.studyGroupMember.findUnique({
+      where: { groupId_userId: { groupId, userId: targetUserId } },
+    })
+    if (!member) return res.status(404).json({ error: 'Member not found.' })
+
+    await prisma.studyGroupMember.update({
+      where: { id: member.id },
+      data: { mutedUntil: null, mutedReason: '', mutedById: null },
+    })
+
+    await writeAuditLog({
+      groupId,
+      actorId: req.user.userId,
+      action: 'member.unmute',
+      targetType: 'member',
+      targetId: targetUserId,
+      req,
+    })
+
+    res.json({ message: 'User unmuted.' })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ===== PHASE 5 C.3: GROUP AUDIT LOG =====
+
+/**
+ * GET /api/study-groups/:id/audit-log
+ * Per-group audit log (admin/moderator of that group, or platform admin).
+ */
+router.get('/:id/audit-log', readLimiter, requireAuth, async (req, res) => {
+  try {
+    const groupId = parseId(req.params.id)
+    if (groupId === null) return res.status(400).json({ error: 'Invalid group ID.' })
+
+    const isMod = await isGroupAdminOrMod(groupId, req.user.userId)
+    const isPlatformAdmin = req.user.role === 'admin'
+    if (!isMod && !isPlatformAdmin) {
+      return res.status(403).json({ error: 'Admin or moderator access required.' })
+    }
+
+    const { limit = 50, offset = 0 } = req.query
+    const limitNum = Math.min(Number.parseInt(limit, 10) || 50, 100)
+    const offsetNum = Math.max(Number.parseInt(offset, 10) || 0, 0)
+
+    const [entries, total] = await Promise.all([
+      prisma.groupAuditLog.findMany({
+        where: { groupId },
+        include: {
+          actor: { select: { id: true, username: true, avatarUrl: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: offsetNum,
+        take: limitNum,
+      }),
+      prisma.groupAuditLog.count({ where: { groupId } }),
+    ])
+
+    // Redact IP from non-platform-admins — group mods can see
+    // action + actor + context but not forensic data.
+    const redacted = entries.map((e) => ({
+      id: e.id,
+      action: e.action,
+      targetType: e.targetType,
+      targetId: e.targetId,
+      context: e.context,
+      actor: e.actor,
+      createdAt: e.createdAt,
+      ...(isPlatformAdmin ? { ipAddress: e.ipAddress, userAgent: e.userAgent } : {}),
+    }))
+
+    res.json({ entries: redacted, total, limit: limitNum, offset: offsetNum })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
 // ===== SUB-ROUTER MOUNTS =====
 
 // Mount sub-routers with mergeParams enabled in each sub-router
@@ -128,5 +415,7 @@ router.use('/:id/resources', resourcesRouter)
 router.use('/:id/sessions', sessionsRouter)
 router.use('/:id/discussions', discussionsRouter)
 router.use('/:id/activity', activityRouter)
+// Phase 5: /report, /appeal, /my-report all handled by the reports sub-router
+router.use('/:id', reportsRouter)
 
 module.exports = router

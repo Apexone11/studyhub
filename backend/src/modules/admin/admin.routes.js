@@ -12,6 +12,7 @@ const auditController = require('./admin.audit.controller')
 const cacheController = require('./admin.cache.controller')
 const plagiarismController = require('./admin.plagiarism.controller')
 const analyticsController = require('./admin.analytics.controller')
+const groupReportsController = require('./admin.groupReports.controller')
 
 const router = express.Router()
 
@@ -30,5 +31,6 @@ router.use(auditController)
 router.use(cacheController)
 router.use(plagiarismController)
 router.use(analyticsController)
+router.use(groupReportsController)
 
 module.exports = router

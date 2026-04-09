@@ -113,8 +113,10 @@ router.post('/:id/fork', requireAuth, requireVerifiedEmail, sheetWriteLimiter, a
     // ── Create fork as DRAFT + initial fork_base commit in one transaction ──
     const checksum = computeChecksum(original.content)
 
-    const [forked] = await prisma.$transaction([
-      prisma.studySheet.create({
+    // Phase 6: batch all fork writes into a single interactive transaction
+    // to reduce DB round trips (sheet create + fork count increment + commit).
+    const forked = await prisma.$transaction(async (tx) => {
+      const created = await tx.studySheet.create({
         data: {
           title: forkTitle,
           description: original.description || '',
@@ -142,25 +144,28 @@ router.post('/:id/fork', requireAuth, requireVerifiedEmail, sheetWriteLimiter, a
             },
           },
         },
-      }),
-      // Increment fork count on original within the transaction
-      prisma.studySheet.update({
+      })
+
+      // Increment fork count on original
+      await tx.studySheet.update({
         where: { id: original.id },
         data: { forks: { increment: 1 } },
-      }),
-    ])
+      })
 
-    // Create fork_base commit (initial snapshot of forked content)
-    await prisma.sheetCommit.create({
-      data: {
-        sheetId: forked.id,
-        userId: req.user.userId,
-        kind: 'fork_base',
-        message: `Forked from "${original.title}"`,
-        content: original.content,
-        contentFormat: original.contentFormat || 'markdown',
-        checksum,
-      },
+      // Create fork_base commit (initial snapshot of forked content)
+      await tx.sheetCommit.create({
+        data: {
+          sheetId: created.id,
+          userId: req.user.userId,
+          kind: 'fork_base',
+          message: `Forked from "${original.title}"`,
+          content: original.content,
+          contentFormat: original.contentFormat || 'markdown',
+          checksum,
+        },
+      })
+
+      return created
     })
 
     await createNotification(prisma, {

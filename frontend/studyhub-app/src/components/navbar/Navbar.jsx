@@ -29,6 +29,7 @@ import { IconMessages } from '../Icons'
 import { S, getConfig, handleIconHover } from './navbarConstants'
 import { API } from '../../config'
 import { authHeaders } from '../../pages/shared/pageUtils'
+import { useChatPanel } from '../../lib/chatPanelContext.js'
 
 // ─── COMPONENT ────────────────────────────────────────────────────
 /**
@@ -65,8 +66,15 @@ export default function Navbar({
 
   // search modal state
   const [searchOpen, setSearchOpen] = useState(false)
-  // chat panel state
-  const [chatOpen, setChatOpen] = useState(false)
+  // chat panel state — mirrored into ChatPanelContext so components outside
+  // the navbar subtree (e.g. AiBubble) can react to it.
+  const { setOpen: setChatPanelOpen } = useChatPanel()
+  const [chatOpen, setChatOpenLocal] = useState(false)
+  const setChatOpen = (next) => {
+    const value = typeof next === 'function' ? next(chatOpen) : next
+    setChatOpenLocal(value)
+    setChatPanelOpen(value)
+  }
   // unread messages count for badge
   const [unreadMessages, setUnreadMessages] = useState(0)
 

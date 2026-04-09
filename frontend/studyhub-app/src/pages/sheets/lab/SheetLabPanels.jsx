@@ -63,8 +63,31 @@ function HunkSeparator({ hunk }) {
 
 /* ── Unified Diff Viewer ──────────────────────────────────────── */
 
-export function UnifiedDiffView({ diff }) {
+/**
+ * When `onSelectLine` is provided, lines become clickable; clicking a
+ * non-header line invokes `onSelectLine({ hunkIndex, lineOffset, side })`.
+ * `selected` is the currently-highlighted coordinate, or null.
+ *
+ * `side` is derived from line type: 'add' -> 'new', 'remove' -> 'old',
+ * 'equal' -> 'new' (we anchor equal-line comments to the new side so the
+ * conversation survives if the old line disappears in a future edit).
+ */
+function sideForLine(line) {
+  return line.type === 'remove' ? 'old' : 'new'
+}
+
+function isSelected(selected, hunkIndex, lineOffset, side) {
+  return (
+    selected
+    && selected.hunkIndex === hunkIndex
+    && selected.lineOffset === lineOffset
+    && selected.side === side
+  )
+}
+
+export function UnifiedDiffView({ diff, onSelectLine, selected }) {
   if (!diff) return null
+  const selectable = typeof onSelectLine === 'function'
   return (
     <div className="sheet-lab__diff-hunks">
       {(diff.hunks || []).map((hunk, hi) => {
@@ -72,25 +95,43 @@ export function UnifiedDiffView({ diff }) {
         return (
           <div key={hi}>
             <HunkSeparator hunk={hunk} />
-            {hunk.lines.map((line, li) => (
-              <div
-                key={li}
-                className={`sheet-lab__diff-line sheet-lab__diff-line--${line.type}`}
-              >
-                <span className="sheet-lab__diff-linenum sheet-lab__diff-linenum--old" aria-hidden="true">
-                  {lineNums[li].oldNum ?? ''}
-                </span>
-                <span className="sheet-lab__diff-linenum sheet-lab__diff-linenum--new" aria-hidden="true">
-                  {lineNums[li].newNum ?? ''}
-                </span>
-                <span className="sheet-lab__diff-gutter">
-                  {line.type === 'add' ? '+' : line.type === 'remove' ? '-' : ' '}
-                </span>
-                <span className="sheet-lab__diff-content">
-                  {line.segments ? <WordSegments segments={line.segments} /> : (line.content || '\u00A0')}
-                </span>
-              </div>
-            ))}
+            {hunk.lines.map((line, li) => {
+              const side = sideForLine(line)
+              const active = isSelected(selected, hi, li, side)
+              const className = `sheet-lab__diff-line sheet-lab__diff-line--${line.type}${active ? ' sheet-lab__diff-line--selected' : ''}`
+              const handleClick = selectable
+                ? () => onSelectLine({ hunkIndex: hi, lineOffset: li, side })
+                : undefined
+              return (
+                <div
+                  key={li}
+                  className={className}
+                  onClick={handleClick}
+                  onKeyDown={selectable ? (event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      onSelectLine({ hunkIndex: hi, lineOffset: li, side })
+                    }
+                  } : undefined}
+                  role={selectable ? 'button' : undefined}
+                  tabIndex={selectable ? 0 : undefined}
+                  style={selectable ? { cursor: 'pointer' } : undefined}
+                >
+                  <span className="sheet-lab__diff-linenum sheet-lab__diff-linenum--old" aria-hidden="true">
+                    {lineNums[li].oldNum ?? ''}
+                  </span>
+                  <span className="sheet-lab__diff-linenum sheet-lab__diff-linenum--new" aria-hidden="true">
+                    {lineNums[li].newNum ?? ''}
+                  </span>
+                  <span className="sheet-lab__diff-gutter">
+                    {line.type === 'add' ? '+' : line.type === 'remove' ? '-' : ' '}
+                  </span>
+                  <span className="sheet-lab__diff-content">
+                    {line.segments ? <WordSegments segments={line.segments} /> : (line.content || '\u00A0')}
+                  </span>
+                </div>
+              )
+            })}
           </div>
         )
       })}
@@ -198,7 +239,7 @@ export function SplitDiffView({ diff }) {
 
 /* ── DiffViewer with mode toggle ──────────────────────────────── */
 
-export function DiffViewer({ diff, title }) {
+export function DiffViewer({ diff, title, onSelectLine, selected }) {
   const [mode, setMode] = useState('unified')
 
   return (
@@ -228,7 +269,9 @@ export function DiffViewer({ diff, title }) {
           </div>
         </div>
       </div>
-      {mode === 'unified' ? <UnifiedDiffView diff={diff} /> : <SplitDiffView diff={diff} />}
+      {mode === 'unified'
+        ? <UnifiedDiffView diff={diff} onSelectLine={onSelectLine} selected={selected} />
+        : <SplitDiffView diff={diff} />}
     </div>
   )
 }

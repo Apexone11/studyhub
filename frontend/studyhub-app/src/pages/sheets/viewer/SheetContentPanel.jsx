@@ -173,13 +173,21 @@ export default function SheetContentPanel({
               <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--sh-brand-hover)', textTransform: 'uppercase' }}>
                 HTML sheet
               </span>
-              {previewMode === 'safe' ? (
-                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--sh-warning)', background: 'var(--sh-warning-bg)', border: '1px solid var(--sh-warning-border)', borderRadius: 6, padding: '2px 8px', textTransform: 'uppercase' }}>
-                  Flagged
+              {sheet.status === 'rejected' ? (
+                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--sh-danger-text)', background: 'var(--sh-danger-bg)', border: '1px solid var(--sh-danger-border)', borderRadius: 6, padding: '2px 8px', textTransform: 'uppercase' }}>
+                  Rejected
                 </span>
-              ) : previewMode === 'restricted' || previewMode === 'disabled' || sheet.status === 'pending_review' ? (
+              ) : sheet.status === 'quarantined' ? (
+                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--sh-danger-text)', background: 'var(--sh-danger-bg)', border: '1px solid var(--sh-danger-border)', borderRadius: 6, padding: '2px 8px', textTransform: 'uppercase' }}>
+                  Quarantined
+                </span>
+              ) : sheet.status === 'pending_review' ? (
                 <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--sh-warning-text)', background: 'var(--sh-warning-bg)', border: '1px solid var(--sh-warning-border)', borderRadius: 6, padding: '2px 8px', textTransform: 'uppercase' }}>
                   Pending Review
+                </span>
+              ) : previewMode === 'safe' ? (
+                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--sh-warning)', background: 'var(--sh-warning-bg)', border: '1px solid var(--sh-warning-border)', borderRadius: 6, padding: '2px 8px', textTransform: 'uppercase' }}>
+                  Flagged
                 </span>
               ) : null}
               {previewMode !== 'interactive' && sheet.htmlWorkflow?.riskSummary && (
