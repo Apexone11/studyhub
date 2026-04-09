@@ -104,7 +104,9 @@ export default function PricingPage() {
       }
     }
     load()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [user])
 
   // Animations
@@ -122,32 +124,41 @@ export default function PricingPage() {
     if (lowerRef.current) fadeInOnScroll(lowerRef.current.children, { y: 20 })
   }, [])
 
-  const effectivePlan = subscription?.plan && subscription.plan !== 'free'
-    ? subscription.plan
-    : (user?.plan && user.plan !== 'free' ? user.plan : 'free')
+  const effectivePlan =
+    subscription?.plan && subscription.plan !== 'free'
+      ? subscription.plan
+      : user?.plan && user.plan !== 'free'
+        ? user.plan
+        : 'free'
   const isSubscribed = effectivePlan !== 'free'
-  const hasActivePro = isSubscribed &&
-    ['active', 'trialing', 'past_due'].includes(subscription?.status || 'active')
+  const hasActivePro =
+    isSubscribed && ['active', 'trialing', 'past_due'].includes(subscription?.status || 'active')
   const isYearly = effectivePlan === 'pro_yearly'
   const isFreeUser = !hasActivePro
 
-  const handleSubscribe = useCallback(async (plan) => {
-    if (!user) { navigate('/login'); return }
-    try {
-      const res = await fetch(`${API}/api/payments/checkout/subscription`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ plan }),
-      })
-      const data = await res.json()
-      if (res.ok && data.url) window.location.href = data.url
-      else return data.error || 'Failed to start checkout.'
-    } catch {
-      return 'Network error. Please try again.'
-    }
-    return null
-  }, [user, navigate])
+  const handleSubscribe = useCallback(
+    async (plan) => {
+      if (!user) {
+        navigate('/login')
+        return
+      }
+      try {
+        const res = await fetch(`${API}/api/payments/checkout/subscription`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ plan }),
+        })
+        const data = await res.json()
+        if (res.ok && data.url) window.location.href = data.url
+        else return data.error || 'Failed to start checkout.'
+      } catch {
+        return 'Network error. Please try again.'
+      }
+      return null
+    },
+    [user, navigate],
+  )
 
   return (
     <div style={p.page}>
@@ -157,7 +168,8 @@ export default function PricingPage() {
       {successFromUrl && (
         <div style={p.successBanner}>
           <p style={p.successText}>
-            Success! Your payment is complete. Thank you for supporting StudyHub. Receipts and payment history are available in your subscription settings.
+            Success! Your payment is complete. Thank you for supporting StudyHub. Receipts and
+            payment history are available in your subscription settings.
           </p>
         </div>
       )}
@@ -166,9 +178,7 @@ export default function PricingPage() {
       <section style={p.hero}>
         <div style={p.heroInner} ref={heroRef}>
           <h1 style={p.heroH1}>StudyHub Pro</h1>
-          <p style={p.heroSub}>
-            Unlock the full power of collaborative studying.
-          </p>
+          <p style={p.heroSub}>Unlock the full power of collaborative studying.</p>
           {hasActivePro && (
             <div style={p.heroBadge}>
               <CheckIcon size={16} color="var(--sh-on-dark)" />
@@ -187,7 +197,10 @@ export default function PricingPage() {
                 <h3 style={p.planSummaryTitle}>
                   {effectivePlan === 'pro_yearly' ? 'Pro Yearly' : 'Pro Monthly'}
                 </h3>
-                <StatusBadge status={subscription?.status} cancelAtEnd={subscription?.cancelAtPeriodEnd} />
+                <StatusBadge
+                  status={subscription?.status}
+                  cancelAtEnd={subscription?.cancelAtPeriodEnd}
+                />
               </div>
               {subscription?.currentPeriodEnd && (
                 <p style={p.planSummaryDate}>
@@ -211,11 +224,7 @@ export default function PricingPage() {
       {/* Plan comparison cards */}
       <section style={p.cardsSection}>
         <div style={p.cardsGrid} ref={cardsRef}>
-          <PlanCard
-            tier="free"
-            isFreeUser={isFreeUser}
-            hasActivePro={hasActivePro}
-          />
+          <PlanCard tier="free" isFreeUser={isFreeUser} hasActivePro={hasActivePro} />
           <PlanCard
             tier="pro"
             isFreeUser={isFreeUser}
@@ -224,11 +233,7 @@ export default function PricingPage() {
             subscription={subscription}
             onSubscribe={handleSubscribe}
           />
-          <PlanCard
-            tier="institution"
-            isFreeUser={isFreeUser}
-            hasActivePro={hasActivePro}
-          />
+          <PlanCard tier="institution" isFreeUser={isFreeUser} hasActivePro={hasActivePro} />
         </div>
       </section>
 
@@ -274,7 +279,10 @@ function PlanCard({ tier, isFreeUser, hasActivePro, isYearly, subscription, onSu
     setError('')
     setSubscribing(plan)
     const err = await onSubscribe(plan)
-    if (err) { setError(err); setSubscribing(null) }
+    if (err) {
+      setError(err)
+      setSubscribing(null)
+    }
   }
 
   const handleWaitlist = async (e) => {
@@ -289,10 +297,15 @@ function PlanCard({ tier, isFreeUser, hasActivePro, isYearly, subscription, onSu
         body: JSON.stringify({ email: waitlistEmail.trim(), tier: 'institution' }),
       })
       const data = await res.json()
-      if (res.ok) { setWaitlistMsg(data.message || 'Joined the waitlist!'); setWaitlistEmail('') }
-      else setError(data.error || 'Something went wrong.')
-    } catch { setError('Network error.') }
-    finally { setWaitlistLoading(false) }
+      if (res.ok) {
+        setWaitlistMsg(data.message || 'Joined the waitlist!')
+        setWaitlistEmail('')
+      } else setError(data.error || 'Something went wrong.')
+    } catch {
+      setError('Network error.')
+    } finally {
+      setWaitlistLoading(false)
+    }
   }
 
   if (tier === 'free') {
@@ -304,10 +317,14 @@ function PlanCard({ tier, isFreeUser, hasActivePro, isYearly, subscription, onSu
           <span style={c.pricePeriod}>/month</span>
         </div>
         <ul style={c.featureList}>
-          {FREE_FEATURES.map((f) => <FeatureRow key={f} text={f} />)}
+          {FREE_FEATURES.map((f) => (
+            <FeatureRow key={f} text={f} />
+          ))}
         </ul>
         {isFreeUser ? (
-          <button style={c.btnOutlineDisabled} disabled>Current Plan</button>
+          <button style={c.btnOutlineDisabled} disabled>
+            Current Plan
+          </button>
         ) : (
           <p style={c.includedNote}>Included with your Pro subscription</p>
         )}
@@ -325,7 +342,9 @@ function PlanCard({ tier, isFreeUser, hasActivePro, isYearly, subscription, onSu
           <span style={c.pricePeriod}>/month</span>
         </div>
         <ul style={c.featureList}>
-          {PRO_FEATURES.map((f) => <FeatureRow key={f} text={f} />)}
+          {PRO_FEATURES.map((f) => (
+            <FeatureRow key={f} text={f} />
+          ))}
         </ul>
         {hasActivePro ? (
           <div style={c.subscribedGroup}>
@@ -341,7 +360,9 @@ function PlanCard({ tier, isFreeUser, hasActivePro, isYearly, subscription, onSu
                 {formatDate(subscription.currentPeriodEnd)}
               </p>
             )}
-            <a href="/settings?tab=subscription" style={c.manageBtn}>Manage Subscription</a>
+            <a href="/settings?tab=subscription" style={c.manageBtn}>
+              Manage Subscription
+            </a>
           </div>
         ) : (
           <div style={c.btnGroup}>
@@ -357,7 +378,9 @@ function PlanCard({ tier, isFreeUser, hasActivePro, isYearly, subscription, onSu
               disabled={subscribing !== null}
               onClick={() => doSubscribe('pro_yearly')}
             >
-              {subscribing === 'pro_yearly' ? 'Redirecting...' : 'Subscribe Yearly -- $49.99/yr (Save 17%)'}
+              {subscribing === 'pro_yearly'
+                ? 'Redirecting...'
+                : 'Subscribe Yearly -- $49.99/yr (Save 17%)'}
             </button>
           </div>
         )}
@@ -376,7 +399,9 @@ function PlanCard({ tier, isFreeUser, hasActivePro, isYearly, subscription, onSu
         <span style={c.pricePeriod}>pricing</span>
       </div>
       <ul style={c.featureList}>
-        {INSTITUTION_FEATURES.map((f) => <FeatureRow key={f} text={f} />)}
+        {INSTITUTION_FEATURES.map((f) => (
+          <FeatureRow key={f} text={f} />
+        ))}
       </ul>
       {waitlistMsg ? (
         <div style={c.successMsg}>{waitlistMsg}</div>
@@ -391,7 +416,11 @@ function PlanCard({ tier, isFreeUser, hasActivePro, isYearly, subscription, onSu
             disabled={waitlistLoading}
             required
           />
-          <button type="submit" style={c.btnPrimary} disabled={waitlistLoading || !waitlistEmail.trim()}>
+          <button
+            type="submit"
+            style={c.btnPrimary}
+            disabled={waitlistLoading || !waitlistEmail.trim()}
+          >
             {waitlistLoading ? 'Joining...' : 'Join Waitlist'}
           </button>
           {error && <div style={c.errorMsg}>{error}</div>}
@@ -415,10 +444,49 @@ function FeatureRow({ text }) {
 // ── Status Badge ─────────────────────────────────────────────────────────
 
 function StatusBadge({ status, cancelAtEnd }) {
-  if (cancelAtEnd) return <span style={{ ...p.statusBadge, background: 'var(--sh-warning-bg)', color: 'var(--sh-warning-text)' }}>Canceling</span>
-  if (status === 'trialing') return <span style={{ ...p.statusBadge, background: 'var(--sh-info-bg)', color: 'var(--sh-info-text)' }}>Trial</span>
-  if (status === 'past_due') return <span style={{ ...p.statusBadge, background: 'var(--sh-danger-bg)', color: 'var(--sh-danger-text)' }}>Past Due</span>
-  return <span style={{ ...p.statusBadge, background: 'var(--sh-success-bg)', color: 'var(--sh-success-text)' }}>Active</span>
+  if (cancelAtEnd)
+    return (
+      <span
+        style={{
+          ...p.statusBadge,
+          background: 'var(--sh-warning-bg)',
+          color: 'var(--sh-warning-text)',
+        }}
+      >
+        Canceling
+      </span>
+    )
+  if (status === 'trialing')
+    return (
+      <span
+        style={{ ...p.statusBadge, background: 'var(--sh-info-bg)', color: 'var(--sh-info-text)' }}
+      >
+        Trial
+      </span>
+    )
+  if (status === 'past_due')
+    return (
+      <span
+        style={{
+          ...p.statusBadge,
+          background: 'var(--sh-danger-bg)',
+          color: 'var(--sh-danger-text)',
+        }}
+      >
+        Past Due
+      </span>
+    )
+  return (
+    <span
+      style={{
+        ...p.statusBadge,
+        background: 'var(--sh-success-bg)',
+        color: 'var(--sh-success-text)',
+      }}
+    >
+      Active
+    </span>
+  )
 }
 
 // ── Special Offers ───────────────────────────────────────────────────────
@@ -438,10 +506,16 @@ function SpecialOffersSection() {
         credentials: 'include',
       })
       const data = await res.json()
-      if (!res.ok) { setMsg({ type: 'error', text: data.error || 'Failed to start trial.' }); return }
+      if (!res.ok) {
+        setMsg({ type: 'error', text: data.error || 'Failed to start trial.' })
+        return
+      }
       window.location.href = data.url
-    } catch { setMsg({ type: 'error', text: 'Network error. Please try again.' }) }
-    finally { setTrialLoading(false) }
+    } catch {
+      setMsg({ type: 'error', text: 'Network error. Please try again.' })
+    } finally {
+      setTrialLoading(false)
+    }
   }
 
   const applyDiscount = async () => {
@@ -455,10 +529,16 @@ function SpecialOffersSection() {
         body: JSON.stringify({ plan: 'pro_monthly' }),
       })
       const data = await res.json()
-      if (!res.ok) { setMsg({ type: 'error', text: data.error || 'Failed to apply discount.' }); return }
+      if (!res.ok) {
+        setMsg({ type: 'error', text: data.error || 'Failed to apply discount.' })
+        return
+      }
       window.location.href = data.url
-    } catch { setMsg({ type: 'error', text: 'Network error. Please try again.' }) }
-    finally { setStudentLoading(false) }
+    } catch {
+      setMsg({ type: 'error', text: 'Network error. Please try again.' })
+    } finally {
+      setStudentLoading(false)
+    }
   }
 
   return (
@@ -470,7 +550,8 @@ function SpecialOffersSection() {
           <div style={p.offerCard}>
             <h3 style={p.offerTitle}>7-Day Free Trial</h3>
             <p style={p.offerDesc}>
-              Try Pro free for 7 days. Cancel anytime before the trial ends and you will not be charged.
+              Try Pro free for 7 days. Cancel anytime before the trial ends and you will not be
+              charged.
             </p>
             <button style={c.btnPrimary} onClick={startTrial} disabled={trialLoading}>
               {trialLoading ? 'Loading...' : 'Start Free Trial'}
@@ -514,13 +595,24 @@ function GiftCard() {
   const [email, setEmail] = useState('')
   const [plan, setPlan] = useState('pro_monthly')
   const [months, setMonths] = useState(1)
+  const isYearlyGift = plan === 'pro_yearly'
+
+  // Reset duration when switching plans so invalid values do not persist.
+  const handlePlanChange = (e) => {
+    const newPlan = e.target.value
+    setPlan(newPlan)
+    setMonths(newPlan === 'pro_yearly' ? 12 : 1)
+  }
   const [giftMessage, setGiftMessage] = useState('')
   const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState(null)
 
   const handleGift = async (e) => {
     e.preventDefault()
-    if (!email.trim()) { setMsg({ type: 'error', text: 'Recipient email is required.' }); return }
+    if (!email.trim()) {
+      setMsg({ type: 'error', text: 'Recipient email is required.' })
+      return
+    }
     setLoading(true)
     setMsg(null)
     try {
@@ -528,13 +620,24 @@ function GiftCard() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ recipientEmail: email.trim(), plan, durationMonths: months, message: giftMessage }),
+        body: JSON.stringify({
+          recipientEmail: email.trim(),
+          plan,
+          durationMonths: months,
+          message: giftMessage,
+        }),
       })
       const data = await res.json()
-      if (!res.ok) { setMsg({ type: 'error', text: data.error || 'Failed to create gift checkout.' }); return }
+      if (!res.ok) {
+        setMsg({ type: 'error', text: data.error || 'Failed to create gift checkout.' })
+        return
+      }
       window.location.href = data.url
-    } catch { setMsg({ type: 'error', text: 'Network error. Please try again.' }) }
-    finally { setLoading(false) }
+    } catch {
+      setMsg({ type: 'error', text: 'Network error. Please try again.' })
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -545,26 +648,53 @@ function GiftCard() {
       <form onSubmit={handleGift} style={p.formStack}>
         <div style={p.fieldGroup}>
           <label style={p.label}>Recipient Email</label>
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="friend@example.com" style={p.input} required />
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="friend@example.com"
+            style={p.input}
+            required
+          />
         </div>
         <div style={p.fieldRow}>
           <div style={p.fieldGroup}>
             <label style={p.label}>Plan</label>
-            <select value={plan} onChange={(e) => setPlan(e.target.value)} style={p.input}>
+            <select value={plan} onChange={handlePlanChange} style={p.input}>
               <option value="pro_monthly">Pro Monthly</option>
               <option value="pro_yearly">Pro Yearly</option>
             </select>
           </div>
           <div style={p.fieldGroup}>
             <label style={p.label}>Duration</label>
-            <select value={months} onChange={(e) => setMonths(Number(e.target.value))} style={p.input}>
-              {[1, 3, 6, 12].map((m) => <option key={m} value={m}>{m} month{m > 1 ? 's' : ''}</option>)}
+            <select
+              value={months}
+              onChange={(e) => setMonths(Number(e.target.value))}
+              style={p.input}
+            >
+              {isYearlyGift
+                ? [1, 2, 3].map((y) => (
+                    <option key={y} value={y * 12}>
+                      {y} year{y > 1 ? 's' : ''}
+                    </option>
+                  ))
+                : [1, 3, 6, 12].map((m) => (
+                    <option key={m} value={m}>
+                      {m} month{m > 1 ? 's' : ''}
+                    </option>
+                  ))}
             </select>
           </div>
         </div>
         <div style={p.fieldGroup}>
           <label style={p.label}>Personal Message (optional)</label>
-          <textarea value={giftMessage} onChange={(e) => setGiftMessage(e.target.value)} placeholder="Enjoy StudyHub Pro!" style={{ ...p.input, minHeight: 56, resize: 'vertical' }} maxLength={500} />
+          <textarea
+            value={giftMessage}
+            onChange={(e) => setGiftMessage(e.target.value)}
+            placeholder="Enjoy StudyHub Pro!"
+            style={{ ...p.input, minHeight: 56, resize: 'vertical' }}
+            maxLength={500}
+          />
         </div>
         <button type="submit" style={c.btnPrimary} disabled={loading}>
           {loading ? 'Processing...' : 'Purchase Gift'}
@@ -586,19 +716,29 @@ function ReferralCard() {
     async function load() {
       try {
         const res = await fetch(`${API}/api/payments/referral/mine`, { credentials: 'include' })
-        if (res.ok && !cancelled) { const data = await res.json(); setCodes(data.codes || []) }
-      } catch { /* silent */ }
-      finally { if (!cancelled) setLoading(false) }
+        if (res.ok && !cancelled) {
+          const data = await res.json()
+          setCodes(data.codes || [])
+        }
+      } catch {
+        /* silent */
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
     }
     load()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const getReferralStatus = (code) => {
     const expiresAt = code.expiresAt ? new Date(code.expiresAt) : null
     const isExpired = Boolean(expiresAt && expiresAt.getTime() < Date.now())
     const isMaxed = code.maxUses > 0 && code.currentUses >= code.maxUses
-    const inactiveReason = code.inactiveReason || (!code.active ? 'deactivated' : isExpired ? 'expired' : isMaxed ? 'maxed_out' : null)
+    const inactiveReason =
+      code.inactiveReason ||
+      (!code.active ? 'deactivated' : isExpired ? 'expired' : isMaxed ? 'maxed_out' : null)
 
     if (inactiveReason === 'expired') {
       return {
@@ -645,25 +785,40 @@ function ReferralCard() {
         credentials: 'include',
       })
       const data = await res.json()
-      if (!res.ok) { setMsg({ type: 'error', text: data.error || 'Failed to create code.' }); return }
+      if (!res.ok) {
+        setMsg({ type: 'error', text: data.error || 'Failed to create code.' })
+        return
+      }
       setCodes((prev) => [data, ...prev])
       setMsg({ type: 'success', text: 'Referral code created.' })
-    } catch { setMsg({ type: 'error', text: 'Network error.' }) }
-    finally { setCreating(false) }
+    } catch {
+      setMsg({ type: 'error', text: 'Network error.' })
+    } finally {
+      setCreating(false)
+    }
   }
 
   const deactivateCode = async (id) => {
     try {
-      const res = await fetch(`${API}/api/payments/referral/${id}`, { method: 'DELETE', credentials: 'include' })
-      if (res.ok) setCodes((prev) => prev.map((co) => co.id === id ? { ...co, active: false } : co))
-    } catch { /* silent */ }
+      const res = await fetch(`${API}/api/payments/referral/${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      if (res.ok)
+        setCodes((prev) => prev.map((co) => (co.id === id ? { ...co, active: false } : co)))
+    } catch {
+      /* silent */
+    }
   }
 
   const copyCode = (code) => {
-    navigator.clipboard.writeText(code).then(() => {
-      setCopied(code)
-      setTimeout(() => setCopied(null), 2000)
-    }).catch(() => {})
+    navigator.clipboard
+      .writeText(code)
+      .then(() => {
+        setCopied(code)
+        setTimeout(() => setCopied(null), 2000)
+      })
+      .catch(() => {})
   }
 
   return (
@@ -676,7 +831,11 @@ function ReferralCard() {
       ) : (
         <>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <button style={c.btnOutline} onClick={createCode} disabled={creating || activeCodeCount >= 5}>
+            <button
+              style={c.btnOutline}
+              onClick={createCode}
+              disabled={creating || activeCodeCount >= 5}
+            >
               {creating ? 'Creating...' : 'Create Referral Code'}
             </button>
             <span style={p.muted}>{activeCodeCount}/5 active codes</span>
@@ -686,11 +845,22 @@ function ReferralCard() {
               {codes.map((co) => {
                 const status = getReferralStatus(co)
                 return (
-                  <div key={co.id} style={{ ...p.codeRow, opacity: status.active ? 1 : 0.62, alignItems: 'flex-start' }}>
+                  <div
+                    key={co.id}
+                    style={{
+                      ...p.codeRow,
+                      opacity: status.active ? 1 : 0.62,
+                      alignItems: 'flex-start',
+                    }}
+                  >
                     <div style={{ display: 'grid', gap: 4, minWidth: 0 }}>
                       <span style={p.codeText}>{co.code}</span>
-                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                        <span style={p.muted}>{co.currentUses} use{co.currentUses !== 1 ? 's' : ''}</span>
+                      <div
+                        style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}
+                      >
+                        <span style={p.muted}>
+                          {co.currentUses} use{co.currentUses !== 1 ? 's' : ''}
+                        </span>
                         <span
                           style={{
                             fontSize: 11,
@@ -698,7 +868,9 @@ function ReferralCard() {
                             padding: '2px 8px',
                             borderRadius: 999,
                             background: status.active ? 'var(--sh-success-bg)' : 'var(--sh-soft)',
-                            border: status.active ? '1px solid var(--sh-success-border)' : '1px solid var(--sh-border)',
+                            border: status.active
+                              ? '1px solid var(--sh-success-border)'
+                              : '1px solid var(--sh-border)',
                             color: status.active ? 'var(--sh-success-text)' : 'var(--sh-muted)',
                           }}
                         >
@@ -712,7 +884,10 @@ function ReferralCard() {
                         <button style={p.smallBtn} onClick={() => copyCode(co.code)}>
                           {copied === co.code ? 'Copied' : 'Copy'}
                         </button>
-                        <button style={{ ...p.smallBtn, color: 'var(--sh-danger)' }} onClick={() => deactivateCode(co.id)}>
+                        <button
+                          style={{ ...p.smallBtn, color: 'var(--sh-danger)' }}
+                          onClick={() => deactivateCode(co.id)}
+                        >
                           Deactivate
                         </button>
                       </>
@@ -738,12 +913,17 @@ function RedeemCard() {
   const handleRedeem = async (e) => {
     e.preventDefault()
     const trimmed = code.trim().toUpperCase()
-    if (!trimmed) { setMsg({ type: 'error', text: 'Please enter a code.' }); return }
+    if (!trimmed) {
+      setMsg({ type: 'error', text: 'Please enter a code.' })
+      return
+    }
     setLoading(true)
     setMsg(null)
     try {
       const isGift = trimmed.startsWith('GIFT-')
-      const endpoint = isGift ? `${API}/api/payments/gift/redeem` : `${API}/api/payments/referral/redeem`
+      const endpoint = isGift
+        ? `${API}/api/payments/gift/redeem`
+        : `${API}/api/payments/referral/redeem`
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -760,21 +940,30 @@ function RedeemCard() {
             body: JSON.stringify({ code: trimmed }),
           })
           const giftData = await giftRes.json()
-          if (giftRes.ok) { setMsg({ type: 'success', text: giftData.message }); setCode(''); return }
+          if (giftRes.ok) {
+            setMsg({ type: 'success', text: giftData.message })
+            setCode('')
+            return
+          }
         }
         setMsg({ type: 'error', text: data.error || 'Invalid code.' })
         return
       }
       setMsg({ type: 'success', text: data.message })
       setCode('')
-    } catch { setMsg({ type: 'error', text: 'Network error. Please try again.' }) }
-    finally { setLoading(false) }
+    } catch {
+      setMsg({ type: 'error', text: 'Network error. Please try again.' })
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
     <div style={p.subCard}>
       <h3 style={p.subCardTitle}>Redeem a Code</h3>
-      <p style={p.subCardDesc}>Enter a referral code (SH-...) or gift code (GIFT-...) to redeem rewards.</p>
+      <p style={p.subCardDesc}>
+        Enter a referral code (SH-...) or gift code (GIFT-...) to redeem rewards.
+      </p>
       {msg && <div style={msg.type === 'error' ? p.errorBox : p.successBox}>{msg.text}</div>}
       <form onSubmit={handleRedeem} style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
         <input
@@ -806,8 +995,14 @@ function DonationSection() {
 
   const handleDonate = async () => {
     setError('')
-    if (!user) { navigate('/login'); return }
-    if (amount < 1 || amount > 1000) { setError('Amount must be between $1 and $1,000.'); return }
+    if (!user) {
+      navigate('/login')
+      return
+    }
+    if (amount < 1 || amount > 1000) {
+      setError('Amount must be between $1 and $1,000.')
+      return
+    }
     setLoading(true)
     try {
       const res = await fetch(`${API}/api/payments/checkout/donation`, {
@@ -817,10 +1012,20 @@ function DonationSection() {
         body: JSON.stringify({ amount, message: message.trim() || '', anonymous }),
       })
       const data = await res.json()
-      if (!res.ok) { setError(data.error || 'Failed to start donation checkout.'); setLoading(false); return }
+      if (!res.ok) {
+        setError(data.error || 'Failed to start donation checkout.')
+        setLoading(false)
+        return
+      }
       if (data.url) window.location.href = data.url
-      else { setError('No checkout URL received.'); setLoading(false) }
-    } catch { setError('Network error. Please try again.'); setLoading(false) }
+      else {
+        setError('No checkout URL received.')
+        setLoading(false)
+      }
+    } catch {
+      setError('Network error. Please try again.')
+      setLoading(false)
+    }
   }
 
   return (
@@ -828,7 +1033,8 @@ function DonationSection() {
       <div style={d.inner}>
         <h2 style={d.title}>Support StudyHub</h2>
         <p style={d.subtitle}>
-          StudyHub is built by students, for students. Your donation helps us keep the platform free and accessible.
+          StudyHub is built by students, for students. Your donation helps us keep the platform free
+          and accessible.
         </p>
         <div style={d.presetRow}>
           {DONATION_PRESETS.map((preset) => (
@@ -850,7 +1056,10 @@ function DonationSection() {
               min={1}
               max={1000}
               value={amount}
-              onChange={(e) => { const v = Number(e.target.value); if (v >= 0 && v <= 1000) setAmount(v) }}
+              onChange={(e) => {
+                const v = Number(e.target.value)
+                if (v >= 0 && v <= 1000) setAmount(v)
+              }}
               style={d.customInput}
             />
           </div>
@@ -866,18 +1075,25 @@ function DonationSection() {
           />
         </div>
         <label style={d.anonLabel}>
-          <input type="checkbox" checked={anonymous} onChange={(e) => setAnonymous(e.target.checked)} style={d.anonCheck} />
+          <input
+            type="checkbox"
+            checked={anonymous}
+            onChange={(e) => setAnonymous(e.target.checked)}
+            style={d.anonCheck}
+          />
           <span style={d.anonText}>Donate anonymously</span>
         </label>
         <div style={d.privacyNote}>
-          Anonymous donations stay off the public supporters list. Your contribution is still counted in the anonymous community total.
+          Anonymous donations stay off the public supporters list. Your contribution is still
+          counted in the anonymous community total.
         </div>
         <button style={d.donateBtn} onClick={handleDonate} disabled={loading || amount < 1}>
           {loading ? 'Redirecting to checkout...' : `Donate $${amount}`}
         </button>
         {error && <div style={d.error}>{error}</div>}
         <p style={d.footnote}>
-          Donations are processed securely through Stripe. After checkout, we email a thank-you and receipt, and your transaction appears in Settings payment history.
+          Donations are processed securely through Stripe. After checkout, we email a thank-you and
+          receipt, and your transaction appears in Settings payment history.
         </p>
       </div>
     </section>
@@ -893,11 +1109,28 @@ function FaqItem({ question, answer }) {
     <details style={p.faqItem} open={open}>
       <summary
         style={p.faqSummary}
-        onClick={(e) => { e.preventDefault(); setOpen(!open) }}
+        onClick={(e) => {
+          e.preventDefault()
+          setOpen(!open)
+        }}
       >
         <span>{question}</span>
-        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease-out', color: 'var(--sh-muted)' }}>
-          <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" fill="currentColor" />
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 20 20"
+          fill="none"
+          style={{
+            flexShrink: 0,
+            transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
+            transition: 'transform 0.2s ease-out',
+            color: 'var(--sh-muted)',
+          }}
+        >
+          <path
+            d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+            fill="currentColor"
+          />
         </svg>
       </summary>
       <p style={p.faqAnswer}>{answer}</p>
@@ -922,7 +1155,11 @@ function CheckIcon({ size = 20, color = 'currentColor' }) {
 
 function formatDate(iso) {
   if (!iso) return '--'
-  return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+  return new Date(iso).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  })
 }
 
 // ── Styles: Page ─────────────────────────────────────────────────────────
