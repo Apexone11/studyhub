@@ -497,12 +497,18 @@ async function joinGroup(req, res) {
       return res.status(403).json({ error: 'Invite only group.' })
     }
 
+    // Phase 5: capture optional join message for private-group gate.
+    const joinMessage = typeof req.body?.joinMessage === 'string'
+      ? req.body.joinMessage.replace(/<[^>]*>/g, '').trim().slice(0, 500)
+      : ''
+
     const member = await prisma.studyGroupMember.create({
       data: {
         groupId,
         userId: req.user.userId,
         role: 'member',
         status,
+        ...(joinMessage ? { joinMessage } : {}),
       },
     })
 
@@ -517,8 +523,45 @@ async function joinGroup(req, res) {
           linkPath: `/study-groups/${groupId}`,
         })
       } catch (notifErr) {
-        // Fire-and-forget: don't fail the request
-        console.error('Failed to create notification:', notifErr.message)
+        captureError(notifErr, { location: 'joinGroup/notifyActive', groupId })
+      }
+    }
+
+    // Phase 5: when a user requests to join a private group (status
+    // 'pending'), notify the FULL mod team (creator + admins + mods)
+    // so any of them can approve. The notification links to the
+    // members tab with a pending filter so the action is one click.
+    if (status === 'pending') {
+      try {
+        const { createNotifications } = require('../../lib/notify')
+        const modTeam = await prisma.studyGroupMember.findMany({
+          where: {
+            groupId,
+            status: 'active',
+            role: { in: ['admin', 'moderator'] },
+          },
+          select: { userId: true },
+        })
+        const recipientIds = new Set([group.createdById])
+        for (const row of modTeam) recipientIds.add(row.userId)
+        // Don't notify the requester even if they were somehow in the list
+        recipientIds.delete(req.user.userId)
+
+        if (recipientIds.size > 0) {
+          const messageText = joinMessage
+            ? `${req.user.username} requested to join ${group.name}: "${joinMessage}"`
+            : `${req.user.username} requested to join ${group.name}`
+          await createNotifications(prisma, Array.from(recipientIds).map((userId) => ({
+            userId,
+            type: 'group_join_request',
+            message: messageText,
+            actorId: req.user.userId,
+            linkPath: `/study-groups/${groupId}?tab=members`,
+            priority: 'medium',
+          })))
+        }
+      } catch (notifErr) {
+        captureError(notifErr, { location: 'joinGroup/notifyPending', groupId })
       }
     }
 
