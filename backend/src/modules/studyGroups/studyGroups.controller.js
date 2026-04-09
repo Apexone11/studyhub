@@ -471,6 +471,14 @@ async function joinGroup(req, res) {
       return res.status(404).json({ error: 'Group not found.' })
     }
 
+    // Phase 5: soft-deleted or locked groups cannot accept new members.
+    if (group.deletedAt || group.moderationStatus === 'deleted') {
+      return res.status(404).json({ error: 'Group not found.' })
+    }
+    if (group.moderationStatus === 'locked') {
+      return res.status(403).json({ error: 'This group is currently locked and not accepting new members.' })
+    }
+
     // Phase 5: block check — blocked users see a generic error (no
     // "you are blocked" reveal, matches the 404-for-private pattern).
     const blocked = await isBlockedFromGroup(groupId, req.user.userId)

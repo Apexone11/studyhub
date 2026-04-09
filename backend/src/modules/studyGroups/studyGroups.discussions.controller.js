@@ -320,6 +320,20 @@ async function getDiscussion(req, res) {
       return res.status(404).json({ error: 'Post not found.' })
     }
 
+    // Phase 5: enforce the same visibility model as listDiscussions.
+    // Non-mods cannot fetch pending_approval or removed posts unless
+    // they are the author of the pending post.
+    const canModerate = member && (member.role === 'admin' || member.role === 'moderator')
+    if (!canModerate) {
+      const isAuthor = post.userId === req.user.userId
+      if (post.status === 'removed') {
+        return res.status(404).json({ error: 'Post not found.' })
+      }
+      if (post.status === 'pending_approval' && !isAuthor) {
+        return res.status(404).json({ error: 'Post not found.' })
+      }
+    }
+
     const formatted = {
       id: post.id,
       groupId: post.groupId,
@@ -330,6 +344,8 @@ async function getDiscussion(req, res) {
       type: post.type,
       pinned: post.pinned,
       resolved: post.resolved,
+      status: post.status || 'published',
+      attachments: post.attachments || null,
       createdAt: post.createdAt,
       updatedAt: post.updatedAt,
       replies: post.replies.map((r) => ({

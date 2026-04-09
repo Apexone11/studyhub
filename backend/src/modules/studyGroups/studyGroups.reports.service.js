@@ -472,7 +472,6 @@ async function listReports({ status = 'pending', limit = 50, offset = 0 }) {
             privacy: true,
             moderationStatus: true,
             createdById: true,
-            memberCount: false,
             createdBy: { select: { id: true, username: true } },
           },
         },
