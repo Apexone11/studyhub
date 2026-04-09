@@ -28,7 +28,7 @@
 
 const express = require('express')
 const requireAuth = require('../../middleware/auth')
-const { readLimiter, writeLimiter } = require('../../lib/rateLimiters')
+const { readLimiter, writeLimiter, groupJoinLimiter } = require('../../lib/rateLimiters')
 
 // Import controller
 const {
@@ -90,7 +90,7 @@ router.delete('/:id', writeLimiter, requireAuth, deleteGroup)
  * POST /api/study-groups/:id/join
  * Join public group or request to join private group
  */
-router.post('/:id/join', writeLimiter, requireAuth, joinGroup)
+router.post('/:id/join', groupJoinLimiter, requireAuth, joinGroup)
 
 /**
  * POST /api/study-groups/:id/leave
@@ -348,6 +348,60 @@ router.delete('/:id/mute/:userId', writeLimiter, requireAuth, async (req, res) =
     })
 
     res.json({ message: 'User unmuted.' })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ===== PHASE 5 C.3: GROUP AUDIT LOG =====
+
+/**
+ * GET /api/study-groups/:id/audit-log
+ * Per-group audit log (admin/moderator of that group, or platform admin).
+ */
+router.get('/:id/audit-log', readLimiter, requireAuth, async (req, res) => {
+  try {
+    const groupId = parseId(req.params.id)
+    if (groupId === null) return res.status(400).json({ error: 'Invalid group ID.' })
+
+    const isMod = await isGroupAdminOrMod(groupId, req.user.userId)
+    const isPlatformAdmin = req.user.role === 'admin'
+    if (!isMod && !isPlatformAdmin) {
+      return res.status(403).json({ error: 'Admin or moderator access required.' })
+    }
+
+    const { limit = 50, offset = 0 } = req.query
+    const limitNum = Math.min(Number.parseInt(limit, 10) || 50, 100)
+    const offsetNum = Math.max(Number.parseInt(offset, 10) || 0, 0)
+
+    const [entries, total] = await Promise.all([
+      prisma.groupAuditLog.findMany({
+        where: { groupId },
+        include: {
+          actor: { select: { id: true, username: true, avatarUrl: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: offsetNum,
+        take: limitNum,
+      }),
+      prisma.groupAuditLog.count({ where: { groupId } }),
+    ])
+
+    // Redact IP from non-platform-admins — group mods can see
+    // action + actor + context but not forensic data.
+    const redacted = entries.map((e) => ({
+      id: e.id,
+      action: e.action,
+      targetType: e.targetType,
+      targetId: e.targetId,
+      context: e.context,
+      actor: e.actor,
+      createdAt: e.createdAt,
+      ...(isPlatformAdmin ? { ipAddress: e.ipAddress, userAgent: e.userAgent } : {}),
+    }))
+
+    res.json({ entries: redacted, total, limit: limitNum, offset: offsetNum })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })

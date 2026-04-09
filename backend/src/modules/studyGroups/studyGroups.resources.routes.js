@@ -29,6 +29,7 @@ const {
   assertQuotaAvailable,
   incrementUsage,
 } = require('./studyGroups.media.service')
+const { checkUrl } = require('../../lib/linkSafety')
 
 const router = express.Router({ mergeParams: true })
 
@@ -291,6 +292,17 @@ router.post('/', writeLimiter, requireAuth, async (req, res) => {
         if (!validUrl) {
           return res.status(400).json({ error: 'Invalid resource URL. Must be a valid http or https URL.' })
         }
+      }
+    }
+
+    // Phase 5 C.2: link safety check on external URLs.
+    if (validUrl && !validUrl.startsWith('/uploads/')) {
+      const linkCheck = checkUrl(validUrl)
+      if (!linkCheck.safe) {
+        return res.status(400).json({
+          error: `This URL was flagged as unsafe: ${linkCheck.reason}. If you believe this is a mistake, contact support.`,
+          code: 'UNSAFE_LINK',
+        })
       }
     }
 
