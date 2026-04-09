@@ -99,7 +99,7 @@ async function createDiscussion(req, res) {
       return res.status(404).json({ error: 'Not a member.' })
     }
 
-    const { title, content, type = 'discussion' } = req.body
+    const { title, content, type = 'discussion', attachments } = req.body
 
     // Validate title
     const validTitle = validateTitle(title)
@@ -130,6 +130,40 @@ async function createDiscussion(req, res) {
       }
     }
 
+    // Phase 4: optional attachments array. Each attachment must be an
+    // object that came from POST /resources/upload — only the internal
+    // /uploads/group-media/... url is allowed through so arbitrary URLs
+    // cannot be injected via this field. Capped at 4 per post.
+    let validatedAttachments = null
+    if (attachments != null) {
+      if (!Array.isArray(attachments)) {
+        return res.status(400).json({ error: 'attachments must be an array.' })
+      }
+      if (attachments.length > 4) {
+        return res.status(400).json({ error: 'Max 4 attachments per post.' })
+      }
+      const allowedKinds = new Set(['image', 'video', 'file'])
+      const normalized = []
+      for (const raw of attachments) {
+        if (!raw || typeof raw !== 'object') {
+          return res.status(400).json({ error: 'Each attachment must be an object.' })
+        }
+        if (typeof raw.url !== 'string' || !raw.url.startsWith('/uploads/group-media/')) {
+          return res.status(400).json({ error: 'attachment.url must be an uploaded /uploads/group-media/... path.' })
+        }
+        if (raw.kind && !allowedKinds.has(raw.kind)) {
+          return res.status(400).json({ error: 'Invalid attachment.kind.' })
+        }
+        normalized.push({
+          url: raw.url,
+          mime: typeof raw.mime === 'string' ? raw.mime.slice(0, 120) : null,
+          bytes: Number.parseInt(raw.bytes, 10) || null,
+          kind: raw.kind || 'file',
+        })
+      }
+      validatedAttachments = normalized
+    }
+
     const post = await prisma.groupDiscussionPost.create({
       data: {
         groupId,
@@ -137,6 +171,7 @@ async function createDiscussion(req, res) {
         title: validTitle,
         content: strippedContent,
         type,
+        ...(validatedAttachments ? { attachments: validatedAttachments } : {}),
       },
       include: {
         author: { select: { id: true, username: true, avatarUrl: true } },

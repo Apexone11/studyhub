@@ -476,6 +476,18 @@ const searchLimiter = rateLimit({
 // ── CATEGORY: Upload Module ───────────────────────────────────────────────
 
 /**
+ * Group media uploads — 10 requests per minute per IP.
+ * Per-user weekly quota is enforced separately by the media service.
+ */
+const groupMediaUploadLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many uploads. Please wait a moment.' },
+})
+
+/**
  * Avatar uploads — 20 requests per 15 minutes per IP.
  */
 const uploadAvatarLimiter = rateLimit({
@@ -781,6 +793,7 @@ module.exports = {
   searchLimiter,
 
   // Upload module
+  groupMediaUploadLimiter,
   uploadAvatarLimiter,
   uploadAttachmentLimiter,
   uploadCoverLimiter,

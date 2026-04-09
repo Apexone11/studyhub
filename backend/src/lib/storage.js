@@ -38,9 +38,10 @@ const ATTACHMENTS_DIR = path.join(UPLOADS_DIR, 'attachments')
 const SCHOOL_LOGOS_DIR = path.join(UPLOADS_DIR, 'school-logos')
 const CONTENT_IMAGES_DIR = path.join(UPLOADS_DIR, 'content-images')
 const NOTE_IMAGES_DIR = path.join(UPLOADS_DIR, 'note-images')
+const GROUP_MEDIA_DIR = path.join(UPLOADS_DIR, 'group-media')
 
 function ensureUploadDirectories() {
-  for (const directory of [UPLOADS_DIR, AVATARS_DIR, COVERS_DIR, ATTACHMENTS_DIR, SCHOOL_LOGOS_DIR, CONTENT_IMAGES_DIR, NOTE_IMAGES_DIR]) {
+  for (const directory of [UPLOADS_DIR, AVATARS_DIR, COVERS_DIR, ATTACHMENTS_DIR, SCHOOL_LOGOS_DIR, CONTENT_IMAGES_DIR, NOTE_IMAGES_DIR, GROUP_MEDIA_DIR]) {
     fs.mkdirSync(directory, { recursive: true })
     fs.accessSync(directory, fs.constants.R_OK | fs.constants.W_OK)
   }
@@ -93,6 +94,10 @@ function buildNoteImageUrl(fileName) {
   return buildUploadUrl('note-images', fileName)
 }
 
+function buildGroupMediaUrl(fileName) {
+  return buildUploadUrl('group-media', fileName)
+}
+
 function isPathWithinRoot(candidatePath, rootDirectory) {
   const resolvedCandidate = path.resolve(candidatePath)
   const resolvedRoot = path.resolve(rootDirectory)
@@ -116,6 +121,7 @@ function resolveManagedUploadPath(uploadUrl) {
     { prefix: `${UPLOADS_URL_PREFIX}/attachments/`, directory: ATTACHMENTS_DIR },
     { prefix: `${UPLOADS_URL_PREFIX}/content-images/`, directory: CONTENT_IMAGES_DIR },
     { prefix: `${UPLOADS_URL_PREFIX}/note-images/`, directory: NOTE_IMAGES_DIR },
+    { prefix: `${UPLOADS_URL_PREFIX}/group-media/`, directory: GROUP_MEDIA_DIR },
     { prefix: PRIVATE_ATTACHMENT_PREFIX, directory: ATTACHMENTS_DIR },
   ]
 
@@ -344,6 +350,7 @@ module.exports = {
   AVATARS_DIR,
   CONTENT_IMAGES_DIR,
   COVERS_DIR,
+  GROUP_MEDIA_DIR,
   NOTE_IMAGES_DIR,
   SCHOOL_LOGOS_DIR,
   PRIVATE_ATTACHMENT_PREFIX,
@@ -352,6 +359,7 @@ module.exports = {
   buildAvatarUrl,
   buildContentImageUrl,
   buildCoverUrl,
+  buildGroupMediaUrl,
   buildNoteImageUrl,
   cleanupAttachmentIfUnused,
   cleanupAvatarIfUnused,

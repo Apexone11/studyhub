@@ -240,7 +240,7 @@ async function updateGroup(req, res) {
       return res.status(403).json({ error: 'Admin access required.' })
     }
 
-    const { name, description, avatarUrl, privacy, maxMembers } = req.body
+    const { name, description, avatarUrl, privacy, maxMembers, backgroundUrl, backgroundCredit } = req.body
     const updates = {}
 
     if (name !== undefined) {
@@ -261,6 +261,35 @@ async function updateGroup(req, res) {
 
     if (avatarUrl !== undefined) {
       updates.avatarUrl = typeof avatarUrl === 'string' && avatarUrl.trim() ? avatarUrl.trim() : null
+    }
+
+    // Phase 4: owner-curated group background. Accept only the internal
+    // /uploads/group-media/... path or the curated-gallery /art/... path
+    // — external URLs are rejected to prevent hotlinking / CSRF-via-image
+    // tracking pixels. Null/empty clears the background.
+    if (backgroundUrl !== undefined) {
+      if (backgroundUrl === null || backgroundUrl === '') {
+        updates.backgroundUrl = null
+      } else if (typeof backgroundUrl !== 'string') {
+        return res.status(400).json({ error: 'backgroundUrl must be a string.' })
+      } else if (
+        !backgroundUrl.startsWith('/uploads/group-media/')
+        && !backgroundUrl.startsWith('/art/')
+      ) {
+        return res.status(400).json({ error: 'backgroundUrl must be an uploaded file or a curated gallery asset.' })
+      } else {
+        updates.backgroundUrl = backgroundUrl
+      }
+    }
+    if (backgroundCredit !== undefined) {
+      if (backgroundCredit === null || backgroundCredit === '') {
+        updates.backgroundCredit = null
+      } else if (typeof backgroundCredit !== 'string') {
+        return res.status(400).json({ error: 'backgroundCredit must be a string.' })
+      } else {
+        // Sanitize: strip tags, cap length.
+        updates.backgroundCredit = backgroundCredit.replace(/<[^>]*>/g, '').trim().slice(0, 200)
+      }
     }
 
     if (privacy !== undefined) {
