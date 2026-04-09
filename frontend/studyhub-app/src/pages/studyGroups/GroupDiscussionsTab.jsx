@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
+import MediaComposer from './MediaComposer'
 import {
   formatRelativeTime,
   getPostTypeLabel,
@@ -178,9 +179,13 @@ export function GroupDiscussionsTab({
   const [replyFormData, setReplyFormData] = useState({})
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  // Phase 4: attachments uploaded via MediaComposer, posted alongside
+  // the discussion body on submit.
+  const [attachments, setAttachments] = useState([])
 
   const handleCreateClick = () => {
     setFormData({ title: '', content: '', type: 'discussion' })
+    setAttachments([])
     setError('')
     setNewPostModalOpen(true)
   }
@@ -204,9 +209,11 @@ export function GroupDiscussionsTab({
       await onCreatePost({
         ...formData,
         groupId,
+        attachments: attachments.length > 0 ? attachments : undefined,
       })
       setNewPostModalOpen(false)
       setFormData({ title: '', content: '', type: 'discussion' })
+      setAttachments([])
     } catch (err) {
       setError(err.message || 'Failed to create post')
     } finally {
@@ -314,6 +321,16 @@ export function GroupDiscussionsTab({
                       onChange={(e) => setFormData({ ...formData, content: e.target.value })}
                       maxLength={5000}
                       placeholder="Write your post..."
+                    />
+                  </div>
+
+                  <div style={styles.formGroup}>
+                    <div style={styles.label}>Attachments (optional)</div>
+                    <MediaComposer
+                      groupId={groupId}
+                      maxFiles={4}
+                      attachments={attachments}
+                      onAttachmentsChange={setAttachments}
                     />
                   </div>
 
@@ -479,6 +496,16 @@ export function GroupDiscussionsTab({
                     onChange={(e) => setFormData({ ...formData, content: e.target.value })}
                     maxLength={5000}
                     placeholder="Write your post..."
+                  />
+                </div>
+
+                <div style={styles.formGroup}>
+                  <div style={styles.label}>Attachments (optional)</div>
+                  <MediaComposer
+                    groupId={groupId}
+                    maxFiles={4}
+                    attachments={attachments}
+                    onAttachmentsChange={setAttachments}
                   />
                 </div>
 
