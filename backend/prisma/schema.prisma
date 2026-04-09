@@ -92,6 +92,7 @@ model User {
   messagePollVotes           MessagePollVote[]
   studyGroupsCreated         StudyGroup[]              @relation("StudyGroupCreator")
   studyGroupMemberships      StudyGroupMember[]
+  groupMediaUsage            GroupMediaUsage[]
   groupResources             GroupResource[]
   groupSessionRsvps          GroupSessionRsvp[]
   groupDiscussionPosts       GroupDiscussionPost[]
@@ -1175,16 +1176,22 @@ model MessagePollVote {
 // ═══════════════════════════════════════════════════════════════════════════
 
 model StudyGroup {
-  id          Int      @id @default(autoincrement())
-  name        String
-  description String   @default("")
-  avatarUrl   String?
-  courseId    Int? // null = freeform group
-  privacy     String   @default("public") // "public", "private", "invite_only"
-  maxMembers  Int      @default(50)
-  createdById Int
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id               Int      @id @default(autoincrement())
+  name             String
+  description      String   @default("")
+  avatarUrl        String?
+  // Phase 4: owner-curated background for the group header.
+  // `backgroundUrl` is either a relative /uploads/group-media/... path
+  // (local dev) or a curated gallery asset path; `backgroundCredit` is
+  // an optional freeform attribution line (e.g. "Pexels · Jane Doe").
+  backgroundUrl    String?
+  backgroundCredit String?
+  courseId         Int? // null = freeform group
+  privacy          String   @default("public") // "public", "private", "invite_only"
+  maxMembers       Int      @default(50)
+  createdById      Int
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   course    Course?               @relation(fields: [courseId], references: [id], onDelete: SetNull)
   createdBy User                  @relation("StudyGroupCreator", fields: [createdById], references: [id])
@@ -1192,6 +1199,7 @@ model StudyGroup {
   resources GroupResource[]
   sessions  GroupSession[]
   posts     GroupDiscussionPost[]
+  mediaUsage GroupMediaUsage[]
 
   @@index([courseId])
   @@index([privacy, updatedAt(sort: Desc)])
@@ -1220,17 +1228,24 @@ model GroupResource {
   userId       Int // who added it
   title        String
   description  String   @default("")
-  resourceType String   @default("link") // "link", "sheet", "note", "file"
+  resourceType String   @default("link") // "link", "sheet", "note", "file", "image", "video"
   resourceUrl  String? // external link or file path
   sheetId      Int? // linked StudySheet
   noteId       Int? // linked Note
   pinned       Boolean  @default(false)
+  // Phase 4: structured media metadata for direct uploads. Nullable so
+  // legacy "link"/"sheet"/"note" resources continue to work unchanged.
+  mediaType    String? // "image" | "video" | "file" | "link"
+  mediaUrl     String?
+  mediaBytes   Int?
+  mediaMime    String?
   createdAt    DateTime @default(now())
 
   group StudyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
   user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([groupId, pinned, createdAt(sort: Desc)])
+  @@index([groupId, createdAt(sort: Desc)])
 }
 
 model GroupSession {
@@ -1276,6 +1291,9 @@ model GroupDiscussionPost {
   type      String   @default("discussion") // "discussion", "question", "announcement", "poll"
   pinned    Boolean  @default(false)
   resolved  Boolean  @default(false) // for Q&A threads
+  // Phase 4: optional media attachments. JSON array of
+  //   [{ url, mime, bytes, kind: 'image'|'video'|'file' }]
+  attachments Json?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1302,6 +1320,25 @@ model GroupDiscussionReply {
   upvotes DiscussionUpvote[]
 
   @@index([postId, createdAt])
+}
+
+// Phase 4: per-user weekly media upload counter for study groups.
+// One row per (user, weekStart) pair. weekStart is the Monday 00:00 UTC
+// of the current ISO week. Incremented after every successful upload via
+// assertQuotaAvailable + incrementUsage in studyGroups.media.service.
+model GroupMediaUsage {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  groupId   Int?
+  weekStart DateTime @db.Date
+  count     Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  user  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group StudyGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, weekStart])
+  @@index([userId, weekStart])
 }
 
 model DiscussionUpvote {
