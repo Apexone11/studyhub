@@ -39,9 +39,24 @@ async function listDiscussions(req, res) {
     const limitNum = Math.min(parseInt(limit, 10) || 50, 100)
     const offsetNum = Math.max(parseInt(offset, 10) || 0, 0)
 
+    // Phase 5 B.5: non-mods only see 'published' posts. Mods see
+    // everything (including pending_approval and removed) so they can
+    // approve/reject and audit. Authors also see their own pending posts.
+    const canModerate = member && (member.role === 'admin' || member.role === 'moderator')
+    const statusFilter = canModerate
+      ? {} // mods see all statuses
+      : {
+          OR: [
+            { status: 'published' },
+            // Authors always see their own pending posts
+            { status: 'pending_approval', userId: req.user.userId },
+          ],
+        }
+
     const where = {
       groupId,
       ...(type && { type }),
+      ...statusFilter,
     }
 
     const [posts, total] = await Promise.all([
@@ -69,6 +84,8 @@ async function listDiscussions(req, res) {
       type: p.type,
       pinned: p.pinned,
       resolved: p.resolved,
+      status: p.status || 'published',
+      attachments: p.attachments || null,
       replyCount: p.replies.length,
       upvoteCount: p.upvotes.length,
       userHasUpvoted: p.upvotes.some((u) => u.userId === req.user.userId),
@@ -170,6 +187,25 @@ async function createDiscussion(req, res) {
       validatedAttachments = normalized
     }
 
+    // Phase 5 B.5: if the group has post-approval enabled and the
+    // caller is not a mod, new posts enter 'pending_approval' status.
+    // Admins/mods bypass the queue — they ARE the moderators.
+    let postStatus = 'published'
+    try {
+      const groupRow = await prisma.studyGroup.findUnique({
+        where: { id: groupId },
+        select: { requirePostApproval: true },
+      })
+      if (groupRow?.requirePostApproval) {
+        const isModUser = await isGroupAdmin(groupId, req.user.userId)
+        if (!isModUser) {
+          postStatus = 'pending_approval'
+        }
+      }
+    } catch {
+      // Graceful degradation — default to published
+    }
+
     const post = await prisma.groupDiscussionPost.create({
       data: {
         groupId,
@@ -177,6 +213,7 @@ async function createDiscussion(req, res) {
         title: validTitle,
         content: strippedContent,
         type,
+        status: postStatus,
         ...(validatedAttachments ? { attachments: validatedAttachments } : {}),
       },
       include: {
