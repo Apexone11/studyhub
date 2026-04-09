@@ -288,7 +288,7 @@ async function updateGroup(req, res) {
       return res.status(403).json({ error: 'Admin access required.' })
     }
 
-    const { name, description, avatarUrl, privacy, maxMembers, backgroundUrl, backgroundCredit } = req.body
+    const { name, description, avatarUrl, privacy, maxMembers, backgroundUrl, backgroundCredit, memberListPrivate, requirePostApproval } = req.body
     const updates = {}
 
     if (name !== undefined) {
@@ -338,6 +338,16 @@ async function updateGroup(req, res) {
         // Sanitize: strip tags, cap length.
         updates.backgroundCredit = backgroundCredit.replace(/<[^>]*>/g, '').trim().slice(0, 200)
       }
+    }
+
+    // Phase 5 B.3: member-list visibility toggle
+    if (memberListPrivate !== undefined) {
+      updates.memberListPrivate = Boolean(memberListPrivate)
+    }
+
+    // Phase 5 B.5: post-approval queue toggle
+    if (requirePostApproval !== undefined) {
+      updates.requirePostApproval = Boolean(requirePostApproval)
     }
 
     if (privacy !== undefined) {
@@ -658,6 +668,13 @@ async function listMembers(req, res) {
       return res.status(403).json({ error: 'Not authorized.' })
     }
 
+    // Phase 5 B.3: if memberListPrivate is true, non-members cannot
+    // see the member roster. Admins/mods always see it regardless.
+    const isMod = userMember && (userMember.role === 'admin' || userMember.role === 'moderator')
+    if (group.memberListPrivate && !userMember && !isMod && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Member list is private.' })
+    }
+
     const canManageMembers = Boolean(
       userMember
       && userMember.status === 'active'
@@ -710,6 +727,13 @@ async function listMembers(req, res) {
       role: m.role,
       status: m.status,
       joinedAt: m.joinedAt,
+      // Phase 5 B.2 + B.4: mute + join-gate message visible to mods only
+      ...(canManageMembers ? {
+        mutedUntil: m.mutedUntil || null,
+        mutedReason: m.mutedReason || '',
+        joinMessage: m.joinMessage || '',
+        strikeCount: m.strikeCount || 0,
+      } : {}),
     }))
 
     res.json({ members: formatted, total, limit: limitNum, offset: offsetNum })
