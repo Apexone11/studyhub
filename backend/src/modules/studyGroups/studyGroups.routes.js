@@ -122,6 +122,138 @@ router.delete('/:id/members/:userId', writeLimiter, requireAuth, removeMember)
  */
 router.post('/:id/invite', writeLimiter, requireAuth, inviteUser)
 
+// ===== PHASE 5: GROUP BLOCKS =====
+
+const prisma = require('../../lib/prisma')
+const { captureError } = require('../../monitoring/sentry')
+const { parseId, isGroupAdminOrMod } = require('./studyGroups.helpers')
+const { writeAuditLog } = require('./studyGroups.reports.service')
+
+/**
+ * POST /api/study-groups/:id/block/:userId
+ * Block a user from a group (admin/moderator only).
+ */
+router.post('/:id/block/:userId', writeLimiter, requireAuth, async (req, res) => {
+  try {
+    const groupId = parseId(req.params.id)
+    const targetUserId = parseId(req.params.userId)
+    if (groupId === null || targetUserId === null) {
+      return res.status(400).json({ error: 'Invalid IDs.' })
+    }
+
+    const isMod = await isGroupAdminOrMod(groupId, req.user.userId)
+    if (!isMod) return res.status(403).json({ error: 'Admin or moderator access required.' })
+
+    if (targetUserId === req.user.userId) {
+      return res.status(400).json({ error: 'You cannot block yourself.' })
+    }
+
+    const reason = typeof req.body?.reason === 'string'
+      ? req.body.reason.replace(/<[^>]*>/g, '').trim().slice(0, 500)
+      : ''
+
+    // Upsert: if already blocked, just update reason.
+    await prisma.groupBlock.upsert({
+      where: { groupId_userId: { groupId, userId: targetUserId } },
+      update: { reason, blockedById: req.user.userId },
+      create: { groupId, userId: targetUserId, blockedById: req.user.userId, reason },
+    })
+
+    // Remove any active membership so the blocked user loses access
+    // immediately. Use deleteMany to avoid errors if the row doesn't exist.
+    await prisma.studyGroupMember.deleteMany({
+      where: { groupId, userId: targetUserId },
+    })
+
+    await writeAuditLog({
+      groupId,
+      actorId: req.user.userId,
+      action: 'member.block',
+      targetType: 'member',
+      targetId: targetUserId,
+      context: { reason },
+      req,
+    })
+
+    res.json({ message: 'User blocked from group.' })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+/**
+ * DELETE /api/study-groups/:id/block/:userId
+ * Unblock a user (admin/moderator only).
+ */
+router.delete('/:id/block/:userId', writeLimiter, requireAuth, async (req, res) => {
+  try {
+    const groupId = parseId(req.params.id)
+    const targetUserId = parseId(req.params.userId)
+    if (groupId === null || targetUserId === null) {
+      return res.status(400).json({ error: 'Invalid IDs.' })
+    }
+
+    const isMod = await isGroupAdminOrMod(groupId, req.user.userId)
+    if (!isMod) return res.status(403).json({ error: 'Admin or moderator access required.' })
+
+    await prisma.groupBlock.deleteMany({
+      where: { groupId, userId: targetUserId },
+    })
+
+    await writeAuditLog({
+      groupId,
+      actorId: req.user.userId,
+      action: 'member.unblock',
+      targetType: 'member',
+      targetId: targetUserId,
+      req,
+    })
+
+    res.json({ message: 'User unblocked.' })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+/**
+ * GET /api/study-groups/:id/blocks
+ * List blocked users (admin/moderator only).
+ */
+router.get('/:id/blocks', readLimiter, requireAuth, async (req, res) => {
+  try {
+    const groupId = parseId(req.params.id)
+    if (groupId === null) return res.status(400).json({ error: 'Invalid group ID.' })
+
+    const isMod = await isGroupAdminOrMod(groupId, req.user.userId)
+    if (!isMod) return res.status(403).json({ error: 'Admin or moderator access required.' })
+
+    const blocks = await prisma.groupBlock.findMany({
+      where: { groupId },
+      include: {
+        user: { select: { id: true, username: true, avatarUrl: true } },
+        blockedBy: { select: { id: true, username: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
+
+    res.json({
+      blocks: blocks.map((b) => ({
+        id: b.id,
+        userId: b.userId,
+        user: b.user,
+        blockedBy: b.blockedBy,
+        reason: b.reason,
+        createdAt: b.createdAt,
+      })),
+    })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
 // ===== SUB-ROUTER MOUNTS =====
 
 // Mount sub-routers with mergeParams enabled in each sub-router

@@ -26,6 +26,7 @@ const {
   requireGroupMember,
   isGroupAdmin,
   isGroupAdminOrMod,
+  isBlockedFromGroup,
   validateGroupName,
   validateDescription,
   formatGroup,
@@ -444,6 +445,13 @@ async function joinGroup(req, res) {
     })
 
     if (!group) {
+      return res.status(404).json({ error: 'Group not found.' })
+    }
+
+    // Phase 5: block check — blocked users see a generic error (no
+    // "you are blocked" reveal, matches the 404-for-private pattern).
+    const blocked = await isBlockedFromGroup(groupId, req.user.userId)
+    if (blocked) {
       return res.status(404).json({ error: 'Group not found.' })
     }
 

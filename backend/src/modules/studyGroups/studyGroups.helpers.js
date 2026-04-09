@@ -39,6 +39,23 @@ async function isGroupAdminOrMod(groupId, userId) {
 }
 
 /**
+ * Phase 5: check if a user is blocked from a group. Returns the block
+ * row on hit, null on miss. Graceful-degradation: returns null on any
+ * DB error so a missing table never 500s the request.
+ */
+async function isBlockedFromGroup(groupId, userId) {
+  if (!groupId || !userId) return null
+  try {
+    return await prisma.groupBlock.findUnique({
+      where: { groupId_userId: { groupId, userId } },
+      select: { id: true, reason: true, createdAt: true },
+    })
+  } catch {
+    return null
+  }
+}
+
+/**
  * Strip HTML tags from user content.
  * Uses sanitize-html to strip all tags reliably (regex is bypassable).
  */
@@ -221,6 +238,7 @@ module.exports = {
   requireGroupMember,
   isGroupAdmin,
   isGroupAdminOrMod,
+  isBlockedFromGroup,
   stripHtmlTags,
   validateGroupName,
   validateDescription,
