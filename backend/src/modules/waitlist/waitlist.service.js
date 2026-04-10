@@ -5,7 +5,6 @@
  * and in-app notification for logged-in users who join the waitlist.
  */
 const prisma = require('../../lib/prisma')
-const { captureError } = require('../../monitoring/sentry')
 
 const VALID_TIERS = ['pro', 'institution']
 const VALID_STATUSES = ['waiting', 'invited', 'converted', 'removed']

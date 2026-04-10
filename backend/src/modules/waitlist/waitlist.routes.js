@@ -18,9 +18,13 @@ const router = express.Router()
 let optionalAuth
 try {
   optionalAuth = require('../../core/auth/optionalAuth')
-} catch {
-  // Fallback for envs where core/auth doesn't exist (tests, etc.)
-  optionalAuth = (_req, _res, next) => next()
+} catch (err) {
+  // Only swallow MODULE_NOT_FOUND for the exact path — re-throw real errors
+  if (err && err.code === 'MODULE_NOT_FOUND') {
+    optionalAuth = (_req, _res, next) => next()
+  } else {
+    throw err
+  }
 }
 
 /**

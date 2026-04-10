@@ -7,7 +7,8 @@
  *   - Control characters (ASCII 0-31 except \t, \n, \r)
  *   - Any single string field longer than MAX_FIELD_LENGTH
  *   - JSON nesting deeper than MAX_DEPTH
- *   - Duplicate query parameters (parameter pollution)
+ * Normalizes duplicate query parameters (parameter pollution) to
+ * first-value-wins instead of rejecting them.
  *
  * Designed to be added early in the Express middleware stack (after
  * express.json() but before any route). Failures return 400 with a

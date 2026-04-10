@@ -90,7 +90,7 @@ export function MessageThread({
           setShowJumpToLatest(true)
         }
       },
-      { threshold: 0.1 },
+      { threshold: 0, rootMargin: '0px 0px 50px 0px' },
     )
     observer.observe(sentinel)
     return () => observer.disconnect()
@@ -480,7 +480,7 @@ export function MessageThread({
           <TypingIndicator usernames={typingUsernames} />
         )}
 
-        <div ref={messagesEndRef} />
+        <div ref={messagesEndRef} style={{ height: 1 }} aria-hidden="true" />
       </div>
 
       {/* Phase 3: "Jump to latest" floating button */}
