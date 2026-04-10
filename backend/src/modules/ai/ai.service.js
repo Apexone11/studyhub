@@ -215,6 +215,24 @@ async function streamMessage({ user, conversationId, content, currentPage, image
     return
   }
 
+  // Phase 5: AI input sanitization — scan for prompt injection patterns
+  // before saving or sending to Claude. We still save the message (for
+  // audit) and let Claude handle the response (it will politely decline),
+  // but we flag the interaction for security review.
+  try {
+    const { sanitizeAiInput } = require('./ai.inputSanitizer')
+    const scan = sanitizeAiInput(content)
+    if (scan.flagged) {
+      captureError(new Error(`AI prompt injection attempt: ${scan.reason}`), {
+        userId,
+        conversationId,
+        contentPreview: content.slice(0, 200),
+      })
+    }
+  } catch {
+    // Sanitizer not available — degrade gracefully
+  }
+
   // 3. Save user message to DB immediately.
   const hasImg = !!(images && images.length > 0)
   await prisma.aiMessage.create({

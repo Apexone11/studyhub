@@ -47,6 +47,21 @@ router.post('/register', registerLimiter, async (req, res) => {
       }
     }
 
+    // Phase 5: check password against HIBP breached-password database.
+    // Non-blocking on API failure (graceful degradation).
+    try {
+      const { checkPasswordBreach } = require('../../lib/passwordSafety')
+      const breach = await checkPasswordBreach(password)
+      if (breach.breached) {
+        return res.status(400).json({
+          error: `This password has appeared in ${breach.count.toLocaleString()} data breaches. Please choose a different password.`,
+          code: 'BREACHED_PASSWORD',
+        })
+      }
+    } catch {
+      // HIBP unreachable — allow registration to proceed
+    }
+
     const passwordHash = await bcrypt.hash(password, 12)
 
     const acceptedAt = new Date()

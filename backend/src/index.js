@@ -7,6 +7,7 @@ const http = require('http')
 const path = require('node:path')
 require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') })
 const { initSentry, captureError } = require('./monitoring/sentry')
+const { validateSecrets: validateStartupSecrets } = require('./lib/secretValidator')
 const { bootstrapRuntime } = require('./lib/bootstrap/bootstrap')
 const { validateEmailTransport } = require('./lib/email/email')
 const { startHtmlArchiveScheduler } = require('./lib/html/htmlArchiveScheduler')
@@ -28,6 +29,10 @@ const { ERROR_CODES, sendError } = require('./middleware/errorEnvelope')
 const prisma = require('./lib/prisma')
 
 const sentryEnabled = initSentry()
+
+// Phase 5: validate all required secrets are set at boot time.
+// In production, missing critical secrets cause a hard exit.
+validateStartupSecrets()
 
 const app = express()
 const PORT = process.env.PORT || 4000
@@ -283,6 +288,11 @@ app.post(
 
 // Parse JSON request bodies for auth and future API routes.
 app.use(express.json())
+
+// Phase 5: reject payloads with null bytes, control chars, excessive
+// nesting/length, or duplicate query params before they reach routes.
+const inputSanitizer = require('./middleware/inputSanitizer')
+app.use(inputSanitizer)
 
 // Optional emergency write-guard for non-admin requests.
 app.use(guardedMode)
