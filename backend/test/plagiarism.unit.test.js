@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// Mock dependencies before importing the module
+// Mock dependencies before importing the module.
+// prisma.js uses module.exports = prisma (CJS), so the mock must
+// return the client object directly, not as a default property.
 vi.mock('../src/lib/prisma', () => ({
-  default: {
-    studySheet: {
-      findUnique: vi.fn(),
-      findMany: vi.fn(),
-    },
+  studySheet: {
+    findUnique: vi.fn(),
+    findMany: vi.fn(),
   },
 }))
 

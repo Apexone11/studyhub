@@ -55,7 +55,7 @@ test.describe('Legal Pages @e2e', () => {
   })
 
   test('cookie policy page loads', async ({ page }) => {
-    await page.goto('/cookie-policy')
+    await page.goto('/cookies')
     await page.waitForLoadState('domcontentloaded')
 
     const heading = page.getByRole('heading', { name: 'Cookie Policy' })
@@ -99,7 +99,7 @@ test.describe('Legal Pages @e2e', () => {
       '/terms',
       '/privacy',
       '/guidelines',
-      '/cookie-policy',
+      '/cookies',
       '/disclaimer',
       '/about',
     ]

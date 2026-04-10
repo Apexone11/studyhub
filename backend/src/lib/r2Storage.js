@@ -325,7 +325,8 @@ function extractObjectKeyFromUrl(url) {
  */
 function generateVideoKey(userId, originalName) {
   const dotIndex = originalName.lastIndexOf('.')
-  const ext = dotIndex > 0 ? originalName.slice(dotIndex + 1).toLowerCase() : 'mp4'
+  const extracted = dotIndex > 0 ? originalName.slice(dotIndex + 1).toLowerCase() : ''
+  const ext = extracted || 'mp4'
   const timestamp = Date.now()
   const random = Math.random().toString(36).slice(2, 10)
   return `videos/${userId}/${timestamp}-${random}.${ext}`
@@ -364,7 +365,8 @@ function generateManifestKey(baseKey) {
  */
 function generateAnnouncementImageKey(announcementId, originalName) {
   const dotIndex = originalName.lastIndexOf('.')
-  const ext = dotIndex > 0 ? originalName.slice(dotIndex + 1).toLowerCase() : 'jpg'
+  const extracted = dotIndex > 0 ? originalName.slice(dotIndex + 1).toLowerCase() : ''
+  const ext = extracted || 'jpg'
   const timestamp = Date.now()
   const random = Math.random().toString(36).slice(2, 10)
   return `announcements/${announcementId}/${timestamp}-${random}.${ext}`
