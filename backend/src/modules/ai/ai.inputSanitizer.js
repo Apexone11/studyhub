@@ -12,7 +12,7 @@
  * Overly aggressive filtering would break legitimate educational
  * questions about prompt engineering or AI safety.
  */
-const { captureError } = require('../../monitoring/sentry')
+// captureError is used by the caller (ai.service.js), not in this module.
 
 // Patterns that attempt to override the system prompt or change the
 // AI's identity/instructions. Case-insensitive, applied to the start
