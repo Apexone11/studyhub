@@ -794,6 +794,24 @@ Frontend:
 - Bars turn amber at >80% usage, red at 100%
 - Backward-compatible with the legacy flat `messagesUsed/messagesLimit` response shape
 
+## Phase 2 — User Product Reviews (2026-04-10)
+
+### Settings ReviewTab
+- Star rating picker (1-5 clickable stars with hover preview, CSS-only)
+- Text feedback textarea with live character counter (500 max)
+- Submit creates or updates via POST /api/reviews
+- Existing pending reviews editable; approved reviews read-only with badge
+- Success toast: "Thank you! Your review is pending approval."
+
+### Admin ReviewsTab
+- Already existed at 631 lines — list, approve/reject, AI report generation
+
+### Public Reviews on About Page
+- `PublicReviews` component fetches GET /api/reviews/public
+- Card grid with star display, review text, student username
+- Average rating calculated + displayed
+- Hidden when no approved reviews exist
+
 ## Phase 3 — Messaging Auto-Scroll (2026-04-10)
 
 ### Scroll UX Overhaul

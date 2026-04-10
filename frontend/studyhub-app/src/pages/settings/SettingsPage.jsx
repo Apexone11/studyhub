@@ -26,6 +26,7 @@ import PrivacyTab from './PrivacyTab'
 import AppearanceTab from './AppearanceTab'
 import SubscriptionTab from './SubscriptionTab'
 import ModerationTab from './ModerationTab'
+import ReviewTab from './ReviewTab'
 import LegalTab from './LegalTab'
 
 const NAV_TABS = [
@@ -38,6 +39,7 @@ const NAV_TABS = [
   { id: 'subscription', label: 'Subscription' },
   { id: 'legal', label: 'Legal' },
   { id: 'moderation', label: 'Moderation' },
+  { id: 'review', label: 'Leave a Review' },
 ]
 
 export default function SettingsPage() {
@@ -294,6 +296,8 @@ export default function SettingsPage() {
         return <LegalTab />
       case 'moderation':
         return <ModerationTab />
+      case 'review':
+        return <ReviewTab />
       default:
         return null
     }
