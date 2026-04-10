@@ -653,3 +653,85 @@ Frontend:
 ### For You Feed Fix
 - Fixed `undefined` values in Prisma `notIn` array (`.filter(Boolean)`)
 - Error messages now surface actual backend error
+
+---
+
+## Phase 2 — Fork & Contribute (2026-04-08)
+
+### Backend
+- `GET /api/sheets/:id/contributors` — lineage-wide top contributors
+- `GET /api/sheets/:id/fork-tree` — nested tree of published forks
+- `GET/POST/DELETE /api/sheets/contributions/:id/comments` — hunk-level inline comments
+- Migration: `20260408000001_add_contribution_comments`
+- 24 backend unit tests
+
+### Frontend
+- DiffViewer extended with line-selection + inline comments panel
+- Pre-submit 3-checkbox checklist on Contribute tab
+- TopContributorsPanel + ForkTreePanel on viewer sidebar
+- Shared ForkTree component extracted from SheetLabLineage
+- 6 Playwright E2E tests
+
+## Phase 3 — Sheet Lab Editor Toggle (2026-04-08)
+
+### Editor Mode Toggle
+- Rich Text and HTML/Code as equal siblings; Markdown is legacy (one-way migration only)
+- CodeMirror 6 HTML editor (~120KB gz) with syntax highlighting, autocomplete
+- Lossy-conversion detector + confirmation modal before HTML to Rich Text switch
+- `@tiptap/extension-table` 2.x — tables now round-trippable
+- StackedEditorPane (vertical editor+preview, collapsible) on SheetLab + Upload page
+- HTML preview iframes hardened to `sandbox=""`
+- 18 Vitest unit tests, 3 Playwright E2E tests
+
+### Bug Fixes
+- AI bubble hides when Messages chat panel is open (ChatPanelProvider context)
+- Rejected sheets show "Rejected" badge, not "PENDING REVIEW"
+- Admin Interactive Preview tab no longer stuck on "Loading..."
+- Fullscreen HTML preview: Escape key exits, stronger exit CTA
+
+## Phase 4 — Study Groups Media + BookHub Art (2026-04-09)
+
+### Track A — Group Media Paywall
+- Migration: `20260409000001_add_group_media_and_backgrounds`
+- Weekly media quota: free 5/week, pro 100/week, admin unlimited
+- `POST /resources/upload` — multer diskStorage, 25MB cap, MIME allowlist
+- `GET /resources/media-quota` — quota snapshot
+- Resources + discussions accept structured media metadata + attachments
+- GroupBackgroundPicker — owner-curated banner with gallery + custom upload
+- 16 backend unit tests, 5 Playwright smoke tests
+
+### Track B — BookHub Art
+- Winslow Homer "Girl Reading Under an Oak Tree" behind BookHub hero
+- `color-mix` gradient overlay, dark mode variant, on-image attribution
+
+## Phase 5 — Trust & Safety Suite (2026-04-09)
+
+### Report System
+- Migration: `20260409000002_add_group_trust_and_safety` (GroupReport, GroupAppeal, GroupAuditLog, GroupBlock + moderation columns on StudyGroup/StudyGroupMember/GroupDiscussionPost)
+- Full report flow: submit, auto-lock at 5 reporters/24h, admin review (dismiss/warn/lock/delete), appeal
+- Reporter anonymity + reporter-hiding from list/search/detail
+- Admin Group Reports tab with status filters + action buttons
+- Private-group join notifications to full admin+mod team
+- 24 backend unit tests
+
+### Safety Features
+- Block users from groups (endpoints + immediate membership removal)
+- Mute users (time-boxed 1-90 days, enforced on resources + discussions)
+- Member-list privacy toggle
+- Join-gate message field (visible to mods)
+- Post-approval queue (pending_approval status, approve/reject endpoints)
+- Two-strikes auto-ban on mod-removed posts (30-day rolling window)
+- Link safety check (static blocklist of bad TLDs, IP loggers, suspicious paths)
+- Audit log endpoint (IP+UA redacted from non-platform-admins)
+
+### Infrastructure
+- Soft-delete for groups (30-day retention instead of hard delete)
+- `@upstash/redis` installed; `redis.js` cached() helper operational
+- Performance indexes migration (`20260409200000`)
+- `groupJoinLimiter`, `groupReportLimiter`, `groupAppealLimiter` rate limiters
+- docker-compose.yml: DIRECT_URL + password derivation fix
+- Group Avatar vs Background labels clarified in Edit modal
+
+### Test Coverage Added
+- Backend: plagiarism, r2Storage, rateLimiters, socketio, storage, videoConstants, webauthn
+- Frontend E2E: courses, dashboard, legal, library, playground
