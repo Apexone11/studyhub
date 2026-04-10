@@ -788,6 +788,12 @@ Frontend:
 - `streamMessage` checks weekly limit after daily limit
 - `GET /api/ai/usage` returns both daily + weekly quota snapshot
 
+### Frontend Quota Display
+- AiBubble: `AiQuotaBar` component shows "12/30 today" + "85/100 this week" with thin progress bars
+- AiPage: `QuotaRow` component with the same dual-bar display + "Upgrade for more messages" CTA when weekly limit hit
+- Bars turn amber at >80% usage, red at 100%
+- Backward-compatible with the legacy flat `messagesUsed/messagesLimit` response shape
+
 ## Phase 3 — Messaging Auto-Scroll (2026-04-10)
 
 ### Scroll UX Overhaul
