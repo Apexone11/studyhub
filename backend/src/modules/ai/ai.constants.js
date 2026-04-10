@@ -17,6 +17,19 @@ const DAILY_LIMITS = {
   admin: 200,
 }
 
+/**
+ * Phase 1: Weekly message limits — acts as a ceiling so users cannot
+ * burn through an entire month's worth of messages in a single day.
+ * Weekly window resets on Monday 00:00 UTC (ISO week).
+ */
+const WEEKLY_LIMITS = {
+  default: 100,
+  verified: 250,
+  donor: 300,
+  pro: 600,
+  admin: 1000,
+}
+
 /** Max characters per user message. */
 const MAX_MESSAGE_LENGTH = 5000
 
@@ -186,6 +199,7 @@ module.exports = {
   DEFAULT_MODEL,
   FAST_MODEL,
   DAILY_LIMITS,
+  WEEKLY_LIMITS,
   MAX_MESSAGE_LENGTH,
   MAX_IMAGES_PER_MESSAGE,
   MAX_IMAGE_SIZE,

@@ -11,6 +11,7 @@ const {
   DEFAULT_MODEL,
   SYSTEM_PROMPT,
   DAILY_LIMITS,
+  WEEKLY_LIMITS,
   CONVERSATION_HISTORY_LIMIT,
   MAX_OUTPUT_TOKENS_QA,
   MAX_OUTPUT_TOKENS_SHEET,
@@ -96,6 +97,97 @@ async function incrementUsage(userId, tokens = 0) {
       tokenCount: { increment: tokens },
     },
   })
+}
+
+// ── Phase 1: Weekly limits ─────────────────────────────────────────
+
+/**
+ * Resolve the weekly message limit for a user (same tier logic as daily).
+ */
+async function getWeeklyLimit(user) {
+  if (user.role === 'admin') return WEEKLY_LIMITS.admin
+  try {
+    const sub = await prisma.subscription.findUnique({
+      where: { userId: user.id || user.userId },
+      select: { plan: true, status: true },
+    })
+    if (sub && (sub.status === 'active' || sub.status === 'trialing') && sub.plan !== 'free') {
+      return WEEKLY_LIMITS.pro
+    }
+  } catch { /* graceful degradation */ }
+  try {
+    const donation = await prisma.donation.findFirst({
+      where: { userId: user.id || user.userId, status: 'completed' },
+      select: { id: true },
+    })
+    if (donation) return WEEKLY_LIMITS.donor
+  } catch { /* graceful degradation */ }
+  if (user.isStaffVerified || user.emailVerified) return WEEKLY_LIMITS.verified
+  return WEEKLY_LIMITS.default
+}
+
+/**
+ * Sum message counts for the current ISO week (Monday 00:00 UTC → Sunday 23:59 UTC).
+ */
+async function getWeeklyUsage(userId) {
+  const now = new Date()
+  const dayOfWeek = now.getUTCDay()
+  const daysSinceMonday = (dayOfWeek + 6) % 7
+  const weekStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - daysSinceMonday))
+  const weekEnd = new Date(weekStart)
+  weekEnd.setUTCDate(weekEnd.getUTCDate() + 7)
+
+  try {
+    const result = await prisma.aiUsageLog.aggregate({
+      where: {
+        userId,
+        date: { gte: weekStart, lt: weekEnd },
+      },
+      _sum: { messageCount: true },
+    })
+    return result._sum.messageCount || 0
+  } catch {
+    return 0
+  }
+}
+
+/**
+ * Full usage quota snapshot for the frontend. Returns:
+ *   { daily: { used, limit, resetAt }, weekly: { used, limit, resetAt } }
+ */
+async function getUsageQuota(user) {
+  const userId = user.id || user.userId
+
+  const [dailyUsage, dailyLimit, weeklyUsed, weeklyLimit] = await Promise.all([
+    getOrCreateUsage(userId),
+    getDailyLimit(user),
+    getWeeklyUsage(userId),
+    getWeeklyLimit(user),
+  ])
+
+  // Daily reset: next midnight UTC
+  const now = new Date()
+  const dailyReset = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1))
+
+  // Weekly reset: next Monday 00:00 UTC
+  const dayOfWeek = now.getUTCDay()
+  const daysUntilMonday = ((8 - dayOfWeek) % 7) || 7
+  const weeklyReset = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + daysUntilMonday))
+
+  return {
+    daily: {
+      used: dailyUsage.messageCount,
+      limit: dailyLimit,
+      remaining: Math.max(0, dailyLimit - dailyUsage.messageCount),
+      resetAt: dailyReset.toISOString(),
+    },
+    weekly: {
+      used: weeklyUsed,
+      limit: weeklyLimit,
+      remaining: Math.max(0, weeklyLimit - weeklyUsed),
+      resetAt: weeklyReset.toISOString(),
+    },
+  }
 }
 
 // ── Conversation helpers ───────────────────────────────────────────
@@ -209,6 +301,22 @@ async function streamMessage({ user, conversationId, content, currentPage, image
     sendSSE(res, {
       type: 'error',
       message: `Daily limit reached (${limit} messages). Resets at midnight UTC.`,
+      code: 'RATE_LIMITED',
+    })
+    res.end()
+    return
+  }
+
+  // 2b. Phase 1: Check weekly rate limit.
+  const weeklyUsed = await getWeeklyUsage(userId)
+  const weeklyLimit = await getWeeklyLimit(user)
+  if (weeklyUsed >= weeklyLimit) {
+    const now = new Date()
+    const dayOfWeek = now.getUTCDay()
+    const daysUntilMonday = ((8 - dayOfWeek) % 7) || 7
+    sendSSE(res, {
+      type: 'error',
+      message: `Weekly limit reached (${weeklyLimit} messages). Resets in ${daysUntilMonday} day${daysUntilMonday !== 1 ? 's' : ''}.`,
       code: 'RATE_LIMITED',
     })
     res.end()
@@ -446,6 +554,9 @@ module.exports = {
   renameConversation,
   streamMessage,
   getUsageStats,
+  getUsageQuota,
   getDailyLimit,
+  getWeeklyLimit,
   getOrCreateUsage,
+  getWeeklyUsage,
 }
