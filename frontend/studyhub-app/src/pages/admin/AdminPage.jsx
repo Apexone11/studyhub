@@ -24,6 +24,7 @@ import ReviewsTab from './ReviewsTab'
 const AnalyticsTab = lazy(() => import('./AnalyticsTab'))
 const RevenueTab = lazy(() => import('./RevenueTab'))
 const GroupReportsTab = lazy(() => import('./GroupReportsTab'))
+const WaitlistTab = lazy(() => import('./WaitlistTab'))
 
 export default function AdminPage() {
   const layout = useResponsiveAppLayout()
@@ -379,6 +380,12 @@ export default function AdminPage() {
                 {activeTab === 'group-reports' ? (
                   <Suspense fallback={<div style={{ padding: 24, color: 'var(--sh-muted)' }}>Loading...</div>}>
                     <GroupReportsTab />
+                  </Suspense>
+                ) : null}
+
+                {activeTab === 'waitlist' ? (
+                  <Suspense fallback={<div style={{ padding: 24, color: 'var(--sh-muted)' }}>Loading...</div>}>
+                    <WaitlistTab />
                   </Suspense>
                 ) : null}
 

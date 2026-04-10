@@ -1635,14 +1635,20 @@ model BookBookmark {
 // ── Waitlist ─────────────────────────────────────────────────
 
 model Waitlist {
-  id        Int      @id @default(autoincrement())
-  email     String
-  tier      String
-  createdAt DateTime @default(now())
+  id          Int       @id @default(autoincrement())
+  email       String
+  tier        String // 'pro' | 'institution'
+  // Phase 0: lifecycle tracking for the admin dashboard
+  status      String    @default("waiting") // 'waiting' | 'invited' | 'converted' | 'removed'
+  invitedAt   DateTime?
+  convertedAt DateTime?
+  notes       String    @default("")
+  createdAt   DateTime  @default(now())
 
   @@unique([email, tier])
   @@index([email])
   @@index([tier])
+  @@index([status, createdAt])
 }
 
 // ── Library Catalog Cache ────────────────────────────────────

@@ -452,24 +452,8 @@ app.use('/api/payments', paymentsRoutes)
 // Reviews module endpoints under /api/reviews.
 app.use('/api/reviews', reviewsRoutes)
 
-// Waitlist (simple inline route for pricing page)
-app.post('/api/waitlist', express.json(), async (req, res) => {
-  try {
-    const { email, tier } = req.body || {}
-    if (!email || !tier) return res.status(400).json({ error: 'Email and tier are required.' })
-    if (!['pro', 'institution'].includes(tier))
-      return res.status(400).json({ error: 'Invalid tier.' })
-    if (typeof email !== 'string' || !email.includes('@') || email.length > 320) {
-      return res.status(400).json({ error: 'Invalid email address.' })
-    }
-    await prisma.waitlist.create({ data: { email: email.trim().toLowerCase(), tier } })
-    res.json({ message: 'You have been added to the waitlist.' })
-  } catch (err) {
-    if (err.code === 'P2002') return res.json({ message: 'You are already on the waitlist.' })
-    console.error('[waitlist]', err.message)
-    res.status(500).json({ error: 'Something went wrong. Please try again.' })
-  }
-})
+// Waitlist module (Phase 0 — confirmation email + in-app notification + admin endpoints)
+app.use('/api/waitlist', require('./modules/waitlist'))
 
 // Public unauthenticated data endpoints (landing page stats, etc.).
 app.use('/api/public', publicRoutes)

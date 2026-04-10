@@ -735,3 +735,27 @@ Frontend:
 ### Test Coverage Added
 - Backend: plagiarism, r2Storage, rateLimiters, socketio, storage, videoConstants, webauthn
 - Frontend E2E: courses, dashboard, legal, library, playground
+
+## Phase 0 — Waitlist System (2026-04-10)
+
+### Module Refactor
+- Inline waitlist route from `index.js` extracted into `backend/src/modules/waitlist/` (routes, service, index)
+- Standard module pattern matching all other StudyHub modules
+
+### Waitlist Signup (0.1 + 0.2)
+- `POST /api/waitlist` — validates email + tier, creates row, fires confirmation email (fire-and-forget), creates in-app notification if caller is logged in
+- Confirmation email personalized by tier (Pro vs Institution copy)
+- Duplicate signups return 200 with "already on the waitlist" (no error)
+
+### Admin Dashboard (0.3)
+- `GET /api/admin/waitlist` — paginated list with tier/status/search filters
+- `GET /api/admin/waitlist/stats` — aggregate counts (total, by tier, by status, daily signups last 30 days)
+- `POST /api/admin/waitlist/export` — CSV download with formula-injection defense
+- `POST /api/admin/waitlist/invite` — mark single entry as invited + send invitation email
+- `POST /api/admin/waitlist/invite-batch` — invite first N entries by tier (max 500)
+- `DELETE /api/admin/waitlist/:id` — soft-remove entry (status='removed')
+- Frontend: `WaitlistTab.jsx` (lazy-loaded) with stat cards, data table, search, tier/status filters, Export CSV + Batch Invite buttons, pagination
+
+### Schema
+- Migration: `20260410000001_waitlist_status_fields`
+- Waitlist model: added `status` (waiting/invited/converted/removed), `invitedAt`, `convertedAt`, `notes`
