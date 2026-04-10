@@ -759,3 +759,40 @@ Frontend:
 ### Schema
 - Migration: `20260410000001_waitlist_status_fields`
 - Waitlist model: added `status` (waiting/invited/converted/removed), `invitedAt`, `convertedAt`, `notes`
+
+## Phase 5 — Security Hardening (2026-04-10)
+
+### Input Sanitization Middleware
+- `inputSanitizer.js` runs after `express.json()` on every request
+- Rejects: null bytes, control characters, strings >10KB, JSON depth >5, arrays >1000, objects >200 keys, duplicate query params
+
+### Password Breach Check (HIBP)
+- `passwordSafety.js` — k-anonymity model (first 5 hex of SHA-1 sent to HIBP, suffix checked locally)
+- Wired into registration + password-reset handlers
+- Graceful degradation on HIBP timeout (3s)
+
+### AI Prompt Injection Defense
+- `ai.inputSanitizer.js` — scans for instruction overrides, role reassignment, system prompt extraction, delimiter injection
+- Flagged messages logged to Sentry; still sent to Claude (which politely declines)
+- Output scanning for leaked system prompt fragments + PII patterns
+
+### Secret Validation on Startup
+- `secretValidator.js` — checks required (JWT_SECRET, DATABASE_URL) + recommended (Stripe, Sentry, Redis, etc.) at boot
+- Missing required secrets in production cause hard exit
+
+## Phase 1 — AI Weekly Limits (2026-04-10)
+
+### Weekly Message Ceilings
+- `WEEKLY_LIMITS`: default 100, verified 250, donor 300, pro 600, admin 1000
+- `getWeeklyLimit(user)`, `getWeeklyUsage(userId)`, `getUsageQuota(user)` in ai.service
+- `streamMessage` checks weekly limit after daily limit
+- `GET /api/ai/usage` returns both daily + weekly quota snapshot
+
+## Phase 3 — Messaging Auto-Scroll (2026-04-10)
+
+### Scroll UX Overhaul
+- Instant scroll to bottom on conversation switch (behavior: 'instant')
+- IntersectionObserver tracks "at bottom" state
+- Auto-scroll on new messages only when already at bottom (sticky scroll)
+- "Jump to latest" floating button with new-message count badge (capped at 99+)
+- Typing indicator only scrolls when at bottom
