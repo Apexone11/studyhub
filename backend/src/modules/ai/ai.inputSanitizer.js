@@ -1,16 +1,17 @@
 /**
  * ai.inputSanitizer.js — Phase 5 prompt injection defense for Hub AI.
  *
- * Scans user messages BEFORE they reach the Claude API and strips or
- * flags common prompt-injection patterns. This is defense-in-depth:
+ * Scans user messages BEFORE they reach the Claude API and flags
+ * common prompt-injection patterns. This is defense-in-depth:
  * Claude's own system-prompt hierarchy provides the primary boundary,
- * but we add a pre-filter so known attack patterns never reach the
- * model at all.
+ * and this module adds a lightweight pre-check so suspicious inputs
+ * can be audited before and after they are sent to the model.
  *
- * The approach is deliberately conservative — we strip only the most
- * blatant injection prefixes/patterns and log the rest for review.
- * Overly aggressive filtering would break legitimate educational
- * questions about prompt engineering or AI safety.
+ * The approach is deliberately conservative — we trim the message and
+ * flag only the most blatant injection prefixes/patterns for review,
+ * rather than stripping content. Overly aggressive filtering would
+ * break legitimate educational questions about prompt engineering or
+ * AI safety.
  */
 // captureError is used by the caller (ai.service.js), not in this module.
 

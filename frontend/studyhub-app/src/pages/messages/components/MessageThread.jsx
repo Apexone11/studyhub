@@ -63,7 +63,7 @@ export function MessageThread({
     // Instant-scroll after the messages for the new conversation render.
     // The IntersectionObserver will flip isAtBottom when it fires.
     const timer = setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
+      messagesEndRef.current?.scrollIntoView({ behavior: 'auto' })
       isAtBottomRef.current = true
     }, 50)
     return () => clearTimeout(timer)
@@ -110,10 +110,12 @@ export function MessageThread({
 
     if (isAtBottomRef.current) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    } else {
+      // Not at bottom — bump the unread counter so the jump-to-latest
+      // badge shows how many messages arrived while scrolled up.
+      // Deferred via rAF to satisfy react-hooks/set-state-in-effect.
+      requestAnimationFrame(() => setNewMessageCount((prev) => prev + 1))
     }
-    // The jump-to-latest button visibility is handled by the
-    // IntersectionObserver above — when the sentinel leaves the
-    // viewport, showJumpToLatest flips to true automatically.
   }, [messagesLength])
 
   // Scroll on typing indicator changes only when at bottom

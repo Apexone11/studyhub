@@ -128,10 +128,13 @@ async function inviteBatch({ tier, count = 50 }) {
     throw err
   }
 
+  // Clamp to safe positive integer range (1–500)
+  const safeCount = Math.min(Math.max(Math.trunc(Number(count)) || 50, 1), 500)
+
   const candidates = await prisma.waitlist.findMany({
     where: { tier, status: 'waiting' },
     orderBy: { createdAt: 'asc' },
-    take: Math.min(count, 500),
+    take: safeCount,
     select: { id: true },
   })
 

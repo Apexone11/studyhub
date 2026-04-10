@@ -54,12 +54,19 @@ function validatePayload(value, depth = 0) {
 }
 
 /**
- * Check for duplicate query parameters (parameter pollution).
- * Express parses ?a=1&a=2 as { a: ['1', '2'] }. We reject that.
+ * Normalize duplicate query parameters (parameter pollution).
+ * Express parses ?a=1&a=2 as { a: ['1', '2'] }. Instead of rejecting
+ * (which would break routes that tolerate duplicates by taking the
+ * first value, e.g. search.routes.js), we normalize arrays to their
+ * first element so downstream code always sees a string.
  */
-function hasDuplicateQueryParams(query) {
-  if (!query || typeof query !== 'object') return false
-  return Object.values(query).some((v) => Array.isArray(v))
+function normalizeDuplicateQueryParams(query) {
+  if (!query || typeof query !== 'object') return
+  for (const key of Object.keys(query)) {
+    if (Array.isArray(query[key])) {
+      query[key] = query[key][0]
+    }
+  }
 }
 
 /**
@@ -73,10 +80,8 @@ function inputSanitizer(req, res, next) {
     }
   }
 
-  // Reject duplicate query params
-  if (hasDuplicateQueryParams(req.query)) {
-    return res.status(400).json({ error: 'Invalid query parameters.' })
-  }
+  // Normalize duplicate query params to first-value-wins
+  normalizeDuplicateQueryParams(req.query)
 
   next()
 }

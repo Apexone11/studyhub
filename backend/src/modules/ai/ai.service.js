@@ -45,7 +45,7 @@ async function getDailyLimit(user) {
       where: { userId: user.id || user.userId },
       select: { plan: true, status: true },
     })
-    if (sub && (sub.status === 'active' || sub.status === 'trialing') && sub.plan !== 'free') {
+    if (sub && ['active', 'trialing', 'past_due'].includes(sub.status) && sub.plan !== 'free') {
       return DAILY_LIMITS.pro
     }
   } catch {
@@ -111,7 +111,7 @@ async function getWeeklyLimit(user) {
       where: { userId: user.id || user.userId },
       select: { plan: true, status: true },
     })
-    if (sub && (sub.status === 'active' || sub.status === 'trialing') && sub.plan !== 'free') {
+    if (sub && ['active', 'trialing', 'past_due'].includes(sub.status) && sub.plan !== 'free') {
       return WEEKLY_LIMITS.pro
     }
   } catch { /* graceful degradation */ }
