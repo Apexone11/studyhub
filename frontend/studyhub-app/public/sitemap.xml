@@ -1,60 +1,56 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <!-- Public pages: crawlable without authentication -->
-
   <url>
-    <loc>https://studyhub-app.up.railway.app/</loc>
+    <loc>https://getstudyhub.org/</loc>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
 
   <url>
-    <loc>https://studyhub-app.up.railway.app/about</loc>
+    <loc>https://getstudyhub.org/about</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
 
   <url>
-    <loc>https://studyhub-app.up.railway.app/pricing</loc>
+    <loc>https://getstudyhub.org/pricing</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
 
   <url>
-    <loc>https://studyhub-app.up.railway.app/login</loc>
+    <loc>https://getstudyhub.org/login</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
 
   <url>
-    <loc>https://studyhub-app.up.railway.app/register</loc>
+    <loc>https://getstudyhub.org/register</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
 
   <url>
-    <loc>https://studyhub-app.up.railway.app/terms</loc>
+    <loc>https://getstudyhub.org/terms</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
 
   <url>
-    <loc>https://studyhub-app.up.railway.app/privacy</loc>
+    <loc>https://getstudyhub.org/privacy</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
 
   <url>
-    <loc>https://studyhub-app.up.railway.app/guidelines</loc>
+    <loc>https://getstudyhub.org/guidelines</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
   </url>
 
-  <!--
-    Dynamic pages (user profiles, public sheets) should be added
-    by a backend endpoint that generates sitemap entries from the
-    database. For now this covers static public pages.
-
-    Future: GET /api/sitemap.xml that queries public users and sheets.
-  -->
+  <url>
+    <loc>https://getstudyhub.org/supporters</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
 </urlset>

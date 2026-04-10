@@ -247,11 +247,15 @@ test.describe('Dashboard Page', () => {
       await page.goto('/dashboard')
 
       // Verify upload sheet action is present
-      const uploadButton = page.locator('a:has-text("Upload Sheet"), button:has-text("Upload Sheet")')
+      const uploadButton = page.locator(
+        'a:has-text("Upload Sheet"), button:has-text("Upload Sheet")',
+      )
       await expect(uploadButton).toBeVisible()
 
       // Verify browse sheets action is present
-      const browseButton = page.locator('a:has-text("Browse Sheets"), button:has-text("Browse Sheets")')
+      const browseButton = page.locator(
+        'a:has-text("Browse Sheets"), button:has-text("Browse Sheets")',
+      )
       await expect(browseButton).toBeVisible()
 
       // Click upload sheet action
@@ -282,10 +286,7 @@ test.describe('Dashboard Page', () => {
     await expect(page).toHaveURL(/\/login/)
 
     // Verify login heading is visible
-    const loginHeading = page.locator('text=Sign In')
-    await expect(loginHeading).toBeVisible({ timeout: 5000 }).catch(() => {
-      // If "Sign In" not found, check for "Login" or similar
-      return expect(page.locator('text=/login|sign in/i')).toBeVisible()
-    })
+    const loginHeading = page.locator('text=Login')
+    await expect(loginHeading).toBeVisible()
   })
 })

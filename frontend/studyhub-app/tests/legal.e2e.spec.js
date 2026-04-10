@@ -95,13 +95,23 @@ test.describe('Legal Pages @e2e', () => {
   })
 
   test('legal pages have navbar', async ({ page }) => {
-    const legalRoutes = ['/terms', '/privacy', '/guidelines', '/cookie-policy', '/disclaimer', '/about']
+    const legalRoutes = [
+      '/terms',
+      '/privacy',
+      '/guidelines',
+      '/cookie-policy',
+      '/disclaimer',
+      '/about',
+    ]
 
     for (const route of legalRoutes) {
       await page.goto(route)
       await page.waitForLoadState('domcontentloaded')
 
-      const logo = page.getByRole('link').filter({ hasText: /studyhub|home/i }).first()
+      const logo = page
+        .getByRole('link')
+        .filter({ hasText: /studyhub|home/i })
+        .first()
       await expect(logo).toBeVisible({
         timeout: 5000,
       })
@@ -120,7 +130,7 @@ test.describe('Legal Pages @e2e', () => {
 
     await expect(page).toHaveURL(/\/privacy$/)
 
-    const privacyHeading = page.getByRole('heading', { name: 'Privacy Policy' })
-    await expect(privacyHeading).toBeVisible()
+    const privacyPageHeading = page.getByRole('heading', { name: 'Privacy Policy' })
+    await expect(privacyPageHeading).toBeVisible()
   })
 })

@@ -4,16 +4,25 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="StudyHub — browse, upload, and collaborate on course study sheets with students at your school." />
+    <meta
+      name="description"
+      content="StudyHub — browse, upload, and collaborate on course study sheets with students at your school."
+    />
     <meta name="theme-color" content="#2563eb" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="StudyHub" />
     <meta property="og:title" content="StudyHub — The GitHub of Studying" />
-    <meta property="og:description" content="Fork study sheets, take practice tests, and collaborate with classmates. Free for students forever." />
+    <meta
+      property="og:description"
+      content="Fork study sheets, take practice tests, and collaborate with classmates. Free for students forever."
+    />
     <meta property="og:url" content="https://studyhub.app" />
     <meta name="twitter:card" content="summary" />
     <meta name="twitter:title" content="StudyHub — The GitHub of Studying" />
-    <meta name="twitter:description" content="Fork study sheets, collaborate with classmates. Free for students." />
+    <meta
+      name="twitter:description"
+      content="Fork study sheets, collaborate with classmates. Free for students."
+    />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <link rel="manifest" href="/manifest.json" />
@@ -21,14 +30,24 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+      integrity="sha384-/o6I2CkkWC//PSjvWC/eYN7l3xM3tJm8ZzVkCOfp//W05QcE3mlGskpoHB6XqI+B"
+      crossorigin="anonymous"
+    />
     <!-- Termly Consent Banner — must load BEFORE any analytics/tracking scripts -->
-    <script type="text/javascript" src="https://app.termly.io/resource-blocker/f44c5c0c-a4fc-4ca4-980b-89068e5aeb41?autoBlock=on"></script>
+    <script
+      type="text/javascript"
+      src="https://app.termly.io/resource-blocker/f44c5c0c-a4fc-4ca4-980b-89068e5aeb41?autoBlock=on"
+    ></script>
     <script type="text/javascript">
-      (function(c, l, a, r, i, t, y) {
-        c[a] = c[a] || function() {
-          (c[a].q = c[a].q || []).push(arguments)
-        }
+      ;(function (c, l, a, r, i, t, y) {
+        c[a] =
+          c[a] ||
+          function () {
+            ;(c[a].q = c[a].q || []).push(arguments)
+          }
         t = l.createElement(r)
         t.async = 1
         t.src = 'https://www.clarity.ms/tag/' + i
@@ -39,21 +58,25 @@
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=AW-18019301841"></script>
     <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-      gtag('config', 'AW-18019301841');
+      window.dataLayer = window.dataLayer || []
+      function gtag() {
+        dataLayer.push(arguments)
+      }
+      gtag('js', new Date())
+      gtag('config', 'AW-18019301841')
     </script>
     <title>StudyHub</title>
     <script>
       // Apply saved theme before React mounts to prevent light-mode flash
-      (function() {
+      ;(function () {
         try {
-          var t = localStorage.getItem('sh-theme') || 'system';
-          var dark = t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-          if (dark) document.documentElement.setAttribute('data-theme', 'dark');
-        } catch(e) {}
-      })();
+          var t = localStorage.getItem('sh-theme') || 'system'
+          var dark =
+            t === 'dark' ||
+            (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+          if (dark) document.documentElement.setAttribute('data-theme', 'dark')
+        } catch (e) {}
+      })()
     </script>
   </head>
   <body>

@@ -100,6 +100,6 @@ test.describe('Playground Page @e2e', () => {
     await page.goto('/playground')
     await page.waitForLoadState('domcontentloaded')
 
-    await expect(page).toHaveURL(/\/(login|auth)/)
+    await expect(page).toHaveURL(/login/)
   })
 })

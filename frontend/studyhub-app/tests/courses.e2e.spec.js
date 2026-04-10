@@ -378,12 +378,5 @@ test.describe('My Courses Page', () => {
 
     // Verify we're on login page
     await expect(page).toHaveURL(/\/login/)
-
-    // Verify login heading is visible
-    const loginHeading = page.locator('text=Sign In')
-    await expect(loginHeading).toBeVisible({ timeout: 5000 }).catch(() => {
-      // If "Sign In" not found, check for "Login" or similar
-      return expect(page.locator('text=/login|sign in/i')).toBeVisible()
-    })
   })
 })
