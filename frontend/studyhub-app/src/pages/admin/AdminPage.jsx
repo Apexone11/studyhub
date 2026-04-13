@@ -25,6 +25,7 @@ const AnalyticsTab = lazy(() => import('./AnalyticsTab'))
 const RevenueTab = lazy(() => import('./RevenueTab'))
 const GroupReportsTab = lazy(() => import('./GroupReportsTab'))
 const WaitlistTab = lazy(() => import('./WaitlistTab'))
+const SecurityTab = lazy(() => import('./SecurityTab'))
 
 export default function AdminPage() {
   const layout = useResponsiveAppLayout()
@@ -386,6 +387,12 @@ export default function AdminPage() {
                 {activeTab === 'waitlist' ? (
                   <Suspense fallback={<div style={{ padding: 24, color: 'var(--sh-muted)' }}>Loading...</div>}>
                     <WaitlistTab />
+                  </Suspense>
+                ) : null}
+
+                {activeTab === 'security' ? (
+                  <Suspense fallback={<div style={{ padding: 24, color: 'var(--sh-muted)' }}>Loading...</div>}>
+                    <SecurityTab />
                   </Suspense>
                 ) : null}
 

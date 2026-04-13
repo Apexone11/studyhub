@@ -17,6 +17,7 @@ export const TABS = [
   ['reviews', 'Reviews'],
   ['group-reports', 'Group Reports'],
   ['waitlist', 'Waitlist'],
+  ['security', 'Security'],
 ]
 
 export function authHeaders() {
