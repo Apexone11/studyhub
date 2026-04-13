@@ -87,7 +87,7 @@ router.post('/login', loginLimiter, async (req, res) => {
     /* Login verification flow removed in v1.5.0. Email verification is no longer
      * required to log in. See docs/beta-v1.7.0-release-log.md for details. */
 
-    const authenticatedUser = await issueAuthenticatedSession(res, user.id)
+    const authenticatedUser = await issueAuthenticatedSession(res, user.id, req)
     void checkAndPromoteTrust(user.id)
     return res.json({
       message: 'Login successful!',

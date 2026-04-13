@@ -1021,3 +1021,64 @@ Frontend:
 - Backend lint: `npx eslint src/modules/plagiarism/ src/index.js src/modules/sheets/sheets.create.controller.js src/modules/sheets/sheets.update.controller.js` — passes (0 errors, 2 pre-existing warnings)
 - Frontend lint: `npx eslint src/pages/plagiarism/PlagiarismReportPage.jsx src/App.jsx` — passes
 - Frontend build: `npm run build` — passes
+
+---
+
+### Session Management — Per-Device Session Tracking and Revocation
+
+**Server-side session tracking enables per-device sign-out, session revocation, and active session visibility.**
+
+Previously, the auth system was purely stateless JWT with no server-side tracking. Logout only cleared the browser cookie while the JWT remained valid until its 24-hour expiry. There was no way to revoke a specific device's access or see which devices were signed in.
+
+#### Database Layer
+
+- **New model**: `Session` in `schema.prisma` with fields: `id` (cuid), `userId` (FK to User), `jti` (unique JWT ID), `userAgent`, `ipAddress`, `deviceLabel` (auto-parsed), `lastActiveAt`, `expiresAt`, `revokedAt`, `createdAt`
+- **Migration**: `20260405000001_add_session_table/migration.sql` — creates table, unique index on `jti`, indexes on `userId`, `jti`, `expiresAt`, foreign key with `ON DELETE CASCADE`
+
+#### Backend Session Service (`backend/src/modules/auth/session.service.js`)
+
+- `createSession({ userId, userAgent, ipAddress })` — generates cryptographic JTI (`crypto.randomUUID()`), parses user-agent into human-readable device label, stores session row with 24-hour expiry
+- `validateSession(jti)` — checks exists + not revoked + not expired
+- `touchSession(jti)` — updates `lastActiveAt` (fire-and-forget from middleware)
+- `revokeSession(sessionId, userId)` — ownership-checked single session revocation
+- `revokeSessionByJti(jti)` — used by logout to revoke current session
+- `revokeAllOtherSessions(userId, currentJti)` — bulk revocation excluding current session
+- `getActiveSessions(userId)` — lists non-revoked, non-expired sessions ordered by `lastActiveAt`
+- `cleanupExpiredSessions()` — deletes sessions expired > 7 days (periodic cleanup)
+- `parseDeviceLabel(ua)` — lightweight user-agent parser (Chrome/Firefox/Safari/Edge/Opera + Windows/macOS/Linux/Android/iOS/ChromeOS)
+
+#### Auth Flow Integration
+
+- **`authTokens.js`**: `signAuthToken(user, options)` now accepts optional `{ jti }` to embed in JWT payload
+- **`auth.service.js`**: `issueAuthenticatedSession(res, userId, req)` now accepts `req` parameter, creates server-side session via `createSession()`, embeds JTI in JWT. Wrapped in try-catch for graceful degradation if Session table does not exist
+- **`requireAuth` middleware**: When JWT contains a JTI, validates the session (checks not revoked/expired). Revoked sessions get `AUTH_EXPIRED` response. Attaches `req.sessionJti` for downstream use. Fires `touchSession()` for activity tracking. All session operations wrapped in try-catch for graceful degradation
+- **Logout**: `POST /logout` now extracts JTI from token and revokes the session row before clearing the cookie
+- **All 5 call sites updated**: login controller, register controller (2 paths), Google OAuth controller (2 paths) — all pass `req` as third argument to `issueAuthenticatedSession`
+
+#### API Endpoints (mounted under `/api/auth/`)
+
+- `GET /api/auth/sessions` — returns `{ sessions: [{ id, deviceLabel, ipAddress, lastActiveAt, createdAt, isCurrent }] }`. Current session is identified by matching JTI
+- `DELETE /api/auth/sessions/:sessionId` — revokes a single session (ownership-checked)
+- `DELETE /api/auth/sessions` — revokes all sessions except the current one
+
+#### Frontend Sessions Tab (`frontend/studyhub-app/src/pages/settings/SessionsTab.jsx`)
+
+- Added to `SettingsPage.jsx` as the third tab ("Sessions") between Security and Notifications
+- Skeleton loading state, error state with retry button
+- Session cards with: Material Symbols device icon (smartphone/laptop/desktop), device label, "This device" badge for current session, IP address, relative timestamp for last active and sign-in time
+- Current session card highlighted with brand border and accent background
+- Per-session "Revoke" button (danger style) with loading state
+- "Sign Out Other Devices" section card (danger) with bulk revocation button, only shown when other sessions exist
+- Action feedback via success/error messages
+
+#### Backward Compatibility
+
+- All session operations use try-catch with graceful degradation — the system works with pre-migration tokens (no JTI) and before the Session table is migrated
+- Existing tokens without JTI continue to work normally (session validation is skipped)
+- No breaking changes to the auth API contract
+
+### Validation
+
+- Backend lint: `npx eslint` on session.service.js, auth.session.controller.js, auth.service.js, auth.js, authTokens.js — passes
+- Frontend lint: `npm run lint` — passes
+- Frontend build: `npm run build` — passes

@@ -28,10 +28,12 @@ import SubscriptionTab from './SubscriptionTab'
 import ModerationTab from './ModerationTab'
 import ReviewTab from './ReviewTab'
 import LegalTab from './LegalTab'
+import SessionsTab from './SessionsTab'
 
 const NAV_TABS = [
   { id: 'profile', label: 'Profile' },
   { id: 'security', label: 'Security' },
+  { id: 'sessions', label: 'Sessions' },
   { id: 'notifications', label: 'Notifications' },
   { id: 'privacy', label: 'Privacy' },
   { id: 'appearance', label: 'Appearance' },
@@ -265,6 +267,8 @@ export default function SettingsPage() {
             syncUser={syncUser}
           />
         )
+      case 'sessions':
+        return <SessionsTab />
       case 'notifications':
         return (
           <div data-tutorial="settings-notifications">
@@ -324,7 +328,10 @@ export default function SettingsPage() {
   )
 
   return (
-    <div className="sh-app-page" style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: FONT }}>
+    <div
+      className="sh-app-page"
+      style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: FONT }}
+    >
       <Navbar crumbs={[{ label: 'Settings', to: '/settings' }]} hideTabs actions={navActions} />
 
       <div

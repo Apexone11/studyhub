@@ -140,6 +140,7 @@ model User {
   generatedReviewReports     ReviewReport[]        @relation("ReviewReportGenerator")
   videoAppeals               VideoAppeal[]         @relation("VideoAppealUploader")
   videoAppealReviews         VideoAppeal[]         @relation("VideoAppealReviewer")
+  sessions                   Session[]
 
   @@index([role])
   @@index([emailHash])
@@ -2099,4 +2100,27 @@ model AiReviewLog {
   @@index([sheetId])
   @@index([decision])
   @@index([createdAt])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Session — Server-side session tracking for per-device JWT management
+// ═══════════════════════════════════════════════════════════════════════════
+
+model Session {
+  id           String    @id @default(cuid())
+  userId       Int
+  jti          String    @unique
+  userAgent    String?   @db.VarChar(512)
+  ipAddress    String?   @db.VarChar(45)
+  deviceLabel  String?   @db.VarChar(100)
+  lastActiveAt DateTime  @default(now())
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([jti])
+  @@index([expiresAt])
 }

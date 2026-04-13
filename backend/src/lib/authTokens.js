@@ -22,22 +22,21 @@ function validateSecrets() {
   const secret = process.env.JWT_SECRET
   if (!secret) {
     throw new Error(
-      'FATAL: JWT_SECRET environment variable is not set. The server cannot start without it.'
+      'FATAL: JWT_SECRET environment variable is not set. The server cannot start without it.',
     )
   }
   if (secret.length < MIN_SECRET_LENGTH) {
     throw new Error(
-      `FATAL: JWT_SECRET is too short (${secret.length} chars). Minimum ${MIN_SECRET_LENGTH} characters required for production safety.`
+      `FATAL: JWT_SECRET is too short (${secret.length} chars). Minimum ${MIN_SECRET_LENGTH} characters required for production safety.`,
     )
   }
 }
 
-function signAuthToken(user) {
-  return jwt.sign(
-    { sub: user.id, role: user.role },
-    getJwtSecret(),
-    { expiresIn: TOKEN_EXPIRES_IN }
-  )
+function signAuthToken(user, options = {}) {
+  const payload = { sub: user.id, role: user.role }
+  if (options.jti) payload.jti = options.jti
+
+  return jwt.sign(payload, getJwtSecret(), { expiresIn: TOKEN_EXPIRES_IN })
 }
 
 function verifyAuthToken(token) {
@@ -72,11 +71,7 @@ function normalizeAuthUser(payload) {
 }
 
 function signCsrfToken(user) {
-  return jwt.sign(
-    { sub: user.id, type: 'csrf' },
-    getJwtSecret(),
-    { expiresIn: TOKEN_EXPIRES_IN }
-  )
+  return jwt.sign({ sub: user.id, type: 'csrf' }, getJwtSecret(), { expiresIn: TOKEN_EXPIRES_IN })
 }
 
 function verifyCsrfToken(token) {
@@ -153,10 +148,7 @@ function clearAuthCookie(res) {
 }
 
 function hashStoredSecret(value) {
-  return crypto
-    .createHmac('sha256', getJwtSecret())
-    .update(value)
-    .digest('hex')
+  return crypto.createHmac('sha256', getJwtSecret()).update(value).digest('hex')
 }
 
 module.exports = {

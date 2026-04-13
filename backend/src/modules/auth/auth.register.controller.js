@@ -35,7 +35,10 @@ router.post('/register', registerLimiter, async (req, res) => {
   try {
     const { username, email, password, accountType } = validateRegistrationInput(req.body || {})
 
-    const existingUsername = await prisma.user.findUnique({ where: { username }, select: { id: true } })
+    const existingUsername = await prisma.user.findUnique({
+      where: { username },
+      select: { id: true },
+    })
     if (existingUsername) {
       return res.status(409).json({ error: 'That username is already taken.' })
     }
@@ -91,7 +94,7 @@ router.post('/register', registerLimiter, async (req, res) => {
       return createdUserRecord
     })
 
-    const user = await issueAuthenticatedSession(res, createdUser.id)
+    const user = await issueAuthenticatedSession(res, createdUser.id, req)
     res.status(201).json({
       message: 'Account created!',
       user,
@@ -106,7 +109,9 @@ router.post('/register/start', registerLimiter, async (req, res) => {
     const { username, email, password, accountType } = validateRegistrationInput(req.body || {})
 
     if (!email) {
-      return res.status(400).json({ error: 'Email is required for the verified registration flow.' })
+      return res
+        .status(400)
+        .json({ error: 'Email is required for the verified registration flow.' })
     }
 
     const [existingUsername, existingEmail] = await Promise.all([
@@ -197,7 +202,10 @@ router.post('/register/complete', registerLimiter, async (req, res) => {
       throw new AppError(400, 'Verify your email before completing registration.')
     }
     if (challenge.payload?.acceptedLegalVersion !== CURRENT_LEGAL_VERSION) {
-      throw new AppError(409, 'Our legal documents were updated. Please restart registration and review the latest version.')
+      throw new AppError(
+        409,
+        'Our legal documents were updated. Please restart registration and review the latest version.',
+      )
     }
 
     // School/course selection is no longer part of registration.
@@ -251,7 +259,7 @@ router.post('/register/complete', registerLimiter, async (req, res) => {
       return createdUser.id
     })
 
-    const user = await issueAuthenticatedSession(res, createdUserId)
+    const user = await issueAuthenticatedSession(res, createdUserId, req)
     res.status(201).json({
       message: 'Account created!',
       user,
