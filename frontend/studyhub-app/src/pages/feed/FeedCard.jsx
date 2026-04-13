@@ -798,10 +798,16 @@ function FeedCardInner({
               {(reaction.likes > 0 || reaction.dislikes > 0 || (item.commentCount || 0) > 0) && (
                 <div style={statsBarStyle}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    {(reaction.likes > 0 || reaction.dislikes > 0) && (
+                    {reaction.likes > 0 && (
                       <span style={statsCountStyle}>
-                        <ThumbUpIcon size={15} filled={reaction.likes > 0} />
-                        {reaction.likes + reaction.dislikes}
+                        <ThumbUpIcon size={15} filled />
+                        {reaction.likes}
+                      </span>
+                    )}
+                    {reaction.dislikes > 0 && (
+                      <span style={{ ...statsCountStyle, color: 'var(--sh-danger)' }}>
+                        <ThumbDownIcon size={15} filled />
+                        {reaction.dislikes}
                       </span>
                     )}
                   </div>
@@ -827,7 +833,7 @@ function FeedCardInner({
                   style={actionBarButton(reaction.userReaction === 'like', 'var(--sh-success)')}
                 >
                   <ThumbUpIcon size={18} filled={reaction.userReaction === 'like'} />
-                  Like
+                  Like{reaction.likes > 0 ? ` ${reaction.likes}` : ''}
                 </button>
                 <button
                   type="button"
@@ -838,7 +844,7 @@ function FeedCardInner({
                   style={actionBarButton(reaction.userReaction === 'dislike', 'var(--sh-danger)')}
                 >
                   <ThumbDownIcon size={18} filled={reaction.userReaction === 'dislike'} />
-                  Dislike
+                  Dislike{reaction.dislikes > 0 ? ` ${reaction.dislikes}` : ''}
                 </button>
                 <button
                   type="button"

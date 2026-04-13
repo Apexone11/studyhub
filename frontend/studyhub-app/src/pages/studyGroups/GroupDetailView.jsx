@@ -60,6 +60,7 @@ export default function GroupDetailView({ groupId }) {
     blockedLoading,
     loadBlockedUsers,
     resources,
+    loadResources,
     addResource,
     deleteResource,
     sessions,
@@ -95,6 +96,13 @@ export default function GroupDetailView({ groupId }) {
       loadActivity(groupId)
     }
   }, [activeTab, activeGroup, groupId, loadActivity])
+
+  // Load resources when resources tab is active
+  useEffect(() => {
+    if (activeTab === 'resources' && activeGroup?.isMember) {
+      loadResources(groupId)
+    }
+  }, [activeTab, groupId, activeGroup, loadResources])
 
   // Load members when members tab is active
   useEffect(() => {
