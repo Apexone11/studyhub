@@ -80,6 +80,8 @@ export default function GroupDetailView({ groupId }) {
     upcomingSessionsPreview,
     loadActivity,
     toggleUpvote,
+    approvePost,
+    rejectPost,
   } = useStudyGroupsData()
 
   // Load group details on mount
@@ -588,6 +590,8 @@ export default function GroupDetailView({ groupId }) {
               onResolve={resolvePost}
               onDeletePost={deletePost}
               onUpvote={(postId) => toggleUpvote(groupId, postId)}
+              onApprovePost={(postId) => approvePost(groupId, postId)}
+              onRejectPost={(postId) => rejectPost(groupId, postId)}
               isMember={isMember}
               isAdminOrMod={isAdminOrMod}
               userId={currentUserId}

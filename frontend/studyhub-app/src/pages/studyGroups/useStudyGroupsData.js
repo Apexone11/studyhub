@@ -103,6 +103,8 @@ export function useStudyGroupsData() {
     addReply: discussions.addReply,
     resolvePost: discussions.resolvePost,
     toggleUpvote: discussions.toggleUpvote,
+    approvePost: discussions.approvePost,
+    rejectPost: discussions.rejectPost,
 
     // Activity feed
     activities: activity.activities,
