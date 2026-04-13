@@ -102,18 +102,23 @@ export default function MessagesPage() {
     if (!Number.isFinite(targetId) || targetId === currentUserId) return
 
     // Clear the dm param from URL
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev)
-      next.delete('dm')
-      return next
-    }, { replace: true })
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete('dm')
+        return next
+      },
+      { replace: true },
+    )
 
     // Start or open existing DM
-    startConversation([targetId], 'dm').then((conv) => {
-      if (conv) selectConversation(conv.id)
-    }).catch(() => {
-      // Silent failure -- DM auto-start is best-effort
-    })
+    startConversation([targetId], 'dm')
+      .then((conv) => {
+        if (conv) selectConversation(conv.id)
+      })
+      .catch(() => {
+        // Silent failure -- DM auto-start is best-effort
+      })
   }, [searchParams, user, currentUserId, startConversation, selectConversation, setSearchParams])
 
   // Get typing usernames for current conversation
@@ -121,30 +126,38 @@ export default function MessagesPage() {
     ? Array.from(typingUsers.get(activeConversation.id) || [])
     : []
 
-  const handleCreateConversation = useCallback(async (data) => {
-    const conv = await startConversation(
-      data.participantIds,
-      data.isGroup ? 'group' : 'dm',
-      data.groupName,
-    )
-    if (conv) {
-      setShowNewModal(false)
-      selectConversation(conv.id)
-    }
-  }, [startConversation, selectConversation])
+  const handleCreateConversation = useCallback(
+    async (data) => {
+      const conv = await startConversation(
+        data.participantIds,
+        data.isGroup ? 'group' : 'dm',
+        data.groupName,
+      )
+      if (conv) {
+        setShowNewModal(false)
+        selectConversation(conv.id)
+      }
+    },
+    [startConversation, selectConversation],
+  )
 
-  const handleBlockUser = useCallback(async (conversation) => {
-    if (!conversation || conversation.type !== 'dm') return
-    const other = conversation.participants?.find((p) => p.id !== currentUserId)
-    if (!other?.username) return
-    const confirmed = window.confirm(`Block ${other.username}? They will no longer be able to message you.`)
-    if (!confirmed) return
-    const success = await blockUser(other.username)
-    if (success) {
-      // Remove conversation from list
-      deleteConversation(conversation.id)
-    }
-  }, [currentUserId, blockUser, deleteConversation])
+  const handleBlockUser = useCallback(
+    async (conversation) => {
+      if (!conversation || conversation.type !== 'dm') return
+      const other = conversation.participants?.find((p) => p.id !== currentUserId)
+      if (!other?.username) return
+      const confirmed = window.confirm(
+        `Block ${other.username}? They will no longer be able to message you.`,
+      )
+      if (!confirmed) return
+      const success = await blockUser(other.username)
+      if (success) {
+        // Remove conversation from list
+        deleteConversation(conversation.id)
+      }
+    },
+    [currentUserId, blockUser, deleteConversation],
+  )
 
   const handleDeleteConversation = useCallback(() => {
     if (deleteTarget) {
@@ -158,10 +171,20 @@ export default function MessagesPage() {
 
   if (authStatus === 'loading') {
     return (
-      <PageShell nav={<Navbar crumbs={[{ label: 'Messages', to: '/messages' }]} hideTabs />} sidebar={<AppSidebar />}>
+      <PageShell
+        nav={<Navbar crumbs={[{ label: 'Messages', to: '/messages' }]} hideTabs />}
+        sidebar={<AppSidebar />}
+      >
         <div className="messages-split-panel">
           <div data-tutorial="messages-conversations" style={{ minWidth: 0 }}>
-            <div style={{ background: 'var(--sh-surface)', borderRadius: 16, border: '1px solid var(--sh-border)', padding: '20px 22px' }}>
+            <div
+              style={{
+                background: 'var(--sh-surface)',
+                borderRadius: 16,
+                border: '1px solid var(--sh-border)',
+                padding: '20px 22px',
+              }}
+            >
               <SkeletonList count={5} />
             </div>
           </div>
@@ -174,35 +197,51 @@ export default function MessagesPage() {
   }
 
   return (
-    <PageShell nav={<Navbar crumbs={[{ label: 'Messages', to: '/messages' }]} hideTabs />} sidebar={<AppSidebar />}>
+    <PageShell
+      nav={<Navbar crumbs={[{ label: 'Messages', to: '/messages' }]} hideTabs />}
+      sidebar={<AppSidebar />}
+    >
       {authError && (
-        <div style={{
-          background: 'var(--sh-warning-bg)',
-          border: '1px solid var(--sh-warning-border)',
-          color: 'var(--sh-warning-text)',
-          borderRadius: 8,
-          padding: '10px 14px',
-          marginBottom: 12,
-          fontSize: 13,
-        }}>
+        <div
+          style={{
+            background: 'var(--sh-warning-bg)',
+            border: '1px solid var(--sh-warning-border)',
+            color: 'var(--sh-warning-text)',
+            borderRadius: 8,
+            padding: '10px 14px',
+            marginBottom: 12,
+            fontSize: 13,
+          }}
+        >
           {authError}
         </div>
       )}
 
       {socketError && (
-        <div role="alert" style={{
-          background: 'var(--sh-info-bg)',
-          border: '1px solid var(--sh-info-border)',
-          color: 'var(--sh-info-text)',
-          borderRadius: 8,
-          padding: '10px 14px',
-          marginBottom: 12,
-          fontSize: 13,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-        }}>
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--sh-warning-text)', flexShrink: 0 }} />
+        <div
+          role="alert"
+          style={{
+            background: 'var(--sh-info-bg)',
+            border: '1px solid var(--sh-info-border)',
+            color: 'var(--sh-info-text)',
+            borderRadius: 8,
+            padding: '10px 14px',
+            marginBottom: 12,
+            fontSize: 13,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+          }}
+        >
+          <span
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              background: 'var(--sh-warning-text)',
+              flexShrink: 0,
+            }}
+          />
           {socketError}
         </div>
       )}
@@ -255,7 +294,7 @@ export default function MessagesPage() {
         )}
       </div>
 
-      <div data-tutorial="messages-new">
+      <div>
         <NewConversationModal
           isOpen={showNewModal}
           onClose={() => setShowNewModal(false)}

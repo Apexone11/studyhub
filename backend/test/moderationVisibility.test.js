@@ -24,10 +24,19 @@ const mockPrisma = {
   noteComment: {
     update: vi.fn(),
   },
+  moderationLog: {
+    create: vi.fn(),
+  },
+  moderationSnapshot: {
+    create: vi.fn(),
+  },
+  studySheet: {
+    update: vi.fn(),
+  },
 }
 
-const mockOpenAI = {
-  moderations: {
+const mockAnthropicClient = {
+  messages: {
     create: vi.fn(),
   },
 }
@@ -36,7 +45,14 @@ const mockTargets = new Map([
   [require.resolve('../src/lib/prisma'), mockPrisma],
   [require.resolve('../src/monitoring/sentry'), { captureError: vi.fn() }],
   [require.resolve('../src/lib/notify'), { createNotification: vi.fn() }],
-  [require.resolve('openai'), vi.fn(function MockOpenAI() { return mockOpenAI })],
+  [
+    require.resolve('@anthropic-ai/sdk'),
+    {
+      default: vi.fn(function MockAnthropic() {
+        return mockAnthropicClient
+      }),
+    },
+  ],
 ])
 
 const originalModuleLoad = Module._load
@@ -63,23 +79,34 @@ afterAll(() => {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  process.env.OPENAI_API_KEY = 'test-key'
+  process.env.ANTHROPIC_API_KEY = 'test-key'
 })
 
 describe('moderation visibility', () => {
   describe('scanContent → pending_review', () => {
     it('sets note moderationStatus to pending_review when flagged', async () => {
-      mockOpenAI.moderations.create.mockResolvedValue({
-        results: [{
-          flagged: true,
-          categories: { violence: true },
-          category_scores: { violence: 0.85 },
-        }],
+      mockAnthropicClient.messages.create.mockResolvedValue({
+        content: [
+          {
+            text: JSON.stringify({
+              flagged: true,
+              categories: { violence: 0.85 },
+              top_category: 'violence',
+              top_score: 0.85,
+              reasoning: 'Violent content detected',
+            }),
+          },
+        ],
       })
-      mockPrisma.moderationCase.create.mockResolvedValue({ id: 1 })
+      mockPrisma.moderationCase.create.mockResolvedValue({ id: 1, userId: 1 })
       mockPrisma.note.update.mockResolvedValue({})
 
-      await scanContent({ contentType: 'note', contentId: 42, text: 'violent content here', userId: 1 })
+      await scanContent({
+        contentType: 'note',
+        contentId: 42,
+        text: 'violent content here',
+        userId: 1,
+      })
 
       expect(mockPrisma.note.update).toHaveBeenCalledWith({
         where: { id: 42 },
@@ -88,17 +115,28 @@ describe('moderation visibility', () => {
     })
 
     it('sets note_comment moderationStatus to pending_review when flagged', async () => {
-      mockOpenAI.moderations.create.mockResolvedValue({
-        results: [{
-          flagged: true,
-          categories: { hate: true },
-          category_scores: { hate: 0.72 },
-        }],
+      mockAnthropicClient.messages.create.mockResolvedValue({
+        content: [
+          {
+            text: JSON.stringify({
+              flagged: true,
+              categories: { hate: 0.72 },
+              top_category: 'hate',
+              top_score: 0.72,
+              reasoning: 'Hateful content detected',
+            }),
+          },
+        ],
       })
-      mockPrisma.moderationCase.create.mockResolvedValue({ id: 2 })
+      mockPrisma.moderationCase.create.mockResolvedValue({ id: 2, userId: 2 })
       mockPrisma.noteComment.update.mockResolvedValue({})
 
-      await scanContent({ contentType: 'note_comment', contentId: 99, text: 'hateful comment text', userId: 2 })
+      await scanContent({
+        contentType: 'note_comment',
+        contentId: 99,
+        text: 'hateful comment text',
+        userId: 2,
+      })
 
       expect(mockPrisma.noteComment.update).toHaveBeenCalledWith({
         where: { id: 99 },
@@ -107,28 +145,45 @@ describe('moderation visibility', () => {
     })
 
     it('does not update moderationStatus for non-note content types', async () => {
-      mockOpenAI.moderations.create.mockResolvedValue({
-        results: [{
-          flagged: true,
-          categories: { violence: true },
-          category_scores: { violence: 0.9 },
-        }],
+      mockAnthropicClient.messages.create.mockResolvedValue({
+        content: [
+          {
+            text: JSON.stringify({
+              flagged: true,
+              categories: { violence: 0.9 },
+              top_category: 'violence',
+              top_score: 0.9,
+              reasoning: 'Violence detected',
+            }),
+          },
+        ],
       })
-      mockPrisma.moderationCase.create.mockResolvedValue({ id: 3 })
+      mockPrisma.moderationCase.create.mockResolvedValue({ id: 3, userId: 3 })
 
-      await scanContent({ contentType: 'feed_post', contentId: 10, text: 'bad feed post', userId: 3 })
+      await scanContent({
+        contentType: 'feed_post',
+        contentId: 10,
+        text: 'bad feed post',
+        userId: 3,
+      })
 
       expect(mockPrisma.note.update).not.toHaveBeenCalled()
       expect(mockPrisma.noteComment.update).not.toHaveBeenCalled()
     })
 
     it('does not update moderationStatus when score is below threshold', async () => {
-      mockOpenAI.moderations.create.mockResolvedValue({
-        results: [{
-          flagged: false,
-          categories: {},
-          category_scores: { violence: 0.1 },
-        }],
+      mockAnthropicClient.messages.create.mockResolvedValue({
+        content: [
+          {
+            text: JSON.stringify({
+              flagged: false,
+              categories: { violence: 0.1 },
+              top_category: null,
+              top_score: 0.1,
+              reasoning: 'Clean content',
+            }),
+          },
+        ],
       })
 
       await scanContent({ contentType: 'note', contentId: 50, text: 'clean content', userId: 4 })
@@ -165,7 +220,12 @@ describe('moderation visibility', () => {
       })
       mockPrisma.note.update.mockResolvedValue({})
 
-      await reviewCase({ caseId: 11, reviewedBy: 1, action: 'confirm', reviewNote: 'Violation confirmed' })
+      await reviewCase({
+        caseId: 11,
+        reviewedBy: 1,
+        action: 'confirm',
+        reviewNote: 'Violation confirmed',
+      })
 
       expect(mockPrisma.note.update).toHaveBeenCalledWith({
         where: { id: 43 },

@@ -35,7 +35,33 @@ const mocks = vi.hoisted(() => {
     verificationChallenge: {
       deleteMany: vi.fn(),
     },
-    $transaction: vi.fn(),
+    legalDocument: {
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+      upsert: vi.fn().mockResolvedValue({}),
+      findMany: vi.fn().mockResolvedValue([]),
+      findFirst: vi.fn().mockResolvedValue(null),
+    },
+    legalAcceptance: {
+      findMany: vi.fn().mockResolvedValue([]),
+      createMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
+    session: {
+      create: vi.fn().mockResolvedValue({ id: 'test-session-id' }),
+    },
+    subscription: {
+      findMany: vi.fn().mockResolvedValue([]),
+    },
+    donation: {
+      groupBy: vi.fn().mockResolvedValue([]),
+    },
+    notification: {
+      findFirst: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockResolvedValue({}),
+    },
+    $transaction: vi.fn(async (fnOrArray) => {
+      if (typeof fnOrArray === 'function') return fnOrArray(prisma)
+      return fnOrArray
+    }),
   }
 
   return {
@@ -226,25 +252,26 @@ describe('auth routes', () => {
     const deliveryError = new Error('provider outage')
     mocks.email.sendEmailVerification.mockRejectedValue(deliveryError)
 
-    const response = await request(app)
-      .post('/register/start')
-      .send({
-        username: 'signup_user',
-        email: 'signup_user@studyhub.test',
-        password: 'Password123',
-        confirmPassword: 'Password123',
-        termsAccepted: true,
-      })
+    const response = await request(app).post('/register/start').send({
+      username: 'signup_user',
+      email: 'signup_user@studyhub.test',
+      password: 'Password123',
+      confirmPassword: 'Password123',
+      termsAccepted: true,
+    })
 
     expect(response.status).toBe(503)
     expect(response.body).toEqual({
       error: 'We could not send your verification code right now. Please try again later.',
     })
     expect(mocks.verification.consumeChallenge).toHaveBeenCalledWith(901)
-    expect(mocks.sentry.captureError).toHaveBeenCalledWith(deliveryError, expect.objectContaining({
-      source: 'sendEmailVerification',
-      purpose: 'signup',
-    }))
+    expect(mocks.sentry.captureError).toHaveBeenCalledWith(
+      deliveryError,
+      expect.objectContaining({
+        source: 'sendEmailVerification',
+        purpose: 'signup',
+      }),
+    )
   })
 
   it('creates a session for legacy users even when no email is stored', async () => {
@@ -313,6 +340,40 @@ describe('auth routes', () => {
     expect(mocks.email.sendTwoFaCode).not.toHaveBeenCalled()
   })
 
+  it('tracks the timestamp of failed login attempts', async () => {
+    const passwordHash = await bcrypt.hash('Password123', 4)
+
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      id: 31,
+      username: 'locked_soon',
+      passwordHash,
+      email: 'locked_soon@studyhub.test',
+      emailVerified: true,
+      failedAttempts: 1,
+      lockedUntil: null,
+      twoFaEnabled: false,
+      role: 'student',
+    })
+
+    const response = await request(app)
+      .post('/login')
+      .send({ username: 'locked_soon', password: 'WrongPassword123' })
+
+    expect(response.status).toBe(401)
+    expect(response.body).toMatchObject({
+      error: 'Incorrect username or password. 3 attempts remaining.',
+      code: 'UNAUTHORIZED',
+    })
+    expect(mocks.prisma.user.update).toHaveBeenCalledWith({
+      where: { id: 31 },
+      data: expect.objectContaining({
+        failedAttempts: 2,
+        lockedUntil: null,
+        lastFailedLoginAt: expect.any(Date),
+      }),
+    })
+  })
+
   it('sends forgot-password email to any user with an email address', async () => {
     mocks.prisma.user.findUnique.mockResolvedValue({
       id: 4,
@@ -344,9 +405,7 @@ describe('auth routes', () => {
       emailVerified: false,
     })
 
-    const response = await request(app)
-      .post('/forgot-password')
-      .send({ username: 'no_email_user' })
+    const response = await request(app).post('/forgot-password').send({ username: 'no_email_user' })
 
     expect(response.status).toBe(200)
     expect(response.body).toEqual({

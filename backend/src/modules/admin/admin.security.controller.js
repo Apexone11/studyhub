@@ -46,8 +46,14 @@ router.get('/security/stats', async (req, res) => {
     // Recent failed-login accounts (top 10 by failed attempts)
     const recentFailedAccounts = await prisma.user.findMany({
       where: { failedAttempts: { gte: 1 } },
-      select: { id: true, username: true, failedAttempts: true, lockedUntil: true, updatedAt: true },
-      orderBy: { failedAttempts: 'desc' },
+      select: {
+        id: true,
+        username: true,
+        failedAttempts: true,
+        lockedUntil: true,
+        lastFailedLoginAt: true,
+      },
+      orderBy: [{ failedAttempts: 'desc' }, { lastFailedLoginAt: 'desc' }],
       take: 10,
     })
 
@@ -69,7 +75,7 @@ router.get('/security/stats', async (req, res) => {
         failedAttempts: u.failedAttempts,
         locked: u.lockedUntil && u.lockedUntil > now,
         lockedUntil: u.lockedUntil,
-        lastAttempt: u.updatedAt,
+        lastAttempt: u.lastFailedLoginAt,
       })),
     })
   } catch (err) {
@@ -89,7 +95,7 @@ router.post('/security/unlock/:userId', async (req, res) => {
 
     await prisma.user.update({
       where: { id: userId },
-      data: { failedAttempts: 0, lockedUntil: null },
+      data: { failedAttempts: 0, lockedUntil: null, lastFailedLoginAt: null },
     })
 
     res.json({ message: 'Account unlocked.' })

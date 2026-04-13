@@ -1,7 +1,13 @@
 const prisma = require('../../core/db/prisma')
 const { AUTHOR_SELECT } = require('./sheets.constants')
+const { canModerateOrOwnSheet } = require('./sheets.service')
 const { SCAN_STATUS, HTML_VERSION_KIND } = require('../../lib/html/htmlDraftWorkflow')
-const { RISK_TIER, generateRiskSummary, generateTierExplanation, groupFindingsByCategory } = require('../../lib/html/htmlSecurity')
+const {
+  RISK_TIER,
+  generateRiskSummary,
+  generateTierExplanation,
+  groupFindingsByCategory,
+} = require('../../lib/html/htmlSecurity')
 
 /**
  * Derive the preview mode string from the risk tier.
@@ -12,10 +18,14 @@ const { RISK_TIER, generateRiskSummary, generateTierExplanation, groupFindingsBy
  */
 function tierToPreviewMode(tier) {
   switch (tier) {
-    case RISK_TIER.FLAGGED: return 'safe'
-    case RISK_TIER.HIGH_RISK: return 'restricted'
-    case RISK_TIER.QUARANTINED: return 'disabled'
-    default: return 'interactive'
+    case RISK_TIER.FLAGGED:
+      return 'safe'
+    case RISK_TIER.HIGH_RISK:
+      return 'restricted'
+    case RISK_TIER.QUARANTINED:
+      return 'disabled'
+    default:
+      return 'interactive'
   }
 }
 
@@ -76,8 +86,12 @@ function serializeSheet(sheet, { starred = false, reactions = null, commentCount
 
   // Strip AI review fields from public responses (admin-only data)
   const {
-    aiReviewDecision: _aiD, aiReviewConfidence: _aiC, aiReviewScore: _aiS,
-    aiReviewFindings: _aiF, aiReviewReasoning: _aiR, aiReviewedAt: _aiAt,
+    aiReviewDecision: _aiD,
+    aiReviewConfidence: _aiC,
+    aiReviewScore: _aiS,
+    aiReviewFindings: _aiF,
+    aiReviewReasoning: _aiR,
+    aiReviewedAt: _aiAt,
     ...publicSheet
   } = sheet
 
@@ -98,7 +112,9 @@ function serializeSheet(sheet, { starred = false, reactions = null, commentCount
       scanFindings: Array.isArray(sheet.htmlScanFindings) ? sheet.htmlScanFindings : [],
       riskSummary: generateRiskSummary(sheet.htmlRiskTier || 0, sheet.htmlScanFindings),
       tierExplanation: generateTierExplanation(sheet.htmlRiskTier || 0),
-      findingsByCategory: groupFindingsByCategory(Array.isArray(sheet.htmlScanFindings) ? sheet.htmlScanFindings : []),
+      findingsByCategory: groupFindingsByCategory(
+        Array.isArray(sheet.htmlScanFindings) ? sheet.htmlScanFindings : [],
+      ),
       scanUpdatedAt: sheet.htmlScanUpdatedAt || null,
       scanAcknowledgedAt: sheet.htmlScanAcknowledgedAt || null,
       hasOriginalVersion: Boolean(originalVersion),
@@ -172,4 +188,9 @@ async function fetchContributionCollections(sheet, currentUser) {
   }
 }
 
-module.exports = { serializeSheet, serializeContribution, fetchContributionCollections, tierToPreviewMode }
+module.exports = {
+  serializeSheet,
+  serializeContribution,
+  fetchContributionCollections,
+  tierToPreviewMode,
+}

@@ -21,7 +21,7 @@ beforeAll(() => {
 
   const appPath = require.resolve('../src/index')
   delete require.cache[appPath]
-  app = require(appPath)
+  app = require(appPath).app
 })
 
 afterAll(() => {
@@ -34,9 +34,7 @@ afterAll(() => {
  * ═══════════════════════════════════════════════════════════════════════════ */
 describe('CORS allowlist', () => {
   it('allowed origin gets Access-Control-Allow-Origin + Credentials', async () => {
-    const res = await request(app)
-      .get('/health')
-      .set('Origin', 'http://localhost:5173')
+    const res = await request(app).get('/health').set('Origin', 'http://localhost:5173')
 
     expect(res.headers['access-control-allow-origin']).toBe('http://localhost:5173')
     expect(res.headers['access-control-allow-credentials']).toBe('true')
@@ -60,7 +58,7 @@ describe('CORS allowlist', () => {
     const res = await request(app).get('/health')
 
     expect(res.status).toBe(200)
-    expect(res.body.status).toBe('ok')
+    expect(res.body.status).toBe('healthy')
   })
 })
 
@@ -69,9 +67,7 @@ describe('CORS allowlist', () => {
  * ═══════════════════════════════════════════════════════════════════════════ */
 describe('CORS deny', () => {
   it('unknown origin does NOT get Access-Control-Allow-Origin (never reflected)', async () => {
-    const res = await request(app)
-      .get('/health')
-      .set('Origin', 'https://evil.com')
+    const res = await request(app).get('/health').set('Origin', 'https://evil.com')
 
     // The response must NOT reflect the attacker origin
     expect(res.headers['access-control-allow-origin']).not.toBe('https://evil.com')
@@ -89,9 +85,7 @@ describe('CORS deny', () => {
   })
 
   it('POST from untrusted origin with non-matching referer is blocked', async () => {
-    const res = await request(app)
-      .post('/api/auth/logout')
-      .set('Origin', 'https://evil.com')
+    const res = await request(app).post('/api/auth/logout').set('Origin', 'https://evil.com')
 
     // cors middleware blocks before the route handler runs
     expect(res.status).toBeGreaterThanOrEqual(400)
@@ -147,7 +141,7 @@ describe('Security headers on API routes', () => {
     try {
       const appPath = require.resolve('../src/index')
       delete require.cache[appPath]
-      const prodApp = require(appPath)
+      const prodApp = require(appPath).app
 
       const res = await request(prodApp).get('/health')
       expect(res.headers['strict-transport-security']).toBeDefined()
@@ -184,11 +178,11 @@ describe('Preview exceptions preserved', () => {
     const previewSurfaceCsp = [
       "default-src 'none'",
       "base-uri 'none'",
-      "frame-ancestors http://localhost:5173",
+      'frame-ancestors http://localhost:5173',
       "form-action 'none'",
       "connect-src 'none'",
-      "img-src data: blob: https:",
-      "font-src data: blob: https://fonts.gstatic.com",
+      'img-src data: blob: https:',
+      'font-src data: blob: https://fonts.gstatic.com',
       "object-src 'none'",
       "script-src 'none'",
       "style-src 'unsafe-inline' https://fonts.googleapis.com",
@@ -263,13 +257,16 @@ describe('Static uploads route headers', () => {
     fs.writeFileSync(path.join(tmpDir, 'test.png'), 'fake-png')
 
     const miniApp = express()
-    miniApp.use('/uploads/avatars', express.static(tmpDir, {
-      index: false,
-      setHeaders: (res) => {
-        res.setHeader('X-Content-Type-Options', 'nosniff')
-        res.setHeader('Cache-Control', 'public, max-age=300')
-      },
-    }))
+    miniApp.use(
+      '/uploads/avatars',
+      express.static(tmpDir, {
+        index: false,
+        setHeaders: (res) => {
+          res.setHeader('X-Content-Type-Options', 'nosniff')
+          res.setHeader('Cache-Control', 'public, max-age=300')
+        },
+      }),
+    )
 
     const res = await request(miniApp).get('/uploads/avatars/test.png')
 
@@ -291,13 +288,16 @@ describe('Static uploads route headers', () => {
     fs.writeFileSync(path.join(tmpDir, 'test.jpg'), 'fake-jpg')
 
     const miniApp = express()
-    miniApp.use('/uploads/covers', express.static(tmpDir, {
-      index: false,
-      setHeaders: (res) => {
-        res.setHeader('X-Content-Type-Options', 'nosniff')
-        res.setHeader('Cache-Control', 'public, max-age=300')
-      },
-    }))
+    miniApp.use(
+      '/uploads/covers',
+      express.static(tmpDir, {
+        index: false,
+        setHeaders: (res) => {
+          res.setHeader('X-Content-Type-Options', 'nosniff')
+          res.setHeader('Cache-Control', 'public, max-age=300')
+        },
+      }),
+    )
 
     const res = await request(miniApp).get('/uploads/covers/test.jpg')
 
@@ -318,13 +318,16 @@ describe('Static uploads route headers', () => {
     fs.writeFileSync(path.join(tmpDir, 'test.png'), 'fake-logo')
 
     const miniApp = express()
-    miniApp.use('/uploads/school-logos', express.static(tmpDir, {
-      index: false,
-      setHeaders: (res) => {
-        res.setHeader('X-Content-Type-Options', 'nosniff')
-        res.setHeader('Cache-Control', 'public, max-age=3600')
-      },
-    }))
+    miniApp.use(
+      '/uploads/school-logos',
+      express.static(tmpDir, {
+        index: false,
+        setHeaders: (res) => {
+          res.setHeader('X-Content-Type-Options', 'nosniff')
+          res.setHeader('Cache-Control', 'public, max-age=3600')
+        },
+      }),
+    )
 
     const res = await request(miniApp).get('/uploads/school-logos/test.png')
 
@@ -341,9 +344,7 @@ describe('Static uploads route headers', () => {
  * ═══════════════════════════════════════════════════════════════════════════ */
 describe('Origin validation on mutations', () => {
   it('POST from trusted origin succeeds', async () => {
-    const res = await request(app)
-      .post('/api/auth/logout')
-      .set('Origin', 'http://localhost:5173')
+    const res = await request(app).post('/api/auth/logout').set('Origin', 'http://localhost:5173')
 
     // Should not be blocked by origin check
     expect(res.status).not.toBe(403)

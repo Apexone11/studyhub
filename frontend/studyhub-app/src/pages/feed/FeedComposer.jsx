@@ -3,11 +3,12 @@
  *
  * Supports text posts, file attachments, and video uploads.
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { IconUpload, IconX } from '../../components/Icons'
 import { COMPOSER_PROMPTS, linkButton } from './feedConstants'
-import { VideoUploader } from '../../components/video'
 import { API } from '../../config'
+
+const VideoUploader = lazy(() => import('../../components/video/VideoUploader'))
 
 const composerPromptIndex = Math.floor(Date.now() / 60000) % COMPOSER_PROMPTS.length
 
@@ -152,11 +153,19 @@ export default function FeedComposer({ user, onSubmitPost }) {
 
       {/* Video uploader */}
       {showVideoUploader && !pendingVideoId && (
-        <VideoUploader
-          onUploadComplete={handleVideoUploadComplete}
-          onCancel={() => setShowVideoUploader(false)}
-          compact
-        />
+        <Suspense
+          fallback={
+            <div style={{ padding: 12, color: 'var(--sh-muted)', fontSize: 13 }}>
+              Loading uploader...
+            </div>
+          }
+        >
+          <VideoUploader
+            onUploadComplete={handleVideoUploadComplete}
+            onCancel={() => setShowVideoUploader(false)}
+            compact
+          />
+        </Suspense>
       )}
 
       {/* Video status indicator */}
@@ -268,7 +277,8 @@ export default function FeedComposer({ user, onSubmitPost }) {
             appearance: 'none',
             WebkitAppearance: 'none',
             paddingRight: 28,
-            backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23636e80' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E\")",
+            backgroundImage:
+              "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23636e80' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E\")",
             backgroundRepeat: 'no-repeat',
             backgroundPosition: 'right 8px center',
             cursor: 'pointer',

@@ -101,7 +101,7 @@ describe('Preview CSP directives', () => {
     const path = require('node:path')
     const source = fs.readFileSync(
       path.join(__dirname, '../src/modules/preview/preview.routes.js'),
-      'utf8'
+      'utf8',
     )
     expect(source).toContain("connect-src 'none'")
   })
@@ -111,7 +111,7 @@ describe('Preview CSP directives', () => {
     const path = require('node:path')
     const source = fs.readFileSync(
       path.join(__dirname, '../src/modules/preview/preview.routes.js'),
-      'utf8'
+      'utf8',
     )
     expect(source).toContain("form-action 'none'")
   })
@@ -121,9 +121,9 @@ describe('Preview CSP directives', () => {
     const path = require('node:path')
     const source = fs.readFileSync(
       path.join(__dirname, '../src/modules/preview/preview.routes.js'),
-      'utf8'
+      'utf8',
     )
-    expect(source).toContain("SAFE_PREVIEW_DIRECTIVES")
+    expect(source).toContain('SAFE_PREVIEW_DIRECTIVES')
     expect(source).toMatch(/SAFE_PREVIEW_DIRECTIVES.*script-src 'none'/s)
   })
 
@@ -132,9 +132,9 @@ describe('Preview CSP directives', () => {
     const path = require('node:path')
     const source = fs.readFileSync(
       path.join(__dirname, '../src/modules/preview/preview.routes.js'),
-      'utf8'
+      'utf8',
     )
-    expect(source).toContain("RUNTIME_DIRECTIVES")
+    expect(source).toContain('RUNTIME_DIRECTIVES')
     expect(source).toMatch(/RUNTIME_DIRECTIVES.*script-src 'unsafe-inline'/s)
   })
 
@@ -143,7 +143,7 @@ describe('Preview CSP directives', () => {
     const path = require('node:path')
     const source = fs.readFileSync(
       path.join(__dirname, '../src/modules/preview/preview.routes.js'),
-      'utf8'
+      'utf8',
     )
     expect(source).toContain("object-src 'none'")
   })
@@ -153,7 +153,7 @@ describe('Preview CSP directives', () => {
     const path = require('node:path')
     const source = fs.readFileSync(
       path.join(__dirname, '../src/modules/preview/preview.routes.js'),
-      'utf8'
+      'utf8',
     )
     expect(source).toContain("worker-src 'none'")
   })
@@ -168,7 +168,7 @@ describe('html-runtime endpoint — owner/admin gate', () => {
     const path = require('node:path')
     const source = fs.readFileSync(
       path.join(__dirname, '../src/modules/sheets/sheets.html.controller.js'),
-      'utf8'
+      'utf8',
     )
 
     // The canModerateOrOwnSheet check must come BEFORE the tier checks
@@ -188,9 +188,11 @@ describe('html-runtime endpoint — owner/admin gate', () => {
     const path = require('node:path')
     const source = fs.readFileSync(
       path.join(__dirname, '../src/modules/sheets/sheets.html.controller.js'),
-      'utf8'
+      'utf8',
     )
-    expect(source).toContain('Interactive preview is only available to the sheet owner or an admin.')
+    expect(source).toContain(
+      'Interactive preview for flagged sheets is only available to the sheet owner or an admin.',
+    )
   })
 })
 
@@ -203,7 +205,7 @@ describe('html-preview endpoint — canInteract flag', () => {
     const path = require('node:path')
     const source = fs.readFileSync(
       path.join(__dirname, '../src/modules/sheets/sheets.html.controller.js'),
-      'utf8'
+      'utf8',
     )
 
     // Find the html-preview handler's res.json call
@@ -224,8 +226,11 @@ describe('Frontend sandbox iframe attributes', () => {
     const fs = require('node:fs')
     const path = require('node:path')
     const source = fs.readFileSync(
-      path.join(__dirname, '../../frontend/studyhub-app/src/pages/sheets/SheetContentPanel.jsx'),
-      'utf8'
+      path.join(
+        __dirname,
+        '../../frontend/studyhub-app/src/pages/sheets/viewer/SheetContentPanel.jsx',
+      ),
+      'utf8',
     )
     expect(source).toContain("'allow-scripts allow-forms'")
     // Must NOT contain allow-same-origin (would break sandbox isolation)
@@ -236,8 +241,11 @@ describe('Frontend sandbox iframe attributes', () => {
     const fs = require('node:fs')
     const path = require('node:path')
     const source = fs.readFileSync(
-      path.join(__dirname, '../../frontend/studyhub-app/src/pages/sheets/SheetContentPanel.jsx'),
-      'utf8'
+      path.join(
+        __dirname,
+        '../../frontend/studyhub-app/src/pages/sheets/viewer/SheetContentPanel.jsx',
+      ),
+      'utf8',
     )
     // The ternary should fall back to empty string for safe mode
     expect(source).toMatch(/sandbox=\{.*\? 'allow-scripts allow-forms' : ''/s)
@@ -247,8 +255,11 @@ describe('Frontend sandbox iframe attributes', () => {
     const fs = require('node:fs')
     const path = require('node:path')
     const source = fs.readFileSync(
-      path.join(__dirname, '../../frontend/studyhub-app/src/pages/preview/SheetHtmlPreviewPage.jsx'),
-      'utf8'
+      path.join(
+        __dirname,
+        '../../frontend/studyhub-app/src/pages/preview/SheetHtmlPreviewPage.jsx',
+      ),
+      'utf8',
     )
     expect(source).toContain("'allow-scripts allow-forms'")
     expect(source).not.toContain('allow-same-origin')
@@ -258,8 +269,11 @@ describe('Frontend sandbox iframe attributes', () => {
     const fs = require('node:fs')
     const path = require('node:path')
     const source = fs.readFileSync(
-      path.join(__dirname, '../../frontend/studyhub-app/src/pages/sheets/SheetContentPanel.jsx'),
-      'utf8'
+      path.join(
+        __dirname,
+        '../../frontend/studyhub-app/src/pages/sheets/viewer/SheetContentPanel.jsx',
+      ),
+      'utf8',
     )
     expect(source).not.toContain('allow-top-navigation')
   })
@@ -268,8 +282,11 @@ describe('Frontend sandbox iframe attributes', () => {
     const fs = require('node:fs')
     const path = require('node:path')
     const source = fs.readFileSync(
-      path.join(__dirname, '../../frontend/studyhub-app/src/pages/sheets/SheetContentPanel.jsx'),
-      'utf8'
+      path.join(
+        __dirname,
+        '../../frontend/studyhub-app/src/pages/sheets/viewer/SheetContentPanel.jsx',
+      ),
+      'utf8',
     )
     expect(source).not.toContain('allow-popups')
   })

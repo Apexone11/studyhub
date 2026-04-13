@@ -18,6 +18,7 @@ const {
 } = require('./sheets.service')
 const { serializeSheet } = require('./sheets.serializer')
 const { createNotification } = require('../../lib/notify')
+const log = require('../../lib/logger')
 
 const router = express.Router()
 
@@ -245,10 +246,9 @@ router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
           if (similarSheets && similarSheets.length > 0) {
             const verySimilar = similarSheets.filter((s) => s.distance <= 5)
             if (verySimilar.length > 0) {
-              // Log for debugging
-              console.log(
-                `[PLAGIARISM] Sheet ${sheetId} has ${verySimilar.length} very similar matches`,
-                verySimilar.slice(0, 3),
+              log.info(
+                { sheetId, matchCount: verySimilar.length, matches: verySimilar.slice(0, 3) },
+                '[PLAGIARISM] very similar matches detected for sheet',
               )
 
               // Check if a plagiarism case already exists for this sheet

@@ -26,6 +26,29 @@ const mocks = vi.hoisted(() => {
       user: {
         findUnique: vi.fn(),
       },
+      legalDocument: {
+        updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+        upsert: vi.fn().mockResolvedValue({}),
+        findMany: vi.fn().mockResolvedValue([]),
+        findFirst: vi.fn().mockResolvedValue(null),
+      },
+      legalAcceptance: {
+        findMany: vi.fn().mockResolvedValue([]),
+        createMany: vi.fn().mockResolvedValue({ count: 0 }),
+      },
+      session: {
+        create: vi.fn().mockResolvedValue({ id: 'test-session-id' }),
+      },
+      subscription: {
+        findMany: vi.fn().mockResolvedValue([]),
+      },
+      donation: {
+        groupBy: vi.fn().mockResolvedValue([]),
+      },
+      notification: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        create: vi.fn().mockResolvedValue({}),
+      },
       $transaction: vi.fn(async (callback) => callback(tx)),
     },
     googleAuth: {
@@ -47,9 +70,11 @@ const mocks = vi.hoisted(() => {
           needsAcceptance: false,
         },
       })),
-      handleAuthError: vi.fn((req, res, error) => res.status(error.statusCode || 500).json({
-        error: error.message || 'Server error.',
-      })),
+      handleAuthError: vi.fn((req, res, error) =>
+        res.status(error.statusCode || 500).json({
+          error: error.message || 'Server error.',
+        }),
+      ),
     },
     legalService: {
       CURRENT_LEGAL_VERSION: '2026-04-04',
@@ -113,16 +138,18 @@ describe('auth google route', () => {
     })
     mocks.googleAuth.findUserByGoogleId.mockResolvedValue({ id: 9 })
 
-    const response = await request(app)
-      .post('/google')
-      .send({ credential: 'valid-google-jwt' })
+    const response = await request(app).post('/google').send({ credential: 'valid-google-jwt' })
 
     expect(response.status).toBe(200)
     expect(response.body).toMatchObject({
       message: 'Login successful!',
       user: expect.objectContaining({ id: 9 }),
     })
-    expect(mocks.authService.issueAuthenticatedSession).toHaveBeenCalledWith(expect.anything(), 9)
+    expect(mocks.authService.issueAuthenticatedSession).toHaveBeenCalledWith(
+      expect.anything(),
+      9,
+      expect.anything(),
+    )
   })
 
   it('rejects new Google account creation when the latest legal documents were not accepted', async () => {
@@ -141,7 +168,8 @@ describe('auth google route', () => {
 
     expect(response.status).toBe(400)
     expect(response.body).toEqual({
-      error: 'Please review and accept the latest StudyHub legal documents before creating your Google account.',
+      error:
+        'Please review and accept the latest StudyHub legal documents before creating your Google account.',
     })
     expect(mocks.prisma.$transaction).not.toHaveBeenCalled()
     expect(mocks.legalService.recordCurrentRequiredLegalAcceptancesTx).not.toHaveBeenCalled()
@@ -155,13 +183,11 @@ describe('auth google route', () => {
     })
     mocks.googleAuth.findUserByGoogleId.mockResolvedValue(null)
 
-    const response = await request(app)
-      .post('/google')
-      .send({
-        credential: 'valid-google-jwt',
-        legalAccepted: true,
-        legalVersion: '2026-04-04',
-      })
+    const response = await request(app).post('/google').send({
+      credential: 'valid-google-jwt',
+      legalAccepted: true,
+      legalVersion: '2026-04-04',
+    })
 
     expect(response.status).toBe(403)
     expect(response.body).toEqual({
@@ -181,13 +207,11 @@ describe('auth google route', () => {
     mocks.googleAuth.findUserByEmail.mockResolvedValue(null)
     mocks.tx.user.create.mockResolvedValue({ id: 77 })
 
-    const response = await request(app)
-      .post('/google')
-      .send({
-        credential: 'valid-google-jwt',
-        legalAccepted: true,
-        legalVersion: '2026-04-04',
-      })
+    const response = await request(app).post('/google').send({
+      credential: 'valid-google-jwt',
+      legalAccepted: true,
+      legalVersion: '2026-04-04',
+    })
 
     expect(response.status).toBe(201)
     expect(response.body).toMatchObject({
@@ -215,7 +239,11 @@ describe('auth google route', () => {
         source: 'google-signup',
       }),
     )
-    expect(mocks.authService.issueAuthenticatedSession).toHaveBeenCalledWith(expect.anything(), 77)
+    expect(mocks.authService.issueAuthenticatedSession).toHaveBeenCalledWith(
+      expect.anything(),
+      77,
+      expect.anything(),
+    )
   })
 
   it('retries username creation when a username collision races with account creation', async () => {
@@ -235,20 +263,24 @@ describe('auth google route', () => {
       .mockRejectedValueOnce(duplicateUsernameError)
       .mockResolvedValueOnce({ id: 88 })
 
-    const response = await request(app)
-      .post('/google')
-      .send({
-        credential: 'valid-google-jwt',
-        legalAccepted: true,
-        legalVersion: '2026-04-04',
-      })
+    const response = await request(app).post('/google').send({
+      credential: 'valid-google-jwt',
+      legalAccepted: true,
+      legalVersion: '2026-04-04',
+    })
 
     expect(response.status).toBe(201)
     expect(mocks.prisma.$transaction).toHaveBeenCalledTimes(2)
     expect(mocks.tx.user.create).toHaveBeenCalledTimes(2)
     expect(mocks.tx.user.create.mock.calls[0][0].data.username.length).toBeLessThanOrEqual(20)
     expect(mocks.tx.user.create.mock.calls[1][0].data.username.length).toBeLessThanOrEqual(20)
-    expect(mocks.tx.user.create.mock.calls[0][0].data.username).not.toBe(mocks.tx.user.create.mock.calls[1][0].data.username)
-    expect(mocks.authService.issueAuthenticatedSession).toHaveBeenCalledWith(expect.anything(), 88)
+    expect(mocks.tx.user.create.mock.calls[0][0].data.username).not.toBe(
+      mocks.tx.user.create.mock.calls[1][0].data.username,
+    )
+    expect(mocks.authService.issueAuthenticatedSession).toHaveBeenCalledWith(
+      expect.anything(),
+      88,
+      expect.anything(),
+    )
   })
 })

@@ -29,4 +29,10 @@ module.exports = [
       sourceType: 'module',
     },
   },
+  {
+    files: ['scripts/**/*.js', 'prisma/*.js'],
+    rules: {
+      'no-console': 'off',
+    },
+  },
 ]

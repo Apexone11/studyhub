@@ -156,7 +156,6 @@ describe('rateLimiters', () => {
     })
 
     it('should reject requests after hitting strict limit', async () => {
-      const limiter = authForgotLimiter
       const agent = request.agent(app)
       let lastResponse
 

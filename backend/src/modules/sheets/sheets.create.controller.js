@@ -22,6 +22,7 @@ const {
   getUserDefaultDownloads,
 } = require('./sheets.service')
 const { serializeSheet } = require('./sheets.serializer')
+const log = require('../../lib/logger')
 
 const router = express.Router()
 
@@ -151,10 +152,13 @@ router.post('/', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (re
         if (similarSheets && similarSheets.length > 0) {
           const verySimialar = similarSheets.filter((s) => s.distance <= 5)
           if (verySimialar.length > 0) {
-            // Log for debugging
-            console.log(
-              `[PLAGIARISM] Sheet ${sheet.id} has ${verySimialar.length} very similar matches`,
-              verySimialar.slice(0, 3),
+            log.info(
+              {
+                sheetId: sheet.id,
+                matchCount: verySimialar.length,
+                matches: verySimialar.slice(0, 3),
+              },
+              '[PLAGIARISM] very similar matches detected for sheet',
             )
 
             // Create a moderation case for manual review

@@ -2,7 +2,45 @@
 
 # Beta v2.0.0 Release Log
 
+## Date: 2026-04-13
+
+### Repo Lint Cleanup and Editor Bundle Splitting
+
+**Repo-wide lint is clean again, and the remaining oversized frontend bundles were split at the owning surfaces instead of being hidden with a higher warning limit**
+
+- Fixed the last blocking lint issues in backend support files by removing a stale ESLint suppression, restoring a missing sheet serializer import, and deleting an unused test local
+- Replaced runtime `console` usage in backend bootstrap, moderation, request-timing, security-event, storage, feed, and sheet plagiarism paths with the shared structured logger, while scoping the `no-console` allowance down to CLI and Prisma script surfaces only
+- Lazy-loaded Sheet Lab tab panels so the route shell no longer eagerly ships every panel, and switched feed and announcement video-upload entry points to direct lazy imports so the `video.js` surface is only loaded when the uploader is opened
+- Split the Sheet Lab editor surface by mode, added dedicated Vite manual chunks for CodeMirror HTML editing, and replaced CodeMirror `basicSetup` with the specific HTML-editor extensions StudyHub actually uses, which dropped `codemirror-core` to `476.61 kB` and cleared the Vite chunk-size warning
+
+**Deep Scan Summary / Deferred Risk**
+
+- The previously oversized `video` and `SheetLabPage` bundles are now small lazy chunks; the largest remaining frontend vendor slices are intentional editor/chart chunks that stay under the current warning threshold but should still be watched if more editor features are added
+- Runtime logging is now consistent with the shared backend logger on the touched app paths; remaining backend `console` calls are intentionally limited to local scripts/tooling surfaces
+
+**Validation**
+
+- `Set-Location -LiteralPath "C:\Users\Abdul PC\OneDrive\Desktop\studyhub"; npm run lint`: passes
+- `Set-Location -LiteralPath "C:\Users\Abdul PC\OneDrive\Desktop\studyhub"; npm run build`: passes
+
 ## Date: 2026-04-08
+
+### Backend Test Harness Recovery
+
+**Previously failing and skipped backend suites now match the current auth, routing, and response contracts**
+
+- Repaired stale backend test mocks for newer auth middleware and route behavior, including optional-auth decoding, verified-email gates, full-text search helpers, feed summary helpers, and recently added Prisma models used by auth, notes, AI, and sheet workflow routes
+- Realigned route-level tests with current backend contracts such as study-group soft delete and `204` delete/leave responses, `groupResource` model usage, the current interactive-preview message, and the moved sheet viewer file path used by frontend sandbox assertions
+- Exported the Express `app` alongside `startServer` from the backend entrypoint so security-header and CORS tests can exercise the HTTP middleware surface directly without booting a live listener
+
+**Deep Scan Summary / Deferred Risk**
+
+- The repaired failures were test-harness drift, dependency damage, and outdated assertions rather than a newly introduced runtime regression in the current backend feature set
+- The new `app` export is a testability-only surface layered on top of the existing `startServer` entrypoint; runtime startup behavior remains unchanged
+
+**Validation**
+
+- `Set-Location -LiteralPath "C:\Users\Abdul PC\OneDrive\Desktop\studyhub\backend"; npx vitest run`: passes (83 files, 1296 tests, 0 skipped)
 
 ### Account Deletion Retention Hardening
 

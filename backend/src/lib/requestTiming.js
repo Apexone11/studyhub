@@ -10,6 +10,7 @@
  */
 
 const SLOW_QUERY_MS = 500
+const log = require('./logger')
 
 /**
  * Wrap a single async operation and measure its wall-clock time.
@@ -45,16 +46,19 @@ function logTiming(req, { sections = [], extra = {} } = {}) {
 
   const slowSections = timings.filter((t) => t.durationMs >= SLOW_QUERY_MS)
 
-  console.info('[perf]', {
-    route,
-    method,
-    userId,
-    durationMs,
-    queryCount: sections.length,
-    ...extra,
-    timings,
-    ...(slowSections.length ? { slowSections } : {}),
-  })
+  log.info(
+    {
+      route,
+      method,
+      userId,
+      durationMs,
+      queryCount: sections.length,
+      ...extra,
+      timings,
+      ...(slowSections.length ? { slowSections } : {}),
+    },
+    '[perf]',
+  )
 }
 
 /**

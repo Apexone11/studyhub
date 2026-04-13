@@ -1,3 +1,5 @@
+const log = require('./logger')
+
 // Structured security event logging keeps auth and authorization decisions
 // attributable even before a full external alerting pipeline is added.
 function logSecurityEvent(event, metadata = {}) {
@@ -7,7 +9,7 @@ function logSecurityEvent(event, metadata = {}) {
     ...metadata,
   }
 
-  console.info(`[security-event] ${JSON.stringify(payload)}`)
+  log.info(payload, '[security-event]')
   return payload
 }
 
