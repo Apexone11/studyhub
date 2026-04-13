@@ -71,6 +71,7 @@ const videoRoutes = require('./modules/video')
 const paymentsRoutes = require('./modules/payments')
 const reviewsRoutes = require('./modules/reviews')
 const legalRoutes = require('./modules/legal')
+const plagiarismRoutes = require('./modules/plagiarism')
 const crypto = require('node:crypto')
 const log = require('./lib/logger')
 const { httpLogger } = require('./lib/httpLogger')
@@ -461,6 +462,9 @@ app.use('/api/payments', paymentsRoutes)
 
 // Reviews module endpoints under /api/reviews.
 app.use('/api/reviews', reviewsRoutes)
+
+// Phase 4: Plagiarism detection user-facing endpoints.
+app.use('/api/plagiarism', plagiarismRoutes)
 
 // Waitlist module (Phase 0 — confirmation email + in-app notification + admin endpoints)
 app.use('/api/waitlist', require('./modules/waitlist'))

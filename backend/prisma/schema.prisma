@@ -103,6 +103,9 @@ model User {
   groupAuditActions          GroupAuditLog[]           @relation("GroupAuditActor")
   groupBlocksReceived        GroupBlock[]              @relation("GroupBlockUser")
   groupBlocksIssued          GroupBlock[]              @relation("GroupBlockActor")
+  plagiarismReportsResolved  PlagiarismReport[]       @relation("PlagiarismReportResolver")
+  plagiarismDisputesFiled    PlagiarismDispute[]      @relation("PlagiarismDisputeFiler")
+  plagiarismDisputesReviewed PlagiarismDispute[]      @relation("PlagiarismDisputeReviewer")
   groupResources             GroupResource[]
   groupSessionRsvps          GroupSessionRsvp[]
   groupDiscussionPosts       GroupDiscussionPost[]
@@ -305,6 +308,8 @@ model StudySheet {
   reactions             Reaction[]
   incomingContributions SheetContribution[] @relation("ContributionTarget")
   outgoingContributions SheetContribution[] @relation("ContributionFork")
+  plagiarismReports     PlagiarismReport[]  @relation("PlagiarismReportSheet")
+  plagiarismMatches     PlagiarismReport[]  @relation("PlagiarismReportMatched")
   htmlVersions          SheetHtmlVersion[]
   commits               SheetCommit[]
   provenance            ProvenanceManifest?
@@ -1652,6 +1657,54 @@ model Waitlist {
 }
 
 // ── Library Catalog Cache ────────────────────────────────────
+
+// Phase 4: Plagiarism detection — per-sheet report when similarity is found.
+// Each report links a sheet to one or more matched sheets, stores the
+// similarity score, match type, AI verdict, and user dispute status.
+model PlagiarismReport {
+  id                 Int       @id @default(autoincrement())
+  sheetId            Int
+  matchedSheetId     Int
+  similarityScore    Float
+  matchType          String    @default("simhash") // "exact" | "simhash" | "ai" | "ngram"
+  highlightedSections Json?    // JSON array of matched ranges
+  aiVerdict          String?   // AI-generated verdict text
+  aiConfidence       Float?    // 0-1
+  status             String    @default("pending") // "pending" | "confirmed" | "dismissed" | "disputed"
+  resolvedAt         DateTime?
+  resolvedById       Int?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  sheet        StudySheet @relation("PlagiarismReportSheet", fields: [sheetId], references: [id], onDelete: Cascade)
+  matchedSheet StudySheet @relation("PlagiarismReportMatched", fields: [matchedSheetId], references: [id], onDelete: Cascade)
+  resolvedBy   User?      @relation("PlagiarismReportResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+  disputes     PlagiarismDispute[]
+
+  @@unique([sheetId, matchedSheetId])
+  @@index([sheetId, status])
+  @@index([matchedSheetId])
+  @@index([status, createdAt])
+}
+
+model PlagiarismDispute {
+  id         Int       @id @default(autoincrement())
+  reportId   Int
+  userId     Int
+  reason     String    @db.Text
+  status     String    @default("pending") // "pending" | "accepted" | "rejected"
+  reviewedBy Int?
+  reviewedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  report     PlagiarismReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  user       User             @relation("PlagiarismDisputeFiler", fields: [userId], references: [id], onDelete: Cascade)
+  reviewer   User?            @relation("PlagiarismDisputeReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+
+  @@unique([reportId, userId])
+  @@index([reportId, status])
+}
 
 model CachedBook {
   id          Int      @id @default(autoincrement())
