@@ -812,6 +812,22 @@ Frontend:
 - Average rating calculated + displayed
 - Hidden when no approved reviews exist
 
+## Phase 5 Batch 2 — Security Dashboard + Approval Queue UI (2026-04-10)
+
+### Admin Security Tab
+- `GET /api/admin/security/stats` — total users, locked accounts, failed attempts (3+), signups (24h/7d), pending reviews, pending reports, waitlist, audit actions (24h)
+- `POST /api/admin/security/unlock/:userId` — manually unlock a locked account
+- `SecurityTab.jsx` (lazy-loaded): 9 stat cards, failed-login table with Unlock buttons
+
+### Post-Approval Queue UI
+- "Pending Approval" amber badge + "Removed" red badge on discussion posts
+- Approve (green) / Reject (red) buttons for admins/mods on pending posts
+- `approvePost()` + `rejectPost()` wired through useGroupDiscussions → useStudyGroupsData → GroupDetailView → GroupDiscussionsTab
+
+### Confirmed Already Built
+- Block/mute UI in GroupMembersTab (665 lines, fully wired to backend)
+- GDPR data export (settings.export.controller, 225 lines)
+
 ## Phase 3 — Messaging Auto-Scroll (2026-04-10)
 
 ### Scroll UX Overhaul
