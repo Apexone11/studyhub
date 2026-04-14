@@ -1,9 +1,9 @@
 /**
  * Admin Growth Controller -- activation funnel, referral stats, and observability summary.
  *
- * GET /growth/activation-funnel   -- Onboarding funnel, activation rate, cohort breakdown
- * GET /growth/referral-stats      -- Referral totals, channel breakdown, top inviters, K-factor
- * GET /growth/observability       -- Route latency percentiles, error rates, placeholder vitals
+ * GET /activation-funnel      -- Onboarding funnel, activation rate, cohort breakdown
+ * GET /referral-stats         -- Referral totals, channel breakdown, top inviters, K-factor
+ * GET /observability/summary  -- Route latency percentiles, error rates, placeholder vitals
  */
 const express = require('express')
 const { captureError } = require('../../monitoring/sentry')
@@ -44,8 +44,8 @@ function toISOWeek(date) {
   return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`
 }
 
-// ── GET /growth/activation-funnel ──────────────────────────────
-router.get('/growth/activation-funnel', async (req, res) => {
+// ── GET /activation-funnel ──────────────────────────────
+router.get('/activation-funnel', async (req, res) => {
   const period = req.query.period || '30d'
   const startDate = periodToStartDate(period)
 
@@ -141,8 +141,8 @@ router.get('/growth/activation-funnel', async (req, res) => {
   }
 })
 
-// ── GET /growth/referral-stats ─────────────────────────────────
-router.get('/growth/referral-stats', async (req, res) => {
+// ── GET /referral-stats ─────────────────────────────────
+router.get('/referral-stats', async (req, res) => {
   const period = req.query.period || '30d'
   const startDate = periodToStartDate(period)
 
@@ -280,8 +280,8 @@ router.get('/growth/referral-stats', async (req, res) => {
   }
 })
 
-// ── GET /growth/observability ──────────────────────────────────
-router.get('/growth/observability', async (req, res) => {
+// ── GET /observability/summary ──────────────────────────────────
+router.get('/observability/summary', async (req, res) => {
   const period = req.query.period || '24h'
   const startDate = periodToStartDate(period)
 

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
+import { Link } from 'react-router-dom'
 import { formatRelativeTime, truncateText } from './studyGroupsHelpers'
 import { styles } from './GroupDetailTabs.styles'
 import MediaComposer from './MediaComposer'
@@ -22,8 +23,10 @@ export function GroupResourcesTab({
   onDelete,
   isAdminOrMod,
   isMember,
+  userId,
 }) {
   const [addModalOpen, setAddModalOpen] = useState(false)
+  const [detailResource, setDetailResource] = useState(null)
 
   const handleAddClick = () => setAddModalOpen(true)
 
@@ -31,12 +34,12 @@ export function GroupResourcesTab({
     return (
       <div style={styles.tabContainer}>
         <div style={styles.emptyState}>
-          <div style={styles.emptyIcon} aria-label="Books icon">Library</div>
+          <div style={styles.emptyIcon} aria-label="Books icon">
+            Library
+          </div>
           <div style={styles.emptyTitle}>No Resources Yet</div>
           <p style={styles.emptyText}>
-            {isMember
-              ? 'Add a resource to help the group!'
-              : 'Join the group to add resources'}
+            {isMember ? 'Add a resource to help the group!' : 'Join the group to add resources'}
           </p>
           {isMember && (
             <button
@@ -62,10 +65,7 @@ export function GroupResourcesTab({
     <div style={styles.tabContainer}>
       {isMember && (
         <div style={{ marginBottom: 'var(--space-4)' }}>
-          <button
-            onClick={handleAddClick}
-            style={{ ...styles.button, ...styles.buttonPrimary }}
-          >
+          <button onClick={handleAddClick} style={{ ...styles.button, ...styles.buttonPrimary }}>
             Add Resource
           </button>
         </div>
@@ -77,16 +77,24 @@ export function GroupResourcesTab({
             key={resource.id}
             resource={resource}
             isAdminOrMod={isAdminOrMod}
+            userId={userId}
             onDelete={onDelete}
+            onViewDetail={() => setDetailResource(resource)}
           />
         ))}
       </div>
 
       {addModalOpen ? (
-        <AddResourceModal
-          groupId={groupId}
-          onAdd={onAdd}
-          onClose={() => setAddModalOpen(false)}
+        <AddResourceModal groupId={groupId} onAdd={onAdd} onClose={() => setAddModalOpen(false)} />
+      ) : null}
+
+      {detailResource ? (
+        <ResourceDetailModal
+          resource={detailResource}
+          isAdminOrMod={isAdminOrMod}
+          userId={userId}
+          onDelete={onDelete}
+          onClose={() => setDetailResource(null)}
         />
       ) : null}
     </div>
@@ -95,16 +103,34 @@ export function GroupResourcesTab({
 
 /* ── Individual resource row ──────────────────────────────── */
 
-function ResourceRow({ resource, isAdminOrMod, onDelete }) {
+function ResourceRow({ resource, isAdminOrMod, userId, onDelete, onViewDetail }) {
   const isImage = resource.mediaType === 'image' && resource.mediaUrl
   const isVideo = resource.mediaType === 'video' && resource.mediaUrl
+  const canDelete = isAdminOrMod || resource.userId === userId || resource.user?.id === userId
 
   return (
-    <div style={styles.listItem}>
+    <div
+      style={{ ...styles.listItem, cursor: 'pointer' }}
+      onClick={onViewDetail}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onViewDetail()
+        }
+      }}
+    >
       <div style={styles.itemContent}>
         <div style={styles.itemTitle}>{resource.title}</div>
         {resource.description && (
-          <p style={{ fontSize: 'var(--type-sm)', color: 'var(--sh-subtext)', marginBottom: 'var(--space-2)' }}>
+          <p
+            style={{
+              fontSize: 'var(--type-sm)',
+              color: 'var(--sh-subtext)',
+              marginBottom: 'var(--space-2)',
+            }}
+          >
             {truncateText(resource.description, 100)}
           </p>
         )}
@@ -130,6 +156,7 @@ function ResourceRow({ resource, isAdminOrMod, onDelete }) {
             src={resource.mediaUrl}
             controls
             preload="metadata"
+            onClick={(e) => e.stopPropagation()}
             style={{
               display: 'block',
               maxWidth: 320,
@@ -144,6 +171,7 @@ function ResourceRow({ resource, isAdminOrMod, onDelete }) {
             href={resource.mediaUrl}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
             style={{
               display: 'inline-block',
               fontSize: 'var(--type-sm)',
@@ -162,10 +190,13 @@ function ResourceRow({ resource, isAdminOrMod, onDelete }) {
           <span>{formatRelativeTime(resource.createdAt)}</span>
         </div>
       </div>
-      {(isAdminOrMod || resource.isOwnedByUser) && (
+      {canDelete && (
         <div style={styles.actionButtons}>
           <button
-            onClick={() => onDelete(resource.id)}
+            onClick={(e) => {
+              e.stopPropagation()
+              onDelete(resource.id)
+            }}
             style={{ ...styles.button, ...styles.buttonDanger, ...styles.buttonSmall }}
             aria-label="Delete resource"
           >
@@ -174,6 +205,221 @@ function ResourceRow({ resource, isAdminOrMod, onDelete }) {
         </div>
       )}
     </div>
+  )
+}
+
+/* ── Resource detail modal ───────────────────────────────── */
+
+function ResourceDetailModal({ resource, isAdminOrMod, userId, onDelete, onClose }) {
+  const isImage = resource.mediaType === 'image' && resource.mediaUrl
+  const isVideo = resource.mediaType === 'video' && resource.mediaUrl
+  const isFile = resource.mediaUrl && !isImage && !isVideo
+  const canDelete = isAdminOrMod || resource.userId === userId || resource.user?.id === userId
+  const resourceType = resource.resourceType || resource.type || 'Link'
+
+  const handleDelete = () => {
+    onDelete(resource.id)
+    onClose()
+  }
+
+  return createPortal(
+    <div style={styles.modalOverlay} onClick={onClose}>
+      <div
+        style={{ ...styles.modalContent, maxWidth: 640 }}
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="resource-detail-title"
+      >
+        {/* Close button */}
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close resource detail"
+          style={{
+            position: 'absolute',
+            top: 16,
+            right: 16,
+            background: 'none',
+            border: 'none',
+            fontSize: 20,
+            fontWeight: 700,
+            color: 'var(--sh-muted)',
+            cursor: 'pointer',
+            lineHeight: 1,
+            padding: 4,
+          }}
+        >
+          X
+        </button>
+
+        {/* Title and type badge */}
+        <h3
+          id="resource-detail-title"
+          style={{ ...styles.sectionTitle, marginBottom: 'var(--space-2)', paddingRight: 32 }}
+        >
+          {resource.title}
+        </h3>
+        <div style={{ marginBottom: 'var(--space-4)' }}>
+          <span style={styles.badge}>{resourceType}</span>
+        </div>
+
+        {/* Full description */}
+        {resource.description && (
+          <p
+            style={{
+              fontSize: 'var(--type-sm)',
+              color: 'var(--sh-text)',
+              lineHeight: 1.6,
+              marginBottom: 'var(--space-4)',
+              whiteSpace: 'pre-wrap',
+            }}
+          >
+            {resource.description}
+          </p>
+        )}
+
+        {/* Full-size media preview */}
+        {isImage ? (
+          <img
+            src={resource.mediaUrl}
+            alt={resource.title}
+            style={{
+              display: 'block',
+              width: '100%',
+              maxHeight: 480,
+              objectFit: 'contain',
+              borderRadius: 8,
+              border: '1px solid var(--sh-border)',
+              marginBottom: 'var(--space-4)',
+            }}
+          />
+        ) : null}
+        {isVideo ? (
+          <video
+            src={resource.mediaUrl}
+            controls
+            preload="metadata"
+            style={{
+              display: 'block',
+              width: '100%',
+              borderRadius: 8,
+              border: '1px solid var(--sh-border)',
+              marginBottom: 'var(--space-4)',
+            }}
+          />
+        ) : null}
+        {isFile ? (
+          <a
+            href={resource.mediaUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'inline-block',
+              padding: '8px 16px',
+              borderRadius: 'var(--radius-control)',
+              background: 'var(--sh-brand)',
+              color: '#fff',
+              fontSize: 'var(--type-sm)',
+              fontWeight: 600,
+              textDecoration: 'none',
+              marginBottom: 'var(--space-4)',
+            }}
+          >
+            Download file
+          </a>
+        ) : null}
+
+        {/* External link */}
+        {resource.resourceUrl && !resource.mediaUrl ? (
+          <a
+            href={resource.resourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'inline-block',
+              padding: '8px 16px',
+              borderRadius: 'var(--radius-control)',
+              background: 'var(--sh-brand)',
+              color: '#fff',
+              fontSize: 'var(--type-sm)',
+              fontWeight: 600,
+              textDecoration: 'none',
+              marginBottom: 'var(--space-4)',
+            }}
+          >
+            Open link
+          </a>
+        ) : null}
+
+        {/* Linked sheet / note */}
+        {resource.sheetId ? (
+          <div style={{ marginBottom: 'var(--space-4)' }}>
+            <Link
+              to={`/sheets/${resource.sheetId}`}
+              style={{
+                display: 'inline-block',
+                padding: '8px 16px',
+                borderRadius: 'var(--radius-control)',
+                border: '1px solid var(--sh-brand)',
+                color: 'var(--sh-brand)',
+                fontSize: 'var(--type-sm)',
+                fontWeight: 600,
+                textDecoration: 'none',
+              }}
+            >
+              View sheet
+            </Link>
+          </div>
+        ) : null}
+        {resource.noteId ? (
+          <div style={{ marginBottom: 'var(--space-4)' }}>
+            <Link
+              to={`/notes/${resource.noteId}`}
+              style={{
+                display: 'inline-block',
+                padding: '8px 16px',
+                borderRadius: 'var(--radius-control)',
+                border: '1px solid var(--sh-brand)',
+                color: 'var(--sh-brand)',
+                fontSize: 'var(--type-sm)',
+                fontWeight: 600,
+                textDecoration: 'none',
+              }}
+            >
+              View note
+            </Link>
+          </div>
+        ) : null}
+
+        {/* Author and timestamp */}
+        <div
+          style={{
+            ...styles.itemMeta,
+            paddingTop: 'var(--space-3)',
+            borderTop: '1px solid var(--sh-border)',
+            marginBottom: canDelete ? 'var(--space-4)' : 0,
+          }}
+        >
+          <span>Added by {resource.user?.username || resource.addedBy || 'Unknown'}</span>
+          <span>{formatRelativeTime(resource.createdAt)}</span>
+        </div>
+
+        {/* Delete button */}
+        {canDelete ? (
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button
+              onClick={handleDelete}
+              style={{ ...styles.button, ...styles.buttonDanger }}
+              aria-label="Delete resource"
+            >
+              Delete
+            </button>
+          </div>
+        ) : null}
+      </div>
+    </div>,
+    document.body,
   )
 }
 
@@ -248,7 +494,9 @@ function AddResourceModal({ groupId, onAdd, onClose }) {
         aria-modal="true"
         aria-labelledby="add-resource-title"
       >
-        <h3 style={styles.sectionTitle} id="add-resource-title">Add Resource</h3>
+        <h3 style={styles.sectionTitle} id="add-resource-title">
+          Add Resource
+        </h3>
         {error && <div style={styles.error}>{error}</div>}
         <form onSubmit={handleSubmit}>
           <div style={styles.formGroup}>

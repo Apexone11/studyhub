@@ -25,7 +25,10 @@ export function useGroupDiscussions(activeGroupId) {
         headers: authHeaders(),
       })
 
-      if (!response.ok) throw new Error('Failed to load discussions')
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}))
+        throw new Error(errData.error || 'Failed to load discussions')
+      }
 
       const data = await response.json()
       setDiscussions(data.discussions || [])
@@ -48,7 +51,10 @@ export function useGroupDiscussions(activeGroupId) {
         body: JSON.stringify(postData),
       })
 
-      if (!response.ok) throw new Error('Failed to create post')
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}))
+        throw new Error(errData.error || 'Failed to create post')
+      }
 
       const newPost = await response.json()
       setDiscussions((prev) => [newPost, ...prev])
@@ -72,7 +78,10 @@ export function useGroupDiscussions(activeGroupId) {
         body: JSON.stringify(updates),
       })
 
-      if (!response.ok) throw new Error('Failed to update post')
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}))
+        throw new Error(errData.error || 'Failed to update post')
+      }
 
       const updatedPost = await response.json()
       setDiscussions((prev) => prev.map((p) => (p.id === postId ? updatedPost : p)))
@@ -95,7 +104,10 @@ export function useGroupDiscussions(activeGroupId) {
         headers: authHeaders(),
       })
 
-      if (!response.ok) throw new Error('Failed to delete post')
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}))
+        throw new Error(errData.error || 'Failed to delete post')
+      }
 
       setDiscussions((prev) => prev.filter((p) => p.id !== postId))
       showToast('Post deleted successfully', 'success')
@@ -121,7 +133,10 @@ export function useGroupDiscussions(activeGroupId) {
           },
         )
 
-        if (!response.ok) throw new Error('Failed to add reply')
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}))
+          throw new Error(errData.error || 'Failed to add reply')
+        }
 
         const newReply = await response.json()
         showToast('Reply added successfully', 'success')
@@ -150,7 +165,10 @@ export function useGroupDiscussions(activeGroupId) {
         },
       )
 
-      if (!response.ok) throw new Error('Failed to resolve post')
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}))
+        throw new Error(errData.error || 'Failed to resolve post')
+      }
 
       const resolvedPost = await response.json()
       setDiscussions((prev) => prev.map((p) => (p.id === postId ? resolvedPost : p)))
@@ -175,19 +193,21 @@ export function useGroupDiscussions(activeGroupId) {
           headers: authHeaders(),
         },
       )
-      if (response.ok) {
-        const data = await response.json()
-        setDiscussions((prev) =>
-          prev.map((p) =>
-            p.id === postId
-              ? { ...p, upvoteCount: data.upvoteCount, userHasUpvoted: data.upvoted }
-              : p,
-          ),
-        )
-        return data
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}))
+        throw new Error(errData.error || 'Failed to toggle upvote')
       }
-    } catch {
-      showToast('Failed to toggle upvote', 'error')
+      const data = await response.json()
+      setDiscussions((prev) =>
+        prev.map((p) =>
+          p.id === postId
+            ? { ...p, upvoteCount: data.upvoteCount, userHasUpvoted: data.upvoted }
+            : p,
+        ),
+      )
+      return data
+    } catch (error) {
+      showToast(error.message || 'Failed to toggle upvote', 'error')
     }
     return null
   }, [])
@@ -238,10 +258,13 @@ export function useGroupDiscussions(activeGroupId) {
         credentials: 'include',
         headers: authHeaders(),
       })
-      if (!res.ok) throw new Error('Could not approve post.')
-      setDiscussions((prev) => prev.map((p) =>
-        p.id === postId ? { ...p, status: 'published' } : p,
-      ))
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.error || 'Could not approve post.')
+      }
+      setDiscussions((prev) =>
+        prev.map((p) => (p.id === postId ? { ...p, status: 'published' } : p)),
+      )
       showToast('Post approved.', 'success')
     } catch (err) {
       showToast(err.message, 'error')
@@ -256,10 +279,11 @@ export function useGroupDiscussions(activeGroupId) {
         credentials: 'include',
         headers: authHeaders(),
       })
-      if (!res.ok) throw new Error('Could not reject post.')
-      setDiscussions((prev) => prev.map((p) =>
-        p.id === postId ? { ...p, status: 'removed' } : p,
-      ))
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.error || 'Could not reject post.')
+      }
+      setDiscussions((prev) => prev.map((p) => (p.id === postId ? { ...p, status: 'removed' } : p)))
       showToast('Post rejected.', 'info')
     } catch (err) {
       showToast(err.message, 'error')
