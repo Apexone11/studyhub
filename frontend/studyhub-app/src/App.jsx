@@ -50,6 +50,8 @@ const BookDetailPage = lazy(() => import('./pages/library/BookDetailPage'))
 const BookReaderPage = lazy(() => import('./pages/library/BookReaderPage'))
 const PlaygroundPage = lazy(() => import('./pages/playground/PlaygroundPage'))
 const ReviewPage = lazy(() => import('./pages/review/ReviewPage'))
+const OnboardingPage = lazy(() => import('./pages/onboarding/OnboardingPage'))
+const InvitePage = lazy(() => import('./pages/invite/InvitePage'))
 const PlagiarismReportPage = lazy(() => import('./pages/plagiarism/PlagiarismReportPage'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 
@@ -119,10 +121,12 @@ const ROUTE_TITLES = {
   '/privacy': 'Privacy Policy',
   '/guidelines': 'Community Guidelines',
   '/about': 'About',
+  '/invite': 'Invite Classmates',
   '/pricing': 'Pricing',
   '/library': 'Library',
   '/playground': 'Code Playground',
   '/review': 'Leave a Review',
+  '/onboarding': 'Onboarding',
   '/forgot-password': 'Forgot Password',
   '/reset-password': 'Reset Password',
 }
@@ -557,6 +561,14 @@ function AppRoutes() {
                     }
                   />
                   <Route
+                    path="/invite"
+                    element={
+                      <PrivateRoute>
+                        <InvitePage />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
                     path="/review"
                     element={
                       <PrivateRoute>
@@ -585,6 +597,15 @@ function AppRoutes() {
                     element={
                       <PrivateRoute>
                         <SettingsPage />
+                      </PrivateRoute>
+                    }
+                  />
+
+                  <Route
+                    path="/onboarding"
+                    element={
+                      <PrivateRoute>
+                        <OnboardingPage />
                       </PrivateRoute>
                     }
                   />

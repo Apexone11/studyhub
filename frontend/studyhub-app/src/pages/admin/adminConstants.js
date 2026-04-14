@@ -18,6 +18,9 @@ export const TABS = [
   ['group-reports', 'Group Reports'],
   ['waitlist', 'Waitlist'],
   ['security', 'Security'],
+  ['activation', 'Activation'],
+  ['referrals-admin', 'Referrals'],
+  ['observability', 'Observability'],
 ]
 
 export function authHeaders() {
@@ -29,7 +32,16 @@ export function createPageState() {
 }
 
 export function createAuditState() {
-  return { loading: false, loaded: false, error: '', page: 1, total: 0, entries: [], suppression: null, suppressionId: null }
+  return {
+    loading: false,
+    loaded: false,
+    error: '',
+    page: 1,
+    total: 0,
+    entries: [],
+    suppression: null,
+    suppressionId: null,
+  }
 }
 
 export function formatDateTime(value) {
@@ -40,7 +52,9 @@ export function formatDateTime(value) {
 }
 
 export function formatLabel(value, fallback = 'Unknown') {
-  const normalized = String(value || '').replace(/[_-]/g, ' ').trim()
+  const normalized = String(value || '')
+    .replace(/[_-]/g, ' ')
+    .trim()
   if (!normalized) return fallback
   return normalized.charAt(0).toUpperCase() + normalized.slice(1)
 }
@@ -54,7 +68,11 @@ export const tableHeadStyle = {
   whiteSpace: 'nowrap',
 }
 
-export const tableCell = { padding: '10px 14px', color: 'var(--sh-slate-600)', verticalAlign: 'top' }
+export const tableCell = {
+  padding: '10px 14px',
+  color: 'var(--sh-slate-600)',
+  verticalAlign: 'top',
+}
 export const tableCellStrong = { ...tableCell, fontWeight: 700, color: 'var(--sh-slate-900)' }
 
 export const inputStyle = {

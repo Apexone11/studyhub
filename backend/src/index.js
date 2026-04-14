@@ -73,6 +73,8 @@ const reviewsRoutes = require('./modules/reviews')
 const legalRoutes = require('./modules/legal')
 const plagiarismRoutes = require('./modules/plagiarism')
 const studyStatusRoutes = require('./modules/studyStatus')
+const onboardingRoutes = require('./modules/onboarding')
+const referralRoutes = require('./modules/referrals')
 const crypto = require('node:crypto')
 const log = require('./lib/logger')
 const { httpLogger } = require('./lib/httpLogger')
@@ -475,6 +477,12 @@ app.use('/api/plagiarism', plagiarismRoutes)
 
 // Study status sync (per-user sheet study tracking across devices).
 app.use('/api/study-status', studyStatusRoutes)
+
+// Onboarding module (7-step new user flow).
+app.use('/api/onboarding', onboardingRoutes)
+
+// Referral system (invite, track, resolve, rewards).
+app.use('/api/referrals', referralRoutes)
 
 // Waitlist module (Phase 0 — confirmation email + in-app notification + admin endpoints)
 app.use('/api/waitlist', require('./modules/waitlist'))

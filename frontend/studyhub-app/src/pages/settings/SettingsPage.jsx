@@ -29,6 +29,7 @@ import ModerationTab from './ModerationTab'
 import ReviewTab from './ReviewTab'
 import LegalTab from './LegalTab'
 import SessionsTab from './SessionsTab'
+import ReferralsTab from './ReferralsTab'
 
 const NAV_TABS = [
   { id: 'profile', label: 'Profile' },
@@ -39,6 +40,7 @@ const NAV_TABS = [
   { id: 'appearance', label: 'Appearance' },
   { id: 'account', label: 'Account' },
   { id: 'subscription', label: 'Subscription' },
+  { id: 'referrals', label: 'Referrals' },
   { id: 'legal', label: 'Legal' },
   { id: 'moderation', label: 'Moderation' },
   { id: 'review', label: 'Leave a Review' },
@@ -296,6 +298,8 @@ export default function SettingsPage() {
         )
       case 'subscription':
         return <SubscriptionTab />
+      case 'referrals':
+        return <ReferralsTab />
       case 'legal':
         return <LegalTab />
       case 'moderation':

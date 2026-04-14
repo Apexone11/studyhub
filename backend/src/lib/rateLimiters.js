@@ -788,6 +788,42 @@ const studyStatusWriteLimiter = rateLimit({
   keyGenerator: (req) => `study-status-write-${req.user?.userId || 'anon'}`,
 })
 
+// ── CATEGORY: Onboarding Module ─────────────────────────────────────────
+
+const onboardingWriteLimiter = rateLimit({
+  windowMs: WINDOW_15_MIN,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many onboarding requests. Please slow down.' },
+  keyGenerator: (req) => `onboarding-${req.user?.userId || 'anon'}`,
+})
+
+// ── CATEGORY: Referral Module ────────────────────────────────────────────
+
+/**
+ * Referral invite sending -- 20 invites per day per user.
+ */
+const referralInviteLimiter = rateLimit({
+  windowMs: WINDOW_1_DAY,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Daily invite limit reached. Try again tomorrow.' },
+  keyGenerator: (req) => `referral-invite-${req.user?.userId || 'anon'}`,
+})
+
+/**
+ * Referral code resolution -- 60 lookups per minute per IP.
+ */
+const referralResolveLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many code lookups. Please slow down.' },
+})
+
 // ── Exports ────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -901,4 +937,11 @@ module.exports = {
   // Study Status module
   studyStatusReadLimiter,
   studyStatusWriteLimiter,
+
+  // Onboarding module
+  onboardingWriteLimiter,
+
+  // Referral module
+  referralInviteLimiter,
+  referralResolveLimiter,
 }

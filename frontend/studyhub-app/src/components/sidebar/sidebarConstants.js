@@ -4,9 +4,21 @@
 // re-exported here for backward-compatible imports.
 
 import {
-  IconFeed, IconSheets, IconTests, IconNotes, IconMessages,
-  IconAnnouncements, IconProfile, IconSchool, IconUsers, IconSpark,
-  IconBook, IconCode, IconTag, IconHeart,
+  IconFeed,
+  IconSheets,
+  IconTests,
+  IconNotes,
+  IconMessages,
+  IconAnnouncements,
+  IconProfile,
+  IconSchool,
+  IconUsers,
+  IconSpark,
+  IconBook,
+  IconCode,
+  IconTag,
+  IconHeart,
+  IconLink,
 } from '../Icons'
 
 export const FOCUSABLE_DRAWER_SELECTORS = [
@@ -19,26 +31,32 @@ export const FOCUSABLE_DRAWER_SELECTORS = [
 ].join(',')
 
 export const NAV_LINKS = [
-  { icon: IconFeed,          label: 'Feed',           to: '/feed' },
-  { icon: IconSheets,        label: 'Study Sheets',   to: '/sheets' },
-  { icon: IconBook,          label: 'Library',         to: '/library' },
-  { icon: IconTests,         label: 'Practice Tests', to: '/tests' },
-  { icon: IconNotes,         label: 'My Notes',       to: '/notes' },
-  { icon: IconMessages,      label: 'Messages',       to: '/messages' },
-  { icon: IconUsers,         label: 'Study Groups',   to: '/study-groups' },
-  { icon: IconSpark,         label: 'Hub AI',          to: '/ai' },
-  { icon: IconCode,          label: 'Playground',     to: '/playground' },
-  { icon: IconAnnouncements, label: 'Announcements',  to: '/announcements' },
-  { icon: IconSchool,        label: 'My Courses',     to: '/my-courses' },
-  { icon: IconTag,           label: 'Pricing',        to: '/pricing' },
-  { icon: IconHeart,         label: 'Supporters',     to: '/supporters' },
-  { icon: IconProfile,       label: 'My Profile',     to: '__MY_PROFILE__' },
+  { icon: IconFeed, label: 'Feed', to: '/feed' },
+  { icon: IconSheets, label: 'Study Sheets', to: '/sheets' },
+  { icon: IconBook, label: 'Library', to: '/library' },
+  { icon: IconTests, label: 'Practice Tests', to: '/tests' },
+  { icon: IconNotes, label: 'My Notes', to: '/notes' },
+  { icon: IconMessages, label: 'Messages', to: '/messages' },
+  { icon: IconUsers, label: 'Study Groups', to: '/study-groups' },
+  { icon: IconSpark, label: 'Hub AI', to: '/ai' },
+  { icon: IconCode, label: 'Playground', to: '/playground' },
+  { icon: IconAnnouncements, label: 'Announcements', to: '/announcements' },
+  { icon: IconSchool, label: 'My Courses', to: '/my-courses' },
+  { icon: IconLink, label: 'Invite Classmates', to: '/invite' },
+  { icon: IconTag, label: 'Pricing', to: '/pricing' },
+  { icon: IconHeart, label: 'Supporters', to: '/supporters' },
+  { icon: IconProfile, label: 'My Profile', to: '__MY_PROFILE__' },
 ]
 
 const COURSE_COLORS = {
-  CMSC: '#8b5cf6', MATH: '#10b981', ENGL: '#f59e0b',
-  PHYS: '#0ea5e9', BIOL: '#ec4899', HIST: '#6366f1',
-  ECON: '#14b8a6', CHEM: '#f97316',
+  CMSC: '#8b5cf6',
+  MATH: '#10b981',
+  ENGL: '#f59e0b',
+  PHYS: '#0ea5e9',
+  BIOL: '#ec4899',
+  HIST: '#6366f1',
+  ECON: '#14b8a6',
+  CHEM: '#f97316',
 }
 
 export function courseColor(code = '') {

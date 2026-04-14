@@ -114,14 +114,18 @@ async function getWeeklyLimit(user) {
     if (sub && ['active', 'trialing', 'past_due'].includes(sub.status) && sub.plan !== 'free') {
       return WEEKLY_LIMITS.pro
     }
-  } catch { /* graceful degradation */ }
+  } catch {
+    /* graceful degradation */
+  }
   try {
     const donation = await prisma.donation.findFirst({
       where: { userId: user.id || user.userId, status: 'completed' },
       select: { id: true },
     })
     if (donation) return WEEKLY_LIMITS.donor
-  } catch { /* graceful degradation */ }
+  } catch {
+    /* graceful degradation */
+  }
   if (user.isStaffVerified || user.emailVerified) return WEEKLY_LIMITS.verified
   return WEEKLY_LIMITS.default
 }
@@ -133,7 +137,9 @@ async function getWeeklyUsage(userId) {
   const now = new Date()
   const dayOfWeek = now.getUTCDay()
   const daysSinceMonday = (dayOfWeek + 6) % 7
-  const weekStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - daysSinceMonday))
+  const weekStart = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - daysSinceMonday),
+  )
   const weekEnd = new Date(weekStart)
   weekEnd.setUTCDate(weekEnd.getUTCDate() + 7)
 
@@ -167,12 +173,16 @@ async function getUsageQuota(user) {
 
   // Daily reset: next midnight UTC
   const now = new Date()
-  const dailyReset = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1))
+  const dailyReset = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1),
+  )
 
   // Weekly reset: next Monday 00:00 UTC
   const dayOfWeek = now.getUTCDay()
-  const daysUntilMonday = ((8 - dayOfWeek) % 7) || 7
-  const weeklyReset = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + daysUntilMonday))
+  const daysUntilMonday = (8 - dayOfWeek) % 7 || 7
+  const weeklyReset = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + daysUntilMonday),
+  )
 
   return {
     daily: {
@@ -313,7 +323,7 @@ async function streamMessage({ user, conversationId, content, currentPage, image
   if (weeklyUsed >= weeklyLimit) {
     const now = new Date()
     const dayOfWeek = now.getUTCDay()
-    const daysUntilMonday = ((8 - dayOfWeek) % 7) || 7
+    const daysUntilMonday = (8 - dayOfWeek) % 7 || 7
     sendSSE(res, {
       type: 'error',
       message: `Weekly limit reached (${weeklyLimit} messages). Resets in ${daysUntilMonday} day${daysUntilMonday !== 1 ? 's' : ''}.`,
@@ -414,6 +424,9 @@ async function streamMessage({ user, conversationId, content, currentPage, image
   let totalOutputTokens = 0
   let wasTruncated = false
 
+  const ttftStart = performance.now()
+  let ttftMs = null
+
   try {
     const client = getClient()
     const stream = await client.messages.stream({
@@ -438,6 +451,9 @@ async function streamMessage({ user, conversationId, content, currentPage, image
     for await (const event of stream) {
       if (aborted) break
       if (event.type === 'content_block_delta' && event.delta?.text) {
+        if (ttftMs === null) {
+          ttftMs = Math.round(performance.now() - ttftStart)
+        }
         fullResponse += event.delta.text
         sendSSE(res, { type: 'delta', text: event.delta.text })
       }
@@ -484,9 +500,13 @@ async function streamMessage({ user, conversationId, content, currentPage, image
 
   // 7. Save assistant response.
   const totalTokens = totalInputTokens + totalOutputTokens
-  const msgMetadata = isSheetRequest || wasTruncated
-    ? { ...(isSheetRequest ? { sheetGeneration: true } : {}), ...(wasTruncated ? { truncated: true } : {}) }
-    : undefined
+  const msgMetadata =
+    isSheetRequest || wasTruncated
+      ? {
+          ...(isSheetRequest ? { sheetGeneration: true } : {}),
+          ...(wasTruncated ? { truncated: true } : {}),
+        }
+      : undefined
   const assistantMsg = await prisma.aiMessage.create({
     data: {
       conversation: { connect: { id: conversationId } },
@@ -514,6 +534,17 @@ async function streamMessage({ user, conversationId, content, currentPage, image
     tokenCount: totalTokens,
     usage: { used: usage.messageCount + 1, limit },
   })
+
+  // Track AI streaming time-to-first-token for observability.
+  if (ttftMs !== null) {
+    const { EVENTS, trackServerEvent } = require('../../lib/events')
+    trackServerEvent(userId, EVENTS.AI_STREAM_TTFT, {
+      msToFirstToken: ttftMs,
+      model: conversation.model || DEFAULT_MODEL,
+      promptTokens: totalInputTokens,
+    })
+  }
+
   res.end()
 }
 

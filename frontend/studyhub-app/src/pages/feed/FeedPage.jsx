@@ -10,7 +10,7 @@
  * Data: useFeedData
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import Navbar from '../../components/navbar/Navbar'
 import AppSidebar from '../../components/sidebar/AppSidebar'
 import ConfirmDialog from '../../components/ConfirmDialog'
@@ -22,6 +22,7 @@ import { SkeletonFeed } from '../../components/Skeleton'
 import SafeJoyride from '../../components/SafeJoyride'
 import { useTutorial } from '../../lib/useTutorial'
 import { FEED_STEPS, TUTORIAL_VERSIONS } from '../../lib/tutorialSteps'
+import { useOnboardingRedirect } from '../../lib/useOnboardingRedirect'
 
 import { FONT, FILTERS } from './feedConstants'
 import { Panel, EmptyFeed, GettingStartedCard } from './FeedWidgets'
@@ -68,6 +69,8 @@ export default function FeedPage() {
   const [reportTarget, setReportTarget] = useState(null)
 
   const { recentlyViewed } = useRecentlyViewed()
+  const { showBanner: showOnboardingBanner, dismissBanner: dismissOnboardingBanner } =
+    useOnboardingRedirect({ user })
   const tutorial = useTutorial('feed', FEED_STEPS, { version: TUTORIAL_VERSIONS.feed })
 
   const setQueryParam = useCallback(
@@ -176,6 +179,70 @@ export default function FeedPage() {
             >
               <GettingStartedCard user={user} />
               <SchoolSuggestionBanner user={user} />
+              {showOnboardingBanner && (
+                <div
+                  style={{
+                    background: 'var(--sh-info-bg)',
+                    border: '1px solid var(--sh-info-border)',
+                    borderRadius: 12,
+                    padding: '14px 16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    fontFamily: FONT,
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 700,
+                        color: 'var(--sh-text)',
+                        marginBottom: 2,
+                      }}
+                    >
+                      You are almost set up
+                    </div>
+                    <div style={{ fontSize: 13, color: 'var(--sh-text-secondary)' }}>
+                      Continue where you left off
+                    </div>
+                  </div>
+                  <Link
+                    to="/onboarding"
+                    style={{
+                      background: 'var(--sh-brand)',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 8,
+                      padding: '7px 16px',
+                      fontSize: 13,
+                      fontWeight: 700,
+                      textDecoration: 'none',
+                      whiteSpace: 'nowrap',
+                      fontFamily: FONT,
+                    }}
+                  >
+                    Resume setup
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={dismissOnboardingBanner}
+                    aria-label="Dismiss onboarding banner"
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: 18,
+                      color: 'var(--sh-text-secondary)',
+                      padding: '2px 4px',
+                      lineHeight: 1,
+                      fontFamily: FONT,
+                    }}
+                  >
+                    &#x2715;
+                  </button>
+                </div>
+              )}
               {newSinceLastVisit > 0 && activeFilter !== 'for-you' ? (
                 <div
                   style={{

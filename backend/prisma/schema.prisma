@@ -143,6 +143,15 @@ model User {
   videoAppealReviews         VideoAppeal[]         @relation("VideoAppealReviewer")
   sessions                   Session[]
   studyStatuses              StudyStatus[]
+  onboardingProgress         OnboardingProgress?
+  referralCode               String?   @unique
+  referredByUserId           Int?
+  proRewardExpiresAt         DateTime?
+  referredBy                 User?            @relation("ReferredBy", fields: [referredByUserId], references: [id], onDelete: SetNull)
+  referralsReceived          User[]           @relation("ReferredBy")
+  invitesSent                Referral[]       @relation("InvitesSent")
+  invitesReceived            Referral[]       @relation("InvitedByReferral")
+  referralRewards            ReferralReward[]
 
   @@index([role])
   @@index([emailHash])
@@ -2162,4 +2171,68 @@ model RequestMetric {
 
   @@index([routeGroup, createdAt])
   @@index([createdAt])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// OnboardingProgress — First-run onboarding state per user
+// ═══════════════════════════════════════════════════════════════════════════
+
+model OnboardingProgress {
+  id              Int       @id @default(autoincrement())
+  userId          Int       @unique
+  currentStep     Int       @default(1)
+  schoolSelected  Boolean   @default(false)
+  coursesAdded    Int       @default(0)
+  firstActionType String?
+  invitesSent     Int       @default(0)
+  completedAt     DateTime?
+  skippedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([completedAt])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Referral — Peer-to-peer invite tracking for growth loop
+// ═══════════════════════════════════════════════════════════════════════════
+
+model Referral {
+  id            Int       @id @default(autoincrement())
+  inviterId     Int
+  code          String
+  email         String?
+  channel       String
+  invitedUserId Int?
+  sentAt        DateTime  @default(now())
+  acceptedAt    DateTime?
+  rewardGranted Boolean   @default(false)
+
+  inviter     User  @relation("InvitesSent", fields: [inviterId], references: [id], onDelete: Cascade)
+  invitedUser User? @relation("InvitedByReferral", fields: [invitedUserId], references: [id], onDelete: SetNull)
+
+  @@index([inviterId])
+  @@index([email])
+  @@index([code])
+  @@index([acceptedAt])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ReferralReward — Milestone-based reward ledger
+// ═══════════════════════════════════════════════════════════════════════════
+
+model ReferralReward {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  milestone Int
+  proMonths Int
+  badgeKey  String?
+  grantedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, milestone])
+  @@index([userId])
 }

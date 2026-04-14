@@ -7,6 +7,7 @@ import { installApiFetchShim } from './lib/http'
 import { applyGlobalTheme } from './lib/appearance'
 import { initTelemetry, captureWebVital } from './lib/telemetry'
 import { reportWebVitals } from './lib/performance'
+import { startWebVitals } from './lib/webVitals'
 
 // Telemetry + fetch shim must never block React mount
 try {
@@ -21,6 +22,11 @@ try {
 }
 try {
   applyGlobalTheme()
+} catch {
+  /* best-effort */
+}
+try {
+  startWebVitals()
 } catch {
   /* best-effort */
 }

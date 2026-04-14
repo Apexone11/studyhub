@@ -94,6 +94,16 @@ router.post('/register', registerLimiter, async (req, res) => {
       return createdUserRecord
     })
 
+    // Attach referral if a ref code was provided (best-effort)
+    if (req.body.ref) {
+      try {
+        const { attachReferral } = require('../referrals/referrals.service')
+        await attachReferral(req.body.ref, createdUser.id, req.ip)
+      } catch {
+        // best-effort -- do not break registration
+      }
+    }
+
     const user = await issueAuthenticatedSession(res, createdUser.id, req)
     res.status(201).json({
       message: 'Account created!',
@@ -258,6 +268,16 @@ router.post('/register/complete', registerLimiter, async (req, res) => {
 
       return createdUser.id
     })
+
+    // Attach referral if a ref code was provided (best-effort)
+    if (body.ref) {
+      try {
+        const { attachReferral } = require('../referrals/referrals.service')
+        await attachReferral(body.ref, createdUserId, req.ip)
+      } catch {
+        // best-effort -- do not break registration
+      }
+    }
 
     const user = await issueAuthenticatedSession(res, createdUserId, req)
     res.status(201).json({

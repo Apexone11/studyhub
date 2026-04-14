@@ -15,6 +15,7 @@ const analyticsController = require('./admin.analytics.controller')
 const groupReportsController = require('./admin.groupReports.controller')
 const waitlistController = require('./admin.waitlist.controller')
 const securityController = require('./admin.security.controller')
+const growthController = require('./admin.growth.controller')
 
 const router = express.Router()
 
@@ -36,5 +37,6 @@ router.use(analyticsController)
 router.use(groupReportsController)
 router.use(waitlistController)
 router.use(securityController)
+router.use(growthController)
 
 module.exports = router
