@@ -151,7 +151,8 @@ export default function GroupDetailView({ groupId }) {
   }
 
   const isAdmin = activeGroup.userRole === 'admin'
-  const membershipStatus = activeGroup.userMembership?.status || (activeGroup.isMember ? 'active' : null)
+  const membershipStatus =
+    activeGroup.userMembership?.status || (activeGroup.isMember ? 'active' : null)
   const isMember = membershipStatus === 'active'
   const isPending = membershipStatus === 'pending'
   const isInvited = membershipStatus === 'invited'
@@ -162,7 +163,9 @@ export default function GroupDetailView({ groupId }) {
   const headerBackgroundUrl = activeGroup.backgroundUrl
     ? resolveGroupImageUrl(activeGroup.backgroundUrl)
     : groupImageUrl
-  const detailDescription = activeGroup.description || 'Use this space to coordinate sessions, share resources, and keep your study rhythm together.'
+  const detailDescription =
+    activeGroup.description ||
+    'Use this space to coordinate sessions, share resources, and keep your study rhythm together.'
 
   const handleEdit = async (updates) => {
     try {
@@ -307,10 +310,20 @@ export default function GroupDetailView({ groupId }) {
               }}
             >
               <div style={{ display: 'grid', gap: 14, minWidth: 0 }}>
-                <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.72)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                <div
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 800,
+                    color: 'rgba(255,255,255,0.72)',
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                  }}
+                >
                   Study Group
                 </div>
-                <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                <div
+                  style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}
+                >
                   <div
                     style={{
                       width: 82,
@@ -319,7 +332,9 @@ export default function GroupDetailView({ groupId }) {
                       overflow: 'hidden',
                       border: '1px solid rgba(255,255,255,0.24)',
                       boxShadow: '0 20px 36px rgba(15, 23, 42, 0.25)',
-                      background: groupImageUrl ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.18)',
+                      background: groupImageUrl
+                        ? 'rgba(255,255,255,0.14)'
+                        : 'rgba(255,255,255,0.18)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -340,22 +355,49 @@ export default function GroupDetailView({ groupId }) {
                   </div>
 
                   <div style={{ flex: 1, minWidth: 0, display: 'grid', gap: 12 }}>
-                    <h1 style={{ ...styles.detailTitle, color: '#fff', marginBottom: 0 }}>{activeGroup.name}</h1>
-                    <p style={{ ...styles.detailDesc, color: 'rgba(255,255,255,0.82)', margin: 0, maxWidth: 760 }}>
+                    <h1 style={{ ...styles.detailTitle, color: '#fff', marginBottom: 0 }}>
+                      {activeGroup.name}
+                    </h1>
+                    <p
+                      style={{
+                        ...styles.detailDesc,
+                        color: 'rgba(255,255,255,0.82)',
+                        margin: 0,
+                        maxWidth: 760,
+                      }}
+                    >
                       {detailDescription}
                     </p>
 
                     <div style={{ ...styles.detailMeta, gap: 10 }}>
-                      <span style={{ ...styles.privacyBadge, background: 'rgba(255,255,255,0.12)', color: '#fff' }}>
+                      <span
+                        style={{
+                          ...styles.privacyBadge,
+                          background: 'rgba(255,255,255,0.12)',
+                          color: '#fff',
+                        }}
+                      >
                         {getPrivacyLabel(activeGroup.privacy)}
                       </span>
-                      <span style={{ ...styles.memberBadge, background: 'rgba(255,255,255,0.12)', color: '#fff' }}>
+                      <span
+                        style={{
+                          ...styles.memberBadge,
+                          background: 'rgba(255,255,255,0.12)',
+                          color: '#fff',
+                        }}
+                      >
                         {activeGroup.memberCount}
                         {activeGroup.maxMembers ? `/${activeGroup.maxMembers}` : ''} member
                         {activeGroup.memberCount === 1 ? '' : 's'}
                       </span>
                       {activeGroup.courseId ? (
-                        <span style={{ ...styles.courseBadge, background: 'rgba(255,255,255,0.12)', color: '#fff' }}>
+                        <span
+                          style={{
+                            ...styles.courseBadge,
+                            background: 'rgba(255,255,255,0.12)',
+                            color: '#fff',
+                          }}
+                        >
                           {activeGroup.courseName}
                         </span>
                       ) : null}
@@ -410,12 +452,17 @@ export default function GroupDetailView({ groupId }) {
                       <button
                         onClick={() => setReportModalOpen(true)}
                         style={{
-                          display: 'inline-flex', alignItems: 'center', gap: 6,
-                          padding: '8px 14px', borderRadius: 10,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          padding: '8px 14px',
+                          borderRadius: 10,
                           border: '1px solid var(--sh-danger-border)',
                           background: 'var(--sh-danger-bg)',
                           color: 'var(--sh-danger-text)',
-                          fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                          fontSize: 12,
+                          fontWeight: 700,
+                          cursor: 'pointer',
                           fontFamily: 'inherit',
                         }}
                         title="Report this group"
@@ -433,17 +480,34 @@ export default function GroupDetailView({ groupId }) {
           <div style={{ padding: '24px', display: 'grid', gap: 18 }}>
             {/* Phase 5: moderation banners */}
             {activeGroup.moderationStatus === 'warned' ? (
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '12px 16px', borderRadius: 12,
-                background: 'var(--sh-warning-bg)', border: '1px solid var(--sh-warning-border)',
-                color: 'var(--sh-warning-text)', fontSize: 13, fontWeight: 600, lineHeight: 1.5,
-              }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '12px 16px',
+                  borderRadius: 12,
+                  background: 'var(--sh-warning-bg)',
+                  border: '1px solid var(--sh-warning-border)',
+                  color: 'var(--sh-warning-text)',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  lineHeight: 1.5,
+                }}
+              >
                 <IconFlag size={16} style={{ flexShrink: 0 }} />
                 <div>
-                  This group received a warning from our review team. Please review the community guidelines to avoid further action.
+                  This group received a warning from our review team. Please review the community
+                  guidelines to avoid further action.
                   {activeGroup.warnedUntil ? (
-                    <span style={{ display: 'block', fontSize: 11, color: 'var(--sh-muted)', marginTop: 4 }}>
+                    <span
+                      style={{
+                        display: 'block',
+                        fontSize: 11,
+                        color: 'var(--sh-muted)',
+                        marginTop: 4,
+                      }}
+                    >
                       Warning expires: {new Date(activeGroup.warnedUntil).toLocaleDateString()}
                     </span>
                   ) : null}
@@ -451,15 +515,25 @@ export default function GroupDetailView({ groupId }) {
               </div>
             ) : null}
             {activeGroup.moderationStatus === 'locked' ? (
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '12px 16px', borderRadius: 12,
-                background: 'var(--sh-danger-bg)', border: '1px solid var(--sh-danger-border)',
-                color: 'var(--sh-danger-text)', fontSize: 13, fontWeight: 600, lineHeight: 1.5,
-              }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '12px 16px',
+                  borderRadius: 12,
+                  background: 'var(--sh-danger-bg)',
+                  border: '1px solid var(--sh-danger-border)',
+                  color: 'var(--sh-danger-text)',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  lineHeight: 1.5,
+                }}
+              >
                 <IconLock size={16} style={{ flexShrink: 0 }} />
                 <div>
-                  This group has been locked (read-only) by our review team. Members can view existing content but cannot post or upload.
+                  This group has been locked (read-only) by our review team. Members can view
+                  existing content but cannot post or upload.
                   {activeGroup.createdById === currentUserId ? (
                     <span style={{ display: 'block', fontSize: 11, marginTop: 4 }}>
                       You can appeal this decision using the Appeal button above.
@@ -493,7 +567,15 @@ export default function GroupDetailView({ groupId }) {
                     gap: 6,
                   }}
                 >
-                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--sh-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <span
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: 'var(--sh-muted)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.04em',
+                    }}
+                  >
                     {stat.label}
                   </span>
                   <span style={{ fontSize: 22, fontWeight: 800, color: 'var(--sh-heading)' }}>
@@ -503,12 +585,27 @@ export default function GroupDetailView({ groupId }) {
               ))}
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-              <div style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--sh-subtext)', maxWidth: 640 }}>
-                Everything your group needs stays here: shared resources, upcoming sessions, discussion threads, and the current member roster.
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                gap: 16,
+                flexWrap: 'wrap',
+                alignItems: 'center',
+              }}
+            >
+              <div
+                style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--sh-subtext)', maxWidth: 640 }}
+              >
+                Everything your group needs stays here: shared resources, upcoming sessions,
+                discussion threads, and the current member roster.
               </div>
               <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--sh-muted)' }}>
-                {isMember ? 'Member access enabled' : activeGroup.privacy === 'public' ? 'Open to all students' : 'Membership approval required'}
+                {isMember
+                  ? 'Member access enabled'
+                  : activeGroup.privacy === 'public'
+                    ? 'Open to all students'
+                    : 'Membership approval required'}
               </div>
             </div>
           </div>
@@ -573,6 +670,7 @@ export default function GroupDetailView({ groupId }) {
               onDelete={(resourceId) => deleteResource(groupId, resourceId)}
               isAdminOrMod={isAdminOrMod}
               isMember={isMember}
+              userId={currentUserId}
             />
           )}
           {activeTab === 'sessions' && (
