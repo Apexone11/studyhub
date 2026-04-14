@@ -22,7 +22,9 @@ function readStatuses() {
 function writeStatuses(statuses) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(statuses))
-  } catch { /* quota exceeded or private browsing */ }
+  } catch {
+    /* quota exceeded or private browsing */
+  }
 }
 
 /**
@@ -34,24 +36,27 @@ export function useStudyStatus(sheetId) {
 
   const entry = sheetId ? statuses[sheetId] || null : null
 
-  const setStatus = useCallback((status, sheet) => {
-    if (!sheetId) return
-    setStatuses((prev) => {
-      const next = { ...prev }
-      if (!status) {
-        delete next[sheetId]
-      } else {
-        next[sheetId] = {
-          status,
-          title: sheet?.title || prev[sheetId]?.title || '',
-          courseCode: sheet?.course?.code || prev[sheetId]?.courseCode || null,
-          updatedAt: new Date().toISOString(),
+  const setStatus = useCallback(
+    (status, sheet) => {
+      if (!sheetId) return
+      setStatuses((prev) => {
+        const next = { ...prev }
+        if (!status) {
+          delete next[sheetId]
+        } else {
+          next[sheetId] = {
+            status,
+            title: sheet?.title || prev[sheetId]?.title || '',
+            courseCode: sheet?.course?.code || prev[sheetId]?.courseCode || null,
+            updatedAt: new Date().toISOString(),
+          }
         }
-      }
-      writeStatuses(next)
-      return next
-    })
-  }, [sheetId])
+        writeStatuses(next)
+        return next
+      })
+    },
+    [sheetId],
+  )
 
   // Cross-tab sync via visibilitychange
   useEffect(() => {
@@ -62,7 +67,12 @@ export function useStudyStatus(sheetId) {
     return () => document.removeEventListener('visibilitychange', onVisibility)
   }, [])
 
-  return { studyStatus: entry?.status || null, setStudyStatus: setStatus, STUDY_STATUSES }
+  return {
+    studyStatus: entry?.status || null,
+    studyStatusEntry: entry,
+    setStudyStatus: setStatus,
+    STUDY_STATUSES,
+  }
 }
 
 /**

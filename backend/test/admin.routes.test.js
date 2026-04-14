@@ -49,6 +49,7 @@ const mocks = vi.hoisted(() => {
     auditLog: {
       findMany: vi.fn(),
       count: vi.fn(),
+      groupBy: vi.fn(),
     },
     moderationCase: {
       count: vi.fn(),
@@ -164,6 +165,7 @@ beforeEach(() => {
   mocks.prisma.reaction.count.mockResolvedValue(4)
   mocks.prisma.auditLog.findMany.mockResolvedValue([])
   mocks.prisma.auditLog.count.mockResolvedValue(0)
+  mocks.prisma.auditLog.groupBy.mockResolvedValue([])
   mocks.prisma.feedPost.count.mockResolvedValue(6)
   mocks.prisma.moderationCase.count.mockResolvedValue(2)
   mocks.prisma.strike.count.mockResolvedValue(1)
@@ -569,6 +571,40 @@ describe('admin routes', () => {
         },
         attempts: [{ refreshToken: '[REDACTED]' }],
       },
+    })
+  })
+
+  it('returns available audit event types with live counts', async () => {
+    mocks.state.role = 'admin'
+    mocks.prisma.auditLog.groupBy.mockResolvedValue([
+      { event: 'sheet.create', _count: { _all: 4 } },
+      { event: 'auth.login', _count: { _all: 2 } },
+      { event: 'auth.logout', _count: { _all: 1 } },
+      { event: 'settings.profile_update', _count: { _all: 1 } },
+    ])
+
+    const response = await request(app).get('/audit-log/event-types?actorId=7&search=login')
+
+    expect(response.status).toBe(200)
+    expect(response.body).toEqual({
+      total: 8,
+      eventTypes: [
+        { value: 'sheet', label: 'Sheets', count: 4 },
+        { value: 'auth', label: 'Auth', count: 3 },
+        { value: 'settings', label: 'Settings', count: 1 },
+      ],
+    })
+    expect(mocks.prisma.auditLog.groupBy).toHaveBeenCalledWith({
+      by: ['event'],
+      where: {
+        actorId: 7,
+        OR: [
+          { event: { contains: 'login', mode: 'insensitive' } },
+          { route: { contains: 'login', mode: 'insensitive' } },
+          { resource: { contains: 'login', mode: 'insensitive' } },
+        ],
+      },
+      _count: { _all: true },
     })
   })
 })

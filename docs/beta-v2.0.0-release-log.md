@@ -4,6 +4,29 @@
 
 ## Date: 2026-04-13
 
+### Security Recovery, Tutorial Refresh, and Study Queue Clarity
+
+**The admin security surface now runs on real failed-login data, tutorials target the visible UI again, and Study Status finally reads like a meaningful workflow instead of a hidden menu toggle**
+
+- Fixed the admin Security tab server error at the root by replacing the nonexistent `User.updatedAt` dependency with a real `lastFailedLoginAt` field, wiring failed and successful login paths to maintain it, clearing it on admin unlock, and adding the matching Prisma migration plus runtime schema repair so the beta stack can heal older databases on boot
+- Refreshed the stale settings, messages, study-groups, and announcements tutorials, moved broken anchors off hidden controls onto visible entry points, and hardened the shared tutorial hook so late-mounted targets are resolved after render instead of silently dropping steps on first run
+- Promoted Study Status from the sheet-viewer overflow menu into a visible header card that explains what each state means, lets users update it in place, and keeps the queue state persisted after reload so it now clearly feeds the existing dashboard study queue
+- Replaced the admin moderation audit-log's static event-type filter list with live backend counts grouped from stored audit rows, so admins only see event categories backed by real data instead of selecting guaranteed-empty prefixes
+
+**Deep Scan Summary / Deferred Risk**
+
+- Study Status is now understandable and immediately visible on the sheet-viewer surface, but it remains local-device state in browser storage rather than a synced backend preference, so the queue still does not roam across browsers or accounts yet
+- Audit event-type options now reflect live stored prefixes and current actor/search filters, which removes empty dead-end categories by design; the remaining visibility gap is upstream coverage for app actions that still do not emit audit events into `auditLog`
+
+**Validation**
+
+- `Set-Location -LiteralPath "C:\Users\Abdul PC\OneDrive\Desktop\studyhub\backend"; npx vitest run test/admin.routes.test.js test/auth.routes.test.js`: passes (21 tests)
+- `Set-Location -LiteralPath "C:\Users\Abdul PC\OneDrive\Desktop\studyhub\backend"; npx prisma validate`: passes
+- `Set-Location -LiteralPath "C:\Users\Abdul PC\OneDrive\Desktop\studyhub\backend"; npx vitest run test/admin.routes.test.js`: passes (14 tests)
+- `Set-Location -LiteralPath "C:\Users\Abdul PC\OneDrive\Desktop\studyhub\frontend\studyhub-app"; npx eslint src/lib/useStudyStatus.js src/pages/sheets/viewer/SheetHeader.jsx src/pages/sheets/viewer/SheetViewerPage.jsx src/pages/admin/moderation/AuditLogSubTab.jsx`: passes
+- `npm run beta:down` and `npm run beta:start:oneclick`: rebuilt the local beta stack with the updated backend route and viewer UI
+- Live localhost verification on the rebuilt stack: admin overview loaded, sheet viewer showed the new Study Status card, the `Studying` state persisted after reload, `/api/admin/audit-log/event-types` returned live auth counts, and `/api/admin/audit-log?event=auth` returned non-empty results
+
 ### Repo Lint Cleanup and Editor Bundle Splitting
 
 **Repo-wide lint is clean again, and the remaining oversized frontend bundles were split at the owning surfaces instead of being hidden with a higher warning limit**

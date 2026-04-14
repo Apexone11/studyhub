@@ -13,18 +13,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { FONT } from '../adminConstants'
 import { API } from '../../../config'
 
-const EVENT_PREFIXES = [
-  { value: '', label: 'All events' },
-  { value: 'auth', label: 'Auth' },
-  { value: 'admin', label: 'Admin' },
-  { value: 'moderation', label: 'Moderation' },
-  { value: 'sheet', label: 'Sheets' },
-  { value: 'comment', label: 'Comments' },
-  { value: 'upload', label: 'Uploads' },
-  { value: 'contribution', label: 'Contributions' },
-  { value: 'settings', label: 'Settings' },
-  { value: 'pii', label: 'PII access' },
-]
+const DEFAULT_EVENT_OPTION = { value: '', label: 'All events', count: 0 }
 
 const EVENT_COLORS = {
   auth: 'var(--sh-info)',
@@ -45,6 +34,7 @@ function eventColor(event) {
 
 export default function AuditLogSubTab({ apiJson }) {
   const [entries, setEntries] = useState([])
+  const [eventOptions, setEventOptions] = useState([DEFAULT_EVENT_OPTION])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [page, setPage] = useState(1)
@@ -73,32 +63,68 @@ export default function AuditLogSubTab({ apiJson }) {
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
-  useEffect(() => () => {
-    clearTimeout(searchTimerRef.current)
-    userSearchAbortRef.current?.abort()
-  }, [])
+  useEffect(
+    () => () => {
+      clearTimeout(searchTimerRef.current)
+      userSearchAbortRef.current?.abort()
+    },
+    [],
+  )
 
-  const load = useCallback(async (p = 1) => {
-    setLoading(true)
-    setError('')
+  const load = useCallback(
+    async (p = 1) => {
+      setLoading(true)
+      setError('')
+      try {
+        const params = new URLSearchParams({ page: p })
+        if (eventFilter) params.set('event', eventFilter)
+        if (searchQuery) params.set('search', searchQuery)
+        if (actorFilter) params.set('actorId', actorFilter.id)
+        const data = await apiJson(`/api/admin/audit-log?${params}`)
+        setEntries(data.entries || [])
+        setPage(data.page || p)
+        setTotalPages(data.pages || 1)
+        setTotal(data.total || 0)
+      } catch (err) {
+        setError(err.message || 'Could not load audit log.')
+      } finally {
+        setLoading(false)
+      }
+    },
+    [apiJson, eventFilter, searchQuery, actorFilter],
+  )
+
+  useEffect(() => {
+    void load(1)
+  }, [load])
+
+  const loadEventOptions = useCallback(async () => {
     try {
-      const params = new URLSearchParams({ page: p })
-      if (eventFilter) params.set('event', eventFilter)
+      const params = new URLSearchParams()
       if (searchQuery) params.set('search', searchQuery)
       if (actorFilter) params.set('actorId', actorFilter.id)
-      const data = await apiJson(`/api/admin/audit-log?${params}`)
-      setEntries(data.entries || [])
-      setPage(data.page || p)
-      setTotalPages(data.pages || 1)
-      setTotal(data.total || 0)
-    } catch (err) {
-      setError(err.message || 'Could not load audit log.')
-    } finally {
-      setLoading(false)
+      const query = params.toString()
+      const data = await apiJson(`/api/admin/audit-log/event-types${query ? `?${query}` : ''}`)
+      const liveOptions = [
+        { ...DEFAULT_EVENT_OPTION, count: data.total || 0 },
+        ...(data.eventTypes || []).map((option) => ({
+          value: option.value,
+          label: option.label,
+          count: option.count || 0,
+        })),
+      ]
+      setEventOptions(liveOptions)
+      setEventFilter((current) =>
+        current && !liveOptions.some((option) => option.value === current) ? '' : current,
+      )
+    } catch {
+      setEventOptions([DEFAULT_EVENT_OPTION])
     }
-  }, [apiJson, eventFilter, searchQuery, actorFilter])
+  }, [actorFilter, apiJson, searchQuery])
 
-  useEffect(() => { void load(1) }, [load])
+  useEffect(() => {
+    void loadEventOptions()
+  }, [loadEventOptions])
 
   // User search with debounce
   function handleUserSearchInput(e) {
@@ -115,10 +141,13 @@ export default function AuditLogSubTab({ apiJson }) {
       const controller = new AbortController()
       userSearchAbortRef.current = controller
       try {
-        const res = await fetch(`${API}/api/admin/users/search?q=${encodeURIComponent(val)}&limit=8`, {
-          credentials: 'include',
-          signal: controller.signal,
-        })
+        const res = await fetch(
+          `${API}/api/admin/users/search?q=${encodeURIComponent(val)}&limit=8`,
+          {
+            credentials: 'include',
+            signal: controller.signal,
+          },
+        )
         const data = await res.json()
         setUserSearchResults(Array.isArray(data) ? data : [])
         setUserSearchOpen(true)
@@ -182,21 +211,41 @@ export default function AuditLogSubTab({ apiJson }) {
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
         {/* Event type filter */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--sh-muted)', textTransform: 'uppercase' }}>Event type</span>
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              color: 'var(--sh-muted)',
+              textTransform: 'uppercase',
+            }}
+          >
+            Event type
+          </span>
           <select
             value={eventFilter}
             onChange={(e) => setEventFilter(e.target.value)}
             style={selectStyle}
           >
-            {EVENT_PREFIXES.map((p) => (
-              <option key={p.value} value={p.value}>{p.label}</option>
+            {eventOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.count > 0 ? `${option.label} (${option.count})` : option.label}
+              </option>
             ))}
           </select>
         </div>
 
         {/* Search */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--sh-muted)', textTransform: 'uppercase' }}>Search</span>
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              color: 'var(--sh-muted)',
+              textTransform: 'uppercase',
+            }}
+          >
+            Search
+          </span>
           <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: 4 }}>
             <input
               type="text"
@@ -209,7 +258,19 @@ export default function AuditLogSubTab({ apiJson }) {
               Search
             </button>
             {searchQuery && (
-              <button type="button" onClick={() => { setSearchInput(''); setSearchQuery('') }} style={{ ...actionBtnStyle, padding: '6px 10px', background: 'var(--sh-soft)', color: 'var(--sh-muted)' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchInput('')
+                  setSearchQuery('')
+                }}
+                style={{
+                  ...actionBtnStyle,
+                  padding: '6px 10px',
+                  background: 'var(--sh-soft)',
+                  color: 'var(--sh-muted)',
+                }}
+              >
                 Clear
               </button>
             )}
@@ -217,20 +278,49 @@ export default function AuditLogSubTab({ apiJson }) {
         </div>
 
         {/* User filter */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, position: 'relative' }} ref={userSearchRef}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--sh-muted)', textTransform: 'uppercase' }}>Filter by user</span>
+        <div
+          style={{ display: 'flex', flexDirection: 'column', gap: 4, position: 'relative' }}
+          ref={userSearchRef}
+        >
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              color: 'var(--sh-muted)',
+              textTransform: 'uppercase',
+            }}
+          >
+            Filter by user
+          </span>
           {actorFilter ? (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              padding: '5px 10px', borderRadius: 8,
-              border: '1px solid var(--sh-info-border)', background: 'var(--sh-info-bg)',
-              fontSize: 12, fontWeight: 700, color: 'var(--sh-info-text)',
-            }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '5px 10px',
+                borderRadius: 8,
+                border: '1px solid var(--sh-info-border)',
+                background: 'var(--sh-info-bg)',
+                fontSize: 12,
+                fontWeight: 700,
+                color: 'var(--sh-info-text)',
+              }}
+            >
               @{actorFilter.username}
               <button
                 type="button"
                 onClick={clearActorFilter}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sh-info-text)', fontSize: 14, fontWeight: 700, lineHeight: 1, padding: 0 }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--sh-info-text)',
+                  fontSize: 14,
+                  fontWeight: 700,
+                  lineHeight: 1,
+                  padding: 0,
+                }}
               >
                 x
               </button>
@@ -245,29 +335,48 @@ export default function AuditLogSubTab({ apiJson }) {
             />
           )}
           {userSearchOpen && userSearchResults.length > 0 && (
-            <div style={{
-              position: 'absolute', top: '100%', left: 0, zIndex: 100,
-              marginTop: 2, background: 'var(--sh-surface)',
-              border: '1px solid var(--sh-border)', borderRadius: 10,
-              boxShadow: '0 6px 20px rgba(15, 23, 42, 0.1)',
-              maxHeight: 240, overflowY: 'auto', minWidth: 200,
-            }}>
+            <div
+              style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                zIndex: 100,
+                marginTop: 2,
+                background: 'var(--sh-surface)',
+                border: '1px solid var(--sh-border)',
+                borderRadius: 10,
+                boxShadow: '0 6px 20px rgba(15, 23, 42, 0.1)',
+                maxHeight: 240,
+                overflowY: 'auto',
+                minWidth: 200,
+              }}
+            >
               {userSearchResults.map((user) => (
                 <button
                   key={user.id}
                   type="button"
                   onClick={() => selectUser(user)}
                   style={{
-                    display: 'block', width: '100%', padding: '8px 12px',
-                    border: 'none', background: 'transparent', cursor: 'pointer',
-                    textAlign: 'left', fontSize: 13, fontFamily: FONT,
+                    display: 'block',
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    fontSize: 13,
+                    fontFamily: FONT,
                     color: 'var(--sh-text)',
                   }}
                   onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--sh-soft)')}
                   onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                 >
                   <span style={{ fontWeight: 700 }}>@{user.username}</span>
-                  {user.displayName ? <span style={{ color: 'var(--sh-muted)', marginLeft: 6 }}>{user.displayName}</span> : null}
+                  {user.displayName ? (
+                    <span style={{ color: 'var(--sh-muted)', marginLeft: 6 }}>
+                      {user.displayName}
+                    </span>
+                  ) : null}
                 </button>
               ))}
             </div>
@@ -277,7 +386,16 @@ export default function AuditLogSubTab({ apiJson }) {
         {/* Export button */}
         {actorFilter && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--sh-muted)', textTransform: 'uppercase' }}>Export</span>
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: 'var(--sh-muted)',
+                textTransform: 'uppercase',
+              }}
+            >
+              Export
+            </span>
             <button
               type="button"
               onClick={handleExport}
@@ -309,7 +427,15 @@ export default function AuditLogSubTab({ apiJson }) {
               setSearchQuery('')
               setActorFilter(null)
             }}
-            style={{ fontSize: 12, color: 'var(--sh-info-text)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: FONT, fontWeight: 600 }}
+            style={{
+              fontSize: 12,
+              color: 'var(--sh-info-text)',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              fontFamily: FONT,
+              fontWeight: 600,
+            }}
           >
             Clear all filters
           </button>
@@ -318,11 +444,16 @@ export default function AuditLogSubTab({ apiJson }) {
 
       {/* Error */}
       {error && (
-        <div style={{
-          padding: '12px 14px', borderRadius: 12,
-          background: 'var(--sh-danger-bg)', border: '1px solid var(--sh-danger-border)',
-          color: 'var(--sh-danger-text)', fontSize: 13,
-        }}>
+        <div
+          style={{
+            padding: '12px 14px',
+            borderRadius: 12,
+            background: 'var(--sh-danger-bg)',
+            border: '1px solid var(--sh-danger-border)',
+            color: 'var(--sh-danger-text)',
+            fontSize: 13,
+          }}
+        >
           {error}
         </div>
       )}
@@ -336,8 +467,16 @@ export default function AuditLogSubTab({ apiJson }) {
 
       {/* Entries */}
       {!loading && entries.length === 0 && !error && (
-        <div style={{ color: 'var(--sh-muted)', fontSize: 13, padding: 20, textAlign: 'center', fontStyle: 'italic' }}>
-          No audit entries found.
+        <div
+          style={{
+            color: 'var(--sh-muted)',
+            fontSize: 13,
+            padding: 20,
+            textAlign: 'center',
+            fontStyle: 'italic',
+          }}
+        >
+          No audit entries found for the current filters.
         </div>
       )}
 
@@ -361,24 +500,41 @@ export default function AuditLogSubTab({ apiJson }) {
                 <tr key={entry.id} style={trStyle}>
                   <td style={tdStyle}>
                     <span style={{ whiteSpace: 'nowrap' }}>
-                      {new Date(entry.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      {new Date(entry.createdAt).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                      })}
                     </span>
                     <br />
                     <span style={{ fontSize: 10, color: 'var(--sh-muted)' }}>
-                      {new Date(entry.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                      {new Date(entry.createdAt).toLocaleTimeString('en-US', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
                     </span>
                   </td>
                   <td style={tdStyle}>
-                    <span style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 6,
-                      padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700,
-                      background: `color-mix(in srgb, ${eventColor(entry.event)} 10%, transparent)`,
-                      color: eventColor(entry.event),
-                    }}>
-                      <span style={{
-                        width: 6, height: 6, borderRadius: '50%',
-                        background: eventColor(entry.event),
-                      }} />
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        padding: '3px 10px',
+                        borderRadius: 999,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        background: `color-mix(in srgb, ${eventColor(entry.event)} 10%, transparent)`,
+                        color: eventColor(entry.event),
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: '50%',
+                          background: eventColor(entry.event),
+                        }}
+                      />
                       {entry.event}
                     </span>
                   </td>
@@ -386,8 +542,19 @@ export default function AuditLogSubTab({ apiJson }) {
                     {entry.actorUsername ? (
                       <button
                         type="button"
-                        onClick={() => selectUser({ id: entry.actorId, username: entry.actorUsername })}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, color: 'var(--sh-heading)', fontFamily: FONT, fontSize: 12.5, padding: 0 }}
+                        onClick={() =>
+                          selectUser({ id: entry.actorId, username: entry.actorUsername })
+                        }
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontWeight: 700,
+                          color: 'var(--sh-heading)',
+                          fontFamily: FONT,
+                          fontSize: 12.5,
+                          padding: 0,
+                        }}
                       >
                         @{entry.actorUsername}
                       </button>
@@ -395,11 +562,21 @@ export default function AuditLogSubTab({ apiJson }) {
                       <span style={{ color: 'var(--sh-muted)', fontStyle: 'italic' }}>system</span>
                     )}
                     {entry.actorRole && (
-                      <span style={{
-                        marginLeft: 6, fontSize: 10, fontWeight: 700, padding: '1px 6px',
-                        borderRadius: 4, background: entry.actorRole === 'admin' ? 'var(--sh-danger-bg)' : 'var(--sh-soft)',
-                        color: entry.actorRole === 'admin' ? 'var(--sh-danger-text)' : 'var(--sh-muted)',
-                      }}>
+                      <span
+                        style={{
+                          marginLeft: 6,
+                          fontSize: 10,
+                          fontWeight: 700,
+                          padding: '1px 6px',
+                          borderRadius: 4,
+                          background:
+                            entry.actorRole === 'admin' ? 'var(--sh-danger-bg)' : 'var(--sh-soft)',
+                          color:
+                            entry.actorRole === 'admin'
+                              ? 'var(--sh-danger-text)'
+                              : 'var(--sh-muted)',
+                        }}
+                      >
                         {entry.actorRole}
                       </span>
                     )}
@@ -416,30 +593,48 @@ export default function AuditLogSubTab({ apiJson }) {
                   <td style={tdStyle}>
                     {entry.resource ? (
                       <span style={{ fontSize: 11, color: 'var(--sh-subtext)' }}>
-                        {entry.resource}{entry.resourceId ? ` #${entry.resourceId}` : ''}
+                        {entry.resource}
+                        {entry.resourceId ? ` #${entry.resourceId}` : ''}
                       </span>
                     ) : (
                       <span style={{ color: 'var(--sh-muted)' }}>--</span>
                     )}
                   </td>
-                  <td style={{ ...tdStyle, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <td
+                    style={{
+                      ...tdStyle,
+                      maxWidth: 200,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
                     <span title={entry.route || ''} style={{ color: 'var(--sh-subtext)' }}>
                       {entry.route || '--'}
                     </span>
                   </td>
                   <td style={tdStyle}>
                     {entry.method ? (
-                      <span style={{
-                        fontWeight: 700, fontSize: 10, padding: '2px 6px', borderRadius: 4,
-                        background: methodColor(entry.method).bg,
-                        color: methodColor(entry.method).text,
-                      }}>
+                      <span
+                        style={{
+                          fontWeight: 700,
+                          fontSize: 10,
+                          padding: '2px 6px',
+                          borderRadius: 4,
+                          background: methodColor(entry.method).bg,
+                          color: methodColor(entry.method).text,
+                        }}
+                      >
                         {entry.method}
                       </span>
-                    ) : '--'}
+                    ) : (
+                      '--'
+                    )}
                   </td>
                   <td style={tdStyle}>
-                    <span style={{ fontSize: 11, color: 'var(--sh-muted)', fontFamily: 'monospace' }}>
+                    <span
+                      style={{ fontSize: 11, color: 'var(--sh-muted)', fontFamily: 'monospace' }}
+                    >
                       {entry.ipAddress || '--'}
                     </span>
                   </td>
@@ -480,10 +675,15 @@ export default function AuditLogSubTab({ apiJson }) {
 
 function methodColor(method) {
   switch (method) {
-    case 'POST': return { bg: 'var(--sh-success-bg)', text: 'var(--sh-success-text)' }
-    case 'PATCH': case 'PUT': return { bg: 'var(--sh-warning-bg)', text: 'var(--sh-warning-text)' }
-    case 'DELETE': return { bg: 'var(--sh-danger-bg)', text: 'var(--sh-danger-text)' }
-    default: return { bg: 'var(--sh-soft)', text: 'var(--sh-muted)' }
+    case 'POST':
+      return { bg: 'var(--sh-success-bg)', text: 'var(--sh-success-text)' }
+    case 'PATCH':
+    case 'PUT':
+      return { bg: 'var(--sh-warning-bg)', text: 'var(--sh-warning-text)' }
+    case 'DELETE':
+      return { bg: 'var(--sh-danger-bg)', text: 'var(--sh-danger-text)' }
+    default:
+      return { bg: 'var(--sh-soft)', text: 'var(--sh-muted)' }
   }
 }
 
