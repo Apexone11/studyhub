@@ -2145,3 +2145,21 @@ model StudyStatus {
   @@index([userId, status])
   @@index([sheetId])
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RequestMetric — Per-request latency data for observability dashboard
+// ═══════════════════════════════════════════════════════════════════════════
+
+model RequestMetric {
+  id         Int      @id @default(autoincrement())
+  method     String
+  routeGroup String
+  route      String
+  statusCode Int
+  durationMs Int
+  userId     Int?
+  createdAt  DateTime @default(now())
+
+  @@index([routeGroup, createdAt])
+  @@index([createdAt])
+}
