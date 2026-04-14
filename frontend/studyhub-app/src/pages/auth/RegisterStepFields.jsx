@@ -21,7 +21,10 @@ export function PasswordHint({ password, confirmPassword }) {
   return (
     <div className="password-hints-grid">
       {checks.map((check) => (
-        <div key={check.label} className={`password-hint ${check.ok ? 'password-hint--pass' : 'password-hint--fail'}`}>
+        <div
+          key={check.label}
+          className={`password-hint ${check.ok ? 'password-hint--pass' : 'password-hint--fail'}`}
+        >
           {check.ok ? '\u2713' : '\u25CB'} {check.label}
         </div>
       ))}
@@ -44,14 +47,20 @@ export function StepIndicator({ steps, step }) {
         return (
           <div key={key} className="register-step">
             <div className="register-step-header">
-              <div className={`register-step-number ${active || complete ? 'register-step-number--active' : 'register-step-number--inactive'}`}>
+              <div
+                className={`register-step-number ${active || complete ? 'register-step-number--active' : 'register-step-number--inactive'}`}
+              >
                 {complete ? '\u2713' : index + 1}
               </div>
-              <span className={`register-step-label ${active ? 'register-step-label--active' : 'register-step-label--inactive'}`}>
+              <span
+                className={`register-step-label ${active ? 'register-step-label--active' : 'register-step-label--inactive'}`}
+              >
                 {label}
               </span>
             </div>
-            <div className={`register-step-bar ${complete || active ? 'register-step-bar--active' : 'register-step-bar--inactive'}`} />
+            <div
+              className={`register-step-bar ${complete || active ? 'register-step-bar--active' : 'register-step-bar--inactive'}`}
+            />
           </div>
         )
       })}
@@ -71,7 +80,13 @@ export function AccountStep({ form, setField, loading, onSubmit, onGoogleSuccess
       <div className="register-section-header">
         <div className="register-logo-mark register-logo-mark--brand">
           <svg width="24" height="24" viewBox="0 0 36 36" fill="none">
-            <path d="M18 6 L18 30 M10 14 L18 6 L26 14 M10 22 L18 14 L26 22" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+            <path
+              d="M18 6 L18 30 M10 14 L18 6 L26 14 M10 22 L18 14 L26 22"
+              stroke="#f59e0b"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
         </div>
         <h1 className="register-h1">Create your account</h1>
@@ -111,7 +126,9 @@ export function AccountStep({ form, setField, loading, onSubmit, onGoogleSuccess
 
       {/* Username */}
       <div>
-        <label htmlFor="register-username" className="register-label">Username</label>
+        <label htmlFor="register-username" className="register-label">
+          Username
+        </label>
         <input
           id="register-username"
           value={form.username}
@@ -125,7 +142,9 @@ export function AccountStep({ form, setField, loading, onSubmit, onGoogleSuccess
 
       {/* Email */}
       <div className="register-field" style={{ marginTop: 14 }}>
-        <label htmlFor="register-email" className="register-label">Email</label>
+        <label htmlFor="register-email" className="register-label">
+          Email
+        </label>
         <input
           id="register-email"
           type="email"
@@ -141,7 +160,9 @@ export function AccountStep({ form, setField, loading, onSubmit, onGoogleSuccess
       {/* Password + Confirm row */}
       <div className="register-pw-grid">
         <div>
-          <label htmlFor="register-password" className="register-label">Password</label>
+          <label htmlFor="register-password" className="register-label">
+            Password
+          </label>
           <input
             id="register-password"
             type="password"
@@ -153,7 +174,9 @@ export function AccountStep({ form, setField, loading, onSubmit, onGoogleSuccess
           />
         </div>
         <div>
-          <label htmlFor="register-confirm-password" className="register-label">Confirm Password</label>
+          <label htmlFor="register-confirm-password" className="register-label">
+            Confirm Password
+          </label>
           <input
             id="register-confirm-password"
             type="password"
@@ -172,7 +195,11 @@ export function AccountStep({ form, setField, loading, onSubmit, onGoogleSuccess
       <div className="register-field" style={{ marginTop: 14 }}>
         <label className="register-label">I am a...</label>
         <div style={{ display: 'flex', gap: 8 }}>
-          {[['student', 'Student'], ['teacher', 'Teacher / TA'], ['other', 'Other']].map(([value, label]) => (
+          {[
+            ['student', 'Student'],
+            ['teacher', 'Teacher / TA'],
+            ['other', 'Self-learner'],
+          ].map(([value, label]) => (
             <button
               key={value}
               type="button"
@@ -191,24 +218,62 @@ export function AccountStep({ form, setField, loading, onSubmit, onGoogleSuccess
         type="button"
         className="register-terms"
         onClick={() => setShowLegalModal(true)}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowLegalModal(true) } }}
-        style={{ cursor: 'pointer', background: 'none', border: 'none', padding: 0, textAlign: 'left', display: 'flex', alignItems: 'flex-start', gap: 8, width: '100%' }}
-        aria-label={form.termsAccepted ? 'Terms accepted. Click to review.' : 'Click to review and accept terms'}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            setShowLegalModal(true)
+          }
+        }}
+        style={{
+          cursor: 'pointer',
+          background: 'none',
+          border: 'none',
+          padding: 0,
+          textAlign: 'left',
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 8,
+          width: '100%',
+        }}
+        aria-label={
+          form.termsAccepted
+            ? 'Terms accepted. Click to review.'
+            : 'Click to review and accept terms'
+        }
       >
-        <span style={{
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          width: 18, height: 18, borderRadius: 4, flexShrink: 0, marginTop: 2,
-          border: form.termsAccepted ? 'none' : '2px solid var(--sh-border)',
-          background: form.termsAccepted ? 'var(--sh-brand)' : 'transparent',
-          color: 'white', fontSize: 12,
-        }}>
+        <span
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 18,
+            height: 18,
+            borderRadius: 4,
+            flexShrink: 0,
+            marginTop: 2,
+            border: form.termsAccepted ? 'none' : '2px solid var(--sh-border)',
+            background: form.termsAccepted ? 'var(--sh-brand)' : 'transparent',
+            color: 'white',
+            fontSize: 12,
+          }}
+        >
           {form.termsAccepted && (
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
           )}
         </span>
         <span style={{ fontSize: 13, color: 'var(--sh-text)', lineHeight: 1.5 }}>
-          I agree to the{' '}
-          <span style={{ color: 'var(--sh-brand)' }}>Terms of Use</span>,{' '}
+          I agree to the <span style={{ color: 'var(--sh-brand)' }}>Terms of Use</span>,{' '}
           <span style={{ color: 'var(--sh-brand)' }}>Privacy Policy</span>, and{' '}
           <span style={{ color: 'var(--sh-brand)' }}>Community Guidelines</span>
         </span>
@@ -229,7 +294,9 @@ export function AccountStep({ form, setField, loading, onSubmit, onGoogleSuccess
         onDecline={() => {
           setPendingGoogleCredential(null)
           setShowLegalModal(false)
-          setError('You must accept the Terms of Use, Privacy Policy, and Community Guidelines to register.')
+          setError(
+            'You must accept the Terms of Use, Privacy Policy, and Community Guidelines to register.',
+          )
         }}
       />
 
@@ -243,31 +310,54 @@ export function AccountStep({ form, setField, loading, onSubmit, onGoogleSuccess
 /* ══════════════════════════════════════════════════════════════════════════
  * STEP 2: Email Verification
  * ══════════════════════════════════════════════════════════════════════════ */
-export function VerifyStep({ verificationCode, setVerificationCode, deliveryHint, loading, resendCountdown, onSubmit, onResend, setError }) {
+export function VerifyStep({
+  verificationCode,
+  setVerificationCode,
+  deliveryHint,
+  loading,
+  resendCountdown,
+  onSubmit,
+  onResend,
+  setError,
+}) {
   return (
     <form onSubmit={onSubmit}>
       <div className="register-section-header">
         <div className="register-logo-mark register-logo-mark--verify">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--sh-link)" strokeWidth="2" strokeLinecap="round">
-            <rect x="2" y="4" width="20" height="16" rx="2"/>
-            <path d="M22 7l-10 7L2 7"/>
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="var(--sh-link)"
+            strokeWidth="2"
+            strokeLinecap="round"
+          >
+            <rect x="2" y="4" width="20" height="16" rx="2" />
+            <path d="M22 7l-10 7L2 7" />
           </svg>
         </div>
         <h1 className="register-h1">Check your email</h1>
         <p className="register-subtitle">
-          We sent a 6-digit code to <strong style={{ color: 'var(--sh-text)' }}>{deliveryHint}</strong>
+          We sent a 6-digit code to{' '}
+          <strong style={{ color: 'var(--sh-text)' }}>{deliveryHint}</strong>
         </p>
       </div>
 
       <div className="register-field">
-        <label htmlFor="verify-code" className="register-label">Verification code</label>
+        <label htmlFor="verify-code" className="register-label">
+          Verification code
+        </label>
         <input
           id="verify-code"
           type="text"
           inputMode="numeric"
           maxLength={6}
           value={verificationCode}
-          onChange={(event) => { setVerificationCode(event.target.value.replace(/\D/g, '').slice(0, 6)); setError('') }}
+          onChange={(event) => {
+            setVerificationCode(event.target.value.replace(/\D/g, '').slice(0, 6))
+            setError('')
+          }}
           placeholder="000000"
           autoComplete="one-time-code"
           className="register-input register-input--code"
@@ -286,7 +376,12 @@ export function VerifyStep({ verificationCode, setVerificationCode, deliveryHint
         {resendCountdown > 0 ? (
           <span>Resend available in {resendCountdown}s</span>
         ) : (
-          <button type="button" disabled={loading} onClick={onResend} className="register-btn-ghost">
+          <button
+            type="button"
+            disabled={loading}
+            onClick={onResend}
+            className="register-btn-ghost"
+          >
             Resend code
           </button>
         )}
@@ -298,4 +393,3 @@ export function VerifyStep({ verificationCode, setVerificationCode, deliveryHint
     </form>
   )
 }
-

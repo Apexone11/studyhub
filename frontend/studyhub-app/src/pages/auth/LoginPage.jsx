@@ -115,6 +115,7 @@ export default function LoginPage() {
     try {
       const response = await fetch(`${API}/api/auth/google`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ credential: credentialResponse.credential }),
       })
@@ -122,6 +123,24 @@ export default function LoginPage() {
 
       if (!response.ok) {
         setError(data.error || 'Google sign-in failed.')
+        return
+      }
+
+      if (data.status === 'needs_role' && data.tempToken) {
+        try {
+          sessionStorage.setItem(
+            'studyhub.google.pending',
+            JSON.stringify({
+              tempToken: data.tempToken,
+              email: data.email,
+              name: data.name,
+              avatarUrl: data.avatarUrl,
+            }),
+          )
+        } catch {
+          /* ignore storage failures */
+        }
+        navigate('/signup/role', { replace: true })
         return
       }
 
@@ -167,7 +186,9 @@ export default function LoginPage() {
           {/* ── Session-expired banner ──────────────────────────────── */}
           {sessionExpired && (
             <div role="status" className="login-alert login-alert--warning">
-              <span className="login-alert-icon" aria-hidden="true">!</span>
+              <span className="login-alert-icon" aria-hidden="true">
+                !
+              </span>
               <span>Your session expired. Sign in again to pick up where you left off.</span>
             </div>
           )}

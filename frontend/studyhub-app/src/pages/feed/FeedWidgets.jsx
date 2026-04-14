@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import UserAvatar from '../../components/UserAvatar'
+import { roleCopy, isSelfLearner } from '../../lib/roleCopy'
 
 /* Re-export UserAvatar as Avatar for backward compatibility with FeedCard imports */
 export function Avatar({ username, role, size = 42, avatarUrl, plan, isDonor, donorLevel }) {
@@ -83,7 +84,7 @@ export function LeaderboardPanel({ title, items, renderLabel, empty }) {
   )
 }
 
-export function EmptyFeed({ message, isFirstRun }) {
+export function EmptyFeed({ message, isFirstRun, accountType }) {
   return (
     <div
       style={{
@@ -137,7 +138,7 @@ export function EmptyFeed({ message, isFirstRun }) {
           marginBottom: isFirstRun ? 16 : 0,
         }}
       >
-        Posts from your classmates and followed users will appear here.
+        {roleCopy('emptyStateBody', accountType)}
       </div>
       {isFirstRun ? (
         <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -297,7 +298,13 @@ export function GettingStartedCard({ user }) {
   const isNewUser = user.createdAt
     ? initState.mountTime - new Date(user.createdAt).getTime() < 7 * 24 * 60 * 60 * 1000
     : false
-  const completedCount = QUICK_ACTIONS.filter((a) => a.check(user)).length
+  const selfLearner = isSelfLearner(user.accountType)
+  const actions = QUICK_ACTIONS.filter((a) => !(selfLearner && a.key === 'courses')).map((a) =>
+    a.key === 'browse' && selfLearner
+      ? { ...a, helper: roleCopy('browseSheetsHelper', 'other') }
+      : a,
+  )
+  const completedCount = actions.filter((a) => a.check(user)).length
   if (!isNewUser && completedCount >= 3) return null
 
   const handleDismiss = () => {
@@ -333,7 +340,7 @@ export function GettingStartedCard({ user }) {
           </h2>
           <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--sh-subtext)' }}>
             Get started by completing a few steps.{' '}
-            {completedCount > 0 ? `${completedCount} of ${QUICK_ACTIONS.length} done.` : ''}
+            {completedCount > 0 ? `${completedCount} of ${actions.length} done.` : ''}
           </p>
         </div>
         <button
@@ -360,7 +367,7 @@ export function GettingStartedCard({ user }) {
           gap: 8,
         }}
       >
-        {QUICK_ACTIONS.map((action) => {
+        {actions.map((action) => {
           const done = action.check(user)
           return (
             <Link

@@ -12,6 +12,7 @@ import { GOOGLE_CLIENT_ID } from './config'
 const HomePage = lazy(() => import('./pages/home/HomePage'))
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'))
 const RegisterScreen = lazy(() => import('./pages/auth/RegisterScreen'))
+const RolePickerPage = lazy(() => import('./pages/auth/RolePickerPage'))
 /* DashboardPage removed — /dashboard now redirects to /users/:me via DashboardRedirect */
 const TermsPage = lazy(() => import('./pages/legal/TermsPage'))
 const PrivacyPage = lazy(() => import('./pages/legal/PrivacyPage'))
@@ -351,6 +352,14 @@ function AppRoutes() {
                     element={
                       <PublicRoute>
                         <RegisterScreen />
+                      </PublicRoute>
+                    }
+                  />
+                  <Route
+                    path="/signup/role"
+                    element={
+                      <PublicRoute>
+                        <RolePickerPage />
                       </PublicRoute>
                     }
                   />

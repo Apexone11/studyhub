@@ -5,7 +5,8 @@
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { IconUpload, IconX } from '../../components/Icons'
-import { COMPOSER_PROMPTS, linkButton } from './feedConstants'
+import { COMPOSER_PROMPTS, COMPOSER_PROMPTS_SELF_LEARNER, linkButton } from './feedConstants'
+import { isSelfLearner } from '../../lib/roleCopy'
 import { API } from '../../config'
 
 const VideoUploader = lazy(() => import('../../components/video/VideoUploader'))
@@ -138,7 +139,11 @@ export default function FeedComposer({ user, onSubmitPost }) {
           setComposer((current) => ({ ...current, content: event.target.value }))
         }
         placeholder={
-          pendingVideoId ? 'Add a caption for your video...' : COMPOSER_PROMPTS[composerPromptIndex]
+          pendingVideoId
+            ? 'Add a caption for your video...'
+            : (isSelfLearner(user?.accountType) ? COMPOSER_PROMPTS_SELF_LEARNER : COMPOSER_PROMPTS)[
+                composerPromptIndex
+              ]
         }
         rows={4}
         className="sh-input"

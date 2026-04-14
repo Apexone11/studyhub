@@ -28,6 +28,7 @@ import ActivityHeatmap from '../../components/ActivityHeatmap'
 import { showToast } from '../../lib/toast'
 import { usePageTitle } from '../../lib/usePageTitle'
 import { readJsonSafely } from '../../lib/http'
+import { roleLabel } from '../../lib/roleLabel'
 import VerificationBadge from '../../components/verification/VerificationBadge'
 import ProBadge from '../../components/ProBadge'
 import DonorBadge from '../../components/DonorBadge'
@@ -567,11 +568,7 @@ export default function UserProfilePage() {
                         border: '1px solid rgba(255,255,255,0.2)',
                       }}
                     >
-                      {profile.accountType === 'teacher'
-                        ? 'Teacher'
-                        : profile.accountType === 'other'
-                          ? 'Member'
-                          : 'Student'}
+                      {roleLabel(profile.accountType)}
                     </span>
                   )}
                   <ProBadge plan={profile.plan} size="sm" />

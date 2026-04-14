@@ -74,6 +74,12 @@ router.patch('/me/account-type', requireAuth, usersController.requestAccountType
 // ── GET /api/users/me/account-type-status ──────────────────────
 router.get('/me/account-type-status', requireAuth, usersController.getAccountTypeStatus)
 
+// ── GET /api/users/me/learning-goal ────────────────────────────
+router.get('/me/learning-goal', requireAuth, usersController.getLearningGoal)
+
+// ── PUT /api/users/me/learning-goal ────────────────────────────
+router.put('/me/learning-goal', requireAuth, usersController.setLearningGoal)
+
 // ── GET /api/users/:username ───────────────────────────────────
 router.get('/:username', optionalAuth, usersController.getUserByUsername)
 
@@ -84,10 +90,20 @@ router.post('/:username/follow', requireAuth, followLimiter, usersController.fol
 router.delete('/:username/follow', requireAuth, followLimiter, usersController.unfollowUser)
 
 // ── POST /api/users/:username/follow-request/accept ─────────────
-router.post('/:username/follow-request/accept', requireAuth, followLimiter, usersController.acceptFollowRequest)
+router.post(
+  '/:username/follow-request/accept',
+  requireAuth,
+  followLimiter,
+  usersController.acceptFollowRequest,
+)
 
 // ── POST /api/users/:username/follow-request/decline ────────────
-router.post('/:username/follow-request/decline', requireAuth, followLimiter, usersController.declineFollowRequest)
+router.post(
+  '/:username/follow-request/decline',
+  requireAuth,
+  followLimiter,
+  usersController.declineFollowRequest,
+)
 
 // ── GET /api/users/:username/followers ─────────────────────
 router.get('/:username/followers', optionalAuth, usersController.getFollowers)

@@ -1,6 +1,7 @@
 const express = require('express')
 const bcrypt = require('bcryptjs')
 const crypto = require('crypto')
+const jwt = require('jsonwebtoken')
 const {
   verifyGoogleIdToken,
   findUserByGoogleId,
@@ -9,12 +10,51 @@ const {
 } = require('../../lib/googleAuth')
 const prisma = require('../../lib/prisma')
 const { googleLimiter } = require('./auth.constants')
+const { googleCompleteLimiter } = require('../../lib/rateLimiters')
 const { AppError, issueAuthenticatedSession, handleAuthError } = require('./auth.service')
 const {
   CURRENT_LEGAL_VERSION,
   LEGAL_ACCEPTANCE_SOURCES,
   recordCurrentRequiredLegalAcceptancesTx,
 } = require('../legal/legal.service')
+
+const VALID_ACCOUNT_TYPES = ['student', 'teacher', 'other']
+const TEMP_TOKEN_EXPIRES_IN = '15m'
+const TEMP_TOKEN_TYPE = 'google_pending'
+
+function getJwtSecret() {
+  if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET is not configured.')
+  return process.env.JWT_SECRET
+}
+
+function signGoogleTempToken(googlePayload) {
+  return jwt.sign(
+    {
+      typ: TEMP_TOKEN_TYPE,
+      email: googlePayload.email,
+      name: googlePayload.name || null,
+      picture: googlePayload.picture || null,
+      googleId: googlePayload.googleId,
+      emailVerified: Boolean(googlePayload.emailVerified),
+    },
+    getJwtSecret(),
+    { expiresIn: TEMP_TOKEN_EXPIRES_IN },
+  )
+}
+
+function verifyGoogleTempToken(token) {
+  const payload = jwt.verify(token, getJwtSecret())
+  if (payload?.typ !== TEMP_TOKEN_TYPE) {
+    throw new Error('Invalid temp token type.')
+  }
+  return payload
+}
+
+function nextRouteForAccountType(accountType) {
+  if (accountType === 'teacher') return '/onboarding?track=teacher'
+  if (accountType === 'other') return '/onboarding?track=self-learner'
+  return '/onboarding'
+}
 
 const router = express.Router()
 const MAX_USERNAME_LENGTH = 20
@@ -51,7 +91,7 @@ function getP2002Targets(error) {
  * personalize later via /my-courses.
  */
 router.post('/google', googleLimiter, async (req, res) => {
-  const { credential, legalAccepted, legalVersion } = req.body || {}
+  const { credential } = req.body || {}
 
   if (!credential) {
     return res.status(400).json({ error: 'Google credential is required.' })
@@ -93,19 +133,84 @@ router.post('/google', googleLimiter, async (req, res) => {
       return res.status(409).json({ error: msg })
     }
 
-    if (!legalAccepted || legalVersion !== CURRENT_LEGAL_VERSION) {
-      throw new AppError(
-        400,
-        'Please review and accept the latest StudyHub legal documents before creating your Google account.',
-      )
+    // New user → do NOT create the row yet. Return a tempToken + profile
+    // so the frontend can prompt for a role (see roles-and-permissions-plan.md §4).
+    const tempToken = signGoogleTempToken(googlePayload)
+    return res.json({
+      status: 'needs_role',
+      tempToken,
+      email: googlePayload.email,
+      name: googlePayload.name || null,
+      avatarUrl: googlePayload.picture || null,
+    })
+  } catch (error) {
+    return handleAuthError(req, res, error)
+  }
+})
+
+/**
+ * POST /api/auth/google/complete
+ * Accepts { tempToken, accountType, legalAccepted, legalVersion }, verifies
+ * the pending Google profile, creates the user with the chosen accountType,
+ * issues a session cookie, and returns the authenticated user + next route.
+ */
+router.post('/google/complete', googleCompleteLimiter, async (req, res) => {
+  const { tempToken, accountType, legalAccepted, legalVersion } = req.body || {}
+
+  if (!tempToken) {
+    return res.status(400).json({ error: 'Signup session missing. Start Google sign-in again.' })
+  }
+  if (!accountType || !VALID_ACCOUNT_TYPES.includes(accountType)) {
+    return res.status(400).json({
+      error: `accountType must be one of: ${VALID_ACCOUNT_TYPES.join(', ')}`,
+    })
+  }
+  if (!legalAccepted || legalVersion !== CURRENT_LEGAL_VERSION) {
+    return res.status(400).json({
+      error: 'Please review and accept the latest StudyHub legal documents before continuing.',
+    })
+  }
+  if (!isGoogleOAuthEnabled()) {
+    return res.status(503).json({ error: 'Google sign-in is not available right now.' })
+  }
+
+  let pending
+  try {
+    pending = verifyGoogleTempToken(tempToken)
+  } catch {
+    return res.status(400).json({
+      error: 'Signup session expired. Start Google sign-in again.',
+    })
+  }
+
+  try {
+    // Re-check for collisions in case an account was created meanwhile.
+    const existingByGoogleId = await findUserByGoogleId(pending.googleId)
+    if (existingByGoogleId) {
+      const authenticatedUser = await issueAuthenticatedSession(res, existingByGoogleId.id, req)
+      return res.json({
+        status: 'signed_in',
+        user: authenticatedUser,
+        nextRoute: '/',
+      })
     }
 
-    // New user → create immediately with zero enrollments
+    const existingByEmail = await findUserByEmail(pending.email)
+    if (existingByEmail) {
+      return res.status(409).json({
+        error:
+          'An account with this email already exists. Log in with your password, then link Google from Settings > Security.',
+      })
+    }
+
     const randomPassword = crypto.randomBytes(32).toString('hex')
     const passwordHash = await bcrypt.hash(randomPassword, 12)
     const acceptedAt = new Date()
 
-    const baseUsername = buildGoogleUsernameBase(googlePayload)
+    const baseUsername = buildGoogleUsernameBase({
+      name: pending.name,
+      email: pending.email,
+    })
     let createdUser = null
 
     for (let attempt = 0; attempt < MAX_GOOGLE_USERNAME_ATTEMPTS; attempt += 1) {
@@ -117,11 +222,12 @@ router.post('/google', googleLimiter, async (req, res) => {
             data: {
               username,
               passwordHash,
-              email: googlePayload.email,
-              emailVerified: isGoogleEmailVerified,
-              googleId: googlePayload.googleId,
+              email: pending.email,
+              emailVerified: Boolean(pending.emailVerified),
+              googleId: pending.googleId,
               authProvider: 'google',
-              avatarUrl: googlePayload.picture || null,
+              avatarUrl: pending.picture || null,
+              accountType,
               termsAcceptedVersion: CURRENT_LEGAL_VERSION,
               termsAcceptedAt: acceptedAt,
             },
@@ -141,9 +247,7 @@ router.post('/google', googleLimiter, async (req, res) => {
         if (error?.code !== 'P2002') throw error
 
         const targets = getP2002Targets(error)
-        if (targets.includes('username')) {
-          continue
-        }
+        if (targets.includes('username')) continue
         if (targets.includes('email')) {
           return res.status(409).json({
             error:
@@ -151,9 +255,10 @@ router.post('/google', googleLimiter, async (req, res) => {
           })
         }
         if (targets.includes('googleId')) {
-          throw new AppError(409, 'This Google account is already linked to another user.')
+          return res.status(409).json({
+            error: 'This Google account is already linked to another user.',
+          })
         }
-
         throw error
       }
     }
@@ -164,8 +269,9 @@ router.post('/google', googleLimiter, async (req, res) => {
 
     const authenticatedUser = await issueAuthenticatedSession(res, createdUser.id, req)
     return res.status(201).json({
-      message: 'Account created with Google!',
+      status: 'signed_in',
       user: authenticatedUser,
+      nextRoute: nextRouteForAccountType(accountType),
     })
   } catch (error) {
     return handleAuthError(req, res, error)

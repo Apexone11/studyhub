@@ -9,6 +9,7 @@ import { useSession } from '../../lib/session-context'
 import { prefetchForRoute } from '../../lib/prefetch'
 import UserAvatar from '../UserAvatar'
 import { FOCUSABLE_DRAWER_SELECTORS, NAV_LINKS, courseColor } from './sidebarConstants'
+import { roleLabel } from '../../lib/roleLabel'
 
 export default function AppSidebar({ mode = 'fixed' }) {
   const { pathname } = useLocation()
@@ -95,13 +96,7 @@ export default function AppSidebar({ mode = 'fixed' }) {
             {user.username}
           </div>
           <div style={{ fontSize: 'var(--type-xs)', color: 'var(--sh-muted)', marginTop: 1 }}>
-            {user.role === 'admin'
-              ? 'Admin'
-              : user.accountType === 'teacher'
-                ? 'Teacher'
-                : user.accountType === 'other'
-                  ? 'Member'
-                  : 'Student'}
+            {user.role === 'admin' ? 'Admin' : roleLabel(user.accountType)}
             {joinDate ? ` · Joined ${joinDate}` : ''}
           </div>
         </div>
@@ -148,7 +143,11 @@ export default function AppSidebar({ mode = 'fixed' }) {
             <IconSheets size={15} />
             My Materials
           </Link>
-          <Link to="/study-groups?mine=true" className="sh-sidebar-nav-link" onClick={handleNavClick}>
+          <Link
+            to="/study-groups?mine=true"
+            className="sh-sidebar-nav-link"
+            onClick={handleNavClick}
+          >
             <IconUsers size={15} />
             My Study Groups
           </Link>
@@ -190,8 +189,12 @@ export default function AppSidebar({ mode = 'fixed' }) {
                   borderRadius: 6,
                   transition: 'background 0.15s',
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--sh-soft)' }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'var(--sh-soft)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent'
+                }}
               >
                 <div
                   style={{

@@ -178,7 +178,25 @@ export default function useRegisterFlow({ referralCode } = {}) {
         return
       }
 
-      // Google creates the user immediately — no extra steps
+      if (result.data.status === 'needs_role' && result.data.tempToken) {
+        try {
+          sessionStorage.setItem(
+            'studyhub.google.pending',
+            JSON.stringify({
+              tempToken: result.data.tempToken,
+              email: result.data.email,
+              name: result.data.name,
+              avatarUrl: result.data.avatarUrl,
+              referralCode: referralCode || null,
+            }),
+          )
+        } catch {
+          /* ignore storage failures */
+        }
+        navigate('/signup/role', { replace: true })
+        return
+      }
+
       completeAuthentication(result.data.user)
       trackSignupConversion()
       trackEvent('signup_completed', { method: 'google' })

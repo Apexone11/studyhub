@@ -156,6 +156,19 @@ const authGoogleLimiter = rateLimit({
   message: { error: 'Too many Google sign-in attempts. Please try again later.' },
 })
 
+/**
+ * Google OAuth complete endpoint — 10 requests per hour per IP.
+ * Used after a pending Google signup picks a role. See
+ * docs/roles-and-permissions-plan.md §4.2.
+ */
+const googleCompleteLimiter = rateLimit({
+  windowMs: WINDOW_1_HOUR,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many signup completion attempts. Please try again later.' },
+})
+
 // ── CATEGORY: Feed Module ──────────────────────────────────────────────────
 
 /**
@@ -842,6 +855,7 @@ module.exports = {
   authForgotLimiter,
   authLogoutLimiter,
   authGoogleLimiter,
+  googleCompleteLimiter,
 
   // Feed module
   feedReactLimiter,

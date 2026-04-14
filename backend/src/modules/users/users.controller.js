@@ -2,10 +2,7 @@ const { captureError } = require('../../monitoring/sentry')
 const { createNotification } = require('../../lib/notify')
 const { getProfileAccessDecision, PROFILE_VISIBILITY } = require('../../lib/profileVisibility')
 const { getUserPII } = require('../../lib/piiVault')
-const {
-  buildProfilePresentation,
-  getProfileFieldVisibility,
-} = require('../../lib/profileMetadata')
+const { buildProfilePresentation, getProfileFieldVisibility } = require('../../lib/profileMetadata')
 const prisma = require('../../lib/prisma')
 const { checkAndAwardBadges } = require('../../lib/badges')
 const { getUserStreak, getWeeklyActivity } = require('../../lib/streaks')
@@ -767,10 +764,7 @@ const getFollowSuggestions = async (req, res) => {
     const suggestions = await prisma.user.findMany({
       where: {
         id: { notIn: excludeIds },
-        OR: [
-          { emailVerified: true },
-          { isStaffVerified: true },
-        ],
+        OR: [{ emailVerified: true }, { isStaffVerified: true }],
       },
       select: {
         id: true,
@@ -796,8 +790,10 @@ const getFollowSuggestions = async (req, res) => {
 
     // Sort: same school first, then by follower count
     const sorted = suggestions.sort((a, b) => {
-      const aSchool = currentSchoolId && getPrimarySchoolId(a.enrollments) === currentSchoolId ? 1 : 0
-      const bSchool = currentSchoolId && getPrimarySchoolId(b.enrollments) === currentSchoolId ? 1 : 0
+      const aSchool =
+        currentSchoolId && getPrimarySchoolId(a.enrollments) === currentSchoolId ? 1 : 0
+      const bSchool =
+        currentSchoolId && getPrimarySchoolId(b.enrollments) === currentSchoolId ? 1 : 0
       if (bSchool !== aSchool) return bSchool - aSchool
       return (b._count?.followers || 0) - (a._count?.followers || 0)
     })
@@ -806,7 +802,7 @@ const getFollowSuggestions = async (req, res) => {
       sorted.slice(0, 8).map(({ enrollments, ...suggestion }) => ({
         ...suggestion,
         schoolId: getPrimarySchoolId(enrollments),
-      }))
+      })),
     )
   } catch (err) {
     captureError(err, { route: req.originalUrl })
@@ -873,7 +869,8 @@ const blockUser = async (req, res) => {
       select: { id: true },
     })
     if (!target) return res.status(404).json({ error: 'User not found.' })
-    if (target.id === req.user.userId) return res.status(400).json({ error: 'Cannot block yourself.' })
+    if (target.id === req.user.userId)
+      return res.status(400).json({ error: 'Cannot block yourself.' })
 
     await prisma.userBlock.create({
       data: { blockerId: req.user.userId, blockedId: target.id },
@@ -934,7 +931,8 @@ const muteUser = async (req, res) => {
       select: { id: true },
     })
     if (!target) return res.status(404).json({ error: 'User not found.' })
-    if (target.id === req.user.userId) return res.status(400).json({ error: 'Cannot mute yourself.' })
+    if (target.id === req.user.userId)
+      return res.status(400).json({ error: 'Cannot mute yourself.' })
 
     await prisma.userMute.create({
       data: { muterId: req.user.userId, mutedId: target.id },
@@ -1179,6 +1177,50 @@ module.exports = {
   acceptTerms,
   requestAccountTypeChange,
   getAccountTypeStatus,
+  getLearningGoal,
+  setLearningGoal,
+}
+
+const MAX_LEARNING_GOAL_LENGTH = 500
+
+async function getLearningGoal(req, res) {
+  try {
+    const latest = await prisma.learningGoal.findFirst({
+      where: { userId: req.user.userId },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, goal: true, createdAt: true },
+    })
+    return res.json({ goal: latest || null })
+  } catch (err) {
+    captureError(err, { where: 'getLearningGoal' })
+    return res.status(500).json({ error: 'Failed to load learning goal' })
+  }
+}
+
+async function setLearningGoal(req, res) {
+  try {
+    const raw = typeof req.body?.goal === 'string' ? req.body.goal.trim() : ''
+    if (!raw) {
+      return res.status(400).json({ error: 'goal is required' })
+    }
+    if (raw.length > MAX_LEARNING_GOAL_LENGTH) {
+      return res
+        .status(400)
+        .json({ error: `goal must be ${MAX_LEARNING_GOAL_LENGTH} characters or fewer` })
+    }
+    const created = await prisma.learningGoal.create({
+      data: { userId: req.user.userId, goal: raw },
+      select: { id: true, goal: true, createdAt: true },
+    })
+    await prisma.user.update({
+      where: { id: req.user.userId },
+      data: { learningGoal: raw },
+    })
+    return res.status(201).json({ goal: created })
+  } catch (err) {
+    captureError(err, { where: 'setLearningGoal' })
+    return res.status(500).json({ error: 'Failed to save learning goal' })
+  }
 }
 
 // ── Account type change with 7-day cooldown ──────────────────────
@@ -1190,7 +1232,9 @@ async function requestAccountTypeChange(req, res) {
   try {
     const { accountType } = req.body || {}
     if (!accountType || !VALID_ACCOUNT_TYPES.includes(accountType)) {
-      return res.status(400).json({ error: `Account type must be one of: ${VALID_ACCOUNT_TYPES.join(', ')}` })
+      return res
+        .status(400)
+        .json({ error: `Account type must be one of: ${VALID_ACCOUNT_TYPES.join(', ')}` })
     }
 
     const user = await prisma.user.findUnique({
@@ -1211,7 +1255,9 @@ async function requestAccountTypeChange(req, res) {
         const remainingDays = Math.ceil(remainingMs / (24 * 60 * 60 * 1000))
         return res.status(429).json({
           error: `You can only change your account type once every 7 days. Please wait ${remainingDays} more day${remainingDays === 1 ? '' : 's'}.`,
-          cooldownEndsAt: new Date(new Date(user.accountTypeChangedAt).getTime() + ACCOUNT_TYPE_COOLDOWN_MS).toISOString(),
+          cooldownEndsAt: new Date(
+            new Date(user.accountTypeChangedAt).getTime() + ACCOUNT_TYPE_COOLDOWN_MS,
+          ).toISOString(),
         })
       }
     }
@@ -1264,7 +1310,9 @@ async function getAccountTypeStatus(req, res) {
           pendingAccountType: null,
           effectiveAt: null,
           cooldownEndsAt: updated.accountTypeChangedAt
-            ? new Date(new Date(updated.accountTypeChangedAt).getTime() + ACCOUNT_TYPE_COOLDOWN_MS).toISOString()
+            ? new Date(
+                new Date(updated.accountTypeChangedAt).getTime() + ACCOUNT_TYPE_COOLDOWN_MS,
+              ).toISOString()
             : null,
         })
       }
@@ -1273,11 +1321,16 @@ async function getAccountTypeStatus(req, res) {
     res.json({
       accountType: user.accountType,
       pendingAccountType: user.pendingAccountType || null,
-      effectiveAt: user.pendingAccountType && user.accountTypeChangedAt
-        ? new Date(new Date(user.accountTypeChangedAt).getTime() + ACCOUNT_TYPE_COOLDOWN_MS).toISOString()
-        : null,
+      effectiveAt:
+        user.pendingAccountType && user.accountTypeChangedAt
+          ? new Date(
+              new Date(user.accountTypeChangedAt).getTime() + ACCOUNT_TYPE_COOLDOWN_MS,
+            ).toISOString()
+          : null,
       cooldownEndsAt: user.accountTypeChangedAt
-        ? new Date(new Date(user.accountTypeChangedAt).getTime() + ACCOUNT_TYPE_COOLDOWN_MS).toISOString()
+        ? new Date(
+            new Date(user.accountTypeChangedAt).getTime() + ACCOUNT_TYPE_COOLDOWN_MS,
+          ).toISOString()
         : null,
     })
   } catch (err) {
