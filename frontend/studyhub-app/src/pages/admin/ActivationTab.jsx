@@ -175,23 +175,23 @@ export default function ActivationTab() {
 
   const funnel = data?.funnel || []
   const cohorts = data?.cohorts || []
-  const activationRate = data?.activationRate ?? null
-  const medianTimeToFirstSheet = data?.medianTimeToFirstSheetMinutes ?? null
-  const totalBase = funnel.length > 0 ? funnel[0].count : 0
+  const activationRate = data?.activationRate != null ? data.activationRate * 100 : null
+  const medianTimeToFirstSheet = data?.medianTimeToFirstSheet ?? null
+  const totalBase = funnel.length > 0 ? funnel[0].reached || 0 : 0
 
   // Find biggest drop-off step
   let worstDropIdx = -1
   let worstDrop = 0
   for (let i = 1; i < funnel.length; i++) {
-    const prev = funnel[i - 1].count || 1
-    const drop = prev > 0 ? ((prev - funnel[i].count) / prev) * 100 : 0
+    const prev = funnel[i - 1].reached || 1
+    const drop = prev > 0 ? ((prev - (funnel[i].reached || 0)) / prev) * 100 : 0
     if (drop > worstDrop) {
       worstDrop = drop
       worstDropIdx = i
     }
   }
 
-  const isEmpty = funnel.length === 0 && cohorts.length === 0
+  const isEmpty = (funnel.length === 0 || totalBase === 0) && cohorts.length === 0
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -251,9 +251,11 @@ export default function ActivationTab() {
               <MetricCard
                 label="Median Time to First Sheet"
                 value={
-                  medianTimeToFirstSheet !== null ? `${medianTimeToFirstSheet.toFixed(0)}m` : '--'
+                  medianTimeToFirstSheet !== null
+                    ? `${(medianTimeToFirstSheet * 60).toFixed(0)}m`
+                    : '--'
                 }
-                sub="Minutes from signup to first upload"
+                sub="Minutes from signup to first action"
                 color="var(--sh-brand)"
               />
             </div>
@@ -278,7 +280,7 @@ export default function ActivationTab() {
                   <FunnelBar
                     key={step.label || i}
                     label={step.label}
-                    count={step.count}
+                    count={step.reached || 0}
                     total={totalBase}
                     isWorst={i === worstDropIdx}
                   />
