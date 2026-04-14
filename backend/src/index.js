@@ -79,6 +79,7 @@ const { httpLogger } = require('./lib/httpLogger')
 const { initSocketIO } = require('./lib/socketio')
 const { featureFlagMiddleware } = require('./lib/featureFlags')
 const { trackActiveUser } = require('./lib/activeTracking')
+const { requestMetricsMiddleware, startMetricsTimers } = require('./middleware/requestMetrics')
 
 if (sentryEnabled) {
   log.info('Sentry monitoring enabled for backend.')
@@ -314,6 +315,11 @@ app.use(checkRestrictions)
 // Track user activity for active-users metrics.
 // Runs after auth decode so req.user is available. Throttled internally.
 app.use(trackActiveUser)
+
+// Per-request latency metrics. Runs after auth so req.user is available.
+// Buffers in memory and flushes to RequestMetric table every 30 seconds.
+app.use(requestMetricsMiddleware)
+startMetricsTimers()
 
 // Audit logging for security-relevant write operations. Hooks into res 'finish'
 // event — zero impact on response latency. Requires req.user from auth decode above.
