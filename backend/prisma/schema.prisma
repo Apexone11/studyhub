@@ -23,6 +23,7 @@ model User {
   emailVerificationExpiry DateTime?
   failedAttempts          Int       @default(0)
   lockedUntil             DateTime?
+  lastFailedLoginAt       DateTime?
   displayName             String?
   bio                     String?   @db.VarChar(500)
   avatarUrl               String?
@@ -103,6 +104,9 @@ model User {
   groupAuditActions          GroupAuditLog[]           @relation("GroupAuditActor")
   groupBlocksReceived        GroupBlock[]              @relation("GroupBlockUser")
   groupBlocksIssued          GroupBlock[]              @relation("GroupBlockActor")
+  plagiarismReportsResolved  PlagiarismReport[]       @relation("PlagiarismReportResolver")
+  plagiarismDisputesFiled    PlagiarismDispute[]      @relation("PlagiarismDisputeFiler")
+  plagiarismDisputesReviewed PlagiarismDispute[]      @relation("PlagiarismDisputeReviewer")
   groupResources             GroupResource[]
   groupSessionRsvps          GroupSessionRsvp[]
   groupDiscussionPosts       GroupDiscussionPost[]
@@ -137,6 +141,17 @@ model User {
   generatedReviewReports     ReviewReport[]        @relation("ReviewReportGenerator")
   videoAppeals               VideoAppeal[]         @relation("VideoAppealUploader")
   videoAppealReviews         VideoAppeal[]         @relation("VideoAppealReviewer")
+  sessions                   Session[]
+  studyStatuses              StudyStatus[]
+  onboardingProgress         OnboardingProgress?
+  referralCode               String?   @unique
+  referredByUserId           Int?
+  proRewardExpiresAt         DateTime?
+  referredBy                 User?            @relation("ReferredBy", fields: [referredByUserId], references: [id], onDelete: SetNull)
+  referralsReceived          User[]           @relation("ReferredBy")
+  invitesSent                Referral[]       @relation("InvitesSent")
+  invitesReceived            Referral[]       @relation("InvitedByReferral")
+  referralRewards            ReferralReward[]
 
   @@index([role])
   @@index([emailHash])
@@ -305,11 +320,14 @@ model StudySheet {
   reactions             Reaction[]
   incomingContributions SheetContribution[] @relation("ContributionTarget")
   outgoingContributions SheetContribution[] @relation("ContributionFork")
+  plagiarismReports     PlagiarismReport[]  @relation("PlagiarismReportSheet")
+  plagiarismMatches     PlagiarismReport[]  @relation("PlagiarismReportMatched")
   htmlVersions          SheetHtmlVersion[]
   commits               SheetCommit[]
   provenance            ProvenanceManifest?
   pinnedBy              UserPinnedSheet[]
   aiReviewLogs          AiReviewLog[]
+  studyStatuses         StudyStatus[]
 
   @@index([createdAt(sort: Desc)])
   @@index([courseId, createdAt(sort: Desc)])
@@ -1635,17 +1653,71 @@ model BookBookmark {
 // ── Waitlist ─────────────────────────────────────────────────
 
 model Waitlist {
-  id        Int      @id @default(autoincrement())
-  email     String
-  tier      String
-  createdAt DateTime @default(now())
+  id          Int       @id @default(autoincrement())
+  email       String
+  tier        String // 'pro' | 'institution'
+  // Phase 0: lifecycle tracking for the admin dashboard
+  status      String    @default("waiting") // 'waiting' | 'invited' | 'converted' | 'removed'
+  invitedAt   DateTime?
+  convertedAt DateTime?
+  notes       String    @default("")
+  createdAt   DateTime  @default(now())
 
   @@unique([email, tier])
   @@index([email])
   @@index([tier])
+  @@index([status, createdAt])
 }
 
 // ── Library Catalog Cache ────────────────────────────────────
+
+// Phase 4: Plagiarism detection — per-sheet report when similarity is found.
+// Each report links a sheet to one or more matched sheets, stores the
+// similarity score, match type, AI verdict, and user dispute status.
+model PlagiarismReport {
+  id                 Int       @id @default(autoincrement())
+  sheetId            Int
+  matchedSheetId     Int
+  similarityScore    Float
+  matchType          String    @default("simhash") // "exact" | "simhash" | "ai" | "ngram"
+  highlightedSections Json?    // JSON array of matched ranges
+  aiVerdict          String?   // AI-generated verdict text
+  aiConfidence       Float?    // 0-1
+  status             String    @default("pending") // "pending" | "confirmed" | "dismissed" | "disputed"
+  resolvedAt         DateTime?
+  resolvedById       Int?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  sheet        StudySheet @relation("PlagiarismReportSheet", fields: [sheetId], references: [id], onDelete: Cascade)
+  matchedSheet StudySheet @relation("PlagiarismReportMatched", fields: [matchedSheetId], references: [id], onDelete: Cascade)
+  resolvedBy   User?      @relation("PlagiarismReportResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+  disputes     PlagiarismDispute[]
+
+  @@unique([sheetId, matchedSheetId])
+  @@index([sheetId, status])
+  @@index([matchedSheetId])
+  @@index([status, createdAt])
+}
+
+model PlagiarismDispute {
+  id         Int       @id @default(autoincrement())
+  reportId   Int
+  userId     Int
+  reason     String    @db.Text
+  status     String    @default("pending") // "pending" | "accepted" | "rejected"
+  reviewedBy Int?
+  reviewedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  report     PlagiarismReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  user       User             @relation("PlagiarismDisputeFiler", fields: [userId], references: [id], onDelete: Cascade)
+  reviewer   User?            @relation("PlagiarismDisputeReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+
+  @@unique([reportId, userId])
+  @@index([reportId, status])
+}
 
 model CachedBook {
   id          Int      @id @default(autoincrement())
@@ -2040,4 +2112,127 @@ model AiReviewLog {
   @@index([sheetId])
   @@index([decision])
   @@index([createdAt])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Session — Server-side session tracking for per-device JWT management
+// ═══════════════════════════════════════════════════════════════════════════
+
+model Session {
+  id           String    @id @default(cuid())
+  userId       Int
+  jti          String    @unique
+  userAgent    String?   @db.VarChar(512)
+  ipAddress    String?   @db.VarChar(45)
+  deviceLabel  String?   @db.VarChar(100)
+  lastActiveAt DateTime  @default(now())
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([jti])
+  @@index([expiresAt])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// StudyStatus — Per-user study tracking state for sheets (synced across devices)
+// ═══════════════════════════════════════════════════════════════════════════
+
+model StudyStatus {
+  userId    Int
+  sheetId   Int
+  status    String
+  updatedAt DateTime @default(now()) @updatedAt
+
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sheet StudySheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+
+  @@id([userId, sheetId])
+  @@index([userId, status])
+  @@index([sheetId])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RequestMetric — Per-request latency data for observability dashboard
+// ═══════════════════════════════════════════════════════════════════════════
+
+model RequestMetric {
+  id         Int      @id @default(autoincrement())
+  method     String
+  routeGroup String
+  route      String
+  statusCode Int
+  durationMs Int
+  userId     Int?
+  createdAt  DateTime @default(now())
+
+  @@index([routeGroup, createdAt])
+  @@index([createdAt])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// OnboardingProgress — First-run onboarding state per user
+// ═══════════════════════════════════════════════════════════════════════════
+
+model OnboardingProgress {
+  id              Int       @id @default(autoincrement())
+  userId          Int       @unique
+  currentStep     Int       @default(1)
+  schoolSelected  Boolean   @default(false)
+  coursesAdded    Int       @default(0)
+  firstActionType String?
+  invitesSent     Int       @default(0)
+  completedAt     DateTime?
+  skippedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([completedAt])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Referral — Peer-to-peer invite tracking for growth loop
+// ═══════════════════════════════════════════════════════════════════════════
+
+model Referral {
+  id            Int       @id @default(autoincrement())
+  inviterId     Int
+  code          String
+  email         String?
+  channel       String
+  invitedUserId Int?
+  sentAt        DateTime  @default(now())
+  acceptedAt    DateTime?
+  rewardGranted Boolean   @default(false)
+
+  inviter     User  @relation("InvitesSent", fields: [inviterId], references: [id], onDelete: Cascade)
+  invitedUser User? @relation("InvitedByReferral", fields: [invitedUserId], references: [id], onDelete: SetNull)
+
+  @@index([inviterId])
+  @@index([email])
+  @@index([code])
+  @@index([acceptedAt])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ReferralReward — Milestone-based reward ledger
+// ═══════════════════════════════════════════════════════════════════════════
+
+model ReferralReward {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  milestone Int
+  proMonths Int
+  badgeKey  String?
+  grantedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, milestone])
+  @@index([userId])
 }

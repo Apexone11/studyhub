@@ -44,6 +44,7 @@ const mocks = vi.hoisted(() => {
     rateLimiters: {
       readLimiter: (_req, _res, next) => next(),
       writeLimiter: (_req, _res, next) => next(),
+      groupJoinLimiter: (_req, _res, next) => next(),
     },
     blockFilter: {
       getBlockedUserIds: vi.fn().mockResolvedValue([]),
@@ -76,6 +77,7 @@ beforeAll(() => {
     [require.resolve('../src/modules/studyGroups/studyGroups.sessions.routes'), emptySubRouter],
     [require.resolve('../src/modules/studyGroups/studyGroups.discussions.routes'), emptySubRouter],
     [require.resolve('../src/modules/studyGroups/studyGroups.activity.routes'), emptySubRouter],
+    [require.resolve('../src/modules/studyGroups/studyGroups.reports.routes'), emptySubRouter],
   ])
 
   Module._load = function patchedModuleLoad(requestId, parent, isMain) {
@@ -167,7 +169,7 @@ describe('study groups join flow', () => {
     expect(mocks.prisma.studyGroupMember.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ status: 'pending' }),
-      })
+      }),
     )
   })
 
@@ -237,7 +239,7 @@ describe('study groups list filters', () => {
             { course: { is: { schoolId: 12 } } },
           ]),
         }),
-      })
+      }),
     )
   })
 })
@@ -280,9 +282,11 @@ describe('study groups members and invites', () => {
     expect(mocks.prisma.studyGroupMember.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({ groupId: 1 }),
-      })
+      }),
     )
-    expect(mocks.prisma.studyGroupMember.findMany.mock.calls[0][0].where).not.toHaveProperty('status')
+    expect(mocks.prisma.studyGroupMember.findMany.mock.calls[0][0].where).not.toHaveProperty(
+      'status',
+    )
   })
 
   it('still limits regular members to active members only', async () => {
@@ -306,7 +310,7 @@ describe('study groups members and invites', () => {
           groupId: 1,
           status: 'active',
         }),
-      })
+      }),
     )
   })
 
@@ -344,7 +348,7 @@ describe('study groups members and invites', () => {
     expect(mocks.prisma.studyGroupMember.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ userId: 99, status: 'invited' }),
-      })
+      }),
     )
   })
 })

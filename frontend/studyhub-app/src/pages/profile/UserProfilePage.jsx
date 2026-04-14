@@ -33,8 +33,16 @@ import ProBadge from '../../components/ProBadge'
 import DonorBadge from '../../components/DonorBadge'
 
 import {
-  authHeaders, fmtDate, pageWrapStyle, containerStyle, cardStyle, sectionHeadingStyle,
-  OWN_TABS, OTHER_TABS, DEFAULT_TAB, isValidTab,
+  authHeaders,
+  fmtDate,
+  pageWrapStyle,
+  containerStyle,
+  cardStyle,
+  sectionHeadingStyle,
+  OWN_TABS,
+  OTHER_TABS,
+  DEFAULT_TAB,
+  isValidTab,
 } from './profileConstants'
 import {
   ProfileAvatar,
@@ -52,6 +60,7 @@ import {
 /* Re-use dashboard widgets directly */
 import {
   ResumeStudying,
+  StudyNudges,
   StudyQueue,
   QuickActions,
   StudyActivity,
@@ -81,11 +90,14 @@ export default function UserProfilePage() {
   const tabs = isOwnProfile ? OWN_TABS : OTHER_TABS
 
   function setTab(key) {
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev)
-      next.set('tab', key)
-      return next
-    }, { replace: true })
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.set('tab', key)
+        return next
+      },
+      { replace: true },
+    )
   }
 
   // If other-user visits with own-only tab, redirect to default
@@ -119,7 +131,22 @@ export default function UserProfilePage() {
   /* ── Dashboard state (own profile only) ────────────────────────────── */
   const [dashboardSummary, setDashboardSummary] = useState(null)
   const { recentlyViewed } = useRecentlyViewed()
-  const { counts: studyQueueCounts, toReview: studyToReview, studying: studyStudying } = useAllStudyStatuses()
+  const {
+    statuses: allStudyStatuses,
+    counts: studyQueueCounts,
+    toReview: studyToReview,
+    studying: studyStudying,
+    done: studyDone,
+  } = useAllStudyStatuses()
+
+  // Derive a sheetId -> status string map for profile sheet cards
+  const profileStudyStatusMap = useMemo(() => {
+    const map = {}
+    for (const [id, entry] of Object.entries(allStudyStatuses || {})) {
+      map[id] = entry.status || entry
+    }
+    return map
+  }, [allStudyStatuses])
 
   const studyActivity = useMemo(() => {
     if (!recentlyViewed || recentlyViewed.length === 0) return null
@@ -128,7 +155,10 @@ export default function UserProfilePage() {
     return { weeklyCount: thisWeek.length, lastStudied: recentlyViewed[0]?.viewedAt || null }
   }, [recentlyViewed])
 
-  const dashboardRecentSheets = useMemo(() => dashboardSummary?.recentSheets || [], [dashboardSummary])
+  const dashboardRecentSheets = useMemo(
+    () => dashboardSummary?.recentSheets || [],
+    [dashboardSummary],
+  )
 
   /* ── Refs & animation ──────────────────────────────────────────────── */
   const tutorial = useTutorial('profile', PROFILE_STEPS, { version: TUTORIAL_VERSIONS.profile })
@@ -140,7 +170,8 @@ export default function UserProfilePage() {
     if (loading || !profile || animatedRef.current) return
     animatedRef.current = true
     if (heroRef.current) fadeInUp(heroRef.current, { duration: 400, y: 16 })
-    if (contentRef.current) staggerEntrance(contentRef.current.children, { staggerMs: 80, duration: 450, y: 14 })
+    if (contentRef.current)
+      staggerEntrance(contentRef.current.children, { staggerMs: 80, duration: 450, y: 14 })
   }, [loading, profile])
 
   /* ── Load follow list ──────────────────────────────────────────────── */
@@ -149,11 +180,15 @@ export default function UserProfilePage() {
     setFollowListLoading(true)
     try {
       const res = await fetch(`${API}/api/users/${username}/${type}`, {
-        headers: authHeaders(), credentials: 'include',
+        headers: authHeaders(),
+        credentials: 'include',
       })
       if (res.ok) setFollowList(await res.json())
-    } catch { /* ignore */ }
-    finally { setFollowListLoading(false) }
+    } catch {
+      /* ignore */
+    } finally {
+      setFollowListLoading(false)
+    }
   }
 
   /* ── Load profile data ─────────────────────────────────────────────── */
@@ -166,7 +201,12 @@ export default function UserProfilePage() {
       .then(async (r) => {
         if (!r.ok) {
           const body = await r.json().catch(() => ({}))
-          throw new Error(body.error || (r.status === 404 ? 'User not found.' : 'Could not load this profile. Please try again.'))
+          throw new Error(
+            body.error ||
+              (r.status === 404
+                ? 'User not found.'
+                : 'Could not load this profile. Please try again.'),
+          )
         }
         return r.json()
       })
@@ -185,14 +225,21 @@ export default function UserProfilePage() {
   /* ── Load activity + badges ────────────────────────────────────────── */
   useEffect(() => {
     if (!profile) return
-    fetch(`${API}/api/users/${username}/activity?weeks=12`, { headers: authHeaders(), credentials: 'include' })
+    fetch(`${API}/api/users/${username}/activity?weeks=12`, {
+      headers: authHeaders(),
+      credentials: 'include',
+    })
       .then((r) => (r.ok ? r.json() : []))
-      .then((data) => { if (Array.isArray(data)) setActivityData(data) })
+      .then((data) => {
+        if (Array.isArray(data)) setActivityData(data)
+      })
       .catch(() => {})
 
     fetch(`${API}/api/users/${username}/badges`, { headers: authHeaders(), credentials: 'include' })
       .then((r) => (r.ok ? r.json() : []))
-      .then((data) => { if (Array.isArray(data)) setBadges(data) })
+      .then((data) => {
+        if (Array.isArray(data)) setBadges(data)
+      })
       .catch(() => {})
   }, [profile, username])
 
@@ -207,14 +254,19 @@ export default function UserProfilePage() {
 
   /* ── Follow toggle ─────────────────────────────────────────────────── */
   async function handleFollowToggle() {
-    if (!isAuthenticated) { navigate('/login'); return }
+    if (!isAuthenticated) {
+      navigate('/login')
+      return
+    }
     // If pending, clicking again should cancel (unfollow)
     const isUnfollow = following || followStatus === 'pending'
     setToggling(true)
     try {
       const method = isUnfollow ? 'DELETE' : 'POST'
       const res = await fetch(`${API}/api/users/${username}/follow`, {
-        method, headers: authHeaders(), credentials: 'include',
+        method,
+        headers: authHeaders(),
+        credentials: 'include',
       })
       const data = await res.json()
       if (res.ok) {
@@ -232,18 +284,26 @@ export default function UserProfilePage() {
       } else {
         showToast(data.error || 'Could not update follow status.', 'error')
       }
-    } catch { showToast('Check your connection and try again.', 'error') }
-    finally { setToggling(false) }
+    } catch {
+      showToast('Check your connection and try again.', 'error')
+    } finally {
+      setToggling(false)
+    }
   }
 
   /* ── Block toggle ───────────────────────────────────────────────────── */
   async function handleBlockToggle() {
-    if (!isAuthenticated) { navigate('/login'); return }
+    if (!isAuthenticated) {
+      navigate('/login')
+      return
+    }
     setBlockToggling(true)
     try {
       const method = isBlocked ? 'DELETE' : 'POST'
       const res = await fetch(`${API}/api/users/${username}/block`, {
-        method, headers: authHeaders(), credentials: 'include',
+        method,
+        headers: authHeaders(),
+        credentials: 'include',
       })
       const data = await res.json()
       if (res.ok) {
@@ -258,18 +318,26 @@ export default function UserProfilePage() {
       } else {
         showToast(data.error || 'Could not update block status.', 'error')
       }
-    } catch { showToast('Check your connection and try again.', 'error') }
-    finally { setBlockToggling(false) }
+    } catch {
+      showToast('Check your connection and try again.', 'error')
+    } finally {
+      setBlockToggling(false)
+    }
   }
 
   /* ── Mute toggle ───────────────────────────────────────────────────── */
   async function handleMuteToggle() {
-    if (!isAuthenticated) { navigate('/login'); return }
+    if (!isAuthenticated) {
+      navigate('/login')
+      return
+    }
     setMuteToggling(true)
     try {
       const method = isMuted ? 'DELETE' : 'POST'
       const res = await fetch(`${API}/api/users/${username}/mute`, {
-        method, headers: authHeaders(), credentials: 'include',
+        method,
+        headers: authHeaders(),
+        credentials: 'include',
       })
       const data = await res.json()
       if (res.ok) {
@@ -278,39 +346,74 @@ export default function UserProfilePage() {
       } else {
         showToast(data.error || 'Could not update mute status.', 'error')
       }
-    } catch { showToast('Check your connection and try again.', 'error') }
-    finally { setMuteToggling(false) }
+    } catch {
+      showToast('Check your connection and try again.', 'error')
+    } finally {
+      setMuteToggling(false)
+    }
   }
 
   /* ── Helpers ────────────────────────────────────────────────────────── */
   const initials = username ? username.slice(0, 2).toUpperCase() : '??'
 
   /* ── Loading ────────────────────────────────────────────────────────── */
-  if (loading) return (
-    <div style={pageWrapStyle}>
-      <Navbar crumbs={[{ label: username, to: `/users/${username}` }]} hideTabs />
-      <div style={containerStyle}><SkeletonProfile /></div>
-    </div>
-  )
-
-  /* ── Error ──────────────────────────────────────────────────────────── */
-  if (error) return (
-    <div style={pageWrapStyle}>
-      <Navbar crumbs={[{ label: 'Profile', to: '#' }]} hideTabs />
-      <div style={containerStyle}>
-        <div style={{ background: 'var(--sh-surface)', borderRadius: 18, border: '1px solid var(--sh-border)', padding: 48, textAlign: 'center' }}>
-          <div style={{ fontSize: 36, color: 'var(--sh-muted)', marginBottom: 14 }}>{/private|classmates/i.test(error) ? <IconShield size={36} /> : <IconProfile size={36} />}</div>
-          <div style={{ fontWeight: 700, fontSize: 18, color: 'var(--sh-heading)', marginBottom: 8 }}>
-            {/private|classmates/i.test(error) ? 'Profile not available' : 'User not found'}
-          </div>
-          <div style={{ fontSize: 14, color: 'var(--sh-muted)', marginBottom: 20 }}>{error}</div>
-          <Link to="/sheets" style={{ display: 'inline-flex', padding: '10px 22px', borderRadius: 10, background: 'var(--sh-brand)', color: '#fff', fontWeight: 700, fontSize: 14, textDecoration: 'none' }}>
-            Browse Sheets
-          </Link>
+  if (loading)
+    return (
+      <div style={pageWrapStyle}>
+        <Navbar crumbs={[{ label: username, to: `/users/${username}` }]} hideTabs />
+        <div style={containerStyle}>
+          <SkeletonProfile />
         </div>
       </div>
-    </div>
-  )
+    )
+
+  /* ── Error ──────────────────────────────────────────────────────────── */
+  if (error)
+    return (
+      <div style={pageWrapStyle}>
+        <Navbar crumbs={[{ label: 'Profile', to: '#' }]} hideTabs />
+        <div style={containerStyle}>
+          <div
+            style={{
+              background: 'var(--sh-surface)',
+              borderRadius: 18,
+              border: '1px solid var(--sh-border)',
+              padding: 48,
+              textAlign: 'center',
+            }}
+          >
+            <div style={{ fontSize: 36, color: 'var(--sh-muted)', marginBottom: 14 }}>
+              {/private|classmates/i.test(error) ? (
+                <IconShield size={36} />
+              ) : (
+                <IconProfile size={36} />
+              )}
+            </div>
+            <div
+              style={{ fontWeight: 700, fontSize: 18, color: 'var(--sh-heading)', marginBottom: 8 }}
+            >
+              {/private|classmates/i.test(error) ? 'Profile not available' : 'User not found'}
+            </div>
+            <div style={{ fontSize: 14, color: 'var(--sh-muted)', marginBottom: 20 }}>{error}</div>
+            <Link
+              to="/sheets"
+              style={{
+                display: 'inline-flex',
+                padding: '10px 22px',
+                borderRadius: 10,
+                background: 'var(--sh-brand)',
+                color: '#fff',
+                fontWeight: 700,
+                fontSize: 14,
+                textDecoration: 'none',
+              }}
+            >
+              Browse Sheets
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
 
   /* ═══════════════════════════════════════════════════════════════════════
    * MAIN PROFILE VIEW
@@ -321,16 +424,33 @@ export default function UserProfilePage() {
 
       <div style={containerStyle}>
         {/* ── HERO ──────────────────────────────────────────────────────── */}
-        <div ref={heroRef} style={{ borderRadius: 18, overflow: 'hidden', marginBottom: 20, border: '1px solid var(--sh-border)', boxShadow: 'var(--shadow-sm, 0 2px 10px rgba(15,23,42,0.05))' }}>
+        <div
+          ref={heroRef}
+          style={{
+            borderRadius: 18,
+            overflow: 'hidden',
+            marginBottom: 20,
+            border: '1px solid var(--sh-border)',
+            boxShadow: 'var(--shadow-sm, 0 2px 10px rgba(15,23,42,0.05))',
+          }}
+        >
           {/* Cover image */}
-          <div className="profile-hero" style={{
-            background: (profile.coverImageUrl && !coverImgError)
-              ? 'var(--sh-slate-900)'
-              : 'linear-gradient(135deg, var(--sh-slate-800), var(--sh-brand))',
-          }}>
+          <div
+            className="profile-hero"
+            style={{
+              background:
+                profile.coverImageUrl && !coverImgError
+                  ? 'var(--sh-slate-900)'
+                  : 'linear-gradient(135deg, var(--sh-slate-800), var(--sh-brand))',
+            }}
+          >
             {profile.coverImageUrl && !coverImgError && (
               <img
-                src={profile.coverImageUrl.startsWith('http') ? profile.coverImageUrl : `${API}${profile.coverImageUrl}`}
+                src={
+                  profile.coverImageUrl.startsWith('http')
+                    ? profile.coverImageUrl
+                    : `${API}${profile.coverImageUrl}`
+                }
                 alt=""
                 loading="lazy"
                 onError={() => setCoverImgError(true)}
@@ -338,21 +458,39 @@ export default function UserProfilePage() {
               />
             )}
             {/* Gradient overlay — always present for readability */}
-            <div style={{
-              position: 'absolute', inset: 0,
-              background: 'linear-gradient(to top, rgba(15,23,42,0.85) 0%, rgba(15,23,42,0.4) 40%, rgba(15,23,42,0.1) 70%, transparent 100%)',
-              pointerEvents: 'none',
-            }} />
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                background:
+                  'linear-gradient(to top, rgba(15,23,42,0.85) 0%, rgba(15,23,42,0.4) 40%, rgba(15,23,42,0.1) 70%, transparent 100%)',
+                pointerEvents: 'none',
+              }}
+            />
 
             {/* Hero content positioned at bottom */}
-            <div style={{
-              position: 'absolute', bottom: 0, left: 0, right: 0,
-              padding: 'clamp(16px, 2vw, 28px) clamp(20px, 3vw, 32px)',
-              display: 'flex', alignItems: 'flex-end', gap: 'clamp(14px, 2vw, 22px)',
-              flexWrap: 'wrap',
-            }}>
+            <div
+              style={{
+                position: 'absolute',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                padding: 'clamp(16px, 2vw, 28px) clamp(20px, 3vw, 32px)',
+                display: 'flex',
+                alignItems: 'flex-end',
+                gap: 'clamp(14px, 2vw, 22px)',
+                flexWrap: 'wrap',
+              }}
+            >
               {/* Avatar */}
-              <div style={{ border: '3px solid var(--sh-surface)', borderRadius: '50%', lineHeight: 0, flexShrink: 0 }}>
+              <div
+                style={{
+                  border: '3px solid var(--sh-surface)',
+                  borderRadius: '50%',
+                  lineHeight: 0,
+                  flexShrink: 0,
+                }}
+              >
                 <ProfileAvatar
                   profile={profile}
                   initials={initials}
@@ -363,32 +501,99 @@ export default function UserProfilePage() {
 
               {/* Identity */}
               <div style={{ flex: 1, minWidth: 200 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
-                  <h1 style={{ margin: 0, fontSize: 'clamp(20px, 2.5vw, 26px)', fontWeight: 800, color: 'var(--sh-nav-text)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    flexWrap: 'wrap',
+                    marginBottom: 4,
+                  }}
+                >
+                  <h1
+                    style={{
+                      margin: 0,
+                      fontSize: 'clamp(20px, 2.5vw, 26px)',
+                      fontWeight: 800,
+                      color: 'var(--sh-nav-text)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                    }}
+                  >
                     {profile.username}
                     {profile.isPrivate && (
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.7 }} aria-label="Private account">
-                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        style={{ opacity: 0.7 }}
+                        aria-label="Private account"
+                      >
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                       </svg>
                     )}
                     <VerificationBadge user={profile} size={18} />
                   </h1>
-                  {profile.role === 'admin'
-                    ? <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 99, background: 'var(--sh-warning-light-bg)', color: 'var(--sh-warning-text)', border: '1px solid var(--sh-warning-border)' }}>Admin</span>
-                    : <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 99, background: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.8)', border: '1px solid rgba(255,255,255,0.2)' }}>{profile.accountType === 'teacher' ? 'Teacher' : profile.accountType === 'other' ? 'Member' : 'Student'}</span>
-                  }
+                  {profile.role === 'admin' ? (
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        padding: '2px 10px',
+                        borderRadius: 99,
+                        background: 'var(--sh-warning-light-bg)',
+                        color: 'var(--sh-warning-text)',
+                        border: '1px solid var(--sh-warning-border)',
+                      }}
+                    >
+                      Admin
+                    </span>
+                  ) : (
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        padding: '2px 10px',
+                        borderRadius: 99,
+                        background: 'rgba(255,255,255,0.15)',
+                        color: 'rgba(255,255,255,0.8)',
+                        border: '1px solid rgba(255,255,255,0.2)',
+                      }}
+                    >
+                      {profile.accountType === 'teacher'
+                        ? 'Teacher'
+                        : profile.accountType === 'other'
+                          ? 'Member'
+                          : 'Student'}
+                    </span>
+                  )}
                   <ProBadge plan={profile.plan} size="sm" />
                   <DonorBadge isDonor={profile.isDonor} donorLevel={profile.donorLevel} size="sm" />
                   {(() => {
                     const school = profile.enrollments?.[0]?.course?.school
                     if (!school) return null
                     return (
-                      <span style={{
-                        fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 99,
-                        background: 'rgba(14,165,233,0.18)', color: 'var(--sh-info-text)',
-                        border: '1px solid rgba(14,165,233,0.3)',
-                        display: 'inline-flex', alignItems: 'center', gap: 4,
-                      }}>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          padding: '2px 10px',
+                          borderRadius: 99,
+                          background: 'rgba(14,165,233,0.18)',
+                          color: 'var(--sh-info-text)',
+                          border: '1px solid rgba(14,165,233,0.3)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                        }}
+                      >
                         <IconSchool size={11} />
                         {school.short}
                       </span>
@@ -396,7 +601,14 @@ export default function UserProfilePage() {
                   })()}
                 </div>
                 {profile.displayName && profile.displayName !== profile.username && (
-                  <div style={{ fontSize: 15, fontWeight: 700, color: 'rgba(255,255,255,0.86)', marginBottom: 6 }}>
+                  <div
+                    style={{
+                      fontSize: 15,
+                      fontWeight: 700,
+                      color: 'rgba(255,255,255,0.86)',
+                      marginBottom: 6,
+                    }}
+                  >
                     {profile.displayName}
                   </div>
                 )}
@@ -421,12 +633,32 @@ export default function UserProfilePage() {
                 {(profile.location || Number.isInteger(profile.age)) && (
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
                     {profile.location && (
-                      <span style={{ fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 99, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.86)' }}>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          padding: '4px 10px',
+                          borderRadius: 99,
+                          border: '1px solid rgba(255,255,255,0.2)',
+                          background: 'rgba(255,255,255,0.12)',
+                          color: 'rgba(255,255,255,0.86)',
+                        }}
+                      >
                         {profile.location}
                       </span>
                     )}
                     {Number.isInteger(profile.age) && (
-                      <span style={{ fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 99, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.86)' }}>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          padding: '4px 10px',
+                          borderRadius: 99,
+                          border: '1px solid rgba(255,255,255,0.2)',
+                          background: 'rgba(255,255,255,0.12)',
+                          color: 'rgba(255,255,255,0.86)',
+                        }}
+                      >
                         Age {profile.age}
                       </span>
                     )}
@@ -468,14 +700,30 @@ export default function UserProfilePage() {
                   </span>
                   <button
                     onClick={() => loadFollowList('followers')}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit', fontSize: 14, color: 'var(--sh-nav-text)' }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: 0,
+                      fontFamily: 'inherit',
+                      fontSize: 14,
+                      color: 'var(--sh-nav-text)',
+                    }}
                   >
                     <strong>{followers}</strong>{' '}
                     <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>followers</span>
                   </button>
                   <button
                     onClick={() => loadFollowList('following')}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit', fontSize: 14, color: 'var(--sh-nav-text)' }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: 0,
+                      fontFamily: 'inherit',
+                      fontSize: 14,
+                      color: 'var(--sh-nav-text)',
+                    }}
                   >
                     <strong>{profile.followingCount || 0}</strong>{' '}
                     <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>following</span>
@@ -486,12 +734,22 @@ export default function UserProfilePage() {
               {/* Action buttons */}
               <div style={{ display: 'flex', gap: 8, alignSelf: 'flex-end', flexWrap: 'wrap' }}>
                 {isOwnProfile ? (
-                  <Link to="/settings" style={{
-                    display: 'inline-flex', alignItems: 'center', padding: '8px 16px', borderRadius: 10,
-                    background: 'rgba(255,255,255,0.15)', color: 'var(--sh-nav-text)', fontWeight: 700, fontSize: 13,
-                    textDecoration: 'none', border: '1px solid rgba(255,255,255,0.25)',
-                    backdropFilter: 'blur(6px)',
-                  }}>
+                  <Link
+                    to="/settings"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      padding: '8px 16px',
+                      borderRadius: 10,
+                      background: 'rgba(255,255,255,0.15)',
+                      color: 'var(--sh-nav-text)',
+                      fontWeight: 700,
+                      fontSize: 13,
+                      textDecoration: 'none',
+                      border: '1px solid rgba(255,255,255,0.25)',
+                      backdropFilter: 'blur(6px)',
+                    }}
+                  >
                     Edit Profile
                   </Link>
                 ) : currentUser ? (
@@ -502,28 +760,42 @@ export default function UserProfilePage() {
                         onClick={handleFollowToggle}
                         disabled={toggling}
                         style={{
-                          display: 'inline-flex', alignItems: 'center', padding: '8px 18px', borderRadius: 10,
-                          fontWeight: 700, fontSize: 13, fontFamily: 'inherit',
-                          border: followStatus === 'active'
-                            ? '1px solid rgba(16,185,129,0.5)'
-                            : followStatus === 'pending'
-                              ? '1px solid var(--sh-border)'
-                              : '1px solid rgba(255,255,255,0.25)',
-                          background: followStatus === 'active'
-                            ? 'rgba(16,185,129,0.2)'
-                            : followStatus === 'pending'
-                              ? 'rgba(255,255,255,0.1)'
-                              : 'var(--sh-brand)',
-                          color: followStatus === 'active'
-                            ? 'var(--sh-success)'
-                            : followStatus === 'pending'
-                              ? 'rgba(255,255,255,0.6)'
-                              : 'var(--sh-nav-text)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          padding: '8px 18px',
+                          borderRadius: 10,
+                          fontWeight: 700,
+                          fontSize: 13,
+                          fontFamily: 'inherit',
+                          border:
+                            followStatus === 'active'
+                              ? '1px solid rgba(16,185,129,0.5)'
+                              : followStatus === 'pending'
+                                ? '1px solid var(--sh-border)'
+                                : '1px solid rgba(255,255,255,0.25)',
+                          background:
+                            followStatus === 'active'
+                              ? 'rgba(16,185,129,0.2)'
+                              : followStatus === 'pending'
+                                ? 'rgba(255,255,255,0.1)'
+                                : 'var(--sh-brand)',
+                          color:
+                            followStatus === 'active'
+                              ? 'var(--sh-success)'
+                              : followStatus === 'pending'
+                                ? 'rgba(255,255,255,0.6)'
+                                : 'var(--sh-nav-text)',
                           cursor: toggling ? 'wait' : 'pointer',
                           backdropFilter: 'blur(6px)',
                         }}
                       >
-                        {toggling ? '...' : followStatus === 'active' ? 'Following' : followStatus === 'pending' ? 'Requested' : 'Follow'}
+                        {toggling
+                          ? '...'
+                          : followStatus === 'active'
+                            ? 'Following'
+                            : followStatus === 'pending'
+                              ? 'Requested'
+                              : 'Follow'}
                       </button>
                     )}
 
@@ -532,8 +804,14 @@ export default function UserProfilePage() {
                       <button
                         onClick={() => navigate(`/messages?dm=${profile.id}`)}
                         style={{
-                          display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10,
-                          fontWeight: 600, fontSize: 12, fontFamily: 'inherit',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          padding: '8px 14px',
+                          borderRadius: 10,
+                          fontWeight: 600,
+                          fontSize: 12,
+                          fontFamily: 'inherit',
                           border: '1px solid rgba(255,255,255,0.25)',
                           background: 'rgba(255,255,255,0.12)',
                           color: 'var(--sh-nav-text)',
@@ -541,8 +819,17 @@ export default function UserProfilePage() {
                           backdropFilter: 'blur(6px)',
                         }}
                       >
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                        <svg
+                          width="12"
+                          height="12"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                         </svg>
                         Message
                       </button>
@@ -554,20 +841,46 @@ export default function UserProfilePage() {
                       disabled={muteToggling}
                       title={isMuted ? 'Unmute this user' : 'Mute this user'}
                       style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10,
-                        fontWeight: 600, fontSize: 12, fontFamily: 'inherit',
-                        border: isMuted ? '1px solid var(--sh-warning-border)' : '1px solid var(--sh-border)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        padding: '8px 14px',
+                        borderRadius: 10,
+                        fontWeight: 600,
+                        fontSize: 12,
+                        fontFamily: 'inherit',
+                        border: isMuted
+                          ? '1px solid var(--sh-warning-border)'
+                          : '1px solid var(--sh-border)',
                         background: isMuted ? 'var(--sh-warning-bg)' : 'var(--sh-soft)',
                         color: isMuted ? 'var(--sh-warning-text)' : 'var(--sh-subtext)',
                         cursor: muteToggling ? 'wait' : 'pointer',
                         backdropFilter: 'blur(6px)',
                       }}
                     >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        {isMuted
-                          ? <><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></>
-                          : <><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></>
-                        }
+                      <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        {isMuted ? (
+                          <>
+                            <path d="M11 5L6 9H2v6h4l5 4V5z" />
+                            <line x1="23" y1="9" x2="17" y2="15" />
+                            <line x1="17" y1="9" x2="23" y2="15" />
+                          </>
+                        ) : (
+                          <>
+                            <path d="M11 5L6 9H2v6h4l5 4V5z" />
+                            <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+                            <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                          </>
+                        )}
                       </svg>
                       {muteToggling ? '...' : isMuted ? 'Muted' : 'Mute'}
                     </button>
@@ -578,17 +891,35 @@ export default function UserProfilePage() {
                       disabled={blockToggling}
                       title={isBlocked ? 'Unblock this user' : 'Block this user'}
                       style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10,
-                        fontWeight: 600, fontSize: 12, fontFamily: 'inherit',
-                        border: isBlocked ? '1px solid var(--sh-danger-border)' : '1px solid var(--sh-border)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        padding: '8px 14px',
+                        borderRadius: 10,
+                        fontWeight: 600,
+                        fontSize: 12,
+                        fontFamily: 'inherit',
+                        border: isBlocked
+                          ? '1px solid var(--sh-danger-border)'
+                          : '1px solid var(--sh-border)',
                         background: isBlocked ? 'var(--sh-danger-bg)' : 'var(--sh-soft)',
                         color: isBlocked ? 'var(--sh-danger-text)' : 'var(--sh-subtext)',
                         cursor: blockToggling ? 'wait' : 'pointer',
                         backdropFilter: 'blur(6px)',
                       }}
                     >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+                      <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
                       </svg>
                       {blockToggling ? '...' : isBlocked ? 'Blocked' : 'Block'}
                     </button>
@@ -597,8 +928,14 @@ export default function UserProfilePage() {
                     <button
                       onClick={() => setReportOpen(true)}
                       style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10,
-                        fontWeight: 600, fontSize: 12, fontFamily: 'inherit',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        padding: '8px 14px',
+                        borderRadius: 10,
+                        fontWeight: 600,
+                        fontSize: 12,
+                        fontFamily: 'inherit',
                         border: '1px solid rgba(255,255,255,0.15)',
                         background: 'rgba(255,255,255,0.08)',
                         color: 'rgba(255,255,255,0.7)',
@@ -606,7 +943,19 @@ export default function UserProfilePage() {
                         backdropFilter: 'blur(6px)',
                       }}
                     >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+                      <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+                        <line x1="4" y1="22" x2="4" y2="15" />
+                      </svg>
                       Report
                     </button>
                   </>
@@ -617,22 +966,36 @@ export default function UserProfilePage() {
 
           {/* ── Own profile: Hero CTA row ────────────────────────────────── */}
           {isOwnProfile && (
-            <div style={{
-              padding: '14px clamp(20px, 3vw, 32px)',
-              background: 'var(--sh-surface)',
-              borderTop: '1px solid var(--sh-border)',
-            }}>
+            <div
+              style={{
+                padding: '14px clamp(20px, 3vw, 32px)',
+                background: 'var(--sh-surface)',
+                borderTop: '1px solid var(--sh-border)',
+              }}
+            >
               <div className="profile-hero-ctas">
                 <Link to="/sheets" className="sh-btn sh-btn--primary sh-btn--sm" style={{ gap: 6 }}>
                   Resume Studying
                 </Link>
-                <Link to="/sheets?starred=1" className="sh-btn sh-btn--secondary sh-btn--sm" style={{ gap: 6 }}>
+                <Link
+                  to="/sheets?starred=1"
+                  className="sh-btn sh-btn--secondary sh-btn--sm"
+                  style={{ gap: 6 }}
+                >
                   Study Queue
                 </Link>
-                <Link to="/sheets/upload" className="sh-btn sh-btn--secondary sh-btn--sm" style={{ gap: 6 }}>
+                <Link
+                  to="/sheets/upload"
+                  className="sh-btn sh-btn--secondary sh-btn--sm"
+                  style={{ gap: 6 }}
+                >
                   Upload Sheet
                 </Link>
-                <Link to="/settings" className="sh-btn sh-btn--secondary sh-btn--sm" style={{ gap: 6 }}>
+                <Link
+                  to="/settings"
+                  className="sh-btn sh-btn--secondary sh-btn--sm"
+                  style={{ gap: 6 }}
+                >
                   Settings
                 </Link>
               </div>
@@ -645,23 +1008,53 @@ export default function UserProfilePage() {
 
         {/* ── Private profile gate ─────────────────────────────────────── */}
         {profile.isPrivateProfile && !isOwnProfile ? (
-          <div style={{
-            ...cardStyle,
-            textAlign: 'center',
-            padding: '48px 24px',
-          }}>
+          <div
+            style={{
+              ...cardStyle,
+              textAlign: 'center',
+              padding: '48px 24px',
+            }}
+          >
             <div style={{ marginBottom: 16, color: 'var(--sh-muted)' }}>
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              <svg
+                width="48"
+                height="48"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
               </svg>
             </div>
-            <div style={{ fontWeight: 700, fontSize: 18, color: 'var(--sh-heading)', marginBottom: 8 }}>
+            <div
+              style={{ fontWeight: 700, fontSize: 18, color: 'var(--sh-heading)', marginBottom: 8 }}
+            >
               This account is private
             </div>
-            <div style={{ fontSize: 14, color: 'var(--sh-muted)', maxWidth: 400, margin: '0 auto', lineHeight: 1.6 }}>
+            <div
+              style={{
+                fontSize: 14,
+                color: 'var(--sh-muted)',
+                maxWidth: 400,
+                margin: '0 auto',
+                lineHeight: 1.6,
+              }}
+            >
               {profile.bio || 'Follow this account to see their posts, sheets, and activity.'}
             </div>
-            <div style={{ fontSize: 13, color: 'var(--sh-muted)', maxWidth: 420, margin: '12px auto 0', lineHeight: 1.6 }}>
+            <div
+              style={{
+                fontSize: 13,
+                color: 'var(--sh-muted)',
+                maxWidth: 420,
+                margin: '12px auto 0',
+                lineHeight: 1.6,
+              }}
+            >
               Send a follow request to unlock their sheets, posts, and study activity.
             </div>
           </div>
@@ -686,27 +1079,26 @@ export default function UserProfilePage() {
 
             {/* ── TAB CONTENT ───────────────────────────────────────────────── */}
             <div ref={contentRef} role="tabpanel" aria-label={activeTab}>
-              {activeTab === 'overview' && (
-                isOwnProfile
-                  ? <OwnOverviewTab
-                      profile={profile}
-                      dashboardSummary={dashboardSummary}
-                      recentlyViewed={recentlyViewed}
-                      studyQueueCounts={studyQueueCounts}
-                      studyToReview={studyToReview}
-                      studyStudying={studyStudying}
-                      dashboardRecentSheets={dashboardRecentSheets}
-                      activityData={activityData}
-                      badges={badges}
-                      followers={followers}
-                      loadFollowList={loadFollowList}
-                    />
-                  : <OtherOverviewTab
-                      profile={profile}
-                      activityData={activityData}
-                      badges={badges}
-                    />
-              )}
+              {activeTab === 'overview' &&
+                (isOwnProfile ? (
+                  <OwnOverviewTab
+                    profile={profile}
+                    dashboardSummary={dashboardSummary}
+                    recentlyViewed={recentlyViewed}
+                    studyQueueCounts={studyQueueCounts}
+                    studyToReview={studyToReview}
+                    studyStudying={studyStudying}
+                    studyDone={studyDone}
+                    profileStudyStatusMap={profileStudyStatusMap}
+                    dashboardRecentSheets={dashboardRecentSheets}
+                    activityData={activityData}
+                    badges={badges}
+                    followers={followers}
+                    loadFollowList={loadFollowList}
+                  />
+                ) : (
+                  <OtherOverviewTab profile={profile} activityData={activityData} badges={badges} />
+                ))}
 
               {activeTab === 'study' && isOwnProfile && (
                 <StudyTab
@@ -715,6 +1107,7 @@ export default function UserProfilePage() {
                   studyQueueCounts={studyQueueCounts}
                   studyToReview={studyToReview}
                   studyStudying={studyStudying}
+                  studyDone={studyDone}
                   dashboardRecentSheets={dashboardRecentSheets}
                 />
               )}
@@ -723,18 +1116,14 @@ export default function UserProfilePage() {
                 <SheetsTab
                   profile={profile}
                   isOwnProfile={isOwnProfile}
+                  studyStatusMap={profileStudyStatusMap}
                 />
               )}
 
-              {activeTab === 'posts' && (
-                <PostsTab profileId={profile?.id} />
-              )}
+              {activeTab === 'posts' && <PostsTab profileId={profile?.id} />}
 
               {activeTab === 'achievements' && (
-                <AchievementsTab
-                  activityData={activityData}
-                  badges={badges}
-                />
+                <AchievementsTab activityData={activityData} badges={badges} />
               )}
             </div>
           </>
@@ -755,12 +1144,19 @@ export default function UserProfilePage() {
           onClose={() => setShowAvatarCrop(false)}
           onUploaded={(avatarUrl) => {
             setProfile((p) => ({ ...p, avatarUrl }))
-            setSessionUser((u) => u ? { ...u, avatarUrl } : u)
+            setSessionUser((u) => (u ? { ...u, avatarUrl } : u))
           }}
         />
       )}
 
-      {profile && <ReportModal open={reportOpen} targetType="user" targetId={profile.id} onClose={() => setReportOpen(false)} />}
+      {profile && (
+        <ReportModal
+          open={reportOpen}
+          targetType="user"
+          targetId={profile.id}
+          onClose={() => setReportOpen(false)}
+        />
+      )}
     </div>
   )
 }
@@ -771,15 +1167,26 @@ export default function UserProfilePage() {
 
 /* ── Own profile Overview: "Student Cockpit" ─────────────────────────────── */
 function OwnOverviewTab({
-  profile, dashboardSummary, recentlyViewed,
-  studyQueueCounts, studyToReview, studyStudying,
-  dashboardRecentSheets, activityData, badges, followers, loadFollowList,
+  profile,
+  dashboardSummary,
+  recentlyViewed,
+  studyQueueCounts,
+  studyToReview,
+  studyStudying,
+  studyDone,
+  profileStudyStatusMap,
+  dashboardRecentSheets,
+  activityData,
+  badges,
+  followers,
+  loadFollowList,
 }) {
   return (
     <div className="profile-cockpit">
       {/* Left column: action / study */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <ResumeStudying entries={recentlyViewed} />
+        <StudyNudges toReview={studyToReview} studying={studyStudying} done={studyDone} />
         <StudyQueue counts={studyQueueCounts} toReview={studyToReview} studying={studyStudying} />
         <DashboardRecentSheets recentSheets={dashboardRecentSheets} />
         <QuickActions />
@@ -788,7 +1195,7 @@ function OwnOverviewTab({
       {/* Right column: identity / progress */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <ProfileStatsWidget username={profile.username} />
-        <PinnedSheetsSection sheets={profile.pinnedSheets} />
+        <PinnedSheetsSection sheets={profile.pinnedSheets} studyStatusMap={profileStudyStatusMap} />
         <SharedShelvesSection shelves={profile.sharedShelves} isOwnProfile />
         {activityData.length > 0 && (
           <div style={cardStyle}>
@@ -803,16 +1210,38 @@ function OwnOverviewTab({
           <div style={{ display: 'flex', gap: 16 }}>
             <button
               onClick={() => loadFollowList('followers')}
-              style={{ flex: 1, background: 'var(--sh-soft)', border: '1px solid var(--sh-border)', borderRadius: 12, padding: '14px 12px', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'center' }}
+              style={{
+                flex: 1,
+                background: 'var(--sh-soft)',
+                border: '1px solid var(--sh-border)',
+                borderRadius: 12,
+                padding: '14px 12px',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                textAlign: 'center',
+              }}
             >
-              <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--sh-heading)' }}>{followers}</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--sh-heading)' }}>
+                {followers}
+              </div>
               <div style={{ fontSize: 12, color: 'var(--sh-muted)' }}>Followers</div>
             </button>
             <button
               onClick={() => loadFollowList('following')}
-              style={{ flex: 1, background: 'var(--sh-soft)', border: '1px solid var(--sh-border)', borderRadius: 12, padding: '14px 12px', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'center' }}
+              style={{
+                flex: 1,
+                background: 'var(--sh-soft)',
+                border: '1px solid var(--sh-border)',
+                borderRadius: 12,
+                padding: '14px 12px',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                textAlign: 'center',
+              }}
             >
-              <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--sh-heading)' }}>{profile.followingCount || 0}</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--sh-heading)' }}>
+                {profile.followingCount || 0}
+              </div>
               <div style={{ fontSize: 12, color: 'var(--sh-muted)' }}>Following</div>
             </button>
           </div>
@@ -827,13 +1256,19 @@ function OwnOverviewTab({
 
 /* ── Own profile Study tab ───────────────────────────────────────────────── */
 function StudyTab({
-  recentlyViewed, studyActivity,
-  studyQueueCounts, studyToReview, studyStudying, dashboardRecentSheets,
+  recentlyViewed,
+  studyActivity,
+  studyQueueCounts,
+  studyToReview,
+  studyStudying,
+  studyDone,
+  dashboardRecentSheets,
 }) {
   return (
     <div className="profile-columns">
       <StudyActivity activity={studyActivity} />
       <ResumeStudying entries={recentlyViewed} />
+      <StudyNudges toReview={studyToReview} studying={studyStudying} done={studyDone} />
       <StudyQueue counts={studyQueueCounts} toReview={studyToReview} studying={studyStudying} />
       <DashboardRecentSheets recentSheets={dashboardRecentSheets} />
       <QuickActions />
@@ -842,11 +1277,15 @@ function StudyTab({
 }
 
 /* ── Sheets tab (both modes) ─────────────────────────────────────────────── */
-function SheetsTab({ profile, isOwnProfile }) {
+function SheetsTab({ profile, isOwnProfile, studyStatusMap }) {
   return (
     <div className="profile-columns">
-      <RecentSheetsSection sheets={profile.recentSheets} />
-      <StarredSheetsSection sheets={profile.starredSheets} isOwnProfile={isOwnProfile} />
+      <RecentSheetsSection sheets={profile.recentSheets} studyStatusMap={studyStatusMap} />
+      <StarredSheetsSection
+        sheets={profile.starredSheets}
+        isOwnProfile={isOwnProfile}
+        studyStatusMap={studyStatusMap}
+      />
       <SharedNotesSection notes={profile.sharedNotes} />
     </div>
   )
@@ -867,8 +1306,12 @@ function PostsTab({ profileId }) {
         if (!cancelled) setPosts(data.items || data.posts || [])
       })
       .catch(() => {})
-      .finally(() => { if (!cancelled) setPostsLoading(false) })
-    return () => { cancelled = true }
+      .finally(() => {
+        if (!cancelled) setPostsLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [profileId])
 
   if (postsLoading) {
@@ -879,12 +1322,24 @@ function PostsTab({ profileId }) {
             <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 14 }}>
               <div className="sh-skeleton" style={{ width: 40, height: 40, borderRadius: '50%' }} />
               <div style={{ flex: 1 }}>
-                <div className="sh-skeleton" style={{ width: '50%', height: 13, borderRadius: 6, marginBottom: 6 }} />
-                <div className="sh-skeleton" style={{ width: '30%', height: 10, borderRadius: 6 }} />
+                <div
+                  className="sh-skeleton"
+                  style={{ width: '50%', height: 13, borderRadius: 6, marginBottom: 6 }}
+                />
+                <div
+                  className="sh-skeleton"
+                  style={{ width: '30%', height: 10, borderRadius: 6 }}
+                />
               </div>
             </div>
-            <div className="sh-skeleton" style={{ width: '80%', height: 14, borderRadius: 6, marginBottom: 8 }} />
-            <div className="sh-skeleton" style={{ width: '100%', height: 12, borderRadius: 6, marginBottom: 6 }} />
+            <div
+              className="sh-skeleton"
+              style={{ width: '80%', height: 14, borderRadius: 6, marginBottom: 8 }}
+            />
+            <div
+              className="sh-skeleton"
+              style={{ width: '100%', height: 12, borderRadius: 6, marginBottom: 6 }}
+            />
             <div className="sh-skeleton" style={{ width: '60%', height: 12, borderRadius: 6 }} />
           </div>
         ))}
@@ -895,8 +1350,12 @@ function PostsTab({ profileId }) {
   if (!posts.length) {
     return (
       <div style={{ ...cardStyle, textAlign: 'center', padding: '48px 24px' }}>
-        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--sh-heading)', marginBottom: 6 }}>No posts yet</div>
-        <div style={{ fontSize: 13, color: 'var(--sh-muted)' }}>This user has not posted anything to the feed.</div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--sh-heading)', marginBottom: 6 }}>
+          No posts yet
+        </div>
+        <div style={{ fontSize: 13, color: 'var(--sh-muted)' }}>
+          This user has not posted anything to the feed.
+        </div>
       </div>
     )
   }
@@ -933,9 +1392,17 @@ function AchievementsTab({ activityData, badges }) {
       <BadgesSection badges={badges} />
       {activityData.length === 0 && badges.length === 0 && (
         <div style={{ ...cardStyle, textAlign: 'center', padding: '48px 24px' }}>
-          <div style={{ fontSize: 36, marginBottom: 12, color: 'var(--sh-muted)' }}><IconStar size={36} /></div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--sh-heading)', marginBottom: 6 }}>No achievements yet</div>
-          <div style={{ fontSize: 13, color: 'var(--sh-muted)' }}>Start studying and contributing to unlock badges.</div>
+          <div style={{ fontSize: 36, marginBottom: 12, color: 'var(--sh-muted)' }}>
+            <IconStar size={36} />
+          </div>
+          <div
+            style={{ fontSize: 15, fontWeight: 700, color: 'var(--sh-heading)', marginBottom: 6 }}
+          >
+            No achievements yet
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--sh-muted)' }}>
+            Start studying and contributing to unlock badges.
+          </div>
         </div>
       )}
     </div>

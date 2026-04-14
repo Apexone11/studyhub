@@ -7,6 +7,7 @@ const http = require('http')
 const path = require('node:path')
 require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') })
 const { initSentry, captureError } = require('./monitoring/sentry')
+const { validateSecrets: validateStartupSecrets } = require('./lib/secretValidator')
 const { bootstrapRuntime } = require('./lib/bootstrap/bootstrap')
 const { validateEmailTransport } = require('./lib/email/email')
 const { startHtmlArchiveScheduler } = require('./lib/html/htmlArchiveScheduler')
@@ -28,6 +29,10 @@ const { ERROR_CODES, sendError } = require('./middleware/errorEnvelope')
 const prisma = require('./lib/prisma')
 
 const sentryEnabled = initSentry()
+
+// Phase 5: validate all required secrets are set at boot time.
+// In production, missing critical secrets cause a hard exit.
+validateStartupSecrets()
 
 const app = express()
 const PORT = process.env.PORT || 4000
@@ -66,12 +71,17 @@ const videoRoutes = require('./modules/video')
 const paymentsRoutes = require('./modules/payments')
 const reviewsRoutes = require('./modules/reviews')
 const legalRoutes = require('./modules/legal')
+const plagiarismRoutes = require('./modules/plagiarism')
+const studyStatusRoutes = require('./modules/studyStatus')
+const onboardingRoutes = require('./modules/onboarding')
+const referralRoutes = require('./modules/referrals')
 const crypto = require('node:crypto')
 const log = require('./lib/logger')
 const { httpLogger } = require('./lib/httpLogger')
 const { initSocketIO } = require('./lib/socketio')
 const { featureFlagMiddleware } = require('./lib/featureFlags')
 const { trackActiveUser } = require('./lib/activeTracking')
+const { requestMetricsMiddleware, startMetricsTimers } = require('./middleware/requestMetrics')
 
 if (sentryEnabled) {
   log.info('Sentry monitoring enabled for backend.')
@@ -284,6 +294,11 @@ app.post(
 // Parse JSON request bodies for auth and future API routes.
 app.use(express.json())
 
+// Phase 5: reject payloads with null bytes, control chars, excessive
+// nesting/length, or duplicate query params before they reach routes.
+const inputSanitizer = require('./middleware/inputSanitizer')
+app.use(inputSanitizer)
+
 // Optional emergency write-guard for non-admin requests.
 app.use(guardedMode)
 
@@ -302,6 +317,11 @@ app.use(checkRestrictions)
 // Track user activity for active-users metrics.
 // Runs after auth decode so req.user is available. Throttled internally.
 app.use(trackActiveUser)
+
+// Per-request latency metrics. Runs after auth so req.user is available.
+// Buffers in memory and flushes to RequestMetric table every 30 seconds.
+app.use(requestMetricsMiddleware)
+startMetricsTimers()
 
 // Audit logging for security-relevant write operations. Hooks into res 'finish'
 // event — zero impact on response latency. Requires req.user from auth decode above.
@@ -452,24 +472,20 @@ app.use('/api/payments', paymentsRoutes)
 // Reviews module endpoints under /api/reviews.
 app.use('/api/reviews', reviewsRoutes)
 
-// Waitlist (simple inline route for pricing page)
-app.post('/api/waitlist', express.json(), async (req, res) => {
-  try {
-    const { email, tier } = req.body || {}
-    if (!email || !tier) return res.status(400).json({ error: 'Email and tier are required.' })
-    if (!['pro', 'institution'].includes(tier))
-      return res.status(400).json({ error: 'Invalid tier.' })
-    if (typeof email !== 'string' || !email.includes('@') || email.length > 320) {
-      return res.status(400).json({ error: 'Invalid email address.' })
-    }
-    await prisma.waitlist.create({ data: { email: email.trim().toLowerCase(), tier } })
-    res.json({ message: 'You have been added to the waitlist.' })
-  } catch (err) {
-    if (err.code === 'P2002') return res.json({ message: 'You are already on the waitlist.' })
-    console.error('[waitlist]', err.message)
-    res.status(500).json({ error: 'Something went wrong. Please try again.' })
-  }
-})
+// Phase 4: Plagiarism detection user-facing endpoints.
+app.use('/api/plagiarism', plagiarismRoutes)
+
+// Study status sync (per-user sheet study tracking across devices).
+app.use('/api/study-status', studyStatusRoutes)
+
+// Onboarding module (7-step new user flow).
+app.use('/api/onboarding', onboardingRoutes)
+
+// Referral system (invite, track, resolve, rewards).
+app.use('/api/referrals', referralRoutes)
+
+// Waitlist module (Phase 0 — confirmation email + in-app notification + admin endpoints)
+app.use('/api/waitlist', require('./modules/waitlist'))
 
 // Public unauthenticated data endpoints (landing page stats, etc.).
 app.use('/api/public', publicRoutes)
@@ -598,7 +614,7 @@ function gracefulShutdown(signal) {
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'))
 process.on('SIGINT', () => gracefulShutdown('SIGINT'))
 
-module.exports = { startServer }
+module.exports = { app, startServer }
 
 if (require.main === module) {
   startServer()

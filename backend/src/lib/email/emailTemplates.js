@@ -57,21 +57,26 @@ function htmlWrap(title, bodyHtml) {
 
 async function sendEmailSmoke(toEmail = getAdminEmail()) {
   if (!toEmail) {
-    throw new Error('No smoke-test recipient is configured. Set ADMIN_EMAIL or pass EMAIL_SMOKE_TO.')
+    throw new Error(
+      'No smoke-test recipient is configured. Set ADMIN_EMAIL or pass EMAIL_SMOKE_TO.',
+    )
   }
 
   const sentAt = new Date().toISOString()
-  return deliverMail({
-    from: `"StudyHub" <${getFromAddress()}>`,
-    to: toEmail,
-    subject: 'StudyHub email smoke test',
-    text: [
-      'This is a StudyHub email smoke test.',
-      '',
-      `Sent at: ${sentAt}`,
-      `Mode: ${getEmailMode()}`,
-    ].join('\n'),
-    html: htmlWrap('StudyHub Email Smoke Test', `
+  return deliverMail(
+    {
+      from: `"StudyHub" <${getFromAddress()}>`,
+      to: toEmail,
+      subject: 'StudyHub email smoke test',
+      text: [
+        'This is a StudyHub email smoke test.',
+        '',
+        `Sent at: ${sentAt}`,
+        `Mode: ${getEmailMode()}`,
+      ].join('\n'),
+      html: htmlWrap(
+        'StudyHub Email Smoke Test',
+        `
       <h2 style="margin:0 0 8px;color:#1e3a5f;font-size:22px;">Email smoke test</h2>
       <p style="margin:0 0 16px;color:#6b7280;font-size:15px;">
         This message confirms that the StudyHub email transport can send mail.
@@ -80,8 +85,11 @@ async function sendEmailSmoke(toEmail = getAdminEmail()) {
         <p style="margin:0 0 6px;color:#334155;font-size:14px;"><strong>Sent at:</strong> ${escapeHtml(sentAt)}</p>
         <p style="margin:0;color:#334155;font-size:14px;"><strong>Mode:</strong> ${escapeHtml(getEmailMode())}</p>
       </div>
-    `),
-  }, 'email-smoke')
+    `,
+      ),
+    },
+    'email-smoke',
+  )
 }
 
 /**
@@ -106,23 +114,26 @@ async function sendPasswordReset(toEmail, username, resetUrl) {
     <p style="margin:0;color:#9ca3af;font-size:13px;">This link expires in <strong>1 hour</strong>. If you didn't request a password reset, no action is needed.</p>
   `
 
-  await deliverMail({
-    from: `"StudyHub" <${getFromAddress()}>`,
-    to: toEmail,
-    subject: 'Reset your StudyHub password',
-    text: [
-      `Hi ${username},`,
-      '',
-      `Your StudyHub username: ${username}`,
-      '',
-      'We received a request to reset your StudyHub password.',
-      '',
-      `Reset link: ${resetUrl}`,
-      '',
-      'This link expires in 1 hour. If you did not request a reset, you can ignore this email.',
-    ].join('\n'),
-    html: htmlWrap('Reset Your StudyHub Password', body),
-  }, 'password-reset')
+  await deliverMail(
+    {
+      from: `"StudyHub" <${getFromAddress()}>`,
+      to: toEmail,
+      subject: 'Reset your StudyHub password',
+      text: [
+        `Hi ${username},`,
+        '',
+        `Your StudyHub username: ${username}`,
+        '',
+        'We received a request to reset your StudyHub password.',
+        '',
+        `Reset link: ${resetUrl}`,
+        '',
+        'This link expires in 1 hour. If you did not request a reset, you can ignore this email.',
+      ].join('\n'),
+      html: htmlWrap('Reset Your StudyHub Password', body),
+    },
+    'password-reset',
+  )
 }
 
 /**
@@ -143,19 +154,22 @@ async function sendEmailVerification(toEmail, username, code) {
     <p style="margin:0;color:#9ca3af;font-size:13px;">This code expires in <strong>15 minutes</strong>.</p>
   `
 
-  await deliverMail({
-    from: `"StudyHub" <${getFromAddress()}>`,
-    to: toEmail,
-    subject: 'Verify your StudyHub email',
-    text: [
-      `Hi ${username},`,
-      '',
-      `Your StudyHub email verification code is: ${code}`,
-      '',
-      'This code expires in 15 minutes.',
-    ].join('\n'),
-    html: htmlWrap('Verify Your StudyHub Email', body),
-  }, 'email-verification')
+  await deliverMail(
+    {
+      from: `"StudyHub" <${getFromAddress()}>`,
+      to: toEmail,
+      subject: 'Verify your StudyHub email',
+      text: [
+        `Hi ${username},`,
+        '',
+        `Your StudyHub email verification code is: ${code}`,
+        '',
+        'This code expires in 15 minutes.',
+      ].join('\n'),
+      html: htmlWrap('Verify Your StudyHub Email', body),
+    },
+    'email-verification',
+  )
 }
 
 function formatCurrency(amountCents, currency = 'usd') {
@@ -201,21 +215,24 @@ async function sendSubscriptionWelcome({
     </p>
   `
 
-  await deliverMail({
-    from: `"StudyHub" <${getFromAddress()}>`,
-    to: toEmail,
-    subject: `Welcome to ${planName || 'StudyHub Pro'}`,
-    text: [
-      `Hi ${username},`,
-      '',
-      `Your ${planName || 'StudyHub Pro'} subscription is active.`,
-      `Billing cadence: ${billingLabel || 'monthly'}.`,
-      '',
-      `Payment history: ${historyUrl || `${getPublicAppUrl()}/settings?tab=subscription`}`,
-      `Manage subscription: ${manageUrl || `${getPublicAppUrl()}/settings?tab=subscription`}`,
-    ].join('\n'),
-    html: htmlWrap('Welcome to StudyHub Pro', body),
-  }, 'subscription-welcome')
+  await deliverMail(
+    {
+      from: `"StudyHub" <${getFromAddress()}>`,
+      to: toEmail,
+      subject: `Welcome to ${planName || 'StudyHub Pro'}`,
+      text: [
+        `Hi ${username},`,
+        '',
+        `Your ${planName || 'StudyHub Pro'} subscription is active.`,
+        `Billing cadence: ${billingLabel || 'monthly'}.`,
+        '',
+        `Payment history: ${historyUrl || `${getPublicAppUrl()}/settings?tab=subscription`}`,
+        `Manage subscription: ${manageUrl || `${getPublicAppUrl()}/settings?tab=subscription`}`,
+      ].join('\n'),
+      html: htmlWrap('Welcome to StudyHub Pro', body),
+    },
+    'subscription-welcome',
+  )
 }
 
 async function sendDonationThankYou({
@@ -231,7 +248,8 @@ async function sendDonationThankYou({
   const formattedAmount = formatCurrency(amountCents, currency)
   const safeHistoryUrl = escapeHtml(historyUrl || `${getPublicAppUrl()}/settings?tab=subscription`)
   const safeSupportersUrl = escapeHtml(supportersUrl || `${getPublicAppUrl()}/supporters`)
-  const safeMessage = typeof message === 'string' && message.trim() ? escapeHtml(message.trim()) : ''
+  const safeMessage =
+    typeof message === 'string' && message.trim() ? escapeHtml(message.trim()) : ''
 
   const body = `
     <h2 style="margin:0 0 8px;color:#1e3a5f;font-size:22px;">Thank you for supporting StudyHub</h2>
@@ -256,22 +274,27 @@ async function sendDonationThankYou({
     </p>
   `
 
-  await deliverMail({
-    from: `"StudyHub" <${getFromAddress()}>`,
-    to: toEmail,
-    subject: 'Thank you for supporting StudyHub',
-    text: [
-      `Hi ${username},`,
-      '',
-      `Thank you for your donation of ${formattedAmount}.`,
-      `Public display: ${anonymous ? 'Anonymous supporter' : 'Visible on supporters page'}.`,
-      safeMessage ? `Your note: ${message.trim()}` : null,
-      '',
-      `Payment history: ${historyUrl || `${getPublicAppUrl()}/settings?tab=subscription`}`,
-      `Supporters page: ${supportersUrl || `${getPublicAppUrl()}/supporters`}`,
-    ].filter(Boolean).join('\n'),
-    html: htmlWrap('Thank You for Supporting StudyHub', body),
-  }, 'donation-thank-you')
+  await deliverMail(
+    {
+      from: `"StudyHub" <${getFromAddress()}>`,
+      to: toEmail,
+      subject: 'Thank you for supporting StudyHub',
+      text: [
+        `Hi ${username},`,
+        '',
+        `Thank you for your donation of ${formattedAmount}.`,
+        `Public display: ${anonymous ? 'Anonymous supporter' : 'Visible on supporters page'}.`,
+        safeMessage ? `Your note: ${message.trim()}` : null,
+        '',
+        `Payment history: ${historyUrl || `${getPublicAppUrl()}/settings?tab=subscription`}`,
+        `Supporters page: ${supportersUrl || `${getPublicAppUrl()}/supporters`}`,
+      ]
+        .filter(Boolean)
+        .join('\n'),
+      html: htmlWrap('Thank You for Supporting StudyHub', body),
+    },
+    'donation-thank-you',
+  )
 }
 
 async function sendPaymentReceipt({
@@ -306,23 +329,27 @@ async function sendPaymentReceipt({
     </p>
   `
 
-  await deliverMail({
-    from: `"StudyHub" <${getFromAddress()}>`,
-    to: toEmail,
-    subject: `StudyHub receipt: ${description || 'Payment received'}`,
-    text: [
-      `Hi ${username},`,
-      '',
-      `Your payment of ${formattedAmount} was processed successfully.`,
-      `Description: ${description || 'StudyHub payment'}`,
-      '',
-      `Payment history: ${historyUrl || `${getPublicAppUrl()}/settings?tab=subscription`}`,
-      receiptUrl ? `Hosted receipt: ${receiptUrl}` : null,
-    ].filter(Boolean).join('\n'),
-    html: htmlWrap('StudyHub Receipt', body),
-  }, 'payment-receipt')
+  await deliverMail(
+    {
+      from: `"StudyHub" <${getFromAddress()}>`,
+      to: toEmail,
+      subject: `StudyHub receipt: ${description || 'Payment received'}`,
+      text: [
+        `Hi ${username},`,
+        '',
+        `Your payment of ${formattedAmount} was processed successfully.`,
+        `Description: ${description || 'StudyHub payment'}`,
+        '',
+        `Payment history: ${historyUrl || `${getPublicAppUrl()}/settings?tab=subscription`}`,
+        receiptUrl ? `Hosted receipt: ${receiptUrl}` : null,
+      ]
+        .filter(Boolean)
+        .join('\n'),
+      html: htmlWrap('StudyHub Receipt', body),
+    },
+    'payment-receipt',
+  )
 }
-
 
 /**
  * Send a course request notification to the company/admin inbox.
@@ -405,7 +432,9 @@ async function sendHighRiskSheetAlert({ sheetId, sheetTitle, username, flags }) 
     return
   }
 
-  const flagList = (flags || []).map((f) => `<li style="color:#991b1b;font-size:13px;">${escapeHtml(f)}</li>`).join('')
+  const flagList = (flags || [])
+    .map((f) => `<li style="color:#991b1b;font-size:13px;">${escapeHtml(f)}</li>`)
+    .join('')
 
   const body = `
     <h2 style="margin:0 0 8px;color:#991b1b;font-size:22px;">High-Risk HTML Sheet Flagged</h2>
@@ -444,6 +473,53 @@ async function sendHighRiskSheetAlert({ sheetId, sheetTitle, username, flags }) 
   await deliverMail(mailOptions, 'high-risk-sheet')
 }
 
+/**
+ * Send a referral invite email.
+ * @param {string} toEmail       - Recipient email address
+ * @param {string} inviterUsername - Username of the person who invited them
+ * @param {string} referralCode  - The referral code to include in the signup URL
+ */
+async function sendReferralInvite(toEmail, inviterUsername, referralCode) {
+  const safeUsername = escapeHtml(inviterUsername)
+  const signupUrl = `${getPublicAppUrl()}/register?ref=${encodeURIComponent(referralCode)}`
+  const safeSignupUrl = escapeHtml(signupUrl)
+
+  const body = `
+    <h2 style="margin:0 0 8px;color:#1e3a5f;font-size:22px;">You have been invited to StudyHub</h2>
+    <p style="margin:0 0 24px;color:#6b7280;font-size:15px;line-height:1.7;">
+      <strong>${safeUsername}</strong> thinks you would love StudyHub -- a collaborative platform
+      where students share, fork, and improve study materials together.
+    </p>
+    <div style="text-align:center;margin:0 0 24px;">
+      <a href="${safeSignupUrl}" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;padding:14px 32px;border-radius:8px;">Join StudyHub</a>
+    </div>
+    <p style="margin:0 0 8px;color:#6b7280;font-size:13px;">Or copy and paste this link into your browser:</p>
+    <p style="margin:0 0 24px;word-break:break-all;font-size:13px;color:#3b82f6;">${safeSignupUrl}</p>
+    <p style="margin:0;color:#9ca3af;font-size:13px;">
+      This invite was sent by ${safeUsername}. If you do not know this person, you can safely ignore this email.
+    </p>
+  `
+
+  await deliverMail(
+    {
+      from: `"StudyHub" <${getFromAddress()}>`,
+      to: toEmail,
+      subject: `${inviterUsername} invited you to StudyHub`,
+      text: [
+        `${inviterUsername} invited you to StudyHub.`,
+        '',
+        'StudyHub is a collaborative platform where students share, fork, and improve study materials together.',
+        '',
+        `Join here: ${signupUrl}`,
+        '',
+        `This invite was sent by ${inviterUsername}. If you do not know this person, you can safely ignore this email.`,
+      ].join('\n'),
+      html: htmlWrap('You have been invited to StudyHub', body),
+    },
+    'referral-invite',
+  )
+}
+
 module.exports = {
   sendEmailSmoke,
   sendPasswordReset,
@@ -453,4 +529,5 @@ module.exports = {
   sendPaymentReceipt,
   sendCourseRequestNotice,
   sendHighRiskSheetAlert,
+  sendReferralInvite,
 }

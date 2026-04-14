@@ -14,10 +14,52 @@
  * recreating the editor — recreation would destroy focus and undo history.
  */
 import { useEffect, useRef } from 'react'
-import { EditorView, basicSetup } from 'codemirror'
 import { EditorState, Compartment } from '@codemirror/state'
+import {
+  EditorView,
+  drawSelection,
+  highlightActiveLine,
+  highlightActiveLineGutter,
+  highlightSpecialChars,
+  keymap,
+  lineNumbers,
+} from '@codemirror/view'
+import {
+  autocompletion,
+  closeBrackets,
+  closeBracketsKeymap,
+  completionKeymap,
+} from '@codemirror/autocomplete'
+import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { html as htmlLang } from '@codemirror/lang-html'
+import {
+  bracketMatching,
+  defaultHighlightStyle,
+  indentOnInput,
+  syntaxHighlighting,
+} from '@codemirror/language'
 import './htmlCodeEditor.css'
+
+const htmlEditorSetup = [
+  lineNumbers(),
+  highlightActiveLineGutter(),
+  history(),
+  drawSelection(),
+  highlightSpecialChars(),
+  syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+  indentOnInput(),
+  bracketMatching(),
+  closeBrackets(),
+  autocompletion(),
+  highlightActiveLine(),
+  keymap.of([
+    indentWithTab,
+    ...closeBracketsKeymap,
+    ...defaultKeymap,
+    ...historyKeymap,
+    ...completionKeymap,
+  ]),
+]
 
 export default function HtmlCodeEditor({ value, onChange, disabled, placeholder }) {
   const hostRef = useRef(null)
@@ -26,7 +68,9 @@ export default function HtmlCodeEditor({ value, onChange, disabled, placeholder 
   // Keep onChange in a ref so the CodeMirror updateListener closure doesn't
   // capture a stale handler when the parent re-renders.
   const onChangeRef = useRef(onChange)
-  useEffect(() => { onChangeRef.current = onChange })
+  useEffect(() => {
+    onChangeRef.current = onChange
+  })
 
   // Mount the CodeMirror view exactly once. We never recreate it on prop
   // changes — updates happen through transactions below.
@@ -36,7 +80,7 @@ export default function HtmlCodeEditor({ value, onChange, disabled, placeholder 
     const state = EditorState.create({
       doc: value || '',
       extensions: [
-        basicSetup,
+        htmlEditorSetup,
         htmlLang(),
         EditorView.lineWrapping,
         editableCompartment.current.of(EditorView.editable.of(!disabled)),

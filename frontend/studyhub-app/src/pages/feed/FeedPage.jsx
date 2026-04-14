@@ -10,7 +10,7 @@
  * Data: useFeedData
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import Navbar from '../../components/navbar/Navbar'
 import AppSidebar from '../../components/sidebar/AppSidebar'
 import ConfirmDialog from '../../components/ConfirmDialog'
@@ -22,6 +22,7 @@ import { SkeletonFeed } from '../../components/Skeleton'
 import SafeJoyride from '../../components/SafeJoyride'
 import { useTutorial } from '../../lib/useTutorial'
 import { FEED_STEPS, TUTORIAL_VERSIONS } from '../../lib/tutorialSteps'
+import { useOnboardingRedirect } from '../../lib/useOnboardingRedirect'
 
 import { FONT, FILTERS } from './feedConstants'
 import { Panel, EmptyFeed, GettingStartedCard } from './FeedWidgets'
@@ -31,6 +32,7 @@ import FeedAside from './FeedAside'
 import ForYouSection from './ForYouSection'
 import { useFeedData } from './useFeedData'
 import { useRecentlyViewed } from '../../lib/useRecentlyViewed'
+import { useStudyStatusBatch } from '../../lib/useStudyStatus'
 import SchoolSuggestionBanner from './SchoolSuggestionBanner'
 
 export default function FeedPage() {
@@ -67,6 +69,8 @@ export default function FeedPage() {
   const [reportTarget, setReportTarget] = useState(null)
 
   const { recentlyViewed } = useRecentlyViewed()
+  const { showBanner: showOnboardingBanner, dismissBanner: dismissOnboardingBanner } =
+    useOnboardingRedirect({ user })
   const tutorial = useTutorial('feed', FEED_STEPS, { version: TUTORIAL_VERSIONS.feed })
 
   const setQueryParam = useCallback(
@@ -100,10 +104,17 @@ export default function FeedPage() {
   const visibleItems = useMemo(() => {
     if (activeFilter === 'all') return feedState.items
     if (activeFilter === 'videos') return feedState.items.filter((item) => item.video)
-    if (activeFilter === 'posts') return feedState.items.filter((item) => item.type === 'post' && !item.video)
+    if (activeFilter === 'posts')
+      return feedState.items.filter((item) => item.type === 'post' && !item.video)
     const nextType = activeFilter === 'announcements' ? 'announcement' : activeFilter.slice(0, -1)
     return feedState.items.filter((item) => item.type === nextType)
   }, [activeFilter, feedState.items])
+
+  const feedSheetIds = useMemo(
+    () => visibleItems.filter((i) => i.type === 'sheet').map((i) => i.id),
+    [visibleItems],
+  )
+  const feedStudyStatusMap = useStudyStatusBatch(feedSheetIds)
 
   useEffect(() => {
     if (!targetPostId || feedState.loading) return
@@ -153,14 +164,85 @@ export default function FeedPage() {
   return (
     <>
       <Navbar />
-      <div className="sh-app-page" style={{ background: 'var(--sh-page-bg)', minHeight: '100vh', fontFamily: FONT }}>
+      <div
+        className="sh-app-page"
+        style={{ background: 'var(--sh-page-bg)', minHeight: '100vh', fontFamily: FONT }}
+      >
         <div className="sh-ambient-shell" style={pageShell('app', 26, 48)}>
           <div className="app-three-col-grid sh-ambient-grid">
             <AppSidebar mode={layout.sidebarMode} />
 
-            <main className="sh-ambient-main feed-page__main" id="main-content" style={{ display: 'grid', gap: 18 }}>
+            <main
+              className="sh-ambient-main feed-page__main"
+              id="main-content"
+              style={{ display: 'grid', gap: 18 }}
+            >
               <GettingStartedCard user={user} />
               <SchoolSuggestionBanner user={user} />
+              {showOnboardingBanner && (
+                <div
+                  style={{
+                    background: 'var(--sh-info-bg)',
+                    border: '1px solid var(--sh-info-border)',
+                    borderRadius: 12,
+                    padding: '14px 16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    fontFamily: FONT,
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 700,
+                        color: 'var(--sh-text)',
+                        marginBottom: 2,
+                      }}
+                    >
+                      You are almost set up
+                    </div>
+                    <div style={{ fontSize: 13, color: 'var(--sh-text-secondary)' }}>
+                      Continue where you left off
+                    </div>
+                  </div>
+                  <Link
+                    to="/onboarding"
+                    style={{
+                      background: 'var(--sh-brand)',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 8,
+                      padding: '7px 16px',
+                      fontSize: 13,
+                      fontWeight: 700,
+                      textDecoration: 'none',
+                      whiteSpace: 'nowrap',
+                      fontFamily: FONT,
+                    }}
+                  >
+                    Resume setup
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={dismissOnboardingBanner}
+                    aria-label="Dismiss onboarding banner"
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: 18,
+                      color: 'var(--sh-text-secondary)',
+                      padding: '2px 4px',
+                      lineHeight: 1,
+                      fontFamily: FONT,
+                    }}
+                  >
+                    &#x2715;
+                  </button>
+                </div>
+              )}
               {newSinceLastVisit > 0 && activeFilter !== 'for-you' ? (
                 <div
                   style={{
@@ -314,6 +396,7 @@ export default function FeedPage() {
                       currentUser={user}
                       onReport={handleReport}
                       targetCommentId={targetCommentId}
+                      studyStatusMap={feedStudyStatusMap}
                     />
                   )}
                 </>

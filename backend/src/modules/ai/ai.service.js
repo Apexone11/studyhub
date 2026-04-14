@@ -11,6 +11,7 @@ const {
   DEFAULT_MODEL,
   SYSTEM_PROMPT,
   DAILY_LIMITS,
+  WEEKLY_LIMITS,
   CONVERSATION_HISTORY_LIMIT,
   MAX_OUTPUT_TOKENS_QA,
   MAX_OUTPUT_TOKENS_SHEET,
@@ -44,7 +45,7 @@ async function getDailyLimit(user) {
       where: { userId: user.id || user.userId },
       select: { plan: true, status: true },
     })
-    if (sub && (sub.status === 'active' || sub.status === 'trialing') && sub.plan !== 'free') {
+    if (sub && ['active', 'trialing', 'past_due'].includes(sub.status) && sub.plan !== 'free') {
       return DAILY_LIMITS.pro
     }
   } catch {
@@ -96,6 +97,107 @@ async function incrementUsage(userId, tokens = 0) {
       tokenCount: { increment: tokens },
     },
   })
+}
+
+// ── Phase 1: Weekly limits ─────────────────────────────────────────
+
+/**
+ * Resolve the weekly message limit for a user (same tier logic as daily).
+ */
+async function getWeeklyLimit(user) {
+  if (user.role === 'admin') return WEEKLY_LIMITS.admin
+  try {
+    const sub = await prisma.subscription.findUnique({
+      where: { userId: user.id || user.userId },
+      select: { plan: true, status: true },
+    })
+    if (sub && ['active', 'trialing', 'past_due'].includes(sub.status) && sub.plan !== 'free') {
+      return WEEKLY_LIMITS.pro
+    }
+  } catch {
+    /* graceful degradation */
+  }
+  try {
+    const donation = await prisma.donation.findFirst({
+      where: { userId: user.id || user.userId, status: 'completed' },
+      select: { id: true },
+    })
+    if (donation) return WEEKLY_LIMITS.donor
+  } catch {
+    /* graceful degradation */
+  }
+  if (user.isStaffVerified || user.emailVerified) return WEEKLY_LIMITS.verified
+  return WEEKLY_LIMITS.default
+}
+
+/**
+ * Sum message counts for the current ISO week (Monday 00:00 UTC → Sunday 23:59 UTC).
+ */
+async function getWeeklyUsage(userId) {
+  const now = new Date()
+  const dayOfWeek = now.getUTCDay()
+  const daysSinceMonday = (dayOfWeek + 6) % 7
+  const weekStart = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - daysSinceMonday),
+  )
+  const weekEnd = new Date(weekStart)
+  weekEnd.setUTCDate(weekEnd.getUTCDate() + 7)
+
+  try {
+    const result = await prisma.aiUsageLog.aggregate({
+      where: {
+        userId,
+        date: { gte: weekStart, lt: weekEnd },
+      },
+      _sum: { messageCount: true },
+    })
+    return result._sum.messageCount || 0
+  } catch {
+    return 0
+  }
+}
+
+/**
+ * Full usage quota snapshot for the frontend. Returns:
+ *   { daily: { used, limit, resetAt }, weekly: { used, limit, resetAt } }
+ */
+async function getUsageQuota(user) {
+  const userId = user.id || user.userId
+
+  const [dailyUsage, dailyLimit, weeklyUsed, weeklyLimit] = await Promise.all([
+    getOrCreateUsage(userId),
+    getDailyLimit(user),
+    getWeeklyUsage(userId),
+    getWeeklyLimit(user),
+  ])
+
+  // Daily reset: next midnight UTC
+  const now = new Date()
+  const dailyReset = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1),
+  )
+
+  // Weekly reset: next Monday 00:00 UTC
+  const dayOfWeek = now.getUTCDay()
+  const daysUntilMonday = (8 - dayOfWeek) % 7 || 7
+  const weeklyReset = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + daysUntilMonday),
+  )
+
+  return {
+    daily: {
+      used: dailyUsage.messageCount,
+      limit: dailyLimit,
+      remaining: Math.max(0, dailyLimit - dailyUsage.messageCount),
+      resetAt: dailyReset.toISOString(),
+    },
+    weekly: {
+      used: weeklyUsed,
+      limit: weeklyLimit,
+      remaining: Math.max(0, weeklyLimit - weeklyUsed),
+      resetAt: weeklyReset.toISOString(),
+    },
+  }
 }
 
 // ── Conversation helpers ───────────────────────────────────────────
@@ -215,6 +317,40 @@ async function streamMessage({ user, conversationId, content, currentPage, image
     return
   }
 
+  // 2b. Phase 1: Check weekly rate limit.
+  const weeklyUsed = await getWeeklyUsage(userId)
+  const weeklyLimit = await getWeeklyLimit(user)
+  if (weeklyUsed >= weeklyLimit) {
+    const now = new Date()
+    const dayOfWeek = now.getUTCDay()
+    const daysUntilMonday = (8 - dayOfWeek) % 7 || 7
+    sendSSE(res, {
+      type: 'error',
+      message: `Weekly limit reached (${weeklyLimit} messages). Resets in ${daysUntilMonday} day${daysUntilMonday !== 1 ? 's' : ''}.`,
+      code: 'RATE_LIMITED',
+    })
+    res.end()
+    return
+  }
+
+  // Phase 5: AI input sanitization — scan for prompt injection patterns
+  // before saving or sending to Claude. We still save the message (for
+  // audit) and let Claude handle the response (it will politely decline),
+  // but we flag the interaction for security review.
+  try {
+    const { sanitizeAiInput } = require('./ai.inputSanitizer')
+    const scan = sanitizeAiInput(content)
+    if (scan.flagged) {
+      captureError(new Error(`AI prompt injection attempt: ${scan.reason}`), {
+        userId,
+        conversationId,
+        contentPreview: content.slice(0, 200),
+      })
+    }
+  } catch {
+    // Sanitizer not available — degrade gracefully
+  }
+
   // 3. Save user message to DB immediately.
   const hasImg = !!(images && images.length > 0)
   await prisma.aiMessage.create({
@@ -288,6 +424,9 @@ async function streamMessage({ user, conversationId, content, currentPage, image
   let totalOutputTokens = 0
   let wasTruncated = false
 
+  const ttftStart = performance.now()
+  let ttftMs = null
+
   try {
     const client = getClient()
     const stream = await client.messages.stream({
@@ -312,6 +451,9 @@ async function streamMessage({ user, conversationId, content, currentPage, image
     for await (const event of stream) {
       if (aborted) break
       if (event.type === 'content_block_delta' && event.delta?.text) {
+        if (ttftMs === null) {
+          ttftMs = Math.round(performance.now() - ttftStart)
+        }
         fullResponse += event.delta.text
         sendSSE(res, { type: 'delta', text: event.delta.text })
       }
@@ -358,9 +500,13 @@ async function streamMessage({ user, conversationId, content, currentPage, image
 
   // 7. Save assistant response.
   const totalTokens = totalInputTokens + totalOutputTokens
-  const msgMetadata = isSheetRequest || wasTruncated
-    ? { ...(isSheetRequest ? { sheetGeneration: true } : {}), ...(wasTruncated ? { truncated: true } : {}) }
-    : undefined
+  const msgMetadata =
+    isSheetRequest || wasTruncated
+      ? {
+          ...(isSheetRequest ? { sheetGeneration: true } : {}),
+          ...(wasTruncated ? { truncated: true } : {}),
+        }
+      : undefined
   const assistantMsg = await prisma.aiMessage.create({
     data: {
       conversation: { connect: { id: conversationId } },
@@ -388,6 +534,17 @@ async function streamMessage({ user, conversationId, content, currentPage, image
     tokenCount: totalTokens,
     usage: { used: usage.messageCount + 1, limit },
   })
+
+  // Track AI streaming time-to-first-token for observability.
+  if (ttftMs !== null) {
+    const { EVENTS, trackServerEvent } = require('../../lib/events')
+    trackServerEvent(userId, EVENTS.AI_STREAM_TTFT, {
+      msToFirstToken: ttftMs,
+      model: conversation.model || DEFAULT_MODEL,
+      promptTokens: totalInputTokens,
+    })
+  }
+
   res.end()
 }
 
@@ -428,6 +585,9 @@ module.exports = {
   renameConversation,
   streamMessage,
   getUsageStats,
+  getUsageQuota,
   getDailyLimit,
+  getWeeklyLimit,
   getOrCreateUsage,
+  getWeeklyUsage,
 }

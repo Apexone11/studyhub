@@ -35,7 +35,10 @@ router.post('/register', registerLimiter, async (req, res) => {
   try {
     const { username, email, password, accountType } = validateRegistrationInput(req.body || {})
 
-    const existingUsername = await prisma.user.findUnique({ where: { username }, select: { id: true } })
+    const existingUsername = await prisma.user.findUnique({
+      where: { username },
+      select: { id: true },
+    })
     if (existingUsername) {
       return res.status(409).json({ error: 'That username is already taken.' })
     }
@@ -45,6 +48,21 @@ router.post('/register', registerLimiter, async (req, res) => {
       if (existingEmail) {
         return res.status(409).json({ error: 'That email is already in use.' })
       }
+    }
+
+    // Phase 5: check password against HIBP breached-password database.
+    // Non-blocking on API failure (graceful degradation).
+    try {
+      const { checkPasswordBreach } = require('../../lib/passwordSafety')
+      const breach = await checkPasswordBreach(password)
+      if (breach.breached) {
+        return res.status(400).json({
+          error: `This password has appeared in ${breach.count.toLocaleString()} data breaches. Please choose a different password.`,
+          code: 'BREACHED_PASSWORD',
+        })
+      }
+    } catch {
+      // HIBP unreachable — allow registration to proceed
     }
 
     const passwordHash = await bcrypt.hash(password, 12)
@@ -76,7 +94,17 @@ router.post('/register', registerLimiter, async (req, res) => {
       return createdUserRecord
     })
 
-    const user = await issueAuthenticatedSession(res, createdUser.id)
+    // Attach referral if a ref code was provided (best-effort)
+    if (req.body.ref) {
+      try {
+        const { attachReferral } = require('../referrals/referrals.service')
+        await attachReferral(req.body.ref, createdUser.id, req.ip)
+      } catch {
+        // best-effort -- do not break registration
+      }
+    }
+
+    const user = await issueAuthenticatedSession(res, createdUser.id, req)
     res.status(201).json({
       message: 'Account created!',
       user,
@@ -91,7 +119,9 @@ router.post('/register/start', registerLimiter, async (req, res) => {
     const { username, email, password, accountType } = validateRegistrationInput(req.body || {})
 
     if (!email) {
-      return res.status(400).json({ error: 'Email is required for the verified registration flow.' })
+      return res
+        .status(400)
+        .json({ error: 'Email is required for the verified registration flow.' })
     }
 
     const [existingUsername, existingEmail] = await Promise.all([
@@ -182,7 +212,10 @@ router.post('/register/complete', registerLimiter, async (req, res) => {
       throw new AppError(400, 'Verify your email before completing registration.')
     }
     if (challenge.payload?.acceptedLegalVersion !== CURRENT_LEGAL_VERSION) {
-      throw new AppError(409, 'Our legal documents were updated. Please restart registration and review the latest version.')
+      throw new AppError(
+        409,
+        'Our legal documents were updated. Please restart registration and review the latest version.',
+      )
     }
 
     // School/course selection is no longer part of registration.
@@ -236,7 +269,17 @@ router.post('/register/complete', registerLimiter, async (req, res) => {
       return createdUser.id
     })
 
-    const user = await issueAuthenticatedSession(res, createdUserId)
+    // Attach referral if a ref code was provided (best-effort)
+    if (body.ref) {
+      try {
+        const { attachReferral } = require('../referrals/referrals.service')
+        await attachReferral(body.ref, createdUserId, req.ip)
+      } catch {
+        // best-effort -- do not break registration
+      }
+    }
+
+    const user = await issueAuthenticatedSession(res, createdUserId, req)
     res.status(201).json({
       message: 'Account created!',
       user,

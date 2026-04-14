@@ -22,7 +22,6 @@ function getRedis() {
     return null
   }
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { Redis } = require('@upstash/redis')
     redis = new Redis({
       url: process.env.UPSTASH_REDIS_URL,

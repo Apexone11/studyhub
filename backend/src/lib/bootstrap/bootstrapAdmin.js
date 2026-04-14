@@ -1,4 +1,5 @@
 const bcrypt = require('bcryptjs')
+const log = require('../logger')
 
 const DEFAULT_ADMIN_EMAIL = 'abdulrfornah@getstudyhub.org'
 
@@ -21,14 +22,12 @@ async function ensureAdminUser(prisma) {
     },
   })
 
-  const nextPasswordHash = password
-    ? await bcrypt.hash(password, 12)
-    : null
+  const nextPasswordHash = password ? await bcrypt.hash(password, 12) : null
 
   if (!existingUser) {
     if (!nextPasswordHash) {
-      console.warn(
-        'Skipping admin bootstrap because ADMIN_PASSWORD is not set for a new admin account.'
+      log.warn(
+        'Skipping admin bootstrap because ADMIN_PASSWORD is not set for a new admin account.',
       )
       return false
     }
@@ -43,7 +42,7 @@ async function ensureAdminUser(prisma) {
       },
       select: { id: true },
     })
-    console.log('Admin bootstrap created the admin account.')
+    log.info('Admin bootstrap created the admin account.')
     return true
   }
 
@@ -70,7 +69,7 @@ async function ensureAdminUser(prisma) {
       data: updates,
       select: { id: true },
     })
-    console.log('Admin bootstrap synced the admin account.')
+    log.info('Admin bootstrap synced the admin account.')
     return true
   }
 

@@ -13,10 +13,12 @@
  * Phase 3 commit B will replace the HTML textarea with a CodeMirror-backed
  * HtmlCodeEditor and introduce an EditorModeToggle.
  */
-import { RichTextEditor } from '../../../../components/editor'
+import { Suspense, lazy } from 'react'
 import StackedEditorPane from '../../../../components/editor/StackedEditorPane'
-import HtmlCodeEditor from '../../../../components/editor/HtmlCodeEditor'
 import { IconUpload, IconEye } from '../../../../components/Icons'
+
+const RichTextEditor = lazy(() => import('../../../../components/editor/RichTextEditor'))
+const HtmlCodeEditor = lazy(() => import('../../../../components/editor/HtmlCodeEditor'))
 
 const textareaStyle = {
   width: '100%',
@@ -42,6 +44,15 @@ const previewFrameStyle = {
   background: '#fff',
 }
 
+const editorLoadingFallbackStyle = {
+  display: 'grid',
+  placeItems: 'center',
+  minHeight: 320,
+  padding: 24,
+  color: 'var(--sh-muted)',
+  background: 'var(--sh-surface)',
+}
+
 export default function SheetLabEditorSurface({
   content,
   contentFormat,
@@ -61,18 +72,22 @@ export default function SheetLabEditorSurface({
           minHeight: 300,
         }}
       >
-        <RichTextEditor
-          content={content}
-          onUpdate={onRichTextUpdate}
-          placeholder="Start writing your study notes..."
-          minHeight={400}
-        />
+        <Suspense fallback={<div style={editorLoadingFallbackStyle}>Loading editor…</div>}>
+          <RichTextEditor
+            content={content}
+            onUpdate={onRichTextUpdate}
+            placeholder="Start writing your study notes..."
+            minHeight={400}
+          />
+        </Suspense>
       </div>
     )
   }
 
   const editorSlot = isHtml ? (
-    <HtmlCodeEditor value={content} onChange={onRichTextUpdate} placeholder="HTML content…" />
+    <Suspense fallback={<div style={editorLoadingFallbackStyle}>Loading HTML editor…</div>}>
+      <HtmlCodeEditor value={content} onChange={onRichTextUpdate} placeholder="HTML content…" />
+    </Suspense>
   ) : (
     <textarea
       value={content}

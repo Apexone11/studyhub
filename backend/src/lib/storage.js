@@ -1,6 +1,7 @@
 const fs = require('node:fs')
 const path = require('node:path')
 const { captureError } = require('../monitoring/sentry')
+const log = require('./logger')
 
 const BACKEND_ROOT = path.resolve(__dirname, '../..')
 const DEFAULT_UPLOADS_DIR = path.join(BACKEND_ROOT, 'uploads')
@@ -41,7 +42,16 @@ const NOTE_IMAGES_DIR = path.join(UPLOADS_DIR, 'note-images')
 const GROUP_MEDIA_DIR = path.join(UPLOADS_DIR, 'group-media')
 
 function ensureUploadDirectories() {
-  for (const directory of [UPLOADS_DIR, AVATARS_DIR, COVERS_DIR, ATTACHMENTS_DIR, SCHOOL_LOGOS_DIR, CONTENT_IMAGES_DIR, NOTE_IMAGES_DIR, GROUP_MEDIA_DIR]) {
+  for (const directory of [
+    UPLOADS_DIR,
+    AVATARS_DIR,
+    COVERS_DIR,
+    ATTACHMENTS_DIR,
+    SCHOOL_LOGOS_DIR,
+    CONTENT_IMAGES_DIR,
+    NOTE_IMAGES_DIR,
+    GROUP_MEDIA_DIR,
+  ]) {
     fs.mkdirSync(directory, { recursive: true })
     fs.accessSync(directory, fs.constants.R_OK | fs.constants.W_OK)
   }
@@ -53,7 +63,7 @@ function validateUploadStorage() {
 
   if (process.env.NODE_ENV === 'production' && !hasPersistentUploadsDir && !allowEphemeralUploads) {
     throw new Error(
-      'UPLOADS_DIR must point to persistent storage in production. On Railway, attach a volume mounted at /data or set UPLOADS_DIR to a mounted volume path such as /data/uploads. For temporary non-persistent environments only, set ALLOW_EPHEMERAL_UPLOADS=true.'
+      'UPLOADS_DIR must point to persistent storage in production. On Railway, attach a volume mounted at /data or set UPLOADS_DIR to a mounted volume path such as /data/uploads. For temporary non-persistent environments only, set ALLOW_EPHEMERAL_UPLOADS=true.',
     )
   }
 
@@ -63,11 +73,11 @@ function validateUploadStorage() {
     ? 'configured'
     : autoDetectedUploadsDir
       ? 'auto-detected-persistent'
-    : allowEphemeralUploads
-      ? 'ephemeral-opt-in'
-      : 'default-local'
+      : allowEphemeralUploads
+        ? 'ephemeral-opt-in'
+        : 'default-local'
 
-  console.log(`Upload storage ready at ${UPLOADS_DIR} (${storageMode}).`)
+  log.info({ uploadsDir: UPLOADS_DIR, storageMode }, 'Upload storage ready')
 }
 
 function buildUploadUrl(kind, fileName) {
@@ -102,8 +112,7 @@ function isPathWithinRoot(candidatePath, rootDirectory) {
   const resolvedCandidate = path.resolve(candidatePath)
   const resolvedRoot = path.resolve(rootDirectory)
   return (
-    resolvedCandidate === resolvedRoot ||
-    resolvedCandidate.startsWith(`${resolvedRoot}${path.sep}`)
+    resolvedCandidate === resolvedRoot || resolvedCandidate.startsWith(`${resolvedRoot}${path.sep}`)
   )
 }
 
@@ -132,7 +141,10 @@ function resolveManagedUploadPath(uploadUrl) {
     if (!isManagedLeafFileName(fileName)) return null
 
     const resolved = path.resolve(entry.directory, fileName)
-    if (!isPathWithinRoot(resolved, entry.directory) || resolved === path.resolve(entry.directory)) {
+    if (
+      !isPathWithinRoot(resolved, entry.directory) ||
+      resolved === path.resolve(entry.directory)
+    ) {
       return null
     }
 
@@ -155,8 +167,8 @@ function resolveAvatarPath(avatarUrl) {
 function resolveAttachmentPath(attachmentUrl) {
   const normalizedUrl = String(attachmentUrl || '')
   if (
-    !normalizedUrl.startsWith(`${UPLOADS_URL_PREFIX}/attachments/`)
-    && !normalizedUrl.startsWith(PRIVATE_ATTACHMENT_PREFIX)
+    !normalizedUrl.startsWith(`${UPLOADS_URL_PREFIX}/attachments/`) &&
+    !normalizedUrl.startsWith(PRIVATE_ATTACHMENT_PREFIX)
   ) {
     return null
   }
@@ -177,9 +189,16 @@ function resolveManagedFilePath(filePath) {
   if (!filePath) return null
 
   const resolved = path.resolve(String(filePath))
-  const managedRoots = [AVATARS_DIR, COVERS_DIR, ATTACHMENTS_DIR, CONTENT_IMAGES_DIR, NOTE_IMAGES_DIR]
+  const managedRoots = [
+    AVATARS_DIR,
+    COVERS_DIR,
+    ATTACHMENTS_DIR,
+    CONTENT_IMAGES_DIR,
+    NOTE_IMAGES_DIR,
+  ]
   const isManagedPath = managedRoots.some(
-    (rootDirectory) => isPathWithinRoot(resolved, rootDirectory) && resolved !== path.resolve(rootDirectory)
+    (rootDirectory) =>
+      isPathWithinRoot(resolved, rootDirectory) && resolved !== path.resolve(rootDirectory),
   )
   if (!isManagedPath) {
     return null

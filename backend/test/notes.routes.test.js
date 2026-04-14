@@ -36,6 +36,12 @@ const mocks = vi.hoisted(() => {
     user: {
       findUnique: vi.fn(),
     },
+    noteVersion: {
+      findMany: vi.fn().mockResolvedValue([]),
+      create: vi.fn().mockResolvedValue({}),
+      findUnique: vi.fn().mockResolvedValue(null),
+      count: vi.fn().mockResolvedValue(0),
+    },
   }
 
   return {
@@ -235,9 +241,7 @@ describe('notes routes', () => {
     })
 
     it('validates title is required', async () => {
-      const response = await request(app)
-        .post('/')
-        .send({ title: '', content: 'content' })
+      const response = await request(app).post('/').send({ title: '', content: 'content' })
 
       expect(response.status).toBe(400)
       expect(response.body).toMatchObject({ error: 'Title is required.' })
@@ -281,9 +285,7 @@ describe('notes routes', () => {
     it('returns 404 when note does not exist', async () => {
       mocks.prisma.note.findUnique.mockResolvedValue(null)
 
-      const response = await request(app)
-        .patch('/999')
-        .send({ title: 'Nope' })
+      const response = await request(app).patch('/999').send({ title: 'Nope' })
 
       expect(response.status).toBe(404)
       expect(response.body).toMatchObject({ error: 'Note not found.' })
@@ -300,9 +302,7 @@ describe('notes routes', () => {
         return false
       })
 
-      const response = await request(app)
-        .patch('/1')
-        .send({ title: 'Stolen' })
+      const response = await request(app).patch('/1').send({ title: 'Stolen' })
 
       expect(response.status).toBe(403)
     })
@@ -314,9 +314,7 @@ describe('notes routes', () => {
         title: 'Current Title',
       })
 
-      const response = await request(app)
-        .patch('/1')
-        .send({ title: '   ' })
+      const response = await request(app).patch('/1').send({ title: '   ' })
 
       expect(response.status).toBe(400)
       expect(response.body).toMatchObject({ error: 'Title cannot be empty.' })
@@ -402,9 +400,7 @@ describe('notes routes', () => {
         course: null,
       })
 
-      await request(app)
-        .patch('/5')
-        .send({ title: 'Updated Title', content: 'Updated body text' })
+      await request(app).patch('/5').send({ title: 'Updated Title', content: 'Updated body text' })
 
       expect(mocks.moderationEngine.scanContent).toHaveBeenCalledWith({
         contentType: 'note',
@@ -429,9 +425,7 @@ describe('notes routes', () => {
         course: null,
       })
 
-      await request(app)
-        .patch('/5')
-        .send({ private: false })
+      await request(app).patch('/5').send({ private: false })
 
       expect(mocks.moderationEngine.scanContent).not.toHaveBeenCalled()
     })
@@ -450,9 +444,7 @@ describe('notes routes', () => {
         course: null,
       })
 
-      await request(app)
-        .post('/')
-        .send({ title: 'Test', content: 'Content' })
+      await request(app).post('/').send({ title: 'Test', content: 'Content' })
 
       expect(mocks.moderationEngine.scanContent).not.toHaveBeenCalled()
     })
@@ -474,9 +466,7 @@ describe('notes routes', () => {
         author: { id: 42, username: 'test_user' },
       })
 
-      const res = await request(app)
-        .post('/3/comments')
-        .send({ content: 'Great explanation!' })
+      const res = await request(app).post('/3/comments').send({ content: 'Great explanation!' })
 
       expect(res.status).toBe(201)
       expect(mocks.moderationEngine.scanContent).toHaveBeenCalledWith({

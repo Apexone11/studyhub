@@ -120,6 +120,12 @@ const mocks = vi.hoisted(() => {
         }
         return session
       }),
+      getOptionalAuthUserFromRequest: vi.fn((req) => {
+        const token = req.headers['x-studyhub-test-token'] || null
+        if (!token) return null
+        const session = SESSION_BY_TOKEN[token]
+        return session || null
+      }),
     },
     rateLimiters: {
       searchLimiter: (_req, _res, next) => next(),
@@ -130,6 +136,14 @@ const mocks = vi.hoisted(() => {
     sentry: {
       captureError: vi.fn(),
     },
+    fullTextSearch: {
+      searchSheetsFTS: vi.fn().mockResolvedValue({ sheets: [], total: 0, page: 1, totalPages: 0 }),
+      searchCoursesFTS: vi.fn().mockResolvedValue([]),
+      searchUsersFTS: vi.fn().mockResolvedValue([]),
+    },
+    feedService: {
+      summarizeText: vi.fn((text) => text),
+    },
   }
 })
 
@@ -139,6 +153,8 @@ const mockTargets = new Map([
   [require.resolve('../src/monitoring/sentry'), mocks.sentry],
   [require.resolve('../src/lib/rateLimiters'), mocks.rateLimiters],
   [require.resolve('../src/lib/social/blockFilter'), mocks.blockFilter],
+  [require.resolve('../src/lib/fullTextSearch'), mocks.fullTextSearch],
+  [require.resolve('../src/modules/feed/feed.service'), mocks.feedService],
 ])
 
 const originalModuleLoad = Module._load
@@ -176,21 +192,21 @@ beforeEach(() => {
 
   mocks.prisma.studySheet.findMany.mockImplementation(async ({ where, take }) => {
     const query = String(
-      where?.OR?.find((clause) => clause.title)?.title?.contains
-        || where?.OR?.find((clause) => clause.content)?.content?.contains
-        || where?.OR?.find((clause) => clause.description)?.description?.contains
-        || ''
+      where?.OR?.find((clause) => clause.title)?.title?.contains ||
+        where?.OR?.find((clause) => clause.content)?.content?.contains ||
+        where?.OR?.find((clause) => clause.description)?.description?.contains ||
+        '',
     ).toLowerCase()
 
-    return SEARCH_SHEETS
-      .filter(({ searchableContent, result }) => {
-        if (where?.status !== 'published') {
-          return false
-        }
+    return SEARCH_SHEETS.filter(({ searchableContent, result }) => {
+      if (where?.status !== 'published') {
+        return false
+      }
 
-        return [result.title, result.description, searchableContent]
-          .some((value) => String(value).toLowerCase().includes(query))
-      })
+      return [result.title, result.description, searchableContent].some((value) =>
+        String(value).toLowerCase().includes(query),
+      )
+    })
       .map(({ result }) => result)
       .slice(0, take)
   })
@@ -198,8 +214,7 @@ beforeEach(() => {
   mocks.prisma.user.findMany.mockImplementation(async ({ where, take }) => {
     const query = String(where?.username?.contains || '').toLowerCase()
 
-    return SEARCH_USERS
-      .filter((user) => user.username.toLowerCase().includes(query))
+    return SEARCH_USERS.filter((user) => user.username.toLowerCase().includes(query))
       .sort((left, right) => left.username.localeCompare(right.username))
       .slice(0, take)
   })
@@ -215,19 +230,19 @@ beforeEach(() => {
   })
   mocks.prisma.enrollment.findMany.mockImplementation(async ({ where }) => {
     if (typeof where?.userId === 'number') {
-      return ENROLLMENTS
-        .filter((enrollment) => enrollment.userId === where.userId)
-        .map((enrollment) => ({ courseId: enrollment.courseId }))
+      return ENROLLMENTS.filter((enrollment) => enrollment.userId === where.userId).map(
+        (enrollment) => ({ courseId: enrollment.courseId }),
+      )
     }
 
     const userIds = where?.userId?.in || []
 
-    return ENROLLMENTS
-      .filter((enrollment) => userIds.includes(enrollment.userId))
-      .map((enrollment) => ({
+    return ENROLLMENTS.filter((enrollment) => userIds.includes(enrollment.userId)).map(
+      (enrollment) => ({
         userId: enrollment.userId,
         courseId: enrollment.courseId,
-      }))
+      }),
+    )
   })
   mocks.prisma.note.findMany.mockResolvedValue([])
   mocks.prisma.studyGroup.findMany.mockResolvedValue([])
@@ -238,7 +253,9 @@ describe('search routes', () => {
     const response = await request(app).get('/').query({ q: 'dijkstra', type: 'sheets' })
 
     expect(response.status).toBe(200)
-    expect(response.body.results.sheets.map((sheet) => sheet.title)).toEqual(['Algorithms Graph Review'])
+    expect(response.body.results.sheets.map((sheet) => sheet.title)).toEqual([
+      'Algorithms Graph Review',
+    ])
   })
 
   it('hides private and classmates-only users from unauthenticated searches', async () => {
@@ -291,7 +308,14 @@ describe('search routes', () => {
   // ── Notes search tests ──────────────────────────────────────────
   it('returns shared notes in search results', async () => {
     mocks.prisma.note.findMany.mockResolvedValue([
-      { id: 301, title: 'Study Guide Chapter 5', tags: '["exam-review"]', createdAt: new Date(), course: { id: 10, code: 'CMSC132', name: 'OOP II' }, author: { id: 99, username: 'note_author' } },
+      {
+        id: 301,
+        title: 'Study Guide Chapter 5',
+        tags: '["exam-review"]',
+        createdAt: new Date(),
+        course: { id: 10, code: 'CMSC132', name: 'OOP II' },
+        author: { id: 99, username: 'note_author' },
+      },
     ])
 
     const response = await request(app)
@@ -320,14 +344,12 @@ describe('search routes', () => {
         { title: { contains: 'anything', mode: 'insensitive' } },
         { content: { contains: 'anything', mode: 'insensitive' } },
         { tags: { contains: 'anything', mode: 'insensitive' } },
-      ])
+      ]),
     )
   })
 
   it('does not return notes for unauthenticated search', async () => {
-    const response = await request(app)
-      .get('/')
-      .query({ q: 'Public Note', type: 'all' })
+    const response = await request(app).get('/').query({ q: 'Public Note', type: 'all' })
 
     // Notes are skipped for unauthenticated users
     expect(response.status).toBe(200)
@@ -337,7 +359,13 @@ describe('search routes', () => {
 
   it('does not expose note content in search results', async () => {
     mocks.prisma.note.findMany.mockResolvedValue([
-      { id: 303, title: 'Secret Content Note', createdAt: new Date(), course: null, author: { id: 1, username: 'user1' } },
+      {
+        id: 303,
+        title: 'Secret Content Note',
+        createdAt: new Date(),
+        course: null,
+        author: { id: 1, username: 'user1' },
+      },
     ])
 
     const response = await request(app)

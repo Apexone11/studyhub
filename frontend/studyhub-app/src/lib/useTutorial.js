@@ -13,7 +13,7 @@
  *   <Joyride {...tutorial.joyrideProps} />
  *   <button onClick={tutorial.restart}>Show Tutorial</button>
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 
 /**
  * @param {string} pageKey — unique key for localStorage (e.g., 'feed', 'sheets')
@@ -48,16 +48,40 @@ export function useTutorial(pageKey, steps, options = {}) {
 
   const [run, setRun] = useState(false)
   const [hasTriggered, setHasTriggered] = useState(false)
+  const [resolvedSteps, setResolvedSteps] = useState([])
+
+  const resolveSteps = useCallback(() => {
+    if (typeof document === 'undefined') {
+      setResolvedSteps(steps)
+      return steps
+    }
+
+    const nextSteps = steps.filter((step) => {
+      if (!step?.target || typeof step.target !== 'string') return true
+      return Boolean(document.querySelector(step.target))
+    })
+
+    setResolvedSteps(nextSteps)
+    return nextSteps
+  }, [steps])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      resolveSteps()
+    }, 0)
+
+    return () => clearTimeout(timer)
+  }, [resolveSteps])
 
   // Auto-trigger once after delay, only if not seen
-  useState(() => {
-    if (alreadySeen || hasTriggered) return
+  useEffect(() => {
+    if (alreadySeen || hasTriggered || resolvedSteps.length === 0) return undefined
     const timer = setTimeout(() => {
       setRun(true)
       setHasTriggered(true)
     }, delayMs)
     return () => clearTimeout(timer)
-  })
+  }, [alreadySeen, hasTriggered, delayMs, resolvedSteps.length])
 
   const markSeen = useCallback(() => {
     try {
@@ -75,17 +99,19 @@ export function useTutorial(pageKey, steps, options = {}) {
         markSeen()
       }
     },
-    [markSeen]
+    [markSeen],
   )
 
   const restart = useCallback(() => {
+    const nextSteps = resolveSteps()
+    if (nextSteps.length === 0) return
     setRun(true)
-  }, [])
+  }, [resolveSteps])
 
   const joyrideProps = useMemo(
     () => ({
-      steps,
-      run,
+      steps: resolvedSteps,
+      run: run && resolvedSteps.length > 0,
       continuous: true,
       showSkipButton: true,
       showProgress: true,
@@ -134,7 +160,7 @@ export function useTutorial(pageKey, steps, options = {}) {
         },
       },
     }),
-    [steps, run, handleCallback]
+    [resolvedSteps, run, handleCallback],
   )
 
   return { joyrideProps, restart, seen: alreadySeen }

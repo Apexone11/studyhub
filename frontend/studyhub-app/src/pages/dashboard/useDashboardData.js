@@ -19,11 +19,17 @@ function getLastDashboardVisit() {
   try {
     const raw = localStorage.getItem(LAST_VISIT_KEY)
     return raw ? new Date(raw).getTime() : 0
-  } catch { return 0 }
+  } catch {
+    return 0
+  }
 }
 
 function markDashboardVisit() {
-  try { localStorage.setItem(LAST_VISIT_KEY, new Date().toISOString()) } catch { /* ignore */ }
+  try {
+    localStorage.setItem(LAST_VISIT_KEY, new Date().toISOString())
+  } catch {
+    /* ignore */
+  }
 }
 
 export function useDashboardData() {
@@ -87,9 +93,27 @@ export function useDashboardData() {
   const cards = useMemo(() => {
     const stats = summary?.stats || {}
     return [
-      summaryCard('Courses', stats.courseCount || 0, 'Active enrollments', 'var(--sh-info)', '/settings?tab=courses'),
-      summaryCard('Sheets', stats.sheetCount || 0, 'Sheets you uploaded', 'var(--sh-success)', '/sheets?mine=1'),
-      summaryCard('Stars', stats.starCount || 0, 'Saved sheets', 'var(--sh-warning)', '/sheets?starred=1'),
+      summaryCard(
+        'Courses',
+        stats.courseCount || 0,
+        'Active enrollments',
+        'var(--sh-info)',
+        '/settings?tab=courses',
+      ),
+      summaryCard(
+        'Sheets',
+        stats.sheetCount || 0,
+        'Sheets you uploaded',
+        'var(--sh-success)',
+        '/sheets?mine=1',
+      ),
+      summaryCard(
+        'Stars',
+        stats.starCount || 0,
+        'Saved sheets',
+        'var(--sh-warning)',
+        '/sheets?starred=1',
+      ),
     ]
   }, [summary])
 
@@ -117,7 +141,12 @@ export function useDashboardData() {
   const courses = summary?.courses || []
   const recentSheets = useMemo(() => summary?.recentSheets || [], [summary])
   const { recentlyViewed } = useRecentlyViewed()
-  const { counts: studyQueueCounts, toReview: studyToReview, studying: studyStudying } = useAllStudyStatuses()
+  const {
+    counts: studyQueueCounts,
+    toReview: studyToReview,
+    studying: studyStudying,
+    done: studyDone,
+  } = useAllStudyStatuses()
 
   /* Study activity derived from recently-viewed localStorage data */
   const studyActivity = useMemo(() => {
@@ -135,7 +164,9 @@ export function useDashboardData() {
   }, [recentSheets, lastVisit])
 
   // Mark dashboard visit once data loads
-  useEffect(() => { if (summary) markDashboardVisit() }, [summary])
+  useEffect(() => {
+    if (summary) markDashboardVisit()
+  }, [summary])
 
   return {
     user,
@@ -163,5 +194,6 @@ export function useDashboardData() {
     studyQueueCounts,
     studyToReview,
     studyStudying,
+    studyDone,
   }
 }

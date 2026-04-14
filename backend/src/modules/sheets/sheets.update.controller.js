@@ -7,6 +7,7 @@ const { validateHtmlForSubmission } = require('../../lib/html/htmlSecurity')
 const { isModerationEnabled, scanContent } = require('../../lib/moderation/moderationEngine')
 const { updateFingerprint } = require('../../lib/plagiarismService')
 const { findSimilarSheets } = require('../../lib/plagiarism')
+const { runPlagiarismScan } = require('../plagiarism/plagiarism.service')
 const { createProvenanceToken } = require('../../lib/provenance')
 const { isHtmlUploadsEnabled } = require('../../lib/html/htmlKillSwitch')
 const { SHEET_STATUS, AUTHOR_SELECT, sheetWriteLimiter } = require('./sheets.constants')
@@ -17,12 +18,14 @@ const {
 } = require('./sheets.service')
 const { serializeSheet } = require('./sheets.serializer')
 const { createNotification } = require('../../lib/notify')
+const log = require('../../lib/logger')
 
 const router = express.Router()
 
 router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
   const sheetId = Number.parseInt(req.params.id, 10)
-  const { title, description, content, courseId, allowDownloads, allowEditing, removeAttachment } = req.body || {}
+  const { title, description, content, courseId, allowDownloads, allowEditing, removeAttachment } =
+    req.body || {}
 
   try {
     const sheet = await prisma.studySheet.findUnique({
@@ -47,7 +50,13 @@ router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
     if (!isOwnerOrAdmin) {
       // Non-owners with editing permission can only update content fields,
       // not metadata like allowDownloads, allowEditing, status, courseId, or removeAttachment.
-      const restricted = ['allowDownloads', 'allowEditing', 'status', 'courseId', 'removeAttachment']
+      const restricted = [
+        'allowDownloads',
+        'allowEditing',
+        'status',
+        'courseId',
+        'removeAttachment',
+      ]
       const body = req.body || {}
       for (const key of restricted) {
         if (Object.hasOwn(body, key)) {
@@ -57,12 +66,12 @@ router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
     }
 
     const data = {}
-    const requestedContentFormat = req.body && Object.hasOwn(req.body, 'contentFormat')
-      ? normalizeContentFormat(req.body.contentFormat)
-      : sheet.contentFormat
-    const requestedStatus = req.body && Object.hasOwn(req.body, 'status')
-      ? normalizeSheetStatus(req.body.status, '')
-      : ''
+    const requestedContentFormat =
+      req.body && Object.hasOwn(req.body, 'contentFormat')
+        ? normalizeContentFormat(req.body.contentFormat)
+        : sheet.contentFormat
+    const requestedStatus =
+      req.body && Object.hasOwn(req.body, 'status') ? normalizeSheetStatus(req.body.status, '') : ''
 
     if (typeof title === 'string') {
       if (!title.trim()) return res.status(400).json({ error: 'Title is required.' })
@@ -97,10 +106,11 @@ router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
     const nextFormat = data.contentFormat || sheet.contentFormat
 
     // Determine if moderation-relevant fields changed (content, format, attachment, status)
-    const contentChanged = typeof content === 'string'
-      || (req.body && Object.hasOwn(req.body, 'contentFormat'))
-      || removeAttachment === true
-      || (req.body && Object.hasOwn(req.body, 'status'))
+    const contentChanged =
+      typeof content === 'string' ||
+      (req.body && Object.hasOwn(req.body, 'contentFormat')) ||
+      removeAttachment === true ||
+      (req.body && Object.hasOwn(req.body, 'status'))
 
     if (contentChanged) {
       const wantsDraft = requestedStatus === SHEET_STATUS.DRAFT
@@ -121,7 +131,8 @@ router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
             code: 'HTML_UPLOADS_DISABLED',
           })
         }
-        const htmlToValidate = typeof nextContent === 'string' ? nextContent : String(sheet.content || '')
+        const htmlToValidate =
+          typeof nextContent === 'string' ? nextContent : String(sheet.content || '')
         if (nextStatus !== SHEET_STATUS.DRAFT || htmlToValidate.trim()) {
           const validation = validateHtmlForSubmission(htmlToValidate)
           if (!validation.ok) {
@@ -162,11 +173,12 @@ router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
 
     res.json({
       ...serializeSheet(updated),
-      message: updated.status === SHEET_STATUS.PENDING_REVIEW
-        ? 'Sheet submitted for admin review.'
-        : updated.status === SHEET_STATUS.DRAFT
-          ? 'Draft saved.'
-          : 'Sheet updated.',
+      message:
+        updated.status === SHEET_STATUS.PENDING_REVIEW
+          ? 'Sheet submitted for admin review.'
+          : updated.status === SHEET_STATUS.DRAFT
+            ? 'Draft saved.'
+            : 'Sheet updated.',
     })
 
     /* Notify fork owners when upstream metadata changes (title or status) — fire-and-forget */
@@ -180,7 +192,9 @@ router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
             select: { userId: true },
           })
           const uniqueOwnerIds = [...new Set(forks.map((f) => f.userId))]
-          const changeDesc = titleChanged ? `renamed to "${data.title}"` : `status changed to ${data.status}`
+          const changeDesc = titleChanged
+            ? `renamed to "${data.title}"`
+            : `status changed to ${data.status}`
           await Promise.allSettled(
             uniqueOwnerIds.map((forkOwnerId) =>
               createNotification(prisma, {
@@ -190,8 +204,8 @@ router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
                 actorId: req.user.userId,
                 sheetId,
                 linkPath: `/sheets/${sheetId}`,
-              })
-            )
+              }),
+            ),
           )
         } catch (err) {
           captureError(err, { context: 'notify.upstreamChange', sheetId })
@@ -205,9 +219,16 @@ router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
         data.title || '',
         data.description || '',
         nextFormat === 'markdown' && typeof content === 'string' ? content : '',
-      ].join(' ').trim()
+      ]
+        .join(' ')
+        .trim()
       if (textToScan) {
-        void scanContent({ contentType: 'sheet', contentId: sheetId, text: textToScan, userId: req.user.userId })
+        void scanContent({
+          contentType: 'sheet',
+          contentId: sheetId,
+          text: textToScan,
+          userId: req.user.userId,
+        })
       }
     }
 
@@ -225,8 +246,10 @@ router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
           if (similarSheets && similarSheets.length > 0) {
             const verySimilar = similarSheets.filter((s) => s.distance <= 5)
             if (verySimilar.length > 0) {
-              // Log for debugging
-              console.log(`[PLAGIARISM] Sheet ${sheetId} has ${verySimilar.length} very similar matches`, verySimilar.slice(0, 3))
+              log.info(
+                { sheetId, matchCount: verySimilar.length, matches: verySimilar.slice(0, 3) },
+                '[PLAGIARISM] very similar matches detected for sheet',
+              )
 
               // Check if a plagiarism case already exists for this sheet
               const existingCase = await prisma.moderationCase.findFirst({
@@ -278,6 +301,9 @@ router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
       })
     }
 
+    /* Phase 4: comprehensive plagiarism scan with multi-window SimHash + n-gram (fire-and-forget) */
+    if (typeof content === 'string') void runPlagiarismScan(sheetId, content, req.user.userId)
+
     /* Auto-generate provenance manifest if one does not exist yet (fire-and-forget) */
     Promise.resolve().then(async () => {
       try {
@@ -291,7 +317,12 @@ router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
             select: { content: true, createdAt: true },
           })
           if (fullSheet) {
-            const token = createProvenanceToken(sheetId, req.user.userId, fullSheet.content, fullSheet.createdAt)
+            const token = createProvenanceToken(
+              sheetId,
+              req.user.userId,
+              fullSheet.content,
+              fullSheet.createdAt,
+            )
             await prisma.provenanceManifest.create({
               data: {
                 sheetId,

@@ -26,18 +26,24 @@ import PrivacyTab from './PrivacyTab'
 import AppearanceTab from './AppearanceTab'
 import SubscriptionTab from './SubscriptionTab'
 import ModerationTab from './ModerationTab'
+import ReviewTab from './ReviewTab'
 import LegalTab from './LegalTab'
+import SessionsTab from './SessionsTab'
+import ReferralsTab from './ReferralsTab'
 
 const NAV_TABS = [
   { id: 'profile', label: 'Profile' },
   { id: 'security', label: 'Security' },
+  { id: 'sessions', label: 'Sessions' },
   { id: 'notifications', label: 'Notifications' },
   { id: 'privacy', label: 'Privacy' },
   { id: 'appearance', label: 'Appearance' },
   { id: 'account', label: 'Account' },
   { id: 'subscription', label: 'Subscription' },
+  { id: 'referrals', label: 'Referrals' },
   { id: 'legal', label: 'Legal' },
   { id: 'moderation', label: 'Moderation' },
+  { id: 'review', label: 'Leave a Review' },
 ]
 
 export default function SettingsPage() {
@@ -263,6 +269,8 @@ export default function SettingsPage() {
             syncUser={syncUser}
           />
         )
+      case 'sessions':
+        return <SessionsTab />
       case 'notifications':
         return (
           <div data-tutorial="settings-notifications">
@@ -290,10 +298,14 @@ export default function SettingsPage() {
         )
       case 'subscription':
         return <SubscriptionTab />
+      case 'referrals':
+        return <ReferralsTab />
       case 'legal':
         return <LegalTab />
       case 'moderation':
         return <ModerationTab />
+      case 'review':
+        return <ReviewTab />
       default:
         return null
     }
@@ -320,7 +332,10 @@ export default function SettingsPage() {
   )
 
   return (
-    <div className="sh-app-page" style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: FONT }}>
+    <div
+      className="sh-app-page"
+      style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: FONT }}
+    >
       <Navbar crumbs={[{ label: 'Settings', to: '/settings' }]} hideTabs actions={navActions} />
 
       <div

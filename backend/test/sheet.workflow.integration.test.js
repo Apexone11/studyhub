@@ -74,7 +74,9 @@ const mocks = vi.hoisted(() => {
           if (where.status && sheet.status !== where.status) return false
           return true
         })
-        .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime())
+        .sort(
+          (left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime(),
+        )
 
       if (matches.length === 0) return null
       return attachRelations(matches[0])
@@ -151,7 +153,9 @@ const mocks = vi.hoisted(() => {
         upsert: vi.fn(async ({ where, create, update }) => {
           const sheetId = Number(where?.sheetId_kind?.sheetId)
           const kind = String(where?.sheetId_kind?.kind || '')
-          const existing = state.versions.find((entry) => entry.sheetId === sheetId && entry.kind === kind)
+          const existing = state.versions.find(
+            (entry) => entry.sheetId === sheetId && entry.kind === kind,
+          )
           if (existing) {
             Object.assign(existing, update, { updatedAt: new Date().toISOString() })
             return { ...existing }
@@ -247,11 +251,28 @@ const mocks = vi.hoisted(() => {
       }
       next()
     },
+    optionalAuth: (req, _res, next) => {
+      const headerUserId = req.headers['x-test-user-id']
+      if (!headerUserId) {
+        next()
+        return
+      }
+      const userId = Number(headerUserId)
+      const role = String(req.headers['x-test-role'] || 'student')
+      req.user = {
+        userId,
+        role,
+        username: role === 'admin' ? 'beta_admin' : 'student_owner',
+      }
+      next()
+    },
+    requireVerifiedEmail: (_req, _res, next) => next(),
     sentry: {
       captureError: vi.fn(),
     },
     authTokens: {
       getAuthTokenFromRequest: vi.fn(() => null),
+      getOptionalAuthUserFromRequest: vi.fn(() => null),
       verifyAuthToken: vi.fn(() => null),
       getJwtSecret: vi.fn(() => 'test-jwt-secret-for-integration-tests'),
     },
@@ -277,6 +298,9 @@ const mocks = vi.hoisted(() => {
 const mockTargets = new Map([
   [require.resolve('../src/lib/prisma'), mocks.prisma],
   [require.resolve('../src/middleware/auth'), mocks.requireAuth],
+  [require.resolve('../src/core/auth/optionalAuth'), mocks.optionalAuth],
+  [require.resolve('../src/core/auth/requireVerifiedEmail'), mocks.requireVerifiedEmail],
+  [require.resolve('../src/middleware/requireVerifiedEmail'), mocks.requireVerifiedEmail],
   [require.resolve('../src/monitoring/sentry'), mocks.sentry],
   [require.resolve('../src/lib/authTokens'), mocks.authTokens],
   [require.resolve('../src/lib/notify'), mocks.notify],
@@ -634,7 +658,8 @@ describe('sheet workflow integration', () => {
   })
 
   it('routes redirect-pattern HTML to pending_review (tier 2 behavioral detection)', async () => {
-    const redirectHtml = '<main><h1>Notes</h1><script>window.location.href = "https://evil.example";</script></main>'
+    const redirectHtml =
+      '<main><h1>Notes</h1><script>window.location.href = "https://evil.example";</script></main>'
 
     const importResponse = await request(app)
       .post('/sheets/drafts/import-html')
@@ -686,7 +711,10 @@ describe('sheet workflow integration', () => {
     const sheetId = draftResponse.body.draft.id
 
     // Manually update to quarantined state (simulates AV detection)
-    mocks.prisma.studySheet.update({ where: { id: sheetId }, data: { status: 'quarantined', htmlRiskTier: 3 } })
+    mocks.prisma.studySheet.update({
+      where: { id: sheetId },
+      data: { status: 'quarantined', htmlRiskTier: 3 },
+    })
 
     // Owner requests runtime — should be blocked (tier 3 = quarantined)
     const runtimeResponse = await request(app)
@@ -698,7 +726,10 @@ describe('sheet workflow integration', () => {
     expect(runtimeResponse.body.error).toMatch(/quarantined/i)
 
     // Set to pending_review with tier 2 for access control test
-    mocks.prisma.studySheet.update({ where: { id: sheetId }, data: { status: 'pending_review', htmlRiskTier: 2 } })
+    mocks.prisma.studySheet.update({
+      where: { id: sheetId },
+      data: { status: 'pending_review', htmlRiskTier: 2 },
+    })
 
     // Owner can access pending_review runtime
     const ownerRuntimeResponse = await request(app)
@@ -833,8 +864,7 @@ describe('sheet workflow integration', () => {
       expect(renameRes.status).toBe(200)
 
       // Read as unauthenticated visitor (optionalAuth sets req.user = undefined)
-      const readRes = await request(app)
-        .get(`/sheets/${created.id}`)
+      const readRes = await request(app).get(`/sheets/${created.id}`)
 
       expect(readRes.status).toBe(200)
       expect(readRes.body.title).toBe('Renamed Public Sheet')

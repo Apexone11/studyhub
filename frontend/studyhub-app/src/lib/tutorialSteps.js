@@ -14,13 +14,13 @@ export const TUTORIAL_VERSIONS = {
   sheets: 2,
   dashboard: 2,
   notes: 2,
-  settings: 2,
+  settings: 3,
   profile: 2,
   viewer: 2,
-  announcements: 2,
+  announcements: 3,
   upload: 2,
-  messages: 1,
-  studyGroups: 1,
+  messages: 2,
+  studyGroups: 2,
   sheetLab: 1,
   myCourses: 1,
 }
@@ -29,7 +29,8 @@ export const FEED_STEPS = [
   {
     target: '[data-tutorial="feed-composer"]',
     title: 'Share with classmates',
-    content: 'Post updates, questions, or links to your latest study sheets. Mention classmates with @username.',
+    content:
+      'Post updates, questions, or links to your latest study sheets. Mention classmates with @username.',
     disableBeacon: true,
   },
   {
@@ -64,7 +65,8 @@ export const SHEETS_STEPS = [
   {
     target: '[data-tutorial="sheets-upload"]',
     title: 'Upload a sheet',
-    content: 'Share your own study sheets. You can write in Markdown, paste HTML, or attach PDFs and images.',
+    content:
+      'Share your own study sheets. You can write in Markdown, paste HTML, or attach PDFs and images.',
   },
   {
     target: '[data-tutorial="sheets-toggles"]',
@@ -93,7 +95,8 @@ export const DASHBOARD_STEPS = [
   {
     target: '[data-tutorial="dashboard-actions"]',
     title: 'Quick actions',
-    content: 'Jump to common tasks like uploading sheets, messaging classmates, or reviewing notes.',
+    content:
+      'Jump to common tasks like uploading sheets, messaging classmates, or reviewing notes.',
   },
 ]
 
@@ -126,17 +129,20 @@ export const SETTINGS_STEPS = [
   {
     target: '[data-tutorial="settings-tabs"]',
     title: 'Settings categories',
-    content: 'Navigate between profile, security, notifications, privacy, courses, and appearance settings.',
+    content:
+      'Move between profile, account, security, sessions, notifications, privacy, appearance, subscription, legal, and moderation tools from one nav.',
   },
   {
     target: '[data-tutorial="settings-appearance"]',
     title: 'Customize appearance',
-    content: 'Switch between light and dark themes, adjust font size, and control tutorial visibility.',
+    content:
+      'Theme, font size, and tutorial controls live here. You can disable auto-tutorials or reset every walkthrough at once.',
   },
   {
     target: '[data-tutorial="settings-notifications"]',
     title: 'Notification preferences',
-    content: 'Control which notifications you receive — stars, comments, follows, messages, and more.',
+    content:
+      'Choose email and in-app alerts for comments, mentions, social activity, study groups, contributions, and other account updates.',
   },
 ]
 
@@ -184,7 +190,8 @@ export const VIEWER_STEPS = [
   {
     target: '[data-tutorial="viewer-sheetlab"]',
     title: 'Edit in Sheet Lab',
-    content: 'Open Sheet Lab to view version history, compare changes, track lineage, and see analytics.',
+    content:
+      'Open Sheet Lab to view version history, compare changes, track lineage, and see analytics.',
   },
 ]
 
@@ -192,13 +199,21 @@ export const ANNOUNCEMENTS_STEPS = [
   {
     target: '[data-tutorial="announcements-header"]',
     title: 'Announcements',
-    content: 'Official updates from the StudyHub team appear here. Pinned announcements stay at the top.',
+    content:
+      'Official StudyHub updates live here. Pinned announcements stay at the top and new posts flow into this feed.',
     disableBeacon: true,
+  },
+  {
+    target: '[data-tutorial="announcements-form"]',
+    title: 'Publish updates with media',
+    content:
+      'Admins can post announcements with images, background-processed video, and pinning directly from this composer.',
   },
   {
     target: '[data-tutorial="announcements-list"]',
     title: 'Stay up to date',
-    content: 'New announcements appear automatically. Pinned posts are highlighted.',
+    content:
+      'Pinned cards are highlighted, media renders inline, and author links let readers jump straight to the poster profile.',
   },
 ]
 
@@ -227,18 +242,21 @@ export const MESSAGES_STEPS = [
   {
     target: '[data-tutorial="messages-conversations"]',
     title: 'Your conversations',
-    content: 'All your direct messages and group chats appear here. Unread counts update in real time.',
+    content:
+      'Jump between direct messages, group chats, message requests, and archived threads from one inbox. Unread counts update in real time.',
     disableBeacon: true,
   },
   {
     target: '[data-tutorial="messages-compose"]',
     title: 'Send a message',
-    content: 'Type your message and press Enter to send. Messages support text up to 5000 characters.',
+    content:
+      'The active thread updates live. Send messages, edit recent posts, react, and watch typing indicators without leaving the conversation.',
   },
   {
     target: '[data-tutorial="messages-new"]',
     title: 'Start a conversation',
-    content: 'Search for a classmate to start a new direct message or create a group chat.',
+    content:
+      'Start a new DM or group chat from here. You can search classmates, pick participants, and name group chats in one flow.',
   },
 ]
 
@@ -246,18 +264,27 @@ export const STUDY_GROUPS_STEPS = [
   {
     target: '[data-tutorial="groups-list"]',
     title: 'Your study groups',
-    content: 'Join or create study groups to collaborate with classmates on shared courses.',
+    content:
+      'Browse public groups or open a group to request access, accept invites, and follow group activity around a shared course.',
     disableBeacon: true,
+  },
+  {
+    target: '[data-tutorial="groups-filters"]',
+    title: 'Search and narrow the list',
+    content:
+      'Search by name or narrow by school, course, or My Groups to find the right study space quickly.',
   },
   {
     target: '[data-tutorial="groups-create"]',
     title: 'Create a group',
-    content: 'Start a new study group. Add members, share resources, and schedule study sessions.',
+    content:
+      'Choose a course and privacy level when you create a group. Private and invite-only groups support approvals and invitations.',
   },
   {
     target: '[data-tutorial="groups-resources"]',
     title: 'Shared resources',
-    content: 'Each group has a shared space for study materials, scheduled sessions, and a discussion board.',
+    content:
+      'Each group page includes shared resources, scheduled sessions, discussions, and moderation tools for the group team.',
   },
 ]
 
@@ -265,7 +292,8 @@ export const SHEET_LAB_STEPS = [
   {
     target: '[data-tutorial="sheetlab-editor"]',
     title: 'Edit your sheet',
-    content: 'Make changes in the editor tab. Each save creates a new version you can compare later.',
+    content:
+      'Make changes in the editor tab. Each save creates a new version you can compare later.',
     disableBeacon: true,
   },
   {
@@ -276,7 +304,8 @@ export const SHEET_LAB_STEPS = [
   {
     target: '[data-tutorial="sheetlab-history"]',
     title: 'Version history',
-    content: 'View all snapshots, restore previous versions, or browse content at any point in time.',
+    content:
+      'View all snapshots, restore previous versions, or browse content at any point in time.',
   },
   {
     target: '[data-tutorial="sheetlab-analytics"]',
@@ -295,7 +324,8 @@ export const MY_COURSES_STEPS = [
   {
     target: '[data-tutorial="courses-add"]',
     title: 'Add a course',
-    content: 'Search for courses at your school and enroll to see relevant study sheets in your feed.',
+    content:
+      'Search for courses at your school and enroll to see relevant study sheets in your feed.',
   },
   {
     target: '[data-tutorial="courses-browse"]',

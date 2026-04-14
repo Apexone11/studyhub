@@ -1,5 +1,6 @@
 const prisma = require('../prisma')
 const { logModerationEvent } = require('./moderationLogger')
+const log = require('../logger')
 
 let cleanupInterval = null
 
@@ -33,7 +34,9 @@ function startModerationCleanupScheduler() {
 
       if (snapshots.length === 0) return
 
-      console.log(`[moderation-cleanup] Processing ${snapshots.length} expired snapshots${dryRun ? ' (dry run)' : ''}`)
+      log.info(
+        `[moderation-cleanup] Processing ${snapshots.length} expired snapshots${dryRun ? ' (dry run)' : ''}`,
+      )
 
       const CONTENT_MODEL_MAP = {
         post: 'feedPost',
@@ -51,7 +54,9 @@ function startModerationCleanupScheduler() {
           if (!modelName) continue
 
           if (dryRun) {
-            console.log(`[moderation-cleanup] DRY RUN: would delete ${snap.targetType} #${snap.targetId} (case #${snap.caseId})`)
+            log.info(
+              `[moderation-cleanup] DRY RUN: would delete ${snap.targetType} #${snap.targetId} (case #${snap.caseId})`,
+            )
             continue
           }
 
@@ -84,13 +89,15 @@ function startModerationCleanupScheduler() {
             })
           }
 
-          console.log(`[moderation-cleanup] Purged ${snap.targetType} #${snap.targetId} (case #${snap.caseId})`)
+          log.info(
+            `[moderation-cleanup] Purged ${snap.targetType} #${snap.targetId} (case #${snap.caseId})`,
+          )
         } catch (err) {
-          console.error(`[moderation-cleanup] Failed to purge snapshot #${snap.id}:`, err.message)
+          log.error({ err, snapshotId: snap.id }, '[moderation-cleanup] Failed to purge snapshot')
         }
       }
     } catch (err) {
-      console.error('[moderation-cleanup] Scheduler error:', err.message)
+      log.error({ err }, '[moderation-cleanup] Scheduler error')
     }
   }
 

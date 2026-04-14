@@ -661,8 +661,7 @@ export function StudyQueue({ counts, toReview, studying }) {
                   borderRadius: 999,
                   background:
                     entry.status === 'studying' ? 'var(--sh-info-bg)' : 'var(--sh-warning-bg)',
-                  color:
-                    entry.status === 'studying' ? 'var(--sh-brand)' : 'var(--sh-warning-text)',
+                  color: entry.status === 'studying' ? 'var(--sh-brand)' : 'var(--sh-warning-text)',
                   whiteSpace: 'nowrap',
                   flexShrink: 0,
                 }}
@@ -673,6 +672,126 @@ export function StudyQueue({ counts, toReview, studying }) {
           ))}
         </div>
       ) : null}
+    </div>
+  )
+}
+
+/* ── Study nudges ──────────────────────────────────────────────────────────── */
+
+const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000
+const THREE_DAYS = 3 * 24 * 60 * 60 * 1000
+
+function buildNudges(toReview, studying, done) {
+  const nudges = []
+  const now = Date.now()
+
+  // Stale "to-review" items (7+ days old)
+  const staleReview = toReview.filter(
+    (e) => e.updatedAt && now - new Date(e.updatedAt).getTime() > SEVEN_DAYS,
+  )
+  if (staleReview.length > 0) {
+    nudges.push({
+      key: 'stale-review',
+      bg: 'var(--sh-warning-bg)',
+      border: 'var(--sh-warning-border)',
+      color: 'var(--sh-warning-text)',
+      title: `${staleReview.length} sheet${staleReview.length > 1 ? 's' : ''} waiting for review`,
+      body: `You marked ${staleReview.length === 1 ? 'a sheet' : 'these sheets'} "To review" over a week ago. Time to study or clear them.`,
+      link: staleReview[0]?.id ? `/sheets/${staleReview[0].id}` : '/sheets',
+      action: 'Start reviewing',
+    })
+  }
+
+  // Resume prompt for "studying" items not touched for 3+ days
+  const staleStudying = studying.filter(
+    (e) => e.updatedAt && now - new Date(e.updatedAt).getTime() > THREE_DAYS,
+  )
+  if (staleStudying.length > 0) {
+    nudges.push({
+      key: 'resume-studying',
+      bg: 'var(--sh-info-bg)',
+      border: 'var(--sh-info-border)',
+      color: 'var(--sh-brand)',
+      title: 'Resume where you left off',
+      body: `${staleStudying[0].title}${staleStudying.length > 1 ? ` and ${staleStudying.length - 1} more` : ''} -- pick up your study session.`,
+      link: `/sheets/${staleStudying[0].id}`,
+      action: 'Continue studying',
+    })
+  }
+
+  // Completion streak nudge
+  if (done.length > 0 && done.length % 5 === 0) {
+    nudges.push({
+      key: 'streak',
+      bg: 'var(--sh-success-bg)',
+      border: 'var(--sh-success-border)',
+      color: 'var(--sh-success-text)',
+      title: `${done.length} sheets completed`,
+      body: 'Great progress -- keep the momentum going.',
+      link: '/sheets',
+      action: 'Find more sheets',
+    })
+  }
+
+  return nudges
+}
+
+export function StudyNudges({ toReview, studying, done }) {
+  const nudges = buildNudges(toReview || [], studying || [], done || [])
+  if (nudges.length === 0) return null
+
+  return (
+    <div style={{ display: 'grid', gap: 10 }}>
+      {nudges.map((nudge) => (
+        <Link
+          key={nudge.key}
+          to={nudge.link}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 14,
+            padding: '14px 18px',
+            borderRadius: 14,
+            border: `1px solid ${nudge.border}`,
+            background: nudge.bg,
+            textDecoration: 'none',
+            transition: 'box-shadow 0.15s',
+          }}
+        >
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div
+              style={{
+                fontSize: 14,
+                fontWeight: 700,
+                color: nudge.color,
+                marginBottom: 3,
+              }}
+            >
+              {nudge.title}
+            </div>
+            <div
+              style={{
+                fontSize: 12,
+                color: 'var(--sh-muted)',
+                lineHeight: 1.5,
+              }}
+            >
+              {nudge.body}
+            </div>
+          </div>
+          <span
+            style={{
+              fontSize: 12,
+              fontWeight: 700,
+              color: nudge.color,
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+            }}
+          >
+            {nudge.action}
+          </span>
+        </Link>
+      ))}
     </div>
   )
 }
@@ -732,10 +851,20 @@ export function CourseFocus({ courses }) {
 /* ── Quick actions panel ─────────────────────────────────────────────────── */
 const QUICK_ACTIONS = [
   { icon: IconSheets, label: 'Browse sheets', to: '/sheets', tone: 'var(--sh-info)' },
-  { icon: IconUpload, label: 'Upload a new sheet', to: '/sheets/upload', tone: 'var(--sh-accent-purple)' },
+  {
+    icon: IconUpload,
+    label: 'Upload a new sheet',
+    to: '/sheets/upload',
+    tone: 'var(--sh-accent-purple)',
+  },
   { icon: IconTests, label: 'Open practice tests', to: '/tests', tone: 'var(--sh-success)' },
   { icon: IconNotes, label: 'Review your notes', to: '/notes', tone: 'var(--sh-accent-pink)' },
-  { icon: IconProfile, label: 'Update settings', to: '/settings', tone: 'var(--sh-neutral-soft-text)' },
+  {
+    icon: IconProfile,
+    label: 'Update settings',
+    to: '/settings',
+    tone: 'var(--sh-neutral-soft-text)',
+  },
 ]
 
 export function QuickActions() {
