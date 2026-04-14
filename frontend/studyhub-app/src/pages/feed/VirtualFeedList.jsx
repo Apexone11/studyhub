@@ -15,6 +15,7 @@ export default function VirtualFeedList({
   currentUser,
   onReport,
   targetCommentId,
+  studyStatusMap,
 }) {
   return (
     <div style={{ display: 'grid', gap: 14 }}>
@@ -32,6 +33,7 @@ export default function VirtualFeedList({
             currentUser={currentUser}
             onReport={onReport}
             targetCommentId={targetCommentId}
+            studyStatus={item.type === 'sheet' ? studyStatusMap?.[item.id] || null : null}
           />
         </div>
       ))}

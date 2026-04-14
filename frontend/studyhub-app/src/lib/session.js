@@ -1,5 +1,6 @@
 import { API } from '../config'
 import { clearFetchCache } from './useFetch'
+import { clearStudyStatusCache } from './useStudyStatus'
 
 let inMemoryCsrfToken = ''
 
@@ -62,6 +63,11 @@ export async function logoutSession() {
   } finally {
     clearStoredSession()
     clearFetchCache()
-    try { sessionStorage.setItem(LOGGED_OUT_FLAG, '1') } catch { /* private mode */ }
+    clearStudyStatusCache()
+    try {
+      sessionStorage.setItem(LOGGED_OUT_FLAG, '1')
+    } catch {
+      /* private mode */
+    }
   }
 }

@@ -142,6 +142,7 @@ model User {
   videoAppeals               VideoAppeal[]         @relation("VideoAppealUploader")
   videoAppealReviews         VideoAppeal[]         @relation("VideoAppealReviewer")
   sessions                   Session[]
+  studyStatuses              StudyStatus[]
 
   @@index([role])
   @@index([emailHash])
@@ -317,6 +318,7 @@ model StudySheet {
   provenance            ProvenanceManifest?
   pinnedBy              UserPinnedSheet[]
   aiReviewLogs          AiReviewLog[]
+  studyStatuses         StudyStatus[]
 
   @@index([createdAt(sort: Desc)])
   @@index([courseId, createdAt(sort: Desc)])
@@ -2124,4 +2126,22 @@ model Session {
   @@index([userId])
   @@index([jti])
   @@index([expiresAt])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// StudyStatus — Per-user study tracking state for sheets (synced across devices)
+// ═══════════════════════════════════════════════════════════════════════════
+
+model StudyStatus {
+  userId    Int
+  sheetId   Int
+  status    String
+  updatedAt DateTime @default(now()) @updatedAt
+
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sheet StudySheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+
+  @@id([userId, sheetId])
+  @@index([userId, status])
+  @@index([sheetId])
 }

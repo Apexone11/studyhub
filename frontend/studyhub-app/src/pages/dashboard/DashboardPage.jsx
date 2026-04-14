@@ -31,6 +31,7 @@ import {
   ResumeStudying,
   StatCards,
   StudyActivity,
+  StudyNudges,
   StudyQueue,
 } from './DashboardWidgets'
 
@@ -64,6 +65,7 @@ export default function DashboardPage() {
     studyQueueCounts,
     studyToReview,
     studyStudying,
+    studyDone,
   } = useDashboardData()
 
   /* Tutorial popup — first-visit or re-trigger via floating "?" button */
@@ -93,14 +95,21 @@ export default function DashboardPage() {
   )
 
   return (
-    <div className="sh-app-page" style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: FONT }}>
+    <div
+      className="sh-app-page"
+      style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: FONT }}
+    >
       <Navbar crumbs={[{ label: 'Dashboard', to: '/dashboard' }]} hideTabs actions={navActions} />
       {/* 2-column responsive grid: sidebar | dashboard content
        * Desktop: sidebar visible, Compact: sidebar as drawer */}
       <div className="app-two-col-grid sh-ambient-grid sh-ambient-shell" style={pageShell('app')}>
         <AppSidebar mode={layout.sidebarMode} />
 
-        <main className="sh-ambient-main" id="main-content" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+        <main
+          className="sh-ambient-main"
+          id="main-content"
+          style={{ display: 'flex', flexDirection: 'column', gap: 18 }}
+        >
           {/* Welcome banner — shown once after registration */}
           {isWelcome && !welcomeDismissed ? (
             <div
@@ -265,6 +274,8 @@ export default function DashboardPage() {
               <ActivationChecklist activation={summary?.activation} />
 
               <ResumeStudying entries={recentlyViewed} />
+
+              <StudyNudges toReview={studyToReview} studying={studyStudying} done={studyDone} />
 
               {/* Content: Recent Sheets (wider) | Course Focus + Quick Actions */}
               <section

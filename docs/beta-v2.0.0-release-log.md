@@ -1143,3 +1143,89 @@ Previously, the auth system was purely stateless JWT with no server-side trackin
 - Backend lint: `npx eslint` on session.service.js, auth.session.controller.js, auth.service.js, auth.js, authTokens.js — passes
 - Frontend lint: `npm run lint` — passes
 - Frontend build: `npm run build` — passes
+
+---
+
+## Study Status: Backend Sync, Status Chips, and Nudges
+
+**Study Status moves from local-only localStorage to a server-synced model, becomes visible on every sheet surface, and drives contextual nudges on the dashboard.**
+
+### 1. Backend Sync (cross-device persistence)
+
+#### Database
+
+- New `StudyStatus` model in Prisma schema with composite PK `(userId, sheetId)`, `status` string, and `updatedAt` timestamp
+- Migration: `20260413170000_add_study_status_table` — creates table, indexes on `(userId, status)` and `sheetId`, foreign keys to User and StudySheet with CASCADE delete
+
+#### API (mounted at `/api/study-status`)
+
+| Method | Path               | Description                                                                    |
+| ------ | ------------------ | ------------------------------------------------------------------------------ |
+| GET    | `/`                | All statuses for the authenticated user (with sheet title and course code)     |
+| GET    | `/batch?ids=1,2,3` | Statuses for specific sheet IDs (max 100)                                      |
+| PUT    | `/:sheetId`        | Set or clear a status (`to-review`, `studying`, `done`, or null to clear)      |
+| POST   | `/sync`            | Bulk upsert from localStorage (one-time migration on first authenticated load) |
+
+- Rate limiters: `studyStatusReadLimiter` (60/min), `studyStatusWriteLimiter` (30/min per user)
+- Module follows standard pattern: `studyStatus.service.js`, `studyStatus.routes.js`, `index.js`
+
+#### Frontend Hook Rewrite
+
+- `useStudyStatus(sheetId)` — same API, now syncs to backend for authenticated users with optimistic updates
+- `useAllStudyStatuses()` — same API, drives dashboard widgets from server state
+- `useStudyStatusBatch(sheetIds)` — new hook for batch lookups on card list pages
+- `clearStudyStatusCache()` — called on logout via `session.js`
+- Guest fallback: localStorage read/write preserved for unauthenticated users
+- Auto-migration: on first authenticated load, any existing localStorage entries are synced to the server via POST `/sync`, then localStorage is cleared
+
+### 2. Status Chips on Sheet Cards
+
+- New `StudyStatusChip` component (`src/components/StudyStatusChip.jsx`) — tiny pill with status-aware color (warning/brand/success)
+- **SheetsPage**: `useStudyStatusBatch` derives statuses for visible sheets, passed to each `SheetListRow` via `studyStatus` prop; chip appears next to the title
+- **FeedPage**: batch lookup for sheet-type feed items, threaded through `VirtualFeedList` to `FeedCard`; chip appears in the header row next to the course code
+- **Profile page**: `PinnedSheetsSection`, `RecentSheetsSection`, `StarredSheetsSection` accept optional `studyStatusMap` prop; chips appear in the metadata row
+- Status is personal — chips only appear for the viewing user's own study state, not on other users' profile views
+
+### 3. Status-Driven Nudges
+
+- New `StudyNudges` widget in `DashboardWidgets.jsx` with three nudge types:
+  - **Stale review**: sheets marked "To review" for 7+ days — warning-colored card prompting review or clearing
+  - **Resume studying**: sheets marked "Studying" not touched for 3+ days — info-colored card linking to the sheet
+  - **Completion streak**: every 5th completed sheet — success-colored card celebrating progress
+- Rendered on Dashboard (between ResumeStudying and content grid), own-profile Overview tab, and Study tab
+- Each nudge is a clickable Link to the relevant sheet or sheets page
+
+### Files Changed
+
+Backend:
+
+- `backend/prisma/schema.prisma` — added `StudyStatus` model and relations on User and StudySheet
+- `backend/prisma/migrations/20260413170000_add_study_status_table/migration.sql` — new
+- `backend/src/modules/studyStatus/studyStatus.service.js` — new
+- `backend/src/modules/studyStatus/studyStatus.routes.js` — new
+- `backend/src/modules/studyStatus/index.js` — new
+- `backend/src/lib/rateLimiters.js` — added studyStatus limiters
+- `backend/src/index.js` — import and mount at `/api/study-status`
+
+Frontend:
+
+- `frontend/studyhub-app/src/lib/useStudyStatus.js` — rewritten for backend sync
+- `frontend/studyhub-app/src/lib/session.js` — clear study status cache on logout
+- `frontend/studyhub-app/src/components/StudyStatusChip.jsx` — new
+- `frontend/studyhub-app/src/pages/sheets/SheetListItem.jsx` — accept and render studyStatus prop
+- `frontend/studyhub-app/src/pages/sheets/SheetsPage.jsx` — batch lookup and pass to rows
+- `frontend/studyhub-app/src/pages/feed/FeedCard.jsx` — accept and render studyStatus prop
+- `frontend/studyhub-app/src/pages/feed/VirtualFeedList.jsx` — thread studyStatusMap
+- `frontend/studyhub-app/src/pages/feed/FeedPage.jsx` — batch lookup for feed items
+- `frontend/studyhub-app/src/pages/profile/ProfileWidgets.jsx` — accept studyStatusMap on sheet sections
+- `frontend/studyhub-app/src/pages/profile/UserProfilePage.jsx` — derive map, pass to widgets and tabs, add nudges
+- `frontend/studyhub-app/src/pages/dashboard/DashboardWidgets.jsx` — added StudyNudges widget
+- `frontend/studyhub-app/src/pages/dashboard/DashboardPage.jsx` — render StudyNudges
+- `frontend/studyhub-app/src/pages/dashboard/useDashboardData.js` — expose studyDone
+
+### Validation
+
+- Backend lint: passes (0 errors)
+- Backend tests: 83 files, 1300 tests pass
+- Frontend lint: passes (0 errors)
+- Frontend build: passes

@@ -31,6 +31,7 @@ import FeedAside from './FeedAside'
 import ForYouSection from './ForYouSection'
 import { useFeedData } from './useFeedData'
 import { useRecentlyViewed } from '../../lib/useRecentlyViewed'
+import { useStudyStatusBatch } from '../../lib/useStudyStatus'
 import SchoolSuggestionBanner from './SchoolSuggestionBanner'
 
 export default function FeedPage() {
@@ -100,10 +101,17 @@ export default function FeedPage() {
   const visibleItems = useMemo(() => {
     if (activeFilter === 'all') return feedState.items
     if (activeFilter === 'videos') return feedState.items.filter((item) => item.video)
-    if (activeFilter === 'posts') return feedState.items.filter((item) => item.type === 'post' && !item.video)
+    if (activeFilter === 'posts')
+      return feedState.items.filter((item) => item.type === 'post' && !item.video)
     const nextType = activeFilter === 'announcements' ? 'announcement' : activeFilter.slice(0, -1)
     return feedState.items.filter((item) => item.type === nextType)
   }, [activeFilter, feedState.items])
+
+  const feedSheetIds = useMemo(
+    () => visibleItems.filter((i) => i.type === 'sheet').map((i) => i.id),
+    [visibleItems],
+  )
+  const feedStudyStatusMap = useStudyStatusBatch(feedSheetIds)
 
   useEffect(() => {
     if (!targetPostId || feedState.loading) return
@@ -153,12 +161,19 @@ export default function FeedPage() {
   return (
     <>
       <Navbar />
-      <div className="sh-app-page" style={{ background: 'var(--sh-page-bg)', minHeight: '100vh', fontFamily: FONT }}>
+      <div
+        className="sh-app-page"
+        style={{ background: 'var(--sh-page-bg)', minHeight: '100vh', fontFamily: FONT }}
+      >
         <div className="sh-ambient-shell" style={pageShell('app', 26, 48)}>
           <div className="app-three-col-grid sh-ambient-grid">
             <AppSidebar mode={layout.sidebarMode} />
 
-            <main className="sh-ambient-main feed-page__main" id="main-content" style={{ display: 'grid', gap: 18 }}>
+            <main
+              className="sh-ambient-main feed-page__main"
+              id="main-content"
+              style={{ display: 'grid', gap: 18 }}
+            >
               <GettingStartedCard user={user} />
               <SchoolSuggestionBanner user={user} />
               {newSinceLastVisit > 0 && activeFilter !== 'for-you' ? (
@@ -314,6 +329,7 @@ export default function FeedPage() {
                       currentUser={user}
                       onReport={handleReport}
                       targetCommentId={targetCommentId}
+                      studyStatusMap={feedStudyStatusMap}
                     />
                   )}
                 </>

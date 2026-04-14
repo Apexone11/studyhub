@@ -7,7 +7,13 @@
  * Organized by feature/module for easy discovery and updates.
  */
 const rateLimit = require('express-rate-limit')
-const { WINDOW_1_MIN, WINDOW_5_MIN, WINDOW_15_MIN, WINDOW_1_HOUR, WINDOW_1_DAY } = require('./constants')
+const {
+  WINDOW_1_MIN,
+  WINDOW_5_MIN,
+  WINDOW_15_MIN,
+  WINDOW_1_HOUR,
+  WINDOW_1_DAY,
+} = require('./constants')
 
 // ── CATEGORY: Generic Base Limiters ────────────────────────────────────────
 
@@ -763,6 +769,25 @@ const reviewReportGenerateLimiter = rateLimit({
   message: { error: 'Report generation limit reached. Please try again later.' },
 })
 
+// ── CATEGORY: Study Status Module ───────────────────────────────────────────
+
+const studyStatusReadLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many study status requests. Please slow down.' },
+})
+
+const studyStatusWriteLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many study status updates. Please slow down.' },
+  keyGenerator: (req) => `study-status-write-${req.user?.userId || 'anon'}`,
+})
+
 // ── Exports ────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -872,4 +897,8 @@ module.exports = {
   reviewSubmitLimiter,
   reviewReadLimiter,
   reviewReportGenerateLimiter,
+
+  // Study Status module
+  studyStatusReadLimiter,
+  studyStatusWriteLimiter,
 }
