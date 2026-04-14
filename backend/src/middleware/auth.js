@@ -26,8 +26,15 @@ async function requireAuth(req, res, next) {
         req.sessionJti = decoded.jti
         // Fire-and-forget: touch lastActiveAt (throttled naturally by request frequency)
         void touchSession(decoded.jti).catch(() => {})
-      } catch {
-        // Session table may not exist yet — graceful degradation
+      } catch (sessionErr) {
+        // P2021 = table does not exist (pre-migration). Degrade gracefully.
+        // Any other error is unexpected and should not silently bypass session checks.
+        const isTableMissing =
+          sessionErr?.code === 'P2021' ||
+          (sessionErr?.message && sessionErr.message.includes('does not exist'))
+        if (!isTableMissing) {
+          return sendError(res, 401, 'Session validation failed.', ERROR_CODES.AUTH_EXPIRED)
+        }
       }
     }
 

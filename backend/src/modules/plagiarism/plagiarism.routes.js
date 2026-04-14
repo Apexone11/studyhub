@@ -92,10 +92,13 @@ router.post('/sheet/:id/dispute', writeLimiter, requireAuth, async (req, res) =>
     }
 
     const { reportId, reason } = req.body || {}
-    if (!reportId) return sendError(res, 400, 'reportId is required.', ERROR_CODES.BAD_REQUEST)
+    const parsedReportId = Number.parseInt(reportId, 10)
+    if (!Number.isInteger(parsedReportId) || parsedReportId <= 0) {
+      return sendError(res, 400, 'reportId must be a positive integer.', ERROR_CODES.BAD_REQUEST)
+    }
 
     const dispute = await plagiarismService.fileDispute({
-      reportId: Number.parseInt(reportId, 10),
+      reportId: parsedReportId,
       userId: req.user.userId,
       reason: typeof reason === 'string' ? reason : '',
     })
@@ -106,7 +109,14 @@ router.post('/sheet/:id/dispute', writeLimiter, requireAuth, async (req, res) =>
       message: 'Dispute filed. Our team will review it.',
     })
   } catch (err) {
-    if (err.status) return sendError(res, err.status, err.message, ERROR_CODES.BAD_REQUEST)
+    if (err.status) {
+      const codeMap = {
+        400: ERROR_CODES.BAD_REQUEST,
+        404: ERROR_CODES.NOT_FOUND,
+        409: ERROR_CODES.CONFLICT,
+      }
+      return sendError(res, err.status, err.message, codeMap[err.status] || ERROR_CODES.BAD_REQUEST)
+    }
     captureError(err, { route: req.originalUrl, method: req.method })
     return sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }

@@ -275,8 +275,15 @@ async function issueAuthenticatedSession(res, userId, req) {
       ipAddress: req?.ip || null,
     })
     jti = sessionResult.jti
-  } catch {
-    // Graceful degradation — if Session table does not exist yet, issue token without JTI
+  } catch (sessionErr) {
+    // P2021 = table does not exist (pre-migration). Degrade gracefully.
+    // Real DB/network errors should not silently disable session tracking.
+    const isTableMissing =
+      sessionErr?.code === 'P2021' ||
+      (sessionErr?.message && sessionErr.message.includes('does not exist'))
+    if (!isTableMissing) {
+      throw sessionErr
+    }
     jti = undefined
   }
 

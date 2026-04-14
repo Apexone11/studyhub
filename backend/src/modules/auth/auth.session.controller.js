@@ -82,6 +82,14 @@ router.delete('/sessions/:sessionId', requireAuth, async (req, res) => {
 
 router.delete('/sessions', requireAuth, async (req, res) => {
   try {
+    if (!req.sessionJti) {
+      return res
+        .status(400)
+        .json({
+          error:
+            'Current session does not support device management. Please log out and log in again.',
+        })
+    }
     const { revokeAllOtherSessions } = require('./session.service')
     await revokeAllOtherSessions(req.user.userId, req.sessionJti)
 
