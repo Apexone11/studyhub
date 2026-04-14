@@ -8,7 +8,7 @@
  *
  * Polling: Announcements refresh every 20 seconds via useLivePolling.
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Navbar from '../../components/navbar/Navbar'
 import AppSidebar from '../../components/sidebar/AppSidebar'
@@ -16,7 +16,6 @@ import SafeJoyride from '../../components/SafeJoyride'
 import MentionText from '../../components/MentionText'
 import AnnouncementMediaGallery from '../../components/AnnouncementMedia'
 import { IconPlus, IconX } from '../../components/Icons'
-import { VideoUploader } from '../../components/video'
 import { API } from '../../config'
 import { useSession } from '../../lib/session-context'
 import { useLivePolling } from '../../lib/useLivePolling'
@@ -27,6 +26,8 @@ import { usePageTitle } from '../../lib/usePageTitle'
 import { SkeletonFeed } from '../../components/Skeleton'
 import { PageShell } from '../shared/pageScaffold'
 import { PAGE_FONT, authHeaders, timeAgo } from '../shared/pageUtils'
+
+const VideoUploader = lazy(() => import('../../components/video/VideoUploader'))
 
 const MAX_BODY = 25000
 const MAX_IMAGES = 5
@@ -192,6 +193,7 @@ export default function AnnouncementsPage() {
   /* ── Navbar action button for admin ──────────────────────────────────── */
   const navActions = isAdmin ? (
     <button
+      data-tutorial="announcements-form"
       onClick={() => setShowForm((v) => !v)}
       style={{
         fontSize: 12,
@@ -249,7 +251,6 @@ export default function AnnouncementsPage() {
       {/* Admin post form */}
       {isAdmin && showForm ? (
         <form
-          data-tutorial="announcements-form"
           onSubmit={handlePost}
           style={{
             background: 'var(--sh-surface)',
@@ -341,14 +342,22 @@ export default function AnnouncementsPage() {
           {/* Video uploader */}
           {showVideoUploader && !pendingVideoId && (
             <div style={{ marginBottom: 12 }}>
-              <VideoUploader
-                onUploadComplete={(vid) => {
-                  setPendingVideoId(vid)
-                  setShowVideoUploader(false)
-                }}
-                onCancel={() => setShowVideoUploader(false)}
-                compact
-              />
+              <Suspense
+                fallback={
+                  <div style={{ padding: 12, color: 'var(--sh-muted)', fontSize: 13 }}>
+                    Loading uploader...
+                  </div>
+                }
+              >
+                <VideoUploader
+                  onUploadComplete={(vid) => {
+                    setPendingVideoId(vid)
+                    setShowVideoUploader(false)
+                  }}
+                  onCancel={() => setShowVideoUploader(false)}
+                  compact
+                />
+              </Suspense>
             </div>
           )}
 

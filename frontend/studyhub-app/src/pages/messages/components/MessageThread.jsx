@@ -2,7 +2,7 @@
  * MessageThread.jsx
  * Message display thread with input area, polls, GIFs, attachments
  * ───────────────────────────────────────────────────────────── */
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import UserAvatar from '../../../components/UserAvatar'
 import { groupMessagesByDate, getConversationDisplayName, getConversationAvatar, formatDateSeparator, truncateText } from '../messagesHelpers'
 import { PAGE_FONT } from '../../shared/pageUtils'
@@ -31,6 +31,9 @@ export function MessageThread({
 }) {
   const messagesEndRef = useRef(null)
   const fileInputRef = useRef(null)
+  const isAtBottomRef = useRef(true)
+  const [showJumpToLatest, setShowJumpToLatest] = useState(false)
+  const [newMessageCount, setNewMessageCount] = useState(0)
   const [inputValue, setInputValue] = useState('')
   const [inputRows, setInputRows] = useState(1)
   const [editingMessageId, setEditingMessageId] = useState(null)
@@ -50,9 +53,83 @@ export function MessageThread({
   const conversationName = getConversationDisplayName(conversation, currentUserId)
   const conversationAvatar = getConversationAvatar(conversation, currentUserId)
 
+  // Phase 3: Conversation-switch scroll — instant jump to bottom when
+  // the active conversation changes. Uses 'instant' (not 'smooth') so
+  // it doesn't look laggy like a slow scroll animation.
+  const currentConvId = conversation?.id
+
   useEffect(() => {
+    if (!currentConvId) return
+    // Instant-scroll after the messages for the new conversation render.
+    // The IntersectionObserver will flip isAtBottom when it fires.
+    const timer = setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'auto' })
+      isAtBottomRef.current = true
+    }, 50)
+    return () => clearTimeout(timer)
+  }, [currentConvId])
+
+  // Phase 3: IntersectionObserver tracks whether the user is "at the
+  // bottom." When the sentinel scrolls out of view (user scrolled up),
+  // show the "jump to latest" button. When it comes back into view,
+  // hide the button and reset the unread counter.
+  useEffect(() => {
+    const sentinel = messagesEndRef.current
+    if (!sentinel) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        const wasAtBottom = isAtBottomRef.current
+        isAtBottomRef.current = entry.isIntersecting
+
+        if (entry.isIntersecting) {
+          // Arrived at bottom — hide the jump button
+          setShowJumpToLatest(false)
+          setNewMessageCount(0)
+        } else if (wasAtBottom && !entry.isIntersecting) {
+          // Just scrolled away from bottom — show the button
+          setShowJumpToLatest(true)
+        }
+      },
+      { threshold: 0, rootMargin: '0px 0px 50px 0px' },
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [currentConvId])
+
+  // Phase 3: Sticky scroll — only auto-scroll on new messages when
+  // the user is already at the bottom. If scrolled up, show the
+  // "jump to latest" button instead.
+  const messagesLength = messages.length
+  const prevMessagesLengthRef = useRef(messagesLength)
+  useEffect(() => {
+    if (messagesLength <= prevMessagesLengthRef.current) {
+      prevMessagesLengthRef.current = messagesLength
+      return
+    }
+    prevMessagesLengthRef.current = messagesLength
+
+    if (isAtBottomRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    } else {
+      // Not at bottom — bump the unread counter so the jump-to-latest
+      // badge shows how many messages arrived while scrolled up.
+      // Deferred via rAF to satisfy react-hooks/set-state-in-effect.
+      requestAnimationFrame(() => setNewMessageCount((prev) => prev + 1))
+    }
+  }, [messagesLength])
+
+  // Scroll on typing indicator changes only when at bottom
+  useEffect(() => {
+    if (isAtBottomRef.current && typingUsernames?.length > 0) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [typingUsernames])
+
+  const handleJumpToLatest = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, typingUsernames])
+    setShowJumpToLatest(false)
+    setNewMessageCount(0)
+  }, [])
 
   // Close header menu on click outside
   useEffect(() => {
@@ -403,8 +480,55 @@ export function MessageThread({
           <TypingIndicator usernames={typingUsernames} />
         )}
 
-        <div ref={messagesEndRef} />
+        <div ref={messagesEndRef} style={{ height: 1 }} aria-hidden="true" />
       </div>
+
+      {/* Phase 3: "Jump to latest" floating button */}
+      {showJumpToLatest ? (
+        <button
+          type="button"
+          onClick={handleJumpToLatest}
+          style={{
+            position: 'absolute',
+            bottom: 80,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '8px 16px',
+            borderRadius: 20,
+            border: '1px solid var(--sh-border)',
+            background: 'var(--sh-surface)',
+            color: 'var(--sh-brand)',
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: 'pointer',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+            zIndex: 10,
+            fontFamily: PAGE_FONT,
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <polyline points="19 12 12 19 5 12" />
+          </svg>
+          Jump to latest
+          {newMessageCount > 0 ? (
+            <span style={{
+              background: 'var(--sh-brand)',
+              color: 'var(--sh-btn-primary-text, #fff)',
+              borderRadius: 10,
+              padding: '1px 7px',
+              fontSize: 10,
+              fontWeight: 800,
+              marginLeft: 2,
+            }}>
+              {newMessageCount > 99 ? '99+' : newMessageCount}
+            </span>
+          ) : null}
+        </button>
+      ) : null}
 
       {/* Hidden file input for attachment picker */}
       <input

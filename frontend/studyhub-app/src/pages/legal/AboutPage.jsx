@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react'
 import Navbar from '../../components/navbar/Navbar'
 import { Link } from 'react-router-dom'
+import { API } from '../../config'
 
 const ROADMAP_V20 = [
   'Hub AI assistant with streaming chat and context awareness',
@@ -323,6 +325,9 @@ export default function AboutPage() {
         </div>
       </section>
 
+      {/* ── PUBLIC REVIEWS ────────────────────────────── */}
+      <PublicReviews />
+
       {/* ── FOOTER ──────────────────────────────────── */}
       <footer style={s.footer}>
         <div style={s.footerLinks}>
@@ -385,6 +390,58 @@ function RoadmapColumn({ title, color, items }) {
         ))}
       </ul>
     </div>
+  )
+}
+
+/**
+ * PublicReviews — fetches approved reviews from GET /api/reviews/public
+ * and renders them as a card grid with star ratings and first names.
+ */
+function PublicReviews() {
+  const [reviews, setReviews] = useState([])
+
+  useEffect(() => {
+    fetch(`${API}/api/reviews/public`, { credentials: 'include' })
+      .then((r) => r.json())
+      .then((data) => setReviews(data.reviews || []))
+      .catch(() => {})
+  }, [])
+
+  if (reviews.length === 0) return null
+
+  // Average rating
+  const avg = reviews.reduce((sum, r) => sum + r.stars, 0) / reviews.length
+
+  return (
+    <section style={s.reviewsSection}>
+      <div style={{ textAlign: 'center', marginBottom: 8 }}>
+        <h2 style={{ margin: '0 0 8px', fontSize: 28, fontWeight: 800, color: 'var(--sh-heading)' }}>
+          What students say
+        </h2>
+        <div style={{ fontSize: 14, color: 'var(--sh-muted)' }}>
+          {avg.toFixed(1)} average from {reviews.length} review{reviews.length !== 1 ? 's' : ''}
+        </div>
+      </div>
+      <div style={s.reviewsGrid}>
+        {reviews.map((r) => (
+          <div key={r.id} style={s.reviewCard}>
+            <div style={{ display: 'flex', gap: 2 }}>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <svg key={n} width="14" height="14" viewBox="0 0 24 24" fill={n <= r.stars ? 'var(--sh-warning, #f59e0b)' : 'var(--sh-border)'} aria-hidden="true">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26" />
+                </svg>
+              ))}
+            </div>
+            <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: 'var(--sh-heading)' }}>
+              {r.text}
+            </p>
+            <div style={{ fontSize: 12, color: 'var(--sh-muted)', fontWeight: 600 }}>
+              {r.user?.username || 'Student'}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   )
 }
 
@@ -551,6 +608,18 @@ const s = {
   teamBio: { fontSize: 14, color: 'var(--sh-subtext)', margin: 0, lineHeight: 1.7 },
   openSourceNote: { fontSize: 14, color: 'var(--sh-muted)', textAlign: 'center' },
   link: { color: 'var(--sh-brand)', fontWeight: 'bold' },
+  reviewsSection: {
+    maxWidth: 960, margin: '0 auto', padding: '60px 20px',
+  },
+  reviewsGrid: {
+    display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+    gap: 16, marginTop: 24,
+  },
+  reviewCard: {
+    padding: '18px 20px', borderRadius: 14,
+    background: 'var(--sh-surface)', border: '1px solid var(--sh-border)',
+    display: 'grid', gap: 8,
+  },
   footer: { background: 'var(--sh-footer-dark-bg)', padding: '40px 20px', textAlign: 'center' },
   footerLinks: {
     display: 'flex',

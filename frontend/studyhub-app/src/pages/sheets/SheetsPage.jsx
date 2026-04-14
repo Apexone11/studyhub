@@ -4,12 +4,14 @@
  * Components: SheetsFilters, SheetsEmptyState, SheetsAside, SheetListItem
  * Data: useSheetsData
  * ═══════════════════════════════════════════════════════════════════════════ */
+import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import Navbar from '../../components/navbar/Navbar'
 import AppSidebar from '../../components/sidebar/AppSidebar'
 import { IconUpload } from '../../components/Icons'
 import { pageShell, useResponsiveAppLayout } from '../../lib/ui'
 import { usePageTitle } from '../../lib/usePageTitle'
+import { useStudyStatusBatch } from '../../lib/useStudyStatus'
 import { SkeletonSheetGrid } from '../../components/Skeleton'
 import SheetListRow from './SheetListItem'
 import SheetsFilters from './SheetsFilters'
@@ -58,6 +60,9 @@ export default function SheetsPage() {
     handleFork,
     loadMoreSheets,
   } = useSheetsData()
+
+  const sheetIds = useMemo(() => (sheetsState.sheets || []).map((s) => s.id), [sheetsState.sheets])
+  const studyStatusMap = useStudyStatusBatch(sheetIds)
 
   return (
     <>
@@ -145,6 +150,7 @@ export default function SheetsPage() {
                       <SheetListRow
                         key={sheet.id}
                         sheet={sheet}
+                        studyStatus={studyStatusMap[sheet.id] || null}
                         forking={forkingSheetId === sheet.id}
                         onOpen={(sheetId) => {
                           const s = sheetsState.sheets.find((x) => x.id === sheetId)
@@ -189,7 +195,6 @@ export default function SheetsPage() {
           </div>
         </div>
       </div>
-
     </>
   )
 }

@@ -1,10 +1,6 @@
 const { captureError } = require('../../monitoring/sentry')
 const { sendEmailVerification } = require('../../lib/email/email')
-const {
-  setAuthCookie,
-  signAuthToken,
-  signCsrfToken,
-} = require('../../lib/authTokens')
+const { setAuthCookie, signAuthToken, signCsrfToken } = require('../../lib/authTokens')
 const { maskEmailAddress } = require('../../lib/verification/verificationCodes')
 const {
   VerificationError,
@@ -53,7 +49,8 @@ function parseCustomCourses(customCourses) {
     const code = typeof course.code === 'string' ? course.code.trim().toUpperCase() : ''
     const name = typeof course.name === 'string' ? course.name.trim() : ''
 
-    if (!code || !name) throw new AppError(400, 'Each custom course must include both code and name.')
+    if (!code || !name)
+      throw new AppError(400, 'Each custom course must include both code and name.')
     if (!COURSE_CODE_REGEX.test(code)) {
       throw new AppError(400, 'Custom course code must be 2-20 characters (A-Z, 0-9, or -).')
     }
@@ -132,11 +129,21 @@ function normalizeEmail(value, allowEmpty = false) {
 
 const VALID_ACCOUNT_TYPES = ['student', 'teacher', 'other']
 
-function validateRegistrationInput({ username, email, password, confirmPassword, termsAccepted, accountType }) {
+function validateRegistrationInput({
+  username,
+  email,
+  password,
+  confirmPassword,
+  termsAccepted,
+  accountType,
+}) {
   const normalizedUsername = typeof username === 'string' ? username.trim() : ''
   if (!normalizedUsername) throw new AppError(400, 'Username is required.')
   if (!USERNAME_REGEX.test(normalizedUsername)) {
-    throw new AppError(400, 'Username must be 3-20 characters using only letters, numbers, and underscores.')
+    throw new AppError(
+      400,
+      'Username must be 3-20 characters using only letters, numbers, and underscores.',
+    )
   }
 
   const normalizedEmail = normalizeEmail(email, true)
@@ -153,9 +160,11 @@ function validateRegistrationInput({ username, email, password, confirmPassword,
     throw new AppError(400, 'You must accept the Terms of Use and Community Guidelines.')
   }
 
-  const normalizedAccountType = typeof accountType === 'string' && VALID_ACCOUNT_TYPES.includes(accountType.trim().toLowerCase())
-    ? accountType.trim().toLowerCase()
-    : 'student'
+  const normalizedAccountType =
+    typeof accountType === 'string' &&
+    VALID_ACCOUNT_TYPES.includes(accountType.trim().toLowerCase())
+      ? accountType.trim().toLowerCase()
+      : 'student'
 
   return {
     username: normalizedUsername,
@@ -245,15 +254,40 @@ async function sendVerificationCodeEmail(email, username, code, metadata = {}) {
       source: 'sendEmailVerification',
       ...metadata,
     })
-    throw new AppError(503, 'We could not send your verification code right now. Please try again later.')
+    throw new AppError(
+      503,
+      'We could not send your verification code right now. Please try again later.',
+    )
   }
 }
 
-async function issueAuthenticatedSession(res, userId) {
+async function issueAuthenticatedSession(res, userId, req) {
   const user = await getAuthenticatedUser(userId)
   if (!user) throw new AppError(404, 'User not found.')
 
-  const token = signAuthToken(user)
+  // Create server-side session for per-device tracking + revocation
+  let jti
+  try {
+    const { createSession } = require('./session.service')
+    const sessionResult = await createSession({
+      userId,
+      userAgent: req?.headers?.['user-agent'] || null,
+      ipAddress: req?.ip || null,
+    })
+    jti = sessionResult.jti
+  } catch (sessionErr) {
+    // P2021 = table does not exist (pre-migration). Degrade gracefully.
+    // Real DB/network errors should not silently disable session tracking.
+    const isTableMissing =
+      sessionErr?.code === 'P2021' ||
+      (sessionErr?.message && sessionErr.message.includes('does not exist'))
+    if (!isTableMissing) {
+      throw sessionErr
+    }
+    jti = undefined
+  }
+
+  const token = signAuthToken(user, { jti })
   setAuthCookie(res, token)
 
   return buildSessionUserPayload(user)

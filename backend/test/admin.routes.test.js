@@ -11,8 +11,10 @@ const mocks = vi.hoisted(() => {
   const prisma = {
     user: {
       count: vi.fn(),
+      findMany: vi.fn(),
       findUnique: vi.fn(),
       groupBy: vi.fn(),
+      update: vi.fn(),
     },
     studySheet: {
       count: vi.fn(),
@@ -47,6 +49,7 @@ const mocks = vi.hoisted(() => {
     auditLog: {
       findMany: vi.fn(),
       count: vi.fn(),
+      groupBy: vi.fn(),
     },
     moderationCase: {
       count: vi.fn(),
@@ -67,6 +70,15 @@ const mocks = vi.hoisted(() => {
     emailSuppressionAudit: {
       create: vi.fn(),
       findMany: vi.fn(),
+      count: vi.fn(),
+    },
+    groupReport: {
+      count: vi.fn(),
+    },
+    waitlist: {
+      count: vi.fn(),
+    },
+    groupAuditLog: {
       count: vi.fn(),
     },
     $transaction: vi.fn(),
@@ -140,6 +152,8 @@ beforeEach(() => {
   }))
   mocks.prisma.user.groupBy.mockResolvedValue([])
   mocks.prisma.user.count.mockResolvedValue(36)
+  mocks.prisma.user.findMany.mockResolvedValue([])
+  mocks.prisma.user.update.mockResolvedValue({})
   mocks.prisma.studySheet.count.mockResolvedValue(19)
   mocks.prisma.studySheet.aggregate.mockResolvedValue({ _sum: { stars: 78 } })
   mocks.prisma.comment.count.mockResolvedValue(14)
@@ -151,6 +165,7 @@ beforeEach(() => {
   mocks.prisma.reaction.count.mockResolvedValue(4)
   mocks.prisma.auditLog.findMany.mockResolvedValue([])
   mocks.prisma.auditLog.count.mockResolvedValue(0)
+  mocks.prisma.auditLog.groupBy.mockResolvedValue([])
   mocks.prisma.feedPost.count.mockResolvedValue(6)
   mocks.prisma.moderationCase.count.mockResolvedValue(2)
   mocks.prisma.strike.count.mockResolvedValue(1)
@@ -215,6 +230,10 @@ beforeEach(() => {
     },
   ])
 
+  mocks.prisma.groupReport.count.mockResolvedValue(0)
+  mocks.prisma.waitlist.count.mockResolvedValue(0)
+  mocks.prisma.groupAuditLog.count.mockResolvedValue(0)
+
   mocks.prisma.$transaction.mockImplementation(async (operation) => operation(mocks.prisma))
 })
 
@@ -276,9 +295,11 @@ describe('admin routes', () => {
       status: 'active',
     })
     expect(response.body.suppressions).toHaveLength(1)
-    expect(mocks.prisma.emailSuppression.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: { active: true },
-    }))
+    expect(mocks.prisma.emailSuppression.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { active: true },
+      }),
+    )
   })
 
   it('unsuppresses a recipient and records an audit entry', async () => {
@@ -342,9 +363,74 @@ describe('admin routes', () => {
       page: 1,
     })
     expect(response.body.entries).toHaveLength(1)
-    expect(mocks.prisma.emailSuppressionAudit.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: { suppressionId: 7 },
-    }))
+    expect(mocks.prisma.emailSuppressionAudit.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { suppressionId: 7 },
+      }),
+    )
+  })
+
+  it('returns security stats with the tracked failed-login timestamp for admins', async () => {
+    mocks.state.role = 'admin'
+    const lastFailedLoginAt = new Date('2026-04-13T20:05:00.000Z')
+
+    mocks.prisma.user.count
+      .mockResolvedValueOnce(36)
+      .mockResolvedValueOnce(2)
+      .mockResolvedValueOnce(3)
+      .mockResolvedValueOnce(9)
+      .mockResolvedValueOnce(4)
+    mocks.prisma.studySheet.count.mockResolvedValueOnce(5)
+    mocks.prisma.groupReport.count.mockResolvedValueOnce(6)
+    mocks.prisma.waitlist.count.mockResolvedValueOnce(7)
+    mocks.prisma.groupAuditLog.count.mockResolvedValueOnce(8)
+    mocks.prisma.user.findMany.mockResolvedValueOnce([
+      {
+        id: 11,
+        username: 'locked_user',
+        failedAttempts: 5,
+        lockedUntil: new Date('2026-04-13T20:20:00.000Z'),
+        lastFailedLoginAt,
+      },
+    ])
+
+    const response = await request(app).get('/security/stats')
+
+    expect(response.status).toBe(200)
+    expect(response.body).toMatchObject({
+      overview: {
+        totalUsers: 36,
+        lockedAccounts: 2,
+        recentSignups24h: 3,
+        recentSignups7d: 9,
+        failedAttemptUsers: 4,
+        pendingSheetReviews: 5,
+        pendingGroupReports: 6,
+        pendingWaitlist: 7,
+        groupAuditActions24h: 8,
+      },
+      recentFailedAccounts: [
+        {
+          id: 11,
+          username: 'locked_user',
+          failedAttempts: 5,
+          lastAttempt: lastFailedLoginAt.toISOString(),
+        },
+      ],
+    })
+  })
+
+  it('clears failed-login state when an admin unlocks an account', async () => {
+    mocks.state.role = 'admin'
+
+    const response = await request(app).post('/security/unlock/7')
+
+    expect(response.status).toBe(200)
+    expect(response.body).toMatchObject({ message: 'Account unlocked.' })
+    expect(mocks.prisma.user.update).toHaveBeenCalledWith({
+      where: { id: 7 },
+      data: { failedAttempts: 0, lockedUntil: null, lastFailedLoginAt: null },
+    })
   })
 
   it('uses req.user.userId (not req.user.id) for reviewedById when reviewing sheets', async () => {
@@ -366,9 +452,7 @@ describe('admin routes', () => {
       reviewedBy: { id: 42, username: 'studyhub_owner' },
     })
 
-    const response = await request(app)
-      .patch('/sheets/100/review')
-      .send({ action: 'approve' })
+    const response = await request(app).patch('/sheets/100/review').send({ action: 'approve' })
 
     expect(response.status).toBe(200)
     expect(response.body).toMatchObject({
@@ -485,10 +569,42 @@ describe('admin routes', () => {
             email: 'p***@example.com',
           },
         },
-        attempts: [
-          { refreshToken: '[REDACTED]' },
+        attempts: [{ refreshToken: '[REDACTED]' }],
+      },
+    })
+  })
+
+  it('returns available audit event types with live counts', async () => {
+    mocks.state.role = 'admin'
+    mocks.prisma.auditLog.groupBy.mockResolvedValue([
+      { event: 'sheet.create', _count: { _all: 4 } },
+      { event: 'auth.login', _count: { _all: 2 } },
+      { event: 'auth.logout', _count: { _all: 1 } },
+      { event: 'settings.profile_update', _count: { _all: 1 } },
+    ])
+
+    const response = await request(app).get('/audit-log/event-types?actorId=7&search=login')
+
+    expect(response.status).toBe(200)
+    expect(response.body).toEqual({
+      total: 8,
+      eventTypes: [
+        { value: 'sheet', label: 'Sheets', count: 4 },
+        { value: 'auth', label: 'Auth', count: 3 },
+        { value: 'settings', label: 'Settings', count: 1 },
+      ],
+    })
+    expect(mocks.prisma.auditLog.groupBy).toHaveBeenCalledWith({
+      by: ['event'],
+      where: {
+        actorId: 7,
+        OR: [
+          { event: { contains: 'login', mode: 'insensitive' } },
+          { route: { contains: 'login', mode: 'insensitive' } },
+          { resource: { contains: 'login', mode: 'insensitive' } },
         ],
       },
+      _count: { _all: true },
     })
   })
 })

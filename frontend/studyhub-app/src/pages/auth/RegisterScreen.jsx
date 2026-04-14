@@ -8,20 +8,40 @@
  * Design: Direction A — Campus Lab tokens, no inline hex colors.
  * ═══════════════════════════════════════════════════════════════════════════ */
 
-import { useEffect, useRef } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import Navbar from '../../components/navbar/Navbar'
 import { fadeInUp } from '../../lib/animations'
 import { validateAccountFields, getSteps } from './registerConstants'
 import useRegisterFlow from './useRegisterFlow'
 import { StepIndicator, AccountStep, VerifyStep } from './RegisterStepFields'
+import { API } from '../../config'
 import './RegisterScreen.css'
 
 export default function RegisterScreen() {
   const cardRef = useRef(null)
+  const [searchParams] = useSearchParams()
+  const ref = searchParams.get('ref')
 
-  const flow = useRegisterFlow()
+  const flow = useRegisterFlow({ referralCode: ref || undefined })
   const steps = getSteps()
+
+  /* ── Resolve referral code to inviter info ─────────────────────── */
+  const [inviter, setInviter] = useState(null)
+
+  useEffect(() => {
+    if (!ref) return
+    let active = true
+    fetch(`${API}/api/referrals/resolve/${encodeURIComponent(ref)}`, { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (active && data?.valid) setInviter(data)
+      })
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [ref])
 
   /* ── Card entrance animation ───────────────────────────────────────── */
   useEffect(() => {
@@ -46,12 +66,66 @@ export default function RegisterScreen() {
       {/* ── Main card ──────────────────────────────────────────────── */}
       <main id="main-content" ref={cardRef} className="register-main">
         <div className="register-card">
+          {/* ── Referral banner ──────────────────────────────────────── */}
+          {inviter && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '10px 14px',
+                borderRadius: 10,
+                background: 'var(--sh-info-bg, #dbeafe)',
+                border: '1px solid var(--sh-info-border, #93c5fd)',
+                color: 'var(--sh-info-text, #1e40af)',
+                fontSize: 13,
+                fontWeight: 600,
+                marginBottom: 14,
+              }}
+            >
+              {inviter.inviterAvatarUrl ? (
+                <img
+                  src={inviter.inviterAvatarUrl}
+                  alt=""
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: '50%',
+                    objectFit: 'cover',
+                    flexShrink: 0,
+                  }}
+                />
+              ) : (
+                <div
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: '50%',
+                    background: 'var(--sh-brand)',
+                    color: '#fff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 13,
+                    fontWeight: 800,
+                    flexShrink: 0,
+                  }}
+                >
+                  {(inviter.inviterUsername || '?')[0].toUpperCase()}
+                </div>
+              )}
+              Invited by {inviter.inviterUsername}
+            </div>
+          )}
+
           {/* ── Step indicator ──────────────────────────────────────── */}
           <StepIndicator steps={steps} step={flow.step} />
 
           {/* ── Error/success messages ──────────────────────────────── */}
           {flow.error && (
-            <div role="alert" className="register-alert register-alert--danger">{flow.error}</div>
+            <div role="alert" className="register-alert register-alert--danger">
+              {flow.error}
+            </div>
           )}
           {flow.success && (
             <div className="register-alert register-alert--success">{flow.success}</div>
@@ -86,7 +160,9 @@ export default function RegisterScreen() {
           {/* ── Sign in link ─────────────────────────────────────────── */}
           <div className="register-footer">
             Already have an account?{' '}
-            <Link to="/login" className="register-link">Sign in here</Link>
+            <Link to="/login" className="register-link">
+              Sign in here
+            </Link>
           </div>
         </div>
       </main>

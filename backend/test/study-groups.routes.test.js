@@ -109,6 +109,10 @@ const mocks = vi.hoisted(() => {
     }),
     readLimiter: vi.fn((_req, _res, next) => next()),
     writeLimiter: vi.fn((_req, _res, next) => next()),
+    groupJoinLimiter: vi.fn((_req, _res, next) => next()),
+    groupMediaUploadLimiter: vi.fn((_req, _res, next) => next()),
+    groupReportLimiter: vi.fn((_req, _res, next) => next()),
+    groupAppealLimiter: vi.fn((_req, _res, next) => next()),
     getBlockedUserIds: vi.fn(async () => []),
     sentry: { captureError: vi.fn() },
     socketio: {
@@ -123,13 +127,23 @@ const mocks = vi.hoisted(() => {
 const mockTargets = new Map([
   [require.resolve('../src/lib/prisma'), mocks.prisma],
   [require.resolve('../src/middleware/auth'), mocks.auth],
-  [require.resolve('../src/lib/rateLimiters'), {
-    readLimiter: mocks.readLimiter,
-    writeLimiter: mocks.writeLimiter,
-  }],
-  [require.resolve('../src/lib/social/blockFilter'), {
-    getBlockedUserIds: mocks.getBlockedUserIds,
-  }],
+  [
+    require.resolve('../src/lib/rateLimiters'),
+    {
+      readLimiter: mocks.readLimiter,
+      writeLimiter: mocks.writeLimiter,
+      groupJoinLimiter: mocks.groupJoinLimiter,
+      groupMediaUploadLimiter: mocks.groupMediaUploadLimiter,
+      groupReportLimiter: mocks.groupReportLimiter,
+      groupAppealLimiter: mocks.groupAppealLimiter,
+    },
+  ],
+  [
+    require.resolve('../src/lib/social/blockFilter'),
+    {
+      getBlockedUserIds: mocks.getBlockedUserIds,
+    },
+  ],
   [require.resolve('../src/monitoring/sentry'), mocks.sentry],
   [require.resolve('../src/lib/socketio'), mocks.socketio],
   [require.resolve('../src/lib/notify'), mocks.notify],
@@ -340,14 +354,19 @@ describe('group CRUD', () => {
 
       mocks.prisma.studyGroup.findUnique.mockResolvedValue(group)
       mocks.prisma.studyGroupMember.deleteMany.mockResolvedValue({ count: 10 })
-      mocks.prisma.studyGroup.delete.mockResolvedValue(group)
+      mocks.prisma.studyGroup.update.mockResolvedValue(group)
 
       const res = await request(app).delete('/1')
 
-      expect(res.status).toBe(200)
-      expect(res.body.success).toBe(true)
-      expect(mocks.prisma.studyGroup.delete).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { id: 1 } })
+      expect(res.status).toBe(204)
+      expect(mocks.prisma.studyGroup.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 1 },
+          data: expect.objectContaining({
+            moderationStatus: 'deleted',
+            deletedById: 42,
+          }),
+        }),
       )
     })
   })
@@ -437,8 +456,7 @@ describe('membership', () => {
 
       const res = await request(app).post('/1/leave').send({})
 
-      expect(res.status).toBe(200)
-      expect(res.body.success).toBe(true)
+      expect(res.status).toBe(204)
       expect(mocks.prisma.studyGroupMember.delete).toHaveBeenCalled()
     })
   })
@@ -503,8 +521,7 @@ describe('membership', () => {
 
       const res = await request(app).delete('/1/members/99')
 
-      expect(res.status).toBe(200)
-      expect(res.body.success).toBe(true)
+      expect(res.status).toBe(204)
       expect(mocks.prisma.studyGroupMember.delete).toHaveBeenCalled()
     })
   })
@@ -534,19 +551,22 @@ describe('resources', () => {
         role: 'member',
         status: 'active',
       })
-      mocks.prisma.studyGroupResource.findMany.mockResolvedValue([
+      mocks.prisma.groupResource.findMany.mockResolvedValue([
         {
           id: 1,
           groupId: 1,
           userId: 42,
           title: 'Study Notes',
-          url: 'https://example.com/notes',
+          resourceType: 'link',
+          resourceUrl: 'https://example.com/notes',
           description: 'Comprehensive notes',
+          pinned: false,
+          user: { id: 42, username: 'test_user', avatarUrl: null },
           createdAt: new Date(),
           updatedAt: new Date(),
         },
       ])
-      mocks.prisma.studyGroupResource.count.mockResolvedValue(1)
+      mocks.prisma.groupResource.count.mockResolvedValue(1)
 
       const res = await request(app).get('/1/resources?limit=20&offset=0')
 
@@ -576,20 +596,23 @@ describe('resources', () => {
         role: 'member',
         status: 'active',
       })
-      mocks.prisma.studyGroupResource.create.mockResolvedValue({
+      mocks.prisma.groupResource.create.mockResolvedValue({
         id: 10,
         groupId: 1,
         userId: 42,
         title: 'New Resource',
-        url: 'https://example.com/resource',
+        resourceType: 'link',
+        resourceUrl: 'https://example.com/resource',
         description: 'Test resource',
+        pinned: false,
+        user: { id: 42, username: 'test_user', avatarUrl: null },
         createdAt: new Date(),
         updatedAt: new Date(),
       })
 
       const res = await request(app).post('/1/resources').send({
         title: 'New Resource',
-        url: 'https://example.com/resource',
+        resourceUrl: 'https://example.com/resource',
         description: 'Test resource',
       })
 
@@ -600,22 +623,22 @@ describe('resources', () => {
 
   describe('DELETE /:id/resources/:resourceId', () => {
     it('deletes own resource', async () => {
-      mocks.prisma.studyGroupResource.findUnique.mockResolvedValue({
+      mocks.prisma.groupResource.findUnique.mockResolvedValue({
         id: 10,
         groupId: 1,
         userId: 42,
         title: 'Resource to Delete',
-        url: 'https://example.com/resource',
+        resourceType: 'link',
+        resourceUrl: 'https://example.com/resource',
         description: 'test',
         createdAt: new Date(),
         updatedAt: new Date(),
       })
-      mocks.prisma.studyGroupResource.delete.mockResolvedValue({ id: 10 })
+      mocks.prisma.groupResource.delete.mockResolvedValue({ id: 10 })
 
       const res = await request(app).delete('/1/resources/10')
 
-      expect(res.status).toBe(200)
-      expect(res.body.success).toBe(true)
+      expect(res.status).toBe(204)
     })
   })
 })

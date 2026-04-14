@@ -317,17 +317,21 @@ function AiBubbleInner() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Usage bar */}
+          {/* Usage quota bar — daily + weekly */}
           {chat.usage && (
-            <div style={{
-              padding: '4px 14px',
-              fontSize: 10,
-              color: 'var(--sh-muted)',
-              display: 'flex',
-              justifyContent: 'space-between',
-            }}>
-              <span>{chat.usage.messagesUsed}/{chat.usage.messagesLimit} today</span>
-              <span>{chat.usage.messagesRemaining} left</span>
+            <div style={{ padding: '6px 14px', fontSize: 10 }}>
+              <AiQuotaBar
+                label="Today"
+                used={chat.usage.daily?.used ?? chat.usage.messagesUsed ?? 0}
+                limit={chat.usage.daily?.limit ?? chat.usage.messagesLimit ?? 30}
+              />
+              {chat.usage.weekly ? (
+                <AiQuotaBar
+                  label="This week"
+                  used={chat.usage.weekly.used}
+                  limit={chat.usage.weekly.limit}
+                />
+              ) : null}
             </div>
           )}
 
@@ -422,6 +426,54 @@ function BubbleMessage({ message }) {
             })()}
           </>
         )}
+      </div>
+    </div>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * AiQuotaBar — compact progress indicator for daily/weekly AI usage.
+ * Phase 1: renders "12/30 today" with a thin bar that turns amber at
+ * >80% and red at 100%.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+function AiQuotaBar({ label, used, limit }) {
+  const pct = limit > 0 ? Math.min(100, (used / limit) * 100) : 0
+  const isWarning = pct >= 80 && pct < 100
+  const isExhausted = pct >= 100
+
+  const barColor = isExhausted
+    ? 'var(--sh-danger, #ef4444)'
+    : isWarning
+      ? 'var(--sh-warning, #f59e0b)'
+      : 'var(--sh-brand, #6366f1)'
+
+  return (
+    <div style={{ marginBottom: 4 }}>
+      <div style={{
+        display: 'flex', justifyContent: 'space-between',
+        color: isExhausted ? 'var(--sh-danger)' : 'var(--sh-muted)',
+        fontSize: 10, fontWeight: 600, marginBottom: 2,
+      }}>
+        <span>{used}/{limit} {label}</span>
+        {isExhausted ? (
+          <span style={{ color: 'var(--sh-danger)', fontWeight: 700 }}>Limit reached</span>
+        ) : isWarning ? (
+          <span style={{ color: 'var(--sh-warning)' }}>{limit - used} left</span>
+        ) : (
+          <span>{limit - used} left</span>
+        )}
+      </div>
+      <div style={{
+        height: 3, borderRadius: 2,
+        background: 'var(--sh-soft, #e2e8f0)',
+        overflow: 'hidden',
+      }}>
+        <div style={{
+          width: `${pct}%`, height: '100%',
+          background: barColor,
+          borderRadius: 2,
+          transition: 'width 0.3s ease',
+        }} />
       </div>
     </div>
   )

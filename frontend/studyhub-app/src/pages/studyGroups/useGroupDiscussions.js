@@ -230,6 +230,42 @@ export function useGroupDiscussions(activeGroupId) {
     }
   }, [socket])
 
+  // Phase 5: approve/reject pending-approval posts
+  const approvePost = useCallback(async (groupId, postId) => {
+    try {
+      const res = await fetch(`${API}/api/study-groups/${groupId}/discussions/${postId}/approve`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: authHeaders(),
+      })
+      if (!res.ok) throw new Error('Could not approve post.')
+      setDiscussions((prev) => prev.map((p) =>
+        p.id === postId ? { ...p, status: 'published' } : p,
+      ))
+      showToast('Post approved.', 'success')
+    } catch (err) {
+      showToast(err.message, 'error')
+    }
+  }, [])
+
+  const rejectPost = useCallback(async (groupId, postId) => {
+    if (!window.confirm('Reject this post? It will be marked as removed.')) return
+    try {
+      const res = await fetch(`${API}/api/study-groups/${groupId}/discussions/${postId}/reject`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: authHeaders(),
+      })
+      if (!res.ok) throw new Error('Could not reject post.')
+      setDiscussions((prev) => prev.map((p) =>
+        p.id === postId ? { ...p, status: 'removed' } : p,
+      ))
+      showToast('Post rejected.', 'info')
+    } catch (err) {
+      showToast(err.message, 'error')
+    }
+  }, [])
+
   return {
     // State
     discussions,
@@ -243,5 +279,7 @@ export function useGroupDiscussions(activeGroupId) {
     addReply,
     resolvePost,
     toggleUpvote,
+    approvePost,
+    rejectPost,
   }
 }

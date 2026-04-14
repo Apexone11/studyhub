@@ -24,6 +24,11 @@ import ReviewsTab from './ReviewsTab'
 const AnalyticsTab = lazy(() => import('./AnalyticsTab'))
 const RevenueTab = lazy(() => import('./RevenueTab'))
 const GroupReportsTab = lazy(() => import('./GroupReportsTab'))
+const WaitlistTab = lazy(() => import('./WaitlistTab'))
+const SecurityTab = lazy(() => import('./SecurityTab'))
+const ActivationTab = lazy(() => import('./ActivationTab'))
+const AdminReferralsTab = lazy(() => import('./AdminReferralsTab'))
+const ObservabilityTab = lazy(() => import('./ObservabilityTab'))
 
 export default function AdminPage() {
   const layout = useResponsiveAppLayout()
@@ -150,7 +155,10 @@ export default function AdminPage() {
 
   return (
     <>
-      <div className="sh-app-page" style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: FONT }}>
+      <div
+        className="sh-app-page"
+        style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: FONT }}
+      >
         <Navbar crumbs={[{ label: 'Admin', to: '/admin' }]} hideTabs actions={navActions} />
         <div
           className="app-two-col-grid sh-ambient-grid sh-ambient-shell"
@@ -161,7 +169,11 @@ export default function AdminPage() {
         >
           <AppSidebar mode={layout.sidebarMode} />
 
-          <main className="sh-ambient-main" id="main-content" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <main
+            className="sh-ambient-main"
+            id="main-content"
+            style={{ display: 'flex', flexDirection: 'column', gap: 16 }}
+          >
             {isAdmin ? (
               <>
                 <section
@@ -248,7 +260,14 @@ export default function AdminPage() {
                 activeTab !== 'settings' &&
                 activeTab !== 'moderation' &&
                 activeTab !== 'schools' &&
-                activeTab !== 'reviews' ? (
+                activeTab !== 'reviews' &&
+                activeTab !== 'revenue' &&
+                activeTab !== 'group-reports' &&
+                activeTab !== 'waitlist' &&
+                activeTab !== 'security' &&
+                activeTab !== 'activation' &&
+                activeTab !== 'referrals-admin' &&
+                activeTab !== 'observability' ? (
                   <section
                     style={{
                       background: 'var(--sh-surface, #fff)',
@@ -377,8 +396,62 @@ export default function AdminPage() {
                 ) : null}
 
                 {activeTab === 'group-reports' ? (
-                  <Suspense fallback={<div style={{ padding: 24, color: 'var(--sh-muted)' }}>Loading...</div>}>
+                  <Suspense
+                    fallback={
+                      <div style={{ padding: 24, color: 'var(--sh-muted)' }}>Loading...</div>
+                    }
+                  >
                     <GroupReportsTab />
+                  </Suspense>
+                ) : null}
+
+                {activeTab === 'waitlist' ? (
+                  <Suspense
+                    fallback={
+                      <div style={{ padding: 24, color: 'var(--sh-muted)' }}>Loading...</div>
+                    }
+                  >
+                    <WaitlistTab />
+                  </Suspense>
+                ) : null}
+
+                {activeTab === 'security' ? (
+                  <Suspense
+                    fallback={
+                      <div style={{ padding: 24, color: 'var(--sh-muted)' }}>Loading...</div>
+                    }
+                  >
+                    <SecurityTab />
+                  </Suspense>
+                ) : null}
+
+                {activeTab === 'activation' ? (
+                  <Suspense
+                    fallback={
+                      <div style={{ padding: 24, color: 'var(--sh-muted)' }}>Loading...</div>
+                    }
+                  >
+                    <ActivationTab />
+                  </Suspense>
+                ) : null}
+
+                {activeTab === 'referrals-admin' ? (
+                  <Suspense
+                    fallback={
+                      <div style={{ padding: 24, color: 'var(--sh-muted)' }}>Loading...</div>
+                    }
+                  >
+                    <AdminReferralsTab />
+                  </Suspense>
+                ) : null}
+
+                {activeTab === 'observability' ? (
+                  <Suspense
+                    fallback={
+                      <div style={{ padding: 24, color: 'var(--sh-muted)' }}>Loading...</div>
+                    }
+                  >
+                    <ObservabilityTab />
                   </Suspense>
                 ) : null}
 

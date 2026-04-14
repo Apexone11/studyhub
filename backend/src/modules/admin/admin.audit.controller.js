@@ -15,13 +15,25 @@ const { PAGE_SIZE, parsePage } = require('./admin.constants')
 
 const router = express.Router()
 
+const EVENT_TYPE_LABELS = {
+  auth: 'Auth',
+  admin: 'Admin',
+  moderation: 'Moderation',
+  sheet: 'Sheets',
+  comment: 'Comments',
+  upload: 'Uploads',
+  contribution: 'Contributions',
+  settings: 'Settings',
+  pii: 'PII access',
+}
+
 /**
  * Build where clause from query params (shared between list and export).
  */
-function buildWhere(query) {
+function buildWhere(query, { includeEvent = true } = {}) {
   const where = {}
 
-  if (query.event) {
+  if (includeEvent && query.event) {
     where.event = { startsWith: query.event }
   }
 
@@ -66,6 +78,20 @@ function buildWhere(query) {
   return where
 }
 
+function eventPrefix(event) {
+  const [prefix] = String(event || '').split('.')
+  return prefix || 'other'
+}
+
+function eventTypeLabel(prefix) {
+  if (EVENT_TYPE_LABELS[prefix]) return EVENT_TYPE_LABELS[prefix]
+  return prefix
+    .split(/[-_]/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
 /**
  * Resolve actor and target usernames for a list of audit entries.
  */
@@ -74,12 +100,13 @@ async function enrichEntries(entries) {
   const targetIds = [...new Set(entries.map((e) => e.targetUserId).filter(Boolean))]
   const allUserIds = [...new Set([...actorIds, ...targetIds])]
 
-  const users = allUserIds.length > 0
-    ? await prisma.user.findMany({
-        where: { id: { in: allUserIds } },
-        select: { id: true, username: true },
-      })
-    : []
+  const users =
+    allUserIds.length > 0
+      ? await prisma.user.findMany({
+          where: { id: { in: allUserIds } },
+          select: { id: true, username: true },
+        })
+      : []
   const userMap = Object.fromEntries(users.map((u) => [u.id, u.username]))
 
   return entries.map((entry) => ({
@@ -114,6 +141,42 @@ router.get('/audit-log', async (req, res) => {
       total,
       page,
       pages: Math.ceil(total / PAGE_SIZE) || 1,
+    })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    return sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
+  }
+})
+
+// ── GET /audit-log/event-types — prefixes with live counts ───────────────
+router.get('/audit-log/event-types', async (req, res) => {
+  try {
+    const where = buildWhere(req.query, { includeEvent: false })
+    const groupedEvents = await prisma.auditLog.groupBy({
+      by: ['event'],
+      where,
+      _count: { _all: true },
+    })
+
+    const totalsByPrefix = new Map()
+
+    for (const row of groupedEvents) {
+      const prefix = eventPrefix(row.event)
+      const count = row._count?._all || 0
+      if (!count) continue
+      totalsByPrefix.set(prefix, (totalsByPrefix.get(prefix) || 0) + count)
+    }
+
+    const eventTypes = [...totalsByPrefix.entries()]
+      .map(([value, count]) => ({ value, label: eventTypeLabel(value), count }))
+      .sort((left, right) => {
+        if (right.count !== left.count) return right.count - left.count
+        return left.label.localeCompare(right.label)
+      })
+
+    res.json({
+      total: eventTypes.reduce((sum, type) => sum + type.count, 0),
+      eventTypes,
     })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
@@ -213,7 +276,11 @@ router.get('/audit-log/export', async (req, res) => {
 
     res.json({
       exportedAt: new Date().toISOString(),
-      user: { id: user.id, username: user.username, email: user.email ? maskEmail(user.email) : null },
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email ? maskEmail(user.email) : null,
+      },
       totalEntries: sanitized.length,
       entries: sanitized,
     })

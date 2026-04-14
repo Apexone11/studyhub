@@ -15,6 +15,8 @@ function DiscussionPostItem({
   onResolve,
   onDelete,
   onUpvote,
+  onApprove,
+  onReject,
   replyFormData,
   setReplyFormData,
   isAdminOrMod,
@@ -23,6 +25,8 @@ function DiscussionPostItem({
   const isAuthor = post.userId === userId || post.authorId === userId
   const authorName = post.author?.username || post.authorName || 'Unknown'
   const isResolved = post.resolved || post.isResolved
+  const isPendingApproval = post.status === 'pending_approval'
+  const isRemoved = post.status === 'removed'
   const badgeStyle = post.type === 'question'
     ? styles.badgeOrange
     : post.type === 'announcement'
@@ -50,6 +54,16 @@ function DiscussionPostItem({
             <span style={{ ...styles.badge, ...badgeStyle }}>
               {getPostTypeLabel(post.type)}
             </span>
+            {isPendingApproval ? (
+              <span style={{ ...styles.badge, background: 'var(--sh-warning-bg)', color: 'var(--sh-warning-text)' }}>
+                Pending Approval
+              </span>
+            ) : null}
+            {isRemoved ? (
+              <span style={{ ...styles.badge, background: 'var(--sh-danger-bg)', color: 'var(--sh-danger-text)' }}>
+                Removed
+              </span>
+            ) : null}
           </div>
         </div>
 
@@ -88,6 +102,34 @@ function DiscussionPostItem({
           </p>
 
           <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-4)', flexWrap: 'wrap' }}>
+            {/* Phase 5: Approve/Reject buttons for posts in the approval queue */}
+            {isPendingApproval && isAdminOrMod && onApprove && (
+              <button
+                onClick={() => onApprove(post.id)}
+                style={{
+                  ...styles.button,
+                  ...styles.buttonSmall,
+                  backgroundColor: 'var(--sh-success)',
+                  color: 'white',
+                }}
+              >
+                Approve
+              </button>
+            )}
+            {isPendingApproval && isAdminOrMod && onReject && (
+              <button
+                onClick={() => onReject(post.id)}
+                style={{
+                  ...styles.button,
+                  ...styles.buttonSmall,
+                  backgroundColor: 'var(--sh-danger)',
+                  color: 'white',
+                }}
+              >
+                Reject
+              </button>
+            )}
+
             {(isAuthor || isAdminOrMod) && post.type === 'question' && (
               <button
                 onClick={() => onResolve(post.id)}
@@ -164,6 +206,8 @@ export function GroupDiscussionsTab({
   onAddReply,
   onResolve,
   onUpvote,
+  onApprovePost,
+  onRejectPost,
   isAdminOrMod,
   isMember,
   userId,
@@ -406,6 +450,8 @@ export function GroupDiscussionsTab({
                 onResolve={onResolve}
                 onDelete={onDeletePost}
                 onUpvote={onUpvote}
+                onApprove={onApprovePost}
+                onReject={onRejectPost}
                 replyFormData={replyFormData}
                 setReplyFormData={setReplyFormData}
                 isAdminOrMod={isAdminOrMod}
@@ -434,6 +480,8 @@ export function GroupDiscussionsTab({
                 onResolve={onResolve}
                 onDelete={onDeletePost}
                 onUpvote={onUpvote}
+                onApprove={onApprovePost}
+                onReject={onRejectPost}
                 replyFormData={replyFormData}
                 setReplyFormData={setReplyFormData}
                 isAdminOrMod={isAdminOrMod}

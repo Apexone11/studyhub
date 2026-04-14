@@ -50,6 +50,9 @@ const BookDetailPage = lazy(() => import('./pages/library/BookDetailPage'))
 const BookReaderPage = lazy(() => import('./pages/library/BookReaderPage'))
 const PlaygroundPage = lazy(() => import('./pages/playground/PlaygroundPage'))
 const ReviewPage = lazy(() => import('./pages/review/ReviewPage'))
+const OnboardingPage = lazy(() => import('./pages/onboarding/OnboardingPage'))
+const InvitePage = lazy(() => import('./pages/invite/InvitePage'))
+const PlagiarismReportPage = lazy(() => import('./pages/plagiarism/PlagiarismReportPage'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 
 import ScrollToTop from './components/ScrollToTop'
@@ -118,21 +121,17 @@ const ROUTE_TITLES = {
   '/privacy': 'Privacy Policy',
   '/guidelines': 'Community Guidelines',
   '/about': 'About',
+  '/invite': 'Invite Classmates',
   '/pricing': 'Pricing',
   '/library': 'Library',
   '/playground': 'Code Playground',
   '/review': 'Leave a Review',
+  '/onboarding': 'Onboarding',
   '/forgot-password': 'Forgot Password',
   '/reset-password': 'Reset Password',
 }
 
-const HOME_CONNECTED_FX_ROUTES = new Set([
-  '/',
-  '/terms',
-  '/privacy',
-  '/guidelines',
-  '/about',
-])
+const HOME_CONNECTED_FX_ROUTES = new Set(['/', '/terms', '/privacy', '/guidelines', '/about'])
 
 function RouteVisualScope({ children }) {
   const location = useLocation()
@@ -328,275 +327,300 @@ function AppRoutes() {
           <LegalAcceptanceEnforcementModal />
           <AuthenticatedAiProvider>
             <ChatPanelProvider>
-            <Suspense fallback={<RouteFallback />}>
-              <Routes>
-              {/* ── public (unauthenticated) ─────────────────────────── */}
-              <Route
-                path="/"
-                element={
-                  <PublicRoute>
-                    <HomePage />
-                  </PublicRoute>
-                }
-              />
-              <Route
-                path="/login"
-                element={
-                  <PublicRoute>
-                    <LoginPage />
-                  </PublicRoute>
-                }
-              />
-              <Route
-                path="/register"
-                element={
-                  <PublicRoute>
-                    <RegisterScreen />
-                  </PublicRoute>
-                }
-              />
-              <Route path="/terms" element={<TermsPage />} />
-              <Route path="/privacy" element={<PrivacyPage />} />
-              <Route path="/guidelines" element={<GuidelinesPage />} />
-              <Route path="/cookies" element={<CookiePolicyPage />} />
-              <Route path="/disclaimer" element={<DisclaimerPage />} />
-              <Route path="/data-request" element={<DataRequestPage />} />
-              <Route path="/about" element={<AboutPage />} />
-              <Route path="/pricing" element={<PricingPage />} />
-              <Route path="/supporters" element={<SupportersPage />} />
-              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-              <Route path="/reset-password" element={<ResetPasswordPage />} />
+              <Suspense fallback={<RouteFallback />}>
+                <Routes>
+                  {/* ── public (unauthenticated) ─────────────────────────── */}
+                  <Route
+                    path="/"
+                    element={
+                      <PublicRoute>
+                        <HomePage />
+                      </PublicRoute>
+                    }
+                  />
+                  <Route
+                    path="/login"
+                    element={
+                      <PublicRoute>
+                        <LoginPage />
+                      </PublicRoute>
+                    }
+                  />
+                  <Route
+                    path="/register"
+                    element={
+                      <PublicRoute>
+                        <RegisterScreen />
+                      </PublicRoute>
+                    }
+                  />
+                  <Route path="/terms" element={<TermsPage />} />
+                  <Route path="/privacy" element={<PrivacyPage />} />
+                  <Route path="/guidelines" element={<GuidelinesPage />} />
+                  <Route path="/cookies" element={<CookiePolicyPage />} />
+                  <Route path="/disclaimer" element={<DisclaimerPage />} />
+                  <Route path="/data-request" element={<DataRequestPage />} />
+                  <Route path="/about" element={<AboutPage />} />
+                  <Route path="/pricing" element={<PricingPage />} />
+                  <Route path="/supporters" element={<SupportersPage />} />
+                  <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                  <Route path="/reset-password" element={<ResetPasswordPage />} />
 
-              {/* ── authenticated ────────────────────────────────────── */}
-              <Route
-                path="/feed"
-                element={
-                  <PrivateRoute>
-                    <FeedPage />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/sheets"
-                element={
-                  <PrivateRoute>
-                    <SheetsPage />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/sheets/upload"
-                element={
-                  <PrivateRoute>
-                    <UploadSheetPage />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/sheets/new/lab"
-                element={
-                  <PrivateRoute>
-                    <AiSheetSetupPage />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/sheets/:id/edit"
-                element={
-                  <PrivateRoute>
-                    <EditRedirect />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/sheets/:id/lab"
-                element={
-                  <PrivateRoute>
-                    <SheetLabPage />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/sheets/:id"
-                element={
-                  <PrivateRoute>
-                    <SheetViewerPage />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/sheets/preview/html/:id"
-                element={
-                  <PrivateRoute>
-                    <SheetHtmlPreviewPage />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/preview/:scope/:id"
-                element={
-                  <PrivateRoute>
-                    <AttachmentPreviewPage />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/tests"
-                element={
-                  <PrivateRoute>
-                    <TestsPage />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/tests/:id"
-                element={
-                  <PrivateRoute>
-                    <TestTakerPage />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/notes"
-                element={
-                  <PrivateRoute>
-                    <NotesPage />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/messages"
-                element={
-                  <PrivateRoute>
-                    <MessagesPage />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/study-groups"
-                element={
-                  <PrivateRoute>
-                    <StudyGroupsPage />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/study-groups/:id"
-                element={
-                  <PrivateRoute>
-                    <StudyGroupsPage />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/ai"
-                element={
-                  <PrivateRoute>
-                    <AiPage />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/library"
-                element={
-                  <PrivateRoute>
-                    <LibraryPage />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/library/:volumeId/read"
-                element={
-                  <PrivateRoute>
-                    <BookReaderPage />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/library/:volumeId"
-                element={
-                  <PrivateRoute>
-                    <BookDetailPage />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/playground"
-                element={
-                  <PrivateRoute>
-                    <PlaygroundPage />
-                  </PrivateRoute>
-                }
-              />
-              <Route path="/notes/:id" element={<NoteViewerPage />} />
-              <Route
-                path="/announcements"
-                element={
-                  <PrivateRoute>
-                    <AnnouncementsPage />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/submit"
-                element={
-                  <PrivateRoute>
-                    <SubmitPage />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/my-courses"
-                element={
-                  <PrivateRoute>
-                    <MyCoursesPage />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/review"
-                element={
-                  <PrivateRoute>
-                    <ReviewPage />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/admin"
-                element={
-                  <PrivateRoute>
-                    <AdminPage />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/dashboard"
-                element={
-                  <PrivateRoute>
-                    <DashboardRedirect />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/settings"
-                element={
-                  <PrivateRoute>
-                    <SettingsPage />
-                  </PrivateRoute>
-                }
-              />
+                  {/* ── authenticated ────────────────────────────────────── */}
+                  <Route
+                    path="/feed"
+                    element={
+                      <PrivateRoute>
+                        <FeedPage />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/sheets"
+                    element={
+                      <PrivateRoute>
+                        <SheetsPage />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/sheets/upload"
+                    element={
+                      <PrivateRoute>
+                        <UploadSheetPage />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/sheets/new/lab"
+                    element={
+                      <PrivateRoute>
+                        <AiSheetSetupPage />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/sheets/:id/edit"
+                    element={
+                      <PrivateRoute>
+                        <EditRedirect />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/sheets/:id/lab"
+                    element={
+                      <PrivateRoute>
+                        <SheetLabPage />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/sheets/:id/plagiarism"
+                    element={
+                      <PrivateRoute>
+                        <PlagiarismReportPage />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/sheets/:id"
+                    element={
+                      <PrivateRoute>
+                        <SheetViewerPage />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/sheets/preview/html/:id"
+                    element={
+                      <PrivateRoute>
+                        <SheetHtmlPreviewPage />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/preview/:scope/:id"
+                    element={
+                      <PrivateRoute>
+                        <AttachmentPreviewPage />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/tests"
+                    element={
+                      <PrivateRoute>
+                        <TestsPage />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/tests/:id"
+                    element={
+                      <PrivateRoute>
+                        <TestTakerPage />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/notes"
+                    element={
+                      <PrivateRoute>
+                        <NotesPage />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/messages"
+                    element={
+                      <PrivateRoute>
+                        <MessagesPage />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/study-groups"
+                    element={
+                      <PrivateRoute>
+                        <StudyGroupsPage />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/study-groups/:id"
+                    element={
+                      <PrivateRoute>
+                        <StudyGroupsPage />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/ai"
+                    element={
+                      <PrivateRoute>
+                        <AiPage />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/library"
+                    element={
+                      <PrivateRoute>
+                        <LibraryPage />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/library/:volumeId/read"
+                    element={
+                      <PrivateRoute>
+                        <BookReaderPage />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/library/:volumeId"
+                    element={
+                      <PrivateRoute>
+                        <BookDetailPage />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/playground"
+                    element={
+                      <PrivateRoute>
+                        <PlaygroundPage />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route path="/notes/:id" element={<NoteViewerPage />} />
+                  <Route
+                    path="/announcements"
+                    element={
+                      <PrivateRoute>
+                        <AnnouncementsPage />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/submit"
+                    element={
+                      <PrivateRoute>
+                        <SubmitPage />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/my-courses"
+                    element={
+                      <PrivateRoute>
+                        <MyCoursesPage />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/invite"
+                    element={
+                      <PrivateRoute>
+                        <InvitePage />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/review"
+                    element={
+                      <PrivateRoute>
+                        <ReviewPage />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin"
+                    element={
+                      <PrivateRoute>
+                        <AdminPage />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/dashboard"
+                    element={
+                      <PrivateRoute>
+                        <DashboardRedirect />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/settings"
+                    element={
+                      <PrivateRoute>
+                        <SettingsPage />
+                      </PrivateRoute>
+                    }
+                  />
 
-              {/* ── public user profiles ─────────────────────────────── */}
-              <Route path="/users/:username" element={<UserProfilePage />} />
+                  <Route
+                    path="/onboarding"
+                    element={
+                      <PrivateRoute>
+                        <OnboardingPage />
+                      </PrivateRoute>
+                    }
+                  />
 
-              {/* ── catch-all ────────────────────────────────────────── */}
-              <Route path="*" element={<NotFoundPage />} />
-              </Routes>
-            </Suspense>
-            <ScrollToTop />
-            <ToastContainer />
-            <OfflineIndicator />
-            <AuthenticatedBubble />
+                  {/* ── public user profiles ─────────────────────────────── */}
+                  <Route path="/users/:username" element={<UserProfilePage />} />
+
+                  {/* ── catch-all ────────────────────────────────────────── */}
+                  <Route path="*" element={<NotFoundPage />} />
+                </Routes>
+              </Suspense>
+              <ScrollToTop />
+              <ToastContainer />
+              <OfflineIndicator />
+              <AuthenticatedBubble />
             </ChatPanelProvider>
           </AuthenticatedAiProvider>
           {PerfOverlay && (

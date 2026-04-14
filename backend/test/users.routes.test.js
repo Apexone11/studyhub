@@ -50,7 +50,9 @@ const mocks = vi.hoisted(() => {
     authTokens: {
       getAuthTokenFromRequest: vi.fn(() => null),
       verifyAuthToken: vi.fn(),
+      getOptionalAuthUserFromRequest: vi.fn(() => null),
     },
+    optionalAuth: vi.fn((req, _res, next) => next()),
     sentry: {
       captureError: vi.fn(),
     },
@@ -62,7 +64,9 @@ const mocks = vi.hoisted(() => {
       PROFILE_VISIBILITY: { PUBLIC: 'public', ENROLLED: 'enrolled', PRIVATE: 'private' },
     },
     userBadges: {
-      enrichUserWithBadges: vi.fn((user) => Promise.resolve({ ...user, plan: 'free', isDonor: false, donorLevel: null })),
+      enrichUserWithBadges: vi.fn((user) =>
+        Promise.resolve({ ...user, plan: 'free', isDonor: false, donorLevel: null }),
+      ),
       enrichUsersWithBadges: vi.fn((users) => Promise.resolve(users)),
     },
     badges: {
@@ -83,6 +87,7 @@ const mockTargets = new Map([
   [require.resolve('../src/lib/prisma'), mocks.prisma],
   [require.resolve('../src/middleware/auth'), mocks.auth],
   [require.resolve('../src/lib/authTokens'), mocks.authTokens],
+  [require.resolve('../src/core/auth/optionalAuth'), mocks.optionalAuth],
   [require.resolve('../src/monitoring/sentry'), mocks.sentry],
   [require.resolve('../src/lib/notify'), mocks.notify],
   [require.resolve('../src/lib/profileVisibility'), mocks.profileVisibility],
@@ -137,8 +142,13 @@ beforeEach(() => {
   mocks.prisma.userFollow.findUnique.mockResolvedValue(null)
   mocks.prisma.userFollow.count.mockResolvedValue(0)
   mocks.notify.createNotification.mockResolvedValue({})
-  mocks.profileVisibility.getProfileAccessDecision.mockResolvedValue({ allowed: true, visibility: 'public' })
-  mocks.userBadges.enrichUserWithBadges.mockImplementation((user) => Promise.resolve({ ...user, plan: 'free', isDonor: false, donorLevel: null }))
+  mocks.profileVisibility.getProfileAccessDecision.mockResolvedValue({
+    allowed: true,
+    visibility: 'public',
+  })
+  mocks.userBadges.enrichUserWithBadges.mockImplementation((user) =>
+    Promise.resolve({ ...user, plan: 'free', isDonor: false, donorLevel: null }),
+  )
 })
 
 describe('users routes', () => {
@@ -153,9 +163,7 @@ describe('users routes', () => {
         isPrivate: false,
         createdAt: new Date('2026-01-01'),
         enrollments: [],
-        studySheets: [
-          { id: 1, title: 'Sheet 1', createdAt: new Date(), course: null },
-        ],
+        studySheets: [{ id: 1, title: 'Sheet 1', createdAt: new Date(), course: null }],
       })
       mocks.prisma.userFollow.count.mockResolvedValue(5)
       mocks.prisma.studySheet.count.mockResolvedValue(3)

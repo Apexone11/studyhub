@@ -9,11 +9,7 @@ const {
 } = require('../../lib/googleAuth')
 const prisma = require('../../lib/prisma')
 const { googleLimiter } = require('./auth.constants')
-const {
-  AppError,
-  issueAuthenticatedSession,
-  handleAuthError,
-} = require('./auth.service')
+const { AppError, issueAuthenticatedSession, handleAuthError } = require('./auth.service')
 const {
   CURRENT_LEGAL_VERSION,
   LEGAL_ACCEPTANCE_SOURCES,
@@ -75,7 +71,7 @@ router.post('/google', googleLimiter, async (req, res) => {
     // Existing user by Google ID → sign in
     const existingByGoogleId = await findUserByGoogleId(googlePayload.googleId)
     if (existingByGoogleId) {
-      const authenticatedUser = await issueAuthenticatedSession(res, existingByGoogleId.id)
+      const authenticatedUser = await issueAuthenticatedSession(res, existingByGoogleId.id, req)
       return res.json({
         message: 'Login successful!',
         user: authenticatedUser,
@@ -90,14 +86,18 @@ router.post('/google', googleLimiter, async (req, res) => {
     // Existing user by email → reject (security: no auto-link)
     const existingByEmail = await findUserByEmail(googlePayload.email)
     if (existingByEmail) {
-      const msg = existingByEmail.authProvider === 'google'
-        ? 'An account with this email already exists. Try signing in with your original Google account.'
-        : 'An account with this email already exists. Log in with your password, then link Google from Settings > Security.'
+      const msg =
+        existingByEmail.authProvider === 'google'
+          ? 'An account with this email already exists. Try signing in with your original Google account.'
+          : 'An account with this email already exists. Log in with your password, then link Google from Settings > Security.'
       return res.status(409).json({ error: msg })
     }
 
     if (!legalAccepted || legalVersion !== CURRENT_LEGAL_VERSION) {
-      throw new AppError(400, 'Please review and accept the latest StudyHub legal documents before creating your Google account.')
+      throw new AppError(
+        400,
+        'Please review and accept the latest StudyHub legal documents before creating your Google account.',
+      )
     }
 
     // New user → create immediately with zero enrollments
@@ -146,7 +146,8 @@ router.post('/google', googleLimiter, async (req, res) => {
         }
         if (targets.includes('email')) {
           return res.status(409).json({
-            error: 'An account with this email already exists. Try signing in with your original Google account.',
+            error:
+              'An account with this email already exists. Try signing in with your original Google account.',
           })
         }
         if (targets.includes('googleId')) {
@@ -161,7 +162,7 @@ router.post('/google', googleLimiter, async (req, res) => {
       throw new AppError(500, 'Unable to generate a unique username. Please try again.')
     }
 
-    const authenticatedUser = await issueAuthenticatedSession(res, createdUser.id)
+    const authenticatedUser = await issueAuthenticatedSession(res, createdUser.id, req)
     return res.status(201).json({
       message: 'Account created with Google!',
       user: authenticatedUser,

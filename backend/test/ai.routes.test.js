@@ -28,6 +28,7 @@ const mocks = vi.hoisted(() => {
       renameConversation: vi.fn(),
       streamMessage: vi.fn(),
       getUsageStats: vi.fn(),
+      getUsageQuota: vi.fn(),
       getDailyLimit: vi.fn(),
       getOrCreateUsage: vi.fn(),
     },
@@ -54,7 +55,15 @@ const mockTargets = new Map([
   [require.resolve('../src/modules/ai/ai.service'), mocks.aiService],
   [require.resolve('../src/monitoring/sentry'), mocks.sentry],
   [require.resolve('../src/middleware/auth'), fakeAuth],
-  [require.resolve('../src/lib/rateLimiters'), { readLimiter: fakeRateLimiter, authLimiter: fakeRateLimiter, writeLimiter: fakeRateLimiter, createAiMessageLimiter: () => fakeRateLimiter }],
+  [
+    require.resolve('../src/lib/rateLimiters'),
+    {
+      readLimiter: fakeRateLimiter,
+      authLimiter: fakeRateLimiter,
+      writeLimiter: fakeRateLimiter,
+      createAiMessageLimiter: () => fakeRateLimiter,
+    },
+  ],
   [require.resolve('express-rate-limit'), () => fakeRateLimiter],
 ])
 
@@ -126,7 +135,12 @@ describe('GET /conversations', () => {
 
 describe('POST /conversations', () => {
   it('creates a conversation', async () => {
-    const mockConv = { id: 1, title: null, model: 'claude-sonnet-4-20250514', createdAt: new Date().toISOString() }
+    const mockConv = {
+      id: 1,
+      title: null,
+      model: 'claude-sonnet-4-20250514',
+      createdAt: new Date().toISOString(),
+    }
     mocks.aiService.createConversation.mockResolvedValue(mockConv)
 
     const res = await request(app).post('/conversations').send({})
@@ -208,27 +222,21 @@ describe('PATCH /conversations/:id', () => {
   it('renames conversation with valid title', async () => {
     mocks.aiService.renameConversation.mockResolvedValue({ id: 5, title: 'New Title' })
 
-    const res = await request(app)
-      .patch('/conversations/5')
-      .send({ title: 'New Title' })
+    const res = await request(app).patch('/conversations/5').send({ title: 'New Title' })
 
     expect(res.status).toBe(200)
     expect(res.body.title).toBe('New Title')
   })
 
   it('returns 400 for missing title', async () => {
-    const res = await request(app)
-      .patch('/conversations/5')
-      .send({})
+    const res = await request(app).patch('/conversations/5').send({})
 
     expect(res.status).toBe(400)
     expect(res.body.error).toContain('Title')
   })
 
   it('returns 400 for empty title', async () => {
-    const res = await request(app)
-      .patch('/conversations/5')
-      .send({ title: '   ' })
+    const res = await request(app).patch('/conversations/5').send({ title: '   ' })
 
     expect(res.status).toBe(400)
   })
@@ -248,27 +256,21 @@ describe('PATCH /conversations/:id', () => {
 
 describe('POST /messages', () => {
   it('returns 400 for missing conversationId', async () => {
-    const res = await request(app)
-      .post('/messages')
-      .send({ content: 'hello' })
+    const res = await request(app).post('/messages').send({ content: 'hello' })
 
     expect(res.status).toBe(400)
     expect(res.body.error).toContain('conversationId')
   })
 
   it('returns 400 for missing content', async () => {
-    const res = await request(app)
-      .post('/messages')
-      .send({ conversationId: 1 })
+    const res = await request(app).post('/messages').send({ conversationId: 1 })
 
     expect(res.status).toBe(400)
     expect(res.body.error).toContain('content')
   })
 
   it('returns 400 for empty content', async () => {
-    const res = await request(app)
-      .post('/messages')
-      .send({ conversationId: 1, content: '   ' })
+    const res = await request(app).post('/messages').send({ conversationId: 1, content: '   ' })
 
     expect(res.status).toBe(400)
   })
@@ -357,13 +359,22 @@ describe('POST /messages', () => {
 
 describe('GET /usage', () => {
   it('returns usage stats', async () => {
-    mocks.prisma.user.findUnique.mockResolvedValue({ id: 1, role: 'student', emailVerified: true, isStaffVerified: false })
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      id: 1,
+      role: 'student',
+      emailVerified: true,
+      isStaffVerified: false,
+    })
     mocks.aiService.getUsageStats.mockResolvedValue({
       messagesUsed: 5,
       messagesLimit: 60,
       messagesRemaining: 55,
       tokensUsed: 1000,
       resetsAt: '2026-04-02T00:00:00.000Z',
+    })
+    mocks.aiService.getUsageQuota.mockResolvedValue({
+      daily: { used: 5, limit: 60, remaining: 55, resetsAt: '2026-04-02T00:00:00.000Z' },
+      weekly: { used: 10, limit: 420, remaining: 410, resetsAt: '2026-04-07T00:00:00.000Z' },
     })
 
     const res = await request(app).get('/usage')

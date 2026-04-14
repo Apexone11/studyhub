@@ -13,6 +13,7 @@
  */
 
 const { encrypt, decrypt, isEncrypted } = require('./fieldEncryption')
+const log = require('./logger')
 
 /**
  * Map of model names to arrays of encrypted field names.
@@ -59,7 +60,7 @@ function decryptFields(modelName, result) {
   if (!fields) return result
 
   if (Array.isArray(result)) {
-    return result.map(item => decryptFields(modelName, item))
+    return result.map((item) => decryptFields(modelName, item))
   }
 
   for (const field of fields) {
@@ -104,7 +105,7 @@ function decryptNestedResults(result) {
   if (!result || typeof result !== 'object') return result
 
   if (Array.isArray(result)) {
-    return result.map(item => decryptNestedResults(item))
+    return result.map((item) => decryptNestedResults(item))
   }
 
   for (const [key, value] of Object.entries(result)) {
@@ -112,7 +113,7 @@ function decryptNestedResults(result) {
       const modelName = relationToModel(key)
       if (modelName && ENCRYPTED_FIELDS[modelName]) {
         if (Array.isArray(value)) {
-          result[key] = value.map(item => {
+          result[key] = value.map((item) => {
             decryptFields(modelName, item)
             return decryptNestedResults(item)
           })
@@ -161,7 +162,7 @@ const READ_ACTIONS = new Set([
  */
 function withEncryption(prismaClient) {
   if (!process.env.FIELD_ENCRYPTION_KEY) {
-    console.log('[prismaEncryption] No FIELD_ENCRYPTION_KEY found -- encryption disabled.')
+    log.info('[prismaEncryption] No FIELD_ENCRYPTION_KEY found -- encryption disabled.')
     return prismaClient
   }
 
@@ -180,12 +181,12 @@ function withEncryption(prismaClient) {
             if (args.update) encryptFields(modelName, args.update)
           }
           if (operation === 'createMany' && Array.isArray(args.data)) {
-            args.data.forEach(item => encryptFields(modelName, item))
+            args.data.forEach((item) => encryptFields(modelName, item))
           }
         }
 
         // Execute the query, then decrypt results
-        return query(args).then(result => {
+        return query(args).then((result) => {
           if (modelName && ENCRYPTED_FIELDS[modelName] && READ_ACTIONS.has(operation) && result) {
             decryptFields(modelName, result)
           }
@@ -198,7 +199,10 @@ function withEncryption(prismaClient) {
     },
   })
 
-  console.log('[prismaEncryption] Encryption extension attached for models:', Object.keys(ENCRYPTED_FIELDS).join(', '))
+  log.info(
+    { models: Object.keys(ENCRYPTED_FIELDS) },
+    '[prismaEncryption] Encryption extension attached for models',
+  )
   return extended
 }
 

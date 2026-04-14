@@ -252,27 +252,42 @@ function ConversationSidebar({ conversations, activeId, onSelect, onNew, onDelet
         ))}
       </div>
 
-      {/* Usage footer */}
+      {/* Usage footer — daily + weekly quota bars */}
       {usage && (
         <div style={{
           padding: '10px 16px',
           borderTop: '1px solid var(--sh-border)',
           fontSize: 11,
           color: 'var(--sh-muted)',
+          display: 'grid',
+          gap: 6,
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-            <span>{usage.messagesUsed} / {usage.messagesLimit} messages today</span>
-            <span>{usage.messagesRemaining} left</span>
-          </div>
-          <div style={{ height: 4, background: 'var(--sh-soft)', borderRadius: 99, overflow: 'hidden' }}>
-            <div style={{
-              height: '100%',
-              width: `${Math.min(100, (usage.messagesUsed / usage.messagesLimit) * 100)}%`,
-              background: usage.messagesRemaining <= 5 ? 'var(--sh-danger)' : 'var(--sh-brand)',
-              borderRadius: 99,
-              transition: 'width 0.3s',
-            }} />
-          </div>
+          <QuotaRow
+            label="Today"
+            used={usage.daily?.used ?? usage.messagesUsed ?? 0}
+            limit={usage.daily?.limit ?? usage.messagesLimit ?? 30}
+          />
+          {usage.weekly ? (
+            <QuotaRow
+              label="This week"
+              used={usage.weekly.used}
+              limit={usage.weekly.limit}
+            />
+          ) : null}
+          {/* Upgrade CTA when at or near weekly limit */}
+          {usage.weekly && usage.weekly.remaining <= 0 ? (
+            <a
+              href="/pricing"
+              style={{
+                display: 'block', textAlign: 'center',
+                padding: '6px 12px', borderRadius: 8,
+                background: 'var(--sh-brand)', color: 'var(--sh-btn-primary-text, #fff)',
+                fontSize: 11, fontWeight: 700, textDecoration: 'none',
+              }}
+            >
+              Upgrade for more messages
+            </a>
+          ) : null}
         </div>
       )}
     </div>
@@ -614,6 +629,38 @@ function MessageBubble({ message }) {
             })()}
           </>
         )}
+      </div>
+    </div>
+  )
+}
+
+/* Phase 1: compact quota row with progress bar */
+function QuotaRow({ label, used, limit }) {
+  const pct = limit > 0 ? Math.min(100, (used / limit) * 100) : 0
+  const isWarning = pct >= 80 && pct < 100
+  const isExhausted = pct >= 100
+  const barColor = isExhausted
+    ? 'var(--sh-danger)'
+    : isWarning
+      ? 'var(--sh-warning)'
+      : 'var(--sh-brand)'
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+        <span style={{ fontWeight: 600, color: isExhausted ? 'var(--sh-danger)' : 'var(--sh-muted)' }}>
+          {used}/{limit} {label}
+        </span>
+        <span style={{ color: isExhausted ? 'var(--sh-danger)' : isWarning ? 'var(--sh-warning)' : 'var(--sh-muted)' }}>
+          {isExhausted ? 'Limit reached' : `${limit - used} left`}
+        </span>
+      </div>
+      <div style={{ height: 4, background: 'var(--sh-soft)', borderRadius: 99, overflow: 'hidden' }}>
+        <div style={{
+          height: '100%', width: `${pct}%`,
+          background: barColor, borderRadius: 99,
+          transition: 'width 0.3s',
+        }} />
       </div>
     </div>
   )

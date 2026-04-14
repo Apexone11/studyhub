@@ -27,6 +27,7 @@ const mockPrisma = {
   },
   strike: { create: vi.fn(), count: vi.fn(), findFirst: vi.fn() },
   userRestriction: { findFirst: vi.fn(), count: vi.fn() },
+  moderationLog: { create: vi.fn() },
 }
 
 const mockSentry = { captureError: vi.fn() }
@@ -105,7 +106,11 @@ describe('moderationEngine issueStrike', () => {
 
   beforeAll(() => {
     /* Also mock the moderationEngine targets */
-    mockTargets.set(require.resolve('openai'), vi.fn(function MockOpenAI() { return {} }))
+    mockTargets.set(require.resolve('@anthropic-ai/sdk'), {
+      default: vi.fn(function MockAnthropic() {
+        return { messages: { create: vi.fn() } }
+      }),
+    })
 
     const enginePath = require.resolve('../src/lib/moderation/moderationEngine')
     delete require.cache[enginePath]
@@ -129,7 +134,9 @@ describe('moderationEngine issueStrike', () => {
 /* ── Report Duplicate Prevention ────────────────────────────────────────── */
 describe('report validation', () => {
   it('REASON_CATEGORIES includes expected categories', () => {
-    const { REASON_CATEGORIES } = require(require.resolve('../src/modules/moderation/moderation.constants'))
+    const { REASON_CATEGORIES } = require(
+      require.resolve('../src/modules/moderation/moderation.constants'),
+    )
     expect(REASON_CATEGORIES).toContain('harassment')
     expect(REASON_CATEGORIES).toContain('spam')
     expect(REASON_CATEGORIES).toContain('plagiarism')

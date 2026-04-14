@@ -40,25 +40,30 @@ export function getSteps(googleCredential) {
   // Local users: Account → Verify → done.
   return googleCredential
     ? []
-    : [['account', 'Account'], ['verify', 'Verify']]
+    : [
+        ['account', 'Account'],
+        ['verify', 'Verify'],
+      ]
 }
 
 /* ── API helpers (return { ok, data } or { ok, error }) ────────────────── */
 
-export async function apiStartRegistration(form) {
+export async function apiStartRegistration(form, options = {}) {
+  const payload = {
+    username: form.username.trim(),
+    email: form.email.trim(),
+    password: form.password,
+    confirmPassword: form.confirmPassword,
+    accountType: form.accountType || 'student',
+    termsAccepted: form.termsAccepted,
+    termsVersion: CURRENT_LEGAL_VERSION,
+  }
+  if (options.referralCode) payload.referralCode = options.referralCode
   const response = await fetch(`${API}/api/auth/register/start`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify({
-      username: form.username.trim(),
-      email: form.email.trim(),
-      password: form.password,
-      confirmPassword: form.confirmPassword,
-      accountType: form.accountType || 'student',
-      termsAccepted: form.termsAccepted,
-      termsVersion: CURRENT_LEGAL_VERSION,
-    }),
+    body: JSON.stringify(payload),
   })
   const data = await response.json()
   if (!response.ok) return { ok: false, error: data.error || 'Could not create your account.' }
@@ -90,15 +95,17 @@ export async function apiResendCode(verificationToken) {
 }
 
 export async function apiGoogleAuth(credential, options = {}) {
+  const payload = {
+    credential,
+    legalAccepted: Boolean(options.legalAccepted),
+    legalVersion: options.legalAccepted ? CURRENT_LEGAL_VERSION : null,
+  }
+  if (options.referralCode) payload.referralCode = options.referralCode
   const response = await fetch(`${API}/api/auth/google`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify({
-      credential,
-      legalAccepted: Boolean(options.legalAccepted),
-      legalVersion: options.legalAccepted ? CURRENT_LEGAL_VERSION : null,
-    }),
+    body: JSON.stringify(payload),
   })
   const data = await response.json()
   if (!response.ok) return { ok: false, error: data.error || 'Google sign-up failed.' }

@@ -7,6 +7,7 @@ const { validateHtmlForSubmission } = require('../../lib/html/htmlSecurity')
 const { isModerationEnabled, scanContent } = require('../../lib/moderation/moderationEngine')
 const { updateFingerprint } = require('../../lib/plagiarismService')
 const { findSimilarSheets } = require('../../lib/plagiarism')
+const { runPlagiarismScan } = require('../plagiarism/plagiarism.service')
 const { createProvenanceToken } = require('../../lib/provenance')
 const { isHtmlUploadsEnabled } = require('../../lib/html/htmlKillSwitch')
 const { SHEET_STATUS, AUTHOR_SELECT, sheetWriteLimiter } = require('./sheets.constants')
@@ -21,6 +22,7 @@ const {
   getUserDefaultDownloads,
 } = require('./sheets.service')
 const { serializeSheet } = require('./sheets.serializer')
+const log = require('../../lib/logger')
 
 const router = express.Router()
 
@@ -81,9 +83,10 @@ router.post('/', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (re
     }
 
     /* Use user's defaultDownloads preference when not explicitly set in request */
-    const resolvedAllowDownloads = typeof allowDownloads === 'boolean'
-      ? allowDownloads
-      : await getUserDefaultDownloads(req.user.userId)
+    const resolvedAllowDownloads =
+      typeof allowDownloads === 'boolean'
+        ? allowDownloads
+        : await getUserDefaultDownloads(req.user.userId)
 
     const sheet = await prisma.studySheet.create({
       data: {
@@ -109,15 +112,22 @@ router.post('/', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (re
 
     res.status(201).json({
       ...serializeSheet(sheet),
-      message: nextStatus === SHEET_STATUS.PENDING_REVIEW
-        ? 'HTML sheet submitted for admin review.'
-        : 'Sheet published.',
+      message:
+        nextStatus === SHEET_STATUS.PENDING_REVIEW
+          ? 'HTML sheet submitted for admin review.'
+          : 'Sheet published.',
     })
 
     /* Async content moderation — scan title + description + markdown content */
     if (isModerationEnabled()) {
-      const textToScan = `${title} ${description || ''} ${contentFormat === 'markdown' ? content : ''}`.trim()
-      void scanContent({ contentType: 'sheet', contentId: sheet.id, text: textToScan, userId: req.user.userId })
+      const textToScan =
+        `${title} ${description || ''} ${contentFormat === 'markdown' ? content : ''}`.trim()
+      void scanContent({
+        contentType: 'sheet',
+        contentId: sheet.id,
+        text: textToScan,
+        userId: req.user.userId,
+      })
     }
 
     /* Abuse detection — rate anomaly, duplicate, new-account checks (fire-and-forget) */
@@ -142,8 +152,14 @@ router.post('/', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (re
         if (similarSheets && similarSheets.length > 0) {
           const verySimialar = similarSheets.filter((s) => s.distance <= 5)
           if (verySimialar.length > 0) {
-            // Log for debugging
-            console.log(`[PLAGIARISM] Sheet ${sheet.id} has ${verySimialar.length} very similar matches`, verySimialar.slice(0, 3))
+            log.info(
+              {
+                sheetId: sheet.id,
+                matchCount: verySimialar.length,
+                matches: verySimialar.slice(0, 3),
+              },
+              '[PLAGIARISM] very similar matches detected for sheet',
+            )
 
             // Create a moderation case for manual review
             try {
@@ -181,10 +197,18 @@ router.post('/', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (re
       }
     })
 
+    /* Phase 4: comprehensive plagiarism scan with multi-window SimHash + n-gram (fire-and-forget) */
+    void runPlagiarismScan(sheet.id, content, req.user.userId)
+
     /* Auto-generate provenance manifest (fire-and-forget) */
     Promise.resolve().then(async () => {
       try {
-        const token = createProvenanceToken(sheet.id, req.user.userId, content.trim(), sheet.createdAt)
+        const token = createProvenanceToken(
+          sheet.id,
+          req.user.userId,
+          content.trim(),
+          sheet.createdAt,
+        )
         await prisma.provenanceManifest.upsert({
           where: { sheetId: sheet.id },
           update: {

@@ -6,15 +6,23 @@
 import { styles } from './studyGroupsStyles'
 
 export default function GroupListFilters({
-  search, schoolId, courseId, mineOnly, allSchools, allCourses,
-  onSearch, onToggleMine, onSchoolFilter, onCourseFilter,
+  search,
+  schoolId,
+  courseId,
+  mineOnly,
+  allSchools,
+  allCourses,
+  onSearch,
+  onToggleMine,
+  onSchoolFilter,
+  onCourseFilter,
 }) {
   const scopedCourses = schoolId
     ? allCourses?.filter((course) => String(course.schoolId) === String(schoolId))
     : allCourses
 
   return (
-    <section style={styles.filterSection}>
+    <section data-tutorial="groups-filters" style={styles.filterSection}>
       <input
         type="text"
         placeholder="Search study groups..."

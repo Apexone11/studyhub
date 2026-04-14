@@ -22,6 +22,7 @@ import {
 } from './feedConstants'
 import { API } from '../../config'
 import ProBadge from '../../components/ProBadge'
+import StudyStatusChip from '../../components/StudyStatusChip'
 
 /* ── SVG icon components for post actions ──────────────────────────────── */
 
@@ -34,7 +35,16 @@ function ThumbUpIcon({ size = 20, filled = false }) {
     )
   }
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
     </svg>
   )
@@ -49,7 +59,16 @@ function ThumbDownIcon({ size = 20, filled = false }) {
     )
   }
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M10 15V19a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10zM17 2h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3" />
     </svg>
   )
@@ -57,7 +76,16 @@ function ThumbDownIcon({ size = 20, filled = false }) {
 
 function CommentIcon({ size = 20 }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
     </svg>
   )
@@ -65,7 +93,16 @@ function CommentIcon({ size = 20 }) {
 
 function ShareIcon({ size = 20 }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
       <polyline points="16 6 12 2 8 6" />
       <line x1="12" y1="2" x2="12" y2="15" />
@@ -255,13 +292,21 @@ function FeedVideoPlayer({ video }) {
           controls
           playsInline
           preload="metadata"
-          controlsList={video.downloadable === false ? 'nodownload nofullscreen noremoteplayback' : undefined}
+          controlsList={
+            video.downloadable === false ? 'nodownload nofullscreen noremoteplayback' : undefined
+          }
           disablePictureInPicture={video.downloadable === false}
           onContextMenu={video.downloadable === false ? (e) => e.preventDefault() : undefined}
           onCanPlay={() => setBuffering(false)}
           onWaiting={() => setBuffering(true)}
           onPlaying={() => setBuffering(false)}
-          style={{ width: '100%', display: 'block', maxHeight: 500, opacity: buffering ? 0 : 1, transition: 'opacity 0.2s' }}
+          style={{
+            width: '100%',
+            display: 'block',
+            maxHeight: 500,
+            opacity: buffering ? 0 : 1,
+            transition: 'opacity 0.2s',
+          }}
         />
       </div>
       <div
@@ -359,6 +404,7 @@ function FeedCardInner({
   currentUser,
   onReport,
   targetCommentId,
+  studyStatus,
 }) {
   const isSheet = item.type === 'sheet'
   const isPost = item.type === 'post'
@@ -379,9 +425,12 @@ function FeedCardInner({
     }, 2000)
   }, [])
 
-  useEffect(() => () => {
-    window.clearTimeout(shareToastTimerRef.current)
-  }, [])
+  useEffect(
+    () => () => {
+      window.clearTimeout(shareToastTimerRef.current)
+    },
+    [],
+  )
 
   const handleShare = useCallback(async () => {
     const url = `${window.location.origin}/feed?post=${item.id}`
@@ -405,7 +454,11 @@ function FeedCardInner({
   }, [flashShareToast, item.id])
 
   return (
-    <article className="sh-card" data-post-id={item.id} style={{ padding: '20px 24px', transition: 'box-shadow 0.2s ease' }}>
+    <article
+      className="sh-card"
+      data-post-id={item.id}
+      style={{ padding: '20px 24px', transition: 'box-shadow 0.2s ease' }}
+    >
       <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
         {item.author?.username ? (
           <Link
@@ -475,6 +528,7 @@ function FeedCardInner({
                     {item.course.code}
                   </span>
                 ) : null}
+                {isSheet && studyStatus ? <StudyStatusChip status={studyStatus} /> : null}
               </div>
               <div style={{ fontSize: 11, color: 'var(--sh-muted)', marginTop: 4 }}>
                 {timeAgo(item.createdAt)}
@@ -636,7 +690,14 @@ function FeedCardInner({
             <PendingReviewBanner />
           )}
           {item.title ? (
-            <h3 style={{ margin: '0 0 8px', color: 'var(--sh-heading)', fontSize: 17, fontWeight: 700 }}>
+            <h3
+              style={{
+                margin: '0 0 8px',
+                color: 'var(--sh-heading)',
+                fontSize: 17,
+                fontWeight: 700,
+              }}
+            >
               {item.title}
             </h3>
           ) : null}
@@ -756,7 +817,9 @@ function FeedCardInner({
                   popScale(e.currentTarget)
                   onReact(item, 'like')
                 }}
-                style={actionButton(reaction.userReaction === 'like' ? 'var(--sh-success)' : 'var(--sh-slate-600)')}
+                style={actionButton(
+                  reaction.userReaction === 'like' ? 'var(--sh-success)' : 'var(--sh-slate-600)',
+                )}
               >
                 Helpful {reaction.likes || 0}
               </button>
@@ -768,7 +831,9 @@ function FeedCardInner({
                   popScale(e.currentTarget)
                   onReact(item, 'dislike')
                 }}
-                style={actionButton(reaction.userReaction === 'dislike' ? 'var(--sh-danger)' : 'var(--sh-slate-600)')}
+                style={actionButton(
+                  reaction.userReaction === 'dislike' ? 'var(--sh-danger)' : 'var(--sh-slate-600)',
+                )}
               >
                 Needs work {reaction.dislikes || 0}
               </button>
@@ -798,10 +863,16 @@ function FeedCardInner({
               {(reaction.likes > 0 || reaction.dislikes > 0 || (item.commentCount || 0) > 0) && (
                 <div style={statsBarStyle}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    {(reaction.likes > 0 || reaction.dislikes > 0) && (
+                    {reaction.likes > 0 && (
                       <span style={statsCountStyle}>
-                        <ThumbUpIcon size={15} filled={reaction.likes > 0} />
-                        {reaction.likes + reaction.dislikes}
+                        <ThumbUpIcon size={15} filled />
+                        {reaction.likes}
+                      </span>
+                    )}
+                    {reaction.dislikes > 0 && (
+                      <span style={{ ...statsCountStyle, color: 'var(--sh-danger)' }}>
+                        <ThumbDownIcon size={15} filled />
+                        {reaction.dislikes}
                       </span>
                     )}
                   </div>
@@ -827,7 +898,7 @@ function FeedCardInner({
                   style={actionBarButton(reaction.userReaction === 'like', 'var(--sh-success)')}
                 >
                   <ThumbUpIcon size={18} filled={reaction.userReaction === 'like'} />
-                  Like
+                  Like{reaction.likes > 0 ? ` ${reaction.likes}` : ''}
                 </button>
                 <button
                   type="button"
@@ -838,7 +909,7 @@ function FeedCardInner({
                   style={actionBarButton(reaction.userReaction === 'dislike', 'var(--sh-danger)')}
                 >
                   <ThumbDownIcon size={18} filled={reaction.userReaction === 'dislike'} />
-                  Dislike
+                  Dislike{reaction.dislikes > 0 ? ` ${reaction.dislikes}` : ''}
                 </button>
                 <button
                   type="button"
@@ -871,9 +942,7 @@ function FeedCardInner({
           )}
 
           {/* Share toast */}
-          {shareToastMessage && (
-            <div style={shareToastStyle}>{shareToastMessage}</div>
-          )}
+          {shareToastMessage && <div style={shareToastStyle}>{shareToastMessage}</div>}
         </div>
       </div>
     </article>
@@ -887,7 +956,8 @@ function feedCardPropsAreEqual(prev, next) {
     prev.isPostMenuOpen === next.isPostMenuOpen &&
     prev.isDeletingPost === next.isDeletingPost &&
     prev.currentUser === next.currentUser &&
-    prev.targetCommentId === next.targetCommentId
+    prev.targetCommentId === next.targetCommentId &&
+    prev.studyStatus === next.studyStatus
   )
 }
 

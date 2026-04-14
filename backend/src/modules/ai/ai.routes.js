@@ -191,7 +191,7 @@ router.post('/messages', requireAuth, aiMessageLimiter, async (req, res) => {
 
 // ── Usage stats ────────────────────────────────────────────────────
 
-// GET /api/ai/usage
+// GET /api/ai/usage — returns both daily and weekly quota snapshot
 router.get('/usage', requireAuth, readLimiter, async (req, res) => {
   try {
     const prisma = require('../../lib/prisma')
@@ -201,8 +201,14 @@ router.get('/usage', requireAuth, readLimiter, async (req, res) => {
     })
     if (!user) return res.status(404).json({ error: 'User not found.' })
 
+    // Phase 1: return the full quota snapshot (daily + weekly)
+    const quota = await aiService.getUsageQuota(user)
+
+    // Also include the legacy flat fields for backward compatibility
+    // with the existing AiBubble usage display.
     const stats = await aiService.getUsageStats(user)
-    res.json(stats)
+
+    res.json({ ...stats, ...quota })
   } catch (err) {
     captureError(err, { tags: { module: 'ai', action: 'getUsage' } })
     res.status(500).json({ error: 'Failed to load usage stats.' })

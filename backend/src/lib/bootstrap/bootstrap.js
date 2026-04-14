@@ -6,6 +6,7 @@ const { ensureCourses } = require('./bootstrapCourses')
 const { DEFAULT_ADMIN_EMAIL, ensureAdminUser } = require('./bootstrapAdmin')
 const { seedBadgeCatalog } = require('../badges')
 const { ensureLegalDocumentsSeeded } = require('../../modules/legal/legal.service')
+const log = require('../logger')
 
 /**
  * Combined catalog seeder — delegates to ensureSchools + ensureCourses
@@ -16,8 +17,8 @@ async function ensureCatalogData(prisma) {
   const { coursesCreated } = await ensureCourses(prisma, schoolsByShort)
 
   if (schoolsCreated || schoolsUpdated || coursesCreated) {
-    console.log(
-      `Catalog bootstrap complete: ${schoolsCreated} schools created, ${schoolsUpdated} schools updated, ${coursesCreated} courses created.`
+    log.info(
+      `Catalog bootstrap complete: ${schoolsCreated} schools created, ${schoolsUpdated} schools updated, ${coursesCreated} courses created.`,
     )
   }
 }

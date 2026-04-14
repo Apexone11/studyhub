@@ -79,6 +79,18 @@ router.post('/reset-password', forgotLimiter, async (req, res) => {
       return res.status(400).json({ error: 'Reset link is invalid or has expired. Please request a new one.' })
     }
 
+    // Phase 5: check against HIBP before allowing password reset
+    try {
+      const { checkPasswordBreach } = require('../../lib/passwordSafety')
+      const breach = await checkPasswordBreach(newPassword)
+      if (breach.breached) {
+        return res.status(400).json({
+          error: `This password has appeared in ${breach.count.toLocaleString()} data breaches. Please choose a different password.`,
+          code: 'BREACHED_PASSWORD',
+        })
+      }
+    } catch { /* HIBP unreachable — allow reset to proceed */ }
+
     const passwordHash = await bcrypt.hash(newPassword, 12)
     await prisma.user.update({
       where: { id: resetToken.userId },

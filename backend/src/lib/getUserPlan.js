@@ -19,6 +19,20 @@ async function getUserPlan(userId) {
   } catch {
     // Subscription table may not exist yet -- graceful degradation
   }
+
+  // Check referral reward Pro time
+  try {
+    const rewardUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { proRewardExpiresAt: true },
+    })
+    if (rewardUser?.proRewardExpiresAt && new Date(rewardUser.proRewardExpiresAt) > new Date()) {
+      return 'pro_monthly'
+    }
+  } catch {
+    // graceful degradation
+  }
+
   return 'free'
 }
 

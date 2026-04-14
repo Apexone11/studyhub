@@ -11,6 +11,7 @@ const {
   formatNote,
 } = require('./feed.service')
 const { enrichUsersWithBadges } = require('../../lib/userBadges')
+const log = require('../../lib/logger')
 
 const router = express.Router()
 
@@ -25,7 +26,7 @@ function scoreFeedItem(item, userContext = null) {
   const forks = item.forkCount || 0
   const ageHours = (Date.now() - new Date(item.createdAt).getTime()) / (1000 * 60 * 60)
   const recencyBoost = Math.max(0, 1 - ageHours / 720) * 15
-  let score = (likes * 3) + (dislikes * -1) + (comments * 5) + (forks * 8) + recencyBoost
+  let score = likes * 3 + dislikes * -1 + comments * 5 + forks * 8 + recencyBoost
 
   // Personalization boosts when user context is available
   if (userContext) {
@@ -53,9 +54,10 @@ router.get('/', async (req, res) => {
   const announcementTake = Math.min(6, Math.max(2, Math.ceil((limit + offset) / 3)))
   const search = typeof req.query.search === 'string' ? req.query.search.trim() : ''
   const filterUserId = req.query.userId ? Number.parseInt(req.query.userId, 10) : null
-  const userIdFilter = filterUserId && Number.isInteger(filterUserId) && filterUserId > 0
-    ? { userId: filterUserId }
-    : {}
+  const userIdFilter =
+    filterUserId && Number.isInteger(filterUserId) && filterUserId > 0
+      ? { userId: filterUserId }
+      : {}
 
   /* Feed cards display text-only previews (summarizeText), never rendered
    * HTML, so filtering by htmlRiskTier here is unnecessary and hides valid
@@ -102,7 +104,7 @@ router.get('/', async (req, res) => {
       ])
     } catch (filterErr) {
       // Graceful degradation: if block/mute tables unavailable, skip filtering
-      console.error('[feed] block/mute filter failed, skipping:', filterErr.message)
+      log.error({ err: filterErr }, '[feed] block/mute filter failed, skipping')
       captureError(filterErr, { route: req.originalUrl, context: 'block-mute-filter' })
     }
     const hideUserIds = [...new Set([...blockedIds, ...mutedIds])]
@@ -244,9 +246,9 @@ router.get('/', async (req, res) => {
 
     primarySections.forEach((section) => {
       if (!section.ok) {
-        console.error(
-          `[feed] section "${section.label}" failed:`,
-          section.error?.message || section.error,
+        log.error(
+          { err: section.error, feedSection: section.label },
+          `[feed] section "${section.label}" failed`,
         )
         captureError(section.error, {
           route: req.originalUrl,
@@ -260,15 +262,18 @@ router.get('/', async (req, res) => {
     // If sections succeeded but returned 0 rows, that's a valid empty feed.
     const allSectionsFailed = primarySections.every((section) => !section.ok)
     if (allSectionsFailed) {
-      console.error('[feed] all primary sections failed', {
-        userId: req.user.userId,
-        search,
-        durations: primarySections.map((section) => ({
-          label: section.label,
-          ok: section.ok,
-          durationMs: section.durationMs,
-        })),
-      })
+      log.error(
+        {
+          userId: req.user.userId,
+          search,
+          durations: primarySections.map((section) => ({
+            label: section.label,
+            ok: section.ok,
+            durationMs: section.durationMs,
+          })),
+        },
+        '[feed] all primary sections failed',
+      )
       return res.status(500).json({ error: 'Could not load the feed right now.' })
     }
 
@@ -427,7 +432,11 @@ router.get('/', async (req, res) => {
         }
       } catch (err) {
         // Non-fatal - proceed without personalization
-        captureError(err, { context: 'feed.personalizationContext', route: req.originalUrl, method: req.method })
+        captureError(err, {
+          context: 'feed.personalizationContext',
+          route: req.originalUrl,
+          method: req.method,
+        })
       }
     }
 
@@ -481,24 +490,27 @@ router.get('/', async (req, res) => {
       degradedSections,
     }
 
-    console.info('[feed] loaded', {
-      userId: req.user.userId,
-      search,
-      durationMs: Date.now() - startedAt,
-      partial: payload.partial,
-      counts: {
-        announcements: announcements.length,
-        posts: posts.length,
-        sheets: sheets.length,
-        notes: notes.length,
-        returned: payload.items.length,
+    log.info(
+      {
+        userId: req.user.userId,
+        search,
+        durationMs: Date.now() - startedAt,
+        partial: payload.partial,
+        counts: {
+          announcements: announcements.length,
+          posts: posts.length,
+          sheets: sheets.length,
+          notes: notes.length,
+          returned: payload.items.length,
+        },
+        timings: [...primarySections, ...secondarySections].map((section) => ({
+          label: section.label,
+          ok: section.ok,
+          durationMs: section.durationMs,
+        })),
       },
-      timings: [...primarySections, ...secondarySections].map((section) => ({
-        label: section.label,
-        ok: section.ok,
-        durationMs: section.durationMs,
-      })),
-    })
+      '[feed] loaded',
+    )
 
     res.json(payload)
   } catch (error) {

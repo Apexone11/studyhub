@@ -1,10 +1,6 @@
 import { Link } from 'react-router-dom'
-import {
-  IconComment,
-  IconFork,
-  IconStar,
-  IconStarFilled,
-} from '../../components/Icons'
+import { IconComment, IconFork, IconStar, IconStarFilled } from '../../components/Icons'
+import StudyStatusChip from '../../components/StudyStatusChip'
 import {
   resolveSheetFormat,
   formatBadgeText,
@@ -14,12 +10,16 @@ import {
   isEditableSheetStatus,
 } from './sheetsPageConstants'
 
-export default function SheetListRow({ sheet, forking, onOpen, onStar, onFork }) {
+export default function SheetListRow({ sheet, forking, onOpen, onStar, onFork, studyStatus }) {
   const format = resolveSheetFormat(sheet)
-  const detailPath = isEditableSheetStatus(sheet.status) ? `/sheets/upload?draft=${sheet.id}` : `/sheets/${sheet.id}`
+  const detailPath = isEditableSheetStatus(sheet.status)
+    ? `/sheets/upload?draft=${sheet.id}`
+    : `/sheets/${sheet.id}`
   const authorName = sheet.author?.username || 'Unknown author'
   const schoolLabel = sheet.course?.school?.short || sheet.course?.school?.name || 'StudyHub'
-  const preview = (sheet.description || sheet.content || 'No summary available yet.').replace(/\s+/g, ' ').trim()
+  const preview = (sheet.description || sheet.content || 'No summary available yet.')
+    .replace(/\s+/g, ' ')
+    .trim()
   const signal = computeSignalBadge(sheet)
   const signalConfig = signal ? SIGNAL_BADGE_CONFIG[signal] : null
 
@@ -46,28 +46,37 @@ export default function SheetListRow({ sheet, forking, onOpen, onStar, onFork })
             {sheet.title}
           </Link>
           {signalConfig ? (
-            <span className={`sheets-repo-row__signal ${signalConfig.className}`}>{signalConfig.label}</span>
+            <span className={`sheets-repo-row__signal ${signalConfig.className}`}>
+              {signalConfig.label}
+            </span>
           ) : null}
+          {studyStatus ? <StudyStatusChip status={studyStatus} /> : null}
         </h2>
         {sheet.forkSource ? (
           <p className="sheets-repo-row__fork-lineage">
             Forked from{' '}
-            <Link to={`/sheets/${sheet.forkSource.id}`} onClick={(event) => event.stopPropagation()}>
+            <Link
+              to={`/sheets/${sheet.forkSource.id}`}
+              onClick={(event) => event.stopPropagation()}
+            >
               {sheet.forkSource.title}
             </Link>
-            {sheet.forkSource.author ? (
-              <> by {sheet.forkSource.author.username}</>
-            ) : null}
+            {sheet.forkSource.author ? <> by {sheet.forkSource.author.username}</> : null}
           </p>
         ) : null}
         <p className="sheets-repo-row__description">{preview}</p>
         <div className="sheets-repo-row__meta">
-          <span>{sheet.course?.code || 'General'} · {schoolLabel}</span>
+          <span>
+            {sheet.course?.code || 'General'} · {schoolLabel}
+          </span>
           <span aria-hidden="true">•</span>
           {sheet.author?.username ? (
             <span>
               by{' '}
-              <Link to={`/users/${sheet.author.username}`} onClick={(event) => event.stopPropagation()}>
+              <Link
+                to={`/users/${sheet.author.username}`}
+                onClick={(event) => event.stopPropagation()}
+              >
                 {sheet.author.username}
               </Link>
             </span>
@@ -81,15 +90,25 @@ export default function SheetListRow({ sheet, forking, onOpen, onStar, onFork })
             {formatBadgeText(format)}
           </span>
           {sheet.status === 'draft' ? (
-            <span className="sh-pill sheets-repo-row__status-badge sheets-repo-row__status-badge--draft">Draft</span>
+            <span className="sh-pill sheets-repo-row__status-badge sheets-repo-row__status-badge--draft">
+              Draft
+            </span>
           ) : sheet.status === 'rejected' ? (
-            <span className="sh-pill sheets-repo-row__status-badge sheets-repo-row__status-badge--danger">Rejected</span>
+            <span className="sh-pill sheets-repo-row__status-badge sheets-repo-row__status-badge--danger">
+              Rejected
+            </span>
           ) : sheet.status === 'quarantined' ? (
-            <span className="sh-pill sheets-repo-row__status-badge sheets-repo-row__status-badge--danger">Quarantined</span>
+            <span className="sh-pill sheets-repo-row__status-badge sheets-repo-row__status-badge--danger">
+              Quarantined
+            </span>
           ) : (sheet.htmlRiskTier || 0) === 1 ? (
-            <span className="sh-pill sheets-repo-row__status-badge sheets-repo-row__status-badge--warning">Flagged</span>
+            <span className="sh-pill sheets-repo-row__status-badge sheets-repo-row__status-badge--warning">
+              Flagged
+            </span>
           ) : (sheet.htmlRiskTier || 0) >= 2 || sheet.status === 'pending_review' ? (
-            <span className="sh-pill sheets-repo-row__status-badge sheets-repo-row__status-badge--review">Pending Review</span>
+            <span className="sh-pill sheets-repo-row__status-badge sheets-repo-row__status-badge--review">
+              Pending Review
+            </span>
           ) : null}
         </div>
       </div>

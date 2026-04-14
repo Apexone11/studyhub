@@ -7,12 +7,14 @@ export default defineConfig(async ({ mode }) => {
 
   if (mode === 'analyze') {
     const { visualizer } = await import('rollup-plugin-visualizer')
-    plugins.push(visualizer({
-      filename: 'dist/bundle-stats.html',
-      gzipSize: true,
-      brotliSize: true,
-      open: false,
-    }))
+    plugins.push(
+      visualizer({
+        filename: 'dist/bundle-stats.html',
+        gzipSize: true,
+        brotliSize: true,
+        open: false,
+      }),
+    )
   }
 
   return {
@@ -51,35 +53,57 @@ export default defineConfig(async ({ mode }) => {
             if (id.includes('node_modules')) {
               // Core React runtime -- loaded on every page
               if (
-                id.includes('\\react\\')
-                || id.includes('/react/')
-                || id.includes('\\react-dom\\')
-                || id.includes('/react-dom/')
+                id.includes('\\react\\') ||
+                id.includes('/react/') ||
+                id.includes('\\react-dom\\') ||
+                id.includes('/react-dom/')
               ) {
                 return 'react-vendor'
               }
 
               // Router -- loaded on every page
-              if (
-                id.includes('\\react-router')
-                || id.includes('/react-router')
-              ) {
+              if (id.includes('\\react-router') || id.includes('/react-router')) {
                 return 'router-vendor'
               }
 
               // Telemetry -- Sentry + PostHog (loaded async, non-blocking)
               if (
-                id.includes('\\@sentry\\')
-                || id.includes('/@sentry/')
-                || id.includes('\\posthog-js\\')
-                || id.includes('/posthog-js/')
+                id.includes('\\@sentry\\') ||
+                id.includes('/@sentry/') ||
+                id.includes('\\posthog-js\\') ||
+                id.includes('/posthog-js/')
               ) {
                 return 'telemetry'
               }
 
               // Rich text editor -- only needed on sheet creation/editing pages
-              if (id.includes('\\@tiptap') || id.includes('/@tiptap') || id.includes('/prosemirror')) {
+              if (
+                id.includes('\\@tiptap') ||
+                id.includes('/@tiptap') ||
+                id.includes('/prosemirror')
+              ) {
                 return 'editor'
+              }
+
+              // CodeMirror HTML editor -- only needed when editing raw HTML
+              if (
+                id.includes('\\@codemirror\\lang-html\\') ||
+                id.includes('/@codemirror/lang-html/')
+              ) {
+                return 'codemirror-html'
+              }
+
+              if (id.includes('\\@lezer\\') || id.includes('/@lezer/')) {
+                return 'codemirror-html'
+              }
+
+              if (
+                id.includes('\\codemirror\\') ||
+                id.includes('/codemirror/') ||
+                id.includes('\\@codemirror\\') ||
+                id.includes('/@codemirror/')
+              ) {
+                return 'codemirror-core'
               }
 
               // Charts -- only needed on feed/analytics pages
@@ -88,7 +112,11 @@ export default defineConfig(async ({ mode }) => {
               }
 
               // Real-time messaging -- only needed when user is authenticated
-              if (id.includes('\\socket.io') || id.includes('/socket.io') || id.includes('/engine.io')) {
+              if (
+                id.includes('\\socket.io') ||
+                id.includes('/socket.io') ||
+                id.includes('/engine.io')
+              ) {
                 return 'realtime'
               }
 

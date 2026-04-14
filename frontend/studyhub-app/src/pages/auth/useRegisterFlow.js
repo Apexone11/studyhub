@@ -19,7 +19,7 @@ import {
   apiCompleteRegistration,
 } from './registerConstants'
 
-export default function useRegisterFlow() {
+export default function useRegisterFlow({ referralCode } = {}) {
   const navigate = useNavigate()
   const { completeAuthentication } = useSession()
 
@@ -48,7 +48,10 @@ export default function useRegisterFlow() {
   useEffect(() => {
     if (!resendAvailableAt) return
     const tick = () => {
-      const remaining = Math.max(0, Math.ceil((new Date(resendAvailableAt).getTime() - Date.now()) / 1000))
+      const remaining = Math.max(
+        0,
+        Math.ceil((new Date(resendAvailableAt).getTime() - Date.now()) / 1000),
+      )
       setResendCountdown(remaining)
     }
     tick()
@@ -66,15 +69,21 @@ export default function useRegisterFlow() {
   /* ── Account creation handler ──────────────────────────────────────── */
   async function handleCreateAccount(event, validationError) {
     event.preventDefault()
-    if (validationError) { setError(validationError); return }
+    if (validationError) {
+      setError(validationError)
+      return
+    }
 
     setLoading(true)
     setError('')
     setSuccess('')
 
     try {
-      const result = await apiStartRegistration(form)
-      if (!result.ok) { setError(result.error); return }
+      const result = await apiStartRegistration(form, { referralCode })
+      if (!result.ok) {
+        setError(result.error)
+        return
+      }
 
       setVerificationToken(result.data.verificationToken)
       setDeliveryHint(result.data.deliveryHint || form.email.trim())
@@ -104,11 +113,17 @@ export default function useRegisterFlow() {
 
     try {
       const verifyResult = await apiVerifyCode(verificationToken, trimmedCode)
-      if (!verifyResult.ok) { setError(verifyResult.error); return }
+      if (!verifyResult.ok) {
+        setError(verifyResult.error)
+        return
+      }
 
       // Immediately complete registration (no courses step)
       const result = await apiCompleteRegistration(verificationToken)
-      if (!result.ok) { setError(result.error); return }
+      if (!result.ok) {
+        setError(result.error)
+        return
+      }
 
       completeAuthentication(result.data.user)
       trackSignupConversion()
@@ -128,7 +143,10 @@ export default function useRegisterFlow() {
 
     try {
       const result = await apiResendCode(verificationToken)
-      if (!result.ok) { setError(result.error); return }
+      if (!result.ok) {
+        setError(result.error)
+        return
+      }
 
       setResendAvailableAt(result.data.resendAvailableAt)
       setVerificationCode('')
@@ -151,8 +169,14 @@ export default function useRegisterFlow() {
     setError('')
 
     try {
-      const result = await apiGoogleAuth(credentialResponse.credential, options)
-      if (!result.ok) { setError(result.error); return }
+      const result = await apiGoogleAuth(credentialResponse.credential, {
+        ...options,
+        referralCode,
+      })
+      if (!result.ok) {
+        setError(result.error)
+        return
+      }
 
       // Google creates the user immediately — no extra steps
       completeAuthentication(result.data.user)
@@ -167,10 +191,20 @@ export default function useRegisterFlow() {
   }
 
   return {
-    step, loading, error, success, form,
-    verificationCode, deliveryHint, resendCountdown,
-    setError, setField, setVerificationCode,
-    handleCreateAccount, handleVerifyCode, handleResendCode,
+    step,
+    loading,
+    error,
+    success,
+    form,
+    verificationCode,
+    deliveryHint,
+    resendCountdown,
+    setError,
+    setField,
+    setVerificationCode,
+    handleCreateAccount,
+    handleVerifyCode,
+    handleResendCode,
     handleGoogleSuccess,
   }
 }

@@ -7,7 +7,13 @@
  * Organized by feature/module for easy discovery and updates.
  */
 const rateLimit = require('express-rate-limit')
-const { WINDOW_1_MIN, WINDOW_5_MIN, WINDOW_15_MIN, WINDOW_1_HOUR, WINDOW_1_DAY } = require('./constants')
+const {
+  WINDOW_1_MIN,
+  WINDOW_5_MIN,
+  WINDOW_15_MIN,
+  WINDOW_1_HOUR,
+  WINDOW_1_DAY,
+} = require('./constants')
 
 // ── CATEGORY: Generic Base Limiters ────────────────────────────────────────
 
@@ -763,6 +769,61 @@ const reviewReportGenerateLimiter = rateLimit({
   message: { error: 'Report generation limit reached. Please try again later.' },
 })
 
+// ── CATEGORY: Study Status Module ───────────────────────────────────────────
+
+const studyStatusReadLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many study status requests. Please slow down.' },
+})
+
+const studyStatusWriteLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many study status updates. Please slow down.' },
+  keyGenerator: (req) => `study-status-write-${req.user?.userId || 'anon'}`,
+})
+
+// ── CATEGORY: Onboarding Module ─────────────────────────────────────────
+
+const onboardingWriteLimiter = rateLimit({
+  windowMs: WINDOW_15_MIN,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many onboarding requests. Please slow down.' },
+  keyGenerator: (req) => `onboarding-${req.user?.userId || 'anon'}`,
+})
+
+// ── CATEGORY: Referral Module ────────────────────────────────────────────
+
+/**
+ * Referral invite sending -- 20 invites per day per user.
+ */
+const referralInviteLimiter = rateLimit({
+  windowMs: WINDOW_1_DAY,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Daily invite limit reached. Try again tomorrow.' },
+  keyGenerator: (req) => `referral-invite-${req.user?.userId || 'anon'}`,
+})
+
+/**
+ * Referral code resolution -- 60 lookups per minute per IP.
+ */
+const referralResolveLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many code lookups. Please slow down.' },
+})
+
 // ── Exports ────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -872,4 +933,15 @@ module.exports = {
   reviewSubmitLimiter,
   reviewReadLimiter,
   reviewReportGenerateLimiter,
+
+  // Study Status module
+  studyStatusReadLimiter,
+  studyStatusWriteLimiter,
+
+  // Onboarding module
+  onboardingWriteLimiter,
+
+  // Referral module
+  referralInviteLimiter,
+  referralResolveLimiter,
 }
