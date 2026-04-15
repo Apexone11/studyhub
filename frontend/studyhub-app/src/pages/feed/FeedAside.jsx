@@ -10,9 +10,18 @@ import TrendingSection from './TrendingSection'
 import FeedFollowSuggestions from './FeedFollowSuggestions'
 import { StreakWidget, WeeklyProgressWidget, LeaderboardWidget } from './GamificationWidgets'
 
-export default function FeedAside({ leaderboards, starredUpdates, recentlyViewed = [] }) {
+export default function FeedAside({
+  leaderboards,
+  starredUpdates,
+  recentlyViewed = [],
+  accountType,
+}) {
   return (
-    <aside className="feed-aside feed-page__aside" data-tutorial="feed-leaderboards" style={{ display: 'grid', gap: 16 }}>
+    <aside
+      className="feed-aside feed-page__aside"
+      data-tutorial="feed-leaderboards"
+      style={{ display: 'grid', gap: 16 }}
+    >
       <StreakWidget />
       <WeeklyProgressWidget />
       <LeaderboardWidget />
@@ -37,14 +46,30 @@ export default function FeedAside({ leaderboards, starredUpdates, recentlyViewed
                 }}
               >
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--sh-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: 'var(--sh-heading)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
                     {entry.title}
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--sh-muted)' }}>
                     {entry.courseCode || 'General'} · {entry.authorUsername || 'unknown'}
                   </div>
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--sh-muted)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: 'var(--sh-muted)',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                  }}
+                >
                   {timeAgo(entry.viewedAt)}
                 </div>
               </Link>
@@ -73,7 +98,16 @@ export default function FeedAside({ leaderboards, starredUpdates, recentlyViewed
                 }}
               >
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--sh-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: 'var(--sh-heading)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
                     {sheet.title}
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--sh-muted)' }}>
@@ -86,35 +120,84 @@ export default function FeedAside({ leaderboards, starredUpdates, recentlyViewed
                       </span>
                     ) : null}
                     {sheet.forks > 0 ? (
-                      <span style={{ fontSize: 10, color: 'var(--sh-success-text)', fontWeight: 700 }}>
+                      <span
+                        style={{ fontSize: 10, color: 'var(--sh-success-text)', fontWeight: 700 }}
+                      >
                         {sheet.forks} {sheet.forks === 1 ? 'fork' : 'forks'}
                       </span>
                     ) : null}
                   </div>
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--sh-muted)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: 'var(--sh-muted)',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                  }}
+                >
                   {timeAgo(sheet.updatedAt)}
                 </div>
               </Link>
             ))}
           </div>
-          <Link to="/sheets?starred=1" style={{ display: 'block', marginTop: 10, fontSize: 12, fontWeight: 700, color: 'var(--sh-brand)', textDecoration: 'none' }}>
+          <Link
+            to="/sheets?starred=1"
+            style={{
+              display: 'block',
+              marginTop: 10,
+              fontSize: 12,
+              fontWeight: 700,
+              color: 'var(--sh-brand)',
+              textDecoration: 'none',
+            }}
+          >
             View all starred
           </Link>
         </Panel>
       ) : null}
-      <FeedFollowSuggestions />
+      <FeedFollowSuggestions accountType={accountType} />
       <TrendingSection period="7d" limit={6} />
-      <LeaderboardPanel title="Top Starred" items={leaderboards.stars} empty="No starred sheets yet." renderLabel={(item) => item.title} />
-      <LeaderboardPanel title="Most Downloaded" items={leaderboards.downloads} empty="No downloads yet." renderLabel={(item) => item.title} />
-      <LeaderboardPanel title="Top Contributors" items={leaderboards.contributors} empty="No contributor activity yet." renderLabel={(item) => item.username} />
+      <LeaderboardPanel
+        title="Top Starred"
+        items={leaderboards.stars}
+        empty="No starred sheets yet."
+        renderLabel={(item) => item.title}
+      />
+      <LeaderboardPanel
+        title="Most Downloaded"
+        items={leaderboards.downloads}
+        empty="No downloads yet."
+        renderLabel={(item) => item.title}
+      />
+      <LeaderboardPanel
+        title="Top Contributors"
+        items={leaderboards.contributors}
+        empty="No contributor activity yet."
+        renderLabel={(item) => item.username}
+      />
       <Panel title="Version 1 collaboration tips">
-        <div style={{ display: 'grid', gap: 10, color: 'var(--sh-subtext)', fontSize: 13, lineHeight: 1.7 }}>
-          <div>Post updates with @mentions, fork a sheet before improving it, and send contributions back from your fork so the original author can review safely.</div>
-          <Link to="/sheets/upload" style={{ ...linkButton(), justifyContent: 'center' }}><IconPlus size={13} /> New Sheet</Link>
+        <div
+          style={{
+            display: 'grid',
+            gap: 10,
+            color: 'var(--sh-subtext)',
+            fontSize: 13,
+            lineHeight: 1.7,
+          }}
+        >
+          <div>
+            Post updates with @mentions, fork a sheet before improving it, and send contributions
+            back from your fork so the original author can review safely.
+          </div>
+          <Link to="/sheets/upload" style={{ ...linkButton(), justifyContent: 'center' }}>
+            <IconPlus size={13} /> New Sheet
+          </Link>
         </div>
       </Panel>
-      {leaderboards.error ? <div style={{ color: 'var(--sh-danger)', fontSize: 13 }}>{leaderboards.error}</div> : null}
+      {leaderboards.error ? (
+        <div style={{ color: 'var(--sh-danger)', fontSize: 13 }}>{leaderboards.error}</div>
+      ) : null}
     </aside>
   )
 }

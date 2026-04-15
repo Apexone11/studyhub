@@ -22,7 +22,8 @@
     ]
   },
   "scripts": {
-    "lint": "npm --prefix backend run lint && npm --prefix frontend/studyhub-app run lint",
+    "lint": "npm --prefix backend run lint && npm --prefix frontend/studyhub-app run lint && node scripts/checkRoleLabels.cjs",
+    "check:role-labels": "node scripts/checkRoleLabels.cjs",
     "format": "prettier --write \"backend/src/**/*.js\" \"frontend/studyhub-app/src/**/*.{js,jsx}\"",
     "format:check": "prettier --check \"backend/src/**/*.js\" \"frontend/studyhub-app/src/**/*.{js,jsx}\"",
     "build": "npm --prefix backend run build && npm --prefix frontend/studyhub-app run build",

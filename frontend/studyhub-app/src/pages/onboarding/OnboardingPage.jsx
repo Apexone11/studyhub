@@ -3,13 +3,15 @@
  *
  * Thin orchestrator: renders Navbar, progress bar, and the active step.
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useRef, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useMemo, useRef, useEffect, useCallback } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import Navbar from '../../components/navbar/Navbar'
 import { Skeleton } from '../../components/Skeleton'
 import { useProtectedPage } from '../../lib/useProtectedPage'
 import { usePageTitle } from '../../lib/usePageTitle'
+import { useSession } from '../../lib/session-context'
 import { useOnboardingState } from '../../features/onboarding/useOnboardingState'
+import { isSelfLearner } from '../../lib/roleCopy'
 import StepWelcome from './StepWelcome'
 import StepSchool from './StepSchool'
 import StepCourses from './StepCourses'
@@ -17,10 +19,10 @@ import StepInterests from './StepInterests'
 import StepFirstSuccess from './StepFirstSuccess'
 import StepInvite from './StepInvite'
 import StepDone from './StepDone'
+import StepSelfLearnerInterests from './StepSelfLearnerInterests'
+import StepSelfLearnerGoal from './StepSelfLearnerGoal'
 
-const TOTAL_STEPS = 7
-
-const STEP_COMPONENTS = {
+const STEP_COMPONENTS_DEFAULT = {
   1: StepWelcome,
   2: StepSchool,
   3: StepCourses,
@@ -30,15 +32,35 @@ const STEP_COMPONENTS = {
   7: StepDone,
 }
 
+const STEP_COMPONENTS_SELF_LEARNER = {
+  1: StepWelcome,
+  2: StepSelfLearnerInterests,
+  3: StepSelfLearnerGoal,
+  4: StepFirstSuccess,
+  5: StepInvite,
+  6: StepDone,
+}
+
 export default function OnboardingPage() {
   usePageTitle('Get Started')
   const { status: authStatus } = useProtectedPage()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const { user } = useSession()
   const { state, loading, error, submitting, submitStep, skip } = useOnboardingState()
   const headingRef = useRef(null)
   const prevStepRef = useRef(null)
 
-  const currentStep = state?.currentStep ?? 1
+  const trackParam = searchParams.get('track')
+  const isSelfLearnerTrack = useMemo(
+    () => trackParam === 'self-learner' || isSelfLearner(user?.accountType),
+    [trackParam, user?.accountType],
+  )
+  const stepComponents = isSelfLearnerTrack ? STEP_COMPONENTS_SELF_LEARNER : STEP_COMPONENTS_DEFAULT
+  const totalSteps = Object.keys(stepComponents).length
+
+  const rawStep = state?.currentStep ?? 1
+  const currentStep = Math.min(rawStep, totalSteps)
 
   // Focus heading on step change
   useEffect(() => {
@@ -108,7 +130,7 @@ export default function OnboardingPage() {
 
   if (!state) return null
 
-  const StepComponent = STEP_COMPONENTS[currentStep]
+  const StepComponent = stepComponents[currentStep]
 
   return (
     <div style={styles.page}>
@@ -121,25 +143,25 @@ export default function OnboardingPage() {
             role="progressbar"
             aria-valuenow={currentStep}
             aria-valuemin={1}
-            aria-valuemax={TOTAL_STEPS}
+            aria-valuemax={totalSteps}
             aria-label="Onboarding progress"
             style={styles.progressTrack}
           >
             <div
               style={{
                 ...styles.progressFill,
-                width: `${(currentStep / TOTAL_STEPS) * 100}%`,
+                width: `${(currentStep / totalSteps) * 100}%`,
               }}
             />
           </div>
           <span style={styles.progressLabel}>
-            Step {currentStep} of {TOTAL_STEPS}
+            Step {currentStep} of {totalSteps}
           </span>
         </div>
 
         {/* Live region for screen readers */}
         <div aria-live="polite" className="sr-only">
-          Step {currentStep} of {TOTAL_STEPS}
+          Step {currentStep} of {totalSteps}
         </div>
 
         {/* Step content card */}
@@ -156,7 +178,7 @@ export default function OnboardingPage() {
         </div>
 
         {/* Skip link (hidden on final step) */}
-        {currentStep < TOTAL_STEPS && (
+        {currentStep < totalSteps && (
           <button
             type="button"
             onClick={handleSkip}
