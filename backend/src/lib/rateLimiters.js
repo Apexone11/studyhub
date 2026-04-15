@@ -481,6 +481,58 @@ const notesCommentLimiter = rateLimit({
   message: { error: 'Too many comments. Please slow down.' },
 })
 
+// Notes hardening v2 — dedicated limiters for PATCH, chunk append, version restore, and diff.
+
+/**
+ * Note PATCH updates — 120 requests per minute per IP.
+ * Higher than generic notesMutateLimiter to accommodate autosave cadence.
+ */
+const notesPatchLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `notes-patch-${req.user?.userId || 'anon'}`,
+  message: { error: 'Too many note updates. Please slow down.' },
+})
+
+/**
+ * Note chunked autosave appends — 30 requests per minute per IP.
+ */
+const notesChunkLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `notes-chunk-${req.user?.userId || 'anon'}`,
+  message: { error: 'Too many chunk appends. Please slow down.' },
+})
+
+/**
+ * Note version restore — 10 requests per minute per IP.
+ * Stricter than general mutations because restore rewrites note content.
+ */
+const notesRestoreLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `notes-restore-${req.user?.userId || 'anon'}`,
+  message: { error: 'Too many restore requests. Please slow down.' },
+})
+
+/**
+ * Note version diff — 60 requests per minute per IP.
+ */
+const notesDiffLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `notes-diff-${req.user?.userId || 'anon'}`,
+  message: { error: 'Too many diff requests. Please slow down.' },
+})
+
 /**
  * Comment reactions (likes/dislikes) — 60 requests per minute per IP.
  */
@@ -912,6 +964,10 @@ module.exports = {
   notesMutateLimiter,
   notesReadLimiter,
   notesCommentLimiter,
+  notesPatchLimiter,
+  notesChunkLimiter,
+  notesRestoreLimiter,
+  notesDiffLimiter,
 
   // Comment reactions (all comment types)
   commentReactLimiter,

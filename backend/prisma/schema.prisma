@@ -465,6 +465,8 @@ model Note {
   noteStars        NoteStar[]
   noteVersions     NoteVersion[]
   noteReactions    NoteReaction[]
+  revision         Int           @default(0)
+  lastSaveId       String?       @db.Uuid
 }
 
 model NoteComment {
@@ -514,17 +516,29 @@ model NoteStar {
 }
 
 model NoteVersion {
-  id        Int      @id @default(autoincrement())
-  noteId    Int
-  userId    Int
-  title     String
-  content   String
-  message   String?
-  createdAt DateTime @default(now())
-  note      Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
-  author    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id              Int             @id @default(autoincrement())
+  noteId          Int
+  userId          Int
+  title           String
+  content         String
+  message         String?
+  createdAt       DateTime        @default(now())
+  revision        Int             @default(0)
+  parentVersionId Int?
+  kind            NoteVersionKind @default(AUTO)
+  bytesContent    Int             @default(0)
+  note            Note            @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  author          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([noteId, createdAt(sort: Desc)])
+  @@index([noteId, createdAt], map: "NoteVersion_noteId_createdAt_hard_idx")
+}
+
+enum NoteVersionKind {
+  AUTO
+  MANUAL
+  PRE_RESTORE
+  CONFLICT_LOSER
 }
 
 model Notification {

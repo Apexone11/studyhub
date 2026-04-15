@@ -7,7 +7,16 @@ const requireVerifiedEmail = require('../../middleware/requireVerifiedEmail')
 const optionalAuth = require('../../core/auth/optionalAuth')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
-const { notesMutateLimiter, notesReadLimiter, notesCommentLimiter, commentReactLimiter } = require('../../lib/rateLimiters')
+const {
+  notesMutateLimiter,
+  notesReadLimiter,
+  notesCommentLimiter,
+  commentReactLimiter,
+  notesPatchLimiter,
+  notesChunkLimiter,
+  notesRestoreLimiter,
+  notesDiffLimiter,
+} = require('../../lib/rateLimiters')
 const notesController = require('./notes.controller')
 
 const router = express.Router()
@@ -32,7 +41,22 @@ router.get('/', requireAuth, readLimiter, notesController.listNotes)
 router.post('/', requireAuth, mutateLimiter, requireVerifiedEmail, notesController.createNote)
 
 // ── PATCH /api/notes/:id ────────────────────────────────────────────��──────────────────────────────��
-router.patch('/:id', requireAuth, mutateLimiter, requireVerifiedEmail, notesController.updateNote)
+router.patch(
+  '/:id',
+  requireAuth,
+  notesPatchLimiter,
+  requireVerifiedEmail,
+  notesController.updateNote,
+)
+
+// ── POST /api/notes/:id/chunks ── Chunked autosave append ──────
+router.post(
+  '/:id/chunks',
+  requireAuth,
+  requireVerifiedEmail,
+  notesChunkLimiter,
+  notesController.appendChunk,
+)
 
 // ── DELETE /api/notes/:id ───────────────────────────────────────
 router.delete('/:id', requireAuth, mutateLimiter, notesController.deleteNote)
@@ -45,88 +69,118 @@ router.delete('/:id', requireAuth, mutateLimiter, notesController.deleteNote)
 router.get('/:id/comments', optionalAuth, readLimiter, notesController.listNoteComments)
 
 // ── POST /api/notes/:id/comments ────────────────────────────────
-router.post('/:id/comments', requireAuth, requireVerifiedEmail, commentLimiter, notesController.createNoteComment)
+router.post(
+  '/:id/comments',
+  requireAuth,
+  requireVerifiedEmail,
+  commentLimiter,
+  notesController.createNoteComment,
+)
 
 // ── PATCH /api/notes/:id/comments/:commentId ── resolve/unresolve
-router.patch('/:id/comments/:commentId', requireAuth, commentLimiter, notesController.updateNoteComment)
+router.patch(
+  '/:id/comments/:commentId',
+  requireAuth,
+  commentLimiter,
+  notesController.updateNoteComment,
+)
 
 // ── POST /api/notes/:id/comments/:commentId/react ────────────────
-router.post('/:id/comments/:commentId/react', requireAuth, commentReactLimiter, async (req, res) => {
-  const noteId = parseInt(req.params.id, 10)
-  const commentId = parseInt(req.params.commentId, 10)
-  const userId = req.user.userId
-  const { type } = req.body || {}
+router.post(
+  '/:id/comments/:commentId/react',
+  requireAuth,
+  commentReactLimiter,
+  async (req, res) => {
+    const noteId = parseInt(req.params.id, 10)
+    const commentId = parseInt(req.params.commentId, 10)
+    const userId = req.user.userId
+    const { type } = req.body || {}
 
-  if (!Number.isInteger(noteId) || noteId < 1) return res.status(400).json({ error: 'Invalid note id.' })
-  if (!Number.isInteger(commentId) || commentId < 1) return res.status(400).json({ error: 'Invalid comment id.' })
-  if (!type || (type !== 'like' && type !== 'dislike')) {
-    return res.status(400).json({ error: 'Reaction type must be "like" or "dislike".' })
-  }
-
-  try {
-    const comment = await prisma.noteComment.findUnique({
-      where: { id: commentId },
-      select: { id: true, noteId: true },
-    })
-    if (!comment || comment.noteId !== noteId) return res.status(404).json({ error: 'Comment not found.' })
-
-    // Verify note is readable
-    const note = await prisma.note.findUnique({
-      where: { id: comment.noteId },
-      select: { id: true, private: true, userId: true },
-    })
-    if (!note || !canReadNote(note, req.user)) {
-      return res.status(404).json({ error: 'Comment not found.' })
+    if (!Number.isInteger(noteId) || noteId < 1)
+      return res.status(400).json({ error: 'Invalid note id.' })
+    if (!Number.isInteger(commentId) || commentId < 1)
+      return res.status(400).json({ error: 'Invalid comment id.' })
+    if (!type || (type !== 'like' && type !== 'dislike')) {
+      return res.status(400).json({ error: 'Reaction type must be "like" or "dislike".' })
     }
 
-    const existing = await prisma.noteCommentReaction.findUnique({
-      where: { userId_commentId: { userId, commentId } },
-    })
+    try {
+      const comment = await prisma.noteComment.findUnique({
+        where: { id: commentId },
+        select: { id: true, noteId: true },
+      })
+      if (!comment || comment.noteId !== noteId)
+        return res.status(404).json({ error: 'Comment not found.' })
 
-    // Toggle logic: if same type, remove; if different, update; if none, create
-    if (existing && existing.type === type) {
-      await prisma.noteCommentReaction.delete({
+      // Verify note is readable
+      const note = await prisma.note.findUnique({
+        where: { id: comment.noteId },
+        select: { id: true, private: true, userId: true },
+      })
+      if (!note || !canReadNote(note, req.user)) {
+        return res.status(404).json({ error: 'Comment not found.' })
+      }
+
+      const existing = await prisma.noteCommentReaction.findUnique({
         where: { userId_commentId: { userId, commentId } },
       })
-    } else if (existing) {
-      await prisma.noteCommentReaction.update({
-        where: { userId_commentId: { userId, commentId } },
-        data: { type },
+
+      // Toggle logic: if same type, remove; if different, update; if none, create
+      if (existing && existing.type === type) {
+        await prisma.noteCommentReaction.delete({
+          where: { userId_commentId: { userId, commentId } },
+        })
+      } else if (existing) {
+        await prisma.noteCommentReaction.update({
+          where: { userId_commentId: { userId, commentId } },
+          data: { type },
+        })
+      } else {
+        await prisma.noteCommentReaction.create({
+          data: { userId, commentId, type },
+        })
+      }
+
+      // Get updated counts
+      const [likes, dislikes, userReaction] = await Promise.all([
+        prisma.noteCommentReaction.count({ where: { commentId, type: 'like' } }),
+        prisma.noteCommentReaction.count({ where: { commentId, type: 'dislike' } }),
+        prisma.noteCommentReaction.findUnique({
+          where: { userId_commentId: { userId, commentId } },
+        }),
+      ])
+
+      res.json({
+        reactionCounts: { like: likes, dislike: dislikes },
+        userReaction: userReaction ? userReaction.type : null,
       })
-    } else {
-      await prisma.noteCommentReaction.create({
-        data: { userId, commentId, type },
-      })
+    } catch (err) {
+      captureError(err, { route: req.originalUrl, method: req.method })
+      res.status(500).json({ error: 'Server error.' })
     }
-
-    // Get updated counts
-    const [likes, dislikes, userReaction] = await Promise.all([
-      prisma.noteCommentReaction.count({ where: { commentId, type: 'like' } }),
-      prisma.noteCommentReaction.count({ where: { commentId, type: 'dislike' } }),
-      prisma.noteCommentReaction.findUnique({
-        where: { userId_commentId: { userId, commentId } },
-      }),
-    ])
-
-    res.json({
-      reactionCounts: { like: likes, dislike: dislikes },
-      userReaction: userReaction ? userReaction.type : null,
-    })
-  } catch (err) {
-    captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
-  }
-})
+  },
+)
 
 // ── DELETE /api/notes/:id/comments/:commentId ───────────────────
-router.delete('/:id/comments/:commentId', requireAuth, commentLimiter, notesController.deleteNoteComment)
+router.delete(
+  '/:id/comments/:commentId',
+  requireAuth,
+  commentLimiter,
+  notesController.deleteNoteComment,
+)
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Note Version History
 // ═══════════════════════════════════════════════════════════════════════════
 
 // ── POST /api/notes/:id/versions — Save a named version snapshot ───
-router.post('/:id/versions', requireAuth, mutateLimiter, requireVerifiedEmail, notesController.createNoteVersion)
+router.post(
+  '/:id/versions',
+  requireAuth,
+  mutateLimiter,
+  requireVerifiedEmail,
+  notesController.createNoteVersion,
+)
 
 // ── GET /api/notes/:id/versions — List version history ─────────────
 router.get('/:id/versions', requireAuth, readLimiter, notesController.listNoteVersions)
@@ -134,8 +188,22 @@ router.get('/:id/versions', requireAuth, readLimiter, notesController.listNoteVe
 // ── GET /api/notes/:id/versions/:versionId — Get a specific version ─
 router.get('/:id/versions/:versionId', requireAuth, readLimiter, notesController.getNoteVersion)
 
+// ── GET /api/notes/:id/versions/:versionId/diff — Word diff vs current or another version
+router.get(
+  '/:id/versions/:versionId/diff',
+  requireAuth,
+  notesDiffLimiter,
+  notesController.getVersionDiff,
+)
+
 // ── POST /api/notes/:id/versions/:versionId/restore — Restore version
-router.post('/:id/versions/:versionId/restore', requireAuth, mutateLimiter, requireVerifiedEmail, notesController.restoreNoteVersion)
+router.post(
+  '/:id/versions/:versionId/restore',
+  requireAuth,
+  notesRestoreLimiter,
+  requireVerifiedEmail,
+  notesController.restoreNoteVersion,
+)
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Note Stars
@@ -208,7 +276,10 @@ router.post('/:id/react', requireAuth, commentReactLimiter, async (req, res) => 
   }
 
   try {
-    const note = await prisma.note.findUnique({ where: { id: noteId }, select: { id: true, private: true } })
+    const note = await prisma.note.findUnique({
+      where: { id: noteId },
+      select: { id: true, private: true },
+    })
     if (!note) return res.status(404).json({ error: 'Note not found.' })
     if (note.private) return res.status(403).json({ error: 'Cannot react to private notes.' })
 

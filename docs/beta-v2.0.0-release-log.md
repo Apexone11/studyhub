@@ -2,6 +2,79 @@
 
 # Beta v2.0.0 Release Log
 
+## Date: 2026-04-15
+
+### Notes Hardening v2 — local-first persistence, conflict resolution, diff/restore (feature flag)
+
+**Fixes the long-standing "saved but empty" and "leave page lose work" bugs in the Notes editor by replacing the broken stale-closure autosave with a local-first state machine, IndexedDB draft cache, server-authoritative revision concurrency, and a non-destructive version diff/restore flow. Behind `flag_notes_hardening_v2`, default off; legacy autosave preserved as fallback.**
+
+#### Schema (migration `20260415000001_notes_hardening`)
+
+- `Note.revision` (Int default 0) — monotonic counter for optimistic concurrency.
+- `Note.lastSaveId` (Uuid?) — client-generated save token for idempotent retries.
+- `Note.contentHash` was already present from a prior migration; reused.
+- `NoteVersion.revision`, `NoteVersion.parentVersionId` (Int? — `NoteVersion.id` is autoincrement Int, not UUID), `NoteVersion.bytesContent`.
+- New enum `NoteVersionKind = AUTO | MANUAL | PRE_RESTORE | CONFLICT_LOSER`.
+- New index `NoteVersion_noteId_createdAt_hard_idx` (ASC; complements existing DESC variant).
+
+#### Backend
+
+- **Rewritten `PATCH /api/notes/:id`**: dispatches on hardened-fields presence. New path returns 200/202/409/413 with `{ note, revision, savedAt, versionCreated }`; legacy clients fall through unchanged.
+- **New `POST /api/notes/:id/chunks`**: chunked save for payloads >64 KB; in-memory `ChunkBuffer` with TTL.
+- **Rewritten `POST /api/notes/:id/versions/:versionId/restore`**: atomic transaction creating a `PRE_RESTORE` snapshot before overwrite — non-destructive.
+- **New `GET /api/notes/:id/versions/:versionId/diff?against=current|<vid>`**: server-side word diff via `diff` package, 60s cache.
+- New helpers: `notes.concurrency.js` (`computeContentHash`, `isRevisionConflict`, `shouldCreateAutoVersion`), `notes.chunks.js`, `notes.diff.js`.
+- Dedicated rate limiters: `notesPatchLimiter` 120/min, `notesChunkLimiter` 30/min, `notesRestoreLimiter` 10/min, `notesDiffLimiter` 60/min.
+- New error codes: `NOTE_REVISION_CONFLICT`, `NOTE_PAYLOAD_TOO_LARGE`, `NOTE_CHUNK_OUT_OF_ORDER`, `NOTE_VERSION_NOT_FOUND`.
+- Backfill script: `npm run backfill:note-version-bytes`.
+- Feature flag seed: `npm run seed:notes-hardening-flag`.
+
+#### Frontend
+
+- **Local-first state machine** via new `useNotePersistence` hook (`useReducer` with explicit transitions: `idle → dirty → saving → saved → error/offline/conflict`). Closes the stale-closure bug by construction (refs hold latest editor state; debounced flush reads from refs, never from closures).
+- **IndexedDB draft cache** (`noteDraftStore.js`, with `sessionStorage` fallback) keyed by `noteId`. Synchronous-ish per-keystroke writes survive tab crashes / browser close.
+- **Mount sequence reconciles draft vs. server** before first render — no more "empty on return" race.
+- **Lifecycle flushes**: `beforeunload` (via `navigator.sendBeacon`), `visibilitychange:hidden`, `online`, route-leave, manual `Ctrl/Cmd+S`.
+- **Save-status chip** (`NoteSaveStatus.jsx`): dot + label + tooltip + inline "Save now" button. States: up-to-date / unsaved / saving / saved / error / offline / conflict.
+- **Conflict resolution**: `NoteConflictBanner.jsx` + `ConflictCompareModal.jsx` (client-side word diff between local draft and server). Choices: keep-mine / use-theirs / cancel — every path produces a `CONFLICT_LOSER` snapshot so nothing is lost.
+- **Cross-tab sync**: `BroadcastChannel('studyhub-notes')` — sibling tabs bump `baseRevision` after a save without false-conflicting.
+- **Paste sanitization** (`notePaste.js`): TipTap `transformPastedHTML` runs Word/Docs HTML through `sanitize-html` whitelist (semantic tags only; Office namespaces, inline styles, classes, scripts dropped).
+- **Version history overhaul** (`NoteVersionHistory.jsx`): kind pills (Manual / Auto / Before restore / Conflict loser), filter chips with localStorage persistence, byte-size badges, "View diff" button opening `NoteVersionDiff.jsx` modal (inline + side-by-side toggle), non-destructive Restore with confirm.
+- **Service Worker scaffold** (`public/sw-notes.js`): offline replay logic, FIFO outbox, `note-save-retry` background sync, `sw-replay` trigger, 409 detection. NOT registered yet — existing `public/sw.js` owns root scope. Folded into the existing SW in a follow-up.
+- **Legacy autosave gated**: `useNotesData.js` no-ops its broken debounced `autoSave` when the hardening flag is on (prevents double-PATCH races). Legacy path remains available for the OFF rollout cohort.
+
+#### Tests
+
+- Backend: 19 new (5 PATCH + 6 chunks + 3 restore + 5 diff) + 9 concurrency unit tests. Total backend pass: 1318+ (prior 2 file failures unchanged, unrelated).
+- Frontend unit: 5 noteDraftStore + 13 reducer + 7 paste sanitizer = 25 new passing.
+- Playwright: `tests/notes.persistence.spec.js` covers reload-persistence, crash-recovery, Ctrl+S, paste sanitization, route-leave flush. Suite enumerates clean; execution requires `npx playwright install` on the host.
+
+#### Rollout
+
+Behind `flag_notes_hardening_v2`. After deploy:
+
+1. `DATABASE_URL=... npx prisma migrate deploy` (Railway)
+2. `npm --prefix backend run seed:notes-hardening-flag` (creates flag disabled)
+3. `npm --prefix backend run backfill:note-version-bytes` (one-time, populates `bytesContent` for legacy versions)
+4. Toggle flag to internal admins → 10 % → 50 % → 100 %; watch `note_save_failed` rate and `note_conflict_*` volume.
+5. After 7 days at 100 % stable, delete the legacy autosave block in `useNotesData.js` and the dispatch fork in `notes.controller.js`.
+
+Frontend dev override available via `localStorage.setItem('flag_notes_hardening_v2', '1')`.
+
+#### Out of scope (deferred)
+
+- CRDT/Yjs real-time multi-device sync.
+- Collaborative cursors / presence.
+- Proper `useFeatureFlag` hook wiring (TODO comments mark the hook check sites).
+- Folding the SW handlers into the primary `public/sw.js`.
+
+#### Documents
+
+- Spec: [`docs/superpowers/specs/2026-04-15-notes-hardening-design.md`](superpowers/specs/2026-04-15-notes-hardening-design.md)
+- Plan: [`docs/superpowers/plans/2026-04-15-notes-hardening.md`](superpowers/plans/2026-04-15-notes-hardening.md)
+
+---
+
 ## Date: 2026-04-13
 
 ### Security Recovery, Tutorial Refresh, and Study Queue Clarity

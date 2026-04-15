@@ -38,11 +38,15 @@ const mocks = vi.hoisted(() => {
     },
     noteVersion: {
       findMany: vi.fn().mockResolvedValue([]),
+      findFirst: vi.fn().mockResolvedValue(null),
       create: vi.fn().mockResolvedValue({}),
       findUnique: vi.fn().mockResolvedValue(null),
       count: vi.fn().mockResolvedValue(0),
     },
   }
+  prisma.$transaction = vi.fn(async (fn) =>
+    typeof fn === 'function' ? fn(prisma) : Promise.all(fn),
+  )
 
   return {
     prisma,
@@ -279,7 +283,8 @@ describe('notes routes', () => {
         .send({ title: 'Updated Title', content: 'Updated content' })
 
       expect(response.status).toBe(200)
-      expect(response.body).toMatchObject({ title: 'Updated Title' })
+      // Hardened contract: response is enveloped as { note, revision, savedAt, versionCreated }.
+      expect(response.body).toMatchObject({ note: { title: 'Updated Title' } })
     })
 
     it('returns 404 when note does not exist', async () => {

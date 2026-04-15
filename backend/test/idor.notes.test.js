@@ -25,7 +25,10 @@ const mocks = vi.hoisted(() => {
     },
     noteVersion: {
       findMany: vi.fn(),
+      findFirst: vi.fn(),
+      create: vi.fn(),
     },
+    $transaction: vi.fn(async (fn) => (typeof fn === 'function' ? fn(prisma) : Promise.all(fn))),
   }
 
   return {
@@ -64,7 +67,9 @@ beforeAll(() => {
       const resolvedRequest = Module._resolveFilename(requestId, parent, isMain)
       const mockedModule = mockTargets.get(resolvedRequest)
       if (mockedModule) return mockedModule
-    } catch { /* fall through */ }
+    } catch {
+      /* fall through */
+    }
     return originalModuleLoad.apply(this, arguments)
   }
 
@@ -108,9 +113,7 @@ describe('PATCH /api/notes/:id — ownership enforcement', () => {
     mocks.state.userId = NON_OWNER_ID
     mocks.prisma.note.findUnique.mockResolvedValue(noteFixture())
 
-    const res = await request(app)
-      .patch('/api/notes/1')
-      .send({ title: 'Hijacked' })
+    const res = await request(app).patch('/api/notes/1').send({ title: 'Hijacked' })
 
     expect(res.status).toBe(403)
     expect(mocks.prisma.note.update).not.toHaveBeenCalled()
@@ -121,9 +124,7 @@ describe('PATCH /api/notes/:id — ownership enforcement', () => {
     mocks.prisma.note.findUnique.mockResolvedValue(noteFixture())
     mocks.prisma.note.update.mockResolvedValue({ ...noteFixture(), title: 'Updated' })
 
-    const res = await request(app)
-      .patch('/api/notes/1')
-      .send({ title: 'Updated' })
+    const res = await request(app).patch('/api/notes/1').send({ title: 'Updated' })
 
     expect(res.status).toBe(200)
     expect(mocks.prisma.note.update).toHaveBeenCalled()
@@ -135,9 +136,7 @@ describe('PATCH /api/notes/:id — ownership enforcement', () => {
     mocks.prisma.note.findUnique.mockResolvedValue(noteFixture())
     mocks.prisma.note.update.mockResolvedValue({ ...noteFixture(), title: 'Admin Edit' })
 
-    const res = await request(app)
-      .patch('/api/notes/1')
-      .send({ title: 'Admin Edit' })
+    const res = await request(app).patch('/api/notes/1').send({ title: 'Admin Edit' })
 
     expect(res.status).toBe(200)
   })
@@ -160,7 +159,7 @@ describe('DELETE /api/notes/:id — ownership enforcement', () => {
   it('returns 200 when owner deletes their own note', async () => {
     mocks.state.userId = OWNER_ID
     mocks.prisma.note.findUnique.mockResolvedValue(
-      noteFixture({ content: '![image](/uploads/note-images/owner-note.png)' })
+      noteFixture({ content: '![image](/uploads/note-images/owner-note.png)' }),
     )
     mocks.prisma.note.delete.mockResolvedValue({})
     mocks.prisma.noteVersion.findMany.mockResolvedValue([
