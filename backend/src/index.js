@@ -230,6 +230,18 @@ app.use(
       if (normalizedOrigin && trustedOrigins.has(normalizedOrigin)) {
         return callback(null, true)
       }
+      // In dev, accept any localhost/127.0.0.1 port so Vite picking a fallback
+      // port (5174, 4177, etc. when 5173 is in use) doesn't break auth.
+      if (!isProd && normalizedOrigin) {
+        try {
+          const { hostname } = new URL(normalizedOrigin)
+          if (hostname === 'localhost' || hostname === '127.0.0.1') {
+            return callback(null, true)
+          }
+        } catch {
+          /* fall through to reject */
+        }
+      }
       callback(new Error(`CORS: origin ${origin} not allowed`))
     },
     credentials: true,

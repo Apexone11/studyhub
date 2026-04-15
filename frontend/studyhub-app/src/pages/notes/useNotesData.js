@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════════
  * useNotesData.js — Custom hook for notes data fetching, state, and actions
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { API } from '../../config'
 import { authHeaders } from '../shared/pageUtils'
@@ -58,40 +58,56 @@ export function useNotesData() {
   const [editorCourseId, setEditorCourseId] = useState('')
   const [editorAllowDownloads, setEditorAllowDownloads] = useState(false)
   const [courses, setCourses] = useState([])
-  const [saving, setSaving] = useState(false)
   const [creating, setCreating] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [loadingNotes, setLoadingNotes] = useState(true)
-  const saveTimer = useRef()
 
-  const updateSearchParam = useCallback((key, value) => {
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev)
-      if (value) next.set(key, value)
-      else next.delete(key)
-      return next
-    }, { replace: true })
-  }, [setSearchParams])
+  const updateSearchParam = useCallback(
+    (key, value) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          if (value) next.set(key, value)
+          else next.delete(key)
+          return next
+        },
+        { replace: true },
+      )
+    },
+    [setSearchParams],
+  )
 
-  const setFilterTab = useCallback((value) => {
-    updateSearchParam('tab', NOTE_FILTER_TABS.has(value) ? value : 'all')
-  }, [updateSearchParam])
+  const setFilterTab = useCallback(
+    (value) => {
+      updateSearchParam('tab', NOTE_FILTER_TABS.has(value) ? value : 'all')
+    },
+    [updateSearchParam],
+  )
 
-  const setSearchQuery = useCallback((value) => {
-    updateSearchParam('q', value)
-  }, [updateSearchParam])
+  const setSearchQuery = useCallback(
+    (value) => {
+      updateSearchParam('q', value)
+    },
+    [updateSearchParam],
+  )
 
-  const setSelectedTag = useCallback((value) => {
-    updateSearchParam('tag', value ? value.toLowerCase() : '')
-  }, [updateSearchParam])
+  const setSelectedTag = useCallback(
+    (value) => {
+      updateSearchParam('tag', value ? value.toLowerCase() : '')
+    },
+    [updateSearchParam],
+  )
 
   const clearFilters = useCallback(() => {
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev)
-      next.delete('q')
-      next.delete('tag')
-      return next
-    }, { replace: true })
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete('q')
+        next.delete('tag')
+        return next
+      },
+      { replace: true },
+    )
   }, [setSearchParams])
 
   /* ── Data loading (with abort cleanup to prevent state updates after unmount) */
@@ -102,7 +118,7 @@ export function useNotesData() {
       .then((response) => response.json())
       .then((data) => {
         if (active) {
-          const list = Array.isArray(data) ? data : (Array.isArray(data?.notes) ? data.notes : [])
+          const list = Array.isArray(data) ? data : Array.isArray(data?.notes) ? data.notes : []
           const normalized = list.map(normalizeNote)
           setNotes(normalized)
           setLoadingNotes(false)
@@ -118,7 +134,12 @@ export function useNotesData() {
     fetch(`${API}/api/courses/schools`, { headers: authHeaders(), credentials: 'include' })
       .then((response) => response.json())
       .then((data) => {
-        if (active) setCourses((data || []).flatMap((school) => (school.courses || []).map((course) => ({ ...course, schoolName: school.name }))))
+        if (active)
+          setCourses(
+            (data || []).flatMap((school) =>
+              (school.courses || []).map((course) => ({ ...course, schoolName: school.name })),
+            ),
+          )
       })
       .catch(() => {
         if (active) {
@@ -126,10 +147,10 @@ export function useNotesData() {
         }
       })
 
-    return () => { active = false }
+    return () => {
+      active = false
+    }
   }, [])
-
-  useEffect(() => () => clearTimeout(saveTimer.current), [])
 
   /* ── Auto-select note from ?select=:id URL param (for "Open in Editor" flow) */
   useEffect(() => {
@@ -139,11 +160,14 @@ export function useNotesData() {
     if (target) {
       selectNote(target)
       // Clean up the URL param after selecting
-      setSearchParams((prev) => {
-        const next = new URLSearchParams(prev)
-        next.delete('select')
-        return next
-      }, { replace: true })
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          next.delete('select')
+          return next
+        },
+        { replace: true },
+      )
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadingNotes, notes, setSearchParams])
@@ -159,57 +183,23 @@ export function useNotesData() {
     setConfirmDelete(false)
   }
 
-  /* ── Auto-save with 1.5s debounce ────────────────────────────────────── */
-  const autoSave = useCallback((noteId, title, content, isPrivate, courseId, allowDownloads) => {
-    clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(async () => {
-      if (!noteId) return
-      setSaving(true)
-      try {
-        const response = await fetch(`${API}/api/notes/${noteId}`, {
-          method: 'PATCH',
-          headers: authHeaders(),
-          credentials: 'include',
-          body: JSON.stringify({ title, content, private: isPrivate, courseId: courseId || null, allowDownloads }),
-        })
-        if (response.ok) {
-          const updated = normalizeNote(await response.json())
-          setNotes((prev) => prev.map((note) => (
-            note.id === noteId ? { ...updated, _starred: note._starred } : note
-          )))
-          setActiveNote((prev) => (
-            prev?.id === noteId ? { ...updated, _starred: prev._starred } : prev
-          ))
-        }
-      } finally {
-        setSaving(false)
-      }
-    }, 1500)
-  }, [])
-
-  /* ── Field change handlers (trigger auto-save) ───────────────────────── */
+  /* ── Field change handlers (persistence owned by useNotePersistence) ── */
   function handleTitleChange(value) {
     setEditorTitle(value)
-    if (activeNote) autoSave(activeNote.id, value, editorContent, editorPrivate, editorCourseId, editorAllowDownloads)
   }
   function handleContentChange(value) {
     setEditorContent(value)
-    if (activeNote) autoSave(activeNote.id, editorTitle, value, editorPrivate, editorCourseId, editorAllowDownloads)
   }
   function handlePrivateChange(value) {
     setEditorPrivate(value)
     // When going private, downloads are auto-reset by backend — reflect locally
-    const nextDownloads = value ? false : editorAllowDownloads
     if (value) setEditorAllowDownloads(false)
-    if (activeNote) autoSave(activeNote.id, editorTitle, editorContent, value, editorCourseId, nextDownloads)
   }
   function handleAllowDownloadsChange(value) {
     setEditorAllowDownloads(value)
-    if (activeNote) autoSave(activeNote.id, editorTitle, editorContent, editorPrivate, editorCourseId, value)
   }
   function handleCourseChange(value) {
     setEditorCourseId(value)
-    if (activeNote) autoSave(activeNote.id, editorTitle, editorContent, editorPrivate, value, editorAllowDownloads)
   }
 
   /* ── Create / Delete ─────────────────────────────────────────────────── */
@@ -262,8 +252,9 @@ export function useNotesData() {
     if (!note) return
     const isStarred = note._starred
     // Optimistic update
-    setNotes((prev) => prev.map((n) => n.id === noteId ? { ...n, _starred: !isStarred } : n))
-    if (activeNote?.id === noteId) setActiveNote((prev) => prev ? { ...prev, _starred: !isStarred } : prev)
+    setNotes((prev) => prev.map((n) => (n.id === noteId ? { ...n, _starred: !isStarred } : n)))
+    if (activeNote?.id === noteId)
+      setActiveNote((prev) => (prev ? { ...prev, _starred: !isStarred } : prev))
     try {
       const res = await fetch(`${API}/api/notes/${noteId}/star`, {
         method: isStarred ? 'DELETE' : 'POST',
@@ -272,14 +263,16 @@ export function useNotesData() {
       })
       if (!res.ok) {
         // Revert optimistic update on failure
-        setNotes((prev) => prev.map((n) => n.id === noteId ? { ...n, _starred: isStarred } : n))
-        if (activeNote?.id === noteId) setActiveNote((prev) => prev ? { ...prev, _starred: isStarred } : prev)
+        setNotes((prev) => prev.map((n) => (n.id === noteId ? { ...n, _starred: isStarred } : n)))
+        if (activeNote?.id === noteId)
+          setActiveNote((prev) => (prev ? { ...prev, _starred: isStarred } : prev))
         showToast('Failed to update star', 'error')
       }
     } catch {
       // Revert optimistic update on error
-      setNotes((prev) => prev.map((n) => n.id === noteId ? { ...n, _starred: isStarred } : n))
-      if (activeNote?.id === noteId) setActiveNote((prev) => prev ? { ...prev, _starred: isStarred } : prev)
+      setNotes((prev) => prev.map((n) => (n.id === noteId ? { ...n, _starred: isStarred } : n)))
+      if (activeNote?.id === noteId)
+        setActiveNote((prev) => (prev ? { ...prev, _starred: isStarred } : prev))
       showToast('Failed to update star', 'error')
     }
   }
@@ -290,8 +283,9 @@ export function useNotesData() {
     if (!note) return
     const wasPinned = note.pinned
     // Optimistic update
-    setNotes((prev) => prev.map((n) => n.id === noteId ? { ...n, pinned: !wasPinned } : n))
-    if (activeNote?.id === noteId) setActiveNote((prev) => prev ? { ...prev, pinned: !wasPinned } : prev)
+    setNotes((prev) => prev.map((n) => (n.id === noteId ? { ...n, pinned: !wasPinned } : n)))
+    if (activeNote?.id === noteId)
+      setActiveNote((prev) => (prev ? { ...prev, pinned: !wasPinned } : prev))
     try {
       const res = await fetch(`${API}/api/notes/${noteId}/pin`, {
         method: 'PATCH',
@@ -301,18 +295,21 @@ export function useNotesData() {
       })
       if (res.ok) {
         const data = await res.json()
-        setNotes((prev) => prev.map((n) => n.id === noteId ? { ...n, pinned: data.pinned } : n))
-        if (activeNote?.id === noteId) setActiveNote((prev) => prev ? { ...prev, pinned: data.pinned } : prev)
+        setNotes((prev) => prev.map((n) => (n.id === noteId ? { ...n, pinned: data.pinned } : n)))
+        if (activeNote?.id === noteId)
+          setActiveNote((prev) => (prev ? { ...prev, pinned: data.pinned } : prev))
       } else {
         // Revert optimistic update on failure
-        setNotes((prev) => prev.map((n) => n.id === noteId ? { ...n, pinned: wasPinned } : n))
-        if (activeNote?.id === noteId) setActiveNote((prev) => prev ? { ...prev, pinned: wasPinned } : prev)
+        setNotes((prev) => prev.map((n) => (n.id === noteId ? { ...n, pinned: wasPinned } : n)))
+        if (activeNote?.id === noteId)
+          setActiveNote((prev) => (prev ? { ...prev, pinned: wasPinned } : prev))
         showToast('Failed to update pin', 'error')
       }
     } catch {
       // Revert optimistic update on error
-      setNotes((prev) => prev.map((n) => n.id === noteId ? { ...n, pinned: wasPinned } : n))
-      if (activeNote?.id === noteId) setActiveNote((prev) => prev ? { ...prev, pinned: wasPinned } : prev)
+      setNotes((prev) => prev.map((n) => (n.id === noteId ? { ...n, pinned: wasPinned } : n)))
+      if (activeNote?.id === noteId)
+        setActiveNote((prev) => (prev ? { ...prev, pinned: wasPinned } : prev))
       showToast('Failed to update pin', 'error')
     }
   }
@@ -320,9 +317,11 @@ export function useNotesData() {
   /* ── Restore version ────────────────────────────────────────────────── */
   function handleRestore(restoredNote) {
     const normalized = normalizeNote(restoredNote)
-    setNotes((prev) => prev.map((note) => (
-      note.id === normalized.id ? { ...normalized, _starred: note._starred } : note
-    )))
+    setNotes((prev) =>
+      prev.map((note) =>
+        note.id === normalized.id ? { ...normalized, _starred: note._starred } : note,
+      ),
+    )
     selectNote({
       ...normalized,
       _starred: activeNote?.id === normalized.id ? activeNote._starred : normalized._starred,
@@ -331,12 +330,10 @@ export function useNotesData() {
   }
 
   const handleTagsChange = useCallback((noteId, nextTags) => {
-    setNotes((prev) => prev.map((note) => (
-      note.id === noteId ? { ...note, tags: nextTags } : note
-    )))
-    setActiveNote((prev) => (
-      prev?.id === noteId ? { ...prev, tags: nextTags } : prev
-    ))
+    setNotes((prev) =>
+      prev.map((note) => (note.id === noteId ? { ...note, tags: nextTags } : note)),
+    )
+    setActiveNote((prev) => (prev?.id === noteId ? { ...prev, tags: nextTags } : prev))
   }, [])
 
   const notesByTab = notes.filter((note) => {
@@ -346,7 +343,9 @@ export function useNotesData() {
     return true
   })
 
-  const availableTags = [...new Set(notesByTab.flatMap((note) => note.tags || []))].sort((left, right) => left.localeCompare(right))
+  const availableTags = [...new Set(notesByTab.flatMap((note) => note.tags || []))].sort(
+    (left, right) => left.localeCompare(right),
+  )
 
   /* ── Filtered notes list ─────────────────────────────────────────────── */
   const visibleNotes = notesByTab
@@ -394,7 +393,7 @@ export function useNotesData() {
     setSelectedTag,
     clearFilters,
     availableTags,
-    saving,
+    saving: false,
     creating,
     confirmDelete,
     setConfirmDelete,
