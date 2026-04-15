@@ -1,12 +1,11 @@
 /* ═══════════════════════════════════════════════════════════════════════════
  * useNotesData.js — Custom hook for notes data fetching, state, and actions
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { API } from '../../config'
 import { authHeaders } from '../shared/pageUtils'
 import { showToast } from '../../lib/toast'
-import { isNotesHardeningEnabled } from './useNotesHardeningFlag.js'
 
 const NOTE_FILTER_TABS = new Set(['all', 'private', 'shared', 'starred'])
 
@@ -59,11 +58,9 @@ export function useNotesData() {
   const [editorCourseId, setEditorCourseId] = useState('')
   const [editorAllowDownloads, setEditorAllowDownloads] = useState(false)
   const [courses, setCourses] = useState([])
-  const [saving, setSaving] = useState(false)
   const [creating, setCreating] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [loadingNotes, setLoadingNotes] = useState(true)
-  const saveTimer = useRef()
 
   const updateSearchParam = useCallback(
     (key, value) => {
@@ -155,8 +152,6 @@ export function useNotesData() {
     }
   }, [])
 
-  useEffect(() => () => clearTimeout(saveTimer.current), [])
-
   /* ── Auto-select note from ?select=:id URL param (for "Open in Editor" flow) */
   useEffect(() => {
     const selectId = searchParams.get('select')
@@ -188,96 +183,23 @@ export function useNotesData() {
     setConfirmDelete(false)
   }
 
-  /* ── Auto-save with 1.5s debounce ────────────────────────────────────── */
-  // When flag_notes_hardening_v2 is enabled, useNotePersistence (in NoteEditor) handles
-  // saves. This legacy debounced autosave then becomes a no-op to avoid double-PATCH
-  // races. Remove this whole callback once 100% rollout is stable for 7 days
-  // (see docs/superpowers/specs/2026-04-15-notes-hardening-design.md, Section 11).
-  const autoSave = useCallback((noteId, title, content, isPrivate, courseId, allowDownloads) => {
-    if (isNotesHardeningEnabled()) return // new persistence layer owns saves
-    clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(async () => {
-      if (!noteId) return
-      setSaving(true)
-      try {
-        const response = await fetch(`${API}/api/notes/${noteId}`, {
-          method: 'PATCH',
-          headers: authHeaders(),
-          credentials: 'include',
-          body: JSON.stringify({
-            title,
-            content,
-            private: isPrivate,
-            courseId: courseId || null,
-            allowDownloads,
-          }),
-        })
-        if (response.ok) {
-          const updated = normalizeNote(await response.json())
-          setNotes((prev) =>
-            prev.map((note) =>
-              note.id === noteId ? { ...updated, _starred: note._starred } : note,
-            ),
-          )
-          setActiveNote((prev) =>
-            prev?.id === noteId ? { ...updated, _starred: prev._starred } : prev,
-          )
-        }
-      } finally {
-        setSaving(false)
-      }
-    }, 1500)
-  }, [])
-
-  /* ── Field change handlers (trigger auto-save) ───────────────────────── */
+  /* ── Field change handlers (persistence owned by useNotePersistence) ── */
   function handleTitleChange(value) {
     setEditorTitle(value)
-    if (activeNote)
-      autoSave(
-        activeNote.id,
-        value,
-        editorContent,
-        editorPrivate,
-        editorCourseId,
-        editorAllowDownloads,
-      )
   }
   function handleContentChange(value) {
     setEditorContent(value)
-    if (activeNote)
-      autoSave(
-        activeNote.id,
-        editorTitle,
-        value,
-        editorPrivate,
-        editorCourseId,
-        editorAllowDownloads,
-      )
   }
   function handlePrivateChange(value) {
     setEditorPrivate(value)
     // When going private, downloads are auto-reset by backend — reflect locally
-    const nextDownloads = value ? false : editorAllowDownloads
     if (value) setEditorAllowDownloads(false)
-    if (activeNote)
-      autoSave(activeNote.id, editorTitle, editorContent, value, editorCourseId, nextDownloads)
   }
   function handleAllowDownloadsChange(value) {
     setEditorAllowDownloads(value)
-    if (activeNote)
-      autoSave(activeNote.id, editorTitle, editorContent, editorPrivate, editorCourseId, value)
   }
   function handleCourseChange(value) {
     setEditorCourseId(value)
-    if (activeNote)
-      autoSave(
-        activeNote.id,
-        editorTitle,
-        editorContent,
-        editorPrivate,
-        value,
-        editorAllowDownloads,
-      )
   }
 
   /* ── Create / Delete ─────────────────────────────────────────────────── */
@@ -471,7 +393,7 @@ export function useNotesData() {
     setSelectedTag,
     clearFilters,
     availableTags,
-    saving,
+    saving: false,
     creating,
     confirmDelete,
     setConfirmDelete,

@@ -36,6 +36,11 @@ export function sanitizePastedHtml(html) {
       img: ['src', 'alt'],
     },
     allowedSchemes: ['http', 'https', 'mailto'],
+    allowedSchemesByTag: {
+      img: ['http', 'https'],
+      a: ['http', 'https', 'mailto'],
+    },
+    allowedSchemesAppliedToAttributes: ['href', 'src'],
     disallowedTagsMode: 'discard',
     transformTags: {
       a: sanitizeHtml.simpleTransform('a', { rel: 'noopener noreferrer', target: '_blank' }),

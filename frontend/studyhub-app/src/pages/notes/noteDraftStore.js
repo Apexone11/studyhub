@@ -97,7 +97,7 @@ export const draftStore = {
     return Object.values(ssRead())
   },
 
-  async _reset() {
+  async clearAll() {
     const handle = await db()
     if (handle) {
       try {
@@ -108,5 +108,10 @@ export const draftStore = {
       }
     }
     ssWrite({})
+  },
+
+  // Test-only alias retained for backward compatibility.
+  async _reset() {
+    return this.clearAll()
   },
 }

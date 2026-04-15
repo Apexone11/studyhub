@@ -1,3 +1,4 @@
+const crypto = require('crypto')
 const { assertOwnerOrAdmin } = require('../../lib/accessControl')
 const { createNotification } = require('../../lib/notify')
 const { notifyMentionedUsers } = require('../../lib/mentions')
@@ -276,103 +277,19 @@ async function updateNote(req, res) {
     return res.status(400).json({ error: 'Invalid note id.' })
 
   const body = req.body || {}
-  const usesHardenedSave =
-    body.baseRevision !== undefined ||
-    typeof body.saveId === 'string' ||
-    typeof body.contentHash === 'string' ||
-    typeof body.trigger === 'string'
-
-  if (usesHardenedSave) {
-    return updateNoteHardened(req, res, noteId, body)
+  // Hardened save path is now the ONLY path. Legacy clients that omit
+  // baseRevision / saveId / contentHash / trigger are accepted with defaults:
+  //   - missing baseRevision → 0 (stale client; server returns 409 if the row moved)
+  //   - missing saveId → server-generated UUID (keeps replay-dedup field populated)
+  //   - missing contentHash → recomputed from content
+  //   - missing trigger → 'unspecified' (NEVER forces a MANUAL snapshot)
+  const normalizedBody = {
+    ...body,
+    baseRevision: body.baseRevision ?? 0,
+    saveId: typeof body.saveId === 'string' && body.saveId ? body.saveId : crypto.randomUUID(),
+    trigger: typeof body.trigger === 'string' ? body.trigger : 'unspecified',
   }
-
-  try {
-    const note = await prisma.note.findUnique({ where: { id: noteId } })
-    if (!note) return res.status(404).json({ error: 'Note not found.' })
-    if (
-      !assertOwnerOrAdmin({
-        res,
-        user: req.user,
-        ownerId: note.userId,
-        message: 'Not your note.',
-        targetType: 'note',
-        targetId: noteId,
-      })
-    )
-      return
-
-    const { title, content, courseId, private: priv, allowDownloads } = body
-    const data = {}
-    if (title !== undefined) {
-      const trimmedTitle = typeof title === 'string' ? title.trim() : ''
-      if (!trimmedTitle) return res.status(400).json({ error: 'Title cannot be empty.' })
-      if (trimmedTitle.length > 120)
-        return res.status(400).json({ error: 'Title must be 120 characters or fewer.' })
-      data.title = trimmedTitle
-    }
-    if (content !== undefined) {
-      const contentStr = typeof content === 'string' ? content : ''
-      if (contentStr.length > 50000)
-        return res.status(400).json({ error: 'Content must be 50000 characters or fewer.' })
-      data.content = contentStr
-    }
-    if (courseId !== undefined) data.courseId = courseId ? parseInt(courseId, 10) || null : null
-    if (priv !== undefined) data.private = Boolean(priv)
-    if (allowDownloads !== undefined) data.allowDownloads = Boolean(allowDownloads)
-
-    // If making note private, reset allowDownloads
-    if (data.private === true) data.allowDownloads = false
-
-    // If toggling from private to public, apply trust-gated moderation status
-    if (body.private === false && note.private === true) {
-      data.moderationStatus = getInitialModerationStatus(req.user)
-    }
-
-    // Auto-save version snapshot when content changes significantly (>50 chars diff)
-    if (data.content !== undefined && note.content) {
-      const lenDiff = Math.abs(data.content.length - note.content.length)
-      if (lenDiff > 50 || (data.title && data.title !== note.title)) {
-        void prisma.noteVersion
-          .create({
-            data: {
-              noteId,
-              userId: req.user.userId,
-              title: note.title,
-              content: note.content,
-              message: null, // auto-saved
-            },
-          })
-          .catch(() => {}) // fire-and-forget
-      }
-    }
-
-    const updated = await prisma.note.update({
-      where: { id: noteId },
-      data,
-      include: NOTE_INCLUDE,
-    })
-
-    // Async content moderation on title/content changes — fire-and-forget
-    if (isModerationEnabled() && (data.title || data.content !== undefined)) {
-      const textToScan = `${updated.title} ${updated.content || ''}`.trim()
-      if (textToScan) {
-        void scanContent({
-          contentType: 'note',
-          contentId: noteId,
-          text: textToScan,
-          userId: req.user.userId,
-        })
-      }
-    }
-
-    /* Content fingerprinting on content changes (fire-and-forget) */
-    if (data.content !== undefined) void updateFingerprint('note', noteId, updated.content)
-
-    res.json(serializeNote(updated))
-  } catch (err) {
-    captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
-  }
+  return updateNoteHardened(req, res, noteId, normalizedBody)
 }
 
 /**
@@ -385,7 +302,8 @@ async function updateNote(req, res) {
  *   413 — content exceeds MAX_NOTE_CONTENT_HARDENED
  */
 async function updateNoteHardened(req, res, noteId, body) {
-  const { title, content, baseRevision, saveId, contentHash, trigger } = body
+  let { title } = body
+  const { content, baseRevision, saveId, contentHash, trigger } = body
 
   if (typeof content === 'string' && content.length > MAX_NOTE_CONTENT_HARDENED) {
     return sendError(
@@ -396,11 +314,29 @@ async function updateNoteHardened(req, res, noteId, body) {
     )
   }
 
+  // Title validation (hardened path is now the only path)
+  if (title !== undefined) {
+    const trimmedTitle = typeof title === 'string' ? title.trim() : ''
+    if (!trimmedTitle) return res.status(400).json({ error: 'Title cannot be empty.' })
+    if (trimmedTitle.length > 120)
+      return res.status(400).json({ error: 'Title must be 120 characters or fewer.' })
+    title = trimmedTitle
+  }
+
   try {
     const note = await prisma.note.findUnique({ where: { id: noteId } })
-    if (!note || note.userId !== req.user.userId) {
-      return sendError(res, 404, 'Note not found.', ERROR_CODES.NOT_FOUND)
-    }
+    if (!note) return sendError(res, 404, 'Note not found.', ERROR_CODES.NOT_FOUND)
+    if (
+      !assertOwnerOrAdmin({
+        res,
+        user: req.user,
+        ownerId: note.userId,
+        message: 'Not your note.',
+        targetType: 'note',
+        targetId: noteId,
+      })
+    )
+      return
 
     // Idempotent replay — same saveId already applied
     if (saveId && note.lastSaveId === saveId) {
@@ -1106,9 +1042,18 @@ async function getVersionDiff(req, res) {
 
   try {
     const note = await prisma.note.findUnique({ where: { id } })
-    if (!note || note.userId !== req.user.userId) {
-      return sendError(res, 404, 'Note not found', ERROR_CODES.NOT_FOUND)
-    }
+    if (!note) return sendError(res, 404, 'Note not found', ERROR_CODES.NOT_FOUND)
+    if (
+      !assertOwnerOrAdmin({
+        res,
+        user: req.user,
+        ownerId: note.userId,
+        message: 'Not your note.',
+        targetType: 'note',
+        targetId: id,
+      })
+    )
+      return
     const version = await prisma.noteVersion.findUnique({ where: { id: versionId } })
     if (!version || version.noteId !== id) {
       return sendError(res, 404, 'Version not found', ERROR_CODES.NOTE_VERSION_NOT_FOUND)
@@ -1156,9 +1101,18 @@ async function restoreNoteVersion(req, res) {
 
   try {
     const note = await prisma.note.findUnique({ where: { id: noteId } })
-    if (!note || note.userId !== req.user.userId) {
-      return sendError(res, 404, 'Note not found.', ERROR_CODES.NOT_FOUND)
-    }
+    if (!note) return sendError(res, 404, 'Note not found.', ERROR_CODES.NOT_FOUND)
+    if (
+      !assertOwnerOrAdmin({
+        res,
+        user: req.user,
+        ownerId: note.userId,
+        message: 'Not your note.',
+        targetType: 'note',
+        targetId: noteId,
+      })
+    )
+      return
 
     const version = await prisma.noteVersion.findUnique({ where: { id: versionId } })
     if (!version || version.noteId !== noteId) {
@@ -1384,7 +1338,7 @@ async function appendChunk(req, res) {
   }
   let result
   try {
-    result = defaultChunkBuffer.append(saveId, chunkIndex, chunkCount, chunk)
+    result = defaultChunkBuffer.append(req.user.userId, saveId, chunkIndex, chunkCount, chunk)
   } catch (e) {
     return sendError(res, 400, e.message, ERROR_CODES.NOTE_CHUNK_OUT_OF_ORDER)
   }

@@ -64,6 +64,24 @@ export async function logoutSession() {
     clearStoredSession()
     clearFetchCache()
     clearStudyStatusCache()
+
+    // Clear notes-hardening local data so the next user on a shared browser
+    // doesn't inherit the previous user's drafts or pending offline saves.
+    try {
+      const { draftStore } = await import('../pages/notes/noteDraftStore.js')
+      await draftStore.clearAll()
+    } catch {
+      /* draft store optional */
+    }
+
+    try {
+      if (typeof navigator !== 'undefined' && navigator.serviceWorker?.controller) {
+        navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_NOTES_OUTBOX' })
+      }
+    } catch {
+      /* SW optional */
+    }
+
     try {
       sessionStorage.setItem(LOGGED_OUT_FLAG, '1')
     } catch {

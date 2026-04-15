@@ -41,4 +41,16 @@ describe('sanitizePastedHtml', () => {
     expect(sanitizePastedHtml(null)).toBe('')
     expect(sanitizePastedHtml(undefined)).toBe('')
   })
+
+  it('strips data: URIs in img src', () => {
+    const out = sanitizePastedHtml(
+      '<img src="data:text/html;base64,PHNjcmlwdD4xPC9zY3JpcHQ+" alt="x">',
+    )
+    expect(out).not.toMatch(/data:/)
+  })
+
+  it('preserves https img src', () => {
+    const out = sanitizePastedHtml('<img src="https://x.y/z.png" alt="z">')
+    expect(out).toContain('src="https://x.y/z.png"')
+  })
 })

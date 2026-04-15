@@ -56,8 +56,12 @@ const mocks = vi.hoisted(() => {
       captureError: vi.fn(),
     },
     accessControl: {
-      assertOwnerOrAdmin: vi.fn(({ user, ownerId }) => {
-        return user.role === 'admin' || Number(ownerId) === Number(user.userId)
+      assertOwnerOrAdmin: vi.fn(({ res, user, ownerId }) => {
+        if (user.role === 'admin' || Number(ownerId) === Number(user.userId)) {
+          return true
+        }
+        if (res) res.status(403).json({ error: 'Not your note.' })
+        return false
       }),
     },
     moderationEngine: {
@@ -130,8 +134,12 @@ afterAll(() => {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mocks.accessControl.assertOwnerOrAdmin.mockImplementation(({ user, ownerId }) => {
-    return user.role === 'admin' || Number(ownerId) === Number(user.userId)
+  mocks.accessControl.assertOwnerOrAdmin.mockImplementation(({ res, user, ownerId }) => {
+    if (user.role === 'admin' || Number(ownerId) === Number(user.userId)) {
+      return true
+    }
+    if (res) res.status(403).json({ error: 'Not your note.' })
+    return false
   })
   mocks.moderationEngine.isModerationEnabled.mockReturnValue(true)
 })
@@ -224,7 +232,7 @@ describe('POST /:id/versions/:versionId/restore', () => {
     expect(res.body.code).toBe('NOTE_VERSION_NOT_FOUND')
   })
 
-  it('returns 404 when note not owned by user', async () => {
+  it('returns 403 when note not owned by user (non-admin)', async () => {
     mocks.prisma.note.findUnique.mockResolvedValue({
       id: 1,
       userId: 999,
@@ -235,7 +243,6 @@ describe('POST /:id/versions/:versionId/restore', () => {
 
     const res = await request(app).post('/1/versions/7/restore').send({})
 
-    expect(res.status).toBe(404)
-    expect(res.body.error).toMatch(/not found/i)
+    expect(res.status).toBe(403)
   })
 })

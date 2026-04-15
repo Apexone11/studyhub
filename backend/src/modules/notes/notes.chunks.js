@@ -4,13 +4,17 @@ class ChunkBuffer {
     this.ttlMs = ttlMs
   }
 
-  append(saveId, chunkIndex, chunkCount, chunk) {
+  // Append a chunk to the buffer. The internal key namespaces by userId to
+  // prevent cross-user saveId collision (malicious or accidental). Two
+  // different users sending the same saveId get isolated buffers.
+  append(userId, saveId, chunkIndex, chunkCount, chunk) {
     const now = Date.now()
-    let sess = this.sessions.get(saveId)
+    const key = `${userId}:${saveId}`
+    let sess = this.sessions.get(key)
     if (!sess) {
       if (chunkIndex !== 0) throw new Error('chunk out of order')
       sess = { parts: [], expected: chunkCount, updatedAt: now }
-      this.sessions.set(saveId, sess)
+      this.sessions.set(key, sess)
     }
     if (chunkIndex !== sess.parts.length) throw new Error('chunk out of order')
     if (chunkCount !== sess.expected) throw new Error('chunkCount mismatch')
@@ -18,7 +22,7 @@ class ChunkBuffer {
     sess.updatedAt = now
     if (sess.parts.length === sess.expected) {
       const content = sess.parts.join('')
-      this.sessions.delete(saveId)
+      this.sessions.delete(key)
       return { complete: true, content }
     }
     return { complete: false }

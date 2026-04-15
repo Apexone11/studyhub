@@ -20,6 +20,13 @@ const MAX_CACHED_PAGES = 30
 const MAX_CACHED_IMAGES = 100
 const MAX_CACHED_FONTS = 20
 
+// Notes offline PATCH-replay outbox (merged from sw-notes.js).
+// Intercepts PATCH /api/notes/<id>, enqueues on network failure,
+// drains via Background Sync tag 'note-save-retry'.
+const NOTES_OUTBOX_DB = 'studyhub-notes-sw'
+const NOTES_OUTBOX_STORE = 'outbox'
+const NOTES_PATCH_RE = /^\/api\/notes\/[^/]+$/
+
 /* ── Install ────────────────────────────────────────────────────────────── */
 
 self.addEventListener('install', () => {
@@ -121,6 +128,21 @@ function isImage(url) {
 
 self.addEventListener('fetch', (event) => {
   const { request } = event
+
+  // Notes offline PATCH-replay: intercept PATCH /api/notes/<id> before any
+  // other routing so the outbox can absorb failed writes.
+  if (request.method === 'PATCH') {
+    let patchUrl
+    try {
+      patchUrl = new URL(request.url)
+    } catch {
+      patchUrl = null
+    }
+    if (patchUrl && NOTES_PATCH_RE.test(patchUrl.pathname)) {
+      event.respondWith(handleNotesPatch(request))
+      return
+    }
+  }
 
   // Only intercept GET requests
   if (request.method !== 'GET') return
@@ -233,8 +255,220 @@ self.addEventListener('fetch', (event) => {
 /* ── Message handler ────────────────────────────────────────────────────── */
 
 self.addEventListener('message', (event) => {
+  const data = event.data
+  if (!data) return
   // Allow the frontend to trigger skipWaiting from a "Update available" toast
-  if (event.data && event.data.type === 'SKIP_WAITING') {
+  if (data.type === 'SKIP_WAITING') {
     self.skipWaiting()
+    return
+  }
+  // Clear the notes offline outbox on logout so the next user on a shared
+  // browser doesn't inherit pending note-save requests.
+  if (data.type === 'CLEAR_NOTES_OUTBOX') {
+    event.waitUntil(clearNotesOutbox())
+    return
   }
 })
+
+async function clearNotesOutbox() {
+  try {
+    const db = await openNotesOutbox()
+    const tx = db.transaction(NOTES_OUTBOX_STORE, 'readwrite')
+    // The wrapper's inner store object does not expose a clear() method,
+    // so drain by listing ids and deleting one by one. Best-effort.
+    const all = await tx.store.getAll()
+    for (const entry of all) {
+      if (entry && entry.id != null) {
+        try {
+          await tx.store.delete(entry.id)
+        } catch {
+          /* skip */
+        }
+      }
+    }
+    await tx.done
+  } catch {
+    /* best-effort cleanup */
+  }
+}
+
+/* ── Notes offline PATCH-replay ─────────────────────────────────────────────
+ * Merged from the previously-unregistered `sw-notes.js`. Contract:
+ *   - On network failure for PATCH /api/notes/<id>, enqueue the request in
+ *     IndexedDB (studyhub-notes-sw / outbox) and return 202.
+ *   - On Background Sync 'note-save-retry', replay FIFO with trigger
+ *     'sw-replay'. Delete entries on 2xx/202 (notify 'sw-saved') or 409
+ *     (notify 'sw-conflict'). Leave other statuses for the next sync.
+ *   - Server body contract preserved:
+ *       { title, content, baseRevision, saveId, contentHash, trigger }
+ *   - Client message contract:
+ *       { type: 'sw-saved',    noteId, revision }
+ *       { type: 'sw-conflict', noteId }
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+async function handleNotesPatch(req) {
+  const cloned = req.clone()
+  let body = ''
+  try {
+    body = await cloned.text()
+  } catch {
+    /* unreadable */
+  }
+  try {
+    const res = await fetch(req)
+    return res
+  } catch {
+    try {
+      const db = await openNotesOutbox()
+      const tx = db.transaction(NOTES_OUTBOX_STORE, 'readwrite')
+      await tx.store.add({
+        url: req.url,
+        body,
+        headers: Array.from(req.headers.entries()),
+        enqueuedAt: Date.now(),
+      })
+      await tx.done
+      if ('sync' in self.registration) {
+        try {
+          await self.registration.sync.register('note-save-retry')
+        } catch {
+          /* unsupported */
+        }
+      }
+    } catch {
+      /* IDB write failed — best-effort */
+    }
+    return new Response(JSON.stringify({ queued: true }), {
+      status: 202,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+}
+
+self.addEventListener('sync', (event) => {
+  if (event.tag !== 'note-save-retry') return
+  event.waitUntil(drainNotesOutbox())
+})
+
+async function drainNotesOutbox() {
+  const db = await openNotesOutbox()
+  const tx = db.transaction(NOTES_OUTBOX_STORE, 'readwrite')
+  const all = await tx.store.getAll()
+  for (const entry of all) {
+    try {
+      const headers = new Headers(entry.headers)
+      let parsed = {}
+      try {
+        parsed = JSON.parse(entry.body || '{}')
+      } catch {
+        /* bad payload, skip */
+        continue
+      }
+      parsed.trigger = 'sw-replay'
+      const res = await fetch(entry.url, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify(parsed),
+        credentials: 'include',
+      })
+      if (res.ok || res.status === 202) {
+        await tx.store.delete(entry.id)
+        notifyNotesClients({
+          type: 'sw-saved',
+          noteId: extractNotesId(entry.url),
+          revision: await tryNotesRevision(res),
+        })
+      } else if (res.status === 409) {
+        // Server has a newer revision. Drop the queued entry and let the
+        // active tab discover the conflict on its next save attempt.
+        await tx.store.delete(entry.id)
+        notifyNotesClients({
+          type: 'sw-conflict',
+          noteId: extractNotesId(entry.url),
+        })
+      }
+      // Other non-OK statuses (5xx) leave the entry; will retry on next sync.
+    } catch {
+      /* network still down or transient error — leave entry, retry next time */
+    }
+  }
+  await tx.done
+}
+
+function extractNotesId(url) {
+  try {
+    const parts = new URL(url).pathname.split('/')
+    return parts[parts.length - 1]
+  } catch {
+    return null
+  }
+}
+
+async function tryNotesRevision(res) {
+  try {
+    const j = await res.clone().json()
+    return j.revision ?? null
+  } catch {
+    return null
+  }
+}
+
+async function notifyNotesClients(message) {
+  try {
+    const clients = await self.clients.matchAll({
+      type: 'window',
+      includeUncontrolled: true,
+    })
+    clients.forEach((c) => c.postMessage(message))
+  } catch {
+    /* swallow */
+  }
+}
+
+function openNotesOutbox() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(NOTES_OUTBOX_DB, 1)
+    req.onupgradeneeded = () => {
+      const db = req.result
+      if (!db.objectStoreNames.contains(NOTES_OUTBOX_STORE)) {
+        db.createObjectStore(NOTES_OUTBOX_STORE, { keyPath: 'id', autoIncrement: true })
+      }
+    }
+    req.onsuccess = () => {
+      const db = req.result
+      resolve({
+        transaction(_storeName, mode) {
+          const tx = db.transaction(NOTES_OUTBOX_STORE, mode || 'readonly')
+          const store = tx.objectStore(NOTES_OUTBOX_STORE)
+          return {
+            store: {
+              add(record) {
+                return notesReqToPromise(store.add(record))
+              },
+              delete(id) {
+                return notesReqToPromise(store.delete(id))
+              },
+              getAll() {
+                return notesReqToPromise(store.getAll())
+              },
+            },
+            get done() {
+              return new Promise((r, j) => {
+                tx.oncomplete = () => r()
+                tx.onerror = () => j(tx.error)
+              })
+            },
+          }
+        },
+      })
+    }
+    req.onerror = () => reject(req.error)
+  })
+}
+
+function notesReqToPromise(req) {
+  return new Promise((resolve, reject) => {
+    req.onsuccess = () => resolve(req.result)
+    req.onerror = () => reject(req.error)
+  })
+}

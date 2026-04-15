@@ -492,6 +492,7 @@ const notesPatchLimiter = rateLimit({
   max: 120,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => `notes-patch-${req.user?.userId || 'anon'}`,
   message: { error: 'Too many note updates. Please slow down.' },
 })
 
@@ -503,6 +504,7 @@ const notesChunkLimiter = rateLimit({
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => `notes-chunk-${req.user?.userId || 'anon'}`,
   message: { error: 'Too many chunk appends. Please slow down.' },
 })
 
@@ -515,6 +517,7 @@ const notesRestoreLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => `notes-restore-${req.user?.userId || 'anon'}`,
   message: { error: 'Too many restore requests. Please slow down.' },
 })
 
@@ -526,6 +529,7 @@ const notesDiffLimiter = rateLimit({
   max: 60,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => `notes-diff-${req.user?.userId || 'anon'}`,
   message: { error: 'Too many diff requests. Please slow down.' },
 })
 
