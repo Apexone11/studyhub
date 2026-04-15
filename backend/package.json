@@ -17,6 +17,7 @@
     "preview:fixture": "node scripts/ensurePreviewFixture.js",
     "seed:admin": "node scripts/seedAdmin.js",
     "seed:roles-v2-flags": "node scripts/seedRolesV2Flags.js",
+    "seed:notes-hardening-flag": "node scripts/seedNotesHardeningFlag.js",
     "smoke:routes": "node scripts/smokeRoutes.js",
     "migrate:readiness": "node scripts/checkMigrationReadiness.js",
     "migrate:readiness:deploy": "node scripts/checkMigrationReadiness.js --deploy",
