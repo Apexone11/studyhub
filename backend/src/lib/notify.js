@@ -104,14 +104,14 @@ const EMAIL_TYPE_LABELS = Object.freeze({
 })
 
 /* ── Anti-spam configuration ──────────────────────────────────── */
-const DEDUP_WINDOW_MS = 60 * 60 * 1000          // 1 hour
+const DEDUP_WINDOW_MS = 60 * 60 * 1000 // 1 hour
 const BURST_THRESHOLD = 3
-const BURST_WINDOW_MS = 2 * 60 * 1000           // 2 minutes
-const BURST_FLUSH_DELAY_MS = 10 * 1000           // flush digest 10s after first burst event
+const BURST_WINDOW_MS = 2 * 60 * 1000 // 2 minutes
+const BURST_FLUSH_DELAY_MS = 10 * 1000 // flush digest 10s after first burst event
 
 /* In-memory dedup + burst tracking (process-scoped, resets on restart) */
-const _emailDedup = new Map()    // key → timestamp
-const _burstQueues = new Map()   // userId → { items: [], timer }
+const _emailDedup = new Map() // key → timestamp
+const _burstQueues = new Map() // userId → { items: [], timer }
 
 function _dedupKey(userId, type, key) {
   return `${userId}:${type}:${key || ''}`
@@ -194,16 +194,70 @@ function _getEmailTypeLabel(type, priority) {
  * @param {string}  [opts.dedupKey]  – optional dedup key (e.g. contentId) for email throttling
  * @param {number}  [opts.performerUserId] – the admin/user who performed the action (for self-notify guard)
  */
-async function createNotification(prisma, {
-  userId, type, message, actorId, sheetId, linkPath,
-  priority, dedupKey, performerUserId,
-}) {
+async function createNotification(
+  prisma,
+  {
+    userId,
+    type,
+    message,
+    actorId,
+    sheetId,
+    linkPath,
+    priority,
+    dedupKey,
+    performerUserId,
+    eventContext,
+  },
+) {
   if (userId === actorId) return // never notify yourself
   const safePriority = VALID_PRIORITIES.includes(priority) ? priority : 'medium'
   const preferences = await _loadNotificationPreferences(prisma, userId)
 
   if (!_shouldCreateInAppNotification(preferences, type)) {
     return null
+  }
+
+  // Role-aware gate (docs/roles-and-permissions-plan.md §10.1). Callers can
+  // opt into the filter by passing { schoolId, courseId, hashtagId } in
+  // eventContext plus a scoped `type` (e.g. 'school.announcement.created').
+  if (eventContext && typeof eventContext === 'object') {
+    try {
+      const { shouldSendForRole } = require('./roleNotifications')
+      const recipient = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          accountType: true,
+          enrollments: { select: { course: { select: { id: true, schoolId: true } } } },
+          hashtagFollows: { select: { hashtagId: true } },
+        },
+      })
+      if (recipient) {
+        const schoolIds = [
+          ...new Set(
+            recipient.enrollments
+              .map((e) => e.course?.schoolId)
+              .filter((id) => typeof id === 'number'),
+          ),
+        ]
+        const enrolledCourseIds = recipient.enrollments
+          .map((e) => e.course?.id)
+          .filter((id) => typeof id === 'number')
+        const followedHashtagIds = recipient.hashtagFollows.map((h) => h.hashtagId)
+        const allow = shouldSendForRole(
+          { type, ...eventContext },
+          {
+            accountType: recipient.accountType,
+            schoolIds,
+            enrolledCourseIds,
+            followedHashtagIds,
+          },
+        )
+        if (!allow) return null
+      }
+    } catch {
+      // Role filter is best-effort. If the lookup fails (e.g. missing tables
+      // during migration), fall through and let the default delivery proceed.
+    }
   }
 
   try {
@@ -216,7 +270,7 @@ async function createNotification(prisma, {
         actorId: actorId || null,
         sheetId: sheetId || null,
         linkPath: linkPath || null,
-      }
+      },
     })
 
     if (_shouldSendEmailNotification(preferences, type, safePriority)) {
@@ -239,21 +293,18 @@ async function createNotification(prisma, {
 }
 
 async function createNotifications(prisma, notifications = []) {
-  return Promise.allSettled(notifications.map((notification) => createNotification(prisma, notification)))
+  return Promise.allSettled(
+    notifications.map((notification) => createNotification(prisma, notification)),
+  )
 }
 
 /**
  * Anti-spam gate before sending email.
  */
-async function _maybeSendNotificationEmail(prisma, {
-  userId,
-  type,
-  message,
-  linkPath,
-  dedupKey,
-  performerUserId,
-  priority,
-}) {
+async function _maybeSendNotificationEmail(
+  prisma,
+  { userId, type, message, linkPath, dedupKey, performerUserId, priority },
+) {
   if (performerUserId && performerUserId === userId) return
 
   if (priority !== 'high') {
@@ -272,7 +323,7 @@ async function _maybeSendNotificationEmail(prisma, {
     _burstQueues.set(userId, queue)
   }
   /* Prune items outside burst window */
-  queue.items = queue.items.filter(item => now - item.ts < BURST_WINDOW_MS)
+  queue.items = queue.items.filter((item) => now - item.ts < BURST_WINDOW_MS)
 
   queue.items.push({ ts: now, type, message, linkPath })
 
@@ -324,7 +375,10 @@ async function _flushBurstDigest(prisma, userId) {
 
   const appUrl = getPublicAppUrl()
   const bulletList = items
-    .map(item => `<li style="margin:0 0 8px;color:#475569;font-size:14px;line-height:1.5;">${escapeHtml(item.message)}</li>`)
+    .map(
+      (item) =>
+        `<li style="margin:0 0 8px;color:#475569;font-size:14px;line-height:1.5;">${escapeHtml(item.message)}</li>`,
+    )
     .join('\n')
 
   const html = `<!DOCTYPE html>
@@ -361,13 +415,16 @@ async function _flushBurstDigest(prisma, userId) {
   const textList = items.map((item, i) => `${i + 1}. ${item.message}`).join('\n')
 
   try {
-    await deliverMail({
-      from: `"StudyHub" <${getFromAddress()}>`,
-      to: user.email,
-      subject: `StudyHub — ${items.length} alerts need your attention`,
-      text: `Hi ${user.username},\n\nYou have ${items.length} high-priority notifications:\n\n${textList}\n\nView: ${appUrl}`,
-      html,
-    }, 'high-priority-digest')
+    await deliverMail(
+      {
+        from: `"StudyHub" <${getFromAddress()}>`,
+        to: user.email,
+        subject: `StudyHub — ${items.length} alerts need your attention`,
+        text: `Hi ${user.username},\n\nYou have ${items.length} high-priority notifications:\n\n${textList}\n\nView: ${appUrl}`,
+        html,
+      },
+      'high-priority-digest',
+    )
   } catch (err) {
     console.error('[notify] burst digest email failed:', err.message)
   }
@@ -376,13 +433,10 @@ async function _flushBurstDigest(prisma, userId) {
 /**
  * Sends an email for a single notification.
  */
-async function sendNotificationEmail(prisma, {
-  userId,
-  type,
-  message,
-  linkPath,
-  priority = 'medium',
-}) {
+async function sendNotificationEmail(
+  prisma,
+  { userId, type, message, linkPath, priority = 'medium' },
+) {
   let deliverMail, getFromAddress, getPublicAppUrl, escapeHtml
   try {
     const transport = require('./email/emailTransport')
@@ -403,9 +457,10 @@ async function sendNotificationEmail(prisma, {
   const appUrl = getPublicAppUrl()
   const actionUrl = linkPath ? `${appUrl}${linkPath}` : appUrl
   const typeLabel = _getEmailTypeLabel(type, priority)
-  const footerText = priority === 'high'
-    ? 'You received this because of an important account event on your StudyHub account.'
-    : 'You received this because this activity email is enabled in your StudyHub settings.'
+  const footerText =
+    priority === 'high'
+      ? 'You received this because of an important account event on your StudyHub account.'
+      : 'You received this because this activity email is enabled in your StudyHub settings.'
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -435,13 +490,16 @@ async function sendNotificationEmail(prisma, {
 </body>
 </html>`
 
-  await deliverMail({
-    from: `"StudyHub" <${getFromAddress()}>`,
-    to: user.email,
-    subject: `StudyHub — ${typeLabel}`,
-    text: `${typeLabel}: ${message}\n\nView details: ${actionUrl}`,
-    html,
-  }, priority === 'high' ? 'high-priority-notification' : 'notification-preference-email')
+  await deliverMail(
+    {
+      from: `"StudyHub" <${getFromAddress()}>`,
+      to: user.email,
+      subject: `StudyHub — ${typeLabel}`,
+      text: `${typeLabel}: ${message}\n\nView details: ${actionUrl}`,
+      html,
+    },
+    priority === 'high' ? 'high-priority-notification' : 'notification-preference-email',
+  )
 }
 
 async function sendHighPriorityEmail(prisma, options) {

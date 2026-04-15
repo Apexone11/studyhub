@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { API } from '../../config'
 import { roleLabel, ACCOUNT_TYPE_OPTIONS } from '../../lib/roleLabel'
 import { showToast } from '../../lib/toast'
+import { useRolesV2Flags } from '../../lib/rolesV2Flags'
 import { Button, Message, SectionCard } from './settingsShared'
 import { FONT } from './settingsState'
 
@@ -63,6 +64,7 @@ function Modal({ open, title, children, onClose }) {
 }
 
 export default function RoleTile({ user }) {
+  const { revertWindow: revertFlagEnabled, loading: flagsLoading } = useRolesV2Flags()
   const [status, setStatus] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -165,10 +167,21 @@ export default function RoleTile({ user }) {
     [handleReloadToApply],
   )
 
-  if (loading) {
+  if (loading || flagsLoading) {
     return (
       <SectionCard title="Your role">
         <div style={{ color: 'var(--sh-muted)', fontSize: 13 }}>Loading…</div>
+      </SectionCard>
+    )
+  }
+  if (!revertFlagEnabled) {
+    // Flag-gated: fall back to a read-only tile so the label is still visible.
+    const currentLabel = roleLabel(status?.accountType || user?.accountType)
+    return (
+      <SectionCard title="Your role" subtitle={`You are a ${currentLabel}.`}>
+        <p style={{ margin: 0, fontSize: 13, color: 'var(--sh-muted)' }}>
+          Role changes are temporarily unavailable. Contact support if you need to update this.
+        </p>
       </SectionCard>
     )
   }

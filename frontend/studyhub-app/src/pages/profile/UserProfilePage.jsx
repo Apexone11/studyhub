@@ -12,7 +12,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import Navbar from '../../components/navbar/Navbar'
-import { IconShield, IconProfile, IconStar, IconSchool } from '../../components/Icons'
+import { IconShield, IconProfile, IconStar } from '../../components/Icons'
 import ReportModal from '../../components/ReportModal'
 import SafeJoyride from '../../components/SafeJoyride'
 import { SkeletonProfile } from '../../components/Skeleton'
@@ -29,6 +29,9 @@ import { showToast } from '../../lib/toast'
 import { usePageTitle } from '../../lib/usePageTitle'
 import { readJsonSafely } from '../../lib/http'
 import { roleLabel } from '../../lib/roleLabel'
+import { isSelfLearner } from '../../lib/roleCopy'
+import MyLearningTab from './MyLearningTab'
+import ProfileBadges from '../../components/ProfileBadges'
 import VerificationBadge from '../../components/verification/VerificationBadge'
 import ProBadge from '../../components/ProBadge'
 import DonorBadge from '../../components/DonorBadge'
@@ -40,8 +43,7 @@ import {
   containerStyle,
   cardStyle,
   sectionHeadingStyle,
-  OWN_TABS,
-  OTHER_TABS,
+  tabsForProfile,
   DEFAULT_TAB,
   isValidTab,
 } from './profileConstants'
@@ -87,8 +89,9 @@ export default function UserProfilePage() {
 
   /* ── Tab state (URL-driven) ────────────────────────────────────────── */
   const rawTab = searchParams.get('tab') || DEFAULT_TAB
-  const activeTab = isValidTab(rawTab, isOwnProfile) ? rawTab : DEFAULT_TAB
-  const tabs = isOwnProfile ? OWN_TABS : OTHER_TABS
+  const viewerAccountType = currentUser?.accountType
+  const activeTab = isValidTab(rawTab, isOwnProfile, viewerAccountType) ? rawTab : DEFAULT_TAB
+  const tabs = tabsForProfile({ isOwn: isOwnProfile, accountType: viewerAccountType })
 
   function setTab(key) {
     setSearchParams(
@@ -101,9 +104,9 @@ export default function UserProfilePage() {
     )
   }
 
-  // If other-user visits with own-only tab, redirect to default
+  // If other-user visits with own-only tab, redirect to default.
   useEffect(() => {
-    if (!isOwnProfile && rawTab === 'study') {
+    if (!isOwnProfile && (rawTab === 'study' || rawTab === 'learning')) {
       setTab(DEFAULT_TAB)
     }
   }, [isOwnProfile, rawTab]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -573,29 +576,7 @@ export default function UserProfilePage() {
                   )}
                   <ProBadge plan={profile.plan} size="sm" />
                   <DonorBadge isDonor={profile.isDonor} donorLevel={profile.donorLevel} size="sm" />
-                  {(() => {
-                    const school = profile.enrollments?.[0]?.course?.school
-                    if (!school) return null
-                    return (
-                      <span
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 700,
-                          padding: '2px 10px',
-                          borderRadius: 99,
-                          background: 'rgba(14,165,233,0.18)',
-                          color: 'var(--sh-info-text)',
-                          border: '1px solid rgba(14,165,233,0.3)',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 4,
-                        }}
-                      >
-                        <IconSchool size={11} />
-                        {school.short}
-                      </span>
-                    )
-                  })()}
+                  <ProfileBadges profile={profile} viewerAccountType={viewerAccountType} />
                 </div>
                 {profile.displayName && profile.displayName !== profile.username && (
                   <div
@@ -1097,7 +1078,11 @@ export default function UserProfilePage() {
                   <OtherOverviewTab profile={profile} activityData={activityData} badges={badges} />
                 ))}
 
-              {activeTab === 'study' && isOwnProfile && (
+              {activeTab === 'learning' && isOwnProfile && (
+                <MyLearningTab profile={profile} recentlyViewed={recentlyViewed} />
+              )}
+
+              {activeTab === 'study' && isOwnProfile && !isSelfLearner(viewerAccountType) && (
                 <StudyTab
                   recentlyViewed={recentlyViewed}
                   studyActivity={studyActivity}

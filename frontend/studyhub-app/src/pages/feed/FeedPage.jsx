@@ -37,11 +37,14 @@ import SchoolSuggestionBanner from './SchoolSuggestionBanner'
 import GoalTriageCard from './GoalTriageCard'
 import InterestChipRow from './InterestChipRow'
 import { roleCopy, isSelfLearner } from '../../lib/roleCopy'
+import { useRolesV2Flags } from '../../lib/rolesV2Flags'
 
 export default function FeedPage() {
   usePageTitle('Feed')
   const { user } = useSession()
   const layout = useResponsiveAppLayout()
+  const { core: rolesV2Core } = useRolesV2Flags()
+  const showSelfLearnerExtras = isSelfLearner(user?.accountType) && rolesV2Core
   const [searchParams, setSearchParams] = useSearchParams()
 
   const activeFilter = FILTERS.includes(searchParams.get('filter'))
@@ -181,8 +184,8 @@ export default function FeedPage() {
               style={{ display: 'grid', gap: 18 }}
             >
               <GettingStartedCard user={user} />
-              {isSelfLearner(user?.accountType) ? <GoalTriageCard /> : null}
-              {isSelfLearner(user?.accountType) ? <InterestChipRow /> : null}
+              {showSelfLearnerExtras ? <GoalTriageCard /> : null}
+              {showSelfLearnerExtras ? <InterestChipRow /> : null}
               <SchoolSuggestionBanner user={user} />
               {showOnboardingBanner && (
                 <div

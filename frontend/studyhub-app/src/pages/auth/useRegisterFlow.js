@@ -18,10 +18,12 @@ import {
   apiGoogleAuth,
   apiCompleteRegistration,
 } from './registerConstants'
+import { useRolesV2Flags } from '../../lib/rolesV2Flags'
 
 export default function useRegisterFlow({ referralCode } = {}) {
   const navigate = useNavigate()
   const { completeAuthentication } = useSession()
+  const { oauthPicker: oauthPickerEnabled } = useRolesV2Flags()
 
   /* ── State ─────────────────────────────────────────────────────────── */
   const [step, setStep] = useState('account')
@@ -179,6 +181,10 @@ export default function useRegisterFlow({ referralCode } = {}) {
       }
 
       if (result.data.status === 'needs_role' && result.data.tempToken) {
+        if (!oauthPickerEnabled) {
+          setError('New Google signups are paused right now. Please sign up with email instead.')
+          return
+        }
         try {
           sessionStorage.setItem(
             'studyhub.google.pending',

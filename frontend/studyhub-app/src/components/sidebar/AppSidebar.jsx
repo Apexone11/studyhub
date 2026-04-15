@@ -10,6 +10,7 @@ import { prefetchForRoute } from '../../lib/prefetch'
 import UserAvatar from '../UserAvatar'
 import { FOCUSABLE_DRAWER_SELECTORS, NAV_LINKS, courseColor } from './sidebarConstants'
 import { roleLabel } from '../../lib/roleLabel'
+import SidebarTopics from './SidebarTopics'
 
 export default function AppSidebar({ mode = 'fixed' }) {
   const { pathname } = useLocation()
@@ -153,6 +154,10 @@ export default function AppSidebar({ mode = 'fixed' }) {
           </Link>
         </div>
       )}
+
+      {/* Topics I follow — Self-learners only (flag-gated) */}
+      {user.accountType === 'other' && <SidebarTopics onNavClick={handleNavClick} />}
+      {/* SidebarTopics self-checks the flag internally via useRolesV2Flags. */}
 
       {/* My Courses — lighter section with label (hidden for "other" account type) */}
       {user.accountType !== 'other' && (

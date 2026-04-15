@@ -18,11 +18,13 @@ import { fadeInUp } from '../../lib/animations'
 import { getAuthenticatedHomePath } from '../../lib/authNavigation'
 import { useSession, SESSION_EXPIRED_FLAG } from '../../lib/session-context'
 import { LOGGED_OUT_FLAG } from '../../lib/session'
+import { useRolesV2Flags } from '../../lib/rolesV2Flags'
 import './LoginPage.css'
 
 export default function LoginPage() {
   const navigate = useNavigate()
   const { completeAuthentication } = useSession()
+  const { oauthPicker: oauthPickerEnabled } = useRolesV2Flags()
   const cardRef = useRef(null)
 
   /* ── State ─────────────────────────────────────────────────────────── */
@@ -127,6 +129,10 @@ export default function LoginPage() {
       }
 
       if (data.status === 'needs_role' && data.tempToken) {
+        if (!oauthPickerEnabled) {
+          setError('New Google signups are paused right now. Please sign up with email instead.')
+          return
+        }
         try {
           sessionStorage.setItem(
             'studyhub.google.pending',
