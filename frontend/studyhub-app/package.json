@@ -65,6 +65,7 @@
     "recharts": "^2.15.4",
     "serve": "^14.2.5",
     "socket.io-client": "^4.8.3",
+    "studyhub": "file:../..",
     "tippy.js": "^6.3.7",
     "video.js": "^8.23.7",
     "web-vitals": "^5.2.0"

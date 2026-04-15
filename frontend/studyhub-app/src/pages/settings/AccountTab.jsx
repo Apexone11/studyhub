@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { API } from '../../config'
 import { Button, FormField, Input, Message, MsgList, SectionCard } from './settingsShared'
 import { FONT } from './settingsState'
+import RoleTile from './RoleTile'
 
 const DELETION_REASONS = [
   { value: 'better_platform', label: 'Found a better platform' },
@@ -25,7 +26,14 @@ function formatResendCountdown(totalSeconds) {
   return `${minutes}:${String(seconds).padStart(2, '0')}`
 }
 
-export default function AccountTab({ user, busyKey, setBusyKey, handlePatch, syncUser, clearSession }) {
+export default function AccountTab({
+  user,
+  busyKey,
+  setBusyKey,
+  handlePatch,
+  syncUser,
+  clearSession,
+}) {
   const navigate = useNavigate()
 
   const [emailForm, setEmailForm] = useState({ email: '', password: '' })
@@ -100,7 +108,10 @@ export default function AccountTab({ user, busyKey, setBusyKey, handlePatch, syn
       const data = await response.json()
 
       if (!response.ok) {
-        setEmailMsg({ type: 'error', text: data.error || 'Could not resend the verification code.' })
+        setEmailMsg({
+          type: 'error',
+          text: data.error || 'Could not resend the verification code.',
+        })
         return
       }
 
@@ -148,35 +159,64 @@ export default function AccountTab({ user, busyKey, setBusyKey, handlePatch, syn
 
   return (
     <>
-      <SectionCard title="Email Address" subtitle={user?.email ? `Current email: ${user.email}` : 'Add an email address to unlock recovery and verification.'}>
+      <RoleTile user={user} />
+      <SectionCard
+        title="Email Address"
+        subtitle={
+          user?.email
+            ? `Current email: ${user.email}`
+            : 'Add an email address to unlock recovery and verification.'
+        }
+      >
         {user?.email && (
           <Message tone={user.emailVerified ? 'success' : 'info'}>
-            {user.emailVerified ? 'Your email is verified.' : 'Email verification is still required.'}
+            {user.emailVerified
+              ? 'Your email is verified.'
+              : 'Email verification is still required.'}
           </Message>
         )}
 
         {user?.pendingEmailVerification && (
           <Message tone="info">
-            Verification is pending for <strong>{user.pendingEmailVerification.deliveryHint || user.pendingEmailVerification.email}</strong>.
+            Verification is pending for{' '}
+            <strong>
+              {user.pendingEmailVerification.deliveryHint || user.pendingEmailVerification.email}
+            </strong>
+            .
             {pendingResendCooldownSeconds > 0 && (
-              <> You can request another code in {formatResendCountdown(pendingResendCooldownSeconds)}.</>
+              <>
+                {' '}
+                You can request another code in{' '}
+                {formatResendCountdown(pendingResendCooldownSeconds)}.
+              </>
             )}
           </Message>
         )}
 
         <FormField label="New Email">
-          <Input type="email" value={emailForm.email} onChange={(e) => setEmailForm((c) => ({ ...c, email: e.target.value }))} placeholder="you@example.com" />
+          <Input
+            type="email"
+            value={emailForm.email}
+            onChange={(e) => setEmailForm((c) => ({ ...c, email: e.target.value }))}
+            placeholder="you@example.com"
+          />
         </FormField>
         <FormField label="Confirm with Password">
-          <Input type="password" value={emailForm.password} onChange={(e) => setEmailForm((c) => ({ ...c, password: e.target.value }))} />
+          <Input
+            type="password"
+            value={emailForm.password}
+            onChange={(e) => setEmailForm((c) => ({ ...c, password: e.target.value }))}
+          />
         </FormField>
         <MsgList msg={emailMsg} />
         <Button
           disabled={busyKey === 'email'}
-          onClick={() => void handlePatch('email', emailForm, setEmailMsg, () => {
-            setEmailForm({ email: '', password: '' })
-            setVerificationCode('')
-          })}
+          onClick={() =>
+            void handlePatch('email', emailForm, setEmailMsg, () => {
+              setEmailForm({ email: '', password: '' })
+              setVerificationCode('')
+            })
+          }
         >
           {busyKey === 'email' ? 'Updating...' : 'Start Email Update'}
         </Button>
@@ -190,11 +230,19 @@ export default function AccountTab({ user, busyKey, setBusyKey, handlePatch, syn
                 placeholder="000000"
                 inputMode="numeric"
                 maxLength={6}
-                style={{ letterSpacing: '0.35em', textAlign: 'center', fontSize: 22, maxWidth: 220 }}
+                style={{
+                  letterSpacing: '0.35em',
+                  textAlign: 'center',
+                  fontSize: 22,
+                  maxWidth: 220,
+                }}
               />
             </FormField>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              <Button disabled={busyKey === 'verify-email' || verificationCode.trim().length !== 6} onClick={handleVerifyEmail}>
+              <Button
+                disabled={busyKey === 'verify-email' || verificationCode.trim().length !== 6}
+                onClick={handleVerifyEmail}
+              >
                 {busyKey === 'verify-email' ? 'Verifying...' : 'Verify Email'}
               </Button>
               <Button
@@ -235,14 +283,18 @@ export default function AccountTab({ user, busyKey, setBusyKey, handlePatch, syn
             >
               <option value="">Select a reason</option>
               {DELETION_REASONS.map((reason) => (
-                <option key={reason.value} value={reason.value}>{reason.label}</option>
+                <option key={reason.value} value={reason.value}>
+                  {reason.label}
+                </option>
               ))}
             </select>
           </FormField>
           <FormField label="Additional details (optional)">
             <textarea
               value={deleteForm.details}
-              onChange={(e) => setDeleteForm((c) => ({ ...c, details: e.target.value.slice(0, 300) }))}
+              onChange={(e) =>
+                setDeleteForm((c) => ({ ...c, details: e.target.value.slice(0, 300) }))
+              }
               rows={4}
               style={{
                 width: '100%',
@@ -258,7 +310,11 @@ export default function AccountTab({ user, busyKey, setBusyKey, handlePatch, syn
             />
           </FormField>
           <FormField label="Confirm with Password">
-            <Input type="password" value={deleteForm.password} onChange={(e) => setDeleteForm((c) => ({ ...c, password: e.target.value }))} />
+            <Input
+              type="password"
+              value={deleteForm.password}
+              onChange={(e) => setDeleteForm((c) => ({ ...c, password: e.target.value }))}
+            />
           </FormField>
           <MsgList msg={deleteMsg} />
           <Button danger type="submit" disabled={busyKey === 'delete-account'}>

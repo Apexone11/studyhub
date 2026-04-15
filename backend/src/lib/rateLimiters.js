@@ -156,6 +156,32 @@ const authGoogleLimiter = rateLimit({
   message: { error: 'Too many Google sign-in attempts. Please try again later.' },
 })
 
+/**
+ * Google OAuth complete endpoint — 10 requests per hour per IP.
+ * Used after a pending Google signup picks a role. See
+ * docs/roles-and-permissions-plan.md §4.2.
+ */
+const googleCompleteLimiter = rateLimit({
+  windowMs: WINDOW_1_HOUR,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many signup completion attempts. Please try again later.' },
+})
+
+/**
+ * Role-change IP bucket — 10 writes per hour per IP. Sits on top of the
+ * per-user 3-changes-per-30-days DB rule enforced in users.controller.js.
+ * See docs/roles-and-permissions-plan.md §8.8.
+ */
+const roleChangeLimiter = rateLimit({
+  windowMs: WINDOW_1_HOUR,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many role-change attempts. Please try again later.' },
+})
+
 // ── CATEGORY: Feed Module ──────────────────────────────────────────────────
 
 /**
@@ -842,6 +868,8 @@ module.exports = {
   authForgotLimiter,
   authLogoutLimiter,
   authGoogleLimiter,
+  googleCompleteLimiter,
+  roleChangeLimiter,
 
   // Feed module
   feedReactLimiter,

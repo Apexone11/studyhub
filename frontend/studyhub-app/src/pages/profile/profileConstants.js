@@ -55,23 +55,36 @@ export const pillStyle = {
 
 /* ── Tab definitions ──────────────────────────────────────────────────── */
 export const OWN_TABS = [
-  { key: 'overview',     label: 'Overview' },
-  { key: 'study',        label: 'Study' },
-  { key: 'sheets',       label: 'Sheets' },
-  { key: 'posts',        label: 'Posts' },
+  { key: 'overview', label: 'Overview' },
+  { key: 'study', label: 'Study' },
+  { key: 'sheets', label: 'Sheets' },
+  { key: 'posts', label: 'Posts' },
+  { key: 'achievements', label: 'Achievements' },
+]
+
+export const OWN_TABS_SELF_LEARNER = [
+  { key: 'overview', label: 'Overview' },
+  { key: 'learning', label: 'My learning' },
+  { key: 'sheets', label: 'Sheets' },
+  { key: 'posts', label: 'Posts' },
   { key: 'achievements', label: 'Achievements' },
 ]
 
 export const OTHER_TABS = [
-  { key: 'overview',     label: 'Overview' },
-  { key: 'sheets',       label: 'Sheets' },
-  { key: 'posts',        label: 'Posts' },
+  { key: 'overview', label: 'Overview' },
+  { key: 'sheets', label: 'Sheets' },
+  { key: 'posts', label: 'Posts' },
   { key: 'achievements', label: 'Achievements' },
 ]
 
 export const DEFAULT_TAB = 'overview'
 
-export function isValidTab(tab, isOwn) {
-  const tabs = isOwn ? OWN_TABS : OTHER_TABS
+export function tabsForProfile({ isOwn, accountType }) {
+  if (!isOwn) return OTHER_TABS
+  return accountType === 'other' ? OWN_TABS_SELF_LEARNER : OWN_TABS
+}
+
+export function isValidTab(tab, isOwn, accountType) {
+  const tabs = tabsForProfile({ isOwn, accountType })
   return tabs.some((t) => t.key === tab)
 }

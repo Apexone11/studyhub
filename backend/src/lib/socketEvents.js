@@ -37,6 +37,9 @@ const SOCKET_EVENTS = {
   // Study group discussion events
   GROUP_DISCUSSION_NEW: 'group:discussion:new',
   GROUP_DISCUSSION_REPLY: 'group:discussion:reply',
+
+  // Account events (cross-device propagation)
+  USER_ROLE_CHANGED: 'user:roleChanged',
 }
 
 module.exports = SOCKET_EVENTS

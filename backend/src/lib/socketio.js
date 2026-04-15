@@ -306,6 +306,23 @@ function getOnlineUsers() {
 }
 
 /**
+ * Emit an event to every active socket in a user's personal room.
+ * Returns true on emission, false if Socket.io has not been initialised yet
+ * (e.g. during tests). Errors are swallowed and reported via Sentry so the
+ * caller doesn't have to wrap every emit in try/catch.
+ */
+function emitToUser(userId, event, payload) {
+  if (!io) return false
+  try {
+    io.to(`user:${userId}`).emit(event, payload)
+    return true
+  } catch (err) {
+    captureError(err, { where: 'emitToUser', userId, event })
+    return false
+  }
+}
+
+/**
  * Parse cookies from header string
  * @param {string} cookieHeader
  * @returns {object}
@@ -330,4 +347,5 @@ module.exports = {
   initSocketIO,
   getIO,
   getOnlineUsers,
+  emitToUser,
 }

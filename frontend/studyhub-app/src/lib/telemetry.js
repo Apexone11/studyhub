@@ -1,10 +1,6 @@
 import * as Sentry from '@sentry/react'
 import posthog from 'posthog-js'
-import {
-  CLARITY_PROJECT_ID,
-  GOOGLE_ADS_ID,
-  GOOGLE_ADS_SIGNUP_CONVERSION_LABEL,
-} from '../config'
+import { CLARITY_PROJECT_ID, GOOGLE_ADS_ID, GOOGLE_ADS_SIGNUP_CONVERSION_LABEL } from '../config'
 
 let posthogInitialized = false
 let sentryInitialized = false
@@ -27,9 +23,7 @@ function initClarity(projectId) {
     return
   }
 
-  const existingClarityScript = document.querySelector(
-    'script[src*="www.clarity.ms/tag/"]'
-  )
+  const existingClarityScript = document.querySelector('script[src*="www.clarity.ms/tag/"]')
 
   if (existingClarityScript) {
     clarityInitialized = true
@@ -63,7 +57,7 @@ function initGoogleAds(adsId) {
     }
 
   const existingAdsScript = document.querySelector(
-    `script[src="https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(adsId)}"]`
+    `script[src="https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(adsId)}"]`,
   )
 
   if (!existingAdsScript) {
@@ -82,16 +76,13 @@ export function initTelemetry() {
   // Telemetry must never crash the app — wrap each provider in try/catch
   try {
     const sentryDsn = import.meta.env.VITE_SENTRY_DSN
-    const sentryTraceRate = parseSampleRate(
-      import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE,
-      0.1
-    )
+    const sentryTraceRate = parseSampleRate(import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE, 0.1)
 
     if (sentryDsn && !sentryInitialized) {
       Sentry.init({
         dsn: sentryDsn,
         tracesSampleRate: sentryTraceRate,
-        environment: import.meta.env.MODE
+        environment: import.meta.env.MODE,
       })
 
       sentryInitialized = true
@@ -108,7 +99,7 @@ export function initTelemetry() {
         api_host: import.meta.env.VITE_POSTHOG_HOST || 'https://us.i.posthog.com',
         capture_pageview: false,
         persistence: 'localStorage',
-        person_profiles: 'identified_only'
+        person_profiles: 'identified_only',
       })
 
       posthogInitialized = true
@@ -117,8 +108,16 @@ export function initTelemetry() {
     console.warn('[telemetry] PostHog init failed:', err.message)
   }
 
-  try { initClarity(CLARITY_PROJECT_ID) } catch { /* best-effort */ }
-  try { initGoogleAds(GOOGLE_ADS_ID) } catch { /* best-effort */ }
+  try {
+    initClarity(CLARITY_PROJECT_ID)
+  } catch {
+    /* best-effort */
+  }
+  try {
+    initGoogleAds(GOOGLE_ADS_ID)
+  } catch {
+    /* best-effort */
+  }
 }
 
 export function trackPageView(pathname) {
@@ -134,7 +133,7 @@ export function trackPageView(pathname) {
     Sentry.addBreadcrumb({
       category: 'navigation',
       message: pathname,
-      level: 'info'
+      level: 'info',
     })
   }
 
@@ -148,16 +147,25 @@ export function identifyAuthenticatedUser(user) {
 
   const userId = user.id !== undefined && user.id !== null ? String(user.id) : undefined
   const username = typeof user.username === 'string' ? user.username : undefined
+  // Role-aware triage (docs/roles-and-permissions-plan.md §10.3/§10.4). Both
+  // axes are attached so funnels and Sentry searches can slice by either.
+  const accountType = typeof user.accountType === 'string' ? user.accountType : undefined
+  const role = typeof user.role === 'string' ? user.role : undefined
 
   if (posthogInitialized && userId) {
-    const traits = username ? { username } : undefined
-    posthog.identify(userId, traits)
+    const traits = {}
+    if (username) traits.username = username
+    if (accountType) traits.accountType = accountType
+    if (role) traits.role = role
+    posthog.identify(userId, Object.keys(traits).length ? traits : undefined)
   }
 
   if (sentryInitialized) {
     Sentry.setUser({
       id: userId,
-      username
+      username,
+      ...(accountType ? { accountType } : {}),
+      ...(role ? { role } : {}),
     })
   }
 }
@@ -230,10 +238,11 @@ export function captureComponentError(error, context = {}) {
   let eventId = ''
 
   if (sentryInitialized) {
-    eventId = Sentry.captureException(error, {
-      tags: { surface },
-      extra,
-    }) || ''
+    eventId =
+      Sentry.captureException(error, {
+        tags: { surface },
+        extra,
+      }) || ''
   }
 
   if (!eventId) {
@@ -248,10 +257,11 @@ export function captureRouteCrash(error, context = {}) {
   let eventId = ''
 
   if (sentryInitialized) {
-    eventId = Sentry.captureException(error, {
-      tags: { surface: 'route-error-boundary' },
-      extra: context,
-    }) || ''
+    eventId =
+      Sentry.captureException(error, {
+        tags: { surface: 'route-error-boundary' },
+        extra: context,
+      }) || ''
   }
 
   if (!eventId) {

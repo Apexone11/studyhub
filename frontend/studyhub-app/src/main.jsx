@@ -8,6 +8,13 @@ import { applyGlobalTheme } from './lib/appearance'
 import { initTelemetry, captureWebVital } from './lib/telemetry'
 import { reportWebVitals } from './lib/performance'
 import { startWebVitals } from './lib/webVitals'
+import { consumePendingRoleReload } from './lib/pendingRoleReload'
+
+try {
+  consumePendingRoleReload()
+} catch {
+  /* best-effort */
+}
 
 // Telemetry + fetch shim must never block React mount
 try {

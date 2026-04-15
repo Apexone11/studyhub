@@ -34,11 +34,17 @@ import { useFeedData } from './useFeedData'
 import { useRecentlyViewed } from '../../lib/useRecentlyViewed'
 import { useStudyStatusBatch } from '../../lib/useStudyStatus'
 import SchoolSuggestionBanner from './SchoolSuggestionBanner'
+import GoalTriageCard from './GoalTriageCard'
+import InterestChipRow from './InterestChipRow'
+import { roleCopy, isSelfLearner } from '../../lib/roleCopy'
+import { useRolesV2Flags } from '../../lib/rolesV2Flags'
 
 export default function FeedPage() {
   usePageTitle('Feed')
   const { user } = useSession()
   const layout = useResponsiveAppLayout()
+  const { core: rolesV2Core } = useRolesV2Flags()
+  const showSelfLearnerExtras = isSelfLearner(user?.accountType) && rolesV2Core
   const [searchParams, setSearchParams] = useSearchParams()
 
   const activeFilter = FILTERS.includes(searchParams.get('filter'))
@@ -178,6 +184,8 @@ export default function FeedPage() {
               style={{ display: 'grid', gap: 18 }}
             >
               <GettingStartedCard user={user} />
+              {showSelfLearnerExtras ? <GoalTriageCard /> : null}
+              {showSelfLearnerExtras ? <InterestChipRow /> : null}
               <SchoolSuggestionBanner user={user} />
               {showOnboardingBanner && (
                 <div
@@ -266,16 +274,8 @@ export default function FeedPage() {
               {activeFilter !== 'for-you' && (
                 <div data-tutorial="feed-composer">
                   <Panel
-                    title={
-                      user?.role === 'student'
-                        ? 'Share with your classmates'
-                        : 'Share with the community'
-                    }
-                    helper={
-                      user?.role === 'student'
-                        ? 'Post class notes, course questions, or links to your latest sheet.'
-                        : 'Post resources, updates, or links to your latest sheet.'
-                    }
+                    title={roleCopy('composerTitle', user?.accountType)}
+                    helper={roleCopy('composerHelper', user?.accountType)}
                   >
                     <FeedComposer user={user} onSubmitPost={submitPost} />
                   </Panel>
@@ -379,6 +379,7 @@ export default function FeedPage() {
                           : 'No feed items matched this filter.'
                       }
                       isFirstRun={feedState.items.length === 0 && !search}
+                      accountType={user?.accountType}
                     />
                   ) : (
                     <VirtualFeedList
@@ -407,6 +408,7 @@ export default function FeedPage() {
               leaderboards={leaderboards}
               starredUpdates={starredUpdates}
               recentlyViewed={recentlyViewed}
+              accountType={user?.accountType}
             />
           </div>
         </div>

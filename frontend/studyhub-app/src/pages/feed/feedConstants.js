@@ -10,6 +10,14 @@ export const COMPOSER_PROMPTS = [
   'Ask for help, share notes, or drop a helpful link…',
 ]
 
+export const COMPOSER_PROMPTS_SELF_LEARNER = [
+  'Share what you learned, mention people with @username, or link a great sheet…',
+  'What are you studying this week? Share a tip with the community…',
+  'Post a question, resource, or link for the community…',
+  'Found a great study sheet? Tag it with @username and share…',
+  'Ask for help, share notes, or drop a helpful link…',
+]
+
 /* ── Style objects ───────────────────────────────────────────────────── */
 export const commentSectionContainerStyle = {
   marginTop: 16,
