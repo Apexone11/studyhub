@@ -1,7 +1,7 @@
 const express = require('express')
 const requireAuth = require('../../middleware/auth')
 const optionalAuth = require('../../core/auth/optionalAuth')
-const { readLimiter, usersFollowLimiter } = require('../../lib/rateLimiters')
+const { readLimiter, usersFollowLimiter, roleChangeLimiter } = require('../../lib/rateLimiters')
 const usersController = require('./users.controller')
 
 const router = express.Router()
@@ -69,10 +69,18 @@ router.get('/me/follow-requests', requireAuth, usersController.getFollowRequests
 router.patch('/me/privacy', requireAuth, usersController.updatePrivacy)
 
 // ── PATCH /api/users/me/account-type ───────────────────────────
-router.patch('/me/account-type', requireAuth, usersController.requestAccountTypeChange)
+router.patch(
+  '/me/account-type',
+  requireAuth,
+  roleChangeLimiter,
+  usersController.requestAccountTypeChange,
+)
 
 // ── GET /api/users/me/account-type-status ──────────────────────
 router.get('/me/account-type-status', requireAuth, usersController.getAccountTypeStatus)
+
+// ── GET /api/users/me/role-status (docs §8.4 alias) ────────────
+router.get('/me/role-status', requireAuth, usersController.getAccountTypeStatus)
 
 // ── GET /api/users/me/learning-goal ────────────────────────────
 router.get('/me/learning-goal', requireAuth, usersController.getLearningGoal)

@@ -75,6 +75,7 @@ const plagiarismRoutes = require('./modules/plagiarism')
 const studyStatusRoutes = require('./modules/studyStatus')
 const onboardingRoutes = require('./modules/onboarding')
 const referralRoutes = require('./modules/referrals')
+const hashtagsRoutes = require('./modules/hashtags')
 const crypto = require('node:crypto')
 const log = require('./lib/logger')
 const { httpLogger } = require('./lib/httpLogger')
@@ -483,6 +484,7 @@ app.use('/api/onboarding', onboardingRoutes)
 
 // Referral system (invite, track, resolve, rewards).
 app.use('/api/referrals', referralRoutes)
+app.use('/api/hashtags', hashtagsRoutes)
 
 // Waitlist module (Phase 0 — confirmation email + in-app notification + admin endpoints)
 app.use('/api/waitlist', require('./modules/waitlist'))

@@ -7,6 +7,7 @@ Companion docs:
 - `docs/mobile-app-plan.md` — Android product spec.
 - `docs/mobile-security.md` — mobile security posture.
 - `docs/mobile-build-plan.md` — Android build waves.
+- `docs/scholar-plan.md` — Scholar (peer-reviewed article reader) respects this role model. Self-learners get topic-first shelves via `getBoostedIdsForUser(user)` returning hashtag IDs; students/teachers get course-first shelves.
 - `CLAUDE.md` — repo-wide conventions.
 
 ---

@@ -19,6 +19,7 @@ const WHITELIST_PATHS = [
   'lib/roleLabel.js',
   'pages/studyGroups/studyGroupsHelpers.js',
   'components/sidebar/AppSidebar.roleLabel.test.jsx',
+  'pages/auth/RolePickerPage.test.jsx',
 ]
 
 const ROLE_CONTEXT = /(accountType|role(?:Label)?)\b/

@@ -54,8 +54,12 @@ export function useSocket() {
         // err.data may contain { code, reason } from the server.
         const code = err?.data?.code || err?.code || ''
         const msg = err?.message || 'Connection failed'
-        const isAuthError = code === 'AUTH_REQUIRED' || msg === 'Auth required' || msg === 'Invalid token'
-        const isTransportError = code === 'TRANSPORT_ERROR' || msg.includes('xhr poll error') || msg.includes('websocket error')
+        const isAuthError =
+          code === 'AUTH_REQUIRED' || msg === 'Auth required' || msg === 'Invalid token'
+        const isTransportError =
+          code === 'TRANSPORT_ERROR' ||
+          msg.includes('xhr poll error') ||
+          msg.includes('websocket error')
 
         if (import.meta.env.DEV) {
           // Log raw error for diagnosis in development
@@ -80,6 +84,22 @@ export function useSocket() {
           next.delete(id)
           return next
         })
+      })
+
+      // Cross-device role-change reload (docs §8.7).
+      socketRef.current.on('user:roleChanged', () => {
+        try {
+          localStorage.setItem(
+            'pending_role_reload',
+            JSON.stringify({ targetRole: null, startedAt: Date.now() }),
+          )
+        } catch {
+          /* ignore */
+        }
+        // Defer so any in-flight UI updates settle before we replace the page.
+        window.setTimeout(() => {
+          window.location.reload()
+        }, 1500)
       })
 
       // Socket.io fires this after exhausting reconnection attempts

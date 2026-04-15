@@ -11,11 +11,12 @@ import { Panel } from './FeedWidgets'
 import UserAvatar from '../../components/UserAvatar'
 import useFetch from '../../lib/useFetch'
 import { API } from '../../config'
+import { isSelfLearner } from '../../lib/roleCopy'
 
-export default function FeedFollowSuggestions() {
+export default function FeedFollowSuggestions({ accountType } = {}) {
   const { data: suggestions, loading } = useFetch('/api/users/me/follow-suggestions', {
     initialData: [],
-    transform: (data) => Array.isArray(data) ? data : [],
+    transform: (data) => (Array.isArray(data) ? data : []),
     swr: 5 * 60 * 1000,
   })
   const [followingSet, setFollowingSet] = useState(new Set())
@@ -31,18 +32,29 @@ export default function FeedFollowSuggestions() {
       })
       if (!res.ok) {
         // Rollback on server error.
-        setFollowingSet((prev) => { const next = new Set(prev); next.delete(username); return next })
+        setFollowingSet((prev) => {
+          const next = new Set(prev)
+          next.delete(username)
+          return next
+        })
       }
     } catch {
       // Rollback on network error.
-      setFollowingSet((prev) => { const next = new Set(prev); next.delete(username); return next })
+      setFollowingSet((prev) => {
+        const next = new Set(prev)
+        next.delete(username)
+        return next
+      })
     }
   }, [])
 
   if (loading || suggestions.length === 0) return null
 
   return (
-    <Panel title="People to Follow" helper="Based on your courses">
+    <Panel
+      title="People to Follow"
+      helper={isSelfLearner(accountType) ? 'Based on topics you follow' : 'Based on your courses'}
+    >
       <div style={{ display: 'grid', gap: 8 }}>
         {suggestions.slice(0, 4).map((user) => {
           const isFollowed = followingSet.has(user.username)
@@ -50,11 +62,27 @@ export default function FeedFollowSuggestions() {
             <div key={user.id} style={rowStyle}>
               <Link
                 to={`/users/${user.username}`}
-                style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', flex: 1, minWidth: 0 }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  textDecoration: 'none',
+                  flex: 1,
+                  minWidth: 0,
+                }}
               >
                 <UserAvatar username={user.username} avatarUrl={user.avatarUrl} size={32} />
                 <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--sh-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: 'var(--sh-heading)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
                     {user.username}
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--sh-muted)' }}>
@@ -91,7 +119,14 @@ export default function FeedFollowSuggestions() {
       {suggestions.length > 4 && (
         <Link
           to={`/users/${suggestions[0]?.username || ''}`}
-          style={{ display: 'block', marginTop: 10, fontSize: 12, fontWeight: 700, color: 'var(--sh-brand)', textDecoration: 'none' }}
+          style={{
+            display: 'block',
+            marginTop: 10,
+            fontSize: 12,
+            fontWeight: 700,
+            color: 'var(--sh-brand)',
+            textDecoration: 'none',
+          }}
         >
           See more suggestions
         </Link>
@@ -109,4 +144,3 @@ const rowStyle = {
   background: 'var(--sh-soft)',
   border: '1px solid var(--sh-border)',
 }
-

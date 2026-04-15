@@ -1548,7 +1548,21 @@ The app is ready for closed beta when:
 - No emojis used as icons anywhere. Every icon is a `Icon*` export from `Icons.jsx`.
 - Security posture in `docs/mobile-security.md` is verified.
 - Build plan gates in `docs/mobile-build-plan.md` are met.
+- Scholar (peer-reviewed article reader) mobile parity deltas in `docs/scholar-plan.md` §12 are met: search entry via existing global search filter chip, no bottom-tab, reader opens in fullscreen sheet, offline-saved papers respected by data-saver mode.
 
 ---
+
+## 28. Scholar feature pointer
+
+Scholar is a cross-cutting feature (web + mobile) documented in full in `docs/scholar-plan.md`. Mobile inherits the same API surface, data model, and reader fallback chain. The only mobile-specific deltas are:
+
+- Entry points: search filter chip ("Scholar") and You tab "Saved papers" shelf. No new bottom-tab.
+- Reader opens in a fullscreen sheet with swipe-to-dismiss and system back button mapped to close.
+- PDF.js worker is loaded lazily when the reader opens (kept out of the app shell bundle).
+- Annotations respect offline-first patterns from §14 and sync via the standard outbox.
+- Data-saver mode (§14.6) downgrades the reader to metadata + abstract unless the paper is already cached.
+- Deep links: `studyhub://scholar/paper/:id` opens the reader; Universal Links mirror the web URL.
+
+Full spec, endpoint list, feature flags, and test plan live in `docs/scholar-plan.md`.
 
 End of product plan.

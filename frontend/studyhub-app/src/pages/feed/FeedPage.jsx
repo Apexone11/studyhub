@@ -35,6 +35,7 @@ import { useRecentlyViewed } from '../../lib/useRecentlyViewed'
 import { useStudyStatusBatch } from '../../lib/useStudyStatus'
 import SchoolSuggestionBanner from './SchoolSuggestionBanner'
 import GoalTriageCard from './GoalTriageCard'
+import InterestChipRow from './InterestChipRow'
 import { roleCopy, isSelfLearner } from '../../lib/roleCopy'
 
 export default function FeedPage() {
@@ -181,6 +182,7 @@ export default function FeedPage() {
             >
               <GettingStartedCard user={user} />
               {isSelfLearner(user?.accountType) ? <GoalTriageCard /> : null}
+              {isSelfLearner(user?.accountType) ? <InterestChipRow /> : null}
               <SchoolSuggestionBanner user={user} />
               {showOnboardingBanner && (
                 <div
@@ -403,6 +405,7 @@ export default function FeedPage() {
               leaderboards={leaderboards}
               starredUpdates={starredUpdates}
               recentlyViewed={recentlyViewed}
+              accountType={user?.accountType}
             />
           </div>
         </div>

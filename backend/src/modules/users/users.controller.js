@@ -1,5 +1,7 @@
 const { captureError } = require('../../monitoring/sentry')
 const { createNotification } = require('../../lib/notify')
+const { emitToUser } = require('../../lib/socketio')
+const SOCKET_EVENTS = require('../../lib/socketEvents')
 const { getProfileAccessDecision, PROFILE_VISIBILITY } = require('../../lib/profileVisibility')
 const { getUserPII } = require('../../lib/piiVault')
 const { buildProfilePresentation, getProfileFieldVisibility } = require('../../lib/profileMetadata')
@@ -1223,23 +1225,94 @@ async function setLearningGoal(req, res) {
   }
 }
 
-// ── Account type change with 7-day cooldown ──────────────────────
+// ── Account type change: 2-day revert + 3 changes/30 days rate cap ──────────
+// See docs/roles-and-permissions-plan.md §8.
 
 const VALID_ACCOUNT_TYPES = ['student', 'teacher', 'other']
-const ACCOUNT_TYPE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
+const DAY_MS = 24 * 60 * 60 * 1000
+const REVERT_WINDOW_MS = 2 * DAY_MS
+const RATE_CAP_WINDOW_MS = 30 * DAY_MS
+const RATE_CAP_MAX_CHANGES = 3
+
+async function countRecentNonRevertChanges(userId, since) {
+  return prisma.roleChangeLog.count({
+    where: {
+      userId,
+      wasRevert: false,
+      changedAt: { gte: since },
+    },
+  })
+}
+
+async function archiveEnrollments(tx, userId) {
+  const enrollments = await tx.enrollment.findMany({
+    where: { userId },
+    select: { id: true, courseId: true },
+  })
+  if (enrollments.length === 0) return 0
+  await tx.userEnrollmentArchive.createMany({
+    data: enrollments.map((e) => ({
+      userId,
+      courseId: e.courseId,
+      reason: 'role_change',
+    })),
+  })
+  await tx.enrollment.deleteMany({ where: { userId } })
+  return enrollments.length
+}
+
+async function restoreEnrollments(tx, userId) {
+  const archived = await tx.userEnrollmentArchive.findMany({
+    where: { userId, reason: 'role_change' },
+    orderBy: { archivedAt: 'desc' },
+  })
+  if (archived.length === 0) return { restored: 0, missing: 0 }
+  const courseIds = [...new Set(archived.map((a) => a.courseId))]
+  const existingCourses = await tx.course.findMany({
+    where: { id: { in: courseIds } },
+    select: { id: true },
+  })
+  const existingIds = new Set(existingCourses.map((c) => c.id))
+  const restorable = archived.filter((a) => existingIds.has(a.courseId))
+  if (restorable.length > 0) {
+    await tx.enrollment.createMany({
+      data: restorable.map((a) => ({ userId, courseId: a.courseId })),
+      skipDuplicates: true,
+    })
+  }
+  // Clear archive rows we've just consumed.
+  await tx.userEnrollmentArchive.deleteMany({
+    where: { userId, reason: 'role_change' },
+  })
+  return {
+    restored: restorable.length,
+    missing: archived.length - restorable.length,
+  }
+}
+
+function isInRevertWindow(user) {
+  return Boolean(
+    user?.roleRevertDeadline && new Date(user.roleRevertDeadline).getTime() > Date.now(),
+  )
+}
 
 async function requestAccountTypeChange(req, res) {
   try {
-    const { accountType } = req.body || {}
+    const { accountType, reason } = req.body || {}
     if (!accountType || !VALID_ACCOUNT_TYPES.includes(accountType)) {
-      return res
-        .status(400)
-        .json({ error: `Account type must be one of: ${VALID_ACCOUNT_TYPES.join(', ')}` })
+      return res.status(400).json({
+        error: `Account type must be one of: ${VALID_ACCOUNT_TYPES.join(', ')}`,
+      })
     }
 
+    const userId = req.user.userId
     const user = await prisma.user.findUnique({
-      where: { id: req.user.userId },
-      select: { accountType: true, pendingAccountType: true, accountTypeChangedAt: true },
+      where: { id: userId },
+      select: {
+        accountType: true,
+        previousAccountType: true,
+        roleRevertDeadline: true,
+      },
     })
     if (!user) return res.status(404).json({ error: 'User not found.' })
 
@@ -1247,36 +1320,104 @@ async function requestAccountTypeChange(req, res) {
       return res.status(400).json({ error: 'You already have this account type.' })
     }
 
-    // Check cooldown: if changed within last 7 days, reject
-    if (user.accountTypeChangedAt) {
-      const elapsed = Date.now() - new Date(user.accountTypeChangedAt).getTime()
-      if (elapsed < ACCOUNT_TYPE_COOLDOWN_MS) {
-        const remainingMs = ACCOUNT_TYPE_COOLDOWN_MS - elapsed
-        const remainingDays = Math.ceil(remainingMs / (24 * 60 * 60 * 1000))
-        return res.status(429).json({
-          error: `You can only change your account type once every 7 days. Please wait ${remainingDays} more day${remainingDays === 1 ? '' : 's'}.`,
-          cooldownEndsAt: new Date(
-            new Date(user.accountTypeChangedAt).getTime() + ACCOUNT_TYPE_COOLDOWN_MS,
-          ).toISOString(),
+    const inRevert = isInRevertWindow(user)
+    const isRevert = inRevert && accountType === user.previousAccountType
+
+    // Forward changes (not reverts) count toward the 30-day rate cap.
+    if (!isRevert) {
+      const since = new Date(Date.now() - RATE_CAP_WINDOW_MS)
+      const used = await countRecentNonRevertChanges(userId, since)
+      if (used >= RATE_CAP_MAX_CHANGES) {
+        const oldestWithinWindow = await prisma.roleChangeLog.findFirst({
+          where: { userId, wasRevert: false, changedAt: { gte: since } },
+          orderBy: { changedAt: 'asc' },
+          select: { changedAt: true },
+        })
+        const retryAfter = oldestWithinWindow
+          ? new Date(oldestWithinWindow.changedAt.getTime() + RATE_CAP_WINDOW_MS).toISOString()
+          : null
+        return res.status(409).json({
+          error: `You can only change your role ${RATE_CAP_MAX_CHANGES} times every 30 days.`,
+          code: 'COOLDOWN',
+          retryAfter,
         })
       }
     }
 
-    // Set the pending type and schedule the change
-    const changeAt = new Date(Date.now() + ACCOUNT_TYPE_COOLDOWN_MS)
+    const now = new Date()
+    const ip = req.ip || null
+    const userAgent = (req.get && req.get('user-agent')) || null
+    let archivedEnrollmentCount = 0
+    let restoredInfo = { restored: 0, missing: 0 }
+    let nextState
 
-    await prisma.user.update({
-      where: { id: req.user.userId },
-      data: {
-        pendingAccountType: accountType,
-        accountTypeChangedAt: new Date(), // marks when the request was made
-      },
+    await prisma.$transaction(async (tx) => {
+      if (isRevert) {
+        restoredInfo = await restoreEnrollments(tx, userId)
+        nextState = await tx.user.update({
+          where: { id: userId },
+          data: {
+            accountType,
+            previousAccountType: null,
+            roleRevertDeadline: null,
+            accountTypeChangedAt: now,
+          },
+          select: {
+            accountType: true,
+            previousAccountType: true,
+            roleRevertDeadline: true,
+          },
+        })
+      } else {
+        archivedEnrollmentCount = await archiveEnrollments(tx, userId)
+        nextState = await tx.user.update({
+          where: { id: userId },
+          data: {
+            accountType,
+            previousAccountType: user.accountType,
+            roleRevertDeadline: new Date(now.getTime() + REVERT_WINDOW_MS),
+            pendingAccountType: null,
+            accountTypeChangedAt: now,
+          },
+          select: {
+            accountType: true,
+            previousAccountType: true,
+            roleRevertDeadline: true,
+          },
+        })
+      }
+
+      await tx.roleChangeLog.create({
+        data: {
+          userId,
+          fromAccountType: user.accountType,
+          toAccountType: accountType,
+          reason: typeof reason === 'string' && reason ? reason.slice(0, 500) : null,
+          wasRevert: isRevert,
+          ip,
+          userAgent,
+          changedAt: now,
+        },
+      })
     })
 
-    res.json({
-      message: `Account type change to "${accountType}" requested. It will take effect in 7 days.`,
-      pendingAccountType: accountType,
-      effectiveAt: changeAt.toISOString(),
+    emitToUser(userId, SOCKET_EVENTS.USER_ROLE_CHANGED, {
+      accountType: nextState.accountType,
+      previousAccountType: nextState.previousAccountType,
+      roleRevertDeadline: nextState.roleRevertDeadline,
+      wasRevert: isRevert,
+      changedAt: now.toISOString(),
+    })
+
+    return res.json({
+      accountType: nextState.accountType,
+      previousAccountType: nextState.previousAccountType,
+      roleRevertDeadline: nextState.roleRevertDeadline,
+      wasRevert: isRevert,
+      archivedEnrollmentCount,
+      restoredEnrollmentCount: restoredInfo.restored,
+      unavailableCourseCount: restoredInfo.missing,
+      needsReload: true,
     })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
@@ -1286,52 +1427,40 @@ async function requestAccountTypeChange(req, res) {
 
 async function getAccountTypeStatus(req, res) {
   try {
+    const userId = req.user.userId
     const user = await prisma.user.findUnique({
-      where: { id: req.user.userId },
-      select: { accountType: true, pendingAccountType: true, accountTypeChangedAt: true },
+      where: { id: userId },
+      select: {
+        accountType: true,
+        previousAccountType: true,
+        roleRevertDeadline: true,
+        accountTypeChangedAt: true,
+      },
     })
     if (!user) return res.status(404).json({ error: 'User not found.' })
 
-    // Check if pending change should be applied
-    if (user.pendingAccountType && user.accountTypeChangedAt) {
-      const elapsed = Date.now() - new Date(user.accountTypeChangedAt).getTime()
-      if (elapsed >= ACCOUNT_TYPE_COOLDOWN_MS) {
-        // Apply the change
-        const updated = await prisma.user.update({
-          where: { id: req.user.userId },
-          data: {
-            accountType: user.pendingAccountType,
-            pendingAccountType: null,
-          },
-          select: { accountType: true, pendingAccountType: true, accountTypeChangedAt: true },
-        })
-        return res.json({
-          accountType: updated.accountType,
-          pendingAccountType: null,
-          effectiveAt: null,
-          cooldownEndsAt: updated.accountTypeChangedAt
-            ? new Date(
-                new Date(updated.accountTypeChangedAt).getTime() + ACCOUNT_TYPE_COOLDOWN_MS,
-              ).toISOString()
-            : null,
-        })
-      }
+    // Expire stale revert windows so the client doesn't see fake state.
+    let previousAccountType = user.previousAccountType
+    let roleRevertDeadline = user.roleRevertDeadline
+    if (roleRevertDeadline && new Date(roleRevertDeadline).getTime() <= Date.now()) {
+      await prisma.user.update({
+        where: { id: userId },
+        data: { roleRevertDeadline: null, previousAccountType: null },
+      })
+      previousAccountType = null
+      roleRevertDeadline = null
     }
 
-    res.json({
+    const since = new Date(Date.now() - RATE_CAP_WINDOW_MS)
+    const used = await countRecentNonRevertChanges(userId, since)
+
+    return res.json({
       accountType: user.accountType,
-      pendingAccountType: user.pendingAccountType || null,
-      effectiveAt:
-        user.pendingAccountType && user.accountTypeChangedAt
-          ? new Date(
-              new Date(user.accountTypeChangedAt).getTime() + ACCOUNT_TYPE_COOLDOWN_MS,
-            ).toISOString()
-          : null,
-      cooldownEndsAt: user.accountTypeChangedAt
-        ? new Date(
-            new Date(user.accountTypeChangedAt).getTime() + ACCOUNT_TYPE_COOLDOWN_MS,
-          ).toISOString()
-        : null,
+      previousAccountType,
+      roleRevertDeadline,
+      changedAt: user.accountTypeChangedAt,
+      changesUsedLast30Days: used,
+      changesRemainingLast30Days: Math.max(0, RATE_CAP_MAX_CHANGES - used),
     })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })

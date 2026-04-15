@@ -722,4 +722,21 @@ The most important threats and our primary mitigations:
 
 ---
 
+## 18. Scholar feature security posture
+
+Scholar (see `docs/scholar-plan.md`) fetches from external academic APIs and renders PDFs/HTML. New attack surface requires the following controls:
+
+- External API keys (Semantic Scholar, CORE, Unpaywall, PubMed, Google Books) live in Railway environment variables only. Never shipped to the mobile or web bundle. All calls proxy through `backend/src/modules/scholar/`.
+- Per-source rate limiters (`scholarSearchLimiter`, `scholarFetchLimiter`, `scholarSaveLimiter`, `scholarAnnotationLimiter`) + circuit breakers on each adapter.
+- Cached PDFs in R2 are OA-license-gated. Backend refuses to cache any paper whose license is not in the allowlist (`cc-by`, `cc-by-sa`, `cc0`, `public-domain`, `arxiv-nonexclusive`). License decision is logged per paper.
+- Cached objects served via short-lived signed URLs (5 minutes). URLs never include user identifiers.
+- External PDFs that cannot be cached are loaded inside a sandboxed iframe (`sandbox="allow-scripts allow-same-origin"` limited to the PDF.js viewer origin) — raw third-party PDFs are never rendered directly in the app DOM.
+- PDF.js worker is served from the same origin (no CDN) to maintain CSP `worker-src 'self'`.
+- HTML readers (arXiv HTML5, PMC HTML) pass through the existing HTML scan pipeline (§6) before render. Tier 2+ content is blocked from the reader, not quarantined (papers are not user-submitted content).
+- Scholar annotations are private by default. Public-sharing requires explicit user action and goes through the same moderation queue as other user content.
+- AI integration (summarize, generate-sheet) uses the same `ANTHROPIC_API_KEY` and rate limits as Hub AI. Paper text passed to the model is truncated to 8000 tokens and stripped of inline JavaScript, base64 images, and tracking pixels before upload.
+- Deep links into Scholar (`studyhub://scholar/paper/:id`) follow the same validation as §3.4 (origin check, paper id whitelist match `^[A-Za-z0-9:._-]+$`).
+
+---
+
 End of security posture document.

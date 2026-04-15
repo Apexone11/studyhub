@@ -366,6 +366,7 @@ These are prerequisites before Wave 1 begins.
   - [ ] Focus mode / study timer.
   - [ ] Live study rooms (if retention signals justify infra cost).
   - [ ] Polls inside group chats.
+  - [ ] Scholar (peer-reviewed article reader) — web first, mobile parity in same wave. Build waves A–E in `docs/scholar-plan.md` §16: backend module + 5-tier API chain, reader fallback chain, annotations, AI summarize/sheet-gen, claim check. Feature-flagged behind `flag_scholar`.
 - [ ] Localization infrastructure:
   - [ ] `i18next` setup.
   - [ ] Extract hardcoded English strings to `src/i18n/en.json`.
