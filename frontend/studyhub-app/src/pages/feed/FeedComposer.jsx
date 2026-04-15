@@ -22,8 +22,47 @@ if (typeof document !== 'undefined' && !document.getElementById('sh-spin-kf')) {
   document.head.appendChild(style)
 }
 
+// Draft sync (docs/roles-and-permissions-plan.md §11). A role change triggers
+// window.location.reload(), which wipes React state. Persisting composer text
+// to localStorage keyed by user ID lets us rehydrate on remount so the user
+// does not lose what they were typing. Storage is scoped per user so two
+// accounts on the same browser don't leak drafts to each other.
+const DRAFT_KEY_PREFIX = 'studyhub.feed.composer.draft.'
+
+function draftKeyFor(user) {
+  const id = user?.id
+  return id ? `${DRAFT_KEY_PREFIX}${id}` : null
+}
+
+function readDraft(user) {
+  const key = draftKeyFor(user)
+  if (!key) return ''
+  try {
+    return localStorage.getItem(key) || ''
+  } catch {
+    return ''
+  }
+}
+
+function writeDraft(user, content) {
+  const key = draftKeyFor(user)
+  if (!key) return
+  try {
+    if (content && content.trim()) {
+      localStorage.setItem(key, content)
+    } else {
+      localStorage.removeItem(key)
+    }
+  } catch {
+    /* best-effort */
+  }
+}
+
 export default function FeedComposer({ user, onSubmitPost }) {
-  const [composer, setComposer] = useState({ content: '', courseId: '' })
+  const [composer, setComposer] = useState(() => ({
+    content: readDraft(user),
+    courseId: '',
+  }))
   const [composeState, setComposeState] = useState({ saving: false, error: '' })
   const [attachedFile, setAttachedFile] = useState(null)
   const [showVideoUploader, setShowVideoUploader] = useState(false)
@@ -32,6 +71,12 @@ export default function FeedComposer({ user, onSubmitPost }) {
   const [videoReady, setVideoReady] = useState(false)
   const [videoFailed, setVideoFailed] = useState(false)
   const fileInputRef = useRef(null)
+
+  // Persist composer text on every change so a role-change reload (docs §11)
+  // or accidental navigation doesn't lose the draft.
+  useEffect(() => {
+    writeDraft(user, composer.content)
+  }, [user, composer.content])
 
   // Poll video status every 3 seconds while processing
   useEffect(() => {
@@ -75,6 +120,7 @@ export default function FeedComposer({ user, onSubmitPost }) {
         attachedFile,
         videoId: pendingVideoId || null,
       })
+      writeDraft(user, '')
       setComposer({ content: '', courseId: '' })
       setAttachedFile(null)
       setPendingVideoId(null)
