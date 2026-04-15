@@ -17,6 +17,12 @@ import EditorToolbar from '../../components/editor/EditorToolbar'
 import { PAGE_FONT } from '../shared/pageUtils'
 import NoteVersionHistory from './NoteVersionHistory'
 import NoteTagsInput from './NoteTagsInput'
+import { useNotePersistence } from './useNotePersistence.js'
+import NoteSaveStatus from './NoteSaveStatus.jsx'
+import NoteConflictBanner from './NoteConflictBanner.jsx'
+import ConflictCompareModal from './ConflictCompareModal.jsx'
+import { sanitizePastedHtml } from './notePaste.js'
+import { useNotesHardeningEnabled } from './useNotesHardeningFlag.js'
 import '../../components/editor/richTextEditor.css'
 
 function getNoteTags(tagsValue) {
@@ -75,15 +81,21 @@ function htmlWordCount(html) {
  * NoteRichEditor — TipTap wrapper with theme-aware note styling
  * and backward-compatible markdown-to-HTML conversion
  * ═══════════════════════════════════════════════════════════════ */
-function NoteRichEditor({ content, onUpdate, noteId }) {
+function NoteRichEditor({ content, onUpdate, noteId, sanitizePaste }) {
   const onUpdateRef = useRef(onUpdate)
-  useEffect(() => { onUpdateRef.current = onUpdate })
+  useEffect(() => {
+    onUpdateRef.current = onUpdate
+  })
+  const sanitizePasteRef = useRef(sanitizePaste)
+  useEffect(() => {
+    sanitizePasteRef.current = sanitizePaste
+  })
 
   // Convert markdown on first load per note
   const initialContent = useMemo(() => {
     if (isMarkdown(content)) return markdownToHtml(content)
     return content || ''
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [noteId])
 
   const editor = useEditor({
@@ -127,7 +139,7 @@ function NoteRichEditor({ content, onUpdate, noteId }) {
     onUpdate: ({ editor: ed }) => {
       const html = ed.getHTML()
       // Treat empty editor as empty string
-      const cleaned = (!html || html === '<p></p>') ? '' : html
+      const cleaned = !html || html === '<p></p>' ? '' : html
       onUpdateRef.current?.(cleaned)
     },
     editorProps: {
@@ -138,6 +150,16 @@ function NoteRichEditor({ content, onUpdate, noteId }) {
         'aria-label': 'Note content editor',
       },
       handlePaste: () => false, // Allow default TipTap paste — sanitized on save
+      transformPastedHTML: (html) => {
+        const fn = sanitizePasteRef.current
+        if (typeof fn !== 'function') return html
+        try {
+          const out = fn(html)
+          return typeof out === 'string' ? out : html
+        } catch {
+          return html
+        }
+      },
     },
   })
 
@@ -147,7 +169,7 @@ function NoteRichEditor({ content, onUpdate, noteId }) {
     if (!editor) return
     if (noteId !== lastNoteId.current) {
       lastNoteId.current = noteId
-      const htmlContent = isMarkdown(content) ? markdownToHtml(content) : (content || '')
+      const htmlContent = isMarkdown(content) ? markdownToHtml(content) : content || ''
       editor.commands.setContent(htmlContent, false)
     }
   }, [noteId, content, editor])
@@ -170,34 +192,38 @@ function NoteRichEditor({ content, onUpdate, noteId }) {
       </div>
 
       {/* Editor content area */}
-      <div style={{
-        flex: 1,
-        minHeight: 300,
-        overflow: 'auto',
-        background: 'var(--sh-surface)',
-      }}>
-        <EditorContent
-          editor={editor}
-          style={{ height: '100%' }}
-        />
+      <div
+        style={{
+          flex: 1,
+          minHeight: 300,
+          overflow: 'auto',
+          background: 'var(--sh-surface)',
+        }}
+      >
+        <EditorContent editor={editor} style={{ height: '100%' }} />
       </div>
 
       {/* Word count footer */}
-      <div style={{
-        display: 'flex', justifyContent: 'flex-end',
-        padding: '6px 14px',
-        borderTop: '1px solid var(--sh-border)',
-        background: 'var(--sh-soft)',
-      }}>
-        <span style={{
-          fontSize: 11,
-          color: 'var(--sh-subtext)',
-          fontWeight: 600,
-          padding: '2px 8px',
-          background: 'var(--sh-surface)',
-          borderRadius: 6,
-          border: '1px solid var(--sh-border)',
-        }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'flex-end',
+          padding: '6px 14px',
+          borderTop: '1px solid var(--sh-border)',
+          background: 'var(--sh-soft)',
+        }}
+      >
+        <span
+          style={{
+            fontSize: 11,
+            color: 'var(--sh-subtext)',
+            fontWeight: 600,
+            padding: '2px 8px',
+            background: 'var(--sh-surface)',
+            borderRadius: 6,
+            border: '1px solid var(--sh-border)',
+          }}
+        >
           {htmlWordCount(editor?.getHTML?.() || '')} words
         </span>
       </div>
@@ -233,14 +259,87 @@ export default function NoteEditor({
   layout,
 }) {
   const [showVersions, setShowVersions] = useState(false)
+  const hardeningEnabled = useNotesHardeningEnabled()
+  // Always call the hook (rules-of-hooks); short-circuits internally when noteId is null.
+  const persistence = useNotePersistence(hardeningEnabled ? (activeNote?.id ?? null) : null)
+  const [showConflictDiff, setShowConflictDiff] = useState(false)
+
+  // Keep refs to latest title/content so persistence callbacks see fresh values.
+  const latestTitleRef = useRef(editorTitle ?? '')
+  const latestContentRef = useRef(editorContent ?? '')
+  useEffect(() => {
+    latestTitleRef.current = editorTitle ?? ''
+  }, [editorTitle])
+  useEffect(() => {
+    latestContentRef.current = editorContent ?? ''
+  }, [editorContent])
+
+  const wrappedTitleChange = (value) => {
+    handleTitleChange?.(value)
+    if (hardeningEnabled && activeNote?.id) {
+      latestTitleRef.current = value ?? ''
+      persistence.onEditorChange(value ?? '', latestContentRef.current ?? '')
+    }
+  }
+
+  const wrappedContentChange = (html) => {
+    handleContentChange?.(html)
+    if (hardeningEnabled && activeNote?.id) {
+      latestContentRef.current = html ?? ''
+      persistence.onEditorChange(latestTitleRef.current ?? '', html ?? '')
+    }
+  }
+
+  // Ctrl/Cmd+S -> manual save (or open conflict diff if conflicted)
+  useEffect(() => {
+    if (!hardeningEnabled) return undefined
+    const onKey = (e) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault()
+        if (persistence.state?.status === 'conflict') setShowConflictDiff(true)
+        else persistence.saveNow?.('manual')
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [hardeningEnabled, persistence])
 
   if (!activeNote) {
     /* Empty state when no note selected (desktop only) */
     if (layout.isPhone) return null
     return (
-      <div style={{ background: 'var(--sh-surface)', borderRadius: 16, border: '2px dashed var(--sh-border)', padding: '64px 24px', textAlign: 'center' }}>
-        <div style={{ width: 64, height: 64, borderRadius: 16, background: 'linear-gradient(135deg, var(--sh-brand-bg, #eff6ff), var(--sh-soft))', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16, color: 'var(--sh-brand)' }}>
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <div
+        style={{
+          background: 'var(--sh-surface)',
+          borderRadius: 16,
+          border: '2px dashed var(--sh-border)',
+          padding: '64px 24px',
+          textAlign: 'center',
+        }}
+      >
+        <div
+          style={{
+            width: 64,
+            height: 64,
+            borderRadius: 16,
+            background: 'linear-gradient(135deg, var(--sh-brand-bg, #eff6ff), var(--sh-soft))',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: 16,
+            color: 'var(--sh-brand)',
+          }}
+        >
+          <svg
+            width="28"
+            height="28"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
           </svg>
@@ -258,57 +357,127 @@ export default function NoteEditor({
   }
 
   return (
-    <div>
+    <div data-testid="note-editor">
       {/* Back button (phone only) */}
       {layout.isPhone && (
         <button
           onClick={() => setActiveNote(null)}
           aria-label="Back to notes list"
-          style={{ background: 'none', border: 'none', color: 'var(--sh-brand)', fontSize: 13, cursor: 'pointer', fontFamily: PAGE_FONT, marginBottom: 12, padding: 0, display: 'flex', alignItems: 'center', gap: 5, fontWeight: 600 }}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: 'var(--sh-brand)',
+            fontSize: 13,
+            cursor: 'pointer',
+            fontFamily: PAGE_FONT,
+            marginBottom: 12,
+            padding: 0,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 5,
+            fontWeight: 600,
+          }}
         >
           &larr; All Notes
         </button>
       )}
 
       {/* Title bar with metadata controls */}
-      <div style={{
-        background: 'var(--sh-surface)', borderRadius: 14, border: '1px solid var(--sh-border)',
-        padding: '14px 18px', marginBottom: 10,
-        display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap',
-      }}>
+      <div
+        style={{
+          background: 'var(--sh-surface)',
+          borderRadius: 14,
+          border: '1px solid var(--sh-border)',
+          padding: '14px 18px',
+          marginBottom: 10,
+          display: 'flex',
+          gap: 12,
+          alignItems: 'center',
+          flexWrap: 'wrap',
+        }}
+      >
         <input
           value={editorTitle}
-          onChange={(e) => handleTitleChange(e.target.value)}
+          onChange={(e) => wrappedTitleChange(e.target.value)}
           placeholder="Note title..."
-          style={{ flex: '1 1 200px', border: 'none', outline: 'none', fontSize: 18, fontWeight: 800, color: 'var(--sh-heading)', fontFamily: PAGE_FONT, minWidth: 120, background: 'transparent' }}
+          style={{
+            flex: '1 1 200px',
+            border: 'none',
+            outline: 'none',
+            fontSize: 18,
+            fontWeight: 800,
+            color: 'var(--sh-heading)',
+            fontFamily: PAGE_FONT,
+            minWidth: 120,
+            background: 'transparent',
+          }}
         />
         <select
           value={editorCourseId}
           onChange={(e) => handleCourseChange(e.target.value)}
-          style={{ border: '1px solid var(--sh-border)', borderRadius: 8, padding: '6px 10px', fontSize: 12, fontFamily: PAGE_FONT, color: 'var(--sh-muted)', outline: 'none', background: 'var(--sh-surface)' }}
+          style={{
+            border: '1px solid var(--sh-border)',
+            borderRadius: 8,
+            padding: '6px 10px',
+            fontSize: 12,
+            fontFamily: PAGE_FONT,
+            color: 'var(--sh-muted)',
+            outline: 'none',
+            background: 'var(--sh-surface)',
+          }}
         >
           <option value="">No course</option>
-          {courses.map((c) => <option key={c.id} value={String(c.id)}>{c.code}</option>)}
+          {courses.map((c) => (
+            <option key={c.id} value={String(c.id)}>
+              {c.code}
+            </option>
+          ))}
         </select>
-        <label style={{
-          display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer',
-          padding: '4px 10px', borderRadius: 8,
-          background: editorPrivate ? 'var(--sh-soft)' : 'var(--sh-success-bg)',
-          color: editorPrivate ? 'var(--sh-muted)' : 'var(--sh-success-text)',
-          fontWeight: 600, transition: 'all .15s',
-        }}>
-          <input type="checkbox" checked={editorPrivate} onChange={(e) => handlePrivateChange(e.target.checked)} style={{ accentColor: 'var(--sh-brand)' }} />
+        <label
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            fontSize: 12,
+            cursor: 'pointer',
+            padding: '4px 10px',
+            borderRadius: 8,
+            background: editorPrivate ? 'var(--sh-soft)' : 'var(--sh-success-bg)',
+            color: editorPrivate ? 'var(--sh-muted)' : 'var(--sh-success-text)',
+            fontWeight: 600,
+            transition: 'all .15s',
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={editorPrivate}
+            onChange={(e) => handlePrivateChange(e.target.checked)}
+            style={{ accentColor: 'var(--sh-brand)' }}
+          />
           {editorPrivate ? 'Private' : 'Shared'}
         </label>
         {!editorPrivate && (
-          <label style={{
-            display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer',
-            padding: '4px 10px', borderRadius: 8,
-            background: editorAllowDownloads ? 'var(--sh-info-bg, #dbeafe)' : 'var(--sh-soft)',
-            color: editorAllowDownloads ? 'var(--sh-info-text, #2563eb)' : 'var(--sh-muted)',
-            fontWeight: 600, transition: 'all .15s',
-          }}>
-            <input type="checkbox" checked={editorAllowDownloads || false} onChange={(e) => handleAllowDownloadsChange(e.target.checked)} style={{ accentColor: 'var(--sh-brand)' }} />
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              fontSize: 12,
+              cursor: 'pointer',
+              padding: '4px 10px',
+              borderRadius: 8,
+              background: editorAllowDownloads ? 'var(--sh-info-bg, #dbeafe)' : 'var(--sh-soft)',
+              color: editorAllowDownloads ? 'var(--sh-info-text, #2563eb)' : 'var(--sh-muted)',
+              fontWeight: 600,
+              transition: 'all .15s',
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={editorAllowDownloads || false}
+              onChange={(e) => handleAllowDownloadsChange(e.target.checked)}
+              style={{ accentColor: 'var(--sh-brand)' }}
+            />
             Downloads
           </label>
         )}
@@ -318,9 +487,16 @@ export default function NoteEditor({
           title={activeNote._starred ? 'Unstar note' : 'Star note'}
           aria-label={activeNote._starred ? 'Unstar note' : 'Star note'}
           style={{
-            background: 'none', border: 'none', cursor: 'pointer', padding: '4px 6px',
-            fontSize: 11, lineHeight: 1, fontWeight: 600, color: activeNote._starred ? 'var(--sh-warning-text, #f59e0b)' : 'var(--sh-muted)',
-            transition: 'color .15s', fontFamily: PAGE_FONT,
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            padding: '4px 6px',
+            fontSize: 11,
+            lineHeight: 1,
+            fontWeight: 600,
+            color: activeNote._starred ? 'var(--sh-warning-text, #f59e0b)' : 'var(--sh-muted)',
+            transition: 'color .15s',
+            fontFamily: PAGE_FONT,
           }}
         >
           {activeNote._starred ? 'Starred' : 'Star'}
@@ -333,8 +509,12 @@ export default function NoteEditor({
           style={{
             background: activeNote.pinned ? 'var(--sh-brand-soft, #eff6ff)' : 'none',
             border: activeNote.pinned ? '1px solid var(--sh-brand)' : '1px solid transparent',
-            borderRadius: 6, cursor: 'pointer', padding: '3px 8px',
-            fontSize: 11, fontWeight: 600, fontFamily: PAGE_FONT,
+            borderRadius: 6,
+            cursor: 'pointer',
+            padding: '3px 8px',
+            fontSize: 11,
+            fontWeight: 600,
+            fontFamily: PAGE_FONT,
             color: activeNote.pinned ? 'var(--sh-brand)' : 'var(--sh-muted)',
             transition: 'all .15s',
           }}
@@ -347,26 +527,73 @@ export default function NoteEditor({
           title="Version history"
           aria-label="Show version history"
           style={{
-            background: 'none', border: '1px solid var(--sh-border)', borderRadius: 6,
-            cursor: 'pointer', padding: '3px 8px', fontSize: 11, fontWeight: 600,
-            fontFamily: PAGE_FONT, color: 'var(--sh-muted)', transition: 'all .15s',
+            background: 'none',
+            border: '1px solid var(--sh-border)',
+            borderRadius: 6,
+            cursor: 'pointer',
+            padding: '3px 8px',
+            fontSize: 11,
+            fontWeight: 600,
+            fontFamily: PAGE_FONT,
+            color: 'var(--sh-muted)',
+            transition: 'all .15s',
           }}
         >
           History
         </button>
         <div style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 6 }}>
-          {saving
-            ? <span style={{ color: 'var(--sh-muted)' }}>Saving...</span>
-            : <span style={{ color: 'var(--sh-success)', fontWeight: 600 }}>Saved</span>
-          }
+          {hardeningEnabled ? (
+            <NoteSaveStatus
+              status={persistence.state?.status}
+              lastSavedAt={persistence.state?.lastSavedAt}
+              onRetry={() => persistence.saveNow?.('manual')}
+              onOpenConflict={() => setShowConflictDiff(true)}
+              onSaveNow={() => persistence.saveNow?.('manual')}
+            />
+          ) : saving ? (
+            <span style={{ color: 'var(--sh-muted)' }}>Saving...</span>
+          ) : (
+            <span style={{ color: 'var(--sh-success)', fontWeight: 600 }}>Saved</span>
+          )}
         </div>
       </div>
 
+      {/* Conflict banner + compare modal (hardening v2) */}
+      {hardeningEnabled && persistence.state?.status === 'conflict' && (
+        <div style={{ marginBottom: 10 }}>
+          <NoteConflictBanner
+            onKeepMine={() => persistence.resolveConflict?.('keep-mine')}
+            onTakeTheirs={() => persistence.resolveConflict?.('take-server')}
+            onCompare={() => setShowConflictDiff(true)}
+          />
+        </div>
+      )}
+      {hardeningEnabled && showConflictDiff && persistence.state?.pendingConflict && (
+        <ConflictCompareModal
+          yours={persistence.state.pendingConflict.yours}
+          current={persistence.state.pendingConflict.current}
+          onClose={() => setShowConflictDiff(false)}
+          onKeepMine={() => {
+            persistence.resolveConflict?.('keep-mine')
+            setShowConflictDiff(false)
+          }}
+          onTakeTheirs={() => {
+            persistence.resolveConflict?.('take-server')
+            setShowConflictDiff(false)
+          }}
+        />
+      )}
+
       {/* Tags input */}
-      <div style={{
-        background: 'var(--sh-surface)', borderRadius: 10, border: '1px solid var(--sh-border)',
-        padding: '8px 14px', marginBottom: 10,
-      }}>
+      <div
+        style={{
+          background: 'var(--sh-surface)',
+          borderRadius: 10,
+          border: '1px solid var(--sh-border)',
+          padding: '8px 14px',
+          marginBottom: 10,
+        }}
+      >
         <NoteTagsInput
           noteId={activeNote.id}
           initialTags={getNoteTags(activeNote.tags)}
@@ -378,7 +605,10 @@ export default function NoteEditor({
       {showVersions && (
         <NoteVersionHistory
           noteId={activeNote.id}
-          onRestore={(restored) => { handleRestore?.(restored); setShowVersions(false) }}
+          onRestore={(restored) => {
+            handleRestore?.(restored)
+            setShowVersions(false)
+          }}
           onClose={() => setShowVersions(false)}
         />
       )}
@@ -388,20 +618,34 @@ export default function NoteEditor({
         <NoteRichEditor
           content={editorContent}
           noteId={activeNote.id}
-          onUpdate={handleContentChange}
+          onUpdate={wrappedContentChange}
+          sanitizePaste={hardeningEnabled ? sanitizePastedHtml : null}
         />
       </div>
 
       {/* Footer: export + delete */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 10,
+        }}
+      >
         <button
           onClick={() => {
             const printWin = window.open('', '_blank', 'width=800,height=600')
             if (!printWin) return
             // For the rich editor, content is already HTML
             const exportHtml = DOMPurify.sanitize(editorContent || '<p>No content to export.</p>')
-            const safeTitle = (editorTitle || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-            printWin.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${safeTitle || 'Note'}</title><style>
+            const safeTitle = (editorTitle || '')
+              .replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;')
+              .replace(/"/g, '&quot;')
+            printWin.document
+              .write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${safeTitle || 'Note'}</title><style>
 body { font-family: 'Plus Jakarta Sans', -apple-system, sans-serif; max-width: 700px; margin: 40px auto; padding: 0 24px; color: #1e293b; line-height: 1.7; }
 h1 { font-size: 24px; font-weight: 800; margin-bottom: 8px; }
 h2 { font-size: 20px; font-weight: 700; }
@@ -422,22 +666,77 @@ a { color: #2563eb; }
           }}
           aria-label="Export as PDF"
           style={{
-            background: 'var(--sh-soft)', border: '1px solid var(--sh-border)',
-            color: 'var(--sh-muted)', borderRadius: 8, padding: '7px 16px',
-            fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: PAGE_FONT,
-            transition: 'background .15s', display: 'flex', alignItems: 'center', gap: 5,
+            background: 'var(--sh-soft)',
+            border: '1px solid var(--sh-border)',
+            color: 'var(--sh-muted)',
+            borderRadius: 8,
+            padding: '7px 16px',
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: 'pointer',
+            fontFamily: PAGE_FONT,
+            transition: 'background .15s',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 5,
           }}
         >
           PDF
         </button>
         {confirmDelete ? (
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <span style={{ fontSize: 12, color: 'var(--sh-danger)', fontWeight: 600 }}>Delete this note permanently?</span>
-            <button onClick={deleteNote} style={{ background: 'var(--sh-danger)', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: PAGE_FONT }}>Yes, delete</button>
-            <button onClick={() => setConfirmDelete(false)} style={{ background: 'transparent', border: '1px solid var(--sh-border)', color: 'var(--sh-muted)', borderRadius: 8, padding: '7px 14px', fontSize: 12, cursor: 'pointer', fontFamily: PAGE_FONT }}>Cancel</button>
+            <span style={{ fontSize: 12, color: 'var(--sh-danger)', fontWeight: 600 }}>
+              Delete this note permanently?
+            </span>
+            <button
+              onClick={deleteNote}
+              style={{
+                background: 'var(--sh-danger)',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 8,
+                padding: '7px 16px',
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: 'pointer',
+                fontFamily: PAGE_FONT,
+              }}
+            >
+              Yes, delete
+            </button>
+            <button
+              onClick={() => setConfirmDelete(false)}
+              style={{
+                background: 'transparent',
+                border: '1px solid var(--sh-border)',
+                color: 'var(--sh-muted)',
+                borderRadius: 8,
+                padding: '7px 14px',
+                fontSize: 12,
+                cursor: 'pointer',
+                fontFamily: PAGE_FONT,
+              }}
+            >
+              Cancel
+            </button>
           </div>
         ) : (
-          <button onClick={() => setConfirmDelete(true)} aria-label="Delete note" style={{ background: 'var(--sh-danger-bg)', border: '1px solid var(--sh-danger-border)', color: 'var(--sh-danger)', borderRadius: 8, padding: '7px 16px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: PAGE_FONT, transition: 'background .15s' }}>
+          <button
+            onClick={() => setConfirmDelete(true)}
+            aria-label="Delete note"
+            style={{
+              background: 'var(--sh-danger-bg)',
+              border: '1px solid var(--sh-danger-border)',
+              color: 'var(--sh-danger)',
+              borderRadius: 8,
+              padding: '7px 16px',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontFamily: PAGE_FONT,
+              transition: 'background .15s',
+            }}
+          >
             Delete Note
           </button>
         )}

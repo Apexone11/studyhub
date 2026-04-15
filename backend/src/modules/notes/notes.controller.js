@@ -11,7 +11,17 @@ const prisma = require('../../lib/prisma')
 const { normalizeCommentGifAttachments } = require('../../lib/commentGifAttachments')
 const { cleanupNoteImageIfUnused, extractNoteImageUrlsFromTexts } = require('../../lib/storage')
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
+const { defaultChunkBuffer } = require('./notes.chunks.js')
+const { buildWordDiff } = require('./notes.diff.js')
 const { timedSection, logTiming } = require('../../lib/requestTiming')
+const {
+  computeContentHash,
+  isRevisionConflict,
+  shouldCreateAutoVersion,
+} = require('./notes.concurrency.js')
+
+const MAX_NOTE_CONTENT_HARDENED = 200000
+const AUTO_VERSION_RETENTION = 50
 
 const COMMENT_INCLUDE = {
   author: { select: { id: true, username: true, avatarUrl: true } },
@@ -67,11 +77,12 @@ function canReadNote(note, user) {
 async function getNoteById(req, res) {
   req._timingStart = Date.now()
   const noteId = parseInt(req.params.id, 10)
-  if (!Number.isInteger(noteId) || noteId < 1) return res.status(400).json({ error: 'Invalid note id.' })
+  if (!Number.isInteger(noteId) || noteId < 1)
+    return res.status(400).json({ error: 'Invalid note id.' })
 
   try {
     const mainSection = await timedSection('note-main', () =>
-      prisma.note.findUnique({ where: { id: noteId }, include: NOTE_INCLUDE })
+      prisma.note.findUnique({ where: { id: noteId }, include: NOTE_INCLUDE }),
     )
     const note = mainSection.data
 
@@ -92,23 +103,31 @@ async function getNoteById(req, res) {
     // Fetch social data in parallel: star status, reaction counts, star count
     const userId = req.user?.userId
     const [starred, starCount, likes, dislikes, userReaction] = await Promise.all([
-      userId ? prisma.noteStar.findUnique({ where: { userId_noteId: { userId, noteId } } }).then(Boolean) : false,
+      userId
+        ? prisma.noteStar.findUnique({ where: { userId_noteId: { userId, noteId } } }).then(Boolean)
+        : false,
       prisma.noteStar.count({ where: { noteId } }),
       prisma.noteReaction.count({ where: { noteId, type: 'like' } }).catch(() => 0),
       prisma.noteReaction.count({ where: { noteId, type: 'dislike' } }).catch(() => 0),
-      userId ? prisma.noteReaction.findUnique({ where: { userId_noteId: { userId, noteId } }, select: { type: true } }).catch(() => null) : null,
+      userId
+        ? prisma.noteReaction
+            .findUnique({ where: { userId_noteId: { userId, noteId } }, select: { type: true } })
+            .catch(() => null)
+        : null,
     ])
 
     logTiming(req, { sections: [mainSection], extra: { noteId, isOwner: Boolean(isOwner) } })
 
-    res.json(serializeNote(note, {
-      isOwner: Boolean(isOwner),
-      starred,
-      starCount,
-      downloads: note.downloads || 0,
-      reactionCounts: { like: likes, dislike: dislikes },
-      userReaction: userReaction?.type || null,
-    }))
+    res.json(
+      serializeNote(note, {
+        isOwner: Boolean(isOwner),
+        starred,
+        starCount,
+        downloads: note.downloads || 0,
+        reactionCounts: { like: likes, dislike: dislikes },
+        userReaction: userReaction?.type || null,
+      }),
+    )
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
@@ -201,15 +220,15 @@ async function createNote(req, res) {
   const trimmedTitle = typeof title === 'string' ? title.trim() : ''
 
   if (!trimmedTitle) return res.status(400).json({ error: 'Title is required.' })
-  if (trimmedTitle.length > 120) return res.status(400).json({ error: 'Title must be 120 characters or fewer.' })
+  if (trimmedTitle.length > 120)
+    return res.status(400).json({ error: 'Title must be 120 characters or fewer.' })
 
   const contentStr = typeof content === 'string' ? content : ''
-  if (contentStr.length > 50000) return res.status(400).json({ error: 'Content must be 50000 characters or fewer.' })
+  if (contentStr.length > 50000)
+    return res.status(400).json({ error: 'Content must be 50000 characters or fewer.' })
 
   try {
-    const moderationStatus = priv === false
-      ? getInitialModerationStatus(req.user)
-      : 'clean'  // Private notes don't need moderation hold
+    const moderationStatus = priv === false ? getInitialModerationStatus(req.user) : 'clean' // Private notes don't need moderation hold
     const note = await prisma.note.create({
       data: {
         title: trimmedTitle,
@@ -225,7 +244,12 @@ async function createNote(req, res) {
     // Async content moderation — fire-and-forget after response is sent
     if (isModerationEnabled()) {
       const textToScan = `${trimmedTitle} ${contentStr}`.trim()
-      void scanContent({ contentType: 'note', contentId: note.id, text: textToScan, userId: req.user.userId })
+      void scanContent({
+        contentType: 'note',
+        contentId: note.id,
+        text: textToScan,
+        userId: req.user.userId,
+      })
     }
 
     /* Content fingerprinting for plagiarism detection (fire-and-forget) */
@@ -240,33 +264,56 @@ async function createNote(req, res) {
 
 /**
  * PATCH /api/notes/:id — Update a note
+ *
+ * Hardening v2: when the client supplies any of `baseRevision`, `saveId`, or
+ * `contentHash`, we run the hardened save pipeline (revision gate, idempotent
+ * replay, no-op detection, auto-version snapshots). Legacy clients that omit
+ * those fields continue through the original flat-response path.
  */
 async function updateNote(req, res) {
   const noteId = parseInt(req.params.id, 10)
-  if (!Number.isInteger(noteId) || noteId < 1) return res.status(400).json({ error: 'Invalid note id.' })
+  if (!Number.isInteger(noteId) || noteId < 1)
+    return res.status(400).json({ error: 'Invalid note id.' })
+
+  const body = req.body || {}
+  const usesHardenedSave =
+    body.baseRevision !== undefined ||
+    typeof body.saveId === 'string' ||
+    typeof body.contentHash === 'string' ||
+    typeof body.trigger === 'string'
+
+  if (usesHardenedSave) {
+    return updateNoteHardened(req, res, noteId, body)
+  }
+
   try {
     const note = await prisma.note.findUnique({ where: { id: noteId } })
     if (!note) return res.status(404).json({ error: 'Note not found.' })
-    if (!assertOwnerOrAdmin({
-      res,
-      user: req.user,
-      ownerId: note.userId,
-      message: 'Not your note.',
-      targetType: 'note',
-      targetId: noteId,
-    })) return
+    if (
+      !assertOwnerOrAdmin({
+        res,
+        user: req.user,
+        ownerId: note.userId,
+        message: 'Not your note.',
+        targetType: 'note',
+        targetId: noteId,
+      })
+    )
+      return
 
-    const { title, content, courseId, private: priv, allowDownloads } = req.body || {}
+    const { title, content, courseId, private: priv, allowDownloads } = body
     const data = {}
     if (title !== undefined) {
       const trimmedTitle = typeof title === 'string' ? title.trim() : ''
       if (!trimmedTitle) return res.status(400).json({ error: 'Title cannot be empty.' })
-      if (trimmedTitle.length > 120) return res.status(400).json({ error: 'Title must be 120 characters or fewer.' })
+      if (trimmedTitle.length > 120)
+        return res.status(400).json({ error: 'Title must be 120 characters or fewer.' })
       data.title = trimmedTitle
     }
     if (content !== undefined) {
       const contentStr = typeof content === 'string' ? content : ''
-      if (contentStr.length > 50000) return res.status(400).json({ error: 'Content must be 50000 characters or fewer.' })
+      if (contentStr.length > 50000)
+        return res.status(400).json({ error: 'Content must be 50000 characters or fewer.' })
       data.content = contentStr
     }
     if (courseId !== undefined) data.courseId = courseId ? parseInt(courseId, 10) || null : null
@@ -277,7 +324,7 @@ async function updateNote(req, res) {
     if (data.private === true) data.allowDownloads = false
 
     // If toggling from private to public, apply trust-gated moderation status
-    if (req.body.private === false && note.private === true) {
+    if (body.private === false && note.private === true) {
       data.moderationStatus = getInitialModerationStatus(req.user)
     }
 
@@ -285,15 +332,17 @@ async function updateNote(req, res) {
     if (data.content !== undefined && note.content) {
       const lenDiff = Math.abs(data.content.length - note.content.length)
       if (lenDiff > 50 || (data.title && data.title !== note.title)) {
-        void prisma.noteVersion.create({
-          data: {
-            noteId,
-            userId: req.user.userId,
-            title: note.title,
-            content: note.content,
-            message: null, // auto-saved
-          },
-        }).catch(() => {}) // fire-and-forget
+        void prisma.noteVersion
+          .create({
+            data: {
+              noteId,
+              userId: req.user.userId,
+              title: note.title,
+              content: note.content,
+              message: null, // auto-saved
+            },
+          })
+          .catch(() => {}) // fire-and-forget
       }
     }
 
@@ -307,7 +356,12 @@ async function updateNote(req, res) {
     if (isModerationEnabled() && (data.title || data.content !== undefined)) {
       const textToScan = `${updated.title} ${updated.content || ''}`.trim()
       if (textToScan) {
-        void scanContent({ contentType: 'note', contentId: noteId, text: textToScan, userId: req.user.userId })
+        void scanContent({
+          contentType: 'note',
+          contentId: noteId,
+          text: textToScan,
+          userId: req.user.userId,
+        })
       }
     }
 
@@ -322,22 +376,180 @@ async function updateNote(req, res) {
 }
 
 /**
+ * Hardened save path (Notes Hardening v2).
+ *
+ * Response envelope:
+ *   200 — { note, revision, savedAt, versionCreated, noop?, replay? }
+ *   202 — replayed saveId (idempotent)
+ *   409 — revision conflict { code, current, yours }
+ *   413 — content exceeds MAX_NOTE_CONTENT_HARDENED
+ */
+async function updateNoteHardened(req, res, noteId, body) {
+  const { title, content, baseRevision, saveId, contentHash, trigger } = body
+
+  if (typeof content === 'string' && content.length > MAX_NOTE_CONTENT_HARDENED) {
+    return sendError(
+      res,
+      413,
+      `Note content exceeds ${MAX_NOTE_CONTENT_HARDENED} characters`,
+      ERROR_CODES.NOTE_PAYLOAD_TOO_LARGE,
+    )
+  }
+
+  try {
+    const note = await prisma.note.findUnique({ where: { id: noteId } })
+    if (!note || note.userId !== req.user.userId) {
+      return sendError(res, 404, 'Note not found.', ERROR_CODES.NOT_FOUND)
+    }
+
+    // Idempotent replay — same saveId already applied
+    if (saveId && note.lastSaveId === saveId) {
+      return res.status(202).json({
+        note: serializeNote(note),
+        revision: note.revision,
+        savedAt: note.updatedAt,
+        versionCreated: false,
+        replay: true,
+      })
+    }
+
+    if (isRevisionConflict(baseRevision ?? 0, note.revision)) {
+      return res.status(409).json({
+        code: ERROR_CODES.NOTE_REVISION_CONFLICT,
+        error: 'Note revision conflict',
+        current: {
+          revision: note.revision,
+          title: note.title,
+          content: note.content,
+          updatedAt: note.updatedAt,
+          contentHash: note.contentHash,
+        },
+        yours: { title, content },
+      })
+    }
+
+    // No-op detection: incoming hash + title match current state
+    const incomingContent = typeof content === 'string' ? content : note.content
+    const normalizedIncomingHash = contentHash || computeContentHash(incomingContent)
+    const titleUnchanged = title === undefined || title === note.title
+    if (note.contentHash && note.contentHash === normalizedIncomingHash && titleUnchanged) {
+      return res.status(200).json({
+        note: serializeNote(note),
+        revision: note.revision,
+        savedAt: note.updatedAt,
+        versionCreated: false,
+        noop: true,
+      })
+    }
+
+    const lastAutoVersion = await prisma.noteVersion.findFirst({
+      where: { noteId, kind: 'AUTO' },
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true },
+    })
+    const autoDue = shouldCreateAutoVersion({
+      lastAutoVersionAt: lastAutoVersion?.createdAt ?? null,
+    })
+    const shouldSnapshot = trigger === 'manual' || autoDue
+
+    const updated = await prisma.$transaction(async (tx) => {
+      if (shouldSnapshot && (note.title || note.content)) {
+        await tx.noteVersion.create({
+          data: {
+            noteId,
+            userId: req.user.userId,
+            title: note.title,
+            content: note.content ?? '',
+            message: trigger === 'manual' ? 'Manual save' : null,
+            revision: note.revision,
+            kind: trigger === 'manual' ? 'MANUAL' : 'AUTO',
+            bytesContent: Buffer.byteLength(note.content ?? '', 'utf8'),
+          },
+        })
+      }
+
+      const data = {
+        revision: note.revision + 1,
+        lastSaveId: saveId ?? null,
+        contentHash: normalizedIncomingHash,
+      }
+      if (title !== undefined) data.title = title
+      if (content !== undefined) data.content = content
+
+      return tx.note.update({
+        where: { id: noteId },
+        data,
+        include: NOTE_INCLUDE,
+      })
+    })
+
+    // Prune AUTO versions past retention limit (best-effort, post-commit)
+    prunePastFiftyAuto(noteId).catch((err) => {
+      captureError(err, {
+        route: req.originalUrl,
+        method: req.method,
+        source: 'prunePastFiftyAuto',
+      })
+    })
+
+    // Async content moderation / fingerprinting — fire-and-forget
+    if (isModerationEnabled() && (title !== undefined || content !== undefined)) {
+      const textToScan = `${updated.title} ${updated.content || ''}`.trim()
+      if (textToScan) {
+        void scanContent({
+          contentType: 'note',
+          contentId: noteId,
+          text: textToScan,
+          userId: req.user.userId,
+        })
+      }
+    }
+    if (content !== undefined) void updateFingerprint('note', noteId, updated.content)
+
+    return res.status(200).json({
+      note: serializeNote(updated),
+      revision: updated.revision,
+      savedAt: updated.updatedAt,
+      versionCreated: shouldSnapshot,
+    })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    return res.status(500).json({ error: 'Server error.' })
+  }
+}
+
+async function prunePastFiftyAuto(noteId) {
+  const autos = await prisma.noteVersion.findMany({
+    where: { noteId, kind: 'AUTO' },
+    orderBy: { createdAt: 'desc' },
+    select: { id: true },
+  })
+  if (autos.length <= AUTO_VERSION_RETENTION) return
+  const toDelete = autos.slice(AUTO_VERSION_RETENTION).map((v) => v.id)
+  await prisma.noteVersion.deleteMany({ where: { id: { in: toDelete } } })
+}
+
+/**
  * DELETE /api/notes/:id — Delete a note
  */
 async function deleteNote(req, res) {
   const noteId = parseInt(req.params.id, 10)
-  if (!Number.isInteger(noteId) || noteId < 1) return res.status(400).json({ error: 'Invalid note id.' })
+  if (!Number.isInteger(noteId) || noteId < 1)
+    return res.status(400).json({ error: 'Invalid note id.' })
   try {
     const note = await prisma.note.findUnique({ where: { id: noteId } })
     if (!note) return res.status(404).json({ error: 'Note not found.' })
-    if (!assertOwnerOrAdmin({
-      res,
-      user: req.user,
-      ownerId: note.userId,
-      message: 'Not your note.',
-      targetType: 'note',
-      targetId: noteId,
-    })) return
+    if (
+      !assertOwnerOrAdmin({
+        res,
+        user: req.user,
+        ownerId: note.userId,
+        message: 'Not your note.',
+        targetType: 'note',
+        targetId: noteId,
+      })
+    )
+      return
 
     const versions = await prisma.noteVersion.findMany({
       where: { noteId },
@@ -352,11 +564,13 @@ async function deleteNote(req, res) {
     await prisma.note.delete({ where: { id: noteId } })
 
     const cleanupResults = await Promise.allSettled(
-      noteImageUrls.map((imageUrl) => cleanupNoteImageIfUnused(prisma, imageUrl, {
-        source: 'deleteNote',
-        noteId,
-        userId: req.user.userId,
-      }))
+      noteImageUrls.map((imageUrl) =>
+        cleanupNoteImageIfUnused(prisma, imageUrl, {
+          source: 'deleteNote',
+          noteId,
+          userId: req.user.userId,
+        }),
+      ),
     )
 
     cleanupResults.forEach((result) => {
@@ -382,18 +596,23 @@ async function deleteNote(req, res) {
 async function listNoteComments(req, res) {
   req._timingStart = Date.now()
   const noteId = parseInt(req.params.id, 10)
-  if (!Number.isInteger(noteId) || noteId < 1) return res.status(400).json({ error: 'Invalid note id.' })
+  if (!Number.isInteger(noteId) || noteId < 1)
+    return res.status(400).json({ error: 'Invalid note id.' })
 
   const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 50))
   const offset = Math.min(10000, Math.max(0, parseInt(req.query.offset, 10) || 0))
 
   try {
     const noteSection = await timedSection('note-lookup', () =>
-      prisma.note.findUnique({ where: { id: noteId }, select: { id: true, private: true, userId: true } })
+      prisma.note.findUnique({
+        where: { id: noteId },
+        select: { id: true, private: true, userId: true },
+      }),
     )
     const note = noteSection.data
     if (!note) return res.status(404).json({ error: 'Note not found.' })
-    if (!canReadNote(note, req.user || null)) return res.status(404).json({ error: 'Note not found.' })
+    if (!canReadNote(note, req.user || null))
+      return res.status(404).json({ error: 'Note not found.' })
 
     const commentWhere = { noteId, parentId: null }
 
@@ -419,7 +638,7 @@ async function listNoteComments(req, res) {
           orderBy: { createdAt: 'desc' },
           take: limit,
           skip: offset,
-        })
+        }),
       ),
       timedSection('count', () => prisma.noteComment.count({ where: commentWhere })),
     ])
@@ -428,7 +647,7 @@ async function listNoteComments(req, res) {
     const allCommentIds = []
     for (const c of commentsSection.data) {
       allCommentIds.push(c.id)
-      for (const r of (c.replies || [])) allCommentIds.push(r.id)
+      for (const r of c.replies || []) allCommentIds.push(r.id)
     }
 
     // Batch fetch reaction counts and user reactions
@@ -489,7 +708,8 @@ async function listNoteComments(req, res) {
  */
 async function createNoteComment(req, res) {
   const noteId = parseInt(req.params.id, 10)
-  if (!Number.isInteger(noteId) || noteId < 1) return res.status(400).json({ error: 'Invalid note id.' })
+  if (!Number.isInteger(noteId) || noteId < 1)
+    return res.status(400).json({ error: 'Invalid note id.' })
 
   const rawContent = typeof req.body.content === 'string' ? req.body.content.trim() : ''
   // Strip HTML tags from comments — comments are plain text only
@@ -503,8 +723,10 @@ async function createNoteComment(req, res) {
 
   const { attachments } = attachmentValidation
 
-  if (!content && attachments.length === 0) return res.status(400).json({ error: 'Comment cannot be empty.' })
-  if (content.length > 500) return res.status(400).json({ error: 'Comment must be 500 characters or fewer.' })
+  if (!content && attachments.length === 0)
+    return res.status(400).json({ error: 'Comment cannot be empty.' })
+  if (content.length > 500)
+    return res.status(400).json({ error: 'Comment must be 500 characters or fewer.' })
 
   // Optional inline anchor fields — validated and context-enriched (only for top-level comments)
   const anchor = parentId ? null : validateAnchorInput(req.body)
@@ -524,8 +746,10 @@ async function createNoteComment(req, res) {
         select: { id: true, noteId: true, parentId: true },
       })
       if (!parentComment) return res.status(400).json({ error: 'Parent comment not found.' })
-      if (parentComment.noteId !== noteId) return res.status(400).json({ error: 'Parent comment belongs to different note.' })
-      if (parentComment.parentId !== null) return res.status(400).json({ error: 'Cannot reply to replies (max 1 level deep).' })
+      if (parentComment.noteId !== noteId)
+        return res.status(400).json({ error: 'Parent comment belongs to different note.' })
+      if (parentComment.parentId !== null)
+        return res.status(400).json({ error: 'Cannot reply to replies (max 1 level deep).' })
     }
 
     // Build surrounding context for anchor re-matching after edits (only for top-level comments)
@@ -544,13 +768,16 @@ async function createNoteComment(req, res) {
         anchorOffset: anchor ? anchor.anchorOffset : null,
         anchorContext,
         moderationStatus,
-        attachments: attachments.length > 0 ? {
-          create: attachments.map((att) => ({
-            url: att.url,
-            type: att.type,
-            name: att.name || '',
-          })),
-        } : undefined,
+        attachments:
+          attachments.length > 0
+            ? {
+                create: attachments.map((att) => ({
+                  url: att.url,
+                  type: att.type,
+                  name: att.name || '',
+                })),
+              }
+            : undefined,
       },
       include: {
         ...COMMENT_INCLUDE,
@@ -560,7 +787,12 @@ async function createNoteComment(req, res) {
 
     // Async content moderation on comment — fire-and-forget
     if (isModerationEnabled()) {
-      void scanContent({ contentType: 'note_comment', contentId: comment.id, text: content, userId: req.user.userId })
+      void scanContent({
+        contentType: 'note_comment',
+        contentId: comment.id,
+        text: content,
+        userId: req.user.userId,
+      })
     }
 
     trackActivity(prisma, req.user.userId, 'comments')
@@ -617,15 +849,22 @@ async function createNoteComment(req, res) {
 async function updateNoteComment(req, res) {
   const noteId = parseInt(req.params.id, 10)
   const commentId = parseInt(req.params.commentId, 10)
-  if (!Number.isInteger(noteId) || noteId < 1) return sendError(res, 400, 'Invalid note id.', ERROR_CODES.VALIDATION)
-  if (!Number.isInteger(commentId) || commentId < 1) return sendError(res, 400, 'Invalid comment id.', ERROR_CODES.VALIDATION)
+  if (!Number.isInteger(noteId) || noteId < 1)
+    return sendError(res, 400, 'Invalid note id.', ERROR_CODES.VALIDATION)
+  if (!Number.isInteger(commentId) || commentId < 1)
+    return sendError(res, 400, 'Invalid comment id.', ERROR_CODES.VALIDATION)
 
   const { resolved, content } = req.body || {}
   const hasResolved = typeof resolved === 'boolean'
   const hasContent = content !== undefined
 
   if (!hasResolved && !hasContent) {
-    return sendError(res, 400, 'Provide resolved (boolean) or content (string).', ERROR_CODES.VALIDATION)
+    return sendError(
+      res,
+      400,
+      'Provide resolved (boolean) or content (string).',
+      ERROR_CODES.VALIDATION,
+    )
   }
 
   try {
@@ -643,7 +882,12 @@ async function updateNoteComment(req, res) {
     if (hasResolved) {
       const isNoteOwner = req.user.userId === comment.note.userId || req.user.role === 'admin'
       if (!isNoteOwner) {
-        return sendError(res, 403, 'Only the note owner can resolve comments.', ERROR_CODES.FORBIDDEN)
+        return sendError(
+          res,
+          403,
+          'Only the note owner can resolve comments.',
+          ERROR_CODES.FORBIDDEN,
+        )
       }
       updateData.resolved = resolved
     }
@@ -654,14 +898,24 @@ async function updateNoteComment(req, res) {
         return sendError(res, 400, 'Comment content is required.', ERROR_CODES.VALIDATION)
       }
       if (content.length > 500) {
-        return sendError(res, 400, 'Comment must be 500 characters or fewer.', ERROR_CODES.VALIDATION)
+        return sendError(
+          res,
+          400,
+          'Comment must be 500 characters or fewer.',
+          ERROR_CODES.VALIDATION,
+        )
       }
       if (comment.userId !== req.user.userId) {
         return sendError(res, 403, 'You can only edit your own comments.', ERROR_CODES.FORBIDDEN)
       }
       const fifteenMinutes = 15 * 60 * 1000
       if (Date.now() - new Date(comment.createdAt).getTime() > fifteenMinutes) {
-        return sendError(res, 403, 'Can only edit comments within 15 minutes.', ERROR_CODES.FORBIDDEN)
+        return sendError(
+          res,
+          403,
+          'Can only edit comments within 15 minutes.',
+          ERROR_CODES.FORBIDDEN,
+        )
       }
       updateData.content = content.trim()
     }
@@ -685,20 +939,24 @@ async function updateNoteComment(req, res) {
 async function deleteNoteComment(req, res) {
   const noteId = parseInt(req.params.id, 10)
   const commentId = parseInt(req.params.commentId, 10)
-  if (!Number.isInteger(noteId) || noteId < 1) return res.status(400).json({ error: 'Invalid note id.' })
-  if (!Number.isInteger(commentId) || commentId < 1) return res.status(400).json({ error: 'Invalid comment id.' })
+  if (!Number.isInteger(noteId) || noteId < 1)
+    return res.status(400).json({ error: 'Invalid note id.' })
+  if (!Number.isInteger(commentId) || commentId < 1)
+    return res.status(400).json({ error: 'Invalid comment id.' })
 
   try {
     const comment = await prisma.noteComment.findUnique({
       where: { id: commentId },
       include: { note: { select: { id: true, userId: true } } },
     })
-    if (!comment || comment.noteId !== noteId) return res.status(404).json({ error: 'Comment not found.' })
+    if (!comment || comment.noteId !== noteId)
+      return res.status(404).json({ error: 'Comment not found.' })
 
     // Comment author, note owner, or admin can delete
-    const canDelete = req.user.userId === comment.userId
-      || req.user.userId === comment.note.userId
-      || req.user.role === 'admin'
+    const canDelete =
+      req.user.userId === comment.userId ||
+      req.user.userId === comment.note.userId ||
+      req.user.role === 'admin'
     if (!canDelete) return res.status(403).json({ error: 'Not authorized to delete this comment.' })
 
     await prisma.noteComment.delete({ where: { id: commentId } })
@@ -714,14 +972,26 @@ async function deleteNoteComment(req, res) {
  */
 async function createNoteVersion(req, res) {
   const noteId = parseInt(req.params.id, 10)
-  if (!Number.isInteger(noteId) || noteId < 1) return res.status(400).json({ error: 'Invalid note id.' })
+  if (!Number.isInteger(noteId) || noteId < 1)
+    return res.status(400).json({ error: 'Invalid note id.' })
 
   try {
     const note = await prisma.note.findUnique({ where: { id: noteId } })
     if (!note) return res.status(404).json({ error: 'Note not found.' })
-    if (!assertOwnerOrAdmin({ res, user: req.user, ownerId: note.userId, message: 'Not your note.', targetType: 'note', targetId: noteId })) return
+    if (
+      !assertOwnerOrAdmin({
+        res,
+        user: req.user,
+        ownerId: note.userId,
+        message: 'Not your note.',
+        targetType: 'note',
+        targetId: noteId,
+      })
+    )
+      return
 
-    const message = typeof req.body.message === 'string' ? req.body.message.trim().slice(0, 200) : null
+    const message =
+      typeof req.body.message === 'string' ? req.body.message.trim().slice(0, 200) : null
 
     const version = await prisma.noteVersion.create({
       data: {
@@ -745,12 +1015,26 @@ async function createNoteVersion(req, res) {
  */
 async function listNoteVersions(req, res) {
   const noteId = parseInt(req.params.id, 10)
-  if (!Number.isInteger(noteId) || noteId < 1) return res.status(400).json({ error: 'Invalid note id.' })
+  if (!Number.isInteger(noteId) || noteId < 1)
+    return res.status(400).json({ error: 'Invalid note id.' })
 
   try {
-    const note = await prisma.note.findUnique({ where: { id: noteId }, select: { id: true, userId: true } })
+    const note = await prisma.note.findUnique({
+      where: { id: noteId },
+      select: { id: true, userId: true },
+    })
     if (!note) return res.status(404).json({ error: 'Note not found.' })
-    if (!assertOwnerOrAdmin({ res, user: req.user, ownerId: note.userId, message: 'Not your note.', targetType: 'note', targetId: noteId })) return
+    if (
+      !assertOwnerOrAdmin({
+        res,
+        user: req.user,
+        ownerId: note.userId,
+        message: 'Not your note.',
+        targetType: 'note',
+        targetId: noteId,
+      })
+    )
+      return
 
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20))
     const versions = await prisma.noteVersion.findMany({
@@ -773,16 +1057,32 @@ async function listNoteVersions(req, res) {
 async function getNoteVersion(req, res) {
   const noteId = parseInt(req.params.id, 10)
   const versionId = parseInt(req.params.versionId, 10)
-  if (!Number.isInteger(noteId) || noteId < 1) return res.status(400).json({ error: 'Invalid note id.' })
-  if (!Number.isInteger(versionId) || versionId < 1) return res.status(400).json({ error: 'Invalid version id.' })
+  if (!Number.isInteger(noteId) || noteId < 1)
+    return res.status(400).json({ error: 'Invalid note id.' })
+  if (!Number.isInteger(versionId) || versionId < 1)
+    return res.status(400).json({ error: 'Invalid version id.' })
 
   try {
-    const note = await prisma.note.findUnique({ where: { id: noteId }, select: { id: true, userId: true } })
+    const note = await prisma.note.findUnique({
+      where: { id: noteId },
+      select: { id: true, userId: true },
+    })
     if (!note) return res.status(404).json({ error: 'Note not found.' })
-    if (!assertOwnerOrAdmin({ res, user: req.user, ownerId: note.userId, message: 'Not your note.', targetType: 'note', targetId: noteId })) return
+    if (
+      !assertOwnerOrAdmin({
+        res,
+        user: req.user,
+        ownerId: note.userId,
+        message: 'Not your note.',
+        targetType: 'note',
+        targetId: noteId,
+      })
+    )
+      return
 
     const version = await prisma.noteVersion.findUnique({ where: { id: versionId } })
-    if (!version || version.noteId !== noteId) return res.status(404).json({ error: 'Version not found.' })
+    if (!version || version.noteId !== noteId)
+      return res.status(404).json({ error: 'Version not found.' })
 
     res.json(version)
   } catch (err) {
@@ -792,44 +1092,114 @@ async function getNoteVersion(req, res) {
 }
 
 /**
+ * GET /api/notes/:id/versions/:versionId/diff — Word-level diff for a version
+ * Query: against=current (default) or another versionId
+ */
+async function getVersionDiff(req, res) {
+  const id = parseInt(req.params.id, 10)
+  const versionId = parseInt(req.params.versionId, 10)
+  if (!Number.isInteger(id) || id < 1 || !Number.isInteger(versionId) || versionId < 1) {
+    return sendError(res, 400, 'Invalid id', ERROR_CODES.BAD_REQUEST)
+  }
+
+  const against = req.query.against || 'current'
+
+  try {
+    const note = await prisma.note.findUnique({ where: { id } })
+    if (!note || note.userId !== req.user.userId) {
+      return sendError(res, 404, 'Note not found', ERROR_CODES.NOT_FOUND)
+    }
+    const version = await prisma.noteVersion.findUnique({ where: { id: versionId } })
+    if (!version || version.noteId !== id) {
+      return sendError(res, 404, 'Version not found', ERROR_CODES.NOTE_VERSION_NOT_FOUND)
+    }
+
+    let rightText
+    if (against === 'current') {
+      rightText = note.content ?? ''
+    } else {
+      const otherId = parseInt(against, 10)
+      if (!Number.isInteger(otherId) || otherId < 1) {
+        return sendError(res, 400, 'Invalid against parameter', ERROR_CODES.BAD_REQUEST)
+      }
+      const other = await prisma.noteVersion.findUnique({ where: { id: otherId } })
+      if (!other || other.noteId !== id) {
+        return sendError(
+          res,
+          404,
+          'Comparison version not found',
+          ERROR_CODES.NOTE_VERSION_NOT_FOUND,
+        )
+      }
+      rightText = other.content ?? ''
+    }
+
+    const result = buildWordDiff(version.content ?? '', rightText)
+    res.set('Cache-Control', 'private, max-age=60')
+    return res.json(result)
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    return sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
+  }
+}
+
+/**
  * POST /api/notes/:id/versions/:versionId/restore — Restore a version
  */
 async function restoreNoteVersion(req, res) {
   const noteId = parseInt(req.params.id, 10)
   const versionId = parseInt(req.params.versionId, 10)
-  if (!Number.isInteger(noteId) || noteId < 1) return res.status(400).json({ error: 'Invalid note id.' })
-  if (!Number.isInteger(versionId) || versionId < 1) return res.status(400).json({ error: 'Invalid version id.' })
+  if (!Number.isInteger(noteId) || noteId < 1)
+    return res.status(400).json({ error: 'Invalid note id.' })
+  if (!Number.isInteger(versionId) || versionId < 1)
+    return res.status(400).json({ error: 'Invalid version id.' })
 
   try {
     const note = await prisma.note.findUnique({ where: { id: noteId } })
-    if (!note) return res.status(404).json({ error: 'Note not found.' })
-    if (!assertOwnerOrAdmin({ res, user: req.user, ownerId: note.userId, message: 'Not your note.', targetType: 'note', targetId: noteId })) return
+    if (!note || note.userId !== req.user.userId) {
+      return sendError(res, 404, 'Note not found.', ERROR_CODES.NOT_FOUND)
+    }
 
     const version = await prisma.noteVersion.findUnique({ where: { id: versionId } })
-    if (!version || version.noteId !== noteId) return res.status(404).json({ error: 'Version not found.' })
+    if (!version || version.noteId !== noteId) {
+      return sendError(res, 404, 'Version not found.', ERROR_CODES.NOTE_VERSION_NOT_FOUND)
+    }
 
-    // Save current state as a version before restoring
-    await prisma.noteVersion.create({
-      data: {
-        noteId,
-        userId: req.user.userId,
-        title: note.title,
-        content: note.content,
-        message: `Auto-saved before restoring version from ${new Date(version.createdAt).toLocaleDateString()}`,
-      },
+    const versionCreatedAtIso =
+      version.createdAt instanceof Date
+        ? version.createdAt.toISOString()
+        : new Date(version.createdAt).toISOString()
+
+    const updated = await prisma.$transaction(async (tx) => {
+      await tx.noteVersion.create({
+        data: {
+          noteId,
+          userId: req.user.userId,
+          title: note.title,
+          content: note.content,
+          message: `Before restore to ${versionCreatedAtIso}`,
+          revision: note.revision,
+          parentVersionId: version.id,
+          kind: 'PRE_RESTORE',
+          bytesContent: Buffer.byteLength(note.content ?? '', 'utf8'),
+        },
+      })
+      return tx.note.update({
+        where: { id: noteId },
+        data: {
+          title: version.title,
+          content: version.content,
+          revision: (note.revision ?? 0) + 1,
+          contentHash: computeContentHash(version.content ?? ''),
+          lastSaveId: null,
+        },
+      })
     })
 
-    // Restore the old version
-    const updated = await prisma.note.update({
-      where: { id: noteId },
-      data: { title: version.title, content: version.content },
-      include: NOTE_INCLUDE,
-    })
-
-    res.json(updated)
+    return res.json({ note: updated, revision: updated.revision })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    return res.status(500).json({ error: 'Server error.' })
   }
 }
 
@@ -838,10 +1208,14 @@ async function restoreNoteVersion(req, res) {
  */
 async function starNote(req, res) {
   const noteId = parseInt(req.params.id, 10)
-  if (!Number.isInteger(noteId) || noteId < 1) return res.status(400).json({ error: 'Invalid note id.' })
+  if (!Number.isInteger(noteId) || noteId < 1)
+    return res.status(400).json({ error: 'Invalid note id.' })
 
   try {
-    const note = await prisma.note.findUnique({ where: { id: noteId }, select: { id: true, private: true, userId: true } })
+    const note = await prisma.note.findUnique({
+      where: { id: noteId },
+      select: { id: true, private: true, userId: true },
+    })
     if (!note) return res.status(404).json({ error: 'Note not found.' })
     if (!canReadNote(note, req.user)) return res.status(404).json({ error: 'Note not found.' })
 
@@ -863,7 +1237,8 @@ async function starNote(req, res) {
  */
 async function unstarNote(req, res) {
   const noteId = parseInt(req.params.id, 10)
-  if (!Number.isInteger(noteId) || noteId < 1) return res.status(400).json({ error: 'Invalid note id.' })
+  if (!Number.isInteger(noteId) || noteId < 1)
+    return res.status(400).json({ error: 'Invalid note id.' })
 
   try {
     await prisma.noteStar.deleteMany({ where: { userId: req.user.userId, noteId } })
@@ -879,12 +1254,26 @@ async function unstarNote(req, res) {
  */
 async function toggleNotePin(req, res) {
   const noteId = parseInt(req.params.id, 10)
-  if (!Number.isInteger(noteId) || noteId < 1) return res.status(400).json({ error: 'Invalid note id.' })
+  if (!Number.isInteger(noteId) || noteId < 1)
+    return res.status(400).json({ error: 'Invalid note id.' })
 
   try {
-    const note = await prisma.note.findUnique({ where: { id: noteId }, select: { id: true, userId: true, pinned: true } })
+    const note = await prisma.note.findUnique({
+      where: { id: noteId },
+      select: { id: true, userId: true, pinned: true },
+    })
     if (!note) return res.status(404).json({ error: 'Note not found.' })
-    if (!assertOwnerOrAdmin({ res, user: req.user, ownerId: note.userId, message: 'Not your note.', targetType: 'note', targetId: noteId })) return
+    if (
+      !assertOwnerOrAdmin({
+        res,
+        user: req.user,
+        ownerId: note.userId,
+        message: 'Not your note.',
+        targetType: 'note',
+        targetId: noteId,
+      })
+    )
+      return
 
     const pinned = req.body.pinned !== undefined ? Boolean(req.body.pinned) : !note.pinned
     const updated = await prisma.note.update({ where: { id: noteId }, data: { pinned } })
@@ -900,19 +1289,36 @@ async function toggleNotePin(req, res) {
  */
 async function updateNoteTags(req, res) {
   const noteId = parseInt(req.params.id, 10)
-  if (!Number.isInteger(noteId) || noteId < 1) return res.status(400).json({ error: 'Invalid note id.' })
+  if (!Number.isInteger(noteId) || noteId < 1)
+    return res.status(400).json({ error: 'Invalid note id.' })
 
   try {
-    const note = await prisma.note.findUnique({ where: { id: noteId }, select: { id: true, userId: true } })
+    const note = await prisma.note.findUnique({
+      where: { id: noteId },
+      select: { id: true, userId: true },
+    })
     if (!note) return res.status(404).json({ error: 'Note not found.' })
-    if (!assertOwnerOrAdmin({ res, user: req.user, ownerId: note.userId, message: 'Not your note.', targetType: 'note', targetId: noteId })) return
+    if (
+      !assertOwnerOrAdmin({
+        res,
+        user: req.user,
+        ownerId: note.userId,
+        message: 'Not your note.',
+        targetType: 'note',
+        targetId: noteId,
+      })
+    )
+      return
 
     const tags = Array.isArray(req.body.tags) ? req.body.tags : []
     // Sanitize: max 10 tags, each max 30 chars, lowercase trimmed, unique
-    const cleaned = [...new Set(
-      tags.map(t => typeof t === 'string' ? t.trim().toLowerCase().slice(0, 30) : '')
-        .filter(Boolean)
-    )].slice(0, 10)
+    const cleaned = [
+      ...new Set(
+        tags
+          .map((t) => (typeof t === 'string' ? t.trim().toLowerCase().slice(0, 30) : ''))
+          .filter(Boolean),
+      ),
+    ].slice(0, 10)
 
     const updated = await prisma.note.update({
       where: { id: noteId },
@@ -930,16 +1336,32 @@ async function updateNoteTags(req, res) {
  */
 async function uploadNoteImage(req, res) {
   const noteId = parseInt(req.params.id, 10)
-  if (!Number.isInteger(noteId) || noteId < 1) return res.status(400).json({ error: 'Invalid note id.' })
+  if (!Number.isInteger(noteId) || noteId < 1)
+    return res.status(400).json({ error: 'Invalid note id.' })
 
   if (!req.file) {
-    return res.status(400).json({ error: 'No image file attached. Use multipart/form-data with field name "image".' })
+    return res
+      .status(400)
+      .json({ error: 'No image file attached. Use multipart/form-data with field name "image".' })
   }
 
   try {
-    const note = await prisma.note.findUnique({ where: { id: noteId }, select: { id: true, userId: true } })
+    const note = await prisma.note.findUnique({
+      where: { id: noteId },
+      select: { id: true, userId: true },
+    })
     if (!note) return res.status(404).json({ error: 'Note not found.' })
-    if (!assertOwnerOrAdmin({ res, user: req.user, ownerId: note.userId, message: 'Not your note.', targetType: 'note', targetId: noteId })) return
+    if (
+      !assertOwnerOrAdmin({
+        res,
+        user: req.user,
+        ownerId: note.userId,
+        message: 'Not your note.',
+        targetType: 'note',
+        targetId: noteId,
+      })
+    )
+      return
 
     // Return the URL for markdown embedding
     const imageUrl = `/uploads/note-images/${req.file.filename}`
@@ -948,6 +1370,38 @@ async function uploadNoteImage(req, res) {
     captureError(uploadErr, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
   }
+}
+
+async function appendChunk(req, res) {
+  const { saveId, chunkIndex, chunkCount, chunk, baseRevision, contentHash, title } = req.body ?? {}
+  if (
+    !saveId ||
+    typeof chunkIndex !== 'number' ||
+    typeof chunkCount !== 'number' ||
+    typeof chunk !== 'string'
+  ) {
+    return sendError(res, 400, 'Invalid chunk payload', ERROR_CODES.BAD_REQUEST)
+  }
+  let result
+  try {
+    result = defaultChunkBuffer.append(saveId, chunkIndex, chunkCount, chunk)
+  } catch (e) {
+    return sendError(res, 400, e.message, ERROR_CODES.NOTE_CHUNK_OUT_OF_ORDER)
+  }
+  if (!result.complete) {
+    return res.status(202).json({ received: chunkIndex + 1, total: chunkCount })
+  }
+  // Delegate to updateNote() with the assembled content. Use trigger='debounce'
+  // since chunked saves come from the autosave path.
+  req.body = {
+    title,
+    content: result.content,
+    baseRevision,
+    saveId,
+    contentHash,
+    trigger: 'debounce',
+  }
+  return updateNote(req, res)
 }
 
 module.exports = {
@@ -963,10 +1417,12 @@ module.exports = {
   createNoteVersion,
   listNoteVersions,
   getNoteVersion,
+  getVersionDiff,
   restoreNoteVersion,
   starNote,
   unstarNote,
   toggleNotePin,
   updateNoteTags,
   uploadNoteImage,
+  appendChunk,
 }

@@ -33,6 +33,12 @@ const ERROR_CODES = Object.freeze({
   ACCOUNT_RESTRICTED: 'ACCOUNT_RESTRICTED',
   SUPER_ADMIN_PROTECTED: 'SUPER_ADMIN_PROTECTED',
 
+  // ── Notes hardening v2 ─────────────────────────────────────────────────
+  NOTE_REVISION_CONFLICT: 'NOTE_REVISION_CONFLICT',
+  NOTE_PAYLOAD_TOO_LARGE: 'NOTE_PAYLOAD_TOO_LARGE',
+  NOTE_CHUNK_OUT_OF_ORDER: 'NOTE_CHUNK_OUT_OF_ORDER',
+  NOTE_VERSION_NOT_FOUND: 'NOTE_VERSION_NOT_FOUND',
+
   // ── Legacy (alias kept for backward compat) ────────────────────────────
   SERVER_ERROR: 'SERVER_ERROR',
 })

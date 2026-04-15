@@ -166,7 +166,13 @@ describe('version history', () => {
     it('saves a version snapshot and returns 201', async () => {
       mocks.prisma.note.findUnique.mockResolvedValue(sampleNote)
       mocks.prisma.noteVersion.create.mockResolvedValue({
-        id: 10, noteId: 1, userId: 42, title: 'Test', content: 'Hello world', message: 'checkpoint', createdAt: new Date(),
+        id: 10,
+        noteId: 1,
+        userId: 42,
+        title: 'Test',
+        content: 'Hello world',
+        message: 'checkpoint',
+        createdAt: new Date(),
       })
 
       const res = await request(app).post('/1/versions').send({ message: 'checkpoint' })
@@ -175,8 +181,14 @@ describe('version history', () => {
       expect(res.body).toMatchObject({ noteId: 1, message: 'checkpoint' })
       expect(mocks.prisma.noteVersion.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ noteId: 1, userId: 42, title: 'Test', content: 'Hello world', message: 'checkpoint' }),
-        })
+          data: expect.objectContaining({
+            noteId: 1,
+            userId: 42,
+            title: 'Test',
+            content: 'Hello world',
+            message: 'checkpoint',
+          }),
+        }),
       )
     })
 
@@ -197,7 +209,13 @@ describe('version history', () => {
     it('truncates message to 200 chars', async () => {
       mocks.prisma.note.findUnique.mockResolvedValue(sampleNote)
       mocks.prisma.noteVersion.create.mockResolvedValue({
-        id: 10, noteId: 1, userId: 42, title: 'Test', content: 'Hello world', message: 'x'.repeat(200), createdAt: new Date(),
+        id: 10,
+        noteId: 1,
+        userId: 42,
+        title: 'Test',
+        content: 'Hello world',
+        message: 'x'.repeat(200),
+        createdAt: new Date(),
       })
 
       const longMessage = 'a'.repeat(300)
@@ -206,7 +224,7 @@ describe('version history', () => {
       expect(mocks.prisma.noteVersion.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ message: 'a'.repeat(200) }),
-        })
+        }),
       )
     })
   })
@@ -233,7 +251,7 @@ describe('version history', () => {
       await request(app).get('/1/versions?limit=100')
 
       expect(mocks.prisma.noteVersion.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ take: 50 })
+        expect.objectContaining({ take: 50 }),
       )
     })
   })
@@ -242,7 +260,11 @@ describe('version history', () => {
     it('returns the version with full content', async () => {
       mocks.prisma.note.findUnique.mockResolvedValue({ id: 1, userId: 42 })
       mocks.prisma.noteVersion.findUnique.mockResolvedValue({
-        id: 10, noteId: 1, title: 'Old', content: 'Old content', createdAt: new Date(),
+        id: 10,
+        noteId: 1,
+        title: 'Old',
+        content: 'Old content',
+        createdAt: new Date(),
       })
 
       const res = await request(app).get('/1/versions/10')
@@ -262,25 +284,50 @@ describe('version history', () => {
 
   describe('POST /:id/versions/:versionId/restore', () => {
     it('auto-saves current state then restores the version', async () => {
-      const currentNote = { id: 1, userId: 42, title: 'Current', content: 'Current content' }
-      const oldVersion = { id: 10, noteId: 1, title: 'Old', content: 'Old content', createdAt: new Date('2026-01-01') }
+      const currentNote = {
+        id: 1,
+        userId: 42,
+        title: 'Current',
+        content: 'Current content',
+        revision: 2,
+      }
+      const oldVersion = {
+        id: 10,
+        noteId: 1,
+        title: 'Old',
+        content: 'Old content',
+        createdAt: new Date('2026-01-01'),
+      }
       mocks.prisma.note.findUnique.mockResolvedValue(currentNote)
       mocks.prisma.noteVersion.findUnique.mockResolvedValue(oldVersion)
-      mocks.prisma.noteVersion.create.mockResolvedValue({}) // auto-save
-      mocks.prisma.note.update.mockResolvedValue({
-        ...currentNote, title: 'Old', content: 'Old content',
-        course: null, author: { id: 42, username: 'test_user' },
+
+      const txVersionCreate = vi.fn().mockResolvedValue({})
+      const txNoteUpdate = vi.fn().mockResolvedValue({
+        ...currentNote,
+        title: 'Old',
+        content: 'Old content',
+        revision: 3,
       })
+      mocks.prisma.$transaction = vi.fn().mockImplementation(async (cb) =>
+        cb({
+          noteVersion: { create: txVersionCreate },
+          note: { update: txNoteUpdate },
+        }),
+      )
 
       const res = await request(app).post('/1/versions/10/restore')
 
       expect(res.status).toBe(200)
-      expect(res.body).toMatchObject({ title: 'Old', content: 'Old content' })
-      // Auto-save should have been called with current content
-      expect(mocks.prisma.noteVersion.create).toHaveBeenCalledWith(
+      expect(res.body.note).toMatchObject({ title: 'Old', content: 'Old content', revision: 3 })
+      // PRE_RESTORE snapshot should carry the current content
+      expect(txVersionCreate).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ title: 'Current', content: 'Current content' }),
-        })
+          data: expect.objectContaining({
+            title: 'Current',
+            content: 'Current content',
+            kind: 'PRE_RESTORE',
+          }),
+        }),
       )
     })
   })
@@ -376,7 +423,9 @@ describe('note tags', () => {
       mocks.prisma.note.findUnique.mockResolvedValue({ id: 1, userId: 42 })
       mocks.prisma.note.update.mockResolvedValue({ id: 1, tags: '["math","physics"]' })
 
-      const res = await request(app).patch('/1/tags').send({ tags: ['Math', ' Physics '] })
+      const res = await request(app)
+        .patch('/1/tags')
+        .send({ tags: ['Math', ' Physics '] })
 
       expect(res.status).toBe(200)
       expect(res.body.tags).toEqual(['math', 'physics'])
@@ -384,7 +433,10 @@ describe('note tags', () => {
 
     it('enforces max 10 tags', async () => {
       mocks.prisma.note.findUnique.mockResolvedValue({ id: 1, userId: 42 })
-      mocks.prisma.note.update.mockResolvedValue({ id: 1, tags: JSON.stringify(Array.from({ length: 10 }, (_, i) => `tag${i}`)) })
+      mocks.prisma.note.update.mockResolvedValue({
+        id: 1,
+        tags: JSON.stringify(Array.from({ length: 10 }, (_, i) => `tag${i}`)),
+      })
 
       const tags = Array.from({ length: 15 }, (_, i) => `tag${i}`)
       await request(app).patch('/1/tags').send({ tags })
@@ -398,7 +450,9 @@ describe('note tags', () => {
       mocks.prisma.note.findUnique.mockResolvedValue({ id: 1, userId: 42 })
       mocks.prisma.note.update.mockResolvedValue({ id: 1, tags: '["hello"]' })
 
-      await request(app).patch('/1/tags').send({ tags: ['hello', 'Hello', 'HELLO'] })
+      await request(app)
+        .patch('/1/tags')
+        .send({ tags: ['hello', 'Hello', 'HELLO'] })
 
       const callData = mocks.prisma.note.update.mock.calls[0][0].data
       const savedTags = JSON.parse(callData.tags)
@@ -422,9 +476,18 @@ describe('note tags', () => {
  * ═══════════════════════════════════════════════════════════════════════════ */
 describe('comment HTML stripping', () => {
   it('strips HTML tags from comment content', async () => {
-    mocks.prisma.note.findUnique.mockResolvedValue({ id: 1, private: false, userId: 42, title: 'Test', content: 'body' })
+    mocks.prisma.note.findUnique.mockResolvedValue({
+      id: 1,
+      private: false,
+      userId: 42,
+      title: 'Test',
+      content: 'body',
+    })
     mocks.prisma.noteComment.create.mockResolvedValue({
-      id: 1, content: 'alert("xss")', noteId: 1, userId: 42,
+      id: 1,
+      content: 'alert("xss")',
+      noteId: 1,
+      userId: 42,
       author: { id: 42, username: 'test_user' },
     })
 
@@ -440,9 +503,7 @@ describe('comment HTML stripping', () => {
   })
 
   it('returns 400 if stripping tags leaves empty content', async () => {
-    const res = await request(app)
-      .post('/1/comments')
-      .send({ content: '<br><hr><div></div>' })
+    const res = await request(app).post('/1/comments').send({ content: '<br><hr><div></div>' })
 
     expect(res.status).toBe(400)
     expect(res.body.error).toMatch(/cannot be empty/i)

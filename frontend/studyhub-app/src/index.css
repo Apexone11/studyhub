@@ -219,7 +219,12 @@
   --sh-home-hero-orb-blue: rgba(59, 130, 246, 0.12);
   --sh-home-hero-orb-violet: rgba(139, 92, 246, 0.1);
   --sh-home-hero-orb-green: rgba(16, 185, 129, 0.08);
-  --sh-home-tree-glow: radial-gradient(circle, rgba(96, 165, 250, 0.15) 0%, rgba(139, 92, 246, 0.08) 40%, transparent 70%);
+  --sh-home-tree-glow: radial-gradient(
+    circle,
+    rgba(96, 165, 250, 0.15) 0%,
+    rgba(139, 92, 246, 0.08) 40%,
+    transparent 70%
+  );
   --sh-home-page-backdrop: var(--sh-surface);
   --sh-home-hero-section-bg: var(--sh-home-hero-gradient);
   --sh-home-primary-shadow: 0 8px 30px rgba(37, 99, 235, 0.45);
@@ -1217,23 +1222,55 @@ textarea.sh-input {
 }
 
 @keyframes treeColorCycle {
-  0%   { filter: blur(12px) hue-rotate(0deg); opacity: 0.18; }
-  25%  { filter: blur(16px) hue-rotate(40deg); opacity: 0.28; }
-  50%  { filter: blur(14px) hue-rotate(90deg); opacity: 0.22; }
-  75%  { filter: blur(18px) hue-rotate(160deg); opacity: 0.26; }
-  100% { filter: blur(12px) hue-rotate(360deg); opacity: 0.18; }
+  0% {
+    filter: blur(12px) hue-rotate(0deg);
+    opacity: 0.18;
+  }
+  25% {
+    filter: blur(16px) hue-rotate(40deg);
+    opacity: 0.28;
+  }
+  50% {
+    filter: blur(14px) hue-rotate(90deg);
+    opacity: 0.22;
+  }
+  75% {
+    filter: blur(18px) hue-rotate(160deg);
+    opacity: 0.26;
+  }
+  100% {
+    filter: blur(12px) hue-rotate(360deg);
+    opacity: 0.18;
+  }
 }
 
 @keyframes treeGlowRadial {
-  0%   { opacity: 0.06; transform: translate(-50%, -54%) scale(1); }
-  33%  { opacity: 0.12; transform: translate(-50%, -54%) scale(1.05); }
-  66%  { opacity: 0.08; transform: translate(-50%, -54%) scale(1.02); }
-  100% { opacity: 0.06; transform: translate(-50%, -54%) scale(1); }
+  0% {
+    opacity: 0.06;
+    transform: translate(-50%, -54%) scale(1);
+  }
+  33% {
+    opacity: 0.12;
+    transform: translate(-50%, -54%) scale(1.05);
+  }
+  66% {
+    opacity: 0.08;
+    transform: translate(-50%, -54%) scale(1.02);
+  }
+  100% {
+    opacity: 0.06;
+    transform: translate(-50%, -54%) scale(1);
+  }
 }
 
 @keyframes treeNodeTwinkle {
-  0%, 100% { opacity: 0.3; }
-  50%      { opacity: 0.8; }
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.8;
+  }
 }
 
 .home-hero-tree {
@@ -1269,17 +1306,27 @@ textarea.sh-input {
   background: var(--sh-home-tree-glow);
   pointer-events: none;
   z-index: 0;
-  animation: treeGlowRadial 8s ease-in-out infinite, treeColorCycle 16s ease-in-out infinite;
+  animation:
+    treeGlowRadial 8s ease-in-out infinite,
+    treeColorCycle 16s ease-in-out infinite;
 }
 
 .hero-tree-base .tree-node-glow {
   animation: treeNodeTwinkle 4s ease-in-out infinite;
 }
 
-.hero-tree-base .tree-node-glow:nth-child(2n)   { animation-delay: -1s; }
-.hero-tree-base .tree-node-glow:nth-child(3n)   { animation-delay: -2s; }
-.hero-tree-base .tree-node-glow:nth-child(4n+1) { animation-delay: -3s; }
-.hero-tree-base .tree-node-glow:nth-child(5n+2) { animation-delay: -0.5s; }
+.hero-tree-base .tree-node-glow:nth-child(2n) {
+  animation-delay: -1s;
+}
+.hero-tree-base .tree-node-glow:nth-child(3n) {
+  animation-delay: -2s;
+}
+.hero-tree-base .tree-node-glow:nth-child(4n + 1) {
+  animation-delay: -3s;
+}
+.hero-tree-base .tree-node-glow:nth-child(5n + 2) {
+  animation-delay: -0.5s;
+}
 
 .hero-cta-glow {
   animation: ctaGlow 3.2s ease-in-out infinite;
@@ -3511,6 +3558,16 @@ textarea.sh-input {
   }
 }
 
+@keyframes sh-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
 @keyframes spin {
   from {
     transform: rotate(0deg);
@@ -3992,15 +4049,30 @@ select:focus-visible {
 }
 
 [data-theme='dark'] .sh-public-route-fx .sh-dark-mode-fx__orb--brand {
-  background: radial-gradient(circle, rgba(59, 130, 246, 0.34) 0%, rgba(59, 130, 246, 0.08) 58%, transparent 78%);
+  background: radial-gradient(
+    circle,
+    rgba(59, 130, 246, 0.34) 0%,
+    rgba(59, 130, 246, 0.08) 58%,
+    transparent 78%
+  );
 }
 
 [data-theme='dark'] .sh-public-route-fx .sh-dark-mode-fx__orb--violet {
-  background: radial-gradient(circle, rgba(167, 139, 250, 0.28) 0%, rgba(167, 139, 250, 0.06) 62%, transparent 80%);
+  background: radial-gradient(
+    circle,
+    rgba(167, 139, 250, 0.28) 0%,
+    rgba(167, 139, 250, 0.06) 62%,
+    transparent 80%
+  );
 }
 
 [data-theme='dark'] .sh-public-route-fx .sh-dark-mode-fx__orb--cyan {
-  background: radial-gradient(circle, rgba(34, 211, 238, 0.22) 0%, rgba(34, 211, 238, 0.04) 62%, transparent 80%);
+  background: radial-gradient(
+    circle,
+    rgba(34, 211, 238, 0.22) 0%,
+    rgba(34, 211, 238, 0.04) 62%,
+    transparent 80%
+  );
 }
 
 [data-theme='dark'] .sh-public-route-fx .sh-dark-mode-fx__beam {
