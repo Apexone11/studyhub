@@ -1,6 +1,7 @@
 import { API } from '../config'
 import { clearFetchCache } from './useFetch'
 import { clearStudyStatusCache } from './useStudyStatus'
+import { clearNativeToken } from './mobile/nativeToken'
 
 let inMemoryCsrfToken = ''
 
@@ -53,6 +54,9 @@ export function setCachedCsrfToken(token) {
 export function clearStoredSession() {
   inMemoryCsrfToken = ''
   localStorage.removeItem('user')
+  // On the Capacitor native shell this also removes the bearer token so the
+  // next request is recognized as unauthenticated. No-op on web.
+  clearNativeToken()
 }
 
 export async function logoutSession() {

@@ -25,12 +25,17 @@
     "visual:smoke": "node tests/helpers/screenshotCleanup.js && (playwright test visual-smoke || true) && node scripts/generate-gallery.mjs",
     "visual:dark:beta": "playwright test --config=playwright.beta.config.js tests/dark-mode.beta-live.spec.js",
     "visual:gallery": "node scripts/generate-gallery.mjs",
-    "visual:review": "node tests/helpers/screenshotCleanup.js && (playwright test visual-baseline || true) && node scripts/generate-gallery.mjs"
+    "visual:review": "node tests/helpers/screenshotCleanup.js && (playwright test visual-baseline || true) && node scripts/generate-gallery.mjs",
+    "mobile:build": "node scripts/build-mobile.js",
+    "mobile:sync": "cap sync android",
+    "mobile:open": "cap open android",
+    "mobile:run": "cap run android"
   },
   "dependencies": {
     "@capacitor/android": "^8.3.0",
     "@capacitor/cli": "^8.3.0",
     "@capacitor/core": "^8.3.0",
+    "@codetrix-studio/capacitor-google-auth": "^3.4.0-rc.4",
     "@codemirror/lang-html": "^6.4.11",
     "@formkit/auto-animate": "^0.9.0",
     "@react-oauth/google": "^0.13.4",

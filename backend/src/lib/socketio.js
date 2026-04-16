@@ -62,13 +62,27 @@ function initSocketIO(httpServer) {
     },
   })
 
-  // Auth middleware: extract JWT from cookie header
+  // Auth middleware: extract JWT from cookie header OR handshake auth token.
+  // Web clients send the HttpOnly `studyhub_session` cookie; the Capacitor
+  // native shell passes the same JWT via `io(..., { auth: { token } })` on
+  // the client because cross-origin cookies are unreliable in the WebView.
   io.use((socket, next) => {
     try {
       // Parse cookie header manually for studyhub_session
       const cookieHeader = socket.handshake.headers.cookie || ''
       const cookies = parseCookies(cookieHeader)
-      const token = cookies.studyhub_session || null
+      const cookieToken = cookies.studyhub_session || null
+
+      const handshakeAuth = socket.handshake.auth || {}
+      const bearerToken = typeof handshakeAuth.token === 'string' ? handshakeAuth.token : null
+
+      const authHeader =
+        typeof socket.handshake.headers.authorization === 'string'
+          ? socket.handshake.headers.authorization
+          : ''
+      const authHeaderToken = /^Bearer\s+(.+)$/i.exec(authHeader)?.[1] || null
+
+      const token = cookieToken || bearerToken || authHeaderToken
 
       if (!token) {
         return next(new Error('Auth required'))

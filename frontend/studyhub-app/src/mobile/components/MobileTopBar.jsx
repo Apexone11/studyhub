@@ -24,6 +24,7 @@ function BackArrow({ size = 20 }) {
  * @param {string} [props.title]
  * @param {boolean} [props.showBack=false]
  * @param {() => void} [props.onBack] — custom back handler, defaults to navigate(-1)
+ * @param {React.ReactNode} [props.left] — left-side slot (overrides showBack when provided)
  * @param {React.ReactNode} [props.right] — right-side slot
  * @param {boolean} [props.transparent=false] — transparent background mode
  * @param {string} [props.className]
@@ -32,6 +33,7 @@ export default function MobileTopBar({
   title,
   showBack = false,
   onBack,
+  left,
   right,
   transparent = false,
   className = '',
@@ -51,7 +53,9 @@ export default function MobileTopBar({
   return (
     <header className={`mob-topbar ${bgClass} ${className}`}>
       <div className="mob-topbar-left">
-        {showBack && (
+        {left ? (
+          left
+        ) : showBack ? (
           <button
             className="mob-topbar-back"
             onClick={handleBack}
@@ -60,7 +64,7 @@ export default function MobileTopBar({
           >
             <BackArrow />
           </button>
-        )}
+        ) : null}
       </div>
       {title && <h1 className="mob-topbar-title">{title}</h1>}
       <div className="mob-topbar-right">{right}</div>
