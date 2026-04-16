@@ -9,7 +9,6 @@ const prisma = require('../../lib/prisma')
 const { timedSection, logTiming } = require('../../lib/requestTiming')
 const { getBlockedUserIds } = require('../../lib/social/blockFilter')
 const { summarizeText } = require('../feed/feed.service')
-const { cached } = require('../../lib/redis')
 const { cacheControl } = require('../../lib/cacheControl')
 const { searchLimiter } = require('../../lib/rateLimiters')
 
@@ -22,7 +21,6 @@ const VALID_TYPES = ['all', 'sheets', 'courses', 'users', 'notes', 'groups']
 /**
  * Execute search queries for anonymous (unauthenticated) users.
  * No block filtering, no notes, only public groups.
- * Used inside the Redis `cached()` wrapper.
  */
 async function executeSearch({ query, type, limit, useFTS }) {
   const wantSheets = type === 'all' || type === 'sheets'
@@ -37,21 +35,43 @@ async function executeSearch({ query, type, limit, useFTS }) {
   // Sheets
   if (wantSheets) {
     if (useFTS) {
-      queries.push(searchSheetsFTS(query, { status: 'published', limit }).then(async (result) => {
-        if (!result.sheets.length) return []
-        const ids = result.sheets.map((s) => Number(s.id))
-        return prisma.studySheet.findMany({
-          where: { id: { in: ids } },
-          select: { id: true, title: true, description: true, stars: true, downloads: true, createdAt: true, course: { select: { id: true, code: true, name: true } }, author: { select: { id: true, username: true } } },
-        })
-      }))
+      queries.push(
+        searchSheetsFTS(query, { status: 'published', limit }).then(async (result) => {
+          if (!result.sheets.length) return []
+          const ids = result.sheets.map((s) => Number(s.id))
+          return prisma.studySheet.findMany({
+            where: { id: { in: ids } },
+            select: {
+              id: true,
+              title: true,
+              description: true,
+              stars: true,
+              downloads: true,
+              createdAt: true,
+              course: { select: { id: true, code: true, name: true } },
+              author: { select: { id: true, username: true } },
+            },
+          })
+        }),
+      )
     } else {
-      queries.push(prisma.studySheet.findMany({
-        where: { status: 'published', OR: sheetTextSearchClauses },
-        select: { id: true, title: true, description: true, stars: true, downloads: true, createdAt: true, course: { select: { id: true, code: true, name: true } }, author: { select: { id: true, username: true } } },
-        orderBy: { stars: 'desc' },
-        take: limit,
-      }))
+      queries.push(
+        prisma.studySheet.findMany({
+          where: { status: 'published', OR: sheetTextSearchClauses },
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            stars: true,
+            downloads: true,
+            createdAt: true,
+            course: { select: { id: true, code: true, name: true } },
+            author: { select: { id: true, username: true } },
+          },
+          orderBy: { stars: 'desc' },
+          take: limit,
+        }),
+      )
     }
   } else {
     queries.push(Promise.resolve([]))
@@ -60,21 +80,40 @@ async function executeSearch({ query, type, limit, useFTS }) {
   // Courses
   if (wantCourses) {
     if (useFTS) {
-      queries.push(searchCoursesFTS(query, { limit }).then(async (rows) => {
-        if (!rows.length) return []
-        const ids = rows.map((c) => Number(c.id))
-        return prisma.course.findMany({
-          where: { id: { in: ids } },
-          select: { id: true, code: true, name: true, school: { select: { id: true, name: true, short: true } } },
-        })
-      }))
+      queries.push(
+        searchCoursesFTS(query, { limit }).then(async (rows) => {
+          if (!rows.length) return []
+          const ids = rows.map((c) => Number(c.id))
+          return prisma.course.findMany({
+            where: { id: { in: ids } },
+            select: {
+              id: true,
+              code: true,
+              name: true,
+              school: { select: { id: true, name: true, short: true } },
+            },
+          })
+        }),
+      )
     } else {
-      queries.push(prisma.course.findMany({
-        where: { OR: [{ code: { contains: query, mode: 'insensitive' } }, { name: { contains: query, mode: 'insensitive' } }] },
-        select: { id: true, code: true, name: true, school: { select: { id: true, name: true, short: true } } },
-        orderBy: { code: 'asc' },
-        take: limit,
-      }))
+      queries.push(
+        prisma.course.findMany({
+          where: {
+            OR: [
+              { code: { contains: query, mode: 'insensitive' } },
+              { name: { contains: query, mode: 'insensitive' } },
+            ],
+          },
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            school: { select: { id: true, name: true, short: true } },
+          },
+          orderBy: { code: 'asc' },
+          take: limit,
+        }),
+      )
     }
   } else {
     queries.push(Promise.resolve([]))
@@ -83,21 +122,25 @@ async function executeSearch({ query, type, limit, useFTS }) {
   // Users
   if (wantUsers) {
     if (useFTS) {
-      queries.push(searchUsersFTS(query, { limit: userSearchTake }).then(async (rows) => {
-        if (!rows.length) return []
-        const ids = rows.map((u) => Number(u.id))
-        return prisma.user.findMany({
-          where: { id: { in: ids } },
-          select: { id: true, username: true, role: true, avatarUrl: true, createdAt: true },
-        })
-      }))
+      queries.push(
+        searchUsersFTS(query, { limit: userSearchTake }).then(async (rows) => {
+          if (!rows.length) return []
+          const ids = rows.map((u) => Number(u.id))
+          return prisma.user.findMany({
+            where: { id: { in: ids } },
+            select: { id: true, username: true, role: true, avatarUrl: true, createdAt: true },
+          })
+        }),
+      )
     } else {
-      queries.push(prisma.user.findMany({
-        where: { username: { contains: query, mode: 'insensitive' } },
-        select: { id: true, username: true, role: true, avatarUrl: true, createdAt: true },
-        orderBy: { username: 'asc' },
-        take: userSearchTake,
-      }))
+      queries.push(
+        prisma.user.findMany({
+          where: { username: { contains: query, mode: 'insensitive' } },
+          select: { id: true, username: true, role: true, avatarUrl: true, createdAt: true },
+          orderBy: { username: 'asc' },
+          take: userSearchTake,
+        }),
+      )
     }
   } else {
     queries.push(Promise.resolve([]))
@@ -108,12 +151,29 @@ async function executeSearch({ query, type, limit, useFTS }) {
 
   // Groups -- only public for anonymous
   if (wantGroups) {
-    queries.push(prisma.studyGroup.findMany({
-      where: { privacy: 'public', OR: [{ name: { contains: query, mode: 'insensitive' } }, { description: { contains: query, mode: 'insensitive' } }] },
-      select: { id: true, name: true, description: true, privacy: true, courseId: true, course: { select: { id: true, code: true, name: true } }, createdAt: true, _count: { select: { members: true } } },
-      orderBy: { createdAt: 'desc' },
-      take: limit,
-    }))
+    queries.push(
+      prisma.studyGroup.findMany({
+        where: {
+          privacy: 'public',
+          OR: [
+            { name: { contains: query, mode: 'insensitive' } },
+            { description: { contains: query, mode: 'insensitive' } },
+          ],
+        },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          privacy: true,
+          courseId: true,
+          course: { select: { id: true, code: true, name: true } },
+          createdAt: true,
+          _count: { select: { members: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+      }),
+    )
   } else {
     queries.push(Promise.resolve([]))
   }
@@ -121,11 +181,21 @@ async function executeSearch({ query, type, limit, useFTS }) {
   const [sheets, courses, users, _notes, groups] = await Promise.all(queries)
 
   // Apply visibility filtering for anonymous users (all public profiles visible)
-  const visibleIds = await getVisibleProfileIds(prisma, null, users.map((u) => u.id))
+  const visibleIds = await getVisibleProfileIds(
+    prisma,
+    null,
+    users.map((u) => u.id),
+  )
   const filteredUsers = users.filter((u) => visibleIds.has(u.id)).slice(0, limit)
 
-  const cleanSheets = sheets.map((s) => ({ ...s, description: s.description ? summarizeText(s.description, 200) : '' }))
-  const cleanGroups = groups.map((g) => ({ ...g, description: g.description ? summarizeText(g.description, 200) : '' }))
+  const cleanSheets = sheets.map((s) => ({
+    ...s,
+    description: s.description ? summarizeText(s.description, 200) : '',
+  }))
+  const cleanGroups = groups.map((g) => ({
+    ...g,
+    description: g.description ? summarizeText(g.description, 200) : '',
+  }))
 
   return {
     results: { sheets: cleanSheets, courses, users: filteredUsers, notes: [], groups: cleanGroups },
@@ -174,10 +244,8 @@ router.get('/', optionalAuth, cacheControl(30, { staleWhileRevalidate: 60 }), as
   const useFTS = req.query.fts === 'true'
 
   try {
-    // Phase 6: cache anonymous search results 60s -- identical for all unauthenticated users
     if (!req.user) {
-      const cacheKey = `search:anon:${type}:${limit}:${useFTS ? 1 : 0}:${query.toLowerCase()}`
-      const result = await cached(cacheKey, () => executeSearch({ query, type, limit, useFTS, user: null }), 60)
+      const result = await executeSearch({ query, type, limit, useFTS })
       return res.json(result)
     }
 

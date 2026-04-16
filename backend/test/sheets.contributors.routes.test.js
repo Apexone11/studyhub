@@ -101,14 +101,10 @@ describe('GET /api/sheets/:id/contributors', () => {
       rootSheetId: 10,
       forkOf: 10,
     })
-    mocks.prisma.studySheet.findMany.mockResolvedValue([
-      { id: 10 },
-      { id: 11 },
-      { id: 12 },
-    ])
+    mocks.prisma.studySheet.findMany.mockResolvedValue([{ id: 10 }, { id: 11 }, { id: 12 }])
     mocks.prisma.sheetCommit.groupBy.mockResolvedValue([
-      { userId: 1, _count: { _all: 5 } },
-      { userId: 2, _count: { _all: 3 } },
+      { userId: 1, _count: { userId: 5 } },
+      { userId: 2, _count: { userId: 3 } },
     ])
     mocks.prisma.user.findMany.mockResolvedValue([
       { id: 1, username: 'alice', avatarUrl: null, isStaffVerified: false },
@@ -125,10 +121,13 @@ describe('GET /api/sheets/:id/contributors', () => {
       commits: 5,
     })
 
-    // Verify the Prisma 6 array-form NOT clause is used.
+    // Verify the Prisma 6 array-form NOT clause is used and that the
+    // groupBy counts/orders by a concrete column (not the removed `_all`).
     const groupByCall = mocks.prisma.sheetCommit.groupBy.mock.calls[0][0]
     expect(groupByCall.where.NOT).toEqual([{ kind: 'fork_base' }])
     expect(groupByCall.where.sheetId.in).toEqual([10, 11, 12])
+    expect(groupByCall._count).toEqual({ userId: true })
+    expect(groupByCall.orderBy).toEqual({ _count: { userId: 'desc' } })
   })
 
   it('drops grouped rows whose user record cannot be loaded', async () => {
@@ -141,8 +140,8 @@ describe('GET /api/sheets/:id/contributors', () => {
     })
     mocks.prisma.studySheet.findMany.mockResolvedValue([{ id: 10 }])
     mocks.prisma.sheetCommit.groupBy.mockResolvedValue([
-      { userId: 1, _count: { _all: 2 } },
-      { userId: 999, _count: { _all: 1 } },
+      { userId: 1, _count: { userId: 2 } },
+      { userId: 999, _count: { userId: 1 } },
     ])
     mocks.prisma.user.findMany.mockResolvedValue([
       { id: 1, username: 'alice', avatarUrl: null, isStaffVerified: false },
@@ -197,16 +196,37 @@ describe('GET /api/sheets/:id/fork-tree', () => {
     const author = { id: 1, username: 'alice', avatarUrl: null, isStaffVerified: false }
     mocks.prisma.studySheet.findMany.mockResolvedValue([
       {
-        id: 10, title: 'Root', status: 'published', forkOf: null, rootSheetId: null,
-        forks: 1, stars: 0, createdAt: new Date('2026-01-01'), author,
+        id: 10,
+        title: 'Root',
+        status: 'published',
+        forkOf: null,
+        rootSheetId: null,
+        forks: 1,
+        stars: 0,
+        createdAt: new Date('2026-01-01'),
+        author,
       },
       {
-        id: 11, title: 'Fork 1', status: 'published', forkOf: 10, rootSheetId: 10,
-        forks: 1, stars: 0, createdAt: new Date('2026-01-02'), author,
+        id: 11,
+        title: 'Fork 1',
+        status: 'published',
+        forkOf: 10,
+        rootSheetId: 10,
+        forks: 1,
+        stars: 0,
+        createdAt: new Date('2026-01-02'),
+        author,
       },
       {
-        id: 12, title: 'Fork 2', status: 'published', forkOf: 11, rootSheetId: 10,
-        forks: 0, stars: 0, createdAt: new Date('2026-01-03'), author,
+        id: 12,
+        title: 'Fork 2',
+        status: 'published',
+        forkOf: 11,
+        rootSheetId: 10,
+        forks: 0,
+        stars: 0,
+        createdAt: new Date('2026-01-03'),
+        author,
       },
     ])
 

@@ -1302,3 +1302,67 @@ Frontend:
 - Backend tests: 83 files, 1300 tests pass
 - Frontend lint: passes (0 errors)
 - Frontend build: passes
+
+---
+
+## 2026-04-16 — Prisma 6.19 groupBy validation fixes + Google Books Sentry noise reduction
+
+### Summary
+
+Three Sentry issues against the production backend were traced to two root causes:
+
+1. Prisma 6.19+ removed the `_all` pseudo-field from `orderBy._count`. Two call sites (`sheetCommit.groupBy` for sheet contributors, `studySheet.groupBy` for popular courses) still used it, triggering `PrismaClientValidationError` on every request.
+2. The popular-courses query also carried a `NOT: [{ courseId: null }]` clause. `StudySheet.courseId` is a non-nullable `Int`, and Prisma 6.19+ now rejects null comparisons on required fields with "Argument `courseId` is missing."
+
+A separate issue — `Error: Google Books search failed: 503` — was being logged to Sentry on every upstream 5xx even though the library service already falls back to the cached-book table. The capture now runs only when the fallback also has no data, so the signal reflects real user-impacting outages.
+
+### Changes
+
+Backend:
+
+- `backend/src/modules/sheets/sheets.contributors.controller.js` — replace `_count: { _all: true }` / `orderBy: { _count: { _all: 'desc' } }` with the grouped column (`userId`); update the row accessor accordingly.
+- `backend/src/modules/courses/courses.schools.controller.js` — drop the invalid `NOT: [{ courseId: null }]` clause (field is non-nullable), count/order by `courseId`, update the row accessor.
+- `backend/src/modules/library/library.service.js` — in both `searchBooks` and `getBookDetail`, consult the cached-book fallback first and only call `captureError` when it also returns empty. Added `fallbackAvailable: false` context so the remaining Sentry events are always real degradations.
+
+Tests:
+
+- `backend/test/sheets.contributors.routes.test.js` — fixtures switched to `_count: { userId: N }`; asserted the new `_count` / `orderBy` shape.
+- `backend/test/courses.routes.test.js` — fixtures switched to `_count: { courseId: N }`; asserted `where.NOT` is absent and the new `_count` / `orderBy` shape.
+
+### Validation
+
+- Backend lint: passes (0 errors)
+- Changed-file tests (`sheets.contributors.routes`, `courses.routes`, `library.service`, `library.routes`): 32/32 pass
+- Backend full suite: 1205 tests pass; the 13 file-level failures are pre-existing on `local-main` (module-load issues in unrelated users/attachments/security suites) and reproduce with the Prisma fixes stashed.
+- Frontend build: passes
+
+---
+
+## 2026-04-16 — Remove Upstash Redis caching layer
+
+### Summary
+
+The Upstash Redis add-on was costing more than the cache was saving — traffic is low enough that the response-time delta per request is small, and the database can easily handle the uncached load. Every call site already had a graceful-degradation fallback (`if (!client) return fetcher()`), so removing the caching layer is safe and required no change to the API contract. Step 1 (unsetting `UPSTASH_REDIS_URL` / `UPSTASH_REDIS_TOKEN` in Railway and deleting the Upstash database) was done manually. This commit completes step 2 — removing the code and dependency.
+
+### Changes
+
+Backend:
+
+- `backend/src/lib/redis.js` — deleted. All `cached()` / `invalidate()` / `ping()` call sites now talk to Prisma directly.
+- `backend/src/modules/announcements/announcements.routes.js` — inlined `prisma.announcement.findMany` on the list endpoint; removed the two `invalidate('announcements:list')` calls on create/delete (no longer needed).
+- `backend/src/modules/dashboard/dashboard.routes.js` — rewrote `GET /summary` to call Prisma directly; cleaned up the stray `return res.status(404).json(...)` that was returning through the old cached fetcher.
+- `backend/src/modules/courses/courses.schools.controller.js` — inlined the `schools` and `popular` queries; the popular endpoint now early-returns `res.json([])` when there are no grouped rows.
+- `backend/src/modules/feed/feed.leaderboard.controller.js` — inlined `getLeaderboard(prisma, period, limit)`.
+- `backend/src/modules/feed/feed.discovery.controller.js` — inlined the three cached blocks in `/trending`, `/for-you`, and `/courses/:courseId/discover`.
+- `backend/src/modules/public/public.routes.js` — inlined `/platform-stats`; removed the Redis leg from `/health` (database-only health check).
+- `backend/src/modules/search/search.routes.js` — removed the anonymous-search cache wrapping (calls `executeSearch` directly).
+- `backend/src/lib/secretValidator.js` — dropped the `UPSTASH_REDIS_URL` / `UPSTASH_REDIS_TOKEN` entries from the recommended-secrets list.
+- `backend/package.json` — uninstalled `@upstash/redis`.
+
+### Validation
+
+- Backend lint: passes (0 errors)
+- Repo-wide sweep: no remaining references to `@upstash/redis`, `lib/redis`, or `UPSTASH_REDIS_*` in `backend/src` or `backend/test`.
+- Touched-file tests (`announcements.routes`, `dashboard.routes`, `courses.routes`, `feed.routes`, `public.routes`, `search.routes`, `sheets.contributors.routes`, `library.service`): 62/62 pass
+- Backend full suite: 1205 tests pass; same 13 pre-existing file-level failures in unrelated suites (users / attachments / security / IDOR / sheet workflow), confirmed to reproduce on `local-main` with the Redis removal reverted.
+- Frontend build: passes

@@ -78,8 +78,8 @@ beforeEach(() => {
 describe('GET /api/courses/popular', () => {
   it('returns 200 with popular courses ranked by sheet count', async () => {
     mocks.prisma.studySheet.groupBy.mockResolvedValue([
-      { courseId: 10, _count: { _all: 5 } },
-      { courseId: 20, _count: { _all: 3 } },
+      { courseId: 10, _count: { courseId: 5 } },
+      { courseId: 20, _count: { courseId: 3 } },
     ])
     mocks.prisma.course.findMany.mockResolvedValue([
       { id: 10, code: 'CMSC131', name: 'Intro CS', school: { id: 1, name: 'UMD', short: 'UMD' } },
@@ -99,9 +99,14 @@ describe('GET /api/courses/popular', () => {
     })
     expect(res.body[1].sheetCount).toBe(3)
 
-    // Verify the where clause excludes null courseIds (Prisma 6.x syntax)
+    // StudySheet.courseId is non-nullable in the schema, so the query
+    // should not carry a null-exclusion filter. Verify the Prisma 6.19
+    // groupBy shape (concrete _count column, not the removed `_all`).
     const groupByCall = mocks.prisma.studySheet.groupBy.mock.calls[0][0]
-    expect(groupByCall.where.NOT).toEqual([{ courseId: null }])
+    expect(groupByCall.where.status).toBe('published')
+    expect(groupByCall.where.NOT).toBeUndefined()
+    expect(groupByCall._count).toEqual({ courseId: true })
+    expect(groupByCall.orderBy).toEqual({ _count: { courseId: 'desc' } })
   })
 
   it('returns empty array when no published sheets exist', async () => {
@@ -117,8 +122,8 @@ describe('GET /api/courses/popular', () => {
 
   it('filters out courses that no longer exist in DB', async () => {
     mocks.prisma.studySheet.groupBy.mockResolvedValue([
-      { courseId: 10, _count: { _all: 5 } },
-      { courseId: 99, _count: { _all: 2 } },
+      { courseId: 10, _count: { courseId: 5 } },
+      { courseId: 99, _count: { courseId: 2 } },
     ])
     mocks.prisma.course.findMany.mockResolvedValue([
       { id: 10, code: 'CMSC131', name: 'Intro CS', school: { id: 1, name: 'UMD', short: 'UMD' } },

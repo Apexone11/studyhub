@@ -22,7 +22,21 @@ function sanitizeBookDescription(description) {
   if (!description || typeof description !== 'string') return null
 
   const sanitized = sanitizeHtml(description, {
-    allowedTags: ['p', 'br', 'strong', 'em', 'b', 'i', 'u', 's', 'ul', 'ol', 'li', 'blockquote', 'a'],
+    allowedTags: [
+      'p',
+      'br',
+      'strong',
+      'em',
+      'b',
+      'i',
+      'u',
+      's',
+      'ul',
+      'ol',
+      'li',
+      'blockquote',
+      'a',
+    ],
     allowedAttributes: {
       a: ['href', 'target', 'rel'],
     },
@@ -150,17 +164,24 @@ async function searchBooks(query, page = 1, filters = {}) {
     const response = await fetchWithRetry(url)
 
     if (!response.ok) {
-      captureError(createHttpStatusError(`Google Books search failed: ${response.status}`, response.status), {
-        context: 'searchBooks',
-        query,
-        page,
-        statusCode: response.status,
-      })
+      // Google Books occasionally returns 5xx under load. If our cached
+      // fallback has data, users don't see a degraded experience, so skip
+      // the Sentry capture to keep that signal meaningful.
       const fallback = await searchCachedBooks(query, page, filters)
       if (fallback && fallback.results && fallback.results.length > 0) {
         fallback._source = 'cache'
         return fallback
       }
+      captureError(
+        createHttpStatusError(`Google Books search failed: ${response.status}`, response.status),
+        {
+          context: 'searchBooks',
+          query,
+          page,
+          statusCode: response.status,
+          fallbackAvailable: false,
+        },
+      )
       return { results: [], count: 0, _unavailable: true }
     }
 
@@ -172,12 +193,12 @@ async function searchBooks(query, page = 1, filters = {}) {
     cache.set(cacheKey, result, CACHE_TTL.SEARCH)
     return result
   } catch (err) {
-    captureError(err, { context: 'searchBooks', query, page })
     const fallback = await searchCachedBooks(query, page, filters)
     if (fallback && fallback.results && fallback.results.length > 0) {
       fallback._source = 'cache'
       return fallback
     }
+    captureError(err, { context: 'searchBooks', query, page, fallbackAvailable: false })
     return { results: [], count: 0, _unavailable: true }
   }
 }
@@ -202,12 +223,21 @@ async function getBookDetail(volumeId) {
     const response = await fetchWithRetry(url)
 
     if (!response.ok) {
-      captureError(createHttpStatusError(`Google Books detail fetch failed: ${response.status}`, response.status), {
-        context: 'getBookDetail',
-        volumeId,
-        statusCode: response.status,
-      })
-      return await getCachedBookDetail(volumeId)
+      const cached = await getCachedBookDetail(volumeId)
+      if (cached) return cached
+      captureError(
+        createHttpStatusError(
+          `Google Books detail fetch failed: ${response.status}`,
+          response.status,
+        ),
+        {
+          context: 'getBookDetail',
+          volumeId,
+          statusCode: response.status,
+          fallbackAvailable: false,
+        },
+      )
+      return null
     }
 
     const data = await response.json()
@@ -216,8 +246,10 @@ async function getBookDetail(volumeId) {
     cache.set(cacheKey, book, CACHE_TTL.BOOK_DETAIL)
     return book
   } catch (err) {
-    captureError(err, { context: 'getBookDetail', volumeId })
-    return await getCachedBookDetail(volumeId)
+    const cached = await getCachedBookDetail(volumeId)
+    if (cached) return cached
+    captureError(err, { context: 'getBookDetail', volumeId, fallbackAvailable: false })
+    return null
   }
 }
 
