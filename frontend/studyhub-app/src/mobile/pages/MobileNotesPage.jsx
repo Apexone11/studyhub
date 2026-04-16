@@ -118,7 +118,10 @@ export default function MobileNotesPage() {
     }, 350)
   }, [])
 
-  const handleNoteTap = useCallback(() => navigate('/m/notes'), [navigate])
+  const handleNoteTap = useCallback(
+    (id) => navigate(id ? `/m/notes/${id}` : '/m/notes'),
+    [navigate],
+  )
 
   const totalPages = Math.ceil(total / 20)
 

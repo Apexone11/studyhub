@@ -421,8 +421,18 @@ async function getMobileFeed(req, res) {
   try {
     const userId = req.user.userId
     const band = req.query.band === 'triage' ? 'triage' : 'discovery'
-    const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : null
+    const rawCursor = typeof req.query.cursor === 'string' ? req.query.cursor : null
     const limit = clampLimit(req.query.limit, { defaultSize: 20, maxSize: 50 })
+
+    // Validate cursor parses to a real date before using it in Prisma filters
+    let cursor = null
+    if (rawCursor) {
+      const parsed = new Date(rawCursor)
+      if (Number.isNaN(parsed.getTime())) {
+        return sendError(res, 400, 'Invalid cursor value.', ERROR_CODES.BAD_REQUEST)
+      }
+      cursor = rawCursor
+    }
 
     const excludedUserIds = await getExcludedUserIds(userId)
 

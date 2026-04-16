@@ -7,11 +7,11 @@
 const runtimeConfig =
   typeof window !== 'undefined' && window.__STUDYHUB_CONFIG__ ? window.__STUDYHUB_CONFIG__ : {}
 
-// Detect Capacitor native shell (https://localhost on Android)
-const _isNative =
-  typeof window !== 'undefined' &&
-  (window.__SH_NATIVE__ ||
-    (window.location.protocol === 'https:' && window.location.hostname === 'localhost'))
+// Detect Capacitor native shell. window.__SH_NATIVE__ is set by index.html
+// inline script as the earliest reliable signal (before any module loads).
+// This is the single source of truth for API-base selection; detectMobile.js
+// re-uses the same flag for routing decisions.
+const _isNative = typeof window !== 'undefined' && Boolean(window.__SH_NATIVE__)
 
 // On native, prefer the mobile-specific API URL, then the standard API URL.
 // Falls back to localhost:4000 for web development only.
