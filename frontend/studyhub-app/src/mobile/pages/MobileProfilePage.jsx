@@ -27,7 +27,7 @@ const QUICK_ACTIONS = [
   {
     key: 'sheets',
     label: 'My Sheets',
-    path: '/sheets?mine=true',
+    path: '/m/home', // sheets filtering will come later
     icon: (
       <path
         d="M6 2h9l5 5v13a2 2 0 01-2 2H6a2 2 0 01-2-2V4a2 2 0 012-2z"
@@ -41,7 +41,7 @@ const QUICK_ACTIONS = [
   {
     key: 'starred',
     label: 'Starred',
-    path: '/sheets?starred=true',
+    path: '/m/home', // sheets filtering will come later
     icon: (
       <path
         d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
@@ -69,7 +69,7 @@ const QUICK_ACTIONS = [
   {
     key: 'groups',
     label: 'Study Groups',
-    path: '/study-groups',
+    path: '/m/home', // study groups mobile route coming later
     icon: (
       <>
         <circle cx="9" cy="8" r="3" stroke="currentColor" strokeWidth="2" />
@@ -85,7 +85,7 @@ const QUICK_ACTIONS = [
   {
     key: 'settings',
     label: 'Settings',
-    path: '/settings',
+    path: '/m/profile', // settings will be part of profile in mobile
     icon: (
       <>
         <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" />

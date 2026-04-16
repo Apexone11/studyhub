@@ -27,6 +27,9 @@ const OnboardingPeople = lazy(() => import('./pages/onboarding/OnboardingPeople'
 const OnboardingNotifs = lazy(() => import('./pages/onboarding/OnboardingNotifs'))
 const WelcomeSplash = lazy(() => import('./pages/onboarding/WelcomeSplash'))
 
+const MobileTermsPage = lazy(() => import('./pages/MobileTermsPage'))
+const MobilePrivacyPage = lazy(() => import('./pages/MobilePrivacyPage'))
+
 // ── Route guards ───────────────────────────────────────────────
 
 function MobilePublicRoute({ children }) {
@@ -211,6 +214,10 @@ export default function AppMobile() {
               </MobilePrivateRoute>
             }
           />
+
+          {/* Legal pages (accessible without auth) */}
+          <Route path="/m/terms" element={<MobileTermsPage />} />
+          <Route path="/m/privacy" element={<MobilePrivacyPage />} />
 
           {/* Default: redirect to landing or home */}
           <Route path="*" element={<MobileDefaultRedirect />} />

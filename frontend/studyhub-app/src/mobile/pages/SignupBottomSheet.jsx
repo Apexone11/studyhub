@@ -312,7 +312,7 @@ export default function SignupBottomSheet({ open, onClose, onSwitchToSignin }) {
               fontSize: 'var(--type-sm)',
               cursor: 'pointer',
             }}
-            onClick={() => setStep('fields')}
+            onClick={() => setStep('account')}
           >
             Back to sign up
           </button>

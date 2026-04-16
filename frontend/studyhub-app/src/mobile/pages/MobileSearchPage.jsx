@@ -87,9 +87,9 @@ export default function MobileSearchPage() {
   }, [loading, results])
 
   const goSheet = useCallback((id) => navigate(`/m/sheets/${id}`), [navigate])
-  const goUser = useCallback((id) => navigate(`/users/${id}`), [navigate])
+  const goUser = useCallback((id) => navigate(`/m/users/${id}`), [navigate])
   const goGroup = useCallback((id) => navigate(`/m/groups/${id}`), [navigate])
-  const goNote = useCallback((id) => navigate(`/notes/${id}`), [navigate])
+  const goNote = useCallback(() => navigate('/m/notes'), [navigate])
 
   const hasResults =
     results &&

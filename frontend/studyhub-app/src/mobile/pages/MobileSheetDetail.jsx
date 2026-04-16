@@ -96,7 +96,7 @@ export default function MobileSheetDetail() {
   }, [sheetId, starred, user])
 
   const handleFork = useCallback(() => {
-    navigate(`/sheets/${sheetId}/fork`)
+    navigate(`/m/sheets/${sheetId}/fork`)
   }, [sheetId, navigate])
 
   if (loading) {

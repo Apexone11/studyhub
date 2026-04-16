@@ -50,6 +50,30 @@
   padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
 }
 
+/* ── Smooth page transition ──────────────────────────────────── */
+/* Applied to lazy-loaded pages for a clean fade-in on route change */
+
+@keyframes mob-page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.mob-shell-content > * {
+  animation: mob-page-enter 0.25s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mob-shell-content > * {
+    animation: none;
+  }
+}
+
 /* ── Top bar ───────────────────────────────────────────────────── */
 
 .mob-topbar {
@@ -246,6 +270,18 @@
   flex-direction: column;
   overflow: hidden;
   background: var(--sh-hero-gradient-primary);
+  overscroll-behavior: none;
+}
+
+/* Prevent dark gap below content on overscroll */
+html,
+body {
+  overscroll-behavior: none;
+  background: var(--sh-bg);
+}
+
+[data-theme='dark'] body {
+  background: var(--sh-bg);
 }
 
 .mob-landing-content {
@@ -315,21 +351,21 @@
 }
 
 .mob-landing-tagline {
-  font-size: var(--type-sm);
-  font-weight: 600;
-  color: var(--sh-on-dark-muted);
-  letter-spacing: 0.12em;
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.45);
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  margin-bottom: var(--space-5);
+  margin-bottom: var(--space-4);
   will-change: transform, opacity;
 }
 
 .mob-landing-subtitle {
-  font-size: var(--type-base);
-  color: var(--sh-on-dark-faint);
-  line-height: 1.6;
-  margin-bottom: var(--space-6);
-  max-width: 320px;
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.65;
+  margin-bottom: var(--space-8);
+  max-width: 300px;
   will-change: transform, opacity;
 }
 
@@ -339,8 +375,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-5);
-  margin-bottom: var(--space-8);
+  gap: var(--space-6);
+  margin-bottom: var(--space-10);
+  padding: var(--space-4) var(--space-5);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   will-change: transform, opacity;
 }
 
@@ -348,6 +390,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 2px;
 }
 
 .mob-landing-stat-num {
@@ -355,18 +398,21 @@
   font-weight: 800;
   color: var(--sh-on-dark);
   font-family: var(--font);
+  letter-spacing: -0.02em;
 }
 
 .mob-landing-stat-label {
-  font-size: var(--type-xs);
-  color: var(--sh-on-dark-soft);
-  font-weight: 500;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.45);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .mob-landing-stat-divider {
   width: 1px;
-  height: 28px;
-  background: var(--sh-glass-border);
+  height: 24px;
+  background: rgba(255, 255, 255, 0.12);
 }
 
 /* ── Floating feature cards ──── */
@@ -377,20 +423,21 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 14px;
+  padding: 6px 12px;
   background: var(--sh-glass-bg-strong);
   border: 1px solid var(--sh-glass-border);
   border-radius: var(--radius);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   color: var(--sh-on-dark-subtle);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   font-family: var(--font);
   white-space: nowrap;
   will-change: transform;
   pointer-events: none;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  opacity: 0.55;
 }
 
 .mob-landing-actions {
@@ -404,36 +451,43 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 52px;
-  border-radius: var(--radius-card);
+  height: 54px;
+  width: 100%;
+  max-width: 320px;
+  border-radius: 16px;
   font-family: var(--font);
   font-size: var(--type-base);
   font-weight: 700;
+  letter-spacing: -0.01em;
   border: none;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   transition:
     transform 0.15s ease,
-    box-shadow 0.15s ease;
+    box-shadow 0.15s ease,
+    opacity 0.15s ease;
   will-change: transform;
 }
 
 .mob-landing-btn:active {
-  transform: scale(0.97);
+  transform: scale(0.96);
+  opacity: 0.9;
 }
 
 .mob-landing-btn--primary {
-  background: var(--sh-on-dark);
+  background: linear-gradient(135deg, #ffffff 0%, #f0f4ff 100%);
   color: var(--sh-brand);
-  box-shadow: 0 8px 30px rgba(255, 255, 255, 0.15);
+  box-shadow:
+    0 8px 32px rgba(255, 255, 255, 0.18),
+    0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .mob-landing-btn--secondary {
-  background: var(--sh-glass-bg);
+  background: rgba(255, 255, 255, 0.08);
   color: var(--sh-on-dark);
-  border: 1px solid var(--sh-glass-border);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .mob-landing-footer {
@@ -453,6 +507,13 @@
   color: var(--sh-on-dark-muted);
   text-decoration: underline;
   text-underline-offset: 2px;
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* ── Auth form styles ──────────────────────────────────────────── */

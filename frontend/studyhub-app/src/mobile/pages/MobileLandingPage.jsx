@@ -4,6 +4,7 @@
 // Design is intentionally distinct from the web — mobile-first, bold, visual.
 
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import anime from '../lib/animeCompat'
 import GradientMesh from '../components/GradientMesh'
 import SignupBottomSheet from './SignupBottomSheet'
@@ -95,10 +96,10 @@ function AppLogo() {
 
 /* ── Floating feature cards behind the hero ─────────────────────── */
 const FEATURE_CARDS = [
-  { icon: 'sheets', label: 'Study Sheets', x: '-8%', y: '18%', delay: 800 },
-  { icon: 'ai', label: 'Hub AI', x: '68%', y: '12%', delay: 1000 },
-  { icon: 'messages', label: 'Messages', x: '72%', y: '38%', delay: 1200 },
-  { icon: 'groups', label: 'Study Groups', x: '-4%', y: '42%', delay: 1400 },
+  { icon: 'sheets', label: 'Study Sheets', x: '-6%', y: '8%', delay: 800 },
+  { icon: 'ai', label: 'Hub AI', x: '74%', y: '5%', delay: 1000 },
+  { icon: 'messages', label: 'Messages', x: '78%', y: '30%', delay: 1200 },
+  { icon: 'groups', label: 'Study Groups', x: '-2%', y: '34%', delay: 1400 },
 ]
 
 function FeatureCardIcon({ type }) {
@@ -221,6 +222,7 @@ function StatsRow({ statsRef }) {
 }
 
 export default function MobileLandingPage() {
+  const navigate = useNavigate()
   const [showSignup, setShowSignup] = useState(false)
   const [showSignin, setShowSignin] = useState(false)
 
@@ -412,22 +414,34 @@ export default function MobileLandingPage() {
       <footer className="mob-landing-footer">
         <p className="mob-landing-footer-text">
           By continuing you agree to our{' '}
-          <a href="/terms" className="mob-landing-footer-link">
+          <button
+            type="button"
+            className="mob-landing-footer-link"
+            onClick={() => navigate('/m/terms')}
+          >
             Terms
-          </a>{' '}
+          </button>{' '}
           and{' '}
-          <a href="/privacy" className="mob-landing-footer-link">
+          <button
+            type="button"
+            className="mob-landing-footer-link"
+            onClick={() => navigate('/m/privacy')}
+          >
             Privacy Policy
-          </a>
+          </button>
         </p>
       </footer>
 
-      {showSignup && (
-        <SignupBottomSheet onClose={() => setShowSignup(false)} onSwitchToSignin={switchToSignin} />
-      )}
-      {showSignin && (
-        <SigninBottomSheet onClose={() => setShowSignin(false)} onSwitchToSignup={switchToSignup} />
-      )}
+      <SignupBottomSheet
+        open={showSignup}
+        onClose={() => setShowSignup(false)}
+        onSwitchToSignin={switchToSignin}
+      />
+      <SigninBottomSheet
+        open={showSignin}
+        onClose={() => setShowSignin(false)}
+        onSwitchToSignup={switchToSignup}
+      />
     </div>
   )
 }

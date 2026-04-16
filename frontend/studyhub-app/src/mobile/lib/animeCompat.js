@@ -29,10 +29,35 @@ function normalizeEasing(e) {
 function adaptOpts(opts) {
   if (!opts) return opts
   const out = { ...opts }
+
+  // Easing: v3 "easeOutCubic" -> v4 "outCubic"
   if (out.easing) {
     out.ease = normalizeEasing(out.easing)
     delete out.easing
   }
+
+  // Callbacks: v3 used "complete", "begin", "update"
+  // v4 uses "onComplete", "onBegin", "onUpdate"
+  if (out.complete && !out.onComplete) {
+    out.onComplete = out.complete
+    delete out.complete
+  }
+  if (out.begin && !out.onBegin) {
+    out.onBegin = out.begin
+    delete out.begin
+  }
+  if (out.update && !out.onUpdate) {
+    out.onUpdate = out.update
+    delete out.update
+  }
+
+  // v3 loop: true -> v4 loop: true (same, but verify boolean)
+  // v3 direction: 'alternate' -> v4 alternate: true
+  if (out.direction === 'alternate') {
+    out.alternate = true
+    delete out.direction
+  }
+
   return out
 }
 

@@ -36,34 +36,54 @@
       integrity="sha384-/o6I2CkkWC//PSjvWC/eYN7l3xM3tJm8ZzVkCOfp//W05QcE3mlGskpoHB6XqI+B"
       crossorigin="anonymous"
     />
-    <!-- Termly Consent Banner — must load BEFORE any analytics/tracking scripts -->
-    <script
-      type="text/javascript"
-      src="https://app.termly.io/resource-blocker/f44c5c0c-a4fc-4ca4-980b-89068e5aeb41?autoBlock=on"
-    ></script>
+    <!-- Analytics and consent — skip on Capacitor native shell -->
     <script type="text/javascript">
-      ;(function (c, l, a, r, i, t, y) {
-        c[a] =
-          c[a] ||
-          function () {
-            ;(c[a].q = c[a].q || []).push(arguments)
-          }
-        t = l.createElement(r)
-        t.async = 1
-        t.src = 'https://www.clarity.ms/tag/' + i
-        y = l.getElementsByTagName(r)[0]
-        y.parentNode.insertBefore(t, y)
-      })(window, document, 'clarity', 'script', 'vv9kfyhqe1')
-    </script>
-    <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=AW-18019301841"></script>
-    <script>
-      window.dataLayer = window.dataLayer || []
-      function gtag() {
-        dataLayer.push(arguments)
-      }
-      gtag('js', new Date())
-      gtag('config', 'AW-18019301841')
+      ;(function () {
+        // Detect Capacitor native shell — skip all web analytics/consent banners
+        var isNative =
+          window.location.protocol === 'capacitor:' ||
+          (window.location.hostname === 'localhost' && window.Capacitor) ||
+          document.URL.indexOf('capacitor://') === 0 ||
+          navigator.userAgent.indexOf('StudyHub') > -1
+        if (isNative) {
+          window.__SH_NATIVE__ = true
+          return
+        }
+
+        // Termly Consent Banner
+        var ts = document.createElement('script')
+        ts.type = 'text/javascript'
+        ts.src =
+          'https://app.termly.io/resource-blocker/f44c5c0c-a4fc-4ca4-980b-89068e5aeb41?autoBlock=on'
+        document.head.appendChild(ts)
+
+        // Microsoft Clarity
+        ;(function (c, l, a, r, i, t, y) {
+          c[a] =
+            c[a] ||
+            function () {
+              ;(c[a].q = c[a].q || []).push(arguments)
+            }
+          t = l.createElement(r)
+          t.async = 1
+          t.src = 'https://www.clarity.ms/tag/' + i
+          y = l.getElementsByTagName(r)[0]
+          y.parentNode.insertBefore(t, y)
+        })(window, document, 'clarity', 'script', 'vv9kfyhqe1')
+
+        // Google tag (gtag.js)
+        var gs = document.createElement('script')
+        gs.async = true
+        gs.src = 'https://www.googletagmanager.com/gtag/js?id=AW-18019301841'
+        document.head.appendChild(gs)
+        window.dataLayer = window.dataLayer || []
+        function gtag() {
+          window.dataLayer.push(arguments)
+        }
+        window.gtag = gtag
+        gtag('js', new Date())
+        gtag('config', 'AW-18019301841')
+      })()
     </script>
     <title>StudyHub</title>
     <script>
