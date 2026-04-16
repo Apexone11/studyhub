@@ -2,7 +2,6 @@ const express = require('express')
 const { leaderboardLimiter } = require('./feed.constants')
 const { captureError } = require('../../monitoring/sentry')
 const { getLeaderboard } = require('../../lib/leaderboard')
-const { cached } = require('../../lib/redis')
 const prisma = require('../../lib/prisma')
 
 const router = express.Router()
@@ -17,12 +16,7 @@ router.get('/leaderboard', leaderboardLimiter, async (req, res) => {
       return res.status(400).json({ error: 'Invalid period. Use weekly, monthly, or alltime.' })
     }
 
-    // Phase 6: Redis cache 30min per period+limit combo
-    const leaderboard = await cached(
-      `feed:leaderboard:${period}:${limit}`,
-      () => getLeaderboard(prisma, period, limit),
-      1800,
-    )
+    const leaderboard = await getLeaderboard(prisma, period, limit)
     res.json(leaderboard)
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })

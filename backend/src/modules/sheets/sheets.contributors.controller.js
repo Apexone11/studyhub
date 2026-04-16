@@ -58,15 +58,17 @@ router.get('/:id/contributors', optionalAuth, async (req, res) => {
     }
 
     // Count non-fork_base commits grouped by author across the lineage.
-    // Prisma 6 requires the `NOT: [{ field: value }]` array form.
+    // Prisma 6 requires the `NOT: [{ field: value }]` array form, and
+    // `orderBy: { _count: { <field>: ... } }` must use a concrete column
+    // (the `_all` pseudo-field was removed in Prisma 6.19).
     const grouped = await prisma.sheetCommit.groupBy({
       by: ['userId'],
       where: {
         sheetId: { in: sheetIds },
         NOT: [{ kind: 'fork_base' }],
       },
-      _count: { _all: true },
-      orderBy: { _count: { _all: 'desc' } },
+      _count: { userId: true },
+      orderBy: { _count: { userId: 'desc' } },
       take: 12,
     })
 
@@ -82,7 +84,7 @@ router.get('/:id/contributors', optionalAuth, async (req, res) => {
     const contributors = grouped
       .map((row) => ({
         user: userMap.get(row.userId) || null,
-        commits: row._count._all,
+        commits: row._count.userId,
       }))
       .filter((entry) => entry.user)
 
