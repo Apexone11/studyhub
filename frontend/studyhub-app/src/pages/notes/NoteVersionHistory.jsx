@@ -235,6 +235,7 @@ export default function NoteVersionHistory({ noteId, onRestore, onClose }) {
       try {
         const response = await fetch(`${API}/api/notes/${noteId}/versions`, {
           credentials: 'include',
+          headers: authHeaders(),
         })
 
         if (!response.ok) {

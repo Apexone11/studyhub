@@ -607,6 +607,11 @@ export default function NoteEditor({
           noteId={activeNote.id}
           onRestore={(restored) => {
             handleRestore?.(restored)
+            // Update persistence hook's baseRevision so the next save
+            // uses the restored note's revision (avoids false 409).
+            if (hardeningEnabled && restored?.revision != null) {
+              persistence.resetRevision?.(restored.revision)
+            }
             setShowVersions(false)
           }}
           onClose={() => setShowVersions(false)}

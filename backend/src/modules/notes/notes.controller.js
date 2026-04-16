@@ -936,6 +936,9 @@ async function createNoteVersion(req, res) {
         title: note.title,
         content: note.content,
         message,
+        kind: 'MANUAL',
+        revision: note.revision ?? 0,
+        bytesContent: Buffer.byteLength(note.content ?? '', 'utf8'),
       },
     })
 
@@ -977,7 +980,15 @@ async function listNoteVersions(req, res) {
       where: { noteId },
       orderBy: { createdAt: 'desc' },
       take: limit,
-      select: { id: true, title: true, message: true, createdAt: true },
+      select: {
+        id: true,
+        title: true,
+        message: true,
+        createdAt: true,
+        kind: true,
+        revision: true,
+        bytesContent: true,
+      },
     })
 
     res.json(versions)

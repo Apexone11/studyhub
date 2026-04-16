@@ -48,9 +48,9 @@ export default function NoteSaveStatus({
     else if (status === 'conflict' && onOpenConflict) onOpenConflict()
   }
 
-  const showSaveNow =
-    (status === 'dirty' || status === 'error' || status === 'offline') &&
-    typeof onSaveNow === 'function'
+  const canSave = status === 'dirty' || status === 'error' || status === 'offline'
+  const saveDisabled = !canSave || status === 'saving'
+  const hasSaveHandler = typeof onSaveNow === 'function'
 
   return (
     <div
@@ -84,9 +84,10 @@ export default function NoteSaveStatus({
         }}
       />
       <span style={{ fontSize: 13 }}>{displayLabel}</span>
-      {showSaveNow && (
+      {hasSaveHandler && (
         <button
           type="button"
+          disabled={saveDisabled}
           onClick={(e) => {
             e.stopPropagation()
             onSaveNow()
@@ -97,12 +98,13 @@ export default function NoteSaveStatus({
             padding: '2px 8px',
             border: 'none',
             borderRadius: 6,
-            background: 'var(--sh-primary)',
+            background: saveDisabled ? 'var(--sh-slate-300)' : 'var(--sh-primary)',
             color: '#ffffff',
-            cursor: 'pointer',
+            cursor: saveDisabled ? 'default' : 'pointer',
+            opacity: saveDisabled ? 0.5 : 1,
           }}
         >
-          Save now
+          Save
         </button>
       )}
     </div>

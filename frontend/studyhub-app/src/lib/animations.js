@@ -14,7 +14,8 @@ let _anime = null
 
 async function getAnime() {
   if (!_anime) {
-    _anime = await import('animejs')
+    const mod = await import('animejs')
+    _anime = mod.default || mod
   }
   return _anime
 }
@@ -22,8 +23,7 @@ async function getAnime() {
 /* ── Reduced-motion gate ─────────────────────────────────── */
 
 const prefersReducedMotion = () =>
-  typeof window !== 'undefined' &&
-  window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 /* ── Sync fallback for reduced-motion ───────────────────── */
 
@@ -149,9 +149,12 @@ export async function fadeInOnScroll(targets, { y = 24, duration = 500, staggerM
   utils.set(targets, { opacity: 0, translateY: y })
 
   // Use IntersectionObserver for scroll-triggered entrance
-  const elements = typeof targets === 'string'
-    ? document.querySelectorAll(targets)
-    : targets instanceof Element ? [targets] : Array.from(targets || [])
+  const elements =
+    typeof targets === 'string'
+      ? document.querySelectorAll(targets)
+      : targets instanceof Element
+        ? [targets]
+        : Array.from(targets || [])
 
   const observer = new IntersectionObserver(
     (entries) => {
@@ -168,7 +171,7 @@ export async function fadeInOnScroll(targets, { y = 24, duration = 500, staggerM
         }
       })
     },
-    { threshold: 0.15 }
+    { threshold: 0.15 },
   )
 
   elements.forEach((el) => observer.observe(el))

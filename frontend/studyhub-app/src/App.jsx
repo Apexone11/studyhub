@@ -8,6 +8,9 @@ import RouteErrorBoundary from './components/RouteErrorBoundary'
 import { getAuthenticatedHomePath } from './lib/authNavigation'
 import { SessionProvider, useSession } from './lib/session-context'
 import { GOOGLE_CLIENT_ID } from './config'
+import { isNativePlatform } from './lib/mobile/detectMobile'
+
+const AppMobile = lazy(() => import('./mobile/App.mobile'))
 
 const HomePage = lazy(() => import('./pages/home/HomePage'))
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'))
@@ -315,6 +318,21 @@ function AuthenticatedBubble() {
 }
 
 function AppRoutes() {
+  const isMobile = isNativePlatform()
+
+  // In the Capacitor native shell, render the mobile-optimized app
+  if (isMobile) {
+    return (
+      <BrowserRouter>
+        <SessionProvider>
+          <Suspense fallback={<RouteFallback />}>
+            <AppMobile />
+          </Suspense>
+        </SessionProvider>
+      </BrowserRouter>
+    )
+  }
+
   return (
     <BrowserRouter>
       <SessionProvider>

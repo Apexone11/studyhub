@@ -145,6 +145,7 @@ model User {
   videoAppeals               VideoAppeal[]         @relation("VideoAppealUploader")
   videoAppealReviews         VideoAppeal[]         @relation("VideoAppealReviewer")
   sessions                   Session[]
+  securityEvents             SecurityEvent[]
   studyStatuses              StudyStatus[]
   onboardingProgress         OnboardingProgress?
   referralCode               String?   @unique
@@ -2156,6 +2157,26 @@ model Session {
   @@index([userId])
   @@index([jti])
   @@index([expiresAt])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SecurityEvent — Audit log for security-relevant actions (login, logout, etc.)
+// ═══════════════════════════════════════════════════════════════════════════
+
+model SecurityEvent {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  eventType String
+  ipAddress String?
+  userAgent String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([eventType])
+  @@index([createdAt])
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
