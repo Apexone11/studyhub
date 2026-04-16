@@ -29,36 +29,38 @@ export default function BottomSheet({
   const backdropRef = useRef(null)
   const dragRef = useRef({ startY: 0, currentY: 0, dragging: false })
   const [mounted, setMounted] = useState(open)
+  const prevOpenRef = useRef(open)
 
-  // Sync mounted state with open prop — derived state pattern
+  // React-approved derived state pattern: set state during render when
+  // the prop changes, not inside an effect. This avoids the
+  // react-hooks/set-state-in-effect lint error.
   if (open && !mounted) {
     setMounted(true)
   }
 
+  // Animate in when the sheet first mounts as open
   useEffect(() => {
-    if (!mounted) return
+    if (!mounted || !open) return
 
     const sheet = sheetRef.current
     const backdrop = backdropRef.current
     if (!sheet || !backdrop) return
 
-    if (open) {
-      // Animate in
-      anime({
-        targets: backdrop,
-        opacity: [0, 1],
-        duration: 250,
-        easing: 'easeOutCubic',
-      })
-      anime({
-        targets: sheet,
-        translateY: ['100%', '0%'],
-        duration: 400,
-        easing: 'easeOutCubic',
-      })
-    }
+    anime({
+      targets: backdrop,
+      opacity: [0, 1],
+      duration: 250,
+      easing: 'easeOutCubic',
+    })
+    anime({
+      targets: sheet,
+      translateY: ['100%', '0%'],
+      duration: 400,
+      easing: 'easeOutCubic',
+    })
   }, [mounted, open])
 
+  // Animate out on user dismiss (drag / backdrop tap)
   const animateClose = useCallback(() => {
     const sheet = sheetRef.current
     const backdrop = backdropRef.current
@@ -84,6 +86,38 @@ export default function BottomSheet({
       },
     })
   }, [onClose])
+
+  // Handle controlled close: parent sets open=false without user interaction.
+  // We trigger the close animation; setMounted(false) happens inside the async
+  // anime complete callback, avoiding the set-state-in-effect lint rule.
+  useEffect(() => {
+    const wasOpen = prevOpenRef.current
+    prevOpenRef.current = open
+
+    if (wasOpen && !open && mounted) {
+      const sheet = sheetRef.current
+      const backdrop = backdropRef.current
+      if (!sheet || !backdrop) {
+        // No DOM refs — schedule unmount on next frame to stay out of the
+        // synchronous effect body (satisfies react-hooks/set-state-in-effect).
+        requestAnimationFrame(() => setMounted(false))
+        return
+      }
+      anime({
+        targets: backdrop,
+        opacity: 0,
+        duration: 200,
+        easing: 'easeInCubic',
+      })
+      anime({
+        targets: sheet,
+        translateY: '100%',
+        duration: 300,
+        easing: 'easeInCubic',
+        complete: () => setMounted(false),
+      })
+    }
+  }, [open, mounted])
 
   // Drag-to-dismiss handlers
   const onTouchStart = useCallback((e) => {

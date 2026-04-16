@@ -21,7 +21,8 @@ export function isNativePlatform() {
     // The `isNativePlatform()` method is the official check.
     _isNative = Capacitor.isNativePlatform()
   } catch {
-    _isNative = false
+    // Fallback: index.html inline script sets __SH_NATIVE__ before modules load
+    _isNative = typeof window !== 'undefined' && Boolean(window.__SH_NATIVE__)
   }
 
   return _isNative
