@@ -281,6 +281,9 @@ function ConversationsDrawer({
       />
       {/* Drawer panel */}
       <aside
+        role="dialog"
+        aria-modal="true"
+        aria-label="Conversations"
         style={{
           position: 'fixed',
           top: 0,
@@ -572,8 +575,13 @@ export default function MobileAiPage() {
         }}
       >
         {loading ? (
-          <div style={{ padding: '40px 20px', textAlign: 'center' }}>
-            <div className="mob-feed-spinner" style={{ margin: '0 auto' }} />
+          <div style={{ padding: '40px 20px', textAlign: 'center' }} aria-busy="true">
+            <div
+              className="mob-feed-spinner"
+              role="status"
+              aria-label="Loading conversation"
+              style={{ margin: '0 auto' }}
+            />
           </div>
         ) : messages.length === 0 && !streaming ? (
           <EmptyThread />
@@ -606,6 +614,7 @@ export default function MobileAiPage() {
             )}
             {error && (
               <div
+                role="alert"
                 style={{
                   margin: '8px 16px',
                   padding: '10px 12px',
@@ -636,6 +645,7 @@ export default function MobileAiPage() {
       >
         <textarea
           ref={textareaRef}
+          aria-label="Message Hub AI"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}

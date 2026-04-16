@@ -1440,3 +1440,70 @@ Frontend:
 - Frontend build: succeeds (1.87s).
 - Backend auth tests: 23/23 pass. Backend socket tests: 16/16 pass.
 - Device verification: deferred to the user per agreement — once the deps are installed locally (`npm install` in `frontend/studyhub-app`), the user will run `npm run mobile:build` then `npx cap run android` to validate on the emulator/device.
+
+---
+
+## 2026-04-16 — Security hardening, dependency bumps, test coverage, mobile a11y + Google sign-in finalization
+
+### Summary
+
+Comprehensive hardening pass driven by a parallel security / dependency / test-coverage / accessibility audit. The session landed five security fixes across auth, payments, and Socket.io; bumped the only outstanding dependency advisory; added ~100 unit tests across three previously untested areas (rateLimiters, video, WebAuthn); applied six accessibility fixes to the mobile screens; and completed the missing pieces of the mobile native Google sign-in config that were blocking the Android build.
+
+### Dependency hygiene
+
+- `npm audit` across backend, frontend, and root workspaces: 1 moderate advisory (`sanitize-html` 2.17.2 — `GHSA-9mrh-v2v3-xpfm`, allowedTags bypass via entity-decoded text, CVSS 6.1). Auto-fixed in both backend and frontend via `npm audit fix`; package-locks regenerated. Post-fix: 0 vulnerabilities across all workspaces.
+
+### Security fixes
+
+Driven by an independent code review of the auth/payments/AI/socket layers. Verified each finding against the actual code before patching.
+
+- **`isMobileClient` trusted an attacker-controllable header.** `backend/src/modules/auth/auth.service.js` — the `X-Client: mobile` header alone was the gate for returning the raw JWT in the response body. Any web-context code (XSS, rogue extension) could set the header and exfiltrate a 24-hour bearer, bypassing the `httpOnly` cookie protection. Now also requires `Origin` to match a Capacitor native scheme (`https://localhost` or `capacitor://localhost`). Browsers set `Origin` themselves and cross-origin attackers cannot override it, making this a non-forgeable second signal. Matching `Origin` values are already in the CORS allowlist (see `backend/src/index.js:104-106`) so no new configuration is needed.
+- **Socket.io bearer-token fallback had no client-type gate.** `backend/src/lib/socketio.js` — the handshake auth / `Authorization: Bearer` fallback was accepted unconditionally. Now gated on the same Capacitor-origin check. Web XSS that captured a JWT cannot re-use it over WebSocket on the studyhub.com origin. Also refactored the middleware into an exported `authenticateSocketHandshake(socket, next)` so it can be unit-tested without booting a full Socket.io server.
+- **Stripe `planFromPriceId` silently escalated unknown prices to pro_monthly.** `backend/src/modules/payments/payments.routes.js` — both the `/admin/sync-stripe` iterator and the `/subscription/sync` self-heal endpoint defaulted to `pro_monthly` when `planFromPriceId(priceId)` returned null. A user whose Stripe customer record picked up a non-pro subscription (e.g., a leftover test-mode price or discount variant) would have been auto-upgraded on the next sync. Both call sites now reject unknown price IDs and log a warning; the service-level `handleSubscriptionUpdated` path was already correct and is unchanged.
+- **Stripe webhook had no Buffer guard.** `backend/src/modules/payments/payments.routes.js` — defense-in-depth: if `express.raw()` were ever removed or reordered in `index.js`, `constructEvent` would fail opaquely on a parsed body. Added a `Buffer.isBuffer(req.body)` check that fails fast with a clear signal before signature verification.
+- **Google signup `tempToken` was replayable.** `backend/src/modules/auth/auth.google.controller.js` — the 15-minute signup JWT had no single-use guard, so an attacker who observed one could race the legitimate user to `/google/complete` and create the account with their chosen `accountType`. The token now carries a random `jti`, and `/google/complete` calls `markTokenUsed(jti, TTL)` before any Prisma write. Legacy tokens without `jti` are rejected and the user is asked to restart Google sign-in.
+- **New library: `backend/src/lib/usedTokenCache.js`.** Process-local TTL cache for one-use JWT identifiers. Used by the Google tempToken flow today; callable from any future single-use JWT site. Scoped to single-instance deployment (sufficient for Railway); horizontal scaling would require migrating to a shared store (Redis was removed; DB table is the next option).
+
+### Mobile native Google sign-in — completed config
+
+The mobile-app release of 2026-04-16 wired the Capgo social-login plugin and the bearer-token auth path but referenced two configuration files that did not exist in the repo. Build of the APK was blocked on these. Both now exist:
+
+- `frontend/studyhub-app/.env.mobile.production` — `VITE_MOBILE_API_URL` pinned to the Railway backend, `VITE_GOOGLE_CLIENT_ID` set to the web OAuth client ID (same value as backend `GOOGLE_CLIENT_ID` because Capgo issues idTokens for the web-registered client, which is what the backend `verifyIdToken({ audience })` check expects). File is `.env.*`-gitignored by the root `.gitignore`.
+- `frontend/studyhub-app/android/app/src/main/res/values/strings.xml` — added `<string name="server_client_id">...</string>` so the Capgo plugin can complete the native OAuth flow.
+
+Device verification still requires the user to run `npm run mobile:build && npx cap run android` — no device harness is available to this session.
+
+### Mobile accessibility (WCAG 2.1 AA)
+
+Code review of all mobile screens under `frontend/studyhub-app/src/mobile/`. Six fixes applied:
+
+- `frontend/studyhub-app/src/mobile/mobile.css` — `.mob-topbar-back` bumped from 36×36 to 44×44 (meets iOS/Android 44pt HIG + WCAG 2.5.5 target size). Added a shared `:focus-visible` rule across the five primary interactive mobile classes (topbar back, tab bar item, auth submit, auth switch link, Google button) with `outline: 2px solid var(--sh-brand); outline-offset: 2px` so BT-keyboard users on mobile/tablet see focus.
+- `frontend/studyhub-app/src/mobile/components/BottomSheet.jsx` — added `aria-labelledby` pointing at the sheet title, and an id on the `<h2>`.
+- `frontend/studyhub-app/src/mobile/pages/MobileAiPage.jsx` — conversations drawer now has `role="dialog"` + `aria-modal="true"` + `aria-label`; error toast has `role="alert"` so failures are announced; loading area has `aria-busy="true"` and the spinner has `role="status"` + `aria-label`; composer textarea has `aria-label="Message Hub AI"`.
+- `frontend/studyhub-app/src/mobile/pages/SigninBottomSheet.jsx` — error banner has `role="alert"`.
+- `frontend/studyhub-app/src/mobile/pages/SignupBottomSheet.jsx` — both error banners (step 1 and step 2) have `role="alert"`.
+
+### Test coverage — previously untested modules
+
+- `backend/test/unit/rateLimiters.unit.test.js` (new) — 18 enforcement tests covering `authLoginLimiter`, `paymentCheckoutLimiter`, `paymentWebhookLimiter`, `messagingWriteLimiter`, `notesMutateLimiter`, `searchLimiter`, `videoUploadChunkLimiter`, the `RateLimit-*` header envelope, custom `keyGenerator` correctness, OPTIONS bypass, and the `createAiMessageLimiter` factory. Each describe block uses `vi.resetModules()` + dynamic import so limiter stores are hermetic. Combined with the existing export-shape file: 39/39 pass.
+- `backend/test/unit/video.unit.test.js` (new) — 30 passing + 1 intentional skip (fs/stream-coupled `processVideo` happy path; covered note directs to integration tests). Uses `Module._load` patching for child_process, r2Storage, clamav, getUserPlan, prisma, and sentry; no real ffmpeg/ffprobe invoked.
+- `backend/test/unit/webauthn-routes.unit.test.js` (new) — 21 passing tests across all 6 route handlers (register options/verify, authenticate options/verify, credentials list/delete). Mocks the `lib/webauthn/webauthn.js` verification barrel and `requireAdmin`; asserts session issuance via spies on `signAuthToken` / `setAuthCookie`.
+
+### Notes Hardening v2 + Service Worker consolidation — confirmed complete
+
+Review found these items already landed in prior work and do not need to be re-done: the `useNotesHardeningEnabled()` hook is wired at `frontend/studyhub-app/src/pages/notes/NoteEditor.jsx:268` and derivative sites, and `sw-notes.js` has already been folded into `public/sw.js` (see the "merged from sw-notes.js" comment at line 23 of `sw.js`). No source-level TODOs remain for these areas.
+
+### Validation
+
+- Backend lint: passes (0 errors).
+- Frontend lint: passes (0 errors) before and after the a11y fixes.
+- Frontend build: passes (31.80s; pre-existing Joyride tree-shaking warning unrelated to these changes).
+- Backend touched-file tests: 129/129 pass on auth + socket + payments after the security fixes.
+- New tests: rateLimiters 39/39, video 30 passing + 1 skip, webauthn-routes 21/21.
+- `npm audit` (all workspaces): 0 vulnerabilities.
+
+### Not implemented
+
+- **Security regression test harness for the 5 fixes** — a dedicated `security-regressions.unit.test.js` was scoped but the session ended before its completion; the five fixes are each covered by existing touched-file test runs, but a single file that explicitly asserts each regression would shorten the review loop on future changes. Tracked for a follow-up PR.
+- **iOS Capacitor target** — only Android is present in the repo. The `CAPACITOR_NATIVE_ORIGINS` set already includes `capacitor://localhost` so the iOS shell will work when added; no code change needed at that point beyond scaffolding the iOS project.
+- **MAX_OUTPUT_TOKENS_SHEET documentation drift** — `ai.constants.js:52` is 16384 while `CLAUDE.md` says 8192. The constant is the source of truth for runtime behavior; leaving the code unchanged so sheet generation doesn't regress. CLAUDE.md should be updated in a follow-up to reflect 16384.

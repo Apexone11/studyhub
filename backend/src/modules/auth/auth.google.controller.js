@@ -17,9 +17,11 @@ const {
   LEGAL_ACCEPTANCE_SOURCES,
   recordCurrentRequiredLegalAcceptancesTx,
 } = require('../legal/legal.service')
+const { markTokenUsed } = require('../../lib/usedTokenCache')
 
 const VALID_ACCOUNT_TYPES = ['student', 'teacher', 'other']
 const TEMP_TOKEN_EXPIRES_IN = '15m'
+const TEMP_TOKEN_EXPIRES_MS = 15 * 60 * 1000
 const TEMP_TOKEN_TYPE = 'google_pending'
 
 function getJwtSecret() {
@@ -28,6 +30,8 @@ function getJwtSecret() {
 }
 
 function signGoogleTempToken(googlePayload) {
+  // Include a random jti so each issued tempToken can be marked single-use
+  // at the point of consumption. See `lib/usedTokenCache.js` for rationale.
   return jwt.sign(
     {
       typ: TEMP_TOKEN_TYPE,
@@ -38,7 +42,10 @@ function signGoogleTempToken(googlePayload) {
       emailVerified: Boolean(googlePayload.emailVerified),
     },
     getJwtSecret(),
-    { expiresIn: TEMP_TOKEN_EXPIRES_IN },
+    {
+      expiresIn: TEMP_TOKEN_EXPIRES_IN,
+      jwtid: crypto.randomUUID(),
+    },
   )
 }
 
@@ -181,6 +188,30 @@ router.post('/google/complete', googleCompleteLimiter, async (req, res) => {
     return res.status(400).json({
       error: 'Signup session expired. Start Google sign-in again.',
     })
+  }
+
+  // Enforce single-use on the tempToken. Even though the token is signed and
+  // expires in 15 minutes, a replay within that window (e.g., an attacker
+  // racing the user after observing the token) could otherwise create an
+  // account tied to the victim's Google identity. Marking by `jti`
+  // guarantees the second call sees TOKEN_ALREADY_USED and is rejected
+  // before any Prisma write happens.
+  if (!pending.jti) {
+    // Legacy tokens issued before this guard was added will not have a jti.
+    // Fail closed — the user can restart Google sign-in to get a fresh token.
+    return res.status(400).json({
+      error: 'Signup session is missing a required field. Start Google sign-in again.',
+    })
+  }
+  try {
+    markTokenUsed(pending.jti, TEMP_TOKEN_EXPIRES_MS)
+  } catch (err) {
+    if (err?.code === 'TOKEN_ALREADY_USED') {
+      return res.status(400).json({
+        error: 'This signup session has already been used. Start Google sign-in again.',
+      })
+    }
+    throw err
   }
 
   try {

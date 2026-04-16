@@ -4,4 +4,5 @@
     <string name="title_activity_main">GetStudyHub</string>
     <string name="package_name">app.studyhub.mobile</string>
     <string name="custom_url_scheme">app.studyhub.mobile</string>
+    <string name="server_client_id">907042990468-v2uh3skincvnbdjlo6ail93pi62r0t7h.apps.googleusercontent.com</string>
 </resources>

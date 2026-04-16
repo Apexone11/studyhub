@@ -85,7 +85,11 @@ export default function SigninBottomSheet({ open, onClose, onSwitchToSignup }) {
 
   return (
     <BottomSheet open={open} onClose={onClose} title="Welcome Back">
-      {error && <div className="mob-auth-error">{error}</div>}
+      {error && (
+        <div role="alert" className="mob-auth-error">
+          {error}
+        </div>
+      )}
 
       <MobileGoogleButton mode="signin" />
 
