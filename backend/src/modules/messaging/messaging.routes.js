@@ -96,7 +96,7 @@ router.get('/unread-total', requireAuth, async (req, res) => {
  * GET /api/messages/online
  * Get list of online user IDs
  */
-router.get('/online', (req, res) => {
+router.get('/online', requireAuth, (req, res) => {
   try {
     const onlineUserIds = getOnlineUsers()
     res.json({ online: onlineUserIds })
@@ -173,104 +173,124 @@ router.get('/requests', requireAuth, async (req, res) => {
  * POST /api/messages/requests/:conversationId/accept
  * Accept a pending message request.
  */
-router.post('/requests/:conversationId/accept', requireAuth, messagingWriteLimiter, async (req, res) => {
-  try {
-    const conversationId = parseInt(req.params.conversationId, 10)
-    if (isNaN(conversationId)) {
-      return sendError(res, 400, 'Invalid conversation ID.', ERROR_CODES.BAD_REQUEST)
-    }
+router.post(
+  '/requests/:conversationId/accept',
+  requireAuth,
+  messagingWriteLimiter,
+  async (req, res) => {
+    try {
+      const conversationId = parseInt(req.params.conversationId, 10)
+      if (isNaN(conversationId)) {
+        return sendError(res, 400, 'Invalid conversation ID.', ERROR_CODES.BAD_REQUEST)
+      }
 
-    const participant = await prisma.conversationParticipant.findUnique({
-      where: {
-        conversationId_userId: {
-          conversationId,
-          userId: req.user.userId,
+      const participant = await prisma.conversationParticipant.findUnique({
+        where: {
+          conversationId_userId: {
+            conversationId,
+            userId: req.user.userId,
+          },
         },
-      },
-    })
+      })
 
-    if (!participant) {
-      return sendError(res, 404, 'Conversation not found.', ERROR_CODES.NOT_FOUND)
-    }
+      if (!participant) {
+        return sendError(res, 404, 'Conversation not found.', ERROR_CODES.NOT_FOUND)
+      }
 
-    if (participant.status !== 'pending') {
-      return sendError(res, 400, 'This request has already been handled.', ERROR_CODES.BAD_REQUEST)
-    }
+      if (participant.status !== 'pending') {
+        return sendError(
+          res,
+          400,
+          'This request has already been handled.',
+          ERROR_CODES.BAD_REQUEST,
+        )
+      }
 
-    await prisma.conversationParticipant.update({
-      where: {
-        conversationId_userId: {
-          conversationId,
-          userId: req.user.userId,
+      await prisma.conversationParticipant.update({
+        where: {
+          conversationId_userId: {
+            conversationId,
+            userId: req.user.userId,
+          },
         },
-      },
-      data: { status: 'active' },
-    })
+        data: { status: 'active' },
+      })
 
-    const conversation = await prisma.conversation.findUnique({
-      where: { id: conversationId },
-      include: {
-        participants: {
-          include: {
-            user: {
-              select: { id: true, username: true, avatarUrl: true },
+      const conversation = await prisma.conversation.findUnique({
+        where: { id: conversationId },
+        include: {
+          participants: {
+            include: {
+              user: {
+                select: { id: true, username: true, avatarUrl: true },
+              },
             },
           },
         },
-      },
-    })
+      })
 
-    res.json(conversation)
-  } catch (err) {
-    captureError(err, { route: req.originalUrl, method: req.method })
-    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
-  }
-})
+      res.json(conversation)
+    } catch (err) {
+      captureError(err, { route: req.originalUrl, method: req.method })
+      sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
+    }
+  },
+)
 
 /**
  * POST /api/messages/requests/:conversationId/decline
  * Decline a pending message request.
  */
-router.post('/requests/:conversationId/decline', requireAuth, messagingWriteLimiter, async (req, res) => {
-  try {
-    const conversationId = parseInt(req.params.conversationId, 10)
-    if (isNaN(conversationId)) {
-      return sendError(res, 400, 'Invalid conversation ID.', ERROR_CODES.BAD_REQUEST)
-    }
+router.post(
+  '/requests/:conversationId/decline',
+  requireAuth,
+  messagingWriteLimiter,
+  async (req, res) => {
+    try {
+      const conversationId = parseInt(req.params.conversationId, 10)
+      if (isNaN(conversationId)) {
+        return sendError(res, 400, 'Invalid conversation ID.', ERROR_CODES.BAD_REQUEST)
+      }
 
-    const participant = await prisma.conversationParticipant.findUnique({
-      where: {
-        conversationId_userId: {
-          conversationId,
-          userId: req.user.userId,
+      const participant = await prisma.conversationParticipant.findUnique({
+        where: {
+          conversationId_userId: {
+            conversationId,
+            userId: req.user.userId,
+          },
         },
-      },
-    })
+      })
 
-    if (!participant) {
-      return sendError(res, 404, 'Conversation not found.', ERROR_CODES.NOT_FOUND)
-    }
+      if (!participant) {
+        return sendError(res, 404, 'Conversation not found.', ERROR_CODES.NOT_FOUND)
+      }
 
-    if (participant.status !== 'pending') {
-      return sendError(res, 400, 'This request has already been handled.', ERROR_CODES.BAD_REQUEST)
-    }
+      if (participant.status !== 'pending') {
+        return sendError(
+          res,
+          400,
+          'This request has already been handled.',
+          ERROR_CODES.BAD_REQUEST,
+        )
+      }
 
-    await prisma.conversationParticipant.update({
-      where: {
-        conversationId_userId: {
-          conversationId,
-          userId: req.user.userId,
+      await prisma.conversationParticipant.update({
+        where: {
+          conversationId_userId: {
+            conversationId,
+            userId: req.user.userId,
+          },
         },
-      },
-      data: { status: 'declined' },
-    })
+        data: { status: 'declined' },
+      })
 
-    res.json({ declined: true })
-  } catch (err) {
-    captureError(err, { route: req.originalUrl, method: req.method })
-    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
-  }
-})
+      res.json({ declined: true })
+    } catch (err) {
+      captureError(err, { route: req.originalUrl, method: req.method })
+      sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
+    }
+  },
+)
 
 // ─── Archived Conversations ─────────────────────────────────────────────────
 

@@ -267,6 +267,7 @@ async function issueAuthenticatedSession(res, userId, req) {
 
   // Create server-side session for per-device tracking + revocation
   let jti
+  let sessionId
   try {
     const { createSession } = require('./session.service')
     const sessionResult = await createSession({
@@ -275,6 +276,7 @@ async function issueAuthenticatedSession(res, userId, req) {
       ipAddress: req?.ip || null,
     })
     jti = sessionResult.jti
+    sessionId = sessionResult.sessionId
   } catch (sessionErr) {
     // P2021 = table does not exist (pre-migration). Degrade gracefully.
     // Real DB/network errors should not silently disable session tracking.
@@ -285,12 +287,15 @@ async function issueAuthenticatedSession(res, userId, req) {
       throw sessionErr
     }
     jti = undefined
+    sessionId = undefined
   }
 
   const token = signAuthToken(user, { jti })
   setAuthCookie(res, token)
 
-  return buildSessionUserPayload(user)
+  const payload = await buildSessionUserPayload(user)
+  if (sessionId) payload.sessionId = sessionId
+  return payload
 }
 
 function loginVerificationResponse(challenge, overrides = {}) {

@@ -298,6 +298,26 @@ router.post('/google/code', googleLimiter, async (req, res) => {
     return res.status(503).json({ error: 'Google sign-in is not available right now.' })
   }
 
+  // Defense-in-depth: validate redirect_uri against server-side allowlist
+  const allowedOrigins = [
+    process.env.FRONTEND_URL,
+    'http://localhost:5173',
+    'http://localhost:4173',
+    'capacitor://localhost',
+    'https://localhost',
+    'http://localhost',
+  ].filter(Boolean)
+  const uriOrigin = (() => {
+    try {
+      return new URL(redirectUri).origin
+    } catch {
+      return null
+    }
+  })()
+  if (!uriOrigin || !allowedOrigins.some((o) => uriOrigin === new URL(o).origin)) {
+    return res.status(400).json({ error: 'Invalid redirect URI.' })
+  }
+
   try {
     // Exchange authorization code for tokens via Google's token endpoint.
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {

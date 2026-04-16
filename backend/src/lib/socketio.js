@@ -52,8 +52,8 @@ setInterval(
 function initSocketIO(httpServer) {
   const isProd = process.env.NODE_ENV === 'production'
   const allowedOrigins = isProd
-    ? [process.env.FRONTEND_URL, process.env.FRONTEND_URL_ALT].filter(Boolean)
-    : ['http://localhost:5173', 'http://localhost:4173']
+    ? [process.env.FRONTEND_URL, process.env.FRONTEND_URL_ALT, 'https://localhost'].filter(Boolean)
+    : ['http://localhost:5173', 'http://localhost:4173', 'https://localhost']
 
   io = new socketIo.Server(httpServer, {
     cors: {

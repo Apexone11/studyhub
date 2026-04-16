@@ -69,12 +69,18 @@ function markdownToHtml(content) {
 /* ── Word count from HTML text content ──────────────────────── */
 function htmlWordCount(html) {
   if (!html?.trim()) return 0
-  // Strip tags, decode entities, count words
-  const tmp = document.createElement('div')
-  tmp.innerHTML = html
-  const text = tmp.textContent || tmp.innerText || ''
-  if (!text.trim()) return 0
-  return text.trim().split(/\s+/).length
+  // Strip tags via regex (avoids innerHTML for security)
+  const text = html
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#\d+;/g, ' ')
+    .trim()
+  if (!text) return 0
+  return text.split(/\s+/).filter(Boolean).length
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -607,6 +613,11 @@ export default function NoteEditor({
           noteId={activeNote.id}
           onRestore={(restored) => {
             handleRestore?.(restored)
+            // Update persistence hook's baseRevision so the next save
+            // uses the restored note's revision (avoids false 409).
+            if (hardeningEnabled && restored?.revision != null) {
+              persistence.resetRevision?.(restored.revision)
+            }
             setShowVersions(false)
           }}
           onClose={() => setShowVersions(false)}

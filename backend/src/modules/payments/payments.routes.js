@@ -242,35 +242,43 @@ router.get('/subscription', paymentReadLimiter, requireAuth, async (req, res) =>
 })
 
 // ── GET /subscription/debug — Raw DB record for debugging ────────────────
-router.get('/subscription/debug', paymentReadLimiter, requireAuth, async (req, res) => {
-  try {
-    // Test if the Subscription table exists by running a raw query
-    let tableExists = true
+router.get(
+  '/subscription/debug',
+  paymentReadLimiter,
+  requireAuth,
+  requireAdmin,
+  async (req, res) => {
     try {
-      await prisma.$queryRaw`SELECT 1 FROM "Subscription" LIMIT 1`
-    } catch {
-      tableExists = false
-    }
+      // Test if the Subscription table exists by running a raw query
+      let tableExists = true
+      try {
+        await prisma.$queryRaw`SELECT 1 FROM "Subscription" LIMIT 1`
+      } catch {
+        tableExists = false
+      }
 
-    const raw = tableExists
-      ? await prisma.subscription.findUnique({ where: { userId: req.user.userId } })
-      : null
+      const raw = tableExists
+        ? await prisma.subscription.findUnique({ where: { userId: req.user.userId } })
+        : null
 
-    const planFromEnv = {
-      STRIPE_PRICE_ID_PRO: process.env.STRIPE_PRICE_ID_PRO ? 'set' : 'MISSING',
-      STRIPE_PRICE_ID_PRO_YEARLY: process.env.STRIPE_PRICE_ID_PRO_YEARLY ? 'set' : 'MISSING',
+      const planFromEnv = {
+        STRIPE_PRICE_ID_PRO: process.env.STRIPE_PRICE_ID_PRO ? 'set' : 'MISSING',
+        STRIPE_PRICE_ID_PRO_YEARLY: process.env.STRIPE_PRICE_ID_PRO_YEARLY ? 'set' : 'MISSING',
+      }
+      res.json({
+        raw: raw || null,
+        envStatus: planFromEnv,
+        userId: req.user.userId,
+        tableExists,
+        migrationHint: tableExists
+          ? null
+          : 'Subscription table does not exist. Run: npx prisma migrate deploy',
+      })
+    } catch (error) {
+      res.status(500).json({ error: error.message })
     }
-    res.json({
-      raw: raw || null,
-      envStatus: planFromEnv,
-      userId: req.user.userId,
-      tableExists,
-      migrationHint: tableExists ? null : 'Subscription table does not exist. Run: npx prisma migrate deploy',
-    })
-  } catch (error) {
-    res.status(500).json({ error: error.message })
-  }
-})
+  },
+)
 
 // ── POST /portal ─────────────────────────────────────────────────────────
 
@@ -329,9 +337,7 @@ router.get('/history/export', paymentReadLimiter, requireAuth, async (req, res) 
       row.receiptUrl || '',
     ])
 
-    const csv = [header, ...csvRows]
-      .map((line) => line.map(escapeCsvValue).join(','))
-      .join('\n')
+    const csv = [header, ...csvRows].map((line) => line.map(escapeCsvValue).join(',')).join('\n')
 
     const filename = `studyhub-payments-${req.user.userId}-${new Date().toISOString().slice(0, 10)}.csv`
     res.setHeader('Content-Type', 'text/csv; charset=utf-8')
@@ -426,9 +432,7 @@ router.post(
           const periodStart = sub.current_period_start
             ? new Date(sub.current_period_start * 1000)
             : null
-          const periodEnd = sub.current_period_end
-            ? new Date(sub.current_period_end * 1000)
-            : null
+          const periodEnd = sub.current_period_end ? new Date(sub.current_period_end * 1000) : null
 
           await prisma.subscription.upsert({
             where: { userId },
@@ -487,7 +491,10 @@ router.post(
 
           synced++
         } catch (err) {
-          log.error({ err, subId: sub.id, userId: parseInt(sub.metadata?.studyhub_user_id, 10) }, 'Failed to sync subscription')
+          log.error(
+            { err, subId: sub.id, userId: parseInt(sub.metadata?.studyhub_user_id, 10) },
+            'Failed to sync subscription',
+          )
           errors++
           // Surface the last error in the response so admin can debug
           res.locals._lastSyncError = err.message
@@ -495,7 +502,12 @@ router.post(
       }
 
       log.info({ synced, errors }, 'Stripe subscription sync complete')
-      res.json({ synced, errors, total: subscriptions.data.length, lastError: res.locals._lastSyncError || null })
+      res.json({
+        synced,
+        errors,
+        total: subscriptions.data.length,
+        lastError: res.locals._lastSyncError || null,
+      })
     } catch (error) {
       captureError(error, { context: 'payments.admin.syncStripe' })
       log.error({ err: error }, 'Failed to sync Stripe subscriptions')
@@ -612,7 +624,10 @@ router.post('/subscription/sync', paymentReadLimiter, requireAuth, async (req, r
             break
           }
         } catch (syncErr) {
-          log.error({ err: syncErr, customerId, status, userId: req.user.userId }, 'Sync: DB write failed for subscription')
+          log.error(
+            { err: syncErr, customerId, status, userId: req.user.userId },
+            'Sync: DB write failed for subscription',
+          )
           // Surface the ACTUAL error to the user so we can debug
           return res.status(500).json({
             synced: false,

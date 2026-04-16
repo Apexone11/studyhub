@@ -46,7 +46,8 @@ createRoot(document.getElementById('root')).render(
 
 // Register service worker for offline support and update detection.
 // Pattern used by GitHub, Vercel, Shopify: detect new SW, show update toast.
-if ('serviceWorker' in navigator) {
+// Skip on Capacitor native shell — native apps update through the Play Store.
+if ('serviceWorker' in navigator && !window.__SH_NATIVE__) {
   window.addEventListener('load', () => {
     navigator.serviceWorker
       .register('/sw.js')
