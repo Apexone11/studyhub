@@ -1,10 +1,10 @@
 // src/mobile/components/MobileGoogleButton.jsx
 // Google Sign-In button for the Capacitor native shell.
 //
-// On native (Android/iOS), uses `@codetrix-studio/capacitor-google-auth` so
-// Google's account chooser opens inside the app — no redirect to Chrome, no
-// return trip to localhost. The plugin returns an ID token which we post to
-// the existing `POST /api/auth/google` endpoint; the bearer-token fetch shim
+// On native (Android/iOS), uses `@capgo/capacitor-social-login` so Google's
+// account chooser opens inside the app — no redirect to Chrome, no return
+// trip to localhost. The plugin returns an ID token which we post to the
+// existing `POST /api/auth/google` endpoint; the bearer-token fetch shim
 // (http.js) reads the returned `authToken` on our behalf.
 //
 // On web fallback (running the same codebase in dev mode), the button falls
@@ -43,23 +43,31 @@ function GoogleLogo() {
   )
 }
 
+// Remembers whether the Capgo plugin has been initialized this session so we
+// don't repeat the handshake on every tap.
+let socialLoginInitialized = false
+
 /**
  * Lazy-loads the native plugin only when actually running in Capacitor. This
  * prevents the web dev bundle from failing to resolve the plugin when it is
  * not installed or when running in a browser tab.
  */
 async function signInWithGoogleNative() {
-  const mod = await import('@codetrix-studio/capacitor-google-auth')
-  const { GoogleAuth } = mod
-  // `initialize` is idempotent but cheap; calling it before each signIn keeps
-  // the client ID in sync if it ever changes at runtime.
-  await GoogleAuth.initialize({
-    clientId: GOOGLE_CLIENT_ID,
-    scopes: ['profile', 'email'],
-    grantOfflineAccess: false,
+  const { SocialLogin } = await import('@capgo/capacitor-social-login')
+
+  if (!socialLoginInitialized) {
+    await SocialLogin.initialize({
+      google: { webClientId: GOOGLE_CLIENT_ID },
+    })
+    socialLoginInitialized = true
+  }
+
+  const res = await SocialLogin.login({
+    provider: 'google',
+    options: { scopes: ['email', 'profile'] },
   })
-  const result = await GoogleAuth.signIn()
-  const idToken = result?.authentication?.idToken
+  // Capgo returns `{ provider, result: { idToken, accessToken, profile, ... } }`
+  const idToken = res?.result?.idToken
   if (!idToken) throw new Error('Google did not return an identity token.')
   return idToken
 }
@@ -135,7 +143,7 @@ export default function MobileGoogleButton({ mode = 'signin' }) {
 
       setError('Unexpected response from Google sign-in.')
     } catch (err) {
-      // `GoogleAuth.signIn()` throws a plain error when the user cancels.
+      // The plugin throws a plain error when the user cancels the chooser.
       const message = err?.message || ''
       if (
         message.includes('canceled') ||

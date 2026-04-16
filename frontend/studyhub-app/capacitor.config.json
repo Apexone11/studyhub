@@ -15,12 +15,5 @@
       "accounts.google.com",
       "*.googleusercontent.com"
     ]
-  },
-  "plugins": {
-    "GoogleAuth": {
-      "scopes": ["profile", "email"],
-      "grantOfflineAccess": false,
-      "forceCodeForRefreshToken": false
-    }
   }
 }
