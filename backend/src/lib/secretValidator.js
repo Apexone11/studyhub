@@ -18,8 +18,6 @@ const RECOMMENDED = [
   { key: 'STRIPE_SECRET_KEY', description: 'Stripe payment processing' },
   { key: 'STRIPE_WEBHOOK_SECRET', description: 'Stripe webhook signature verification' },
   { key: 'SENTRY_DSN', description: 'Error monitoring' },
-  { key: 'UPSTASH_REDIS_URL', description: 'Redis cache (Upstash REST URL)' },
-  { key: 'UPSTASH_REDIS_TOKEN', description: 'Redis cache (Upstash REST token)' },
   { key: 'FRONTEND_URL', description: 'Frontend origin for CORS + redirects' },
 ]
 
@@ -65,9 +63,7 @@ function validateSecrets() {
   }
 
   const configured = REQUIRED.length + RECOMMENDED.length + OPTIONAL.length
-  const set = [...REQUIRED, ...RECOMMENDED, ...OPTIONAL].filter(
-    (s) => process.env[s.key],
-  ).length
+  const set = [...REQUIRED, ...RECOMMENDED, ...OPTIONAL].filter((s) => process.env[s.key]).length
 
   console.warn(`[SECURITY] Secrets: ${set}/${configured} configured.`)
 }

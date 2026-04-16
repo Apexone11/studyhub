@@ -4,7 +4,6 @@ const { readLimiter } = require('../../lib/rateLimiters')
 const { sendForbidden } = require('../../lib/accessControl')
 const requireAuth = require('../../middleware/auth')
 const { captureError } = require('../../monitoring/sentry')
-const { cached, invalidate } = require('../../lib/redis')
 const prisma = require('../../lib/prisma')
 const r2 = require('../../lib/r2Storage')
 
@@ -63,18 +62,14 @@ const mediaInclude = {
 // ── GET /api/announcements — public ──────────────────────────
 router.get('/', async (req, res) => {
   try {
-    // Phase 6: Redis cache 15min -- announcements change rarely
-    const announcements = await cached('announcements:list', () =>
-      prisma.announcement.findMany({
-        include: {
-          author: { select: { id: true, username: true, avatarUrl: true } },
-          ...mediaInclude,
-        },
-        orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
-        take: 20,
-      }),
-      900,
-    )
+    const announcements = await prisma.announcement.findMany({
+      include: {
+        author: { select: { id: true, username: true, avatarUrl: true } },
+        ...mediaInclude,
+      },
+      orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
+      take: 20,
+    })
     res.json(announcements)
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
@@ -139,7 +134,6 @@ router.post('/', requireAuth, async (req, res) => {
         ...mediaInclude,
       },
     })
-    await invalidate('announcements:list')
     res.status(201).json(announcement)
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
@@ -360,7 +354,6 @@ router.delete('/:id', requireAuth, async (req, res) => {
 
     // Cascade will delete AnnouncementMedia rows
     await prisma.announcement.delete({ where: { id: announcementId } })
-    await invalidate('announcements:list')
     res.json({ message: 'Announcement deleted.' })
   } catch (err) {
     if (err.code === 'P2025') return res.status(404).json({ error: 'Announcement not found.' })

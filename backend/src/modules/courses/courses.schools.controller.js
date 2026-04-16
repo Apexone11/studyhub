@@ -2,66 +2,75 @@ const express = require('express')
 const requireAuth = require('../../middleware/auth')
 const { captureError } = require('../../monitoring/sentry')
 const { cacheControl } = require('../../lib/cacheControl')
-const { cached } = require('../../lib/redis')
 const prisma = require('../../lib/prisma')
 const { schoolsLimiter, POPULAR_COURSES_LIMIT } = require('./courses.constants')
 
 const router = express.Router()
 
 // Public endpoint for school + course dropdowns.
-router.get('/schools', cacheControl(600, { public: true, staleWhileRevalidate: 1800 }), schoolsLimiter, async (req, res) => {
-  try {
-    // Phase 6: Redis cache 1 hour -- schools barely change
-    const schools = await cached('schools:all', () => prisma.school.findMany({
-      select: {
-        id: true,
-        name: true,
-        short: true,
-        city: true,
-        state: true,
-        schoolType: true,
-        logoUrl: true,
-        courses: {
-          select: {
-            id: true,
-            code: true,
-            name: true,
-            department: true,
+router.get(
+  '/schools',
+  cacheControl(600, { public: true, staleWhileRevalidate: 1800 }),
+  schoolsLimiter,
+  async (req, res) => {
+    try {
+      const schools = await prisma.school.findMany({
+        select: {
+          id: true,
+          name: true,
+          short: true,
+          city: true,
+          state: true,
+          schoolType: true,
+          logoUrl: true,
+          courses: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+              department: true,
+            },
+            orderBy: { code: 'asc' },
           },
-          orderBy: { code: 'asc' }
-        }
-      },
-      orderBy: { name: 'asc' }
-    }), 3600)
+        },
+        orderBy: { name: 'asc' },
+      })
 
-    return res.json(schools)
-  } catch (error) {
-    captureError(error, {
-      route: req.originalUrl,
-      method: req.method
-    })
+      return res.json(schools)
+    } catch (error) {
+      captureError(error, {
+        route: req.originalUrl,
+        method: req.method,
+      })
 
-    console.error(error)
-    return res.status(500).json({ error: 'Server error.' })
-  }
-})
+      console.error(error)
+      return res.status(500).json({ error: 'Server error.' })
+    }
+  },
+)
 
 // Public endpoint for popular courses ranked by published sheet count.
-router.get('/popular', cacheControl(300, { public: true, staleWhileRevalidate: 600 }), schoolsLimiter, async (req, res) => {
-  try {
-    // Phase 6: Redis cache 10 min -- popular courses change slowly
-    const result = await cached('courses:popular', async () => {
+router.get(
+  '/popular',
+  cacheControl(300, { public: true, staleWhileRevalidate: 600 }),
+  schoolsLimiter,
+  async (req, res) => {
+    try {
+      // StudySheet.courseId is a non-nullable Int in the schema, so no
+      // null-exclusion filter is needed (and Prisma 6.19+ rejects the
+      // `NOT: [{ courseId: null }]` form on required fields). Grouping
+      // uses a concrete column count since `_all` was removed in 6.19.
       const grouped = await prisma.studySheet.groupBy({
         by: ['courseId'],
-        where: { status: 'published', NOT: [{ courseId: null }] },
-        _count: { _all: true },
-        orderBy: { _count: { _all: 'desc' } },
+        where: { status: 'published' },
+        _count: { courseId: true },
+        orderBy: { _count: { courseId: 'desc' } },
         take: POPULAR_COURSES_LIMIT,
       })
 
       const courseIds = grouped.map((row) => row.courseId)
 
-      if (courseIds.length === 0) return []
+      if (courseIds.length === 0) return res.json([])
 
       const courses = await prisma.course.findMany({
         where: { id: { in: courseIds } },
@@ -73,10 +82,10 @@ router.get('/popular', cacheControl(300, { public: true, staleWhileRevalidate: 6
         },
       })
 
-      const countMap = new Map(grouped.map((row) => [row.courseId, row._count._all]))
+      const countMap = new Map(grouped.map((row) => [row.courseId, row._count.courseId]))
       const courseMap = new Map(courses.map((course) => [course.id, course]))
 
-      return courseIds
+      const result = courseIds
         .map((id) => {
           const course = courseMap.get(id)
           if (!course) return null
@@ -89,15 +98,15 @@ router.get('/popular', cacheControl(300, { public: true, staleWhileRevalidate: 6
           }
         })
         .filter(Boolean)
-    }, 600)
 
-    return res.json(result)
-  } catch (error) {
-    captureError(error, { route: req.originalUrl, method: req.method })
-    console.error(error)
-    return res.status(500).json({ error: 'Server error.' })
-  }
-})
+      return res.json(result)
+    } catch (error) {
+      captureError(error, { route: req.originalUrl, method: req.method })
+      console.error(error)
+      return res.status(500).json({ error: 'Server error.' })
+    }
+  },
+)
 
 /**
  * GET /api/courses/schools/suggest
