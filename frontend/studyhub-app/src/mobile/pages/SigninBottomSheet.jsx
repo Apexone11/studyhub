@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import BottomSheet from '../components/BottomSheet'
+import MobileGoogleButton from '../components/MobileGoogleButton'
 import { API } from '../../config'
 import { useSession } from '../../lib/session-context'
 
@@ -80,6 +81,12 @@ export default function SigninBottomSheet({ open, onClose, onSwitchToSignup }) {
   return (
     <BottomSheet open={open} onClose={onClose} title="Welcome Back">
       {error && <div className="mob-auth-error">{error}</div>}
+
+      <MobileGoogleButton mode="signin" />
+
+      <div className="mob-auth-or">
+        <span className="mob-auth-or-text">or</span>
+      </div>
 
       <form onSubmit={handleLogin}>
         <div className="mob-auth-field">

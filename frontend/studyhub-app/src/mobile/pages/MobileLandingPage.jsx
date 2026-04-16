@@ -3,10 +3,14 @@
 // cards, animated gradient mesh, and staggered content reveal.
 // Design is intentionally distinct from the web — mobile-first, bold, visual.
 
-import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import anime from '../lib/animeCompat'
 import GradientMesh from '../components/GradientMesh'
+import BottomSheet from '../components/BottomSheet'
+import { API } from '../../config'
+import { useSession } from '../../lib/session-context'
+import { CURRENT_LEGAL_VERSION } from '../../lib/legalVersions'
 import SignupBottomSheet from './SignupBottomSheet'
 import SigninBottomSheet from './SigninBottomSheet'
 
@@ -96,10 +100,10 @@ function AppLogo() {
 
 /* ── Floating feature cards behind the hero ─────────────────────── */
 const FEATURE_CARDS = [
-  { icon: 'sheets', label: 'Study Sheets', x: '-6%', y: '8%', delay: 800 },
-  { icon: 'ai', label: 'Hub AI', x: '74%', y: '5%', delay: 1000 },
-  { icon: 'messages', label: 'Messages', x: '78%', y: '30%', delay: 1200 },
-  { icon: 'groups', label: 'Study Groups', x: '-2%', y: '34%', delay: 1400 },
+  { icon: 'sheets', label: 'Study Sheets', x: '4%', y: '10%', delay: 800 },
+  { icon: 'ai', label: 'Hub AI', x: '66%', y: '6%', delay: 1000 },
+  { icon: 'messages', label: 'Messages', x: '64%', y: '32%', delay: 1200 },
+  { icon: 'groups', label: 'Study Groups', x: '6%', y: '36%', delay: 1400 },
 ]
 
 function FeatureCardIcon({ type }) {
@@ -223,8 +227,17 @@ function StatsRow({ statsRef }) {
 
 export default function MobileLandingPage() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const { completeAuthentication } = useSession()
+
   const [showSignup, setShowSignup] = useState(false)
   const [showSignin, setShowSignin] = useState(false)
+  const [googleLoading, setGoogleLoading] = useState(false)
+  const [googleError, setGoogleError] = useState('')
+
+  // Google role picker state (for new Google users)
+  const [showRolePicker, setShowRolePicker] = useState(false)
+  const [pendingGoogle, setPendingGoogle] = useState(null)
 
   const logoRef = useRef(null)
   const glowRef = useRef(null)
@@ -233,6 +246,98 @@ export default function MobileLandingPage() {
   const subtitleRef = useRef(null)
   const statsRef = useRef(null)
   const actionsRef = useRef(null)
+
+  // ── Google OAuth callback handler ──
+  // When Google redirects back with ?code=, exchange it for auth
+  useEffect(() => {
+    const code = searchParams.get('code')
+    if (!code) return
+
+    // Clear ?code= from URL immediately
+    setSearchParams({}, { replace: true })
+
+    setGoogleLoading(true)
+    setGoogleError('')
+
+    const redirectUri = `${window.location.origin}/m/landing`
+
+    fetch(`${API}/api/auth/google/code`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ code, redirectUri }),
+    })
+      .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
+      .then(({ ok, data }) => {
+        if (!ok) {
+          setGoogleError(data.error || 'Google sign-in failed.')
+          return
+        }
+
+        // Existing user -- signed in directly
+        if (data.user) {
+          completeAuthentication(data.user)
+          navigate(data.user.onboardingCompleted ? '/m/home' : '/m/onboarding/goals', {
+            replace: true,
+          })
+          return
+        }
+
+        // New user -- needs to pick a role
+        if (data.status === 'needs_role' && data.tempToken) {
+          setPendingGoogle({
+            tempToken: data.tempToken,
+            email: data.email,
+            name: data.name,
+            avatarUrl: data.avatarUrl,
+          })
+          setShowRolePicker(true)
+        }
+      })
+      .catch(() => {
+        setGoogleError('Connection error during Google sign-in.')
+      })
+      .finally(() => {
+        setGoogleLoading(false)
+      })
+  }, [searchParams, setSearchParams, completeAuthentication, navigate])
+
+  // ── Complete Google signup (role selection) ──
+  const handleGoogleRoleComplete = useCallback(
+    async (accountType) => {
+      if (!pendingGoogle?.tempToken) return
+      setGoogleLoading(true)
+
+      try {
+        const res = await fetch(`${API}/api/auth/google/complete`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            tempToken: pendingGoogle.tempToken,
+            accountType,
+            legalAccepted: true,
+            legalVersion: CURRENT_LEGAL_VERSION,
+          }),
+        })
+        const data = await res.json()
+
+        if (!res.ok) {
+          setGoogleError(data.error || 'Could not complete registration.')
+          return
+        }
+
+        completeAuthentication(data.user)
+        setShowRolePicker(false)
+        navigate('/m/onboarding/goals', { replace: true })
+      } catch {
+        setGoogleError('Connection error. Please try again.')
+      } finally {
+        setGoogleLoading(false)
+      }
+    },
+    [pendingGoogle, completeAuthentication, navigate],
+  )
 
   const prefersReduced =
     typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
@@ -432,6 +537,72 @@ export default function MobileLandingPage() {
         </p>
       </footer>
 
+      {/* ── Google loading overlay ──────────────────────────── */}
+      {googleLoading && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            background: 'rgba(0,0,0,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexDirection: 'column',
+            gap: 'var(--space-4)',
+          }}
+        >
+          <div
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: '50%',
+              border: '3px solid rgba(255,255,255,0.2)',
+              borderTopColor: '#ffffff',
+              animation: 'mob-spin 0.7s linear infinite',
+            }}
+          />
+          <span style={{ color: '#ffffff', fontSize: 14, fontWeight: 600 }}>
+            Signing in with Google...
+          </span>
+        </div>
+      )}
+
+      {/* ── Google error toast ─────────────────────────────── */}
+      {googleError && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: 80,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 9999,
+            background: 'var(--sh-danger-bg)',
+            border: '1px solid var(--sh-danger-border)',
+            color: 'var(--sh-danger-text)',
+            padding: '12px 20px',
+            borderRadius: 12,
+            fontSize: 13,
+            fontWeight: 600,
+            maxWidth: 'calc(100vw - 48px)',
+            textAlign: 'center',
+          }}
+          onClick={() => setGoogleError('')}
+          role="alert"
+        >
+          {googleError}
+        </div>
+      )}
+
+      {/* ── Google role picker (new users) ─────────────────── */}
+      <GoogleRolePicker
+        open={showRolePicker}
+        onClose={() => setShowRolePicker(false)}
+        pendingGoogle={pendingGoogle}
+        loading={googleLoading}
+        onSelect={handleGoogleRoleComplete}
+      />
+
       <SignupBottomSheet
         open={showSignup}
         onClose={() => setShowSignup(false)}
@@ -443,5 +614,73 @@ export default function MobileLandingPage() {
         onSwitchToSignup={switchToSignup}
       />
     </div>
+  )
+}
+
+/* ── Google role picker bottom sheet ──────────────────────────── */
+function GoogleRolePicker({ open, onClose, pendingGoogle, loading, onSelect }) {
+  const [selected, setSelected] = useState('student')
+
+  const roles = [
+    { value: 'student', label: 'Student', desc: 'I am enrolled in a school or university' },
+    { value: 'teacher', label: 'Teacher / Professor', desc: 'I teach or manage courses' },
+    { value: 'other', label: 'Other', desc: 'Self-learner, tutor, or professional' },
+  ]
+
+  return (
+    <BottomSheet open={open} onClose={onClose} title="One more step">
+      {pendingGoogle?.name && (
+        <p
+          style={{
+            color: 'var(--sh-subtext)',
+            fontSize: 'var(--type-sm)',
+            marginBottom: 'var(--space-5)',
+            lineHeight: 1.5,
+          }}
+        >
+          Welcome, <strong style={{ color: 'var(--sh-text)' }}>{pendingGoogle.name}</strong>. Pick
+          your role to get started.
+        </p>
+      )}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+        {roles.map((role) => (
+          <button
+            key={role.value}
+            type="button"
+            className={`mob-onboarding-option${selected === role.value ? ' mob-onboarding-option--selected' : ''}`}
+            onClick={() => setSelected(role.value)}
+          >
+            <div style={{ flex: 1, textAlign: 'left' }}>
+              <div className="mob-onboarding-option-text">{role.label}</div>
+              <div className="mob-onboarding-option-desc">{role.desc}</div>
+            </div>
+            <div className="mob-onboarding-check">
+              {selected === role.value && (
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M5 12l5 5L20 7"
+                    stroke="#fff"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              )}
+            </div>
+          </button>
+        ))}
+      </div>
+
+      <button
+        type="button"
+        className="mob-auth-submit"
+        style={{ marginTop: 'var(--space-6)' }}
+        disabled={loading}
+        onClick={() => onSelect(selected)}
+      >
+        {loading ? 'Creating account...' : 'Continue'}
+      </button>
+    </BottomSheet>
   )
 }

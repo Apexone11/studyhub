@@ -304,6 +304,7 @@ router.post('/google/code', googleLimiter, async (req, res) => {
     'http://localhost:5173',
     'http://localhost:4173',
     'capacitor://localhost',
+    'https://localhost',
     'http://localhost',
   ].filter(Boolean)
   const uriOrigin = (() => {

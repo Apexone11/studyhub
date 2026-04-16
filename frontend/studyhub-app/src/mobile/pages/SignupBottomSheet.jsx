@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import BottomSheet from '../components/BottomSheet'
+import MobileGoogleButton from '../components/MobileGoogleButton'
 import { API } from '../../config'
 import { useSession } from '../../lib/session-context'
 import { CURRENT_LEGAL_VERSION } from '../../lib/legalVersions'
@@ -185,79 +186,87 @@ export default function SignupBottomSheet({ open, onClose, onSwitchToSignin }) {
       {error && <div className="mob-auth-error">{error}</div>}
 
       {step === 'account' && (
-        <form onSubmit={handleCreateAccount}>
-          <div className="mob-auth-field">
-            <label className="mob-auth-label" htmlFor="mob-signup-username">
-              Username
-            </label>
-            <input
-              id="mob-signup-username"
-              className="mob-auth-input"
-              type="text"
-              placeholder="Choose a username"
-              autoComplete="username"
-              autoCapitalize="none"
-              value={form.username}
-              onChange={(e) => setField('username', e.target.value)}
-            />
+        <>
+          <MobileGoogleButton mode="signup" />
+
+          <div className="mob-auth-or">
+            <span className="mob-auth-or-text">or</span>
           </div>
 
-          <div className="mob-auth-field">
-            <label className="mob-auth-label" htmlFor="mob-signup-email">
-              Email
-            </label>
-            <input
-              id="mob-signup-email"
-              className="mob-auth-input"
-              type="email"
-              placeholder="your@university.edu"
-              autoComplete="email"
-              value={form.email}
-              onChange={(e) => setField('email', e.target.value)}
-            />
-          </div>
+          <form onSubmit={handleCreateAccount}>
+            <div className="mob-auth-field">
+              <label className="mob-auth-label" htmlFor="mob-signup-username">
+                Username
+              </label>
+              <input
+                id="mob-signup-username"
+                className="mob-auth-input"
+                type="text"
+                placeholder="Choose a username"
+                autoComplete="username"
+                autoCapitalize="none"
+                value={form.username}
+                onChange={(e) => setField('username', e.target.value)}
+              />
+            </div>
 
-          <div className="mob-auth-field">
-            <label className="mob-auth-label" htmlFor="mob-signup-pw">
-              Password
-            </label>
-            <input
-              id="mob-signup-pw"
-              className="mob-auth-input"
-              type="password"
-              placeholder="Min 8 chars, 1 uppercase, 1 number"
-              autoComplete="new-password"
-              value={form.password}
-              onChange={(e) => setField('password', e.target.value)}
-            />
-          </div>
+            <div className="mob-auth-field">
+              <label className="mob-auth-label" htmlFor="mob-signup-email">
+                Email
+              </label>
+              <input
+                id="mob-signup-email"
+                className="mob-auth-input"
+                type="email"
+                placeholder="your@university.edu"
+                autoComplete="email"
+                value={form.email}
+                onChange={(e) => setField('email', e.target.value)}
+              />
+            </div>
 
-          <div className="mob-auth-field">
-            <label className="mob-auth-label" htmlFor="mob-signup-cpw">
-              Confirm Password
-            </label>
-            <input
-              id="mob-signup-cpw"
-              className="mob-auth-input"
-              type="password"
-              placeholder="Re-enter your password"
-              autoComplete="new-password"
-              value={form.confirmPassword}
-              onChange={(e) => setField('confirmPassword', e.target.value)}
-            />
-          </div>
+            <div className="mob-auth-field">
+              <label className="mob-auth-label" htmlFor="mob-signup-pw">
+                Password
+              </label>
+              <input
+                id="mob-signup-pw"
+                className="mob-auth-input"
+                type="password"
+                placeholder="Min 8 chars, 1 uppercase, 1 number"
+                autoComplete="new-password"
+                value={form.password}
+                onChange={(e) => setField('password', e.target.value)}
+              />
+            </div>
 
-          <button type="submit" className="mob-auth-submit" disabled={loading}>
-            {loading ? 'Creating account...' : 'Continue'}
-          </button>
+            <div className="mob-auth-field">
+              <label className="mob-auth-label" htmlFor="mob-signup-cpw">
+                Confirm Password
+              </label>
+              <input
+                id="mob-signup-cpw"
+                className="mob-auth-input"
+                type="password"
+                placeholder="Re-enter your password"
+                autoComplete="new-password"
+                value={form.confirmPassword}
+                onChange={(e) => setField('confirmPassword', e.target.value)}
+              />
+            </div>
 
-          <p className="mob-auth-switch">
-            Already have an account?{' '}
-            <button type="button" className="mob-auth-switch-link" onClick={onSwitchToSignin}>
-              Sign in
+            <button type="submit" className="mob-auth-submit" disabled={loading}>
+              {loading ? 'Creating account...' : 'Continue'}
             </button>
-          </p>
-        </form>
+
+            <p className="mob-auth-switch">
+              Already have an account?{' '}
+              <button type="button" className="mob-auth-switch-link" onClick={onSwitchToSignin}>
+                Sign in
+              </button>
+            </p>
+          </form>
+        </>
       )}
 
       {step === 'verify' && (
@@ -318,13 +327,6 @@ export default function SignupBottomSheet({ open, onClose, onSwitchToSignin }) {
           </button>
         </form>
       )}
-
-      <p className="mob-auth-switch">
-        Already have an account?{' '}
-        <button type="button" className="mob-auth-switch-link" onClick={onSwitchToSignin}>
-          Sign in
-        </button>
-      </p>
     </BottomSheet>
   )
 }

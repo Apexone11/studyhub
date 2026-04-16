@@ -42,8 +42,8 @@
         // Detect Capacitor native shell — skip all web analytics/consent banners
         var isNative =
           window.location.protocol === 'capacitor:' ||
-          (window.location.hostname === 'localhost' && window.Capacitor) ||
           document.URL.indexOf('capacitor://') === 0 ||
+          (window.location.protocol === 'https:' && window.location.hostname === 'localhost') ||
           navigator.userAgent.indexOf('StudyHub') > -1
         if (isNative) {
           window.__SH_NATIVE__ = true

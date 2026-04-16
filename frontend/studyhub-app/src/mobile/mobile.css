@@ -200,12 +200,14 @@
   width: 100%;
   max-height: 80vh;
   background: var(--sh-surface);
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  border-radius: 20px 20px 0 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   will-change: transform;
-  box-shadow: 0 -4px 32px rgba(0, 0, 0, 0.12);
+  box-shadow:
+    0 -8px 40px rgba(0, 0, 0, 0.2),
+    0 -1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .mob-bottom-sheet--full {
@@ -269,7 +271,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--sh-hero-gradient-primary);
+  background: #0a0e1a;
   overscroll-behavior: none;
 }
 
@@ -293,8 +295,9 @@ body {
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: var(--space-8) var(--space-6);
-  padding-top: calc(env(safe-area-inset-top, 0px) + var(--space-12));
+  padding: 0 var(--space-8);
+  padding-top: calc(env(safe-area-inset-top, 0px) + var(--space-10));
+  padding-bottom: var(--space-4);
 }
 
 /* ── Logo hero zone ──── */
@@ -304,21 +307,21 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: var(--space-8);
-  width: 120px;
-  height: 120px;
+  margin-bottom: var(--space-6);
+  width: 100px;
+  height: 100px;
 }
 
 .mob-landing-logo-glow {
   position: absolute;
-  width: 140px;
-  height: 140px;
+  width: 160px;
+  height: 160px;
   border-radius: 50%;
   background: radial-gradient(
     circle,
-    rgba(59, 130, 246, 0.35) 0%,
-    rgba(139, 92, 246, 0.15) 50%,
-    transparent 75%
+    rgba(59, 130, 246, 0.3) 0%,
+    rgba(99, 102, 241, 0.12) 40%,
+    transparent 70%
   );
   will-change: transform, opacity;
   pointer-events: none;
@@ -327,45 +330,48 @@ body {
 .mob-landing-logo-mark {
   position: relative;
   will-change: transform, opacity;
-  filter: drop-shadow(0 0 20px rgba(59, 130, 246, 0.4));
+  filter: drop-shadow(0 0 24px rgba(59, 130, 246, 0.35));
 }
 
 /* ── App name ──── */
 
 .mob-landing-app-name {
-  font-size: clamp(2rem, 6vw, 2.8rem);
+  font-size: clamp(2.2rem, 7vw, 3rem);
   font-weight: 800;
   font-family: var(--font);
-  letter-spacing: -0.03em;
-  line-height: 1.1;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
   margin-bottom: var(--space-2);
   will-change: transform, opacity;
 }
 
 .mob-landing-app-name-study {
-  color: var(--sh-on-dark);
+  color: #ffffff;
 }
 
 .mob-landing-app-name-hub {
-  color: #3b82f6;
+  background: linear-gradient(135deg, #3b82f6 0%, #818cf8 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .mob-landing-tagline {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.45);
-  letter-spacing: 0.18em;
+  color: rgba(255, 255, 255, 0.35);
+  letter-spacing: 0.22em;
   text-transform: uppercase;
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-5);
   will-change: transform, opacity;
 }
 
 .mob-landing-subtitle {
   font-size: 15px;
-  color: rgba(255, 255, 255, 0.6);
-  line-height: 1.65;
-  margin-bottom: var(--space-8);
-  max-width: 300px;
+  color: rgba(255, 255, 255, 0.55);
+  line-height: 1.7;
+  margin-bottom: var(--space-6);
+  max-width: 280px;
   will-change: transform, opacity;
 }
 
@@ -375,14 +381,12 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-6);
-  margin-bottom: var(--space-10);
-  padding: var(--space-4) var(--space-5);
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  gap: var(--space-5);
+  margin-bottom: var(--space-8);
+  padding: 14px var(--space-6);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
   will-change: transform, opacity;
 }
 
@@ -394,25 +398,25 @@ body {
 }
 
 .mob-landing-stat-num {
-  font-size: var(--type-lg);
+  font-size: 18px;
   font-weight: 800;
-  color: var(--sh-on-dark);
+  color: #ffffff;
   font-family: var(--font);
   letter-spacing: -0.02em;
 }
 
 .mob-landing-stat-label {
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.45);
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.35);
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
 }
 
 .mob-landing-stat-divider {
   width: 1px;
-  height: 24px;
-  background: rgba(255, 255, 255, 0.12);
+  height: 20px;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 /* ── Floating feature cards ──── */
@@ -422,28 +426,29 @@ body {
   z-index: 1;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  background: var(--sh-glass-bg-strong);
-  border: 1px solid var(--sh-glass-border);
-  border-radius: var(--radius);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  color: var(--sh-on-dark-subtle);
-  font-size: 10px;
+  gap: 5px;
+  padding: 5px 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 9px;
   font-weight: 600;
   font-family: var(--font);
   white-space: nowrap;
   will-change: transform;
   pointer-events: none;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-  opacity: 0.55;
+  opacity: 0.4;
 }
 
 .mob-landing-actions {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+  width: 100%;
+  max-width: 320px;
   will-change: transform, opacity;
 }
 
@@ -451,61 +456,57 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 54px;
+  height: 52px;
   width: 100%;
-  max-width: 320px;
-  border-radius: 16px;
+  border-radius: 14px;
   font-family: var(--font);
-  font-size: var(--type-base);
+  font-size: 15px;
   font-weight: 700;
   letter-spacing: -0.01em;
   border: none;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   transition:
-    transform 0.15s ease,
-    box-shadow 0.15s ease,
-    opacity 0.15s ease;
+    transform 0.12s ease,
+    opacity 0.12s ease;
   will-change: transform;
 }
 
 .mob-landing-btn:active {
-  transform: scale(0.96);
-  opacity: 0.9;
+  transform: scale(0.97);
+  opacity: 0.85;
 }
 
 .mob-landing-btn--primary {
-  background: linear-gradient(135deg, #ffffff 0%, #f0f4ff 100%);
-  color: var(--sh-brand);
-  box-shadow:
-    0 8px 32px rgba(255, 255, 255, 0.18),
-    0 2px 8px rgba(0, 0, 0, 0.08);
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 4px 20px rgba(255, 255, 255, 0.12);
 }
 
 .mob-landing-btn--secondary {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--sh-on-dark);
-  border: 1.5px solid rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .mob-landing-footer {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   text-align: center;
-  padding: var(--space-6);
-  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--space-6));
+  padding: var(--space-4) var(--space-6);
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--space-5));
 }
 
 .mob-landing-footer-text {
-  font-size: var(--type-xs);
-  color: var(--sh-on-dark-soft);
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.3);
+  line-height: 1.4;
 }
 
 .mob-landing-footer-link {
-  color: var(--sh-on-dark-muted);
+  color: rgba(255, 255, 255, 0.5);
   text-decoration: underline;
+  text-decoration-color: rgba(255, 255, 255, 0.2);
   text-underline-offset: 2px;
   background: none;
   border: none;
@@ -532,10 +533,10 @@ body {
 }
 
 .mob-auth-input {
-  height: var(--control-h-lg);
+  height: 48px;
   padding: 0 var(--space-4);
   border: 1.5px solid var(--sh-input-border);
-  border-radius: var(--radius-control);
+  border-radius: 12px;
   background: var(--sh-input-bg);
   color: var(--sh-input-text);
   font-size: var(--type-base);
@@ -561,10 +562,11 @@ body {
   justify-content: center;
   width: 100%;
   height: 50px;
-  border-radius: var(--radius-control);
+  margin-top: var(--space-2);
+  border-radius: 12px;
   background: var(--sh-btn-primary-bg);
   color: var(--sh-btn-primary-text);
-  font-size: var(--type-base);
+  font-size: 15px;
   font-weight: 700;
   font-family: var(--font);
   border: none;
@@ -572,8 +574,8 @@ body {
   box-shadow: var(--sh-btn-primary-shadow);
   -webkit-tap-highlight-color: transparent;
   transition:
-    transform 0.15s ease,
-    opacity 0.15s ease;
+    transform 0.12s ease,
+    opacity 0.12s ease;
 }
 
 .mob-auth-submit:active {
@@ -631,6 +633,73 @@ body {
   cursor: pointer;
   font-family: var(--font);
   font-size: var(--type-sm);
+}
+
+/* ── Google Sign-In button ──── */
+
+.mob-google-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  width: 100%;
+  height: 48px;
+  border-radius: 12px;
+  background: var(--sh-surface);
+  border: 1.5px solid var(--sh-border);
+  color: var(--sh-text);
+  font-size: 14px;
+  font-weight: 600;
+  font-family: var(--font);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform 0.12s ease,
+    background 0.12s ease;
+}
+
+.mob-google-btn:active {
+  transform: scale(0.98);
+  background: var(--sh-soft);
+}
+
+.mob-google-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.mob-google-btn-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--sh-border);
+  border-top-color: var(--sh-brand);
+  border-radius: 50%;
+  animation: mob-spin 0.6s linear infinite;
+}
+
+/* ── Auth divider ──── */
+
+.mob-auth-or {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-5) 0;
+}
+
+.mob-auth-or::before,
+.mob-auth-or::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--sh-border);
+}
+
+.mob-auth-or-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sh-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 /* ── Onboarding ────────────────────────────────────────────────── */
