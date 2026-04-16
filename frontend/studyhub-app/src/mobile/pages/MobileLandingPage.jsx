@@ -4,8 +4,7 @@
 // Design is intentionally distinct from the web — mobile-first, bold, visual.
 
 import { useEffect, useRef, useState } from 'react'
-import * as _animeModule from 'animejs'
-const anime = _animeModule.default || _animeModule
+import anime from '../lib/animeCompat'
 import GradientMesh from '../components/GradientMesh'
 import SignupBottomSheet from './SignupBottomSheet'
 import SigninBottomSheet from './SigninBottomSheet'

@@ -4,8 +4,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import * as _animeModule from 'animejs'
-const anime = _animeModule.default || _animeModule
+import anime from '../lib/animeCompat'
 import { useSession } from '../../lib/session-context'
 import { API } from '../../config'
 import MobileTopBar from '../components/MobileTopBar'

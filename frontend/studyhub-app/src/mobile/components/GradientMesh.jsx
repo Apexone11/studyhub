@@ -4,8 +4,7 @@
 // Respects prefers-reduced-motion.
 
 import { useCallback, useEffect, useRef } from 'react'
-import * as _animeModule from 'animejs'
-const anime = _animeModule.default || _animeModule
+import anime from '../lib/animeCompat'
 
 const PREFERS_REDUCED =
   typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches

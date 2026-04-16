@@ -3,8 +3,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import * as _animeModule from 'animejs'
-const anime = _animeModule.default || _animeModule
+import anime from '../../lib/animeCompat'
 
 const NOTIF_OPTIONS = [
   { id: 'messages', label: 'Messages', desc: 'When someone sends you a direct message' },

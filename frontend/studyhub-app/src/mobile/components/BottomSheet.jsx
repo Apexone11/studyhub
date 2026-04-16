@@ -4,8 +4,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import * as _animeModule from 'animejs'
-const anime = _animeModule.default || _animeModule
+import anime from '../lib/animeCompat'
 
 const DRAG_DISMISS_THRESHOLD = 120
 

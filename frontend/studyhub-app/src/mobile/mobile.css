@@ -4,6 +4,30 @@
  * GPU-accelerated animations only (transform, opacity).
  * ═══════════════════════════════════════════════════════════════════ */
 
+/* ── Animation safety net ─────────────────────────────────────── */
+/* If JS animations fail to run, ensure content becomes visible    */
+/* after a short delay. This prevents invisible-content-on-dark-bg */
+/* when anime.js throws. Also covers prefers-reduced-motion.       */
+
+@media (prefers-reduced-motion: reduce) {
+  [style*='opacity: 0'] {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
+@keyframes mob-safety-reveal {
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.mob-landing [style*='opacity: 0'],
+.mob-onboarding [style*='opacity: 0'] {
+  animation: mob-safety-reveal 0.01s 2s forwards;
+}
+
 /* ── Mobile layout shell ───────────────────────────────────────── */
 
 .mob-shell {

@@ -3,8 +3,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import * as _animeModule from 'animejs'
-const anime = _animeModule.default || _animeModule
+import anime from '../../lib/animeCompat'
 
 const GOALS = [
   { id: 'share', label: 'Share study materials', desc: 'Upload and collaborate on study sheets' },

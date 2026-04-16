@@ -3,8 +3,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import * as _animeModule from 'animejs'
-const anime = _animeModule.default || _animeModule
+import anime from '../../lib/animeCompat'
 import { API } from '../../../config'
 
 export default function OnboardingPeople() {
