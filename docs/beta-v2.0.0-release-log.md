@@ -1366,3 +1366,35 @@ Backend:
 - Touched-file tests (`announcements.routes`, `dashboard.routes`, `courses.routes`, `feed.routes`, `public.routes`, `search.routes`, `sheets.contributors.routes`, `library.service`): 62/62 pass
 - Backend full suite: 1205 tests pass; same 13 pre-existing file-level failures in unrelated suites (users / attachments / security / IDOR / sheet workflow), confirmed to reproduce on `local-main` with the Redis removal reverted.
 - Frontend build: passes
+
+---
+
+## 2026-04-16 — Post-merge review fixes for Upstash Redis removal
+
+### Summary
+
+Addressed review feedback on the merged Upstash Redis removal PR. Also fixes a pre-existing `/api/feed/for-you` response-shape mismatch where the unauthenticated early-return used different keys than the authenticated path; the frontend `ForYouSection` reads `sheets`/`groups`/`people`/`trending` so the old unauthenticated keys (`recommendedSheets`/`courseActivity`/`recommendedPeople`/`trendingSheets`) were silently falling back to `[]` via `Array.isArray(result.sheets) ? ... : []`.
+
+The reviewer comment that `dashboard /summary` lacks `requireAuth` was verified against the code and is incorrect: `dashboard.routes.js` calls `router.use(requireAuth)` on line 9 and the wrapper covers every route in the module.
+
+### Changes
+
+Backend:
+
+- `backend/package-lock.json` — regenerated so `@upstash/redis` is no longer listed. Root `package-lock.json` similarly regenerated via the workspace install.
+- `backend/src/modules/feed/feed.discovery.controller.js`:
+  - `/trending` doc comment: replaced "Cached for 5 minutes per period" with the actual HTTP cacheControl settings (120s max-age + 300s stale-while-revalidate).
+  - `/for-you` doc comment: replaced "Auth required. Cached for 2 minutes per user" with the real behavior (optionalAuth, unauthenticated callers get an empty payload matching the authenticated shape, no server-side caching).
+  - `/for-you` handler: removed the unnecessary `await (async () => { ... })()` IIFE that was left over from inlining `redisCached`; the body now sits directly in the route handler with normal indentation.
+  - `/for-you` unauthenticated response: keys changed from `{ recommendedSheets, courseActivity, recommendedPeople, trendingSheets }` to `{ sheets, groups, people, trending }` to match the authenticated shape and the frontend consumer.
+
+### Not implemented
+
+- Extracting a shared sheet-scoring helper across `/trending`, `/for-you` (sheets), and `/for-you` (trending). Deferred: the three scoring formulas differ materially (comments weight vs. none, different recency-decay time windows, per-user multipliers for the for-you sheets path), so any shared helper needs parameters for weights and decay hours. Worth doing, but it's a non-trivial refactor that deserves its own PR with test coverage.
+
+### Validation
+
+- Backend lint: passes (0 errors)
+- Touched-file tests (`announcements.routes`, `dashboard.routes`, `courses.routes`, `feed.routes`, `search.routes`): 43/43 pass
+- Backend full suite: 1205 tests pass, 75 skipped; same 13 pre-existing file-level failures on `local-main`, unrelated to these changes.
+- Repo-wide sweep for `@upstash/redis` in lockfiles: 0 hits in `backend/package-lock.json` and 0 hits in the root `package-lock.json`.
