@@ -1,6 +1,11 @@
 import { Component } from 'react'
-import Joyride from 'react-joyride'
+import * as JoyrideModule from 'react-joyride'
 import { captureComponentError } from '../lib/telemetry'
+
+// react-joyride v3's ESM build uses a re-export pattern that rolldown
+// (Vite 8 bundler) cannot resolve as a default import. Namespace import
+// + fallback handles both bundler quirks and version differences.
+const Joyride = JoyrideModule.default || JoyrideModule
 
 /**
  * Wraps react-joyride in an error boundary so that React 19 incompatibilities
