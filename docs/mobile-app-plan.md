@@ -1,3 +1,5 @@
+<!-- markdownlint-disable MD007 MD010 MD022 MD032 MD036 -->
+
 # StudyHub Mobile — Product Plan
 
 Status: Draft, April 2026

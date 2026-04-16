@@ -3,7 +3,7 @@
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 import { useState } from 'react'
-import { GoogleLogin } from '@react-oauth/google'
+import GoogleSignInButton from '../../components/GoogleSignInButton'
 import { GOOGLE_CLIENT_ID } from '../../config'
 import LegalAcceptanceModal from './LegalAcceptanceModal'
 
@@ -97,7 +97,7 @@ export function AccountStep({ form, setField, loading, onSubmit, onGoogleSuccess
       {GOOGLE_CLIENT_ID && (
         <>
           <div className="register-google-wrap">
-            <GoogleLogin
+            <GoogleSignInButton
               onSuccess={(credentialResponse) => {
                 if (form.termsAccepted) {
                   void onGoogleSuccess(credentialResponse, { legalAccepted: true })
@@ -108,12 +108,9 @@ export function AccountStep({ form, setField, loading, onSubmit, onGoogleSuccess
                 setShowLegalModal(true)
                 setError('Review and accept the legal documents to continue with Google sign-up.')
               }}
-              onError={() => setError('Google sign-up was cancelled or failed.')}
-              size="large"
-              width="300"
+              onError={(msg) => setError(msg || 'Google sign-up was cancelled or failed.')}
               text="signup_with"
-              shape="rectangular"
-              theme="outline"
+              width={300}
             />
           </div>
           <div className="register-divider">
