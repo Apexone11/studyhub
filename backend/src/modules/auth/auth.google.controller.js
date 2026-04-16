@@ -278,4 +278,89 @@ router.post('/google/complete', googleCompleteLimiter, async (req, res) => {
   }
 })
 
+/**
+ * POST /api/auth/google/code
+ * Redirect-flow fallback: the frontend navigated the user to Google's OAuth
+ * consent page directly (bypassing the GIS iframe/popup). Google redirected
+ * back with an authorization code. We exchange it for an ID token and proceed
+ * exactly like POST /google.
+ *
+ * Body: { code: string, redirectUri: string }
+ * redirectUri must match what the frontend used in the redirect.
+ */
+router.post('/google/code', googleLimiter, async (req, res) => {
+  const { code, redirectUri } = req.body || {}
+
+  if (!code || !redirectUri) {
+    return res.status(400).json({ error: 'Authorization code and redirectUri are required.' })
+  }
+  if (!isGoogleOAuthEnabled()) {
+    return res.status(503).json({ error: 'Google sign-in is not available right now.' })
+  }
+
+  try {
+    // Exchange authorization code for tokens via Google's token endpoint.
+    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code,
+        client_id: process.env.GOOGLE_CLIENT_ID,
+        client_secret: process.env.GOOGLE_CLIENT_SECRET,
+        redirect_uri: redirectUri,
+        grant_type: 'authorization_code',
+      }),
+    })
+
+    if (!tokenResponse.ok) {
+      const err = await tokenResponse.json().catch(() => ({}))
+      throw new AppError(401, err.error_description || 'Failed to exchange Google code.')
+    }
+
+    const tokens = await tokenResponse.json()
+    if (!tokens.id_token) {
+      throw new AppError(401, 'Google did not return an identity token.')
+    }
+
+    // Verify the ID token the same way POST /google does.
+    let googlePayload
+    try {
+      googlePayload = await verifyGoogleIdToken(tokens.id_token)
+    } catch {
+      throw new AppError(401, 'Google sign-in failed. Please try again.')
+    }
+
+    // From here, identical logic to POST /google.
+    const existingByGoogleId = await findUserByGoogleId(googlePayload.googleId)
+    if (existingByGoogleId) {
+      const authenticatedUser = await issueAuthenticatedSession(res, existingByGoogleId.id, req)
+      return res.json({ message: 'Login successful!', user: authenticatedUser })
+    }
+
+    if (!googlePayload.emailVerified) {
+      throw new AppError(403, 'Google account email must be verified before you can sign in.')
+    }
+
+    const existingByEmail = await findUserByEmail(googlePayload.email)
+    if (existingByEmail) {
+      const msg =
+        existingByEmail.authProvider === 'google'
+          ? 'An account with this email already exists. Try signing in with your original Google account.'
+          : 'An account with this email already exists. Log in with your password, then link Google from Settings > Security.'
+      return res.status(409).json({ error: msg })
+    }
+
+    const tempToken = signGoogleTempToken(googlePayload)
+    return res.json({
+      status: 'needs_role',
+      tempToken,
+      email: googlePayload.email,
+      name: googlePayload.name || null,
+      avatarUrl: googlePayload.picture || null,
+    })
+  } catch (error) {
+    return handleAuthError(req, res, error)
+  }
+})
+
 module.exports = router

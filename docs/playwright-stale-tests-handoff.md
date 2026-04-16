@@ -1,3 +1,5 @@
+<!-- markdownlint-disable MD007 MD010 MD022 MD032 MD036 -->
+
 # Playwright Suite — Stale Test Cleanup Handoff
 
 **Generated:** 2026-04-08
@@ -25,19 +27,24 @@ The `.beta-live.spec.js` files are excluded by default (see `playwright.config.j
 I spot-checked representative failures to identify the shared root causes. Each category should be fixable in one pass by patching the source of the breakage once.
 
 ### Category A — `mockAuthenticatedApp` dashboard state is broken (~40 failures)
+
 **Symptom:** `getByText(/welcome back/i)` not found on `/dashboard` despite the copy still existing at [DashboardPage.jsx:169](frontend/studyhub-app/src/pages/dashboard/DashboardPage.jsx#L169).
 **Root cause:** The shared `mockAuthenticatedApp` helper in [tests/helpers/mockStudyHubApi.js](frontend/studyhub-app/tests/helpers/mockStudyHubApi.js) doesn't mock whatever endpoint the dashboard now needs to render its hero. The dashboard likely calls a newer endpoint (`/api/dashboard/overview`? `/api/stats`?) that returns 404 in the mock, so the hero crashes or shows a skeleton forever.
 **Fix:** Open the dashboard in the Playwright trace viewer, look at which network calls are pending/failing, add matching routes to `mockAuthenticatedApp`. Single-file fix unblocks ~40 tests.
 **Affected specs:**
+
 - `visual-baseline.spec.js` — all `dashboard` tests across mobile/tablet/desktop × light/dark (10 tests)
 - `visual-smoke.spec.js` — same (12 tests)
 - All other specs that navigate through the dashboard as a setup step
 
 ### Category B — `"welcome back"` also missing on tests 70, 75, 80, 84, 89, 94, 98, 100, 102, 104, 106, 108
+
 Same root cause as Category A — the dashboard hero is not rendering at all in mocked mode. Fixing Category A fixes these.
 
 ### Category C — Page copy renamed (~20 failures)
+
 Tests assert literal strings that were renamed in the UI.
+
 - `"Admin Overview"` → check current admin page heading: `admin.email-suppressions.smoke.spec.js`, `cycle36-decomposed-pages.smoke.spec.js` (4 tests)
 - `"HTML Security Scan"` → check current modal heading: `sheets.html-security-tiers.smoke.spec.js` (4 tests)
 - `"Full preview"` link label → `feed.preview-and-delete.smoke.spec.js` (3 tests)
@@ -46,7 +53,9 @@ Tests assert literal strings that were renamed in the UI.
 **Fix approach:** For each group, open the current page in the browser, grab the current copy, update the spec's locator.
 
 ### Category D — Auth/redirect behavior changed (~10 failures)
+
 Tests expect `/dashboard` after login but current code redirects to `/users/:username?tab=overview`.
+
 - `app.responsive.smoke.spec.js` — `"keeps the session active when dashboard returns 403"` (3 tests × mobile/tablet/desktop = 6)
 - `security.e2e.spec.js` — `Auth Boundary Enforcement` suite (5 tests)
 - `auth.smoke.spec.js` — registration/login flow (2 tests)
@@ -54,16 +63,19 @@ Tests expect `/dashboard` after login but current code redirects to `/users/:use
 **Fix:** Update the expected URL patterns to match the new post-login destination. Single grep+replace across 3 files.
 
 ### Category E — Specific features broken or removed
+
 - `notifications.e2e.spec.js` — 13 tests fail. Entire notifications dropdown may have changed markup since the spec was written. Likely needs the full spec rewritten against the current dropdown DOM.
 - `study-groups.e2e.spec.js` — 8 tests fail. Study groups list/detail pages evolved significantly in PR #198.
 - `messaging.e2e.spec.js:256` — single test: "selecting a conversation loads the message thread". Probably a selector update.
 - `critical-flows.e2e.spec.js` — 4 tests (sheet CRUD, feed interaction, profile viewing, admin moderation). These are the most valuable ones to fix first after Category A.
 
 ### Category F — Visual regression baselines (~30 failures in visual-baseline.spec.js)
+
 These compare rendered screenshots against committed baseline PNGs. Most will be fixed by Category A (dashboard rendering); a few may legitimately need new baseline images committed because of intentional UI changes.
 **Fix approach:** After Category A is fixed, re-run with `--update-snapshots` to regenerate baselines, then eyeball the diff to make sure nothing unintended slipped in.
 
 ### Category G — HTML security scan workflow (~6 failures)
+
 - `sheets.html-security-tiers.smoke.spec.js` (4 tests)
 - `sheets.html-preview.sandbox.smoke.spec.js` (2 tests)
 - `sheets.upload-html-workflow.smoke.spec.js` (1 test)

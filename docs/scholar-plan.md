@@ -1,3 +1,5 @@
+<!-- markdownlint-disable MD007 MD010 MD022 MD032 MD036 -->
+
 # Scholar Plan (Web + Mobile)
 
 A StudyHub page dedicated to discovering, reading, annotating, and studying peer-reviewed articles and preprints. This doc is the single source of truth for both the web `/scholar` route and its mobile equivalent.

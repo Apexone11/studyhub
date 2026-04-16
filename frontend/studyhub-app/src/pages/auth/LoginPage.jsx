@@ -11,8 +11,9 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { GoogleLogin } from '@react-oauth/google'
 import Navbar from '../../components/navbar/Navbar'
+import GoogleSignInButton from '../../components/GoogleSignInButton'
+import { getGoogleRedirectUri } from '../../components/googleSignInHelpers'
 import { API, GOOGLE_CLIENT_ID } from '../../config'
 import { fadeInUp } from '../../lib/animations'
 import { getAuthenticatedHomePath } from '../../lib/authNavigation'
@@ -36,7 +37,7 @@ export default function LoginPage() {
   const [sessionExpired, setSessionExpired] = useState(false)
   const [loggedOut, setLoggedOut] = useState(false)
 
-  /* ── Detect session-expired redirect ─────────────────────────────── */
+  /* ── Detect session-expired redirect + Google OAuth redirect code ── */
   useEffect(() => {
     try {
       if (sessionStorage.getItem(SESSION_EXPIRED_FLAG)) {
@@ -50,16 +51,77 @@ export default function LoginPage() {
     } catch {
       /* private mode */
     }
-    // Also check URL param set by session-context redirect
     const params = new URLSearchParams(window.location.search)
     if (params.get('expired') === '1') {
       setSessionExpired(true)
-      // Clean the URL so a refresh does not re-show the banner
       params.delete('expired')
       const clean = params.toString()
       window.history.replaceState({}, '', window.location.pathname + (clean ? `?${clean}` : ''))
     }
-  }, [])
+
+    // Google OAuth redirect-flow: Google redirected back with ?code=...
+    const googleCode = params.get('code')
+    if (googleCode) {
+      // Clean the code from the URL immediately
+      params.delete('code')
+      params.delete('scope')
+      params.delete('authuser')
+      params.delete('prompt')
+      const cleanUrl = params.toString()
+      window.history.replaceState(
+        {},
+        '',
+        window.location.pathname + (cleanUrl ? `?${cleanUrl}` : ''),
+      )
+      // Exchange the code for an authenticated session
+      handleGoogleCodeExchange(googleCode)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function handleGoogleCodeExchange(code) {
+    setLoading(true)
+    setError('')
+    try {
+      const response = await fetch(`${API}/api/auth/google/code`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, redirectUri: getGoogleRedirectUri() }),
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        setError(data.error || 'Google sign-in failed.')
+        return
+      }
+      if (data.status === 'needs_role' && data.tempToken) {
+        if (!oauthPickerEnabled) {
+          setError('New Google signups are paused right now. Please sign up with email instead.')
+          return
+        }
+        try {
+          sessionStorage.setItem(
+            'studyhub.google.pending',
+            JSON.stringify({
+              tempToken: data.tempToken,
+              email: data.email,
+              name: data.name,
+              avatarUrl: data.avatarUrl,
+            }),
+          )
+        } catch {
+          /* ignore */
+        }
+        navigate('/signup/role', { replace: true })
+        return
+      }
+      completeAuthentication(data.user)
+      navigate(getAuthenticatedHomePath(data.user), { replace: true })
+    } catch {
+      setError('Check your connection and try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   /* ── Card entrance animation ───────────────────────────────────────── */
   useEffect(() => {
@@ -213,18 +275,15 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* ── Google Sign-In button ─────────────────────────────────── */}
+          {/* ── Google Sign-In button (GIS iframe + redirect fallback) ── */}
           {GOOGLE_CLIENT_ID && (
             <>
               <div className="login-google-wrap">
-                <GoogleLogin
+                <GoogleSignInButton
                   onSuccess={handleGoogleSuccess}
-                  onError={() => setError('Google sign-in was cancelled or failed.')}
-                  size="large"
-                  width="300"
+                  onError={(msg) => setError(msg || 'Google sign-in was cancelled or failed.')}
                   text="signin_with"
-                  shape="rectangular"
-                  theme="outline"
+                  width={300}
                 />
               </div>
               <div className="login-divider">
