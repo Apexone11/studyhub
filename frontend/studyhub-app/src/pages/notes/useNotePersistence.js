@@ -37,6 +37,11 @@ export function useNotePersistence(noteId) {
   const safetyTimer = useRef(null)
   const broadcast = useRef(null)
   const stateRef = useRef(state)
+  // Guard: don't flush saves until the mount effect has fetched the note's
+  // real server revision. Without this, the first debounce-triggered flush
+  // sends baseRevision=0, and the server rejects with 409 for any note
+  // that has revision >= 1.
+  const mountedRef = useRef(false)
   useEffect(() => {
     stateRef.current = state
   }, [state])
@@ -71,6 +76,7 @@ export function useNotePersistence(noteId) {
       if (debounceTimer.current) clearTimeout(debounceTimer.current)
       if (safetyTimer.current) clearTimeout(safetyTimer.current)
       safetyTimer.current = null
+      if (!mountedRef.current) return // server revision not yet fetched
       if (stateRef.current.status === 'conflict') return
       if (!pendingSaveId.current) return
       const { title, content } = latest.current
@@ -217,6 +223,7 @@ export function useNotePersistence(noteId) {
   useEffect(() => {
     if (!noteId) return undefined
     let cancelled = false
+    mountedRef.current = false
     Promise.all([
       fetch(`${API}/api/notes/${noteId}`, { credentials: 'include', headers: authHeaders() })
         .then((r) => (r.ok ? r.json() : null))
@@ -228,6 +235,13 @@ export function useNotePersistence(noteId) {
         server ?? { title: '', content: '', revision: 0, updatedAt: Date.now() }
       latest.current = { title: srv.title ?? '', content: srv.content ?? '' }
       baseRevision.current = Number(srv.revision ?? 0)
+      mountedRef.current = true // server revision is now known; saves are safe
+
+      // If the user typed before mount completed, a debounce flush was blocked.
+      // Re-schedule it now that baseRevision is set correctly.
+      if (pendingSaveId.current && !draft) {
+        scheduleFlush('debounce')
+      }
 
       if (draft) {
         if (Number(draft.baseRevision ?? 0) < baseRevision.current) {
