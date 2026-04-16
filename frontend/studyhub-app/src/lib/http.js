@@ -6,6 +6,8 @@ import {
   setCachedCsrfToken,
   setStoredUser,
 } from './session'
+import { isNativePlatform } from './mobile/detectMobile'
+import { getNativeToken } from './mobile/nativeToken'
 
 let fetchShimInstalled = false
 export const AUTH_SESSION_EXPIRED_EVENT = 'studyhub:auth-expired'
@@ -100,9 +102,21 @@ export function installApiFetchShim() {
     if (getCachedCsrfToken()) return getCachedCsrfToken()
     if (csrfBootstrapPromise) return csrfBootstrapPromise
 
+    // Inner fetch bypasses the window.fetch wrapper to avoid recursion. On
+    // native we still need the bearer header, otherwise /api/auth/me returns
+    // 401 and the CSRF token never loads.
+    const bootstrapHeaders = { 'Content-Type': 'application/json' }
+    if (isNativePlatform()) {
+      bootstrapHeaders['X-Client'] = 'mobile'
+      const nativeToken = getNativeToken()
+      if (nativeToken) {
+        bootstrapHeaders.Authorization = `Bearer ${nativeToken}`
+      }
+    }
+
     csrfBootstrapPromise = nativeFetch(`${API}/api/auth/me`, {
       credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
+      headers: bootstrapHeaders,
     })
       .then(async (response) => {
         const data = await readJsonSafely(response, {})
@@ -130,10 +144,11 @@ export function installApiFetchShim() {
     return csrfBootstrapPromise
   }
 
+  const isNative = isNativePlatform()
+
   window.fetch = async (input, init) => {
     const requestUrl = typeof input === 'string' ? input : input?.url
-    const shouldIncludeCredentials =
-      typeof requestUrl === 'string' && requestUrl.startsWith(API)
+    const shouldIncludeCredentials = typeof requestUrl === 'string' && requestUrl.startsWith(API)
 
     if (!shouldIncludeCredentials) {
       return nativeFetch(input, init)
@@ -142,21 +157,34 @@ export function installApiFetchShim() {
     const nextInit = { ...init, credentials: 'include' }
     const method = getRequestMethod(input, init)
 
-    if (isMutationRequest(method)) {
-      const headers = new Headers(
-        input instanceof Request
-          ? input.headers
-          : init?.headers
-      )
+    const needsHeaderMutation = isNative || isMutationRequest(method)
+    if (needsHeaderMutation) {
+      const headers = new Headers(input instanceof Request ? input.headers : init?.headers)
 
-      headers.set('X-Requested-With', 'XMLHttpRequest')
-
-      let csrfToken = getCachedCsrfToken()
-      if (!csrfToken && getStoredUser()) {
-        csrfToken = await getOrBootstrapCsrfToken()
+      // Native (Capacitor) path: the WebView origin differs from the Railway
+      // backend origin, so the `studyhub_session` cookie cannot be relied on.
+      // Every API call carries an `Authorization: Bearer <jwt>` header backed
+      // by the token we persisted at login. The `X-Client: mobile` header
+      // signals the backend to include a fresh `authToken` on auth responses
+      // so we can keep refreshing the stored token transparently.
+      if (isNative) {
+        headers.set('X-Client', 'mobile')
+        const nativeToken = getNativeToken()
+        if (nativeToken && !headers.has('Authorization')) {
+          headers.set('Authorization', `Bearer ${nativeToken}`)
+        }
       }
-      if (csrfToken && !headers.has('X-CSRF-Token')) {
-        headers.set('X-CSRF-Token', csrfToken)
+
+      if (isMutationRequest(method)) {
+        headers.set('X-Requested-With', 'XMLHttpRequest')
+
+        let csrfToken = getCachedCsrfToken()
+        if (!csrfToken && getStoredUser()) {
+          csrfToken = await getOrBootstrapCsrfToken()
+        }
+        if (csrfToken && !headers.has('X-CSRF-Token')) {
+          headers.set('X-CSRF-Token', csrfToken)
+        }
       }
 
       nextInit.headers = headers

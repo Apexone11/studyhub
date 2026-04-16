@@ -5,6 +5,8 @@ import { useEffect, useRef, useState } from 'react'
 import { io } from 'socket.io-client'
 import { API } from '../config'
 import { useSession } from './session-context'
+import { isNativePlatform } from './mobile/detectMobile'
+import { getNativeToken } from './mobile/nativeToken'
 
 export function useSocket() {
   const socketRef = useRef(null)
@@ -26,14 +28,25 @@ export function useSocket() {
     }
 
     if (!socketRef.current) {
-      socketRef.current = io(API, {
+      // On the Capacitor native shell, cookies cannot be relied on across
+      // the Railway origin, so we pass the stored bearer token through
+      // Socket.io's `auth` field. The backend middleware accepts either the
+      // cookie or `handshake.auth.token` (see backend/src/lib/socketio.js).
+      const socketOptions = {
         withCredentials: true,
         autoConnect: false,
         transports: ['websocket', 'polling'],
         reconnectionAttempts: 10,
         reconnectionDelay: 1000,
         reconnectionDelayMax: 10000,
-      })
+      }
+      if (isNativePlatform()) {
+        const nativeToken = getNativeToken()
+        if (nativeToken) {
+          socketOptions.auth = { token: nativeToken }
+        }
+      }
+      socketRef.current = io(API, socketOptions)
 
       socketRef.current.on('connect', () => {
         setConnected(true)

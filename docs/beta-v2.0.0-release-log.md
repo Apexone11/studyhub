@@ -1366,3 +1366,42 @@ Backend:
 - Touched-file tests (`announcements.routes`, `dashboard.routes`, `courses.routes`, `feed.routes`, `public.routes`, `search.routes`, `sheets.contributors.routes`, `library.service`): 62/62 pass
 - Backend full suite: 1205 tests pass; same 13 pre-existing file-level failures in unrelated suites (users / attachments / security / IDOR / sheet workflow), confirmed to reproduce on `local-main` with the Redis removal reverted.
 - Frontend build: passes
+
+## 2026-04-16 — Mobile app: bearer-token auth, native Google sign-in, Wave 2 AI tab
+
+### Summary
+
+The Capacitor Android shell could not complete login on device. Google sign-in opened Chrome and tried to return to `localhost/m/landing` (connection refused), the API base resolved to `http://localhost:4000` (device-side), and the session cookie could not flow across the Capacitor WebView origin. This change makes the mobile app a real native shell that shares accounts with the web but never depends on the web domain to work.
+
+Approach: the backend already accepts `Authorization: Bearer <jwt>` via `getAuthTokenFromRequest` in `backend/src/lib/authTokens.js`. We wire the mobile shell to use that path — storing the JWT locally and attaching it to every API and Socket.io request. Web behavior is untouched: no cookie changes, no new endpoints required for the existing web flows, and no shared state that could leak the bearer token into web responses.
+
+### Changes
+
+Backend:
+
+- `backend/src/modules/auth/auth.service.js` — added `isMobileClient(req)` and modified `issueAuthenticatedSession` to also return the raw JWT as `authToken` on the user payload when the request carries `X-Client: mobile`. Web clients never receive this field — the Set-Cookie header remains authoritative for them.
+- `backend/src/lib/socketio.js` — auth middleware now accepts the JWT from the Socket.io `handshake.auth.token` field and from `Authorization: Bearer <token>` header, in addition to the existing cookie path. Web flow unchanged.
+
+Frontend:
+
+- `frontend/studyhub-app/src/lib/mobile/nativeToken.js` — new. Get/set/clear bearer token, plus `extractAndStoreNativeToken()` that strips `authToken` from a user payload and persists it to `localStorage` (Capacitor sandboxes localStorage per-app). No-op on web.
+- `frontend/studyhub-app/src/lib/http.js` — the installed fetch shim now attaches `X-Client: mobile` and `Authorization: Bearer <token>` on every API request when running in the Capacitor native shell. Inner `/api/auth/me` bootstrap fetch includes the bearer header too, otherwise CSRF hydration 401s in a loop.
+- `frontend/studyhub-app/src/lib/session.js` — `clearStoredSession()` also clears the native bearer token.
+- `frontend/studyhub-app/src/lib/session-context.jsx` — `completeAuthentication` and `refreshSession` now route through `syncUser`, which calls `extractAndStoreNativeToken()` to persist the token and strip it from the cached user record.
+- `frontend/studyhub-app/src/lib/useSocket.js` — on native, passes the stored bearer token through Socket.io's `auth.token` option on first connect.
+- `frontend/studyhub-app/src/config.js` — native builds default to `https://studyhub-production-c655.up.railway.app` when neither `VITE_MOBILE_API_URL` nor `VITE_API_URL` is set. Web fallback to `http://localhost:4000` is preserved for dev.
+- `frontend/studyhub-app/src/mobile/components/MobileGoogleButton.jsx` — rewritten. On native, opens the in-app Google account chooser via `@codetrix-studio/capacitor-google-auth`, posts the returned ID token to `POST /api/auth/google` with `X-Client: mobile`, and calls `/api/auth/google/complete` with `accountType: 'student'` for brand-new accounts so sign-in is a single tap. The old redirect flow is preserved only as a web-dev fallback.
+- `frontend/studyhub-app/src/mobile/components/MobileTopBar.jsx` — added an optional `left` slot so pages can render custom left-side actions (used by the AI drawer button).
+- `frontend/studyhub-app/src/mobile/pages/MobileAiPage.jsx` — replaced the 32-line web-wrapper stub with a full native implementation: conversation drawer, SSE streaming via the existing `useAiChat` hook, daily usage chip, stop/continue controls, truncation continuation, markdown rendering, and an auto-sizing composer.
+- `frontend/studyhub-app/src/mobile/pages/SigninBottomSheet.jsx` — sends `X-Client: mobile` explicitly on the login request (the shim also does this; explicit at the auth boundary documents intent).
+- `frontend/studyhub-app/capacitor.config.json` — added `server.androidScheme: 'https'`, `server.hostname: 'localhost'`, `server.allowNavigation` for the Railway domain + Google OAuth, and the `GoogleAuth` plugin config block.
+- `frontend/studyhub-app/package.json` — added `@codetrix-studio/capacitor-google-auth` dependency and `mobile:build` / `mobile:sync` / `mobile:open` / `mobile:run` npm scripts.
+- `frontend/studyhub-app/.env.mobile.production` — new. Pins `VITE_MOBILE_API_URL` to the Railway backend so the bundled Capacitor build never points at localhost; `VITE_GOOGLE_CLIENT_ID` is set at build time by whoever runs the pipeline.
+- `frontend/studyhub-app/scripts/build-mobile.js` — new. Runs `vite build --mode mobile` then `npx cap sync android` so one command produces a synced Android project.
+
+### Validation
+
+- Frontend lint: see next commit step.
+- Backend lint: see next commit step.
+- Frontend build: see next commit step.
+- Device verification: deferred to the user per agreement — once the deps are installed locally (`npm install` in `frontend/studyhub-app`), the user will run `npm run mobile:build` then `npx cap run android` to validate on the emulator/device.
