@@ -1507,3 +1507,55 @@ Review found these items already landed in prior work and do not need to be re-d
 - **Security regression test harness for the 5 fixes** — a dedicated `security-regressions.unit.test.js` was scoped but the session ended before its completion; the five fixes are each covered by existing touched-file test runs, but a single file that explicitly asserts each regression would shorten the review loop on future changes. Tracked for a follow-up PR.
 - **iOS Capacitor target** — only Android is present in the repo. The `CAPACITOR_NATIVE_ORIGINS` set already includes `capacitor://localhost` so the iOS shell will work when added; no code change needed at that point beyond scaffolding the iOS project.
 - **MAX_OUTPUT_TOKENS_SHEET documentation drift** — `ai.constants.js:52` is 16384 while `CLAUDE.md` says 8192. The constant is the source of truth for runtime behavior; leaving the code unchanged so sheet generation doesn't regress. CLAUDE.md should be updated in a follow-up to reflect 16384.
+
+---
+
+## 2026-04-16 — Test coverage expansion + Wave 2 mobile detail routes + deep linking
+
+### Summary
+
+Continued the hardening pass with five more parallel test-writing agents and started chipping away at mobile Wave 2. Added 177 new tests across SheetLab, plagiarism, r2Storage, storage, and video routes; closed all four "still untested" backend modules listed in CLAUDE.md. Fixed the AI sheet-gen token-count documentation drift. Added native deep linking (custom scheme + HTTPS App Links) plus the two missing mobile detail routes that were 404-ing from search and notes-list links.
+
+### Documentation
+
+- `CLAUDE.md` — `Max output tokens` line updated to reflect the actual `MAX_OUTPUT_TOKENS_SHEET = 16384` runtime constant (was documented as 8192). The constant in `ai.constants.js` remains the source of truth.
+
+### Test coverage — closed every untested backend module CLAUDE.md flagged
+
+- `backend/test/unit/sheetlab.unit.test.js` (new) — 33 tests across 8 describe blocks. Covers `sheetLab.constants` pure utilities (parsePositiveInt, computeChecksum determinism + null-safety, `canReadSheet` access matrix), `GET /commits` paginated/draft-gated, `POST /commits` with checksum + parent wiring + activity hooks + 500-char truncation, `POST /restore/:commitId` with transactional snapshot, `POST /sync-upstream` non-fork rejection + merge commit creation, `GET /uncommitted-diff`, `GET /lineage` (root-only and parent/children with `isCurrent` flag), `GET /compare-upstream` identical/diverged. SheetLab is the Git-style version control surface for sheets (commits, restore, fork sync, lineage browsing).
+- `backend/test/unit/plagiarism.unit.test.js` (new) — 29 tests covering `src/lib/plagiarismService.js` and its pure-algorithm dependency `src/lib/contentFingerprint.js`. Algorithm: SHA-256 normalized-text hash for exact copies plus 64-bit SimHash from 3-word FNV-1a-hashed shingles for fuzzy paraphrase detection; similarity = `1 − hamming/64`, threshold 0.70, likely-copy at 0.85. Covers identical → 1.0, near-duplicates > 0.70, unrelated < 0.70, empty/whitespace returns null, exact-hash phase, same-user filter, sort order (older wins as likely original), and Prisma error fallback. Pre-existing `backend/test/plagiarism.unit.test.js` (Hamming/Union-Find tests) is untouched.
+- `backend/test/unit/r2Storage.unit.test.js` (new) — 25 tests. Patches `@aws-sdk/client-s3` and `@aws-sdk/s3-request-presigner` via `Module._load`. Covers key generators (format, collision avoidance over 50 calls, deterministic base-dir sharing), partial-credential `isR2Configured` branch, single-object operations (`uploadObject`/`getObject`/`deleteObject`/`objectExists`), signed URL generation (download + upload), full multipart state machine (`createMultipartUpload` → `uploadPart` × 2 → `completeMultipartUpload` round-trip; `abortMultipartUpload` with Sentry capture), and URL helpers (`getPublicUrl` proxy fallback, `extractObjectKeyFromUrl` round-trip + unrelated-host rejection).
+- `backend/test/unit/storage.unit.test.js` (new) — 25 tests. Filesystem-backed uploads abstraction (avatars, covers, attachments, content/note/group images, school logos). Covers URL builders for all six prefixes plus the `attachment://` private scheme; path-safety guards (`isManagedLeafFileName`, `isPathWithinRoot` accept/reject matrix); `resolveManagedUploadPath` traversal rejection; `safeUnlinkFile` outside-root rejection + null-byte basename rejection + EBUSY → Sentry capture; reference-counted cleanup helpers per asset type; `extractNoteImageUrlsFromTexts` dedup/type/prefix filtering; `validateUploadStorage` ensuring all 8 managed dirs are created and access-checked, with the `ALLOW_EPHEMERAL_UPLOADS` opt-in branch.
+- `backend/test/unit/video-routes.integration.test.js` (new) — 40 tests complementing the existing `video.unit.test.js`. Mounts `/api/video/upload/chunk` with `express.raw({ type: '*/*', limit: '3mb' })` to mirror the production wiring. Covers chunk upload (missing headers, oversized real 2.5 MB body, wrong owner, magic-byte signature rejection, small-chunk happy buffering), upload complete (full multi-chunk flow forcing `completeMultipartUpload`, ClamAV-infected → R2 delete + status=failed), upload abort, stream endpoint with quality selection + `downloadable=false` non-owner 403, PATCH metadata allowlist enforcement (rejects `contentHash`/`userId`/`r2Key`/`status`), title/description truncation at 200/2000 chars, appeal flow (short reason, conflict on existing pending, no original found), captions upload + delete, language cap. Combined video test count: 70 passed + 1 skipped.
+
+### Wave 4 — Native deep linking
+
+- `frontend/studyhub-app/android/app/src/main/AndroidManifest.xml` — added two intent filters on the main activity: a custom-scheme filter (`getstudyhub://...`) for QR codes and inter-app testing, and an HTTPS App Links filter for `getstudyhub.org` with `android:autoVerify="false"` (the OS will show an "Open with" chooser the first time; flip to true once `/.well-known/assetlinks.json` is published on the domain).
+- `frontend/studyhub-app/src/lib/mobile/deepLinking.js` (new) — exports a pure `routeForDeepLink(url)` mapping function and a `useDeepLinkRouter()` React hook that lazily imports `@capacitor/app` only on native and calls `navigate(route)` when an `appUrlOpen` event fires. No-op on web. Accepts both schemes for: `sheet`, `note`, `user`, `conversation`, `group`/`study-groups`, `search` (preserves query), `home`/`feed`, `profile`, `ai`/`hub-ai`. Unknown resources fall through to `/m/home`; unknown hosts on the HTTPS path are rejected.
+- `frontend/studyhub-app/src/lib/mobile/deepLinking.test.js` (new) — 21 unit tests covering the route mapper for both schemes, query preservation, special-character encoding, foreign-host rejection, malformed URL rejection, and the alias coverage.
+- `frontend/studyhub-app/src/mobile/App.mobile.jsx` — `MobileTabShell` now calls `useDeepLinkRouter()` so the listener is registered once at the mobile-app root.
+- `frontend/studyhub-app/package.json` — added `@capacitor/app@^8.1.0` (the requested 8.3 isn't published yet; 8.1 is the latest compatible with Capacitor 8.3).
+
+### Wave 2 — Closed the two routes that were 404-ing
+
+The Wave 2 survey found that most mobile pages are already 70–95% complete (Home/Feed at 80%, Messages at 90%, Thread at 95%, Profile at 70%, Notes at 85%, Search at 90%, SheetDetail at 85%, GroupDetail at 80%). The most concrete blocker was navigation: search results and other links pointed at routes that didn't exist. Two new pages close that gap.
+
+- `frontend/studyhub-app/src/mobile/pages/MobileUserProfilePage.jsx` (new) — public profile viewer for `/m/users/:username`. Fetches `GET /api/users/:username`, renders identity card with avatar fallback, four stat cells (sheets, followers, following, stars), follow/unfollow button with optimistic update + rollback on failure, and a "Message" button that routes to `/m/messages?dm=:userId` (existing DM auto-start handler in MessagesPage). Self-profile redirects to `/m/profile` to avoid showing the wrong layout. Private-account view hides stats and shows a "follow to see their activity" hint.
+- `frontend/studyhub-app/src/mobile/pages/MobileNoteDetail.jsx` (new) — read-only viewer for `/m/notes/:noteId`. Fetches `GET /api/notes/:id` (which already supports the `optionalAuth` shared-or-owner gate), renders title, course tag, last-updated relative date, tags, and content. Edit/share/star are deliberately scoped to Wave 3 — Notes Hardening v2's persistence/conflict surface lives in the web `NoteEditor` and isn't reused here yet.
+- `frontend/studyhub-app/src/mobile/App.mobile.jsx` — registered `/m/users/:username` and `/m/notes/:noteId` routes behind `MobilePrivateRoute`.
+
+### Validation
+
+- All new tests pass: SheetLab 33/33, plagiarism 29/29, r2Storage 25/25, storage 25/25, video routes 40/40 (combined video 70 passed + 1 skipped). Frontend `deepLinking.test.js` 21/21.
+- Backend lint: passes.
+- Frontend lint: passes.
+- `npm audit` (all workspaces): still 0 vulnerabilities.
+
+### Not implemented (carried forward, unchanged)
+
+- **iOS** — needs macOS + Xcode; not feasible from Windows.
+- **Push notifications (FCM)** — needs `google-services.json` from a Google Cloud / Firebase project the user controls. Client-side wiring is straightforward once that file exists; build will fail without it.
+- **Biometric lock** — needs a plugin selection (`@capacitor-community/biometric-auth` is one option) and native manifest entries; deferred to keep this session focused.
+- **Full offline mode** — significant architectural work (mobile-specific service worker strategy, IndexedDB queue for writes, conflict resolution); not a single-session item at the no-placeholders standard.
+- **Wave 3 messaging composer + voice** — needs `@capacitor/voice-recorder` + audio storage pipeline; deferred.
+- **Mobile Wave 2 polish** — top bar hide-on-scroll, Socket.io "new posts" pill, profile activity tabs, group members/resources/sessions sub-views, all-eight feed card type renderers. None are blocking; cherry-pick from the survey punch list as needed.

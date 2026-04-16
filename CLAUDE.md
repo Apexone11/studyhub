@@ -133,7 +133,7 @@ Backend:
 - API key: stored as `ANTHROPIC_API_KEY` environment variable in Railway (never in code).
 - Default model: `claude-sonnet-4-20250514`. Detailed system prompt defined in `ai.constants.js` (personality, capabilities, academic integrity rules, full HTML generation spec, context awareness instructions).
 - AI-generated sheets use full HTML documents (`<!DOCTYPE html>` with `<head>`, `<style>`, `<body>`) -- NOT fragments. The AI is instructed to include inline `<style>` blocks but NEVER `<script>` tags (scripts trigger Tier 1+ in the security scanner). Sheets flow through the same scan pipeline as user-uploaded HTML.
-- Max output tokens: 2048 for Q&A, 8192 for sheet generation.
+- Max output tokens: 2048 for Q&A, 16384 for sheet generation (full HTML documents need the larger budget; `MAX_OUTPUT_TOKENS_SHEET` in `ai.constants.js` is the source of truth).
 - Database tables: `AiConversation`, `AiMessage`, `AiUsageLog` (migration: `20260331000004_add_ai_assistant_tables`).
 - Frontend page: `frontend/studyhub-app/src/pages/ai/AiPage.jsx` at route `/ai`.
 - Floating bubble: `frontend/studyhub-app/src/components/ai/AiBubble.jsx` (rendered on all authenticated pages via `createPortal`).
@@ -302,4 +302,4 @@ When handling a new task:
 8. Do not use emojis in code, comments, or UI text.
 9. All inline style colors must use CSS custom property tokens (`var(--sh-*)`).
 10. Wrap any call to `getBlockedUserIds` or `getMutedUserIds` in try-catch for graceful degradation.
-                                                                                                                                                                                                                                                                                  
+                                                                                                                                                                                                                                                                                      
