@@ -1,0 +1,133 @@
+name: Mobile Android Build
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: ['main']
+    tags:
+      - 'mobile-v*'
+    paths:
+      - 'frontend/studyhub-app/**'
+      - '.github/workflows/mobile-android.yml'
+  pull_request:
+    branches: ['main']
+    paths:
+      - 'frontend/studyhub-app/**'
+      - '.github/workflows/mobile-android.yml'
+
+jobs:
+  build-debug:
+    name: Build Debug APK
+    runs-on: ubuntu-latest
+    if: "!startsWith(github.ref, 'refs/tags/mobile-v')"
+    defaults:
+      run:
+        working-directory: frontend/studyhub-app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/studyhub-app/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          api-level: 34
+          build-tools-version: 34.0.0
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build web assets
+        run: npm run build
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Build debug APK
+        working-directory: frontend/studyhub-app/android
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-apk
+          path: frontend/studyhub-app/android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14
+
+  build-release:
+    name: Build Release AAB
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/mobile-v')
+    defaults:
+      run:
+        working-directory: frontend/studyhub-app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/studyhub-app/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          api-level: 34
+          build-tools-version: 34.0.0
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web assets
+        run: npm run build
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Decode keystore
+        run: echo "${{ secrets.ANDROID_KEYSTORE_B64 }}" | base64 -d > android/app/studyhub-release.keystore
+
+      - name: Build release AAB
+        working-directory: frontend/studyhub-app/android
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/frontend/studyhub-app/android/app/studyhub-release.keystore
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew bundleRelease --no-daemon --stacktrace
+
+      - name: Upload release AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-aab
+          path: frontend/studyhub-app/android/app/build/outputs/bundle/release/app-release.aab
+          retention-days: 90
+
+      - name: Upload to Play Console
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: app.studyhub.mobile
+          releaseFiles: frontend/studyhub-app/android/app/build/outputs/bundle/release/app-release.aab
+          track: internal
+          status: completed
