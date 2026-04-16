@@ -9,13 +9,6 @@ const SAFETY_FLUSH_MS = 5000
 const CHUNK_THRESHOLD = 64 * 1024
 const CHUNK_SIZE = 32 * 1024
 
-async function sha256Hex(text) {
-  if (typeof crypto === 'undefined' || !crypto.subtle) return null
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text ?? ''))
-  const arr = Array.from(new Uint8Array(buf))
-  return 'sha256:' + arr.map((b) => b.toString(16).padStart(2, '0')).join('')
-}
-
 function newSaveId() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
     return crypto.randomUUID()
@@ -83,13 +76,15 @@ export function useNotePersistence(noteId) {
       const saveId = pendingSaveId.current
 
       dispatch({ type: 'SAVE_START' })
-      const contentHash = await sha256Hex(content ?? '')
+      // Skip client-side SHA256 — the server computes its own contentHash
+      // via computeContentHash(). Removing the async crypto.subtle.digest
+      // call saves ~5-15ms per flush and eliminates a blocking await.
       const payload = {
         title,
         content,
         baseRevision: baseRevision.current,
         saveId,
-        contentHash,
+        contentHash: null,
         trigger,
       }
       try {
@@ -220,6 +215,22 @@ export function useNotePersistence(noteId) {
     dispatch({ type: 'RESET_TO_SAVED', revision: baseRevision.current, savedAt: new Date() })
   }, [noteId])
 
+  // Call after an external restore: updates baseRevision so the next save
+  // doesn't trigger a false 409 conflict.
+  const resetRevision = useCallback(
+    (newRevision) => {
+      baseRevision.current = Number(newRevision ?? 0)
+      pendingSaveId.current = null
+      try {
+        draftStore.delete(noteId)
+      } catch {
+        /* ignore */
+      }
+      dispatch({ type: 'RESET_TO_SAVED', revision: baseRevision.current, savedAt: new Date() })
+    },
+    [noteId],
+  )
+
   useEffect(() => {
     if (!noteId) return undefined
     let cancelled = false
@@ -333,8 +344,9 @@ export function useNotePersistence(noteId) {
       saveNow,
       resolveConflict,
       discardDraft,
+      resetRevision,
       currentValues: latest,
     }),
-    [state, onEditorChange, saveNow, resolveConflict, discardDraft],
+    [state, onEditorChange, saveNow, resolveConflict, discardDraft, resetRevision],
   )
 }

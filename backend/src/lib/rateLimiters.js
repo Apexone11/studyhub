@@ -271,6 +271,18 @@ const feedDiscoveryLimiter = rateLimit({
   legacyHeaders: false,
 })
 
+/**
+ * Mobile feed endpoint — 60 requests per minute per user.
+ */
+const feedMobileLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `feed-mobile-${req.user?.userId || 'anon'}`,
+  message: { error: 'Too many mobile feed requests. Please slow down.' },
+})
+
 // ── CATEGORY: Sheets Module ────────────────────────────────────────────────
 
 /**
@@ -902,6 +914,32 @@ const referralResolveLimiter = rateLimit({
   message: { error: 'Too many code lookups. Please slow down.' },
 })
 
+// ── CATEGORY: Session Management ────────────────────────────────────────────
+
+/**
+ * Session list — 30 requests per minute per user.
+ */
+const sessionListLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `session-list-${req.user?.userId || 'anon'}`,
+  message: { error: 'Too many session requests. Please slow down.' },
+})
+
+/**
+ * Session revoke — 10 requests per minute per user.
+ */
+const sessionRevokeLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `session-revoke-${req.user?.userId || 'anon'}`,
+  message: { error: 'Too many session revocation requests. Please slow down.' },
+})
+
 // ── Exports ────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -932,6 +970,7 @@ module.exports = {
   feedAuthLimiter,
   feedLeaderboardLimiter,
   feedDiscoveryLimiter,
+  feedMobileLimiter,
 
   // Sheets module
   sheetReactLimiter,
@@ -977,13 +1016,15 @@ module.exports = {
 
   // Upload module
   groupMediaUploadLimiter,
-  groupReportLimiter,
-  groupAppealLimiter,
-  groupJoinLimiter,
   uploadAvatarLimiter,
   uploadAttachmentLimiter,
   uploadCoverLimiter,
   uploadContentImageLimiter,
+
+  // Study groups module
+  groupReportLimiter,
+  groupAppealLimiter,
+  groupJoinLimiter,
 
   // Users module
   usersFollowLimiter,
@@ -1000,12 +1041,12 @@ module.exports = {
   // Library module
   libraryWriteLimiter,
 
+  // Export module
+  exportDataLimiter,
+
   // Video module
   videoUploadInitLimiter,
   videoUploadChunkLimiter,
-
-  // Data export (expensive query -- 3 per day per user)
-  exportDataLimiter,
 
   // Payments module
   paymentCheckoutLimiter,
@@ -1028,4 +1069,8 @@ module.exports = {
   // Referral module
   referralInviteLimiter,
   referralResolveLimiter,
+
+  // Session management
+  sessionListLimiter,
+  sessionRevokeLimiter,
 }

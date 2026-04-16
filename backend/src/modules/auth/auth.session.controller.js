@@ -7,6 +7,7 @@ const {
 } = require('../../lib/authTokens')
 const requireAuth = require('../../middleware/auth')
 const { logoutLimiter } = require('./auth.constants')
+const { sessionListLimiter, sessionRevokeLimiter } = require('../../lib/rateLimiters')
 const { getAuthenticatedUser, buildSessionUserPayload } = require('./auth.service')
 
 const router = express.Router()
@@ -44,7 +45,7 @@ router.get('/me', requireAuth, async (req, res) => {
 
 // ─── Active Sessions Management ────────────────────────────────────────────
 
-router.get('/sessions', requireAuth, async (req, res) => {
+router.get('/sessions', requireAuth, sessionListLimiter, async (req, res) => {
   try {
     const { getActiveSessions } = require('./session.service')
     const sessions = await getActiveSessions(req.user.userId)
@@ -67,7 +68,7 @@ router.get('/sessions', requireAuth, async (req, res) => {
   }
 })
 
-router.delete('/sessions/:sessionId', requireAuth, async (req, res) => {
+router.delete('/sessions/:sessionId', requireAuth, sessionRevokeLimiter, async (req, res) => {
   try {
     const { revokeSession } = require('./session.service')
     const revoked = await revokeSession(req.params.sessionId, req.user.userId)
@@ -80,15 +81,13 @@ router.delete('/sessions/:sessionId', requireAuth, async (req, res) => {
   }
 })
 
-router.delete('/sessions', requireAuth, async (req, res) => {
+router.delete('/sessions', requireAuth, sessionRevokeLimiter, async (req, res) => {
   try {
     if (!req.sessionJti) {
-      return res
-        .status(400)
-        .json({
-          error:
-            'Current session does not support device management. Please log out and log in again.',
-        })
+      return res.status(400).json({
+        error:
+          'Current session does not support device management. Please log out and log in again.',
+      })
     }
     const { revokeAllOtherSessions } = require('./session.service')
     await revokeAllOtherSessions(req.user.userId, req.sessionJti)

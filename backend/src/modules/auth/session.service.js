@@ -44,7 +44,7 @@ async function createSession({ userId, userAgent, ipAddress }) {
   const expiresAt = new Date(Date.now() + SESSION_EXPIRY_MS)
   const deviceLabel = parseDeviceLabel(userAgent)
 
-  await prisma.session.create({
+  const session = await prisma.session.create({
     data: {
       userId,
       jti,
@@ -55,7 +55,7 @@ async function createSession({ userId, userAgent, ipAddress }) {
     },
   })
 
-  return { jti }
+  return { jti, sessionId: session.id }
 }
 
 /**
