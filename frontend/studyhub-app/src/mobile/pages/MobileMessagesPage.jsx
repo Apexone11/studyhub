@@ -9,6 +9,7 @@ const anime = _animeModule.default || _animeModule
 import { useSession } from '../../lib/session-context'
 import { API } from '../../config'
 import MobileTopBar from '../components/MobileTopBar'
+import usePullToRefresh from '../hooks/usePullToRefresh'
 
 const PREFERS_REDUCED =
   typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
@@ -163,6 +164,24 @@ export default function MobileMessagesPage() {
   const [error, setError] = useState(null)
   const listRef = useRef(null)
 
+  // Pull-to-refresh
+  const handleRefresh = useCallback(async () => {
+    try {
+      const data = await fetchConversations()
+      const list = Array.isArray(data) ? data : data.conversations || []
+      setConversations(list)
+      setError(null)
+    } catch {
+      // keep existing data
+    }
+  }, [])
+  const {
+    containerRef: pullRef,
+    pulling,
+    refreshing,
+    pullDistance,
+  } = usePullToRefresh(handleRefresh)
+
   useEffect(() => {
     let active = true
     fetchConversations()
@@ -198,7 +217,7 @@ export default function MobileMessagesPage() {
 
   const handleTapConversation = useCallback(
     (id) => {
-      navigate(`/messages?conversation=${id}`)
+      navigate(`/m/messages/${id}`)
     },
     [navigate],
   )
@@ -206,26 +225,35 @@ export default function MobileMessagesPage() {
   return (
     <>
       <MobileTopBar title="Messages" />
-      {loading ? (
-        <MessagesSkeleton />
-      ) : error ? (
-        <div className="mob-feed-empty">
-          <p className="mob-feed-empty-text">Could not load messages.</p>
-        </div>
-      ) : conversations.length === 0 ? (
-        <EmptyMessages />
-      ) : (
-        <div ref={listRef} className="mob-msg-list">
-          {conversations.map((conv) => (
-            <ConversationRow
-              key={conv.id}
-              conversation={conv}
-              currentUserId={user?.id}
-              onTap={handleTapConversation}
-            />
-          ))}
-        </div>
-      )}
+      <div ref={pullRef} style={{ overflowY: 'auto', flex: 1 }}>
+        {(pulling || refreshing) && (
+          <div className="mob-ptr" style={{ height: pullDistance }}>
+            <div className={`mob-ptr-spinner ${refreshing ? 'mob-ptr-spinner--active' : ''}`}>
+              <div className="mob-feed-spinner" />
+            </div>
+          </div>
+        )}
+        {loading ? (
+          <MessagesSkeleton />
+        ) : error ? (
+          <div className="mob-feed-empty">
+            <p className="mob-feed-empty-text">Could not load messages.</p>
+          </div>
+        ) : conversations.length === 0 ? (
+          <EmptyMessages />
+        ) : (
+          <div ref={listRef} className="mob-msg-list">
+            {conversations.map((conv) => (
+              <ConversationRow
+                key={conv.id}
+                conversation={conv}
+                currentUserId={user?.id}
+                onTap={handleTapConversation}
+              />
+            ))}
+          </div>
+        )}
+      </div>
     </>
   )
 }

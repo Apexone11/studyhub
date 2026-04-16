@@ -16,6 +16,12 @@ const MobileMessagesPage = lazy(() => import('./pages/MobileMessagesPage'))
 const MobileAiPage = lazy(() => import('./pages/MobileAiPage'))
 const MobileProfilePage = lazy(() => import('./pages/MobileProfilePage'))
 
+const MobileMessageThread = lazy(() => import('./pages/MobileMessageThread'))
+const MobileSheetDetail = lazy(() => import('./pages/MobileSheetDetail'))
+const MobileNotesPage = lazy(() => import('./pages/MobileNotesPage'))
+const MobileSearchPage = lazy(() => import('./pages/MobileSearchPage'))
+const MobileStudyGroupDetail = lazy(() => import('./pages/MobileStudyGroupDetail'))
+
 const OnboardingGoals = lazy(() => import('./pages/onboarding/OnboardingGoals'))
 const OnboardingPeople = lazy(() => import('./pages/onboarding/OnboardingPeople'))
 const OnboardingNotifs = lazy(() => import('./pages/onboarding/OnboardingNotifs'))
@@ -164,6 +170,48 @@ export default function AppMobile() {
             }
           />
 
+          {/* Detail pages (require auth) */}
+          <Route
+            path="/m/messages/:conversationId"
+            element={
+              <MobilePrivateRoute>
+                <MobileMessageThread />
+              </MobilePrivateRoute>
+            }
+          />
+          <Route
+            path="/m/sheets/:sheetId"
+            element={
+              <MobilePrivateRoute>
+                <MobileSheetDetail />
+              </MobilePrivateRoute>
+            }
+          />
+          <Route
+            path="/m/notes"
+            element={
+              <MobilePrivateRoute>
+                <MobileNotesPage />
+              </MobilePrivateRoute>
+            }
+          />
+          <Route
+            path="/m/search"
+            element={
+              <MobilePrivateRoute>
+                <MobileSearchPage />
+              </MobilePrivateRoute>
+            }
+          />
+          <Route
+            path="/m/groups/:groupId"
+            element={
+              <MobilePrivateRoute>
+                <MobileStudyGroupDetail />
+              </MobilePrivateRoute>
+            }
+          />
+
           {/* Default: redirect to landing or home */}
           <Route path="*" element={<MobileDefaultRedirect />} />
         </Routes>
@@ -173,6 +221,7 @@ export default function AppMobile() {
 }
 
 function MobileDefaultRedirect() {
-  const { isAuthenticated } = useSession()
+  const { isAuthenticated, isBootstrapping } = useSession()
+  if (isBootstrapping) return null
   return <Navigate to={isAuthenticated ? '/m/home' : '/m/landing'} replace />
 }

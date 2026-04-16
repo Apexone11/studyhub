@@ -9,6 +9,7 @@ const anime = _animeModule.default || _animeModule
 import { useSession } from '../../lib/session-context'
 import { API } from '../../config'
 import MobileTopBar from '../components/MobileTopBar'
+import usePullToRefresh from '../hooks/usePullToRefresh'
 
 const PREFERS_REDUCED =
   typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
@@ -92,13 +93,13 @@ function TriageCard({ item }) {
   const handleTap = useCallback(() => {
     switch (item.type) {
       case 'sheet':
-        navigate(`/sheets/${item.id}`)
+        navigate(`/m/sheets/${item.id}`)
         break
       case 'note':
-        navigate(`/notes/${item.id}`)
+        navigate(`/m/notes`)
         break
       case 'group_activity':
-        navigate(`/study-groups/${item.payload?.groupId}`)
+        navigate(`/m/groups/${item.payload?.groupId}`)
         break
       default:
         break
@@ -148,15 +149,15 @@ function DiscoveryCard({ item }) {
   const handleTap = useCallback(() => {
     switch (item.type) {
       case 'sheet':
-        navigate(`/sheets/${item.id}`)
+        navigate(`/m/sheets/${item.id}`)
         break
       case 'note':
-        navigate(`/notes/${item.id}`)
+        navigate(`/m/notes`)
         break
       case 'post':
         break
       case 'group_activity':
-        navigate(`/study-groups/${item.payload?.groupId}`)
+        navigate(`/m/groups/${item.payload?.groupId}`)
         break
       default:
         break
@@ -267,6 +268,29 @@ export default function MobileHomePage() {
   const observerRef = useRef(null)
   const sentinelRef = useRef(null)
 
+  // Pull-to-refresh
+  const handleRefresh = useCallback(async () => {
+    try {
+      const [triage, discovery] = await Promise.all([
+        fetchBand('triage', null, 5),
+        fetchBand('discovery', null, 20),
+      ])
+      setTriageItems(triage.items || [])
+      setDiscoveryItems(discovery.items || [])
+      setCursor(discovery.nextCursor || null)
+      setHasMore(Boolean(discovery.hasMore))
+      setError(null)
+    } catch {
+      // keep existing data
+    }
+  }, [])
+  const {
+    containerRef: pullRef,
+    pulling,
+    refreshing,
+    pullDistance,
+  } = usePullToRefresh(handleRefresh)
+
   // Initial load: triage + first discovery page
   useEffect(() => {
     let active = true
@@ -340,7 +364,7 @@ export default function MobileHomePage() {
     <button
       type="button"
       className="mob-topbar-back"
-      onClick={() => navigate('/search')}
+      onClick={() => navigate('/m/search')}
       aria-label="Search"
     >
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -386,7 +410,16 @@ export default function MobileHomePage() {
   return (
     <>
       <MobileTopBar title="Home" right={searchAction} />
-      <div className="mob-feed">
+      <div ref={pullRef} className="mob-feed" style={{ overflowY: 'auto' }}>
+        {/* Pull-to-refresh indicator */}
+        {(pulling || refreshing) && (
+          <div className="mob-ptr" style={{ height: pullDistance }}>
+            <div className={`mob-ptr-spinner ${refreshing ? 'mob-ptr-spinner--active' : ''}`}>
+              <div className="mob-feed-spinner" />
+            </div>
+          </div>
+        )}
+
         {/* Greeting */}
         <div className="mob-feed-greeting">
           <h2 className="mob-feed-greeting-text">
@@ -433,7 +466,11 @@ export default function MobileHomePage() {
             </div>
           </section>
         ) : !showTriage ? (
-          <EmptyFeed />
+          <div className="mob-feed-empty">
+            <p className="mob-feed-empty-text">
+              Nothing here yet. Check back soon for new content.
+            </p>
+          </div>
         ) : null}
       </div>
     </>
