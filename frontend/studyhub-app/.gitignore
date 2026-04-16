@@ -15,6 +15,15 @@ test-results
 tests/screenshots/*.png
 *.local
 
+# Capacitor Android build artifacts (keep the android/ project in git
+# but ignore Gradle caches, build outputs, and local IDE overrides)
+android/app/build
+android/.gradle
+android/build
+android/local.properties
+android/app/src/main/assets/public
+android/app/src/main/assets/capacitor.config.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

@@ -34,8 +34,8 @@ async function main() {
     create: {
       name: FLAG.name,
       description: FLAG.description,
-      enabled: false,
-      rolloutPercentage: 0,
+      enabled: true,
+      rolloutPercentage: 100,
     },
   })
   if (existing) {

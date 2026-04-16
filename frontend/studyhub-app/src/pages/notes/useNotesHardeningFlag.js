@@ -17,13 +17,21 @@ function readLocalOverride() {
 
 /**
  * React hook: returns whether Notes Hardening v2 is enabled for the current user.
- * Reads backend-driven flag via useFeatureFlag; a localStorage override
- * (`flag_notes_hardening_v2` = "1"/"0") wins for dev/QA.
+ *
+ * The legacy autoSave was fully removed (cleanup C+D), so the hardened path is
+ * the ONLY save path. Default is `true`; the backend flag and localStorage
+ * override serve as an emergency kill-switch only (`localStorage.setItem(
+ * 'flag_notes_hardening_v2', '0')` disables saves entirely — intentional, for
+ * incident response).
  */
 export function useNotesHardeningEnabled() {
-  const { enabled } = useFeatureFlag(FLAG_NAME)
+  const { enabled, loading } = useFeatureFlag(FLAG_NAME)
   const override = readLocalOverride()
   if (override !== null) return override
+  // While the flag is still loading from the backend, default to true so saves
+  // fire immediately. If the backend explicitly returns enabled=false (kill-switch),
+  // we respect that once the response arrives.
+  if (loading) return true
   return Boolean(enabled)
 }
 
@@ -42,5 +50,7 @@ export function isNotesHardeningEnabled() {
   const override = readLocalOverride()
   if (override !== null) return override
   const sync = getFlagSync(FLAG_NAME)
-  return sync === true
+  // Default true: the hardened path is the only save path.
+  // sync is null (not yet fetched) or true/false.
+  return sync !== false
 }
