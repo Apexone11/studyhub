@@ -506,6 +506,16 @@
     linear-gradient(180deg, #161616 0%, #171717 42%, #111827 100%);
   --sh-home-hero-section-bg: var(--sh-home-page-backdrop);
 
+  /* Landing-page card surfaces. Without these overrides, the cards
+     stayed hardcoded white (#fbfdff / #f8fafc) in dark mode while the
+     heading text flipped to #f5f5f5 — making the "Create your account",
+     "Pick your school and courses", and "Access everything" titles
+     nearly invisible on white cards. */
+  --sh-home-step-card-bg: #1c1c1c;
+  --sh-home-panel-bg: #1c1c1c;
+  --sh-home-testimonials-gradient: linear-gradient(180deg, #161616 0%, #1c1c1c 100%);
+  --sh-home-step-number-shadow: 0 8px 24px rgba(59, 130, 246, 0.55);
+
   color-scheme: dark;
 }
 

@@ -1753,3 +1753,27 @@ All of them now emit a proper `Vary` header without any per-route changes.
 ### Follow-up — not fixed this round
 
 - The `/sheets` page also shows `Failed to load conversations` and `Failed to load notes` toasts at the bottom. These originate from the AI assistant bubble's `useAiChat.listConversations()` call. `/api/ai/conversations` does NOT use `cacheControl`, so this `Vary` fix won't clear those toasts. A separate investigation with browser DevTools (Network tab on the failed request) is needed to see the actual failure mode — most likely a 401/timeout around the bubble load on certain pages. Tracked for a follow-up PR.
+
+---
+
+## 2026-04-17 — Dark-mode fix: landing-page "Simple Setup" cards were unreadable
+
+### Summary
+
+Production screenshots showed the three numbered cards on the landing page's "Up and Running in 60 Seconds" section ("Create your account", "Pick your school and courses", "Access everything") with nearly-invisible titles in dark mode. The `--sh-home-step-card-bg` (and a couple of related landing-page surface tokens) had no dark-mode override, so the cards stayed hardcoded white (`#fbfdff`) while the heading text correctly flipped to `#f5f5f5` — light-on-light, unreadable.
+
+### Fix — `frontend/studyhub-app/src/index.css` dark-mode block
+
+Added overrides for the four landing-page surface tokens that were missed when dark mode was first wired up:
+
+- `--sh-home-step-card-bg: #1c1c1c` — matches the rest of the dark-mode card surfaces (`--sh-surface`).
+- `--sh-home-panel-bg: #1c1c1c` — same reasoning, used by other landing panels.
+- `--sh-home-testimonials-gradient: linear-gradient(180deg, #161616 0%, #1c1c1c 100%)` — replaces the hardcoded white-to-near-white gradient used by the testimonials strip.
+- `--sh-home-step-number-shadow: 0 8px 24px rgba(59, 130, 246, 0.55)` — slightly punchier glow on the brand-blue step circles so they remain prominent against the now-dark card.
+
+No JSX changes; the cards already use `var(--sh-home-step-card-bg)` and `var(--sh-heading)`. With the tokens flipped for dark mode, the text/background contrast resolves on its own.
+
+### Validation
+
+- Frontend lint: passes.
+- Frontend build: passes (1.16 s).
