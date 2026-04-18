@@ -63,6 +63,7 @@ import ScrollToTop from './components/ScrollToTop'
 import ToastContainer from './components/Toast'
 import OfflineIndicator from './components/OfflineIndicator'
 import LegalAcceptanceEnforcementModal from './components/LegalAcceptanceEnforcementModal'
+import SwUpdateAutoReloader from './components/SwUpdateAutoReloader'
 import DarkModeFx from './components/DarkModeFx'
 import { ChatPanelProvider } from './lib/chatPanelContext.jsx'
 
@@ -342,6 +343,7 @@ function AppRoutes() {
           </a>
           <RouteAnnouncer />
           <RouteTelemetry />
+          <SwUpdateAutoReloader />
           <PreferencesBootstrap />
           <LegalAcceptanceEnforcementModal />
           <AuthenticatedAiProvider>

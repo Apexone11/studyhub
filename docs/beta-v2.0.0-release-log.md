@@ -1670,3 +1670,37 @@ StudyHub users had to hard-refresh to pick up new deploys or see content saved f
 
 - **Real-time Feed "N new posts" pill via Socket.io** — the feed currently relies on 30-s polling. Upgrading it to a Socket.io subscription would require a backend feed-broadcast channel that doesn't exist yet. Out of scope for this round; the focus-revalidation gives most of the same user-facing benefit because tabbing back pulls the latest feed.
 - **Auto-reload on SW update** — considered and rejected. Silently reloading mid-typing would destroy unsaved work (compose boxes, note edits, etc.). The persistent banner is the safer pattern; users who want the update just click.
+
+---
+
+## 2026-04-17 — Silent auto-reload on SW update (Facebook/Instagram/GitHub pattern)
+
+### Summary
+
+Revisited the "don't show a banner, just refresh" decision from the previous release log entry. The user feedback was that a "Refresh" banner still requires a click, and StudyHub should feel like Facebook / Instagram / GitHub where deploys are invisible to the user. Implemented silent auto-reload that waits for the next safe moment (route change, tab return, or long idle) before swapping in the new bundle. No banner.
+
+### How it works
+
+- `frontend/studyhub-app/src/lib/swUpdateState.js` (new) — module-level state: `markSwUpdateAvailable()`, `isSwUpdateAvailable()`, `swUpdatePendingAgeMs()`, and a pub-sub `subscribeSwUpdate(cb)` for React components. Also tracks a page-load-level `reloadTriggered` guard via `hasReloadBeenTriggered()` / `markReloadTriggered()` so the reload only fires once per page even when multiple triggers line up.
+- `frontend/studyhub-app/src/components/SwUpdateAutoReloader.jsx` (new) — mounted once inside the `BrowserRouter` tree (next to `RouteAnnouncer` / `RouteTelemetry`). Reads `useLocation()` and watches `pathname` for changes; on any route change AFTER the flag is set, calls `window.location.reload()`. Also listens for `visibilitychange` → visible and `window.focus` (the user coming back to the tab), and has a `setInterval` long-idle fallback that reloads after 30 minutes of pending-without-reload.
+- `frontend/studyhub-app/src/main.jsx` — the SW update handler no longer builds a DOM banner. It just calls `clearFetchCache()` (flush stale SWR data) and `markSwUpdateAvailable()`. The banner code and the slide-up animation styles are gone.
+- `frontend/studyhub-app/src/App.jsx` — mounted `<SwUpdateAutoReloader />` inside the authenticated web router. It's a null-rendering component; no visible UI.
+
+### Safety rails
+
+1. **Grace period** — nothing reloads within `INITIAL_GRACE_MS` (2 s) of the update flag being set. Guards against races where the user is mid-click when the new SW activates.
+2. **Once-per-page guard** — `hasReloadBeenTriggered()` prevents duplicate `window.location.reload()` calls even if route change + visibility + subscription callback all fire in the same tick.
+3. **No reload on initial mount** — the component compares against its mount-time path and only acts on _subsequent_ pathname changes. First render never reloads.
+4. **Still no mid-typing reload** — reload only fires on route change or tab-return. A user actively typing on a single page won't be interrupted; they only pick up the new version when they navigate or tab away. The 30-minute long-idle fallback is the only automatic trigger, and 30 min of continuous typing in one form is an edge case worth the trade-off.
+
+### Tests
+
+- `frontend/studyhub-app/src/lib/swUpdateState.test.js` (new) — 8 tests covering initial state, `markSwUpdateAvailable` idempotency + age, subscription callback delivery, unsubscribe, listener-error isolation, and non-function-subscriber guards.
+- `frontend/studyhub-app/src/components/SwUpdateAutoReloader.test.jsx` (new) — 5 tests: does not reload on initial mount, does not reload on route change without pending update, DOES reload on route change with pending past grace period, defers during grace period, reloads at most once across multiple triggers. Uses a `MemoryRouter` harness with nav buttons to drive route changes.
+- Combined: 28/28 pass (8 swUpdateState + 5 SwUpdateAutoReloader + 15 pre-existing useFetch tests).
+
+### Validation
+
+- Frontend lint: passes.
+- Frontend build: passes (1.38 s).
+- All 3 related test files pass.

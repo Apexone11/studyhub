@@ -10,6 +10,7 @@ import { reportWebVitals } from './lib/performance'
 import { startWebVitals } from './lib/webVitals'
 import { consumePendingRoleReload } from './lib/pendingRoleReload'
 import { clearFetchCache } from './lib/useFetch'
+import { markSwUpdateAvailable } from './lib/swUpdateState'
 
 try {
   consumePendingRoleReload()
@@ -105,59 +106,23 @@ if ('serviceWorker' in navigator && !window.__SH_NATIVE__) {
 
 /**
  * Handle a service-worker update event. Two things happen:
- *   1. Flush the in-memory SWR cache in useFetch so any page still mounted
- *      will get fresh data on its next refetch — prevents the "I see stale
- *      data even after refresh was offered" footgun.
- *   2. Show the refresh banner so the user knows a new version is live.
+ *   1. Flush the in-memory SWR cache in useFetch so any page still
+ *      mounted picks up fresh data on its next refetch — prevents the
+ *      "I see stale data even after the new SW activated" footgun.
+ *   2. Flag the update in `swUpdateState`. The `SwUpdateAutoReloader`
+ *      component mounted inside the router reads that flag and silently
+ *      reloads on the next safe moment (route change, tab return, or
+ *      a 30-minute long-idle fallback). No visible banner — matches the
+ *      Facebook / Instagram / GitHub pattern where deploys are
+ *      invisible to the user.
  */
 function handleSwUpdate() {
   try {
     clearFetchCache()
   } catch {
-    // Cache flush is best-effort; the banner still matters.
+    // Cache flush is best-effort; the reload still happens either way.
   }
-  showUpdateBanner()
-}
-
-/** Show a non-intrusive banner prompting the user to refresh for the latest version. */
-function showUpdateBanner() {
-  // Don't show if one is already visible
-  if (document.getElementById('sh-update-banner')) return
-
-  const banner = document.createElement('div')
-  banner.id = 'sh-update-banner'
-  banner.setAttribute('role', 'alert')
-  banner.style.cssText =
-    'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);' +
-    'z-index:99999;background:var(--sh-slate-800);color:var(--sh-slate-50);padding:12px 20px;border-radius:12px;' +
-    'box-shadow:0 8px 30px rgba(0,0,0,0.2);display:flex;align-items:center;gap:12px;' +
-    'font-family:"Plus Jakarta Sans",system-ui,sans-serif;font-size:13px;font-weight:500;' +
-    'max-width:calc(100vw - 48px);animation:sh-slide-up 0.3s ease-out'
-
-  banner.innerHTML =
-    '<span>A new version of StudyHub is available.</span>' +
-    '<button onclick="window.location.reload()" style="background:var(--sh-info);color:#fff;border:none;' +
-    'border-radius:8px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;' +
-    'font-family:inherit;white-space:nowrap">Refresh</button>' +
-    '<button onclick="this.parentElement.remove()" style="background:none;border:none;' +
-    'color:var(--sh-slate-400);cursor:pointer;font-size:16px;padding:0 4px;line-height:1" aria-label="Dismiss">' +
-    'x</button>'
-
-  // Add slide-up animation
-  const style = document.createElement('style')
-  style.textContent =
-    '@keyframes sh-slide-up{from{transform:translateX(-50%) translateY(20px);opacity:0}' +
-    'to{transform:translateX(-50%) translateY(0);opacity:1}}'
-  document.head.appendChild(style)
-
-  document.body.appendChild(banner)
-
-  // Deliberately NOT auto-dismissing. Previous behavior hid the banner
-  // after 30 s, which meant many users missed the update entirely and
-  // kept running the old bundle until they tabbed away long enough for
-  // the next SW check. The banner now stays until the user clicks
-  // Refresh or explicitly dismisses it — they always know a fresh
-  // version is waiting.
+  markSwUpdateAvailable()
 }
 
 // Report Web Vitals to telemetry
