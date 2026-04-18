@@ -1704,3 +1704,52 @@ Revisited the "don't show a banner, just refresh" decision from the previous rel
 - Frontend lint: passes.
 - Frontend build: passes (1.38 s).
 - All 3 related test files pass.
+
+---
+
+## 2026-04-17 — CRITICAL: cacheControl middleware missing Vary: Origin — fixes prod "Failed to fetch"
+
+### Summary
+
+Production admin + user reports of `Failed to fetch` on `/my-courses`, `Failed to load courses` toast on `/notes`, and a `Failed to fetch` banner at the top of `/sheets` (with the sheet list still rendering below it) all traced back to a single root cause: the `cacheControl` middleware sets `Cache-Control: public, max-age=...` without emitting a `Vary: Origin` header. Any shared HTTP cache between the browser and the backend (Cloudflare edge, Railway proxy, the browser's own HTTP cache) can then serve the same cached body to requests from different origins. For credentialed (`credentials: 'include'`) CORS requests, the browser rejects a cached response whose `Access-Control-Allow-Origin` header doesn't match the current origin — and that surfaces in the frontend as `TypeError: Failed to fetch`, even though the backend is healthy.
+
+This explains exactly the symptoms reported:
+
+- `/api/courses/schools` is consumed by **three** components (`MyCoursesPage`, `useSheetsData`, `useNotesData`), all with `credentials: 'include'`, and the endpoint had `cacheControl(600, { public: true })`. Whenever a shared cache had a stale origin-bound response, any of the three pages could show the failure.
+- The sheet list below the banner on `/sheets` loaded fine because `/api/sheets` does NOT use `cacheControl` — the failure was the catalog dropdowns' `/api/courses/schools` call, whose `catalogError` state renders the banner.
+
+### Fix — `backend/src/lib/cacheControl.js`
+
+- Middleware now calls a new `appendVary(res, ['Origin', 'Cookie', 'Authorization'])` helper after setting `Cache-Control`. The helper preserves any existing `Vary` tokens (e.g., `Accept-Encoding` set upstream) and deduplicates, so future middleware stacks compose correctly.
+- `Origin` is the bug fix itself — it forces shared caches to key entries by the request origin so a response decorated with `Access-Control-Allow-Origin: https://getstudyhub.org` can never be served to a request from another origin.
+- `Cookie` and `Authorization` are defense in depth: they prevent an authenticated response from leaking into an anonymous cache slot (or vice versa) for endpoints that accept both auth and non-auth traffic.
+
+### Impact on affected endpoints
+
+Every endpoint that currently mounts `cacheControl(...)`:
+
+- `/api/courses/schools`, `/api/courses/popular` — the direct cause of the reported failures
+- `/api/public/platform-stats` (via `public.routes.js`)
+- `/api/feed/trending`, `/api/feed/for-you` (via `feed.discovery.controller.js`)
+- `/api/search` (shorter 30-s cache, same middleware)
+- `/api/settings/preferences`, `/api/notes/...` (private cache — `Vary: Cookie, Authorization` also helps here)
+
+All of them now emit a proper `Vary` header without any per-route changes.
+
+### Tests — `backend/test/unit/cacheControl.unit.test.js` (new, 9 tests)
+
+- Cache-Control output: public + max-age, private default, stale-while-revalidate.
+- **Vary: Origin, Cookie, Authorization is always set** (three assertions, the actual regression guard).
+- Does not clobber an upstream `Vary: Accept-Encoding`.
+- Does not duplicate a token already present.
+- `appendVary` helper: empty-start behavior, merge into existing, deduplication.
+
+### Validation
+
+- New unit file: 9/9 pass.
+- Full backend `test/unit` + `test/public` + `test/search` suites: 257 pass + 1 skipped (no regressions).
+- Backend lint (scoped to touched files): passes.
+
+### Follow-up — not fixed this round
+
+- The `/sheets` page also shows `Failed to load conversations` and `Failed to load notes` toasts at the bottom. These originate from the AI assistant bubble's `useAiChat.listConversations()` call. `/api/ai/conversations` does NOT use `cacheControl`, so this `Vary` fix won't clear those toasts. A separate investigation with browser DevTools (Network tab on the failed request) is needed to see the actual failure mode — most likely a 401/timeout around the bubble load on certain pages. Tracked for a follow-up PR.
