@@ -1626,3 +1626,47 @@ Also audited `frontend/studyhub-app/src/pages/feed/ForYouSection.jsx` — it con
 
 - Frontend lint: passes.
 - The deletion set (2,717 files) is purely bookkeeping — no source references break because nothing was importing from `package/`.
+
+---
+
+## 2026-04-16 — Auto-refresh infrastructure: SW update detection, focus revalidation, Notes polling
+
+### Summary
+
+StudyHub users had to hard-refresh to pick up new deploys or see content saved from another device — behavior that falls short of Facebook / Instagram / GitHub-grade freshness expectations. Three changes close that gap without changing any page-level behavior the user has to think about.
+
+### Service-worker update detection — `frontend/studyhub-app/src/main.jsx`
+
+- Poll cadence bumped from **60 min → 10 min**. The previous hour-long window meant a deploy could take up to an hour to reach an active user; 10 min keeps every cache-warm window fresh without measurable bandwidth cost.
+- Added explicit `window.focus`, `online`, and `document.visibilitychange` listeners that trigger `registration.update()` on the spot. Most users don't sit on one tab for 10 straight minutes — they tab away and come back, and that's exactly the moment to discover a new deploy.
+- When the SW reports an update (`SW_UPDATED` postMessage or a newly-activated worker), the handler now flushes the in-memory SWR cache via `clearFetchCache()` before showing the refresh banner. This prevents the "I see stale data even after refresh was offered" footgun where a cached response served to a just-activated new SW could still look old.
+- Refresh banner no longer auto-dismisses after 30 s. The old behavior silently removed the banner, so users who tabbed away and came back missed the update entirely. The banner now stays until the user clicks **Refresh** or the **x** dismiss button.
+
+### `useFetch` focus revalidation — `frontend/studyhub-app/src/lib/useFetch.js`
+
+- New default: any `useFetch(..., { swr: <ms> })` call now refetches when the tab regains focus (`window.focus` + `document.visibilitychange`). Throttled to at most one refetch per cacheKey per 10 s so rapid tab-switching doesn't hammer the backend.
+- Opt-out: pass `revalidateOnFocus: false` on SWR-enabled fetches that shouldn't refresh on focus.
+- Opt-in for non-SWR fetches: pass `revalidateOnFocus: true`. The default remains off for non-SWR fetches because most of those are one-shots (page-load stats, enum lists) where a focus refetch is wasted work.
+- This is the pattern Vercel SWR, React Query, and Apollo all default to. Matches user expectation from every modern app.
+
+### Notes page polling — `frontend/studyhub-app/src/pages/notes/useNotesData.js`
+
+- Previously the note list fetched once on mount and never again. Shared notes from classmates (or saves from another device) required a hard refresh to appear.
+- Extracted the inline fetch into a `loadNotes` callback and wired it through `useLivePolling` at a 60-s interval. The hook already honors `pauseWhenHidden` + `focus` / `online` / `visibilitychange`, so this is a cheap sidecar to the existing infrastructure.
+- The initial mount toast is suppressed on background-refresh failures (`hasLoadedNotesOnceRef`) so a momentary network drop doesn't spam the user with "Failed to load notes" every minute.
+
+### Tests
+
+- `frontend/studyhub-app/src/lib/useFetch.test.js` — 4 new tests covering focus-revalidation behavior: refetches on focus when SWR is enabled, does NOT refetch when SWR is off, honors the explicit `revalidateOnFocus: true` opt-in, and throttles burst focus events to at most one refetch. Combined file: 15/15 pass.
+
+### Validation
+
+- Frontend lint: passes.
+- Frontend build: passes.
+- `useFetch.test.js`: 15/15.
+- No backend changes this round; backend tests unchanged.
+
+### Not implemented
+
+- **Real-time Feed "N new posts" pill via Socket.io** — the feed currently relies on 30-s polling. Upgrading it to a Socket.io subscription would require a backend feed-broadcast channel that doesn't exist yet. Out of scope for this round; the focus-revalidation gives most of the same user-facing benefit because tabbing back pulls the latest feed.
+- **Auto-reload on SW update** — considered and rejected. Silently reloading mid-typing would destroy unsaved work (compose boxes, note edits, etc.). The persistent banner is the safer pattern; users who want the update just click.

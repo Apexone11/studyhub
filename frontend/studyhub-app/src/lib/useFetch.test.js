@@ -1,5 +1,6 @@
-import { describe, expect, it, beforeEach } from 'vitest'
-import { cache, clearFetchCache } from './useFetch'
+import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest'
+import { renderHook, waitFor, act } from '@testing-library/react'
+import useFetch, { cache, clearFetchCache } from './useFetch'
 
 describe('useFetch cache utilities', () => {
   beforeEach(() => {
@@ -163,5 +164,93 @@ describe('useFetch cache utilities', () => {
       expect(entry.data).toBeUndefined()
       expect(entry.timestamp).toBe(timestamp)
     })
+  })
+})
+
+describe('useFetch focus revalidation', () => {
+  let fetchSpy
+
+  beforeEach(() => {
+    cache.clear()
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => ({
+      ok: true,
+      json: async () => ({ value: 1 }),
+      text: async () => '',
+    }))
+  })
+
+  afterEach(() => {
+    fetchSpy.mockRestore()
+  })
+
+  async function waitForInitialFetch() {
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1))
+  }
+
+  it('refetches on window focus when swr > 0', async () => {
+    const { unmount } = renderHook(() => useFetch('/api/focus-swr-test', { swr: 60_000 }))
+    await waitForInitialFetch()
+
+    // Advance wall-clock past the focus throttle so the hook doesn't skip.
+    const realNow = Date.now
+    vi.spyOn(Date, 'now').mockReturnValue(realNow() + 60_000)
+
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'))
+    })
+
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2))
+    Date.now.mockRestore()
+    unmount()
+  })
+
+  it('does NOT refetch on focus when swr = 0 (default)', async () => {
+    const { unmount } = renderHook(() => useFetch('/api/focus-no-swr-test'))
+    await waitForInitialFetch()
+
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'))
+    })
+
+    // Give any microtasks a chance to flush; still should be exactly 1.
+    await new Promise((r) => setTimeout(r, 30))
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    unmount()
+  })
+
+  it('refetches on focus when revalidateOnFocus=true is explicitly set', async () => {
+    const { unmount } = renderHook(() =>
+      useFetch('/api/focus-explicit-test', { revalidateOnFocus: true }),
+    )
+    await waitForInitialFetch()
+
+    const realNow = Date.now
+    vi.spyOn(Date, 'now').mockReturnValue(realNow() + 60_000)
+
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'))
+    })
+
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2))
+    Date.now.mockRestore()
+    unmount()
+  })
+
+  it('throttles repeated focus events to avoid hammering the backend', async () => {
+    const { unmount } = renderHook(() => useFetch('/api/focus-throttle-test', { swr: 60_000 }))
+    await waitForInitialFetch()
+
+    // Three focus events in quick succession (same throttle window) should
+    // produce at most one additional fetch, not three.
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'))
+      window.dispatchEvent(new Event('focus'))
+      window.dispatchEvent(new Event('focus'))
+    })
+    await new Promise((r) => setTimeout(r, 30))
+
+    // Initial + one throttled refetch.
+    expect(fetchSpy.mock.calls.length).toBeLessThanOrEqual(2)
+    unmount()
   })
 })
