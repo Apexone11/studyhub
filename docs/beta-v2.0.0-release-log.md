@@ -1597,3 +1597,32 @@ Fix three user-reported production bugs (issue #246) plus a gitignore hygiene pa
 - Frontend lint: passes.
 - Frontend build: passes.
 - No backend changes this round, so backend tests unchanged.
+
+---
+
+## 2026-04-16 — Follow-up: profile-page "People You May Know" + repo cleanup
+
+### Summary
+
+Screenshot review caught a second instance of the `undefined follower(s)` bug — this time on the profile-page "People You May Know" widget (a different component from the feed sidebar fixed in the previous entry) — plus confirmed that the repo had 2,715 tracked files of vendored `effect-ts` source (33 MB at the repo root as `package/`) and two stray Superpowers brainstorm artifacts. All three fixed in one pass.
+
+### `FollowSuggestions.jsx` (profile page)
+
+Same bug, same endpoint, different consumer: `GET /api/users/me/follow-suggestions` returns Prisma's `_count` object and does not populate `reason` / `sharedCourses` / `sheetCount`, but `frontend/studyhub-app/src/pages/profile/FollowSuggestions.jsx` read those flat properties directly. The screenshot in issue #246 shows six rows of `"undefined followers"` as a result. Applied the same normalization as the feed sidebar fix:
+
+- `user.followerCount ?? user._count?.followers`
+- `user.sheetCount ?? user._count?.studySheets`
+- `sharedCourses` only used when the backend actually sets `reason === 'classmate'`
+- Sub-label is omitted entirely when no count is available, instead of rendering the string `"undefined"`.
+
+Also audited `frontend/studyhub-app/src/pages/feed/ForYouSection.jsx` — it consumes `/api/feed/for-you` which _does_ populate `sharedCourses` + `followerCount` on its `people` array, so no fix needed there.
+
+### Repo cleanup — untracked 2,717 stray files
+
+- `package/` — a vendored copy of `node_modules/effect/package/` source that had been committed into the repo root (2,715 files, 33 MB). No code in `backend/src` or `frontend/studyhub-app/src` imports from it; the `effect` dependency in `backend/package.json` resolves normally through `node_modules`. Untracked via `git rm -r --cached package/` and added `/package/` to `.gitignore`. Left on disk in case anyone still wants the source tree for reference.
+- `.superpowers/brainstorm/1197-1775419202/` — two HTML files from a local Superpowers brainstorm session. Untracked; `.superpowers/brainstorm/` added to `.gitignore`.
+
+### Validation
+
+- Frontend lint: passes.
+- The deletion set (2,717 files) is purely bookkeeping — no source references break because nothing was importing from `package/`.

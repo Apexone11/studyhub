@@ -76,6 +76,15 @@ pnpm-debug.log*
 
 # Local brainstorming/runtime state
 .superpowers/**/state/
+.superpowers/brainstorm/
 
 # Nested repos / experiments
 mission-control/
+
+# Vendored `effect-ts` source that was accidentally committed into the
+# repo root (2,715 files, ~33 MB). Nothing in backend/src or
+# frontend/studyhub-app/src imports from `package/`; the `effect`
+# dependency in backend/package.json resolves through node_modules, not
+# this tree. Keeping the directory on disk (in case anyone still needs
+# it for reference) but excluding from git.
+/package/
