@@ -156,6 +156,15 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
+  // Skip cross-origin requests. The browser enforces CSP `connect-src`
+  // against the SW's internal `fetch()` call, so if we intercept a
+  // request to a host that's allowed by `img-src` / `style-src` / etc.
+  // but not by `connect-src`, the SW's fetch fails and — if both network
+  // and cache return nothing — `event.respondWith(undefined)` throws
+  // "Failed to convert value to 'Response'". Letting the browser handle
+  // cross-origin requests natively side-steps both problems.
+  if (url.origin !== self.location.origin) return
+
   // ── API requests: network-only with offline fallback ──────────────────
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(
@@ -196,6 +205,11 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
+  // A Response the browser can render as "network error". Every branch's
+  // final `.then` or `.catch` resolves to one of these instead of null so
+  // `event.respondWith(...)` never receives a non-Response value.
+  const networkErrorResponse = () => new Response('', { status: 504, statusText: 'SW fallback' })
+
   // ── Hashed assets (/assets/*): cache-first (immutable) ────────────────
   if (isHashedAsset(url)) {
     event.respondWith(
@@ -203,7 +217,7 @@ self.addEventListener('fetch', (event) => {
         cached || fetch(request).then((response) => {
           if (response.ok) safeCachePut(request, response.clone())
           return response
-        }).catch(() => cached)
+        }).catch(() => cached || networkErrorResponse())
       )
     )
     return
@@ -216,7 +230,7 @@ self.addEventListener('fetch', (event) => {
         cached || fetch(request).then((response) => {
           if (response.ok) safeCachePut(request, response.clone())
           return response
-        }).catch(() => cached)
+        }).catch(() => cached || networkErrorResponse())
       )
     )
     trimCache(CACHE_NAME, MAX_CACHED_FONTS + MAX_CACHED_IMAGES + MAX_CACHED_PAGES)
@@ -227,13 +241,12 @@ self.addEventListener('fetch', (event) => {
   if (isImage(url)) {
     event.respondWith(
       caches.match(request).then((cached) => {
-        // Return cached immediately, fetch in background to refresh
         const networkFetch = fetch(request)
           .then((response) => {
             if (response.ok) safeCachePut(request, response.clone())
             return response
           })
-          .catch(() => cached)
+          .catch(() => cached || networkErrorResponse())
 
         return cached || networkFetch
       })
@@ -248,7 +261,9 @@ self.addEventListener('fetch', (event) => {
         if (response.ok) safeCachePut(request, response.clone())
         return response
       })
-      .catch(() => caches.match(request))
+      .catch(() =>
+        caches.match(request).then((cached) => cached || networkErrorResponse()),
+      ),
   )
 })
 

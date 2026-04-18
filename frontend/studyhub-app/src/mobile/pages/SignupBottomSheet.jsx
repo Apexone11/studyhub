@@ -183,7 +183,11 @@ export default function SignupBottomSheet({ open, onClose, onSwitchToSignin }) {
 
   return (
     <BottomSheet open={open} onClose={onClose} title={title} fullHeight>
-      {error && <div className="mob-auth-error">{error}</div>}
+      {error && (
+        <div role="alert" className="mob-auth-error">
+          {error}
+        </div>
+      )}
 
       {step === 'account' && (
         <>
@@ -303,7 +307,11 @@ export default function SignupBottomSheet({ open, onClose, onSwitchToSignin }) {
             />
           </div>
 
-          {error && <p className="mob-auth-error">{error}</p>}
+          {error && (
+            <p role="alert" className="mob-auth-error">
+              {error}
+            </p>
+          )}
 
           <button type="submit" className="mob-auth-submit" disabled={loading}>
             {loading ? 'Verifying...' : 'Verify and Create Account'}

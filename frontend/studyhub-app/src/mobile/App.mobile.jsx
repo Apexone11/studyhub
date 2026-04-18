@@ -6,6 +6,7 @@
 import { Suspense, lazy } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useSession } from '../lib/session-context'
+import { useDeepLinkRouter } from '../lib/mobile/deepLinking'
 import BottomTabBar from './components/BottomTabBar'
 import './mobile.css'
 
@@ -19,8 +20,10 @@ const MobileProfilePage = lazy(() => import('./pages/MobileProfilePage'))
 const MobileMessageThread = lazy(() => import('./pages/MobileMessageThread'))
 const MobileSheetDetail = lazy(() => import('./pages/MobileSheetDetail'))
 const MobileNotesPage = lazy(() => import('./pages/MobileNotesPage'))
+const MobileNoteDetail = lazy(() => import('./pages/MobileNoteDetail'))
 const MobileSearchPage = lazy(() => import('./pages/MobileSearchPage'))
 const MobileStudyGroupDetail = lazy(() => import('./pages/MobileStudyGroupDetail'))
+const MobileUserProfilePage = lazy(() => import('./pages/MobileUserProfilePage'))
 
 const OnboardingGoals = lazy(() => import('./pages/onboarding/OnboardingGoals'))
 const OnboardingPeople = lazy(() => import('./pages/onboarding/OnboardingPeople'))
@@ -79,6 +82,10 @@ const TAB_PATHS = new Set(['/m/home', '/m/messages', '/m/ai', '/m/profile'])
 function MobileTabShell({ children }) {
   const location = useLocation()
   const showTabs = TAB_PATHS.has(location.pathname)
+
+  // Listen for OS-level deep links (custom scheme + https App Links) and
+  // route them to the matching in-app screen. No-op on web.
+  useDeepLinkRouter()
 
   return (
     <div className="mob-shell">
@@ -199,6 +206,14 @@ export default function AppMobile() {
             }
           />
           <Route
+            path="/m/notes/:noteId"
+            element={
+              <MobilePrivateRoute>
+                <MobileNoteDetail />
+              </MobilePrivateRoute>
+            }
+          />
+          <Route
             path="/m/search"
             element={
               <MobilePrivateRoute>
@@ -211,6 +226,14 @@ export default function AppMobile() {
             element={
               <MobilePrivateRoute>
                 <MobileStudyGroupDetail />
+              </MobilePrivateRoute>
+            }
+          />
+          <Route
+            path="/m/users/:username"
+            element={
+              <MobilePrivateRoute>
+                <MobileUserProfilePage />
               </MobilePrivateRoute>
             }
           />

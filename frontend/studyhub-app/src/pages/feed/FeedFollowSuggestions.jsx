@@ -20,6 +20,7 @@ export default function FeedFollowSuggestions({ accountType } = {}) {
     swr: 5 * 60 * 1000,
   })
   const [followingSet, setFollowingSet] = useState(new Set())
+  const [expanded, setExpanded] = useState(false)
 
   const handleFollow = useCallback(async (username) => {
     // Optimistic: show "Following" immediately.
@@ -50,14 +51,34 @@ export default function FeedFollowSuggestions({ accountType } = {}) {
 
   if (loading || suggestions.length === 0) return null
 
+  // Normalize the backend shape: `_count.followers` -> `followerCount`.
+  // The backend returns Prisma's `_count` object directly; rendering the
+  // string `"undefined followers"` when that's missing is the bug the
+  // in-app label used to show.
+  const visibleCount = expanded ? 8 : 4
+
   return (
     <Panel
       title="People to Follow"
       helper={isSelfLearner(accountType) ? 'Based on topics you follow' : 'Based on your courses'}
     >
       <div style={{ display: 'grid', gap: 8 }}>
-        {suggestions.slice(0, 4).map((user) => {
+        {suggestions.slice(0, visibleCount).map((user) => {
           const isFollowed = followingSet.has(user.username)
+          const followerCount =
+            typeof user.followerCount === 'number' ? user.followerCount : user._count?.followers
+          const hasFollowerCount = typeof followerCount === 'number'
+          const sharedCourses = typeof user.sharedCourses === 'number' ? user.sharedCourses : null
+
+          let subLabel = ''
+          if (user.reason === 'classmate' && sharedCourses !== null) {
+            subLabel = `${sharedCourses} shared course${sharedCourses === 1 ? '' : 's'}`
+          } else if (hasFollowerCount) {
+            subLabel = `${followerCount} follower${followerCount === 1 ? '' : 's'}`
+          } else if (user.displayName) {
+            subLabel = user.displayName
+          }
+
           return (
             <div key={user.id} style={rowStyle}>
               <Link
@@ -85,11 +106,9 @@ export default function FeedFollowSuggestions({ accountType } = {}) {
                   >
                     {user.username}
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--sh-muted)' }}>
-                    {user.reason === 'classmate'
-                      ? `${user.sharedCourses} shared course${user.sharedCourses > 1 ? 's' : ''}`
-                      : `${user.followerCount} follower${user.followerCount !== 1 ? 's' : ''}`}
-                  </div>
+                  {subLabel && (
+                    <div style={{ fontSize: 11, color: 'var(--sh-muted)' }}>{subLabel}</div>
+                  )}
                 </div>
               </Link>
               <button
@@ -116,20 +135,47 @@ export default function FeedFollowSuggestions({ accountType } = {}) {
           )
         })}
       </div>
-      {suggestions.length > 4 && (
-        <Link
-          to={`/users/${suggestions[0]?.username || ''}`}
+      {suggestions.length > visibleCount && (
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
           style={{
             display: 'block',
             marginTop: 10,
             fontSize: 12,
             fontWeight: 700,
             color: 'var(--sh-brand)',
-            textDecoration: 'none',
+            background: 'none',
+            border: 'none',
+            padding: 0,
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            textAlign: 'left',
           }}
         >
           See more suggestions
-        </Link>
+        </button>
+      )}
+      {expanded && suggestions.length > 4 && (
+        <button
+          type="button"
+          onClick={() => setExpanded(false)}
+          style={{
+            display: 'block',
+            marginTop: 10,
+            fontSize: 12,
+            fontWeight: 600,
+            color: 'var(--sh-muted)',
+            background: 'none',
+            border: 'none',
+            padding: 0,
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            textAlign: 'left',
+          }}
+        >
+          Show fewer
+        </button>
       )}
     </Panel>
   )

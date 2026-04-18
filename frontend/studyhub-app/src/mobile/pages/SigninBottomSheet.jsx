@@ -48,7 +48,12 @@ export default function SigninBottomSheet({ open, onClose, onSwitchToSignup }) {
       try {
         const res = await fetch(`${API}/api/auth/login`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            // Tells the backend this is the Capacitor native shell, so the
+            // response `user` includes `authToken` for bearer-auth storage.
+            'X-Client': 'mobile',
+          },
           credentials: 'include',
           body: JSON.stringify({
             username: username.trim(),
@@ -80,7 +85,11 @@ export default function SigninBottomSheet({ open, onClose, onSwitchToSignup }) {
 
   return (
     <BottomSheet open={open} onClose={onClose} title="Welcome Back">
-      {error && <div className="mob-auth-error">{error}</div>}
+      {error && (
+        <div role="alert" className="mob-auth-error">
+          {error}
+        </div>
+      )}
 
       <MobileGoogleButton mode="signin" />
 
