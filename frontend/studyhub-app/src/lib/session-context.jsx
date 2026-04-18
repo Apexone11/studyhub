@@ -18,6 +18,7 @@ import {
   readJsonSafely,
 } from './http'
 import { clearStoredSession, getStoredUser, logoutSession, setStoredUser } from './session'
+import { extractAndStoreNativeToken } from './mobile/nativeToken'
 
 export const SESSION_EXPIRED_FLAG = 'studyhub:session-expired'
 
@@ -65,9 +66,14 @@ export function SessionProvider({ children }) {
   const navigate = useNavigate()
 
   const syncUser = useCallback((nextUser) => {
-    setStoredUser(nextUser)
-    setUser(nextUser)
-    return nextUser
+    // On the Capacitor native shell the backend includes an `authToken` field
+    // in auth responses (see auth.service.js issueAuthenticatedSession). Pull
+    // it out and persist it for bearer-auth, then store the user record with
+    // the token stripped so the cached user object never contains secrets.
+    const cleanUser = extractAndStoreNativeToken(nextUser)
+    setStoredUser(cleanUser)
+    setUser(cleanUser)
+    return cleanUser
   }, [])
 
   const clearSession = useCallback(() => {
@@ -103,8 +109,9 @@ export function SessionProvider({ children }) {
           return
         }
 
-        setStoredUser(result.user)
-        setUser(result.user)
+        // syncUser strips any `authToken` field and stores it for bearer-auth
+        // on native, then caches the user record locally.
+        syncUser(result.user)
         setStatus('authenticated')
         setError('')
       })
@@ -129,7 +136,7 @@ export function SessionProvider({ children }) {
         error: user ? 'Could not refresh your session. Showing cached data.' : '',
       }
     }
-  }, [user])
+  }, [user, syncUser])
 
   useEffect(() => {
     if (bootstrappedRef.current) return

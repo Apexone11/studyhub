@@ -1,11 +1,12 @@
 /* ═══════════════════════════════════════════════════════════════════════════
  * useNotesData.js — Custom hook for notes data fetching, state, and actions
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { API } from '../../config'
 import { authHeaders } from '../shared/pageUtils'
 import { showToast } from '../../lib/toast'
+import { useLivePolling } from '../../lib/useLivePolling'
 
 const NOTE_FILTER_TABS = new Set(['all', 'private', 'shared', 'starred'])
 
@@ -111,26 +112,42 @@ export function useNotesData() {
   }, [setSearchParams])
 
   /* ── Data loading (with abort cleanup to prevent state updates after unmount) */
+  // `hasLoadedNotesOnceRef` lets us silence the toast on polling failures —
+  // a transient network blip during a 60-s background refresh shouldn't
+  // look like the initial load failed.
+  const hasLoadedNotesOnceRef = useRef(false)
+
+  const loadNotes = useCallback(async ({ signal } = {}) => {
+    try {
+      const response = await fetch(`${API}/api/notes`, {
+        headers: authHeaders(),
+        credentials: 'include',
+        signal,
+      })
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      const data = await response.json()
+      const list = Array.isArray(data) ? data : Array.isArray(data?.notes) ? data.notes : []
+      const normalized = list.map(normalizeNote)
+      setNotes(normalized)
+      setLoadingNotes(false)
+      hasLoadedNotesOnceRef.current = true
+    } catch (err) {
+      if (err?.name === 'AbortError') return
+      // Only show the toast on the very first attempt. Polling failures
+      // stay silent so a momentary network drop doesn't spam the user.
+      if (!hasLoadedNotesOnceRef.current) {
+        showToast('Failed to load notes', 'error')
+      }
+      setLoadingNotes(false)
+    }
+  }, [])
+
   useEffect(() => {
     let active = true
+    loadNotes()
 
-    fetch(`${API}/api/notes`, { headers: authHeaders(), credentials: 'include' })
-      .then((response) => response.json())
-      .then((data) => {
-        if (active) {
-          const list = Array.isArray(data) ? data : Array.isArray(data?.notes) ? data.notes : []
-          const normalized = list.map(normalizeNote)
-          setNotes(normalized)
-          setLoadingNotes(false)
-        }
-      })
-      .catch(() => {
-        if (active) {
-          showToast('Failed to load notes', 'error')
-          setLoadingNotes(false)
-        }
-      })
-
+    // The rest of this effect fetches the course-school list; that one
+    // doesn't need polling (course enrollments change rarely).
     fetch(`${API}/api/courses/schools`, { headers: authHeaders(), credentials: 'include' })
       .then((response) => response.json())
       .then((data) => {
@@ -150,7 +167,17 @@ export function useNotesData() {
     return () => {
       active = false
     }
-  }, [])
+  }, [loadNotes])
+
+  // Background refresh: the notes list is shared data (shared notes from
+  // classmates, or saves from other devices), so a light 60-s poll keeps
+  // it in sync without any manual refresh. `useLivePolling` already
+  // pauses when the tab is hidden and re-runs immediately on focus /
+  // online / visibility change, so this is cheap.
+  useLivePolling(loadNotes, {
+    intervalMs: 60 * 1000,
+    immediate: false, // the initial load above already ran
+  })
 
   /* ── Auto-select note from ?select=:id URL param (for "Open in Editor" flow) */
   useEffect(() => {

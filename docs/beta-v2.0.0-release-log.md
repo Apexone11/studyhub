@@ -1366,3 +1366,307 @@ Backend:
 - Touched-file tests (`announcements.routes`, `dashboard.routes`, `courses.routes`, `feed.routes`, `public.routes`, `search.routes`, `sheets.contributors.routes`, `library.service`): 62/62 pass
 - Backend full suite: 1205 tests pass; same 13 pre-existing file-level failures in unrelated suites (users / attachments / security / IDOR / sheet workflow), confirmed to reproduce on `local-main` with the Redis removal reverted.
 - Frontend build: passes
+
+---
+
+## 2026-04-16 — Post-merge review fixes for Upstash Redis removal
+
+### Summary
+
+Addressed review feedback on the merged Upstash Redis removal PR. Also fixes a pre-existing `/api/feed/for-you` response-shape mismatch where the unauthenticated early-return used different keys than the authenticated path; the frontend `ForYouSection` reads `sheets`/`groups`/`people`/`trending` so the old unauthenticated keys (`recommendedSheets`/`courseActivity`/`recommendedPeople`/`trendingSheets`) were silently falling back to `[]` via `Array.isArray(result.sheets) ? ... : []`.
+
+The reviewer comment that `dashboard /summary` lacks `requireAuth` was verified against the code and is incorrect: `dashboard.routes.js` calls `router.use(requireAuth)` on line 9 and the wrapper covers every route in the module.
+
+### Changes
+
+Backend:
+
+- `backend/package-lock.json` — regenerated so `@upstash/redis` is no longer listed. Root `package-lock.json` similarly regenerated via the workspace install.
+- `backend/src/modules/feed/feed.discovery.controller.js`:
+  - `/trending` doc comment: replaced "Cached for 5 minutes per period" with the actual HTTP cacheControl settings (120s max-age + 300s stale-while-revalidate).
+  - `/for-you` doc comment: replaced "Auth required. Cached for 2 minutes per user" with the real behavior (optionalAuth, unauthenticated callers get an empty payload matching the authenticated shape, no server-side caching).
+  - `/for-you` handler: removed the unnecessary `await (async () => { ... })()` IIFE that was left over from inlining `redisCached`; the body now sits directly in the route handler with normal indentation.
+  - `/for-you` unauthenticated response: keys changed from `{ recommendedSheets, courseActivity, recommendedPeople, trendingSheets }` to `{ sheets, groups, people, trending }` to match the authenticated shape and the frontend consumer.
+
+### Not implemented
+
+- Extracting a shared sheet-scoring helper across `/trending`, `/for-you` (sheets), and `/for-you` (trending). Deferred: the three scoring formulas differ materially (comments weight vs. none, different recency-decay time windows, per-user multipliers for the for-you sheets path), so any shared helper needs parameters for weights and decay hours. Worth doing, but it's a non-trivial refactor that deserves its own PR with test coverage.
+
+### Validation
+
+- Backend lint: passes (0 errors)
+- Touched-file tests (`announcements.routes`, `dashboard.routes`, `courses.routes`, `feed.routes`, `search.routes`): 43/43 pass
+- Backend full suite: 1205 tests pass, 75 skipped; same 13 pre-existing file-level failures on `local-main`, unrelated to these changes.
+- Repo-wide sweep for `@upstash/redis` in lockfiles: 0 hits in `backend/package-lock.json` and 0 hits in the root `package-lock.json`.
+
+---
+
+## 2026-04-16 — Mobile app: bearer-token auth, native Google sign-in, Wave 2 AI tab
+
+### Summary
+
+The Capacitor Android shell could not complete login on device. Google sign-in opened Chrome and tried to return to `localhost/m/landing` (connection refused), the API base resolved to `http://localhost:4000` (device-side), and the session cookie could not flow across the Capacitor WebView origin. This change makes the mobile app a real native shell that shares accounts with the web but never depends on the web domain to work.
+
+Approach: the backend already accepts `Authorization: Bearer <jwt>` via `getAuthTokenFromRequest` in `backend/src/lib/authTokens.js`. We wire the mobile shell to use that path — storing the JWT locally and attaching it to every API and Socket.io request. Web behavior is untouched: no cookie changes, no new endpoints required for the existing web flows, and no shared state that could leak the bearer token into web responses.
+
+### Changes
+
+Backend:
+
+- `backend/src/modules/auth/auth.service.js` — added `isMobileClient(req)` and modified `issueAuthenticatedSession` to also return the raw JWT as `authToken` on the user payload when the request carries `X-Client: mobile`. Web clients never receive this field — the Set-Cookie header remains authoritative for them.
+- `backend/src/lib/socketio.js` — auth middleware now accepts the JWT from the Socket.io `handshake.auth.token` field and from `Authorization: Bearer <token>` header, in addition to the existing cookie path. Web flow unchanged.
+
+Frontend:
+
+- `frontend/studyhub-app/src/lib/mobile/nativeToken.js` — new. Get/set/clear bearer token, plus `extractAndStoreNativeToken()` that strips `authToken` from a user payload and persists it to `localStorage` (Capacitor sandboxes localStorage per-app). No-op on web.
+- `frontend/studyhub-app/src/lib/http.js` — the installed fetch shim now attaches `X-Client: mobile` and `Authorization: Bearer <token>` on every API request when running in the Capacitor native shell. Inner `/api/auth/me` bootstrap fetch includes the bearer header too, otherwise CSRF hydration 401s in a loop.
+- `frontend/studyhub-app/src/lib/session.js` — `clearStoredSession()` also clears the native bearer token.
+- `frontend/studyhub-app/src/lib/session-context.jsx` — `completeAuthentication` and `refreshSession` now route through `syncUser`, which calls `extractAndStoreNativeToken()` to persist the token and strip it from the cached user record.
+- `frontend/studyhub-app/src/lib/useSocket.js` — on native, passes the stored bearer token through Socket.io's `auth.token` option on first connect.
+- `frontend/studyhub-app/src/config.js` — native builds default to `https://studyhub-production-c655.up.railway.app` when neither `VITE_MOBILE_API_URL` nor `VITE_API_URL` is set. Web fallback to `http://localhost:4000` is preserved for dev.
+- `frontend/studyhub-app/src/mobile/components/MobileGoogleButton.jsx` — rewritten. On native, opens the in-app Google account chooser via `@capgo/capacitor-social-login`, posts the returned ID token to `POST /api/auth/google` with `X-Client: mobile`, and calls `/api/auth/google/complete` with `accountType: 'student'` for brand-new accounts so sign-in is a single tap. The old redirect flow is preserved only as a web-dev fallback.
+- `frontend/studyhub-app/src/mobile/components/MobileTopBar.jsx` — added an optional `left` slot so pages can render custom left-side actions (used by the AI drawer button).
+- `frontend/studyhub-app/src/mobile/pages/MobileAiPage.jsx` — replaced the 32-line web-wrapper stub with a full native implementation: conversation drawer, SSE streaming via the existing `useAiChat` hook, daily usage chip, stop/continue controls, truncation continuation, markdown rendering, and an auto-sizing composer.
+- `frontend/studyhub-app/src/mobile/pages/SigninBottomSheet.jsx` — sends `X-Client: mobile` explicitly on the login request (the shim also does this; explicit at the auth boundary documents intent).
+- `frontend/studyhub-app/capacitor.config.json` — added `server.androidScheme: 'https'`, `server.hostname: 'localhost'`, and `server.allowNavigation` for the Railway domain + Google OAuth. The Capgo social-login plugin is initialized in JS at first tap, so no plugin block in capacitor.config is needed.
+- `frontend/studyhub-app/package.json` — added `@capgo/capacitor-social-login@^8.3.14` dependency (the codetrix-studio package pins `@capacitor/core` to `^6`; Capgo supports Capacitor 8) and `mobile:build` / `mobile:sync` / `mobile:open` / `mobile:run` npm scripts.
+- `frontend/studyhub-app/.env.mobile.production` — new. Pins `VITE_MOBILE_API_URL` to the Railway backend so the bundled Capacitor build never points at localhost; `VITE_GOOGLE_CLIENT_ID` is set at build time by whoever runs the pipeline.
+- `frontend/studyhub-app/scripts/build-mobile.js` — new. Runs `vite build --mode mobile` then `npx cap sync android` so one command produces a synced Android project.
+
+### Validation
+
+- Backend lint: passes (0 errors).
+- Frontend lint: passes (0 errors).
+- Frontend build: succeeds (1.87s).
+- Backend auth tests: 23/23 pass. Backend socket tests: 16/16 pass.
+- Device verification: deferred to the user per agreement — once the deps are installed locally (`npm install` in `frontend/studyhub-app`), the user will run `npm run mobile:build` then `npx cap run android` to validate on the emulator/device.
+
+---
+
+## 2026-04-16 — Security hardening, dependency bumps, test coverage, mobile a11y + Google sign-in finalization
+
+### Summary
+
+Comprehensive hardening pass driven by a parallel security / dependency / test-coverage / accessibility audit. The session landed five security fixes across auth, payments, and Socket.io; bumped the only outstanding dependency advisory; added ~100 unit tests across three previously untested areas (rateLimiters, video, WebAuthn); applied six accessibility fixes to the mobile screens; and completed the missing pieces of the mobile native Google sign-in config that were blocking the Android build.
+
+### Dependency hygiene
+
+- `npm audit` across backend, frontend, and root workspaces: 1 moderate advisory (`sanitize-html` 2.17.2 — `GHSA-9mrh-v2v3-xpfm`, allowedTags bypass via entity-decoded text, CVSS 6.1). Auto-fixed in both backend and frontend via `npm audit fix`; package-locks regenerated. Post-fix: 0 vulnerabilities across all workspaces.
+
+### Security fixes
+
+Driven by an independent code review of the auth/payments/AI/socket layers. Verified each finding against the actual code before patching.
+
+- **`isMobileClient` trusted an attacker-controllable header.** `backend/src/modules/auth/auth.service.js` — the `X-Client: mobile` header alone was the gate for returning the raw JWT in the response body. Any web-context code (XSS, rogue extension) could set the header and exfiltrate a 24-hour bearer, bypassing the `httpOnly` cookie protection. Now also requires `Origin` to match a Capacitor native scheme (`https://localhost` or `capacitor://localhost`). Browsers set `Origin` themselves and cross-origin attackers cannot override it, making this a non-forgeable second signal. Matching `Origin` values are already in the CORS allowlist (see `backend/src/index.js:104-106`) so no new configuration is needed.
+- **Socket.io bearer-token fallback had no client-type gate.** `backend/src/lib/socketio.js` — the handshake auth / `Authorization: Bearer` fallback was accepted unconditionally. Now gated on the same Capacitor-origin check. Web XSS that captured a JWT cannot re-use it over WebSocket on the studyhub.com origin. Also refactored the middleware into an exported `authenticateSocketHandshake(socket, next)` so it can be unit-tested without booting a full Socket.io server.
+- **Stripe `planFromPriceId` silently escalated unknown prices to pro_monthly.** `backend/src/modules/payments/payments.routes.js` — both the `/admin/sync-stripe` iterator and the `/subscription/sync` self-heal endpoint defaulted to `pro_monthly` when `planFromPriceId(priceId)` returned null. A user whose Stripe customer record picked up a non-pro subscription (e.g., a leftover test-mode price or discount variant) would have been auto-upgraded on the next sync. Both call sites now reject unknown price IDs and log a warning; the service-level `handleSubscriptionUpdated` path was already correct and is unchanged.
+- **Stripe webhook had no Buffer guard.** `backend/src/modules/payments/payments.routes.js` — defense-in-depth: if `express.raw()` were ever removed or reordered in `index.js`, `constructEvent` would fail opaquely on a parsed body. Added a `Buffer.isBuffer(req.body)` check that fails fast with a clear signal before signature verification.
+- **Google signup `tempToken` was replayable.** `backend/src/modules/auth/auth.google.controller.js` — the 15-minute signup JWT had no single-use guard, so an attacker who observed one could race the legitimate user to `/google/complete` and create the account with their chosen `accountType`. The token now carries a random `jti`, and `/google/complete` calls `markTokenUsed(jti, TTL)` before any Prisma write. Legacy tokens without `jti` are rejected and the user is asked to restart Google sign-in.
+- **New library: `backend/src/lib/usedTokenCache.js`.** Process-local TTL cache for one-use JWT identifiers. Used by the Google tempToken flow today; callable from any future single-use JWT site. Scoped to single-instance deployment (sufficient for Railway); horizontal scaling would require migrating to a shared store (Redis was removed; DB table is the next option).
+
+### Mobile native Google sign-in — completed config
+
+The mobile-app release of 2026-04-16 wired the Capgo social-login plugin and the bearer-token auth path but referenced two configuration files that did not exist in the repo. Build of the APK was blocked on these. Both now exist:
+
+- `frontend/studyhub-app/.env.mobile.production` — `VITE_MOBILE_API_URL` pinned to the Railway backend, `VITE_GOOGLE_CLIENT_ID` set to the web OAuth client ID (same value as backend `GOOGLE_CLIENT_ID` because Capgo issues idTokens for the web-registered client, which is what the backend `verifyIdToken({ audience })` check expects). File is `.env.*`-gitignored by the root `.gitignore`.
+- `frontend/studyhub-app/android/app/src/main/res/values/strings.xml` — added `<string name="server_client_id">...</string>` so the Capgo plugin can complete the native OAuth flow.
+
+Device verification still requires the user to run `npm run mobile:build && npx cap run android` — no device harness is available to this session.
+
+### Mobile accessibility (WCAG 2.1 AA)
+
+Code review of all mobile screens under `frontend/studyhub-app/src/mobile/`. Six fixes applied:
+
+- `frontend/studyhub-app/src/mobile/mobile.css` — `.mob-topbar-back` bumped from 36×36 to 44×44 (meets iOS/Android 44pt HIG + WCAG 2.5.5 target size). Added a shared `:focus-visible` rule across the five primary interactive mobile classes (topbar back, tab bar item, auth submit, auth switch link, Google button) with `outline: 2px solid var(--sh-brand); outline-offset: 2px` so BT-keyboard users on mobile/tablet see focus.
+- `frontend/studyhub-app/src/mobile/components/BottomSheet.jsx` — added `aria-labelledby` pointing at the sheet title, and an id on the `<h2>`.
+- `frontend/studyhub-app/src/mobile/pages/MobileAiPage.jsx` — conversations drawer now has `role="dialog"` + `aria-modal="true"` + `aria-label`; error toast has `role="alert"` so failures are announced; loading area has `aria-busy="true"` and the spinner has `role="status"` + `aria-label`; composer textarea has `aria-label="Message Hub AI"`.
+- `frontend/studyhub-app/src/mobile/pages/SigninBottomSheet.jsx` — error banner has `role="alert"`.
+- `frontend/studyhub-app/src/mobile/pages/SignupBottomSheet.jsx` — both error banners (step 1 and step 2) have `role="alert"`.
+
+### Test coverage — previously untested modules
+
+- `backend/test/unit/rateLimiters.unit.test.js` (new) — 18 enforcement tests covering `authLoginLimiter`, `paymentCheckoutLimiter`, `paymentWebhookLimiter`, `messagingWriteLimiter`, `notesMutateLimiter`, `searchLimiter`, `videoUploadChunkLimiter`, the `RateLimit-*` header envelope, custom `keyGenerator` correctness, OPTIONS bypass, and the `createAiMessageLimiter` factory. Each describe block uses `vi.resetModules()` + dynamic import so limiter stores are hermetic. Combined with the existing export-shape file: 39/39 pass.
+- `backend/test/unit/video.unit.test.js` (new) — 30 passing + 1 intentional skip (fs/stream-coupled `processVideo` happy path; covered note directs to integration tests). Uses `Module._load` patching for child_process, r2Storage, clamav, getUserPlan, prisma, and sentry; no real ffmpeg/ffprobe invoked.
+- `backend/test/unit/webauthn-routes.unit.test.js` (new) — 21 passing tests across all 6 route handlers (register options/verify, authenticate options/verify, credentials list/delete). Mocks the `lib/webauthn/webauthn.js` verification barrel and `requireAdmin`; asserts session issuance via spies on `signAuthToken` / `setAuthCookie`.
+
+### Notes Hardening v2 + Service Worker consolidation — confirmed complete
+
+Review found these items already landed in prior work and do not need to be re-done: the `useNotesHardeningEnabled()` hook is wired at `frontend/studyhub-app/src/pages/notes/NoteEditor.jsx:268` and derivative sites, and `sw-notes.js` has already been folded into `public/sw.js` (see the "merged from sw-notes.js" comment at line 23 of `sw.js`). No source-level TODOs remain for these areas.
+
+### Validation
+
+- Backend lint: passes (0 errors).
+- Frontend lint: passes (0 errors) before and after the a11y fixes.
+- Frontend build: passes (31.80s; pre-existing Joyride tree-shaking warning unrelated to these changes).
+- Backend touched-file tests: 129/129 pass on auth + socket + payments after the security fixes.
+- New tests: rateLimiters 39/39, video 30 passing + 1 skip, webauthn-routes 21/21.
+- `npm audit` (all workspaces): 0 vulnerabilities.
+
+### Not implemented
+
+- **Security regression test harness for the 5 fixes** — a dedicated `security-regressions.unit.test.js` was scoped but the session ended before its completion; the five fixes are each covered by existing touched-file test runs, but a single file that explicitly asserts each regression would shorten the review loop on future changes. Tracked for a follow-up PR.
+- **iOS Capacitor target** — only Android is present in the repo. The `CAPACITOR_NATIVE_ORIGINS` set already includes `capacitor://localhost` so the iOS shell will work when added; no code change needed at that point beyond scaffolding the iOS project.
+- **MAX_OUTPUT_TOKENS_SHEET documentation drift** — `ai.constants.js:52` is 16384 while `CLAUDE.md` says 8192. The constant is the source of truth for runtime behavior; leaving the code unchanged so sheet generation doesn't regress. CLAUDE.md should be updated in a follow-up to reflect 16384.
+
+---
+
+## 2026-04-16 — Test coverage expansion + Wave 2 mobile detail routes + deep linking
+
+### Summary
+
+Continued the hardening pass with five more parallel test-writing agents and started chipping away at mobile Wave 2. Added 177 new tests across SheetLab, plagiarism, r2Storage, storage, and video routes; closed all four "still untested" backend modules listed in CLAUDE.md. Fixed the AI sheet-gen token-count documentation drift. Added native deep linking (custom scheme + HTTPS App Links) plus the two missing mobile detail routes that were 404-ing from search and notes-list links.
+
+### Documentation
+
+- `CLAUDE.md` — `Max output tokens` line updated to reflect the actual `MAX_OUTPUT_TOKENS_SHEET = 16384` runtime constant (was documented as 8192). The constant in `ai.constants.js` remains the source of truth.
+
+### Test coverage — closed every untested backend module CLAUDE.md flagged
+
+- `backend/test/unit/sheetlab.unit.test.js` (new) — 33 tests across 8 describe blocks. Covers `sheetLab.constants` pure utilities (parsePositiveInt, computeChecksum determinism + null-safety, `canReadSheet` access matrix), `GET /commits` paginated/draft-gated, `POST /commits` with checksum + parent wiring + activity hooks + 500-char truncation, `POST /restore/:commitId` with transactional snapshot, `POST /sync-upstream` non-fork rejection + merge commit creation, `GET /uncommitted-diff`, `GET /lineage` (root-only and parent/children with `isCurrent` flag), `GET /compare-upstream` identical/diverged. SheetLab is the Git-style version control surface for sheets (commits, restore, fork sync, lineage browsing).
+- `backend/test/unit/plagiarism.unit.test.js` (new) — 29 tests covering `src/lib/plagiarismService.js` and its pure-algorithm dependency `src/lib/contentFingerprint.js`. Algorithm: SHA-256 normalized-text hash for exact copies plus 64-bit SimHash from 3-word FNV-1a-hashed shingles for fuzzy paraphrase detection; similarity = `1 − hamming/64`, threshold 0.70, likely-copy at 0.85. Covers identical → 1.0, near-duplicates > 0.70, unrelated < 0.70, empty/whitespace returns null, exact-hash phase, same-user filter, sort order (older wins as likely original), and Prisma error fallback. Pre-existing `backend/test/plagiarism.unit.test.js` (Hamming/Union-Find tests) is untouched.
+- `backend/test/unit/r2Storage.unit.test.js` (new) — 25 tests. Patches `@aws-sdk/client-s3` and `@aws-sdk/s3-request-presigner` via `Module._load`. Covers key generators (format, collision avoidance over 50 calls, deterministic base-dir sharing), partial-credential `isR2Configured` branch, single-object operations (`uploadObject`/`getObject`/`deleteObject`/`objectExists`), signed URL generation (download + upload), full multipart state machine (`createMultipartUpload` → `uploadPart` × 2 → `completeMultipartUpload` round-trip; `abortMultipartUpload` with Sentry capture), and URL helpers (`getPublicUrl` proxy fallback, `extractObjectKeyFromUrl` round-trip + unrelated-host rejection).
+- `backend/test/unit/storage.unit.test.js` (new) — 25 tests. Filesystem-backed uploads abstraction (avatars, covers, attachments, content/note/group images, school logos). Covers URL builders for all six prefixes plus the `attachment://` private scheme; path-safety guards (`isManagedLeafFileName`, `isPathWithinRoot` accept/reject matrix); `resolveManagedUploadPath` traversal rejection; `safeUnlinkFile` outside-root rejection + null-byte basename rejection + EBUSY → Sentry capture; reference-counted cleanup helpers per asset type; `extractNoteImageUrlsFromTexts` dedup/type/prefix filtering; `validateUploadStorage` ensuring all 8 managed dirs are created and access-checked, with the `ALLOW_EPHEMERAL_UPLOADS` opt-in branch.
+- `backend/test/unit/video-routes.integration.test.js` (new) — 40 tests complementing the existing `video.unit.test.js`. Mounts `/api/video/upload/chunk` with `express.raw({ type: '*/*', limit: '3mb' })` to mirror the production wiring. Covers chunk upload (missing headers, oversized real 2.5 MB body, wrong owner, magic-byte signature rejection, small-chunk happy buffering), upload complete (full multi-chunk flow forcing `completeMultipartUpload`, ClamAV-infected → R2 delete + status=failed), upload abort, stream endpoint with quality selection + `downloadable=false` non-owner 403, PATCH metadata allowlist enforcement (rejects `contentHash`/`userId`/`r2Key`/`status`), title/description truncation at 200/2000 chars, appeal flow (short reason, conflict on existing pending, no original found), captions upload + delete, language cap. Combined video test count: 70 passed + 1 skipped.
+
+### Wave 4 — Native deep linking
+
+- `frontend/studyhub-app/android/app/src/main/AndroidManifest.xml` — added two intent filters on the main activity: a custom-scheme filter (`getstudyhub://...`) for QR codes and inter-app testing, and an HTTPS App Links filter for `getstudyhub.org` with `android:autoVerify="false"` (the OS will show an "Open with" chooser the first time; flip to true once `/.well-known/assetlinks.json` is published on the domain).
+- `frontend/studyhub-app/src/lib/mobile/deepLinking.js` (new) — exports a pure `routeForDeepLink(url)` mapping function and a `useDeepLinkRouter()` React hook that lazily imports `@capacitor/app` only on native and calls `navigate(route)` when an `appUrlOpen` event fires. No-op on web. Accepts both schemes for: `sheet`, `note`, `user`, `conversation`, `group`/`study-groups`, `search` (preserves query), `home`/`feed`, `profile`, `ai`/`hub-ai`. Unknown resources fall through to `/m/home`; unknown hosts on the HTTPS path are rejected.
+- `frontend/studyhub-app/src/lib/mobile/deepLinking.test.js` (new) — 21 unit tests covering the route mapper for both schemes, query preservation, special-character encoding, foreign-host rejection, malformed URL rejection, and the alias coverage.
+- `frontend/studyhub-app/src/mobile/App.mobile.jsx` — `MobileTabShell` now calls `useDeepLinkRouter()` so the listener is registered once at the mobile-app root.
+- `frontend/studyhub-app/package.json` — added `@capacitor/app@^8.1.0` (the requested 8.3 isn't published yet; 8.1 is the latest compatible with Capacitor 8.3).
+
+### Wave 2 — Closed the two routes that were 404-ing
+
+The Wave 2 survey found that most mobile pages are already 70–95% complete (Home/Feed at 80%, Messages at 90%, Thread at 95%, Profile at 70%, Notes at 85%, Search at 90%, SheetDetail at 85%, GroupDetail at 80%). The most concrete blocker was navigation: search results and other links pointed at routes that didn't exist. Two new pages close that gap.
+
+- `frontend/studyhub-app/src/mobile/pages/MobileUserProfilePage.jsx` (new) — public profile viewer for `/m/users/:username`. Fetches `GET /api/users/:username`, renders identity card with avatar fallback, four stat cells (sheets, followers, following, stars), follow/unfollow button with optimistic update + rollback on failure, and a "Message" button that routes to `/m/messages?dm=:userId` (existing DM auto-start handler in MessagesPage). Self-profile redirects to `/m/profile` to avoid showing the wrong layout. Private-account view hides stats and shows a "follow to see their activity" hint.
+- `frontend/studyhub-app/src/mobile/pages/MobileNoteDetail.jsx` (new) — read-only viewer for `/m/notes/:noteId`. Fetches `GET /api/notes/:id` (which already supports the `optionalAuth` shared-or-owner gate), renders title, course tag, last-updated relative date, tags, and content. Edit/share/star are deliberately scoped to Wave 3 — Notes Hardening v2's persistence/conflict surface lives in the web `NoteEditor` and isn't reused here yet.
+- `frontend/studyhub-app/src/mobile/App.mobile.jsx` — registered `/m/users/:username` and `/m/notes/:noteId` routes behind `MobilePrivateRoute`.
+
+### Validation
+
+- All new tests pass: SheetLab 33/33, plagiarism 29/29, r2Storage 25/25, storage 25/25, video routes 40/40 (combined video 70 passed + 1 skipped). Frontend `deepLinking.test.js` 21/21.
+- Backend lint: passes.
+- Frontend lint: passes.
+- `npm audit` (all workspaces): still 0 vulnerabilities.
+
+### Not implemented (carried forward, unchanged)
+
+- **iOS** — needs macOS + Xcode; not feasible from Windows.
+- **Push notifications (FCM)** — needs `google-services.json` from a Google Cloud / Firebase project the user controls. Client-side wiring is straightforward once that file exists; build will fail without it.
+- **Biometric lock** — needs a plugin selection (`@capacitor-community/biometric-auth` is one option) and native manifest entries; deferred to keep this session focused.
+- **Full offline mode** — significant architectural work (mobile-specific service worker strategy, IndexedDB queue for writes, conflict resolution); not a single-session item at the no-placeholders standard.
+- **Wave 3 messaging composer + voice** — needs `@capacitor/voice-recorder` + audio storage pipeline; deferred.
+- **Mobile Wave 2 polish** — top bar hide-on-scroll, Socket.io "new posts" pill, profile activity tabs, group members/resources/sessions sub-views, all-eight feed card type renderers. None are blocking; cherry-pick from the survey punch list as needed.
+
+---
+
+## 2026-04-16 — Production bug fixes: CSP broke BookHub; People-to-Follow label; SW respondWith crash; .gitignore hygiene
+
+### Summary
+
+Fix three user-reported production bugs (issue #246) plus a gitignore hygiene pass. The Library (BookHub) page was broken in production because the frontend CSP did not allow the Google Books image CDN, and the service worker's cross-origin fetch path was throwing `TypeError: Failed to convert value to 'Response'` when it landed on CSP-blocked URLs. The "People to Follow" widget showed `undefined follower(s)` and the "See more suggestions" link pointed to the first user's profile instead of anything useful.
+
+### Frontend CSP — `frontend/studyhub-app/public/_headers`
+
+- `connect-src` extended with `https://books.google.com`, `https://*.googleusercontent.com`, `https://www.googleapis.com`, `https://cdnjs.cloudflare.com`, `https://fonts.googleapis.com`, and `https://fonts.gstatic.com`. The browser enforces `connect-src` against the service worker's internal `fetch()` calls, so omitting those hosts caused every SW-intercepted request to them to fail. BookHub embeds cover images from `books.google.com/books/content?id=...`, which are declared under `img-src` (which already allows all `https:`) but are fetched by the SW as part of the image-caching strategy — the SW fetch is the one that hit the CSP wall.
+
+### Service worker — `frontend/studyhub-app/public/sw.js`
+
+- Added an early-return for cross-origin requests right after the protocol guard. `self.location.origin` vs `new URL(request.url).origin` comparison lets the browser handle every third-party resource natively with its own caching strategy, and the SW only keeps jurisdiction over `getstudyhub.org` / same-origin URLs. This eliminates the entire class of CSP-vs-SW conflicts going forward — even if a new third-party host is added to `img-src` without updating `connect-src`, the SW will no longer destabilize.
+- Hardened the fallback path in every cache-strategy branch (hashed assets, fonts, images, catch-all) to resolve to a synthetic `new Response('', { status: 504 })` instead of `undefined`/`null`. The production error `TypeError: Failed to convert value to 'Response'` came from `cached || networkFetch` evaluating to `null` when both the cache miss and network error paths produced falsy values; `event.respondWith(null)` then throws. Now every branch guarantees a valid Response.
+
+### `FeedFollowSuggestions.jsx`
+
+- The backend returns `_count: { followers, studySheets }` via Prisma's `_count` selection, but the component read `user.followerCount` (never populated), so the sub-label rendered as `"undefined follower(s)"`. Also `user.reason === 'classmate'` was the branch for shared-courses copy, but the backend never sets `reason` or `sharedCourses` on the payload either. Fixed by normalizing the shape: `user.followerCount ?? user._count?.followers`, and falling back to the user's `displayName` when no count is available. The broken variants now just don't render a sub-label instead of rendering the string `"undefined"`.
+- The "See more suggestions" link at the bottom used `to={`/users/${suggestions[0]?.username}`}` — it navigated to the _first suggestion's profile page_, which is obviously not "see more". Replaced with a `<button>` that toggles in-place between 4 and 8 visible suggestions, plus a "Show fewer" control when expanded. This also avoids the need for a dedicated `/suggestions` page that doesn't exist yet.
+
+### `.gitignore` hygiene
+
+- Added: `test-results/`, `playwright-report/` (Playwright artifacts regenerated every run), `coverage/` + `.nyc_output/`, Android build trees (`android/.gradle/`, `android/build/`, `android/app/build/`, `capacitor-cordova-android-plugins/build/`, `**/local.properties`), iOS build trees (for when the target is added), Vite cache (`**/.vite/`), OS cruft (`.DS_Store`, `Thumbs.db`, `desktop.ini`), editor swap files (`*.swp`, `*.swo`, `*~`), and npm/yarn/pnpm debug logs.
+- Untracked the stray `test-results/.last-run.json` that had been committed before the ignore rule existed (`git rm --cached`).
+
+### Not implemented
+
+- **"My Notes is buggy"** (also in issue #246) — the report did not specify a concrete symptom, and the screenshots only show the editor saving normally and the notifications/messages pollers firing at the documented 30-second cadence. The notification polling is working as designed (30 s × 2 endpoints × preflight = the request volume shown). If there is a more specific repro, a follow-up issue with steps will let me act on it; without that, changing anything here would be shooting in the dark.
+- **`.vscode/` workspace settings** — currently tracked (`settings.json`, `tasks.json`, two Checkmarx dev-assist markers). Left alone because the existing tracked files look like shared team config. If you want them gone, `git rm --cached .vscode/*` cleans up.
+
+### Validation
+
+- Frontend lint: passes.
+- Frontend build: passes.
+- No backend changes this round, so backend tests unchanged.
+
+---
+
+## 2026-04-16 — Follow-up: profile-page "People You May Know" + repo cleanup
+
+### Summary
+
+Screenshot review caught a second instance of the `undefined follower(s)` bug — this time on the profile-page "People You May Know" widget (a different component from the feed sidebar fixed in the previous entry) — plus confirmed that the repo had 2,715 tracked files of vendored `effect-ts` source (33 MB at the repo root as `package/`) and two stray Superpowers brainstorm artifacts. All three fixed in one pass.
+
+### `FollowSuggestions.jsx` (profile page)
+
+Same bug, same endpoint, different consumer: `GET /api/users/me/follow-suggestions` returns Prisma's `_count` object and does not populate `reason` / `sharedCourses` / `sheetCount`, but `frontend/studyhub-app/src/pages/profile/FollowSuggestions.jsx` read those flat properties directly. The screenshot in issue #246 shows six rows of `"undefined followers"` as a result. Applied the same normalization as the feed sidebar fix:
+
+- `user.followerCount ?? user._count?.followers`
+- `user.sheetCount ?? user._count?.studySheets`
+- `sharedCourses` only used when the backend actually sets `reason === 'classmate'`
+- Sub-label is omitted entirely when no count is available, instead of rendering the string `"undefined"`.
+
+Also audited `frontend/studyhub-app/src/pages/feed/ForYouSection.jsx` — it consumes `/api/feed/for-you` which _does_ populate `sharedCourses` + `followerCount` on its `people` array, so no fix needed there.
+
+### Repo cleanup — untracked 2,717 stray files
+
+- `package/` — a vendored copy of `node_modules/effect/package/` source that had been committed into the repo root (2,715 files, 33 MB). No code in `backend/src` or `frontend/studyhub-app/src` imports from it; the `effect` dependency in `backend/package.json` resolves normally through `node_modules`. Untracked via `git rm -r --cached package/` and added `/package/` to `.gitignore`. Left on disk in case anyone still wants the source tree for reference.
+- `.superpowers/brainstorm/1197-1775419202/` — two HTML files from a local Superpowers brainstorm session. Untracked; `.superpowers/brainstorm/` added to `.gitignore`.
+
+### Validation
+
+- Frontend lint: passes.
+- The deletion set (2,717 files) is purely bookkeeping — no source references break because nothing was importing from `package/`.
+
+---
+
+## 2026-04-16 — Auto-refresh infrastructure: SW update detection, focus revalidation, Notes polling
+
+### Summary
+
+StudyHub users had to hard-refresh to pick up new deploys or see content saved from another device — behavior that falls short of Facebook / Instagram / GitHub-grade freshness expectations. Three changes close that gap without changing any page-level behavior the user has to think about.
+
+### Service-worker update detection — `frontend/studyhub-app/src/main.jsx`
+
+- Poll cadence bumped from **60 min → 10 min**. The previous hour-long window meant a deploy could take up to an hour to reach an active user; 10 min keeps every cache-warm window fresh without measurable bandwidth cost.
+- Added explicit `window.focus`, `online`, and `document.visibilitychange` listeners that trigger `registration.update()` on the spot. Most users don't sit on one tab for 10 straight minutes — they tab away and come back, and that's exactly the moment to discover a new deploy.
+- When the SW reports an update (`SW_UPDATED` postMessage or a newly-activated worker), the handler now flushes the in-memory SWR cache via `clearFetchCache()` before showing the refresh banner. This prevents the "I see stale data even after refresh was offered" footgun where a cached response served to a just-activated new SW could still look old.
+- Refresh banner no longer auto-dismisses after 30 s. The old behavior silently removed the banner, so users who tabbed away and came back missed the update entirely. The banner now stays until the user clicks **Refresh** or the **x** dismiss button.
+
+### `useFetch` focus revalidation — `frontend/studyhub-app/src/lib/useFetch.js`
+
+- New default: any `useFetch(..., { swr: <ms> })` call now refetches when the tab regains focus (`window.focus` + `document.visibilitychange`). Throttled to at most one refetch per cacheKey per 10 s so rapid tab-switching doesn't hammer the backend.
+- Opt-out: pass `revalidateOnFocus: false` on SWR-enabled fetches that shouldn't refresh on focus.
+- Opt-in for non-SWR fetches: pass `revalidateOnFocus: true`. The default remains off for non-SWR fetches because most of those are one-shots (page-load stats, enum lists) where a focus refetch is wasted work.
+- This is the pattern Vercel SWR, React Query, and Apollo all default to. Matches user expectation from every modern app.
+
+### Notes page polling — `frontend/studyhub-app/src/pages/notes/useNotesData.js`
+
+- Previously the note list fetched once on mount and never again. Shared notes from classmates (or saves from another device) required a hard refresh to appear.
+- Extracted the inline fetch into a `loadNotes` callback and wired it through `useLivePolling` at a 60-s interval. The hook already honors `pauseWhenHidden` + `focus` / `online` / `visibilitychange`, so this is a cheap sidecar to the existing infrastructure.
+- The initial mount toast is suppressed on background-refresh failures (`hasLoadedNotesOnceRef`) so a momentary network drop doesn't spam the user with "Failed to load notes" every minute.
+
+### Tests
+
+- `frontend/studyhub-app/src/lib/useFetch.test.js` — 4 new tests covering focus-revalidation behavior: refetches on focus when SWR is enabled, does NOT refetch when SWR is off, honors the explicit `revalidateOnFocus: true` opt-in, and throttles burst focus events to at most one refetch. Combined file: 15/15 pass.
+
+### Validation
+
+- Frontend lint: passes.
+- Frontend build: passes.
+- `useFetch.test.js`: 15/15.
+- No backend changes this round; backend tests unchanged.
+
+### Not implemented
+
+- **Real-time Feed "N new posts" pill via Socket.io** — the feed currently relies on 30-s polling. Upgrading it to a Socket.io subscription would require a backend feed-broadcast channel that doesn't exist yet. Out of scope for this round; the focus-revalidation gives most of the same user-facing benefit because tabbing back pulls the latest feed.
+- **Auto-reload on SW update** — considered and rejected. Silently reloading mid-typing would destroy unsaved work (compose boxes, note edits, etc.). The persistent banner is the safer pattern; users who want the update just click.

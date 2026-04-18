@@ -120,14 +120,23 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   border-radius: var(--radius-full);
   border: none;
   background: none;
   color: var(--sh-text);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+}
+
+.mob-topbar-back:focus-visible,
+.mob-tab-bar-item:focus-visible,
+.mob-auth-submit:focus-visible,
+.mob-auth-switch-link:focus-visible,
+.mob-google-btn:focus-visible {
+  outline: 2px solid var(--sh-brand);
+  outline-offset: 2px;
 }
 
 .mob-topbar-back:active {

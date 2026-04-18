@@ -35,34 +35,77 @@ export default function FollowSuggestions() {
       if (res.ok) {
         setFollowingSet((prev) => new Set([...prev, username]))
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, [])
 
   if (loading || suggestions.length === 0) return null
 
+  // `GET /api/users/me/follow-suggestions` returns Prisma's `_count` object
+  // directly rather than flat `followerCount` / `sheetCount`, and it does
+  // not populate `reason` / `sharedCourses`. Normalize the shape here so
+  // the widget doesn't render "undefined follower(s)" or "undefined
+  // shared course(s)" — the production bug that this block is fixing.
   return (
     <div style={cardStyle}>
       <h3 style={sectionHeadingStyle}>People You May Know</h3>
       <div style={{ display: 'grid', gap: 8 }}>
         {suggestions.slice(0, 6).map((user) => {
           const isFollowed = followingSet.has(user.username)
+          const followerCount =
+            typeof user.followerCount === 'number' ? user.followerCount : user._count?.followers
+          const sheetCount =
+            typeof user.sheetCount === 'number' ? user.sheetCount : user._count?.studySheets
+          const sharedCourses = typeof user.sharedCourses === 'number' ? user.sharedCourses : null
+
+          let primaryLabel = ''
+          if (user.reason === 'classmate' && sharedCourses !== null) {
+            primaryLabel = `${sharedCourses} shared course${sharedCourses === 1 ? '' : 's'}`
+          } else if (typeof followerCount === 'number') {
+            primaryLabel = `${followerCount} follower${followerCount === 1 ? '' : 's'}`
+          } else if (user.displayName) {
+            primaryLabel = user.displayName
+          }
+
+          const sheetSuffix =
+            typeof sheetCount === 'number' && sheetCount > 0
+              ? ` · ${sheetCount} sheet${sheetCount === 1 ? '' : 's'}`
+              : ''
+
           return (
             <div key={user.id} style={rowStyle}>
               <Link
                 to={`/users/${user.username}`}
-                style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', flex: 1, minWidth: 0 }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  textDecoration: 'none',
+                  flex: 1,
+                  minWidth: 0,
+                }}
               >
                 <UserAvatar username={user.username} avatarUrl={user.avatarUrl} size={36} />
                 <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--sh-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: 'var(--sh-heading)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
                     {user.username}
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--sh-muted)' }}>
-                    {user.reason === 'classmate'
-                      ? `${user.sharedCourses} shared course${user.sharedCourses > 1 ? 's' : ''}`
-                      : `${user.followerCount} follower${user.followerCount !== 1 ? 's' : ''}`}
-                    {user.sheetCount > 0 && ` · ${user.sheetCount} sheets`}
-                  </div>
+                  {(primaryLabel || sheetSuffix) && (
+                    <div style={{ fontSize: 11, color: 'var(--sh-muted)' }}>
+                      {primaryLabel}
+                      {sheetSuffix}
+                    </div>
+                  )}
                 </div>
               </Link>
               <button
@@ -95,7 +138,6 @@ const rowStyle = {
   background: 'var(--sh-bg)',
   transition: 'background .15s',
 }
-
 
 const followBtnStyle = {
   fontSize: 12,

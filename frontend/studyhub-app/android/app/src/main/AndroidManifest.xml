@@ -22,6 +22,28 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- Deep linking: custom scheme for inter-app / QR / testing. -->
+            <!-- Example: getstudyhub://sheet/123 opens the sheet detail screen. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="getstudyhub" />
+            </intent-filter>
+
+            <!-- Deep linking: HTTPS App Links for getstudyhub.org. -->
+            <!-- autoVerify is false until a /.well-known/assetlinks.json is -->
+            <!-- published on the domain. With autoVerify=false, Android -->
+            <!-- shows a "Open with" chooser the first time; user can pick -->
+            <!-- the app as the default. -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+                <data android:host="getstudyhub.org" />
+            </intent-filter>
+
         </activity>
 
         <provider

@@ -183,7 +183,12 @@ export default function BottomSheet({
   const heightClass = fullHeight ? 'mob-bottom-sheet--full' : ''
 
   return createPortal(
-    <div className="mob-bottom-sheet-overlay" aria-modal="true" role="dialog">
+    <div
+      className="mob-bottom-sheet-overlay"
+      aria-modal="true"
+      role="dialog"
+      aria-labelledby={title ? 'mob-bottom-sheet-title' : undefined}
+    >
       <div
         ref={backdropRef}
         className="mob-bottom-sheet-backdrop"
@@ -205,7 +210,9 @@ export default function BottomSheet({
         </div>
         {title && (
           <div className="mob-bottom-sheet-header">
-            <h2 className="mob-bottom-sheet-title">{title}</h2>
+            <h2 id="mob-bottom-sheet-title" className="mob-bottom-sheet-title">
+              {title}
+            </h2>
           </div>
         )}
         <div className="mob-bottom-sheet-body">{children}</div>

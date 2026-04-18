@@ -13,12 +13,19 @@ const runtimeConfig =
 // re-uses the same flag for routing decisions.
 const _isNative = typeof window !== 'undefined' && Boolean(window.__SH_NATIVE__)
 
-// On native, prefer the mobile-specific API URL, then the standard API URL.
-// Falls back to localhost:4000 for web development only.
+// Production Railway backend. Used as the default for native builds because
+// the Capacitor APK has no web server to proxy against. Also serves as a
+// last-resort fallback if someone forgets to set VITE_MOBILE_API_URL.
+const RAILWAY_BACKEND_URL = 'https://studyhub-production-c655.up.railway.app'
+
+// On native, prefer the mobile-specific API URL, then the standard API URL,
+// then fall back to the Railway production backend (NEVER to localhost, which
+// resolves to the phone itself and fails every request).
+// On web, fall back to localhost:4000 for development.
 export const API =
   runtimeConfig.API ||
   (_isNative
-    ? import.meta.env.VITE_MOBILE_API_URL || import.meta.env.VITE_API_URL || 'http://localhost:4000'
+    ? import.meta.env.VITE_MOBILE_API_URL || import.meta.env.VITE_API_URL || RAILWAY_BACKEND_URL
     : import.meta.env.VITE_API_URL || 'http://localhost:4000')
 
 export const SUPPORT_EMAIL =

@@ -1,12 +1,23 @@
 // src/mobile/components/MobileGoogleButton.jsx
-// Google Sign-In / Sign-Up button for the Capacitor mobile app.
-// Uses the redirect-based OAuth flow (most reliable in WebView).
-// On tap: navigates to Google consent screen.
-// On return: MobileLandingPage detects ?code= and exchanges it.
+// Google Sign-In button for the Capacitor native shell.
+//
+// On native (Android/iOS), uses `@capgo/capacitor-social-login` so Google's
+// account chooser opens inside the app — no redirect to Chrome, no return
+// trip to localhost. The plugin returns an ID token which we post to the
+// existing `POST /api/auth/google` endpoint; the bearer-token fetch shim
+// (http.js) reads the returned `authToken` on our behalf.
+//
+// On web fallback (running the same codebase in dev mode), the button falls
+// back to the redirect flow so developers can still test sign-in without the
+// native plugin loaded.
 
 import { useCallback, useState } from 'react'
-import { GOOGLE_CLIENT_ID } from '../../config'
+import { useNavigate } from 'react-router-dom'
+import { GOOGLE_CLIENT_ID, API } from '../../config'
 import { buildGoogleOAuthUrl } from '../../components/googleSignInHelpers'
+import { isNativePlatform } from '../../lib/mobile/detectMobile'
+import { useSession } from '../../lib/session-context'
+import { CURRENT_LEGAL_VERSION } from '../../lib/legalVersions'
 
 /** Google "G" logo as inline SVG */
 function GoogleLogo() {
@@ -32,39 +43,155 @@ function GoogleLogo() {
   )
 }
 
+// Remembers whether the Capgo plugin has been initialized this session so we
+// don't repeat the handshake on every tap.
+let socialLoginInitialized = false
+
+/**
+ * Lazy-loads the native plugin only when actually running in Capacitor. This
+ * prevents the web dev bundle from failing to resolve the plugin when it is
+ * not installed or when running in a browser tab.
+ */
+async function signInWithGoogleNative() {
+  const { SocialLogin } = await import('@capgo/capacitor-social-login')
+
+  if (!socialLoginInitialized) {
+    await SocialLogin.initialize({
+      google: { webClientId: GOOGLE_CLIENT_ID },
+    })
+    socialLoginInitialized = true
+  }
+
+  const res = await SocialLogin.login({
+    provider: 'google',
+    options: { scopes: ['email', 'profile'] },
+  })
+  // Capgo returns `{ provider, result: { idToken, accessToken, profile, ... } }`
+  const idToken = res?.result?.idToken
+  if (!idToken) throw new Error('Google did not return an identity token.')
+  return idToken
+}
+
 /**
  * @param {object} props
  * @param {'signin' | 'signup'} [props.mode='signin']
  */
 export default function MobileGoogleButton({ mode = 'signin' }) {
+  const navigate = useNavigate()
+  const { completeAuthentication } = useSession()
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleNativeSignIn = useCallback(async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const idToken = await signInWithGoogleNative()
+
+      const res = await fetch(`${API}/api/auth/google`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Client': 'mobile',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ credential: idToken }),
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error || 'Google sign-in failed.')
+        return
+      }
+
+      // Existing user → straight to home (or onboarding if unfinished).
+      if (data.user) {
+        completeAuthentication(data.user)
+        navigate(data.user?.onboardingCompleted ? '/m/home' : '/m/onboarding/goals', {
+          replace: true,
+        })
+        return
+      }
+
+      // New user → backend wants a role selection. For mobile we default to
+      // `student`, consistent with the email signup flow; users can switch
+      // role later from Settings. Complete the account creation in one step.
+      if (data.status === 'needs_role' && data.tempToken) {
+        const completeRes = await fetch(`${API}/api/auth/google/complete`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Client': 'mobile',
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            tempToken: data.tempToken,
+            accountType: 'student',
+            legalAccepted: true,
+            legalVersion: CURRENT_LEGAL_VERSION,
+          }),
+        })
+        const completeData = await completeRes.json()
+        if (!completeRes.ok) {
+          setError(completeData.error || 'Could not finish signing you in.')
+          return
+        }
+        completeAuthentication(completeData.user)
+        navigate('/m/onboarding/goals', { replace: true })
+        return
+      }
+
+      setError('Unexpected response from Google sign-in.')
+    } catch (err) {
+      // The plugin throws a plain error when the user cancels the chooser.
+      const message = err?.message || ''
+      if (
+        message.includes('canceled') ||
+        message.includes('cancelled') ||
+        message.includes('CANCEL')
+      ) {
+        // User backed out of the account chooser — no UI error.
+        return
+      }
+      setError('Could not sign in with Google. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }, [completeAuthentication, navigate])
+
+  const handleWebFallback = useCallback(() => {
+    if (!GOOGLE_CLIENT_ID || loading) return
+    setLoading(true)
+    const redirectUri = `${window.location.origin}/m/landing`
+    window.location.href = buildGoogleOAuthUrl(redirectUri)
+  }, [loading])
 
   const handleTap = useCallback(() => {
     if (!GOOGLE_CLIENT_ID || loading) return
-    setLoading(true)
-
-    // Build redirect URI back to landing page
-    const redirectUri = `${window.location.origin}/m/landing`
-    const url = buildGoogleOAuthUrl(redirectUri)
-
-    // Navigate to Google's OAuth consent screen
-    window.location.href = url
-  }, [loading])
+    if (isNativePlatform()) {
+      void handleNativeSignIn()
+    } else {
+      handleWebFallback()
+    }
+  }, [loading, handleNativeSignIn, handleWebFallback])
 
   if (!GOOGLE_CLIENT_ID) return null
 
   const label = mode === 'signup' ? 'Continue with Google' : 'Sign in with Google'
 
   return (
-    <button
-      type="button"
-      className="mob-google-btn"
-      onClick={handleTap}
-      disabled={loading}
-      aria-label={label}
-    >
-      {loading ? <div className="mob-google-btn-spinner" /> : <GoogleLogo />}
-      <span>{label}</span>
-    </button>
+    <>
+      <button
+        type="button"
+        className="mob-google-btn"
+        onClick={handleTap}
+        disabled={loading}
+        aria-label={label}
+      >
+        {loading ? <div className="mob-google-btn-spinner" /> : <GoogleLogo />}
+        <span>{label}</span>
+      </button>
+      {error && <div className="mob-auth-error">{error}</div>}
+    </>
   )
 }

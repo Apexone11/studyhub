@@ -9,6 +9,7 @@ import { initTelemetry, captureWebVital } from './lib/telemetry'
 import { reportWebVitals } from './lib/performance'
 import { startWebVitals } from './lib/webVitals'
 import { consumePendingRoleReload } from './lib/pendingRoleReload'
+import { clearFetchCache } from './lib/useFetch'
 
 try {
   consumePendingRoleReload()
@@ -52,13 +53,31 @@ if ('serviceWorker' in navigator && !window.__SH_NATIVE__) {
     navigator.serviceWorker
       .register('/sw.js')
       .then((registration) => {
-        // Check for updates every 60 minutes
+        // Poll for updates every 10 minutes. This used to be 60 min, which
+        // meant a deploy could take up to an hour to reach an active user
+        // — well off-pace from what people expect on Facebook / Instagram /
+        // GitHub-grade apps. 10 min is the sweet spot: frequent enough
+        // that people see fixes within one cache-warm window, sparing
+        // enough that it's not a measurable bandwidth cost.
         setInterval(
           () => {
             registration.update().catch(() => {})
           },
-          60 * 60 * 1000,
+          10 * 60 * 1000,
         )
+
+        // Also check immediately when the user comes back to the tab or
+        // reconnects to the network. Most users don't sit on one tab for
+        // 10 minutes straight — they tab away and come back, and that's
+        // exactly the moment to discover a new deploy.
+        function checkForUpdate() {
+          registration.update().catch(() => {})
+        }
+        window.addEventListener('focus', checkForUpdate)
+        window.addEventListener('online', checkForUpdate)
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') checkForUpdate()
+        })
 
         // When a new SW installs, listen for its activation
         registration.addEventListener('updatefound', () => {
@@ -68,7 +87,7 @@ if ('serviceWorker' in navigator && !window.__SH_NATIVE__) {
           newWorker.addEventListener('statechange', () => {
             // New SW is active and there was a previous one -- update is ready
             if (newWorker.state === 'activated' && navigator.serviceWorker.controller) {
-              showUpdateBanner()
+              handleSwUpdate()
             }
           })
         })
@@ -78,10 +97,26 @@ if ('serviceWorker' in navigator && !window.__SH_NATIVE__) {
     // Listen for the SW_UPDATED message from the service worker
     navigator.serviceWorker.addEventListener('message', (event) => {
       if (event.data && event.data.type === 'SW_UPDATED') {
-        showUpdateBanner()
+        handleSwUpdate()
       }
     })
   })
+}
+
+/**
+ * Handle a service-worker update event. Two things happen:
+ *   1. Flush the in-memory SWR cache in useFetch so any page still mounted
+ *      will get fresh data on its next refetch — prevents the "I see stale
+ *      data even after refresh was offered" footgun.
+ *   2. Show the refresh banner so the user knows a new version is live.
+ */
+function handleSwUpdate() {
+  try {
+    clearFetchCache()
+  } catch {
+    // Cache flush is best-effort; the banner still matters.
+  }
+  showUpdateBanner()
 }
 
 /** Show a non-intrusive banner prompting the user to refresh for the latest version. */
@@ -117,10 +152,12 @@ function showUpdateBanner() {
 
   document.body.appendChild(banner)
 
-  // Auto-dismiss after 30 seconds
-  setTimeout(() => {
-    banner.remove()
-  }, 30000)
+  // Deliberately NOT auto-dismissing. Previous behavior hid the banner
+  // after 30 s, which meant many users missed the update entirely and
+  // kept running the old bundle until they tabbed away long enough for
+  // the next SW check. The banner now stays until the user clicks
+  // Refresh or explicitly dismisses it — they always know a fresh
+  // version is waiting.
 }
 
 // Report Web Vitals to telemetry

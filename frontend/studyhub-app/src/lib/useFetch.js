@@ -12,6 +12,10 @@
  *   - initialData: any - Initial data value (default: null)
  *   - swr: number - Stale-while-revalidate time in ms (default: 0, no caching)
  *   - cacheKey: string - Custom cache key (default: path)
+ *   - revalidateOnFocus: boolean - Refetch when the tab regains focus
+ *     (default: true when `swr > 0`, false otherwise). Throttled to at
+ *     most one refetch per `FOCUS_REVALIDATE_THROTTLE_MS` per cacheKey
+ *     so rapid tab-switching doesn't hammer the backend.
  */
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { API } from '../config'
@@ -24,6 +28,12 @@ const MAX_CACHE_SIZE = 50
 const CACHE_MAX_AGE_MS = 10 * 60 * 1000 // 10 minutes
 const SWEEP_INTERVAL_MS = 60 * 1000 // 1 minute
 let sweepTimer = null
+
+// Focus-revalidation throttle: if the user blurs-and-refocuses repeatedly
+// we don't want to refetch the same endpoint dozens of times. Track the
+// last refetch timestamp per cacheKey and skip if within this window.
+const FOCUS_REVALIDATE_THROTTLE_MS = 10 * 1000
+const lastFocusRefetchAt = new Map()
 
 /** Evict stale entries and enforce size cap. */
 export function sweepCache() {
@@ -59,8 +69,20 @@ export function clearFetchCache(cacheKey = null) {
 }
 
 export default function useFetch(path, options = {}) {
-  const { skip = false, transform, initialData = null, swr = 0, cacheKey: customCacheKey } = options
+  const {
+    skip = false,
+    transform,
+    initialData = null,
+    swr = 0,
+    cacheKey: customCacheKey,
+    revalidateOnFocus,
+  } = options
   const cacheKeyToUse = customCacheKey || path
+  // Default: opt into focus-revalidation when the caller already opted
+  // into caching (swr > 0). Non-caching fetches are usually one-shots
+  // (e.g., page-load stats) where a focus refetch is wasted work.
+  const shouldRevalidateOnFocus =
+    typeof revalidateOnFocus === 'boolean' ? revalidateOnFocus : swr > 0
   const [data, setData] = useState(initialData)
   const [loading, setLoading] = useState(!skip)
   const [error, setError] = useState(null)
@@ -115,14 +137,47 @@ export default function useFetch(path, options = {}) {
         setError(null)
         setLoading(false)
         fetchData()
-        return () => { mountedRef.current = false }
+        return () => {
+          mountedRef.current = false
+        }
       }
     }
 
     // No cache or SWR disabled: fetch normally
     fetchData()
-    return () => { mountedRef.current = false }
+    return () => {
+      mountedRef.current = false
+    }
   }, [fetchData, skip, swr, cacheKeyToUse])
+
+  // Revalidate when the tab regains focus. This is the behavior modern
+  // apps rely on (GitHub, Notion, Linear): you switch tabs, come back,
+  // and the page you were on reflects the latest state without a hard
+  // refresh. Only active when the caller opted into SWR (or explicitly
+  // enabled the flag) to avoid refetch storms on one-shot endpoints.
+  useEffect(() => {
+    if (skip || !shouldRevalidateOnFocus || typeof window === 'undefined') return undefined
+
+    function handleFocus() {
+      if (!mountedRef.current) return
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return
+      const last = lastFocusRefetchAt.get(cacheKeyToUse) || 0
+      if (Date.now() - last < FOCUS_REVALIDATE_THROTTLE_MS) return
+      lastFocusRefetchAt.set(cacheKeyToUse, Date.now())
+      fetchData()
+    }
+
+    window.addEventListener('focus', handleFocus)
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleFocus)
+    }
+    return () => {
+      window.removeEventListener('focus', handleFocus)
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleFocus)
+      }
+    }
+  }, [fetchData, skip, shouldRevalidateOnFocus, cacheKeyToUse])
 
   return { data, loading, error, refetch: fetchData }
 }

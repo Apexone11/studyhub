@@ -49,6 +49,57 @@ setInterval(
   5 * 60 * 1000,
 )
 
+/**
+ * Authenticate a Socket.io handshake. Exported so it can be unit-tested in
+ * isolation without booting a full Socket.io server.
+ *
+ * Rule: the `studyhub_session` httpOnly cookie is authoritative for web
+ * clients. The bearer/Authorization fallback is ONLY honored when the
+ * handshake originates from a Capacitor native scheme. A web attacker
+ * cannot forge `Origin` (the browser sets it), so this prevents an XSS
+ * exfiltrator that captured a JWT from replaying it over WebSocket to
+ * the same origin to bypass cookie-based defenses.
+ */
+function authenticateSocketHandshake(socket, next) {
+  try {
+    // Parse cookie header manually for studyhub_session
+    const cookieHeader = socket.handshake.headers.cookie || ''
+    const cookies = parseCookies(cookieHeader)
+    const cookieToken = cookies.studyhub_session || null
+
+    const handshakeAuth = socket.handshake.auth || {}
+    const bearerToken = typeof handshakeAuth.token === 'string' ? handshakeAuth.token : null
+
+    const authHeader =
+      typeof socket.handshake.headers.authorization === 'string'
+        ? socket.handshake.headers.authorization
+        : ''
+    const authHeaderToken = /^Bearer\s+(.+)$/i.exec(authHeader)?.[1] || null
+
+    const originHeader =
+      typeof socket.handshake.headers.origin === 'string'
+        ? socket.handshake.headers.origin.toLowerCase()
+        : ''
+    const isCapacitorOrigin =
+      originHeader === 'https://localhost' || originHeader === 'capacitor://localhost'
+
+    const token = cookieToken || (isCapacitorOrigin ? bearerToken || authHeaderToken : null)
+
+    if (!token) {
+      return next(new Error('Auth required'))
+    }
+
+    const decoded = verifyAuthToken(token)
+    socket.userId = decoded.sub
+    socket.username = null // Will be populated after DB lookup
+
+    return next()
+  } catch (err) {
+    captureError(err, { source: 'socketio-auth', socketId: socket.id })
+    return next(new Error('Invalid token'))
+  }
+}
+
 function initSocketIO(httpServer) {
   const isProd = process.env.NODE_ENV === 'production'
   const allowedOrigins = isProd
@@ -62,28 +113,11 @@ function initSocketIO(httpServer) {
     },
   })
 
-  // Auth middleware: extract JWT from cookie header
-  io.use((socket, next) => {
-    try {
-      // Parse cookie header manually for studyhub_session
-      const cookieHeader = socket.handshake.headers.cookie || ''
-      const cookies = parseCookies(cookieHeader)
-      const token = cookies.studyhub_session || null
-
-      if (!token) {
-        return next(new Error('Auth required'))
-      }
-
-      const decoded = verifyAuthToken(token)
-      socket.userId = decoded.sub
-      socket.username = null // Will be populated after DB lookup
-
-      next()
-    } catch (err) {
-      captureError(err, { source: 'socketio-auth', socketId: socket.id })
-      next(new Error('Invalid token'))
-    }
-  })
+  // Auth middleware: extract JWT from cookie header OR handshake auth token.
+  // Web clients send the HttpOnly `studyhub_session` cookie; the Capacitor
+  // native shell passes the same JWT via `io(..., { auth: { token } })` on
+  // the client because cross-origin cookies are unreliable in the WebView.
+  io.use(authenticateSocketHandshake)
 
   io.on('connection', async (socket) => {
     try {
@@ -348,4 +382,5 @@ module.exports = {
   getIO,
   getOnlineUsers,
   emitToUser,
+  authenticateSocketHandshake,
 }

@@ -261,6 +261,37 @@ async function sendVerificationCodeEmail(email, username, code, metadata = {}) {
   }
 }
 
+/**
+ * True when the request originated from the Capacitor native mobile shell.
+ * The mobile client sends `X-Client: mobile` on every auth and authenticated
+ * request. WebView cookies can be unreliable across the Railway origin, so
+ * mobile uses bearer tokens (`Authorization: Bearer <jwt>`) instead. For web
+ * clients this header is absent and behavior is unchanged.
+ *
+ * Security: the `X-Client` header alone is attacker-controllable from a web
+ * browser (any fetch can set it). Trusting it alone means a web-context
+ * attacker (XSS, rogue extension) could cause the server to emit the raw JWT
+ * in the response body, bypassing the httpOnly cookie protection. To prevent
+ * that, also require the `Origin` header to match a Capacitor native scheme
+ * — browsers set `Origin` themselves and cross-origin attackers cannot
+ * override it, so this is a non-forgeable second signal.
+ *
+ * Capacitor origins we accept:
+ *   - `https://localhost` — Android when `server.androidScheme: 'https'`
+ *     (our current capacitor.config.json)
+ *   - `capacitor://localhost` — iOS default scheme
+ */
+const CAPACITOR_NATIVE_ORIGINS = new Set(['https://localhost', 'capacitor://localhost'])
+
+function isMobileClient(req) {
+  if (!req || !req.headers) return false
+  const clientHeader = req.headers['x-client']
+  if (typeof clientHeader !== 'string') return false
+  if (clientHeader.trim().toLowerCase() !== 'mobile') return false
+  const origin = typeof req.headers.origin === 'string' ? req.headers.origin.toLowerCase() : ''
+  return CAPACITOR_NATIVE_ORIGINS.has(origin)
+}
+
 async function issueAuthenticatedSession(res, userId, req) {
   const user = await getAuthenticatedUser(userId)
   if (!user) throw new AppError(404, 'User not found.')
@@ -295,6 +326,15 @@ async function issueAuthenticatedSession(res, userId, req) {
 
   const payload = await buildSessionUserPayload(user)
   if (sessionId) payload.sessionId = sessionId
+
+  // Mobile clients cannot rely on the Set-Cookie header because the Capacitor
+  // WebView origin differs from the Railway backend origin. Return the raw JWT
+  // in the response body so the app can store it and send as
+  // `Authorization: Bearer <token>` on subsequent requests. Web clients never
+  // receive this field (the cookie above is authoritative for them).
+  if (isMobileClient(req)) {
+    payload.authToken = token
+  }
   return payload
 }
 
@@ -332,6 +372,7 @@ module.exports = {
   buildAuthenticatedUserPayload,
   buildSessionUserPayload,
   sendVerificationCodeEmail,
+  isMobileClient,
   issueAuthenticatedSession,
   loginVerificationResponse,
   handleAuthError,

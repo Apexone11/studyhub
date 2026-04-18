@@ -1,5 +1,19 @@
 {
   "appId": "app.studyhub.mobile",
   "appName": "GetStudyHub",
-  "webDir": "dist"
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": false,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false
+  },
+  "server": {
+    "androidScheme": "https",
+    "hostname": "localhost",
+    "allowNavigation": [
+      "studyhub-production-c655.up.railway.app",
+      "accounts.google.com",
+      "*.googleusercontent.com"
+    ]
+  }
 }

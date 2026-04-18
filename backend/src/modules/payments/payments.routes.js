@@ -180,6 +180,16 @@ router.post('/webhook', paymentWebhookLimiter, async (req, res) => {
     return res.status(500).json({ error: 'Webhook not configured' })
   }
 
+  // Defense in depth: constructEvent needs the raw body Buffer to verify the
+  // HMAC signature. The app mounts express.raw() for this path in index.js
+  // BEFORE express.json(), but if that mount is ever accidentally removed or
+  // reordered, the handler would receive a parsed object and constructEvent
+  // would throw an opaque error. Fail fast with a clear signal instead.
+  if (!Buffer.isBuffer(req.body)) {
+    log.error('Stripe webhook received non-Buffer body — raw middleware not applied')
+    return res.status(400).json({ error: 'Invalid webhook payload' })
+  }
+
   let event
   try {
     event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret)
@@ -419,12 +429,19 @@ router.post(
           if (!userId || isNaN(userId)) continue
 
           const priceId = sub.items?.data?.[0]?.price?.id || ''
-          const plan =
-            PLANS.pro_monthly?.stripePriceId === priceId
-              ? 'pro_monthly'
-              : PLANS.pro_yearly?.stripePriceId === priceId
-                ? 'pro_yearly'
-                : 'pro_monthly'
+          // Reject unknown price IDs. Silently falling back to `pro_monthly`
+          // here would let a non-pro Stripe subscription (e.g., a test-mode
+          // or discount-price one created under the same customer) escalate
+          // to pro on the next admin sync.
+          const plan = planFromPriceId(priceId)
+          if (!plan) {
+            log.warn(
+              { priceId, subId: sub.id, userId },
+              'admin-sync: unrecognized Stripe price ID — skipping',
+            )
+            errors++
+            continue
+          }
 
           const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer?.id
 
@@ -580,8 +597,19 @@ router.post('/subscription/sync', paymentReadLimiter, requireAuth, async (req, r
 
           for (const sub of subs.data) {
             const priceId = sub.items?.data?.[0]?.price?.id || ''
-            const resolved = planFromPriceId(priceId)
-            const plan = resolved || 'pro_monthly'
+            // Reject unknown price IDs rather than defaulting to pro_monthly.
+            // An attacker who managed to attach a non-pro Stripe subscription
+            // to their own customer (e.g., via a leftover test-mode price
+            // ID) could otherwise call /subscription/sync and escalate to
+            // pro. planFromPriceId returns null for unrecognized price IDs.
+            const plan = planFromPriceId(priceId)
+            if (!plan) {
+              log.warn(
+                { priceId, customerId, userId: req.user.userId },
+                'self-sync: unrecognized Stripe price ID — skipping',
+              )
+              continue
+            }
 
             const periodStart = sub.current_period_start
               ? new Date(sub.current_period_start * 1000)
