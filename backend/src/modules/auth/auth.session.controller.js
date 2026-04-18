@@ -7,8 +7,13 @@ const {
 } = require('../../lib/authTokens')
 const requireAuth = require('../../middleware/auth')
 const { logoutLimiter } = require('./auth.constants')
-const { sessionListLimiter, sessionRevokeLimiter } = require('../../lib/rateLimiters')
+const {
+  sessionListLimiter,
+  sessionRevokeLimiter,
+  loginActivityLimiter,
+} = require('../../lib/rateLimiters')
 const { getAuthenticatedUser, buildSessionUserPayload } = require('./auth.service')
+const prisma = require('../../lib/prisma')
 
 const router = express.Router()
 
@@ -55,7 +60,11 @@ router.get('/sessions', requireAuth, sessionListLimiter, async (req, res) => {
     const mapped = sessions.map((s) => ({
       id: s.id,
       deviceLabel: s.deviceLabel,
+      deviceKind: s.deviceKind,
       ipAddress: s.ipAddress,
+      country: s.country,
+      region: s.region,
+      city: s.city,
       lastActiveAt: s.lastActiveAt,
       createdAt: s.createdAt,
       isCurrent: s.jti === currentJti,
@@ -78,6 +87,57 @@ router.delete('/sessions/:sessionId', requireAuth, sessionRevokeLimiter, async (
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
     return res.status(500).json({ error: 'Could not revoke session.' })
+  }
+})
+
+// ─── Login Activity ───────────────────────────────────────────────────────
+//
+// Returns the last N login events for the current user. Powers the
+// Security-tab "Login activity" list. Scoped to login.* eventType rows
+// from SecurityEvent; metadata includes geo + riskScore + band.
+
+router.get('/security/login-activity', requireAuth, loginActivityLimiter, async (req, res) => {
+  try {
+    const limitParam = parseInt(req.query.limit, 10)
+    const limit = Number.isFinite(limitParam) ? Math.min(Math.max(limitParam, 1), 50) : 30
+
+    const events = await prisma.securityEvent.findMany({
+      where: {
+        userId: req.user.userId,
+        eventType: { in: ['login.success', 'login.challenge', 'login.blocked', 'login.notify'] },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      select: {
+        id: true,
+        eventType: true,
+        ipAddress: true,
+        userAgent: true,
+        metadata: true,
+        createdAt: true,
+      },
+    })
+
+    const shaped = events.map((e) => ({
+      id: e.id,
+      eventType: e.eventType,
+      ipAddress: e.ipAddress,
+      createdAt: e.createdAt,
+      deviceLabel: e.metadata?.deviceLabel || null,
+      deviceKind: e.metadata?.deviceKind || null,
+      country: e.metadata?.country || null,
+      region: e.metadata?.region || null,
+      city: e.metadata?.city || null,
+      riskScore: e.metadata?.riskScore ?? null,
+      band: e.metadata?.band || 'normal',
+      deviceKnown: e.metadata?.deviceKnown ?? null,
+      sessionId: e.metadata?.sessionId || null,
+    }))
+
+    return res.json({ events: shaped })
+  } catch (error) {
+    captureError(error, { route: req.originalUrl, method: req.method })
+    return res.status(500).json({ error: 'Could not load login activity.' })
   }
 })
 

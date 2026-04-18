@@ -11,6 +11,7 @@ import { API } from '../../config'
 import { useSession } from '../../lib/session-context'
 import { SectionCard, Button, Message } from './settingsShared'
 import { FONT } from './settingsState'
+import { LogoMark } from '../../components/Icons'
 
 /* ─── Constants ──────────────────────────────────────────────────────── */
 
@@ -28,12 +29,42 @@ const PLAN_IMAGES = {
 }
 
 const STATUS_STYLES = {
-  active: { bg: 'var(--sh-success-bg)', border: 'var(--sh-success-border)', text: 'var(--sh-success-text)', label: 'Active' },
-  trialing: { bg: 'var(--sh-info-bg)', border: 'var(--sh-info-border)', text: 'var(--sh-info-text)', label: 'Trial' },
-  past_due: { bg: 'var(--sh-warning-bg)', border: 'var(--sh-warning-border)', text: 'var(--sh-warning-text)', label: 'Past Due' },
-  canceling: { bg: 'var(--sh-warning-bg)', border: 'var(--sh-warning-border)', text: 'var(--sh-warning-text)', label: 'Canceling' },
-  donor: { bg: 'var(--sh-success-bg)', border: 'var(--sh-success-border)', text: 'var(--sh-success-text)', label: 'Supporter' },
-  free: { bg: 'var(--sh-soft)', border: 'var(--sh-border)', text: 'var(--sh-muted)', label: 'Free' },
+  active: {
+    bg: 'var(--sh-success-bg)',
+    border: 'var(--sh-success-border)',
+    text: 'var(--sh-success-text)',
+    label: 'Active',
+  },
+  trialing: {
+    bg: 'var(--sh-info-bg)',
+    border: 'var(--sh-info-border)',
+    text: 'var(--sh-info-text)',
+    label: 'Trial',
+  },
+  past_due: {
+    bg: 'var(--sh-warning-bg)',
+    border: 'var(--sh-warning-border)',
+    text: 'var(--sh-warning-text)',
+    label: 'Past Due',
+  },
+  canceling: {
+    bg: 'var(--sh-warning-bg)',
+    border: 'var(--sh-warning-border)',
+    text: 'var(--sh-warning-text)',
+    label: 'Canceling',
+  },
+  donor: {
+    bg: 'var(--sh-success-bg)',
+    border: 'var(--sh-success-border)',
+    text: 'var(--sh-success-text)',
+    label: 'Supporter',
+  },
+  free: {
+    bg: 'var(--sh-soft)',
+    border: 'var(--sh-border)',
+    text: 'var(--sh-muted)',
+    label: 'Free',
+  },
 }
 
 const HISTORY_PAGE_SIZE = 10
@@ -42,7 +73,11 @@ const HISTORY_PAGE_SIZE = 10
 
 function fmtDate(iso) {
   if (!iso) return '--'
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  return new Date(iso).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
 }
 
 function fmtCurrency(cents) {
@@ -64,11 +99,19 @@ function getStatusKey(sub, cancelAtPeriodEnd) {
 function StatusBadge({ statusKey }) {
   const style = STATUS_STYLES[statusKey] || STATUS_STYLES.free
   return (
-    <span style={{
-      display: 'inline-block', padding: '3px 10px', borderRadius: 6,
-      fontSize: 12, fontWeight: 700, fontFamily: FONT,
-      background: style.bg, border: `1px solid ${style.border}`, color: style.text,
-    }}>
+    <span
+      style={{
+        display: 'inline-block',
+        padding: '3px 10px',
+        borderRadius: 6,
+        fontSize: 12,
+        fontWeight: 700,
+        fontFamily: FONT,
+        background: style.bg,
+        border: `1px solid ${style.border}`,
+        color: style.text,
+      }}
+    >
       {style.label}
     </span>
   )
@@ -77,11 +120,24 @@ function StatusBadge({ statusKey }) {
 function ProgressBar({ value, max, unlimited }) {
   const pct = unlimited ? 15 : max > 0 ? Math.min((value / max) * 100, 100) : 0
   return (
-    <div style={{ height: 6, borderRadius: 3, background: 'var(--sh-soft)', overflow: 'hidden', marginTop: 8 }}>
-      <div style={{
-        height: '100%', borderRadius: 3, background: 'var(--sh-brand)',
-        width: `${pct}%`, transition: 'width .3s ease',
-      }} />
+    <div
+      style={{
+        height: 6,
+        borderRadius: 3,
+        background: 'var(--sh-soft)',
+        overflow: 'hidden',
+        marginTop: 8,
+      }}
+    >
+      <div
+        style={{
+          height: '100%',
+          borderRadius: 3,
+          background: 'var(--sh-brand)',
+          width: `${pct}%`,
+          transition: 'width .3s ease',
+        }}
+      />
     </div>
   )
 }
@@ -89,11 +145,17 @@ function ProgressBar({ value, max, unlimited }) {
 function MetricCard({ label, value, max, unlimited }) {
   const limitText = unlimited ? 'Unlimited' : `${value} / ${max}`
   return (
-    <div style={{
-      background: 'var(--sh-surface)', border: '1px solid var(--sh-border)',
-      borderRadius: 12, padding: 16,
-    }}>
-      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--sh-muted)', marginBottom: 4 }}>{label}</div>
+    <div
+      style={{
+        background: 'var(--sh-surface)',
+        border: '1px solid var(--sh-border)',
+        borderRadius: 12,
+        padding: 16,
+      }}
+    >
+      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--sh-muted)', marginBottom: 4 }}>
+        {label}
+      </div>
       <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--sh-heading)' }}>{limitText}</div>
       <ProgressBar value={value} max={max} unlimited={unlimited} />
     </div>
@@ -102,19 +164,37 @@ function MetricCard({ label, value, max, unlimited }) {
 
 function ConfirmDialog({ message, onConfirm, onCancel }) {
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 9999,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'rgba(0,0,0,0.4)',
-    }}>
-      <div style={{
-        background: 'var(--sh-surface)', borderRadius: 14, padding: 24,
-        maxWidth: 400, width: '90%', boxShadow: '0 8px 30px rgba(0,0,0,0.2)',
-      }}>
-        <p style={{ margin: '0 0 20px', fontSize: 14, color: 'var(--sh-text)', lineHeight: 1.6 }}>{message}</p>
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 9999,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'rgba(0,0,0,0.4)',
+      }}
+    >
+      <div
+        style={{
+          background: 'var(--sh-surface)',
+          borderRadius: 14,
+          padding: 24,
+          maxWidth: 400,
+          width: '90%',
+          boxShadow: '0 8px 30px rgba(0,0,0,0.2)',
+        }}
+      >
+        <p style={{ margin: '0 0 20px', fontSize: 14, color: 'var(--sh-text)', lineHeight: 1.6 }}>
+          {message}
+        </p>
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-          <Button secondary onClick={onCancel}>Keep Plan</Button>
-          <Button danger onClick={onConfirm}>Cancel Subscription</Button>
+          <Button secondary onClick={onCancel}>
+            Keep Plan
+          </Button>
+          <Button danger onClick={onConfirm}>
+            Cancel Subscription
+          </Button>
         </div>
       </div>
     </div>
@@ -147,7 +227,9 @@ export default function SubscriptionTab() {
   const fetchSubscriptionData = useCallback(async () => {
     const [subRes, histRes] = await Promise.all([
       fetch(`${API}/api/payments/subscription`, { credentials: 'include' }),
-      fetch(`${API}/api/payments/history?page=1&limit=${HISTORY_PAGE_SIZE}`, { credentials: 'include' }),
+      fetch(`${API}/api/payments/history?page=1&limit=${HISTORY_PAGE_SIZE}`, {
+        credentials: 'include',
+      }),
     ])
     const subData = subRes.ok ? await subRes.json() : null
     const histData = histRes.ok ? await histRes.json() : null
@@ -156,12 +238,17 @@ export default function SubscriptionTab() {
 
   const fetchHistory = useCallback(async (page) => {
     try {
-      const res = await fetch(`${API}/api/payments/history?page=${page}&limit=${HISTORY_PAGE_SIZE}`, { credentials: 'include' })
+      const res = await fetch(
+        `${API}/api/payments/history?page=${page}&limit=${HISTORY_PAGE_SIZE}`,
+        { credentials: 'include' },
+      )
       if (res.ok) {
         const data = await res.json()
         setHistory(data)
       }
-    } catch { /* silent */ }
+    } catch {
+      /* silent */
+    }
   }, [])
 
   // Payment success polling
@@ -210,7 +297,9 @@ export default function SubscriptionTab() {
       }
     }
     load()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [fetchSubscriptionData])
 
   /* ── Derived state ─────────────────────────────────────────────── */
@@ -257,7 +346,7 @@ export default function SubscriptionTab() {
       })
       const data = await res.json()
       if (res.ok) {
-        setSub((prev) => prev ? { ...prev, cancelAtPeriodEnd: true } : prev)
+        setSub((prev) => (prev ? { ...prev, cancelAtPeriodEnd: true } : prev))
         refreshSession()
       } else {
         setError(data.error || 'Could not cancel subscription.')
@@ -280,7 +369,7 @@ export default function SubscriptionTab() {
       })
       const data = await res.json()
       if (res.ok) {
-        setSub((prev) => prev ? { ...prev, cancelAtPeriodEnd: false } : prev)
+        setSub((prev) => (prev ? { ...prev, cancelAtPeriodEnd: false } : prev))
         refreshSession()
       } else {
         setError(data.error || 'Could not reactivate subscription.')
@@ -380,12 +469,9 @@ export default function SubscriptionTab() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-
       {/* Success Banner */}
       {showSuccess && (
-        <Message tone="success">
-          Payment successful! Your Pro plan is now active.
-        </Message>
+        <Message tone="success">Payment successful! Your Pro plan is now active.</Message>
       )}
 
       {/* Error Banner */}
@@ -401,14 +487,21 @@ export default function SubscriptionTab() {
               style={{ width: 48, height: 48, borderRadius: 12, objectFit: 'cover', flexShrink: 0 }}
             />
           ) : (
-            <div style={{
-              width: 48, height: 48, borderRadius: 12,
-              background: 'var(--sh-soft)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 20, fontWeight: 800, color: 'var(--sh-muted)',
-              flexShrink: 0,
-            }}>
-              F
+            <div
+              aria-label="StudyHub Free plan"
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: 12,
+                background: 'var(--sh-soft)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                overflow: 'hidden',
+              }}
+            >
+              <LogoMark size={32} />
             </div>
           )}
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -430,10 +523,13 @@ export default function SubscriptionTab() {
             )}
             {isFree && (
               <div style={{ fontSize: 13, color: 'var(--sh-muted)', marginTop: 4 }}>
-                <Link to="/pricing" style={{ color: 'var(--sh-brand)', fontWeight: 600, textDecoration: 'none' }}>
+                <Link
+                  to="/pricing"
+                  style={{ color: 'var(--sh-brand)', fontWeight: 600, textDecoration: 'none' }}
+                >
                   Upgrade to Pro
-                </Link>
-                {' '}for unlimited uploads, more AI messages, and priority features.
+                </Link>{' '}
+                for unlimited uploads, more AI messages, and priority features.
               </div>
             )}
           </div>
@@ -442,19 +538,47 @@ export default function SubscriptionTab() {
 
       {/* Section 2: Usage Dashboard */}
       <SectionCard title="Usage" subtitle="Your current usage this billing period.">
-        <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-          gap: 12,
-        }}>
-          <MetricCard label="Sheets uploaded (this month)" value={sheetsUploaded} max={sheetsLimit} unlimited={!isFree} />
-          <MetricCard label="AI messages (today)" value={aiMessages} max={aiLimit} unlimited={false} />
-          <MetricCard label="Private groups" value={privateGroups} max={groupsLimit} unlimited={false} />
-          <div style={{
-            background: 'var(--sh-surface)', border: '1px solid var(--sh-border)',
-            borderRadius: 12, padding: 16,
-          }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--sh-muted)', marginBottom: 4 }}>Video storage</div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--sh-heading)' }}>{videoSummary}</div>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+            gap: 12,
+          }}
+        >
+          <MetricCard
+            label="Sheets uploaded (this month)"
+            value={sheetsUploaded}
+            max={sheetsLimit}
+            unlimited={!isFree}
+          />
+          <MetricCard
+            label="AI messages (today)"
+            value={aiMessages}
+            max={aiLimit}
+            unlimited={false}
+          />
+          <MetricCard
+            label="Private groups"
+            value={privateGroups}
+            max={groupsLimit}
+            unlimited={false}
+          />
+          <div
+            style={{
+              background: 'var(--sh-surface)',
+              border: '1px solid var(--sh-border)',
+              borderRadius: 12,
+              padding: 16,
+            }}
+          >
+            <div
+              style={{ fontSize: 12, fontWeight: 600, color: 'var(--sh-muted)', marginBottom: 4 }}
+            >
+              Video storage
+            </div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--sh-heading)' }}>
+              {videoSummary}
+            </div>
             <ProgressBar value={0} max={1} unlimited={!isFree} />
           </div>
         </div>
@@ -488,11 +612,25 @@ export default function SubscriptionTab() {
 
       {/* Section 4: Payment History */}
       <SectionCard title="Payment History" subtitle="Your recent transactions and receipts.">
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 14 }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            gap: 12,
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            marginBottom: 14,
+          }}
+        >
           <div style={{ fontSize: 12, color: 'var(--sh-muted)', lineHeight: 1.6 }}>
-            Download a CSV copy of your payment history. Receipt emails are also sent automatically for successful charges.
+            Download a CSV copy of your payment history. Receipt emails are also sent automatically
+            for successful charges.
           </div>
-          <Button secondary onClick={handleExportHistory} disabled={exportLoading || payments.length === 0}>
+          <Button
+            secondary
+            onClick={handleExportHistory}
+            disabled={exportLoading || payments.length === 0}
+          >
             {exportLoading ? 'Preparing...' : 'Download CSV'}
           </Button>
         </div>
@@ -503,24 +641,39 @@ export default function SubscriptionTab() {
         ) : (
           <>
             <div style={{ overflowX: 'auto' }}>
-              <table style={{
-                width: '100%', borderCollapse: 'collapse', fontSize: 13,
-                fontFamily: FONT,
-              }}>
+              <table
+                style={{
+                  width: '100%',
+                  borderCollapse: 'collapse',
+                  fontSize: 13,
+                  fontFamily: FONT,
+                }}
+              >
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--sh-border)' }}>
                     {['Date', 'Description', 'Amount', 'Status', 'Receipt'].map((h) => (
-                      <th key={h} style={{
-                        textAlign: 'left', padding: '8px 10px', fontSize: 12,
-                        fontWeight: 700, color: 'var(--sh-muted)', whiteSpace: 'nowrap',
-                      }}>{h}</th>
+                      <th
+                        key={h}
+                        style={{
+                          textAlign: 'left',
+                          padding: '8px 10px',
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color: 'var(--sh-muted)',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {h}
+                      </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {payments.map((p, i) => (
                     <tr key={p.id || i} style={{ borderBottom: '1px solid var(--sh-soft)' }}>
-                      <td style={{ padding: '10px', color: 'var(--sh-text)', whiteSpace: 'nowrap' }}>
+                      <td
+                        style={{ padding: '10px', color: 'var(--sh-text)', whiteSpace: 'nowrap' }}
+                      >
                         {fmtDate(p.createdAt || p.date)}
                       </td>
                       <td style={{ padding: '10px', color: 'var(--sh-text)' }}>
@@ -530,24 +683,44 @@ export default function SubscriptionTab() {
                         {fmtCurrency(p.amount)}
                       </td>
                       <td style={{ padding: '10px' }}>
-                        <span style={{
-                          display: 'inline-block', padding: '2px 8px', borderRadius: 5,
-                          fontSize: 11, fontWeight: 600,
-                          background: p.status === 'succeeded' || p.status === 'paid'
-                            ? 'var(--sh-success-bg)' : 'var(--sh-warning-bg)',
-                          color: p.status === 'succeeded' || p.status === 'paid'
-                            ? 'var(--sh-success-text)' : 'var(--sh-warning-text)',
-                        }}>
+                        <span
+                          style={{
+                            display: 'inline-block',
+                            padding: '2px 8px',
+                            borderRadius: 5,
+                            fontSize: 11,
+                            fontWeight: 600,
+                            background:
+                              p.status === 'succeeded' || p.status === 'paid'
+                                ? 'var(--sh-success-bg)'
+                                : 'var(--sh-warning-bg)',
+                            color:
+                              p.status === 'succeeded' || p.status === 'paid'
+                                ? 'var(--sh-success-text)'
+                                : 'var(--sh-warning-text)',
+                          }}
+                        >
                           {p.status || 'unknown'}
                         </span>
                       </td>
                       <td style={{ padding: '10px' }}>
                         {p.receiptUrl ? (
-                          <a href={p.receiptUrl} target="_blank" rel="noopener noreferrer"
-                            style={{ color: 'var(--sh-brand)', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>
+                          <a
+                            href={p.receiptUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              color: 'var(--sh-brand)',
+                              fontSize: 12,
+                              fontWeight: 600,
+                              textDecoration: 'none',
+                            }}
+                          >
                             View
                           </a>
-                        ) : '--'}
+                        ) : (
+                          '--'
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -563,8 +736,14 @@ export default function SubscriptionTab() {
                     key={page}
                     onClick={() => handleHistoryPage(page)}
                     style={{
-                      width: 30, height: 30, borderRadius: 8, border: 'none',
-                      fontSize: 12, fontWeight: 700, fontFamily: FONT, cursor: 'pointer',
+                      width: 30,
+                      height: 30,
+                      borderRadius: 8,
+                      border: 'none',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      fontFamily: FONT,
+                      cursor: 'pointer',
                       background: page === historyPage ? 'var(--sh-brand)' : 'var(--sh-soft)',
                       color: page === historyPage ? 'var(--sh-btn-primary-text)' : 'var(--sh-text)',
                     }}
@@ -585,9 +764,15 @@ export default function SubscriptionTab() {
           onClick={handleSync}
           disabled={syncLoading}
           style={{
-            background: 'none', border: 'none', cursor: syncLoading ? 'not-allowed' : 'pointer',
-            fontSize: 12, color: 'var(--sh-muted)', textDecoration: 'underline',
-            fontFamily: FONT, padding: 4, opacity: syncLoading ? 0.6 : 1,
+            background: 'none',
+            border: 'none',
+            cursor: syncLoading ? 'not-allowed' : 'pointer',
+            fontSize: 12,
+            color: 'var(--sh-muted)',
+            textDecoration: 'underline',
+            fontFamily: FONT,
+            padding: 4,
+            opacity: syncLoading ? 0.6 : 1,
           }}
         >
           {syncLoading ? 'Syncing...' : 'Subscription not showing? Sync from Stripe'}

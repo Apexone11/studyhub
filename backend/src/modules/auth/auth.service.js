@@ -292,25 +292,108 @@ function isMobileClient(req) {
   return CAPACITOR_NATIVE_ORIGINS.has(origin)
 }
 
-async function issueAuthenticatedSession(res, userId, req) {
+/**
+ * Resolve device identity + geo + risk for a login attempt.
+ * The login controller calls this BEFORE issuing a session so it can route
+ * to a step-up challenge for high-risk attempts. Other callers (register,
+ * Google OAuth, password reset) skip this path and go straight to
+ * issueAuthenticatedSession, which will do a best-effort computation of
+ * its own if no pre-computed risk is passed.
+ */
+async function evaluateLoginRisk(userId, req, res) {
+  const userAgent = req?.headers?.['user-agent'] || null
+  const ipAddress = req?.ip || null
+
+  let trustedDeviceId = null
+  let deviceId = null
+  let deviceKnown = false
+  try {
+    const { getOrSetDeviceId } = require('../../lib/deviceCookie')
+    const { findOrCreateDevice } = require('./trustedDevice.service')
+    const { parseDeviceLabel } = require('./session.service')
+    const prisma = require('../../lib/prisma')
+    if (res && req) {
+      deviceId = getOrSetDeviceId(req, res)
+      const existing = await prisma.trustedDevice.findUnique({
+        where: { userId_deviceId: { userId, deviceId } },
+      })
+      deviceKnown = !!(existing && !existing.revokedAt)
+      const device = await findOrCreateDevice({
+        userId,
+        deviceId,
+        label: parseDeviceLabel(userAgent),
+        ip: ipAddress,
+      })
+      trustedDeviceId = device?.id || null
+    }
+  } catch {
+    trustedDeviceId = null
+    deviceId = null
+    deviceKnown = false
+  }
+
+  let geo = null
+  let riskResult = { score: 0, band: 'normal', signals: [] }
+  try {
+    const { lookup } = require('../../lib/geoip.service')
+    geo = await lookup(ipAddress)
+    const { scoreLogin } = require('./riskScoring.service')
+    const prisma = require('../../lib/prisma')
+    const recent = await prisma.session.findMany({
+      where: { userId, revokedAt: null },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+      select: { country: true, region: true, createdAt: true },
+    })
+    riskResult = scoreLogin({
+      deviceKnown,
+      geo,
+      recentSessions: recent,
+      uaFamilyChanged: false,
+      anonymousIp: !!geo?.isAnonymous,
+      failedAttempts15m: 0,
+    })
+  } catch {
+    riskResult = { score: 0, band: 'normal', signals: [] }
+    geo = null
+  }
+
+  return { deviceId, deviceKnown, trustedDeviceId, geo, riskResult, userAgent, ipAddress }
+}
+
+/**
+ * Issue an authenticated session.
+ *
+ * @param res          Express response
+ * @param userId       numeric User.id
+ * @param req          Express request
+ * @param preComputed  optional output of evaluateLoginRisk() — when provided,
+ *                     we skip internal risk evaluation and reuse the caller's.
+ */
+async function issueAuthenticatedSession(res, userId, req, preComputed = null) {
   const user = await getAuthenticatedUser(userId)
   if (!user) throw new AppError(404, 'User not found.')
 
-  // Create server-side session for per-device tracking + revocation
+  const ctx = preComputed || (await evaluateLoginRisk(userId, req, res))
+  const { trustedDeviceId, deviceKnown, geo, riskResult, userAgent, ipAddress } = ctx
+
   let jti
   let sessionId
   try {
     const { createSession } = require('./session.service')
     const sessionResult = await createSession({
       userId,
-      userAgent: req?.headers?.['user-agent'] || null,
-      ipAddress: req?.ip || null,
+      userAgent,
+      ipAddress,
+      trustedDeviceId,
+      country: geo?.country || null,
+      region: geo?.region || null,
+      city: geo?.city || null,
+      riskScore: riskResult.score,
     })
     jti = sessionResult.jti
     sessionId = sessionResult.sessionId
   } catch (sessionErr) {
-    // P2021 = table does not exist (pre-migration). Degrade gracefully.
-    // Real DB/network errors should not silently disable session tracking.
     const isTableMissing =
       sessionErr?.code === 'P2021' ||
       (sessionErr?.message && sessionErr.message.includes('does not exist'))
@@ -319,6 +402,34 @@ async function issueAuthenticatedSession(res, userId, req) {
     }
     jti = undefined
     sessionId = undefined
+  }
+
+  // Enriched login event — best-effort.
+  try {
+    const prisma = require('../../lib/prisma')
+    const { deriveDeviceKind, parseDeviceLabel } = require('./session.service')
+    await prisma.securityEvent.create({
+      data: {
+        userId,
+        eventType: 'login.success',
+        ipAddress: ipAddress ? String(ipAddress).slice(0, 45) : null,
+        userAgent: userAgent ? String(userAgent).slice(0, 512) : null,
+        metadata: {
+          country: geo?.country || null,
+          region: geo?.region || null,
+          city: geo?.city || null,
+          deviceKind: deriveDeviceKind(userAgent),
+          deviceLabel: parseDeviceLabel(userAgent),
+          deviceKnown,
+          riskScore: riskResult.score,
+          band: riskResult.band,
+          signals: riskResult.signals,
+          sessionId: sessionId || null,
+        },
+      },
+    })
+  } catch {
+    // intentionally silent
   }
 
   const token = signAuthToken(user, { jti })
@@ -374,6 +485,7 @@ module.exports = {
   sendVerificationCodeEmail,
   isMobileClient,
   issueAuthenticatedSession,
+  evaluateLoginRisk,
   loginVerificationResponse,
   handleAuthError,
 }

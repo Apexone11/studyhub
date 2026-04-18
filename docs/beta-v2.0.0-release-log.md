@@ -2,6 +2,75 @@
 
 # Beta v2.0.0 Release Log
 
+## Date: 2026-04-17
+
+### Settings & Sessions polish + geo-based login security (4 phases)
+
+**Spec:** `docs/superpowers/specs/2026-04-17-settings-sessions-geo-security-design.md`
+**Plan:** `docs/superpowers/plans/2026-04-17-settings-sessions-geo-security.md`
+
+#### Phase 1a — Settings / Sessions / Free-plan visual polish (pure frontend, no migration)
+
+- 10 new SVG icons in `src/components/Icons.jsx`: `IconMonitor`, `IconPalette`, `IconScroll`, `IconUser` (nav) and `IconDeviceLaptop/Desktop/Mobile/Tablet/Watch/Unknown` (sessions). No emoji, matches the existing stroke family.
+- Settings sidebar now shows a per-tab icon and a 3px `--sh-brand` left accent bar on the active tab. 11 tabs unchanged in order.
+- Free-plan tile replaced the hardcoded `F` with the StudyHub `<LogoMark />` in `SubscriptionTab.jsx` and `PricingPage.jsx`.
+- `SessionsTab.jsx` rewritten: 48×48 device icon per row, card layout, prominent `Revoke` button routed through a new `ConfirmDialog.jsx` modal, sticky "Sign out all other devices" bar when 2+ other sessions exist. Drops the `material-symbols-rounded` fallback.
+
+#### Phase 1b — Device identity backend (migration `20260418000001_add_trusted_device_and_geo_fields`)
+
+- New `TrustedDevice` table (userId, deviceId, label, first/lastSeenAt, lastIp, lastCountry, lastRegion, trustedAt, revokedAt).
+- `Session` gains `deviceKind`, `country`, `region`, `city`, `riskScore`, `trustedDeviceId` + FK.
+- `UserPreferences` gains `alertOnNewCountry`, `alertOnNewCity`, `blockAnonymousIp`.
+- New `sh_did` httpOnly cookie (128-bit random, 10-year TTL) in `src/lib/deviceCookie.js`; survives logout so returning devices stay recognizable.
+- New `trustedDevice.service.js` (findOrCreate, markTrusted, revoke, getUserDevices) + `deriveDeviceKind(ua)` exported from `session.service.js`. Login path wired in `issueAuthenticatedSession`; revoking a session now also revokes its trusted device.
+- 13 new unit tests in `test/session.deviceKind.test.js` — all green.
+
+#### Phase 2 — Geo lookup + risk scoring + Login Activity UI
+
+- New `maxmind` npm dep. `src/lib/geoip.service.js` lazy-loads `GeoLite2-City.mmdb` + `GeoIP2-Anonymous-IP.mmdb` from `backend/geoip/`. **Graceful fallback**: if the MMDB files are absent (no `MAXMIND_LICENSE_KEY` configured), `lookup()` returns `null` and all geo-derived signals skip. No runtime blocker.
+- `scripts/updateGeoipDb.js` + `npm run update-geoip-db` downloads the DBs when a license key is provisioned.
+- `src/modules/auth/riskScoring.service.js` — pure function `scoreLogin()` with tunable weights: unknown device +30, new country +40, new region +15, impossible travel +50, anonymous IP +25, UA change +10, 3+ failed attempts +20. Banding: <30 normal / 30-59 notify / ≥60 challenge. 15 unit tests — all green.
+- Login controller now calls `evaluateLoginRisk(userId, req, res)` before issuing a session. All login paths populate `Session.country/region/city/riskScore`.
+- Enriched `SecurityEvent` rows (`login.success`, `login.challenge`) include geo + deviceKind + score + band + signals.
+- New endpoint `GET /api/auth/security/login-activity?limit=30` backed by `loginActivityLimiter` (30 req / 5 min / user).
+- New frontend `LoginActivitySection.jsx` embedded in the Security tab — device icon, location, IP, timestamp, risk badge (`Normal` / `Reviewed` / `Challenged` / `Blocked`).
+- `SessionsTab.jsx` renders the new `country/region/city` fields (graceful when null).
+
+#### Phase 3 — Email alerts, step-up challenge, alert prefs
+
+- Migration `20260420000001_add_login_challenge` creates `LoginChallenge` (pendingDeviceId, hashed 6-digit code, 15-min expiry, 3-attempt cap).
+- `loginChallenge.service.js` — `createChallenge`, `verifyChallenge`, `sweepExpired`.
+- Two new email templates in `emailTemplates.js`: `sendNewLoginLocation` (with one-use revoke link CTA) and `sendLoginChallengeCode` (6-digit code).
+- Login controller bands:
+  - **notify (30-59):** session issued normally; fire-and-forget new-location email with a signed revoke link.
+  - **challenge (≥60):** no session issued; responds `{ status: 'challenge', challengeId }`, emails a code. `POST /api/auth/login/challenge` consumes the code, marks `TrustedDevice.trustedAt`, issues the session.
+- New `src/lib/revokeLinkTokens.js` — signed one-use tokens (JWT with `aud=studyhub-revoke-link`, 24h TTL). `GET /api/auth/revoke-link/:token` revokes the target session + trusted device and serves a minimal success page.
+- Security alert prefs added to `UserPreferences.PREF_BOOLEAN_KEYS` — `GET/PATCH /api/settings/preferences` now accepts `alertOnNewCountry`, `alertOnNewCity`, `blockAnonymousIp`.
+- New frontend `LoginChallengePage.jsx` at `/login/challenge/:id` — 6-digit `one-time-code` input, locks after 3 wrong codes, linked from `LoginPage.jsx` on `data.status === 'challenge'`.
+- New frontend `SecurityAlertsSection.jsx` with three `ToggleRow`s in the Security tab.
+
+#### Phase 4 — Re-auth infrastructure + Panic mode + inactive-session sweeper
+
+- `src/middleware/requireTrustedDevice.js` — gates endpoints requiring a verified device. Fails open on DB error (CLAUDE.md rule 10) and on legacy sessions without a JTI. **Not yet applied to existing sensitive endpoints** — delete-account and change-password already require a password re-entry, so adding this gate on top would risk locking users out before the wider rollout. The middleware + the `POST /security/reauth/send` + `POST /security/reauth/verify` endpoints are in place for opt-in rollout once the ecosystem has a few days of trusted-device data.
+- `POST /api/auth/security/panic` — revokes every session, revokes every trusted device, rotates the `sh_did` cookie, clears the auth cookie, fires a password-reset email. Rate limited 3/hour/user. New `PanicSection.jsx` at the bottom of the Security tab with a confirm dialog.
+- `scripts/sweepInactiveSessions.js` + `npm run sweep-inactive-sessions` — revokes sessions with `lastActiveAt < now - 30d`. Safe to run daily.
+
+#### Validation
+
+- Backend: `npm --prefix backend run lint` clean.
+- Backend: `npm --prefix backend test` — **1587 passed, 44 skipped**. 3 pre-existing file failures (`users.routes.test.js`, `block-mute.routes.test.js`, `security.headers.test.js`) all present on clean HEAD before this work (verified by `git stash` A/B).
+- 28 new tests written for this work — all green (13 deviceKind + 15 riskScoring).
+- Frontend: `npm --prefix frontend/studyhub-app run lint` clean.
+- Frontend: `npm --prefix frontend/studyhub-app run build` — succeeds in ~1s.
+
+#### Deployment notes
+
+- After code deploy, run `npx prisma migrate deploy` to apply both migrations.
+- Provision `MAXMIND_LICENSE_KEY` in Railway env, then run `npm run update-geoip-db` once (plus a weekly cron) to populate the MMDB files. Until then, the service returns `null` from `lookup()` and risk scoring treats all attempts as no-geo. No user-visible failure.
+- Schedule `npm run sweep-inactive-sessions` as a daily cron when convenient.
+
+---
+
 ## Date: 2026-04-15
 
 ### Notes Hardening v2 — local-first persistence, conflict resolution, diff/restore (feature flag)

@@ -145,6 +145,8 @@ model User {
   videoAppeals               VideoAppeal[]         @relation("VideoAppealUploader")
   videoAppealReviews         VideoAppeal[]         @relation("VideoAppealReviewer")
   sessions                   Session[]
+  trustedDevices             TrustedDevice[]
+  loginChallenges            LoginChallenge[]
   securityEvents             SecurityEvent[]
   studyStatuses              StudyStatus[]
   onboardingProgress         OnboardingProgress?
@@ -794,6 +796,9 @@ model UserPreferences {
   defaultContributions Boolean @default(true)
   theme                String  @default("system")
   fontSize             String  @default("medium")
+  alertOnNewCountry    Boolean @default(true)
+  alertOnNewCity       Boolean @default(false)
+  blockAnonymousIp     Boolean @default(false)
   user                 User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
@@ -2141,22 +2146,80 @@ model AiReviewLog {
 // ═══════════════════════════════════════════════════════════════════════════
 
 model Session {
-  id           String    @id @default(cuid())
-  userId       Int
-  jti          String    @unique
-  userAgent    String?   @db.VarChar(512)
-  ipAddress    String?   @db.VarChar(45)
-  deviceLabel  String?   @db.VarChar(100)
-  lastActiveAt DateTime  @default(now())
-  expiresAt    DateTime
-  revokedAt    DateTime?
-  createdAt    DateTime  @default(now())
+  id              String    @id @default(cuid())
+  userId          Int
+  jti             String    @unique
+  userAgent       String?   @db.VarChar(512)
+  ipAddress       String?   @db.VarChar(45)
+  deviceLabel     String?   @db.VarChar(100)
+  deviceKind      String?   @db.VarChar(16)
+  country         String?   @db.VarChar(2)
+  region          String?   @db.VarChar(10)
+  city            String?   @db.VarChar(128)
+  riskScore       Int?
+  trustedDeviceId String?
+  lastActiveAt    DateTime  @default(now())
+  expiresAt       DateTime
+  revokedAt       DateTime?
+  createdAt       DateTime  @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trustedDevice TrustedDevice? @relation(fields: [trustedDeviceId], references: [id])
 
   @@index([userId])
   @@index([jti])
   @@index([expiresAt])
+  @@index([trustedDeviceId])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LoginChallenge — Pending email-code step-up challenge.
+// Created when a login lands in the "challenge" risk band (score >= 60).
+// ═══════════════════════════════════════════════════════════════════════════
+
+model LoginChallenge {
+  id              String    @id @default(cuid())
+  userId          Int
+  pendingDeviceId String
+  codeHash        String    @db.VarChar(128)
+  attempts        Int       @default(0)
+  expiresAt       DateTime
+  consumedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  ipAddress       String?   @db.VarChar(45)
+  userAgent       String?   @db.VarChar(512)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TrustedDevice — Stable device identity across sessions
+// Keyed by the httpOnly `sh_did` cookie. Survives logout so we can recognize
+// a returning device. Revoked devices are treated as new on next login.
+// ═══════════════════════════════════════════════════════════════════════════
+
+model TrustedDevice {
+  id          String    @id @default(cuid())
+  userId      Int
+  deviceId    String
+  label       String
+  firstSeenAt DateTime  @default(now())
+  lastSeenAt  DateTime  @default(now())
+  lastIp      String?   @db.VarChar(45)
+  lastCountry String?   @db.VarChar(2)
+  lastRegion  String?   @db.VarChar(10)
+  trustedAt   DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessions Session[]
+
+  @@unique([userId, deviceId])
+  @@index([userId])
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

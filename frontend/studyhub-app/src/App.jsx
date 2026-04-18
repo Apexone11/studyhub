@@ -14,6 +14,7 @@ const AppMobile = lazy(() => import('./mobile/App.mobile'))
 
 const HomePage = lazy(() => import('./pages/home/HomePage'))
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'))
+const LoginChallengePage = lazy(() => import('./pages/auth/LoginChallengePage'))
 const RegisterScreen = lazy(() => import('./pages/auth/RegisterScreen'))
 const RolePickerPage = lazy(() => import('./pages/auth/RolePickerPage'))
 /* DashboardPage removed — /dashboard now redirects to /users/:me via DashboardRedirect */
@@ -364,6 +365,14 @@ function AppRoutes() {
                     element={
                       <PublicRoute>
                         <LoginPage />
+                      </PublicRoute>
+                    }
+                  />
+                  <Route
+                    path="/login/challenge/:id"
+                    element={
+                      <PublicRoute>
+                        <LoginChallengePage />
                       </PublicRoute>
                     }
                   />

@@ -1,2 +1,6 @@
 node_modules/
 .env
+
+# GeoIP MMDB databases (downloaded by scripts/updateGeoipDb.js)
+geoip/*.mmdb
+geoip/*.tar.gz

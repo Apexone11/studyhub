@@ -940,6 +940,19 @@ const sessionRevokeLimiter = rateLimit({
   message: { error: 'Too many session revocation requests. Please slow down.' },
 })
 
+/**
+ * Login activity read — 30 requests per 5 minutes per user.
+ * Powers the Security-tab "Login activity" list.
+ */
+const loginActivityLimiter = rateLimit({
+  windowMs: WINDOW_5_MIN,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `login-activity-${req.user?.userId || 'anon'}`,
+  message: { error: 'Too many login activity requests. Please slow down.' },
+})
+
 // ── Exports ────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -1073,4 +1086,5 @@ module.exports = {
   // Session management
   sessionListLimiter,
   sessionRevokeLimiter,
+  loginActivityLimiter,
 }

@@ -3,6 +3,9 @@ import { GoogleLogin } from '@react-oauth/google'
 import { API, GOOGLE_CLIENT_ID } from '../../config'
 import { Button, FormField, Input, Message, MsgList, SectionCard } from './settingsShared'
 import PasskeysSection from './PasskeysSection'
+import LoginActivitySection from './LoginActivitySection'
+import SecurityAlertsSection from './SecurityAlertsSection'
+import PanicSection from './PanicSection'
 import {
   googleLinkedBadgeStyle,
   googleOnlyHintStyle,
@@ -10,8 +13,19 @@ import {
   googlePopupCenterStyle,
 } from './securityConstants'
 
-export default function SecurityTab({ user, sessionUser, busyKey, setBusyKey, handlePatch, syncUser }) {
-  const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
+export default function SecurityTab({
+  user,
+  sessionUser,
+  busyKey,
+  setBusyKey,
+  handlePatch,
+  syncUser,
+}) {
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  })
   const [usernameForm, setUsernameForm] = useState({ newUsername: '', password: '' })
   const [googleUnlinkPassword, setGoogleUnlinkPassword] = useState('')
 
@@ -86,15 +100,30 @@ export default function SecurityTab({ user, sessionUser, busyKey, setBusyKey, ha
   return (
     <>
       {!isGoogleOnly && (
-        <SectionCard title="Change Password" subtitle="Use a password with at least 8 characters, one capital letter, and one number.">
+        <SectionCard
+          title="Change Password"
+          subtitle="Use a password with at least 8 characters, one capital letter, and one number."
+        >
           <FormField label="Current Password">
-            <Input type="password" value={passwordForm.currentPassword} onChange={(e) => setPasswordForm((c) => ({ ...c, currentPassword: e.target.value }))} />
+            <Input
+              type="password"
+              value={passwordForm.currentPassword}
+              onChange={(e) => setPasswordForm((c) => ({ ...c, currentPassword: e.target.value }))}
+            />
           </FormField>
           <FormField label="New Password">
-            <Input type="password" value={passwordForm.newPassword} onChange={(e) => setPasswordForm((c) => ({ ...c, newPassword: e.target.value }))} />
+            <Input
+              type="password"
+              value={passwordForm.newPassword}
+              onChange={(e) => setPasswordForm((c) => ({ ...c, newPassword: e.target.value }))}
+            />
           </FormField>
           <FormField label="Confirm New Password">
-            <Input type="password" value={passwordForm.confirmPassword} onChange={(e) => setPasswordForm((c) => ({ ...c, confirmPassword: e.target.value }))} />
+            <Input
+              type="password"
+              value={passwordForm.confirmPassword}
+              onChange={(e) => setPasswordForm((c) => ({ ...c, confirmPassword: e.target.value }))}
+            />
           </FormField>
           <MsgList msg={passwordMsg} />
           <Button
@@ -104,12 +133,17 @@ export default function SecurityTab({ user, sessionUser, busyKey, setBusyKey, ha
                 setPasswordMsg({ type: 'error', text: 'New passwords do not match.' })
                 return
               }
-              void handlePatch('password', {
-                currentPassword: passwordForm.currentPassword,
-                newPassword: passwordForm.newPassword,
-              }, setPasswordMsg, () => {
-                setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
-              })
+              void handlePatch(
+                'password',
+                {
+                  currentPassword: passwordForm.currentPassword,
+                  newPassword: passwordForm.newPassword,
+                },
+                setPasswordMsg,
+                () => {
+                  setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
+                },
+              )
             }}
           >
             {busyKey === 'password' ? 'Saving...' : 'Update Password'}
@@ -117,23 +151,38 @@ export default function SecurityTab({ user, sessionUser, busyKey, setBusyKey, ha
         </SectionCard>
       )}
 
-      <SectionCard title="Change Username" subtitle={`Current username: ${user?.username || sessionUser?.username || 'unknown'}`}>
+      <SectionCard
+        title="Change Username"
+        subtitle={`Current username: ${user?.username || sessionUser?.username || 'unknown'}`}
+      >
         {isGoogleOnly ? (
-          <Message tone="info">Google-only accounts must set a password in the Account tab before changing their username.</Message>
+          <Message tone="info">
+            Google-only accounts must set a password in the Account tab before changing their
+            username.
+          </Message>
         ) : (
           <>
             <FormField label="New Username">
-              <Input value={usernameForm.newUsername} onChange={(e) => setUsernameForm((c) => ({ ...c, newUsername: e.target.value }))} />
+              <Input
+                value={usernameForm.newUsername}
+                onChange={(e) => setUsernameForm((c) => ({ ...c, newUsername: e.target.value }))}
+              />
             </FormField>
             <FormField label="Confirm with Password">
-              <Input type="password" value={usernameForm.password} onChange={(e) => setUsernameForm((c) => ({ ...c, password: e.target.value }))} />
+              <Input
+                type="password"
+                value={usernameForm.password}
+                onChange={(e) => setUsernameForm((c) => ({ ...c, password: e.target.value }))}
+              />
             </FormField>
             <MsgList msg={usernameMsg} />
             <Button
               disabled={busyKey === 'username'}
-              onClick={() => void handlePatch('username', usernameForm, setUsernameMsg, () => {
-                setUsernameForm({ newUsername: '', password: '' })
-              })}
+              onClick={() =>
+                void handlePatch('username', usernameForm, setUsernameMsg, () => {
+                  setUsernameForm({ newUsername: '', password: '' })
+                })
+              }
             >
               {busyKey === 'username' ? 'Saving...' : 'Update Username'}
             </Button>
@@ -142,7 +191,14 @@ export default function SecurityTab({ user, sessionUser, busyKey, setBusyKey, ha
       </SectionCard>
 
       {GOOGLE_CLIENT_ID && (
-        <SectionCard title="Google Account" subtitle={user?.googleId ? 'Your Google account is linked.' : 'Link your Google account for one-click sign-in.'}>
+        <SectionCard
+          title="Google Account"
+          subtitle={
+            user?.googleId
+              ? 'Your Google account is linked.'
+              : 'Link your Google account for one-click sign-in.'
+          }
+        >
           <MsgList msg={googleMsg} />
           {user?.googleId ? (
             <div>
@@ -152,9 +208,18 @@ export default function SecurityTab({ user, sessionUser, busyKey, setBusyKey, ha
               {user.authProvider !== 'google' && (
                 <>
                   <FormField label="Confirm with Password">
-                    <Input type="password" value={googleUnlinkPassword} onChange={(e) => setGoogleUnlinkPassword(e.target.value)} placeholder="Enter your password to unlink" />
+                    <Input
+                      type="password"
+                      value={googleUnlinkPassword}
+                      onChange={(e) => setGoogleUnlinkPassword(e.target.value)}
+                      placeholder="Enter your password to unlink"
+                    />
                   </FormField>
-                  <Button secondary disabled={busyKey === 'google-unlink' || !googleUnlinkPassword} onClick={handleGoogleUnlink}>
+                  <Button
+                    secondary
+                    disabled={busyKey === 'google-unlink' || !googleUnlinkPassword}
+                    onClick={handleGoogleUnlink}
+                  >
                     {busyKey === 'google-unlink' ? 'Unlinking...' : 'Unlink Google'}
                   </Button>
                 </>
@@ -170,14 +235,18 @@ export default function SecurityTab({ user, sessionUser, busyKey, setBusyKey, ha
               <div style={googlePopupCenterStyle}>
                 <GoogleLogin
                   onSuccess={handleGoogleLinkSuccess}
-                  onError={() => setGoogleMsg({ type: 'error', text: 'Google sign-in was cancelled or failed.' })}
+                  onError={() =>
+                    setGoogleMsg({ type: 'error', text: 'Google sign-in was cancelled or failed.' })
+                  }
                   size="large"
                   text="signin_with"
                   shape="rectangular"
                   theme="outline"
                 />
               </div>
-              <Button secondary onClick={() => setShowGooglePopup(false)}>Cancel</Button>
+              <Button secondary onClick={() => setShowGooglePopup(false)}>
+                Cancel
+              </Button>
             </div>
           ) : (
             <Button disabled={busyKey === 'google-link'} onClick={() => setShowGooglePopup(true)}>
@@ -187,7 +256,18 @@ export default function SecurityTab({ user, sessionUser, busyKey, setBusyKey, ha
         </SectionCard>
       )}
 
-      <PasskeysSection user={user} sessionUser={sessionUser} busyKey={busyKey} setBusyKey={setBusyKey} />
+      <PasskeysSection
+        user={user}
+        sessionUser={sessionUser}
+        busyKey={busyKey}
+        setBusyKey={setBusyKey}
+      />
+
+      <SecurityAlertsSection />
+
+      <LoginActivitySection />
+
+      <PanicSection />
     </>
   )
 }
