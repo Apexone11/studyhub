@@ -1559,3 +1559,41 @@ The Wave 2 survey found that most mobile pages are already 70–95% complete (Ho
 - **Full offline mode** — significant architectural work (mobile-specific service worker strategy, IndexedDB queue for writes, conflict resolution); not a single-session item at the no-placeholders standard.
 - **Wave 3 messaging composer + voice** — needs `@capacitor/voice-recorder` + audio storage pipeline; deferred.
 - **Mobile Wave 2 polish** — top bar hide-on-scroll, Socket.io "new posts" pill, profile activity tabs, group members/resources/sessions sub-views, all-eight feed card type renderers. None are blocking; cherry-pick from the survey punch list as needed.
+
+---
+
+## 2026-04-16 — Production bug fixes: CSP broke BookHub; People-to-Follow label; SW respondWith crash; .gitignore hygiene
+
+### Summary
+
+Fix three user-reported production bugs (issue #246) plus a gitignore hygiene pass. The Library (BookHub) page was broken in production because the frontend CSP did not allow the Google Books image CDN, and the service worker's cross-origin fetch path was throwing `TypeError: Failed to convert value to 'Response'` when it landed on CSP-blocked URLs. The "People to Follow" widget showed `undefined follower(s)` and the "See more suggestions" link pointed to the first user's profile instead of anything useful.
+
+### Frontend CSP — `frontend/studyhub-app/public/_headers`
+
+- `connect-src` extended with `https://books.google.com`, `https://*.googleusercontent.com`, `https://www.googleapis.com`, `https://cdnjs.cloudflare.com`, `https://fonts.googleapis.com`, and `https://fonts.gstatic.com`. The browser enforces `connect-src` against the service worker's internal `fetch()` calls, so omitting those hosts caused every SW-intercepted request to them to fail. BookHub embeds cover images from `books.google.com/books/content?id=...`, which are declared under `img-src` (which already allows all `https:`) but are fetched by the SW as part of the image-caching strategy — the SW fetch is the one that hit the CSP wall.
+
+### Service worker — `frontend/studyhub-app/public/sw.js`
+
+- Added an early-return for cross-origin requests right after the protocol guard. `self.location.origin` vs `new URL(request.url).origin` comparison lets the browser handle every third-party resource natively with its own caching strategy, and the SW only keeps jurisdiction over `getstudyhub.org` / same-origin URLs. This eliminates the entire class of CSP-vs-SW conflicts going forward — even if a new third-party host is added to `img-src` without updating `connect-src`, the SW will no longer destabilize.
+- Hardened the fallback path in every cache-strategy branch (hashed assets, fonts, images, catch-all) to resolve to a synthetic `new Response('', { status: 504 })` instead of `undefined`/`null`. The production error `TypeError: Failed to convert value to 'Response'` came from `cached || networkFetch` evaluating to `null` when both the cache miss and network error paths produced falsy values; `event.respondWith(null)` then throws. Now every branch guarantees a valid Response.
+
+### `FeedFollowSuggestions.jsx`
+
+- The backend returns `_count: { followers, studySheets }` via Prisma's `_count` selection, but the component read `user.followerCount` (never populated), so the sub-label rendered as `"undefined follower(s)"`. Also `user.reason === 'classmate'` was the branch for shared-courses copy, but the backend never sets `reason` or `sharedCourses` on the payload either. Fixed by normalizing the shape: `user.followerCount ?? user._count?.followers`, and falling back to the user's `displayName` when no count is available. The broken variants now just don't render a sub-label instead of rendering the string `"undefined"`.
+- The "See more suggestions" link at the bottom used `to={`/users/${suggestions[0]?.username}`}` — it navigated to the _first suggestion's profile page_, which is obviously not "see more". Replaced with a `<button>` that toggles in-place between 4 and 8 visible suggestions, plus a "Show fewer" control when expanded. This also avoids the need for a dedicated `/suggestions` page that doesn't exist yet.
+
+### `.gitignore` hygiene
+
+- Added: `test-results/`, `playwright-report/` (Playwright artifacts regenerated every run), `coverage/` + `.nyc_output/`, Android build trees (`android/.gradle/`, `android/build/`, `android/app/build/`, `capacitor-cordova-android-plugins/build/`, `**/local.properties`), iOS build trees (for when the target is added), Vite cache (`**/.vite/`), OS cruft (`.DS_Store`, `Thumbs.db`, `desktop.ini`), editor swap files (`*.swp`, `*.swo`, `*~`), and npm/yarn/pnpm debug logs.
+- Untracked the stray `test-results/.last-run.json` that had been committed before the ignore rule existed (`git rm --cached`).
+
+### Not implemented
+
+- **"My Notes is buggy"** (also in issue #246) — the report did not specify a concrete symptom, and the screenshots only show the editor saving normally and the notifications/messages pollers firing at the documented 30-second cadence. The notification polling is working as designed (30 s × 2 endpoints × preflight = the request volume shown). If there is a more specific repro, a follow-up issue with steps will let me act on it; without that, changing anything here would be shooting in the dark.
+- **`.vscode/` workspace settings** — currently tracked (`settings.json`, `tasks.json`, two Checkmarx dev-assist markers). Left alone because the existing tracked files look like shared team config. If you want them gone, `git rm --cached .vscode/*` cleans up.
+
+### Validation
+
+- Frontend lint: passes.
+- Frontend build: passes.
+- No backend changes this round, so backend tests unchanged.
