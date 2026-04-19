@@ -2,7 +2,7 @@
  * StepSelfLearnerGoal -- Onboarding (track=self-learner): optional goal.
  *
  * One-line free text saved to /api/users/me/learning-goal.
- * See docs/roles-and-permissions-plan.md §5.1 step 3.
+ * See docs/internal/roles-and-permissions-plan.md §5.1 step 3.
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { forwardRef, useState } from 'react'
 import { API } from '../../config'

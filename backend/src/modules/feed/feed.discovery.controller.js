@@ -223,7 +223,7 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
 
     const userId = req.user.userId
     // Resolve the per-role boost set: enrolled course IDs for students/teachers,
-    // followed hashtag IDs for Self-learners. See docs/roles-and-permissions-plan.md §6.5.
+    // followed hashtag IDs for Self-learners. See docs/internal/roles-and-permissions-plan.md §6.5.
     const requester = await prisma.user.findUnique({
       where: { id: userId },
       select: { id: true, accountType: true },

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 /**
- * Role switch E2E (docs/roles-and-permissions-plan.md §12.4).
+ * Role switch E2E (docs/internal/roles-and-permissions-plan.md §12.4).
  * Drives Settings → Role tile through three scenarios:
  *   1. Change role → success path → reload-to-apply flag set.
  *   2. Revert within 2 days → restored-enrollment toast.

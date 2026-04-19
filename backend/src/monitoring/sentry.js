@@ -73,7 +73,7 @@ function captureError(error, context = {}) {
   const safeContext = redactObject(context)
   Sentry.withScope((scope) => {
     // Promote a known user payload to scope.setUser so error triage can filter
-    // by accountType/role (docs/roles-and-permissions-plan.md §10.4).
+    // by accountType/role (docs/internal/roles-and-permissions-plan.md §10.4).
     const user = safeContext && typeof safeContext.user === 'object' ? safeContext.user : null
     if (user) {
       scope.setUser({

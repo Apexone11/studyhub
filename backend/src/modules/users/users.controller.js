@@ -1226,7 +1226,7 @@ async function setLearningGoal(req, res) {
 }
 
 // ── Account type change: 2-day revert + 3 changes/30 days rate cap ──────────
-// See docs/roles-and-permissions-plan.md §8.
+// See docs/internal/roles-and-permissions-plan.md §8.
 
 const VALID_ACCOUNT_TYPES = ['student', 'teacher', 'other']
 const DAY_MS = 24 * 60 * 60 * 1000

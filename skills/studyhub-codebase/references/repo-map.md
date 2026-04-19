@@ -4,7 +4,7 @@
 
 - `README.md` - public project overview
 - `docker-compose.yml` - local dev stack
-- `docs/railway-deployment-checklist.md` - hosted deployment notes
+- `docs/internal/railway-deployment-checklist.md` - hosted deployment notes
 
 ## Backend
 

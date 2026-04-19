@@ -72,6 +72,7 @@ pnpm-debug.log*
 # Claude Code local settings
 .claude/settings.local.json
 .claude/worktrees/
+.claude/scheduled_tasks.lock
 .~lock.*#
 
 # Local brainstorming/runtime state
@@ -80,6 +81,13 @@ pnpm-debug.log*
 
 # Nested repos / experiments
 mission-control/
+
+# Internal planning, strategy, security, and release-log documents.
+# These are private working docs for the StudyHub core team and must
+# not be exposed in the public repository — including if/when StudyHub
+# is open-sourced in the future. Individual files can be reviewed,
+# redacted, and promoted back to docs/ on a case-by-case basis.
+docs/internal/
 
 # Vendored `effect-ts` source that was accidentally committed into the
 # repo root (2,715 files, ~33 MB). Nothing in backend/src or

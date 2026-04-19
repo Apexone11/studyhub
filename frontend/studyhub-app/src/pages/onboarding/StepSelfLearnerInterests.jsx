@@ -3,7 +3,7 @@
  *
  * 20 curated chips + free-text input. Requires at least 3.
  * Each selection becomes a HashtagFollow row on submit.
- * See docs/roles-and-permissions-plan.md §5.1 step 2.
+ * See docs/internal/roles-and-permissions-plan.md §5.1 step 2.
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { forwardRef, useState } from 'react'
 import { API } from '../../config'

@@ -15,6 +15,7 @@
 import { Link } from 'react-router-dom'
 import Navbar from '../../components/navbar/Navbar'
 import AppSidebar from '../../components/sidebar/AppSidebar'
+import TopContributors from '../../components/TopContributors'
 import { pageShell, useResponsiveAppLayout } from '../../lib/ui'
 import { usePageTitle } from '../../lib/usePageTitle'
 import SafeJoyride from '../../components/SafeJoyride'
@@ -22,6 +23,8 @@ import { useTutorial } from '../../lib/useTutorial'
 import { DASHBOARD_STEPS, TUTORIAL_VERSIONS } from '../../lib/tutorialSteps'
 import { FONT, formatJoinedDate } from './dashboardConstants'
 import { useDashboardData } from './useDashboardData'
+import { roleCopy } from '../../lib/roleCopy'
+import { useDesignV2Flags } from '../../lib/designV2Flags'
 import {
   ActivationChecklist,
   CourseFocus,
@@ -72,6 +75,14 @@ export default function DashboardPage() {
   const tutorial = useTutorial('dashboard', DASHBOARD_STEPS, {
     version: TUTORIAL_VERSIONS.dashboard,
   })
+
+  // Phase 1 of v2 design refresh. Flag-gated; fail-open in dev.
+  // See docs/internal/design-refresh-v2-master-plan.md Phase 1.
+  const v2Flags = useDesignV2Flags()
+  const phase1On = v2Flags.phase1Dashboard && !v2Flags.loading
+  const accountType = user?.accountType || 'student'
+  const welcomeContext = roleCopy('dashboardWelcomeContext', accountType)
+  const heroEyebrow = roleCopy('dashboardHeroEyebrow', accountType)
 
   const navActions = (
     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -172,22 +183,35 @@ export default function DashboardPage() {
                   marginBottom: 8,
                 }}
               >
-                SESSION READY
+                {phase1On ? heroEyebrow : 'SESSION READY'}
               </div>
               <h1 style={{ margin: 0, fontSize: 30, fontWeight: 800, letterSpacing: '-0.03em' }}>
                 Welcome back, {hero.username || user?.username || 'Student'}.
               </h1>
-              <p
-                style={{
-                  margin: '10px 0 0',
-                  fontSize: 14,
-                  lineHeight: 1.7,
-                  color: 'var(--sh-on-dark-faint)',
-                }}
-              >
-                Joined {formatJoinedDate(hero.createdAt || user?.createdAt)}. Your study sheets,
-                notes, and practice tests are ready.
-              </p>
+              {phase1On ? (
+                <p
+                  style={{
+                    margin: '10px 0 0',
+                    fontSize: 14,
+                    lineHeight: 1.7,
+                    color: 'var(--sh-on-dark-faint)',
+                  }}
+                >
+                  Joined {formatJoinedDate(hero.createdAt || user?.createdAt)}. {welcomeContext}
+                </p>
+              ) : (
+                <p
+                  style={{
+                    margin: '10px 0 0',
+                    fontSize: 14,
+                    lineHeight: 1.7,
+                    color: 'var(--sh-on-dark-faint)',
+                  }}
+                >
+                  Joined {formatJoinedDate(hero.createdAt || user?.createdAt)}. Your study sheets,
+                  notes, and practice tests are ready.
+                </p>
+              )}
             </div>
 
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -292,6 +316,17 @@ export default function DashboardPage() {
                     studying={studyStudying}
                   />
                   <CourseFocus courses={courses} />
+                  {/* Phase 1: Top Contributors mini-widget. Stub data until
+                      the backend endpoint lands mid-Week 1. See
+                      docs/internal/design-refresh-v2-master-plan.md Phase 1. */}
+                  {phase1On ? (
+                    <TopContributors
+                      contributors={summary?.topContributors || []}
+                      accountType={accountType}
+                      loading={loading && !summary}
+                      max={5}
+                    />
+                  ) : null}
                   <QuickActions />
                 </div>
               </section>

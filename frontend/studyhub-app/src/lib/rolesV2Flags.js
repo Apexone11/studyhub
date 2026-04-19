@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { API } from '../config'
 
 /**
- * Roles v2 feature-flag wrapper (docs/roles-and-permissions-plan.md §13).
+ * Roles v2 feature-flag wrapper (docs/internal/roles-and-permissions-plan.md §13).
  *
  * Each flag is evaluated via the existing `/api/flags/evaluate/:name` endpoint
  * and cached in-memory. Evaluation failures (network, missing flag row) are

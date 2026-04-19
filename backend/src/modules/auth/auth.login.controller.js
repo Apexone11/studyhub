@@ -87,7 +87,7 @@ router.post('/login', loginLimiter, async (req, res) => {
     })
 
     /* Login verification flow removed in v1.5.0. Email verification is no longer
-     * required to log in. See docs/beta-v1.7.0-release-log.md for details. */
+     * required to log in. See docs/internal/beta-v1.7.0-release-log.md for details. */
 
     // Evaluate device + geo + risk BEFORE issuing a session. Lets us route
     // high-risk attempts (band=challenge, score >= 60) through an email

@@ -94,7 +94,7 @@ StudyHub Version 1 is a full-stack student collaboration platform with course-ba
   - `frontend/studyhub-app/Dockerfile`
   - `backend/railway.toml`
   - `frontend/studyhub-app/railway.toml`
-  - `docs/railway-deployment-checklist.md`
+  - `docs/internal/railway-deployment-checklist.md`
 - Tests and traffic:
   - `backend/scripts/smokeRoutes.js`
   - `backend/scripts/loadTraffic.js`

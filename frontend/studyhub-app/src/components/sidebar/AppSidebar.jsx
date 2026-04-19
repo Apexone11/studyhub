@@ -8,8 +8,14 @@ import { IconPlus, IconSettings, IconSheets, IconUsers } from '../Icons'
 import { useSession } from '../../lib/session-context'
 import { prefetchForRoute } from '../../lib/prefetch'
 import UserAvatar from '../UserAvatar'
-import { FOCUSABLE_DRAWER_SELECTORS, NAV_LINKS, courseColor } from './sidebarConstants'
+import {
+  FOCUSABLE_DRAWER_SELECTORS,
+  NAV_LINKS,
+  courseColor,
+  visibleSidebarSections,
+} from './sidebarConstants'
 import { roleLabel } from '../../lib/roleLabel'
+import { useDesignV2Flags } from '../../lib/designV2Flags'
 import SidebarTopics from './SidebarTopics'
 
 export default function AppSidebar({ mode = 'fixed' }) {
@@ -22,6 +28,11 @@ export default function AppSidebar({ mode = 'fixed' }) {
   const previouslyFocusedRef = useRef(null)
 
   const { user } = useSession()
+
+  // Phase 1 of v2 design refresh. Sectioned sidebar nav + user card at bottom.
+  // Flag-gated via design_v2_phase1_dashboard; fail-open during loading.
+  const v2Flags = useDesignV2Flags()
+  const phase1On = v2Flags.phase1Dashboard && !v2Flags.loading
 
   useEffect(() => {
     if (!drawerOpen) {
@@ -103,36 +114,75 @@ export default function AppSidebar({ mode = 'fixed' }) {
         </div>
       </div>
 
-      {/* Nav links — clean list, no enclosing card */}
-      <nav aria-label="Sidebar navigation" className="sh-sidebar-section">
-        {NAV_LINKS.filter((link) => {
-          // Hide "My Courses" nav link for "other" account type
-          if (link.to === '/my-courses' && user.accountType === 'other') return false
-          return true
-        }).map((link) => {
-          const to = link.to === '__MY_PROFILE__' ? `/users/${user.username}` : link.to
-          const isActive =
-            to === pathname ||
-            (link.to === '/sheets' && pathname.startsWith('/sheets')) ||
-            (link.to === '__MY_PROFILE__' && pathname === `/users/${user.username}`)
-          const Icon = link.icon
-          return (
-            <Link
-              key={to}
-              to={to}
-              className={`sh-sidebar-nav-link${isActive ? ' sh-sidebar-nav-link--active' : ''}`}
-              aria-current={isActive ? 'page' : undefined}
-              onClick={handleNavClick}
-              onMouseEnter={() =>
-                prefetchForRoute(link.to === '__MY_PROFILE__' ? '/users/:username' : link.to)
-              }
-            >
-              <Icon size={15} />
-              {link.label}
-            </Link>
-          )
-        })}
-      </nav>
+      {/* Nav links — clean list, no enclosing card.
+          Phase 1: behind design_v2_phase1_dashboard we render sectioned
+          groups (MAIN / PERSONAL / ACCOUNT). Legacy flat rendering stays
+          available so we can flip the flag off without regressions.
+          See docs/internal/design-refresh-v2-master-plan.md Phase 1. */}
+      {phase1On ? (
+        <nav aria-label="Sidebar navigation" className="sh-sidebar-section">
+          {visibleSidebarSections(user).map((section) => (
+            <div key={section.key} style={{ marginBottom: 14 }}>
+              <div className="sh-label" style={{ marginBottom: 6, paddingLeft: 2 }}>
+                {section.label}
+              </div>
+              {section.links.map((link) => {
+                const to = link.to === '__MY_PROFILE__' ? `/users/${user.username}` : link.to
+                const isActive =
+                  to === pathname ||
+                  (link.to === '/sheets' && pathname.startsWith('/sheets')) ||
+                  (link.to === '__MY_PROFILE__' && pathname === `/users/${user.username}`)
+                const Icon = link.icon
+                return (
+                  <Link
+                    key={to}
+                    to={to}
+                    className={`sh-sidebar-nav-link${isActive ? ' sh-sidebar-nav-link--active' : ''}`}
+                    aria-current={isActive ? 'page' : undefined}
+                    onClick={handleNavClick}
+                    onMouseEnter={() =>
+                      prefetchForRoute(link.to === '__MY_PROFILE__' ? '/users/:username' : link.to)
+                    }
+                  >
+                    <Icon size={15} />
+                    {link.label}
+                  </Link>
+                )
+              })}
+            </div>
+          ))}
+        </nav>
+      ) : (
+        <nav aria-label="Sidebar navigation" className="sh-sidebar-section">
+          {NAV_LINKS.filter((link) => {
+            // Hide "My Courses" nav link for "other" account type
+            if (link.to === '/my-courses' && user.accountType === 'other') return false
+            return true
+          }).map((link) => {
+            const to = link.to === '__MY_PROFILE__' ? `/users/${user.username}` : link.to
+            const isActive =
+              to === pathname ||
+              (link.to === '/sheets' && pathname.startsWith('/sheets')) ||
+              (link.to === '__MY_PROFILE__' && pathname === `/users/${user.username}`)
+            const Icon = link.icon
+            return (
+              <Link
+                key={to}
+                to={to}
+                className={`sh-sidebar-nav-link${isActive ? ' sh-sidebar-nav-link--active' : ''}`}
+                aria-current={isActive ? 'page' : undefined}
+                onClick={handleNavClick}
+                onMouseEnter={() =>
+                  prefetchForRoute(link.to === '__MY_PROFILE__' ? '/users/:username' : link.to)
+                }
+              >
+                <Icon size={15} />
+                {link.label}
+              </Link>
+            )
+          })}
+        </nav>
+      )}
 
       {/* Teacher section — for teacher accounts */}
       {user.accountType === 'teacher' && (

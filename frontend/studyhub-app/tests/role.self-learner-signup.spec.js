@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 /**
- * Self-learner signup E2E (docs/roles-and-permissions-plan.md §12.4):
+ * Self-learner signup E2E (docs/internal/roles-and-permissions-plan.md §12.4):
  * - Email/password sign-up with the "Self-learner" chip.
  * - Lands on /onboarding?track=self-learner.
  * - Onboarding skips school + course steps and shows the interest-chip grid.

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 /**
- * Self-learner feed redesign E2E (docs/roles-and-permissions-plan.md §12.4).
+ * Self-learner feed redesign E2E (docs/internal/roles-and-permissions-plan.md §12.4).
  * Asserts that a Self-learner viewer:
  *   - Sees the topic interest chip row (not course chips).
  *   - Sees the goal triage card.

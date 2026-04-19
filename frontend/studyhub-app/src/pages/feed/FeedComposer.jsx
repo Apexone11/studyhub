@@ -22,7 +22,7 @@ if (typeof document !== 'undefined' && !document.getElementById('sh-spin-kf')) {
   document.head.appendChild(style)
 }
 
-// Draft sync (docs/roles-and-permissions-plan.md §11). A role change triggers
+// Draft sync (docs/internal/roles-and-permissions-plan.md §11). A role change triggers
 // window.location.reload(), which wipes React state. Persisting composer text
 // to localStorage keyed by user ID lets us rehydrate on remount so the user
 // does not lose what they were typing. Storage is scoped per user so two

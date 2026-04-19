@@ -165,7 +165,7 @@ Backend:
 
 - Inline style colors must use CSS custom property tokens from `index.css`. Semantic tokens (`--sh-danger`, `--sh-success`, `--sh-warning`, `--sh-info` with `-bg`, `-border`, `-text` variants), slate scale (`--sh-slate-50` through `--sh-slate-900`), and surface tokens (`--sh-surface`, `--sh-soft`, `--sh-border`). Exceptions: dark-mode-always editor panels, unique per-metric palette colors, white text on colored buttons.
 - Modals inside animated containers must use `createPortal(jsx, document.body)`. Any ancestor with `transform` (e.g., anime.js `fadeInUp`) creates a new containing block that breaks `position: fixed` viewport centering.
-- Do not use emojis anywhere in code or UI text.
+- Emoji policy (decided April 19, 2026 as part of the v2 design refresh): emoji are permitted ONLY inside user-generated content (feed posts, messages, note bodies, group discussions, comments, profile bios). Emoji are NEVER permitted in UI chrome — no emoji in component copy, buttons, headings, labels, toasts, modals, empty states, nav items, tab labels, or placeholder text. When rendering user content that contains emoji, treat it as normal text; do not strip it. This supersedes the earlier "no emojis anywhere" rule.
 
 ### HTML Security Policy
 
@@ -212,7 +212,7 @@ Tables with migrations (safe to query):
 - Scan existing implementation patterns before editing. Follow the established style unless correctness requires a change.
 - Keep changes incremental and pattern-aligned.
 - Prefer fixing root causes over local patches.
-- After each beta implementation cycle, document changes and validation results in `docs/beta-v2.0.0-release-log.md`.
+- After each beta implementation cycle, document changes and validation results in `docs/internal/beta-v2.0.0-release-log.md`.
 - For frontend validation in this repo, `npm --prefix frontend/studyhub-app run lint` is the reliable full-lint command.
 - Use quoted paths in PowerShell because the workspace path contains spaces.
 
@@ -299,7 +299,25 @@ When handling a new task:
 5. All frontend API calls must use `${API}/api/...` (never omit the `/api` prefix).
 6. Validate changes with the smallest relevant lint/test/build commands, then broader checks if the surface area is wider.
 7. Update the beta release log when a beta-cycle code change is completed.
-8. Do not use emojis in code, comments, or UI text.
+8. Do not put emoji in UI chrome (component copy, buttons, headings, labels, nav, empty states, toasts). Emoji are allowed only inside user-generated content surfaces (feed posts, messages, notes, comments, group discussions, profile bios). See "CSS and Styling" for the full policy.
 9. All inline style colors must use CSS custom property tokens (`var(--sh-*)`).
 10. Wrap any call to `getBlockedUserIds` or `getMutedUserIds` in try-catch for graceful degradation.
-                                                                                                                                                                                                                                                                                      
+
+## Active Design Refresh Cycle (v2, April 2026)
+
+Founder-approved design refresh in progress. Context for any agent picking up this work:
+
+- Full brainstorm, KEEP/SKIP lists, phased plan, locked decisions: `docs/internal/design-refresh-v2-brainstorm.md` — read before editing any page listed below.
+- Web master plan (8 phases, approved April 19, 2026): `docs/internal/design-refresh-v2-master-plan.md`.
+- Mobile companion plan (8 phases + M1–M10 parity suggestions, parallel-weekly cadence): `docs/internal/design-refresh-v2-mobile-plan.md`. Every phase ships behind a shared `design_v2_*` feature flag so web and mobile light up together. Parallel cadence: web Mon–Wed, mobile Thu–Fri, cohort rollout end of week.
+- Roles integration plan (student / teacher / self-learner as three first-class experiences, woven into every v2 phase, with teacher module landing in week 7): `docs/internal/design-refresh-v2-roles-integration.md`. Founder approved April 19, 2026 — Week 1 (Phase 1) in progress. See also `docs/internal/roles-and-permissions-plan.md` for the underlying role model and OAuth picker flow.
+- **All internal planning docs live in `docs/internal/` and are gitignored.** Do not recreate planning docs at the `docs/` root. Do not reference them by the old root path.
+- Identity: stay "Campus Lab" (warm paper, `#f6f5f2`, ink typography, blue `#2563eb` accent). Gradients remain accent moments on hero/auth only; do NOT gradient-fill inner app pages.
+- Emoji policy (see above): user content only, never UI chrome. The mockup's "Welcome back, Jaden 👋" renders as "Welcome back, Jaden" in our implementation.
+- Sheets browse Grid/List toggle: default List for all users; may revisit default for new users later.
+- Sheet card preview: adding `previewText` column to `StudySheet` (server-extracted from sanitized HTML on create/update). New migration required per the Migration Rules.
+- Top nav: keep existing `NavBar` + `--sh-nav-bg` chrome. Spacing/search polish only.
+- Phase 1 target: `frontend/studyhub-app/src/pages/dashboard/DashboardPage.jsx` (authenticated personal overview, NOT the public profile page at `/u/:username`). Sidebar section labels (MAIN/PERSONAL/ACCOUNT), sidebar user card at bottom, dashboard welcome context line, Top Contributors mini-widget. Frontend-only, no migrations.
+- Later phases (do not start without founder approval): Upcoming Exams card (needs schema work), inline Hub AI suggestion card, Sheets Grid view (needs `previewText` migration + backfill), auth split layout + referral banner, onboarding polish, feed polish, home hero dial-up.
+- Hard rules for this cycle: no package.json / package-lock.json changes, no new npm deps, no auth logic changes, no git commits without founder approval, no hardcoded colors.
+                                                                                                                                                                                                                                                                                    

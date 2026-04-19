@@ -8,6 +8,24 @@ vi.mock('../../lib/session-context', () => ({
   useSession: () => ({ user: mockUser.current }),
 }))
 
+// Keep these legacy role-label tests deterministic by forcing the Phase 1
+// flag OFF. Sectioned-nav behavior is covered in AppSidebar.sections.test.jsx.
+vi.mock('../../lib/designV2Flags', () => ({
+  useDesignV2Flags: () => ({
+    phase1Dashboard: false,
+    phase2Triage: false,
+    aiCard: false,
+    sheetsGrid: false,
+    authSplit: false,
+    onboarding: false,
+    feedPolish: false,
+    homeHero: false,
+    loading: false,
+  }),
+  clearDesignV2FlagCache: () => {},
+  FLAG_NAMES: {},
+}))
+
 import AppSidebar from './AppSidebar'
 
 function renderWith(user) {

@@ -7,7 +7,7 @@ import { useRolesV2Flags } from '../../lib/rolesV2Flags'
  * Renders the Self-learner-only "TOPICS I FOLLOW" sidebar section.
  * Pulls follows from /api/hashtags/me with a one-shot fetch (cache via useFetch
  * is overkill here — the list rarely changes mid-session and a missed update
- * resolves on the next route mount). See docs/roles-and-permissions-plan.md §7.
+ * resolves on the next route mount). See docs/internal/roles-and-permissions-plan.md §7.
  */
 export default function SidebarTopics({ onNavClick }) {
   const { core: rolesV2Core } = useRolesV2Flags()
