@@ -17,6 +17,22 @@ vi.mock('@react-oauth/google', () => ({
   GoogleLogin: () => null,
 }))
 
+// The real LegalAcceptanceModal fetches three legal documents from the API
+// and gates its Accept button on all three tabs being viewed. The test is
+// exercising the registration flow, not the legal copy, so we stand in a
+// lightweight modal that exposes a single Accept button for the user-event
+// click. This keeps the test focused on register/verify/complete.
+vi.mock('./LegalAcceptanceModal', () => ({
+  default: ({ open, onAccept }) =>
+    open ? (
+      <div role="dialog" aria-label="legal-stub">
+        <button type="button" onClick={onAccept}>
+          Accept All
+        </button>
+      </div>
+    ) : null,
+}))
+
 afterEach(() => {
   cleanup()
 })
@@ -43,16 +59,19 @@ describe('RegisterScreen', () => {
     let registerCompletePayload = null
 
     server.use(
-      http.get('http://localhost:4000/api/auth/me', () => (
-        HttpResponse.json({ error: 'Unauthorized' }, { status: 401 })
-      )),
+      http.get('http://localhost:4000/api/auth/me', () =>
+        HttpResponse.json({ error: 'Unauthorized' }, { status: 401 }),
+      ),
       http.post('http://localhost:4000/api/auth/register/start', async ({ request }) => {
         registerStartPayload = await request.json()
-        return HttpResponse.json({
-          verificationToken: 'signup-token',
-          deliveryHint: 'new_student@studyhub.test',
-          resendAvailableAt: '2026-03-16T12:01:00.000Z',
-        }, { status: 201 })
+        return HttpResponse.json(
+          {
+            verificationToken: 'signup-token',
+            deliveryHint: 'new_student@studyhub.test',
+            resendAvailableAt: '2026-03-16T12:01:00.000Z',
+          },
+          { status: 201 },
+        )
       }),
       http.post('http://localhost:4000/api/auth/register/verify', async ({ request }) => {
         verifyPayload = await request.json()
@@ -64,25 +83,28 @@ describe('RegisterScreen', () => {
       }),
       http.post('http://localhost:4000/api/auth/register/complete', async ({ request }) => {
         registerCompletePayload = await request.json()
-        return HttpResponse.json({
-          user: {
-            id: 7,
-            username: 'new_student',
-            role: 'student',
-            email: 'new_student@studyhub.test',
-            emailVerified: true,
-            twoFaEnabled: false,
-            avatarUrl: null,
-            createdAt: '2026-03-16T12:00:00.000Z',
-            enrollments: [],
-            counts: { courses: 0, sheets: 0, stars: 0 },
-            csrfToken: 'csrf-token',
+        return HttpResponse.json(
+          {
+            user: {
+              id: 7,
+              username: 'new_student',
+              role: 'student',
+              email: 'new_student@studyhub.test',
+              emailVerified: true,
+              twoFaEnabled: false,
+              avatarUrl: null,
+              createdAt: '2026-03-16T12:00:00.000Z',
+              enrollments: [],
+              counts: { courses: 0, sheets: 0, stars: 0 },
+              csrfToken: 'csrf-token',
+            },
           },
-        }, { status: 201 })
+          { status: 201 },
+        )
       }),
-      http.get('http://localhost:4000/api/notifications', () => (
-        HttpResponse.json({ notifications: [], unreadCount: 0 })
-      )),
+      http.get('http://localhost:4000/api/notifications', () =>
+        HttpResponse.json({ notifications: [], unreadCount: 0 }),
+      ),
     )
 
     renderRegisterScreen()
@@ -91,7 +113,8 @@ describe('RegisterScreen', () => {
     await user.type(screen.getByLabelText('Email'), 'new_student@studyhub.test')
     await user.type(screen.getByLabelText('Password'), 'Password123')
     await user.type(screen.getByLabelText('Confirm Password'), 'Password123')
-    await user.click(screen.getByRole('checkbox', { name: /I agree to the Terms of Use/i }))
+    await user.click(screen.getByRole('button', { name: /Click to review and accept terms/i }))
+    await user.click(await screen.findByRole('button', { name: 'Accept All' }))
     await user.click(screen.getByRole('button', { name: 'Create Account' }))
 
     expect(registerStartPayload).toMatchObject({
@@ -124,16 +147,19 @@ describe('RegisterScreen', () => {
     let registerCompletePayload = null
 
     server.use(
-      http.get('http://localhost:4000/api/auth/me', () => (
-        HttpResponse.json({ error: 'Unauthorized' }, { status: 401 })
-      )),
+      http.get('http://localhost:4000/api/auth/me', () =>
+        HttpResponse.json({ error: 'Unauthorized' }, { status: 401 }),
+      ),
       http.post('http://localhost:4000/api/auth/register/start', async ({ request }) => {
         registerStartPayload = await request.json()
-        return HttpResponse.json({
-          verificationToken: 'second-signup-token',
-          deliveryHint: 'course_user@studyhub.test',
-          resendAvailableAt: '2026-03-16T12:01:00.000Z',
-        }, { status: 201 })
+        return HttpResponse.json(
+          {
+            verificationToken: 'second-signup-token',
+            deliveryHint: 'course_user@studyhub.test',
+            resendAvailableAt: '2026-03-16T12:01:00.000Z',
+          },
+          { status: 201 },
+        )
       }),
       http.post('http://localhost:4000/api/auth/register/verify', async ({ request }) => {
         verifyPayload = await request.json()
@@ -145,25 +171,28 @@ describe('RegisterScreen', () => {
       }),
       http.post('http://localhost:4000/api/auth/register/complete', async ({ request }) => {
         registerCompletePayload = await request.json()
-        return HttpResponse.json({
-          user: {
-            id: 8,
-            username: 'course_user',
-            role: 'student',
-            email: 'course_user@studyhub.test',
-            emailVerified: true,
-            twoFaEnabled: false,
-            avatarUrl: null,
-            createdAt: '2026-03-16T12:00:00.000Z',
-            enrollments: [],
-            counts: { courses: 0, sheets: 0, stars: 0 },
-            csrfToken: 'csrf-token',
+        return HttpResponse.json(
+          {
+            user: {
+              id: 8,
+              username: 'course_user',
+              role: 'student',
+              email: 'course_user@studyhub.test',
+              emailVerified: true,
+              twoFaEnabled: false,
+              avatarUrl: null,
+              createdAt: '2026-03-16T12:00:00.000Z',
+              enrollments: [],
+              counts: { courses: 0, sheets: 0, stars: 0 },
+              csrfToken: 'csrf-token',
+            },
           },
-        }, { status: 201 })
+          { status: 201 },
+        )
       }),
-      http.get('http://localhost:4000/api/notifications', () => (
-        HttpResponse.json({ notifications: [], unreadCount: 0 })
-      )),
+      http.get('http://localhost:4000/api/notifications', () =>
+        HttpResponse.json({ notifications: [], unreadCount: 0 }),
+      ),
     )
 
     renderRegisterScreen()
@@ -172,7 +201,8 @@ describe('RegisterScreen', () => {
     await user.type(screen.getByLabelText('Email'), 'course_user@studyhub.test')
     await user.type(screen.getByLabelText('Password'), 'Password123')
     await user.type(screen.getByLabelText('Confirm Password'), 'Password123')
-    await user.click(screen.getByRole('checkbox', { name: /I agree to the Terms of Use/i }))
+    await user.click(screen.getByRole('button', { name: /Click to review and accept terms/i }))
+    await user.click(await screen.findByRole('button', { name: 'Accept All' }))
     await user.click(screen.getByRole('button', { name: 'Create Account' }))
 
     expect(registerStartPayload).toMatchObject({

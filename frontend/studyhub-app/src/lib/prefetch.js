@@ -86,3 +86,7 @@ export function prefetchForRoute(routePath) {
     prefetch(apiPath)
   }
 }
+
+export function _resetPrefetchDebounceForTests() {
+  prefetchedAt.clear()
+}

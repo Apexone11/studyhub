@@ -79,6 +79,7 @@ const mocks = vi.hoisted(() => {
     rateLimiters: {
       readLimiter: (_req, _res, next) => next(),
       usersFollowLimiter: (_req, _res, next) => next(),
+      roleChangeLimiter: (_req, _res, next) => next(),
     },
   }
 })

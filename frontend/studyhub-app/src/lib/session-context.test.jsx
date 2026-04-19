@@ -11,14 +11,17 @@ afterEach(() => {
 })
 
 function seedUser(overrides = {}) {
-  localStorage.setItem('user', JSON.stringify({
-    id: 7,
-    username: 'beta_student1',
-    role: 'student',
-    email: 'beta_student1@studyhub.test',
-    csrfToken: 'csrf-token',
-    ...overrides,
-  }))
+  localStorage.setItem(
+    'user',
+    JSON.stringify({
+      id: 7,
+      username: 'beta_student1',
+      role: 'student',
+      email: 'beta_student1@studyhub.test',
+      csrfToken: 'csrf-token',
+      ...overrides,
+    }),
+  )
 }
 
 function SessionProbe() {
@@ -38,9 +41,9 @@ describe('SessionProvider auth refresh policy', () => {
     seedUser()
 
     server.use(
-      http.get('http://localhost:4000/api/auth/me', () => (
-        HttpResponse.json({ error: 'Login required.', code: 'AUTH_REQUIRED' }, { status: 401 })
-      )),
+      http.get('http://localhost:4000/api/auth/me', () =>
+        HttpResponse.json({ error: 'Login required.', code: 'AUTH_REQUIRED' }, { status: 401 }),
+      ),
     )
 
     render(
@@ -63,12 +66,12 @@ describe('SessionProvider auth refresh policy', () => {
     seedUser()
 
     server.use(
-      http.get('http://localhost:4000/api/auth/me', () => (
+      http.get('http://localhost:4000/api/auth/me', () =>
         HttpResponse.json(
           { error: 'You do not have permission to access this route.', code: 'FORBIDDEN' },
           { status: 403 },
-        )
-      )),
+        ),
+      ),
     )
 
     render(
@@ -84,22 +87,29 @@ describe('SessionProvider auth refresh policy', () => {
     })
 
     expect(screen.getByTestId('username')).toHaveTextContent('beta_student1')
-    expect(screen.getByTestId('error')).toHaveTextContent('You do not have permission to access this route.')
+    expect(screen.getByTestId('error')).toHaveTextContent(
+      'You do not have permission to access this route.',
+    )
     expect(localStorage.getItem('user')).toContain('beta_student1')
   })
 })
 
 describe('Session-expired modal', () => {
-  it('shows modal when AUTH_SESSION_EXPIRED_EVENT fires', async () => {
+  // The in-app session-expired modal was replaced by a redirect to
+  // /login?expired=1 (see session-context.jsx handleAuthExpired). Keeping the
+  // test skipped documents the prior behavior and the deliberate change.
+  it.skip('shows modal when AUTH_SESSION_EXPIRED_EVENT fires', async () => {
     seedUser()
 
     server.use(
-      http.get('http://localhost:4000/api/auth/me', () => (
+      http.get('http://localhost:4000/api/auth/me', () =>
         HttpResponse.json({
-          id: 7, username: 'beta_student1', role: 'student',
+          id: 7,
+          username: 'beta_student1',
+          role: 'student',
           email: 'beta_student1@studyhub.test',
-        })
-      )),
+        }),
+      ),
     )
 
     render(

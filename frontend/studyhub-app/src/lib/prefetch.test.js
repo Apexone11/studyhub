@@ -1,6 +1,6 @@
 /* eslint-disable no-undef */
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest'
-import { prefetchForRoute } from './prefetch'
+import { prefetchForRoute, _resetPrefetchDebounceForTests } from './prefetch'
 import { cache } from './useFetch'
 
 // Mock the API config
@@ -10,8 +10,10 @@ vi.mock('../config', () => ({
 
 describe('prefetch module', () => {
   beforeEach(() => {
-    // Clear cache before each test
+    // Clear cache + debounce map before each test so prior prefetches do not
+    // suppress the fetch under test via the 30-second debounce window.
     cache.clear()
+    _resetPrefetchDebounceForTests()
     vi.clearAllMocks()
 
     // Mock fetch globally
@@ -40,10 +42,9 @@ describe('prefetch module', () => {
       await new Promise((resolve) => setTimeout(resolve, 10))
 
       // Assert: fetch was called with correct URL
-      expect(global.fetch).toHaveBeenCalledWith(
-        'http://localhost:4000/api/feed',
-        { credentials: 'include' }
-      )
+      expect(global.fetch).toHaveBeenCalledWith('http://localhost:4000/api/feed', {
+        credentials: 'include',
+      })
     })
 
     it('is a no-op for an unknown route', async () => {
@@ -88,14 +89,12 @@ describe('prefetch module', () => {
 
       // Assert: both fetches were called with correct endpoints
       expect(global.fetch).toHaveBeenCalledTimes(2)
-      expect(global.fetch).toHaveBeenCalledWith(
-        'http://localhost:4000/api/feed',
-        { credentials: 'include' }
-      )
-      expect(global.fetch).toHaveBeenCalledWith(
-        'http://localhost:4000/api/sheets',
-        { credentials: 'include' }
-      )
+      expect(global.fetch).toHaveBeenCalledWith('http://localhost:4000/api/feed', {
+        credentials: 'include',
+      })
+      expect(global.fetch).toHaveBeenCalledWith('http://localhost:4000/api/sheets', {
+        credentials: 'include',
+      })
     })
 
     it('handles fetch errors gracefully (silent failure)', async () => {
@@ -244,7 +243,7 @@ describe('prefetch module', () => {
 
       expect(global.fetch).toHaveBeenCalledWith(
         'http://localhost:4000/api/feed',
-        expect.any(Object)
+        expect.any(Object),
       )
     })
 
@@ -259,7 +258,7 @@ describe('prefetch module', () => {
 
       expect(global.fetch).toHaveBeenCalledWith(
         'http://localhost:4000/api/sheets',
-        expect.any(Object)
+        expect.any(Object),
       )
     })
 
@@ -274,7 +273,7 @@ describe('prefetch module', () => {
 
       expect(global.fetch).toHaveBeenCalledWith(
         'http://localhost:4000/api/notes',
-        expect.any(Object)
+        expect.any(Object),
       )
     })
 
@@ -289,7 +288,7 @@ describe('prefetch module', () => {
 
       expect(global.fetch).toHaveBeenCalledWith(
         'http://localhost:4000/api/messages/conversations',
-        expect.any(Object)
+        expect.any(Object),
       )
     })
 
@@ -304,7 +303,7 @@ describe('prefetch module', () => {
 
       expect(global.fetch).toHaveBeenCalledWith(
         'http://localhost:4000/api/study-groups',
-        expect.any(Object)
+        expect.any(Object),
       )
     })
 
@@ -319,7 +318,7 @@ describe('prefetch module', () => {
 
       expect(global.fetch).toHaveBeenCalledWith(
         'http://localhost:4000/api/announcements',
-        expect.any(Object)
+        expect.any(Object),
       )
     })
 
@@ -334,7 +333,7 @@ describe('prefetch module', () => {
 
       expect(global.fetch).toHaveBeenCalledWith(
         'http://localhost:4000/api/courses/enrolled',
-        expect.any(Object)
+        expect.any(Object),
       )
     })
 
@@ -349,7 +348,7 @@ describe('prefetch module', () => {
 
       expect(global.fetch).toHaveBeenCalledWith(
         'http://localhost:4000/api/ai/conversations',
-        expect.any(Object)
+        expect.any(Object),
       )
     })
   })
@@ -413,10 +412,7 @@ describe('prefetch module', () => {
       await new Promise((resolve) => setTimeout(resolve, 10))
 
       // Assert: fetch called with credentials
-      expect(global.fetch).toHaveBeenCalledWith(
-        expect.any(String),
-        { credentials: 'include' }
-      )
+      expect(global.fetch).toHaveBeenCalledWith(expect.any(String), { credentials: 'include' })
     })
   })
 })

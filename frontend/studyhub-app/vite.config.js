@@ -46,6 +46,10 @@ export default defineConfig(async ({ mode }) => {
             'react-router',
             'react-router-dom',
             '@testing-library/react',
+            // Inline animejs so vi.mock('animejs', ...) intercepts the
+            // dynamic import inside src/lib/animations.js. Without this, the
+            // package is externalized and mocks are bypassed.
+            'animejs',
           ],
         },
       },
