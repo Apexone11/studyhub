@@ -1,10 +1,25 @@
 // src/lib/mobile/detectMobile.js
 // Detect whether the app is running inside a Capacitor native shell.
 // This is the single source of truth for mobile vs. web routing.
-
-import { Capacitor } from '@capacitor/core'
+//
+// IMPORTANT: Do not statically `import` from '@capacitor/core' here. The
+// Capacitor runtime injects a global `window.Capacitor` object inside the
+// native Android/iOS WebView, and that global is the authoritative source at
+// runtime. Statically importing the package would pull mobile-only code into
+// the web Vite build, which (a) breaks the dev server when the package isn't
+// installed in the web container and (b) couples the web bundle to the
+// mobile SDK for a check that is by definition a no-op on the web. Anything
+// that truly needs the @capacitor/* packages (deep links, social login, etc.)
+// does `await import('@capacitor/...')` behind an `isNativePlatform()` gate,
+// so those chunks only load on mobile.
 
 let _isNative = null
+
+function getNativeCapacitor() {
+  if (typeof window === 'undefined') return null
+  const cap = window.Capacitor
+  return cap && typeof cap === 'object' ? cap : null
+}
 
 /**
  * Returns `true` when running inside the Capacitor WebView (Android/iOS).
@@ -16,15 +31,18 @@ let _isNative = null
 export function isNativePlatform() {
   if (_isNative !== null) return _isNative
 
-  try {
-    // Capacitor injects a global `Capacitor` object in native shells.
-    // The `isNativePlatform()` method is the official check.
-    _isNative = Capacitor.isNativePlatform()
-  } catch {
-    // Fallback: index.html inline script sets __SH_NATIVE__ before modules load
-    _isNative = typeof window !== 'undefined' && Boolean(window.__SH_NATIVE__)
+  const cap = getNativeCapacitor()
+  if (cap && typeof cap.isNativePlatform === 'function') {
+    try {
+      _isNative = Boolean(cap.isNativePlatform())
+      return _isNative
+    } catch {
+      /* fall through to the window flag */
+    }
   }
 
+  // Fallback: index.html inline script sets __SH_NATIVE__ before modules load.
+  _isNative = typeof window !== 'undefined' && Boolean(window.__SH_NATIVE__)
   return _isNative
 }
 
@@ -32,11 +50,16 @@ export function isNativePlatform() {
  * Returns the platform string: 'android', 'ios', or 'web'.
  */
 export function getPlatform() {
-  try {
-    return Capacitor.getPlatform()
-  } catch {
-    return 'web'
+  const cap = getNativeCapacitor()
+  if (cap && typeof cap.getPlatform === 'function') {
+    try {
+      const platform = cap.getPlatform()
+      if (typeof platform === 'string' && platform.length > 0) return platform
+    } catch {
+      /* fall through */
+    }
   }
+  return 'web'
 }
 
 /**
