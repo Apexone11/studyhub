@@ -17,7 +17,6 @@ const LoginPage = lazy(() => import('./pages/auth/LoginPage'))
 const LoginChallengePage = lazy(() => import('./pages/auth/LoginChallengePage'))
 const RegisterScreen = lazy(() => import('./pages/auth/RegisterScreen'))
 const RolePickerPage = lazy(() => import('./pages/auth/RolePickerPage'))
-/* DashboardPage removed — /dashboard now redirects to /users/:me via DashboardRedirect */
 const TermsPage = lazy(() => import('./pages/legal/TermsPage'))
 const PrivacyPage = lazy(() => import('./pages/legal/PrivacyPage'))
 const GuidelinesPage = lazy(() => import('./pages/legal/GuidelinesPage'))

@@ -171,8 +171,8 @@ describe('dashboard routes', () => {
  * web + mobile dashboards can render without a second request.
  *
  * These tests are `.skip`'d until the backend field lands mid-Week 1;
- * they encode the contract the frontend (`DashboardPage.jsx` and
- * `TopContributors.jsx`) is already consuming.
+ * they encode the contract the frontend (UserProfilePage.jsx +
+ * TopContributors.jsx) is already consuming.
  *
  * See:
  *   - docs/internal/design-refresh-v2-master-plan.md (Phase 1)
