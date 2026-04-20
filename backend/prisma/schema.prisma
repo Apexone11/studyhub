@@ -162,6 +162,7 @@ model User {
   enrollmentArchives         UserEnrollmentArchive[]
   hashtagFollows             HashtagFollow[]
   learningGoals              LearningGoal[]
+  courseExams                CourseExam[]
 
   @@index([role])
   @@index([emailHash])
@@ -266,6 +267,7 @@ model Course {
   notes       Note[]
   feedPosts   FeedPost[]
   studyGroups StudyGroup[]
+  courseExams CourseExam[]
 
   @@unique([schoolId, code])
 }
@@ -2407,4 +2409,26 @@ model LearningGoal {
 
   @@index([userId])
   @@index([userId, createdAt])
+}
+
+// Phase 2 of v2 design refresh — Upcoming Exams.
+// See docs/internal/design-refresh-v2-master-plan.md §5.
+// Private by default; future "course"-level visibility is a stretch item, not in Phase 2.
+model CourseExam {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  courseId   Int
+  title      String   @db.VarChar(120)
+  location   String?  @db.VarChar(120)
+  examDate   DateTime
+  visibility String   @default("private")
+  notes      String?  @db.VarChar(500)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([userId, examDate])
+  @@index([courseId, examDate])
 }

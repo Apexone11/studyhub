@@ -42,6 +42,7 @@ const courseRoutes = require('./modules/courses')
 const sheetRoutes = require('./modules/sheets')
 const feedRoutes = require('./modules/feed')
 const dashboardRoutes = require('./modules/dashboard')
+const examRoutes = require('./modules/exams')
 const settingsRoutes = require('./modules/settings')
 const announcementRoutes = require('./modules/announcements')
 const adminRoutes = require('./modules/admin')
@@ -418,6 +419,11 @@ app.use('/api/feed', feedRoutes)
 
 // Mount dashboard summary endpoints under /api/dashboard.
 app.use('/api/dashboard', dashboardRoutes)
+
+// Mount upcoming-exams endpoints under /api/exams (Phase 2 of v2 design refresh).
+// Frontend is flag-gated by `design_v2_upcoming_exams`; server keeps endpoints
+// available to authenticated users so the flag flip is one-sided.
+app.use('/api/exams', examRoutes)
 
 // Mount settings endpoints under /api/settings.
 app.use('/api/settings', settingsRoutes)
