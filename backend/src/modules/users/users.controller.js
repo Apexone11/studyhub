@@ -1181,6 +1181,7 @@ module.exports = {
   getAccountTypeStatus,
   getLearningGoal,
   setLearningGoal,
+  getOnboardingState,
 }
 
 const MAX_LEARNING_GOAL_LENGTH = 500
@@ -1465,5 +1466,135 @@ async function getAccountTypeStatus(req, res) {
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
+  }
+}
+
+// ── GET /api/users/me/onboarding-state ──────────────────────────────────────
+//
+// Per-role Getting Started checklist state. Every signal here is derived from
+// existing tables — no new schema. The shape matches the `testFn(state)`
+// contract in frontend/studyhub-app/src/features/onboarding/checklistConfig.js.
+//
+// Each Prisma call is wrapped in safeCount/safeFirst below so a missing table
+// (e.g., if a migration is lagging in a preview env) degrades gracefully to
+// 0 / false rather than throwing. The per-call fallbacks are also why this
+// endpoint is safe to ship before every downstream feature (Sections, topic
+// follow scoreboard, learning-goal task engine) has landed — those counters
+// will stay at 0 until the underlying tables ship in later weeks.
+//
+// See docs/internal/design-refresh-v2-week2-brainstorm.md §7 and
+//     docs/internal/design-refresh-v2-week2-to-week5-execution.md.
+async function getOnboardingState(req, res) {
+  const userId = req.user?.userId
+  if (!userId) {
+    return res.status(401).json({ error: 'Not authenticated' })
+  }
+
+  /** Run a Prisma promise and return `fallback` if it rejects. */
+  const safe = async (thunk, fallback) => {
+    try {
+      return await thunk()
+    } catch (err) {
+      captureError(err, { where: 'getOnboardingState', userId, note: 'safe fallback' })
+      return fallback
+    }
+  }
+
+  try {
+    const [
+      userRow,
+      onboarding,
+      enrollmentCount,
+      starCount,
+      examCount,
+      groupMembershipCount,
+      publishedMaterialCount,
+      problemQueuePostCount,
+      hashtagFollowCount,
+      learningGoalRow,
+      noteCount,
+    ] = await Promise.all([
+      safe(
+        () =>
+          prisma.user.findUnique({
+            where: { id: userId },
+            select: { accountType: true, trustLevel: true, learningGoal: true },
+          }),
+        null,
+      ),
+      safe(
+        () =>
+          prisma.onboardingProgress.findUnique({
+            where: { userId },
+            select: { schoolSelected: true, coursesAdded: true, completedAt: true },
+          }),
+        null,
+      ),
+      safe(() => prisma.enrollment.count({ where: { userId } }), 0),
+      safe(() => prisma.starredSheet.count({ where: { userId } }), 0),
+      safe(() => prisma.courseExam.count({ where: { userId } }), 0),
+      safe(() => prisma.studyGroupMember.count({ where: { userId, status: 'active' } }), 0),
+      safe(() => prisma.studySheet.count({ where: { userId, status: 'published' } }), 0),
+      safe(
+        () =>
+          prisma.groupDiscussionPost.count({
+            where: { userId, type: { in: ['question', 'announcement'] } },
+          }),
+        0,
+      ),
+      safe(() => prisma.hashtagFollow.count({ where: { userId } }), 0),
+      safe(
+        () =>
+          prisma.learningGoal.findFirst({
+            where: { userId },
+            orderBy: { createdAt: 'desc' },
+            select: { id: true },
+          }),
+        null,
+      ),
+      safe(() => prisma.note.count({ where: { userId } }), 0),
+    ])
+
+    const accountType = userRow?.accountType || 'student'
+    // hasSchool: true if onboarding has a recorded school selection OR the
+    // user has at least one enrollment (because enrollment implies a school).
+    const hasSchool = Boolean(onboarding?.schoolSelected) || enrollmentCount > 0
+    // hasMajor is not yet a first-class field — v2 Week 3 will add a
+    // `major` column under the Settings → Profile polish pass. Until then
+    // this is false and the checklist item stays unchecked.
+    const hasMajor = false
+    // teacherVerified proxies off trustLevel >= 2 for now. When the full
+    // StaffVerification model lands (v2 Week 4+), swap in the real lookup.
+    const teacherVerified = (userRow?.trustLevel ?? 0) >= 2
+
+    return res.json({
+      accountType,
+      hasSchool,
+      hasMajor,
+      courseFollowCount: enrollmentCount,
+      starCount,
+      examCount,
+      groupMembershipCount,
+      teacherVerified,
+      publishedMaterialCount,
+      // The following counters stay at 0 until their features ship; the
+      // front-end checklist renders them as "not yet complete" which is the
+      // correct UX during the ramp-up weeks.
+      sectionCount: 0, // Section model → Week 3
+      scheduledSessionCount: 0, // GroupSession.createdById → Week 3
+      problemQueuePostCount,
+      topicFollowCount: hashtagFollowCount,
+      hasLearningGoal: Boolean(learningGoalRow) || Boolean(userRow?.learningGoal),
+      completedGoalTaskCount: 0, // Goal task engine → Week 4
+      noteCount,
+      // Non-checklist metadata the client uses for copy + analytics.
+      meta: {
+        onboardingCompleted: Boolean(onboarding?.completedAt),
+        generatedAt: new Date().toISOString(),
+      },
+    })
+  } catch (err) {
+    captureError(err, { where: 'getOnboardingState', userId })
+    return res.status(500).json({ error: 'Failed to load onboarding state' })
   }
 }

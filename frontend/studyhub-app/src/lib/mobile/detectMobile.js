@@ -15,6 +15,18 @@
 
 let _isNative = null
 
+// Build-time flag. `vite build --mode mobile` (see scripts/build-mobile.js)
+// sets `import.meta.env.MODE === 'mobile'`. That string literal is inlined
+// by Vite's define plugin at compile time, so this becomes a constant that
+// dead-code-eliminates cleanly in web builds (where MODE !== 'mobile').
+//
+// The mobile bundle is physically packaged into the Android APK's assets
+// and is never served to a browser — so trusting this compile-time flag
+// avoids the runtime-sniffing fragility (WebView URL quirks, Capacitor
+// injection timing) that was rendering the web HomePage inside the APK
+// instead of MobileLandingPage.
+const BUILD_MARKED_MOBILE = import.meta.env.MODE === 'mobile'
+
 function getNativeCapacitor() {
   if (typeof window === 'undefined') return null
   const cap = window.Capacitor
@@ -30,6 +42,12 @@ function getNativeCapacitor() {
  */
 export function isNativePlatform() {
   if (_isNative !== null) return _isNative
+
+  // Build-time marker wins — a mobile-built bundle is always mobile.
+  if (BUILD_MARKED_MOBILE) {
+    _isNative = true
+    return _isNative
+  }
 
   const cap = getNativeCapacitor()
   if (cap && typeof cap.isNativePlatform === 'function') {

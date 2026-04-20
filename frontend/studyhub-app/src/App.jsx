@@ -25,6 +25,12 @@ const DisclaimerPage = lazy(() => import('./pages/legal/DisclaimerPage'))
 const DataRequestPage = lazy(() => import('./pages/legal/DataRequestPage'))
 const FeedPage = lazy(() => import('./pages/feed/FeedPage'))
 const SheetsPage = lazy(() => import('./pages/sheets/SheetsPage'))
+// Design Refresh v2 — Week 2 new pages
+const TeachMaterialsPage = lazy(() => import('./pages/teach/TeachMaterialsPage'))
+const DocsPage = lazy(() => import('./pages/docs/DocsPage').then((m) => ({ default: m.default })))
+const DocsFeaturePage = lazy(() =>
+  import('./pages/docs/DocsPage').then((m) => ({ default: m.DocsFeaturePage })),
+)
 const SheetViewerPage = lazy(() => import('./pages/sheets/viewer/SheetViewerPage'))
 const AttachmentPreviewPage = lazy(() => import('./pages/preview/AttachmentPreviewPage'))
 const SheetHtmlPreviewPage = lazy(() => import('./pages/preview/SheetHtmlPreviewPage'))
@@ -398,6 +404,9 @@ function AppRoutes() {
                   <Route path="/disclaimer" element={<DisclaimerPage />} />
                   <Route path="/data-request" element={<DataRequestPage />} />
                   <Route path="/about" element={<AboutPage />} />
+                  {/* Public feature catalog — v2 design refresh Week 2 */}
+                  <Route path="/docs" element={<DocsPage />} />
+                  <Route path="/docs/:slug" element={<DocsFeaturePage />} />
                   <Route path="/pricing" element={<PricingPage />} />
                   <Route path="/supporters" element={<SupportersPage />} />
                   <Route path="/forgot-password" element={<ForgotPasswordPage />} />
@@ -417,6 +426,16 @@ function AppRoutes() {
                     element={
                       <PrivateRoute>
                         <SheetsPage />
+                      </PrivateRoute>
+                    }
+                  />
+                  {/* Teacher workspace — v2 design refresh Week 2. Non-
+                     teachers are redirected inside the component to /sheets. */}
+                  <Route
+                    path="/teach/materials"
+                    element={
+                      <PrivateRoute>
+                        <TeachMaterialsPage />
                       </PrivateRoute>
                     }
                   />

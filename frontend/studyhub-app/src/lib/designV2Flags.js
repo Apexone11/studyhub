@@ -36,6 +36,16 @@ const FLAG_NAMES = {
   onboarding: 'design_v2_onboarding',
   feedPolish: 'design_v2_feed_polish',
   homeHero: 'design_v2_home_hero',
+  // Week 2 of v2 refresh — see
+  // docs/internal/design-refresh-v2-week2-to-week5-execution.md
+  teachMaterials: 'design_v2_teach_materials',
+  docsPublic: 'design_v2_docs_public',
+  groupsPolish: 'design_v2_groups_polish',
+  roleChecklist: 'design_v2_role_checklist',
+  weeklyFocus: 'design_v2_weekly_focus',
+  // Week 3 — Section-aware publishing (Sections + Materials + bulk assign).
+  // See docs/internal/design-refresh-v2-week2-to-week5-execution.md §W3.
+  teachSections: 'design_v2_teach_sections',
 }
 
 // Module-level cache keyed by flag name → Promise<boolean>. Shared across
@@ -71,6 +81,16 @@ const DEFAULTS = {
   onboarding: true,
   feedPolish: true,
   homeHero: true,
+  // Week 2 flags — fail-open defaults. `weeklyFocus` stays false by default
+  // until the Week 3 merge of GoalTriage + InterestChipRow + WeeklyProgress.
+  teachMaterials: true,
+  docsPublic: true,
+  groupsPolish: true,
+  roleChecklist: true,
+  weeklyFocus: false,
+  // Section-aware publishing opens gated (fail-open true, same as other Week 3
+  // surfaces). Gate flip is cohort-driven server-side.
+  teachSections: true,
   loading: true,
 }
 
@@ -88,6 +108,12 @@ export function useDesignV2Flags() {
       fetchFlag(FLAG_NAMES.onboarding),
       fetchFlag(FLAG_NAMES.feedPolish),
       fetchFlag(FLAG_NAMES.homeHero),
+      fetchFlag(FLAG_NAMES.teachMaterials),
+      fetchFlag(FLAG_NAMES.docsPublic),
+      fetchFlag(FLAG_NAMES.groupsPolish),
+      fetchFlag(FLAG_NAMES.roleChecklist),
+      fetchFlag(FLAG_NAMES.weeklyFocus),
+      fetchFlag(FLAG_NAMES.teachSections),
     ])
       .then(
         ([
@@ -99,6 +125,12 @@ export function useDesignV2Flags() {
           onboarding,
           feedPolish,
           homeHero,
+          teachMaterials,
+          docsPublic,
+          groupsPolish,
+          roleChecklist,
+          weeklyFocus,
+          teachSections,
         ]) => {
           if (cancelled) return
           setFlags({
@@ -110,6 +142,12 @@ export function useDesignV2Flags() {
             onboarding,
             feedPolish,
             homeHero,
+            teachMaterials,
+            docsPublic,
+            groupsPolish,
+            roleChecklist,
+            weeklyFocus,
+            teachSections,
             loading: false,
           })
         },

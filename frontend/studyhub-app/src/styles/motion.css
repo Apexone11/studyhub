@@ -1,0 +1,188 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+ * motion.css — Design Refresh v2 motion primitives (Week 2).
+ *
+ * Foundational hover / press / focus / skeleton animations used across every
+ * interactive surface. Keeps motion consistent and cheap (no JS, no libs).
+ *
+ * All primitives honor `@media (prefers-reduced-motion: reduce)` by disabling
+ * transforms and animations. Focus rings always render (they're accessibility
+ * critical, not decoration).
+ *
+ * Usage:
+ *   <button class="sh-hover-lift sh-press sh-focus-ring">...</button>
+ *
+ * See docs/internal/design-refresh-v2-week2-to-week5-execution.md §0.2
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ---------- Hover lift ---------------------------------------------------- */
+.sh-hover-lift {
+  transition:
+    transform 120ms ease-out,
+    box-shadow 120ms ease-out,
+    border-color 120ms ease-out;
+  will-change: transform;
+}
+
+.sh-hover-lift:hover {
+  transform: translateY(-1px);
+}
+
+/* ---------- Active press -------------------------------------------------- */
+.sh-press {
+  transition: transform 80ms ease-in;
+}
+
+.sh-press:active {
+  transform: scale(0.98);
+}
+
+/* Combined variant so a single class covers both without nesting. */
+.sh-hover-lift.sh-press:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* ---------- Focus ring ---------------------------------------------------- */
+.sh-focus-ring:focus {
+  outline: none;
+}
+
+.sh-focus-ring:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--sh-focus-ring, rgba(37, 99, 235, 0.35));
+}
+
+/* ---------- Skeleton shimmer --------------------------------------------- */
+@keyframes sh-skeleton-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.sh-skeleton {
+  background: linear-gradient(90deg, var(--sh-soft) 25%, var(--sh-border) 50%, var(--sh-soft) 75%);
+  background-size: 200% 100%;
+  animation: sh-skeleton-shimmer 1.6s linear infinite;
+  border-radius: var(--radius-sm);
+}
+
+/* ---------- Fade-in on mount --------------------------------------------- */
+@keyframes sh-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sh-fade-up {
+  animation: sh-fade-up 220ms ease-out both;
+}
+
+/* Stagger helpers — add to children to cascade the fade */
+.sh-fade-up-stagger > *:nth-child(1) {
+  animation-delay: 0ms;
+}
+.sh-fade-up-stagger > *:nth-child(2) {
+  animation-delay: 40ms;
+}
+.sh-fade-up-stagger > *:nth-child(3) {
+  animation-delay: 80ms;
+}
+.sh-fade-up-stagger > *:nth-child(4) {
+  animation-delay: 120ms;
+}
+.sh-fade-up-stagger > *:nth-child(5) {
+  animation-delay: 160ms;
+}
+.sh-fade-up-stagger > *:nth-child(6) {
+  animation-delay: 200ms;
+}
+.sh-fade-up-stagger > *:nth-child(n + 7) {
+  animation-delay: 240ms;
+}
+
+/* ---------- Pulse (for unmet goal ring, unread badges) ------------------- */
+@keyframes sh-pulse-soft {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.02);
+    opacity: 0.95;
+  }
+}
+
+.sh-pulse-soft {
+  animation: sh-pulse-soft 3s ease-in-out infinite;
+}
+
+/* ---------- Ring expand (badge count bump) ------------------------------- */
+@keyframes sh-badge-bump {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.sh-badge-bump {
+  animation: sh-badge-bump 600ms ease-out;
+}
+
+/* ---------- Card surface (consistent radius + border) -------------------- */
+.sh-card {
+  background: var(--sh-surface);
+  border: 1px solid var(--sh-border);
+  border-radius: var(--radius-card);
+}
+
+.sh-card.sh-hover-lift:hover {
+  border-color: var(--sh-border-strong);
+}
+
+/* ---------- Chip / pill (small radius, never sharp) ---------------------- */
+.sh-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  background: var(--sh-soft);
+  border: 1px solid var(--sh-border);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sh-heading);
+}
+
+/* ---------- Reduced motion ----------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .sh-hover-lift,
+  .sh-press,
+  .sh-fade-up,
+  .sh-pulse-soft,
+  .sh-badge-bump,
+  .sh-skeleton {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .sh-hover-lift:hover,
+  .sh-press:active,
+  .sh-hover-lift.sh-press:active {
+    transform: none !important;
+  }
+
+  /* Focus ring MUST still render — it's accessibility critical. */
+}

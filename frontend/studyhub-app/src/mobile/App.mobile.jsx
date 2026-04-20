@@ -3,12 +3,21 @@
 // Renders mobile-specific routes with bottom tab navigation.
 // Shares SessionProvider and auth state with the web app.
 
-import { Suspense, lazy } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useState } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useSession } from '../lib/session-context'
 import { useDeepLinkRouter } from '../lib/mobile/deepLinking'
 import BottomTabBar from './components/BottomTabBar'
+import BrandedSplash from './components/BrandedSplash'
+import { ToastProvider } from './components/Toast'
 import './mobile.css'
+// Mobile Design Refresh v3 — "Campus Lab Aurora" foundation.
+// See docs/internal/mobile-design-refresh-v3-spec.md
+import './styles/tokens.css'
+import './styles/motion.css'
+import './styles/type.css'
+import './styles/primitives.css'
+import './styles/shell.css'
 
 // ── Lazy-loaded pages ──────────────────────────────────────────
 const MobileLandingPage = lazy(() => import('./pages/MobileLandingPage'))
@@ -97,156 +106,192 @@ function MobileTabShell({ children }) {
 
 // ── Main mobile routes ─────────────────────────────────────────
 
+function useMobileBodyClass() {
+  useEffect(() => {
+    if (typeof document === 'undefined') return undefined
+    document.body.classList.add('sh-mobile')
+    return () => {
+      document.body.classList.remove('sh-mobile')
+    }
+  }, [])
+}
+
+function useSplash() {
+  // Skip the splash on non-mobile preview surfaces so dev iteration
+  // on the web-preview of the mobile shell isn't blocked.
+  const [done, setDone] = useState(() => {
+    if (typeof window === 'undefined') return true
+    if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('sh-m-splash-done')) {
+      return true
+    }
+    return false
+  })
+  const markDone = useCallback(() => {
+    setDone(true)
+    try {
+      sessionStorage.setItem('sh-m-splash-done', '1')
+    } catch {
+      /* storage may be unavailable */
+    }
+  }, [])
+  return [done, markDone]
+}
+
 export default function AppMobile() {
+  useMobileBodyClass()
+  const [splashDone, markSplashDone] = useSplash()
   return (
-    <Suspense fallback={<MobileFallback />}>
-      <MobileTabShell>
-        <Routes>
-          {/* Public: landing page */}
-          <Route
-            path="/m/landing"
-            element={
-              <MobilePublicRoute>
-                <MobileLandingPage />
-              </MobilePublicRoute>
-            }
-          />
+    <ToastProvider>
+      {!splashDone && <BrandedSplash onDone={markSplashDone} />}
+      <Suspense fallback={<MobileFallback />}>
+        <MobileTabShell>
+          <Routes>
+            {/* Public: landing page */}
+            <Route
+              path="/m/landing"
+              element={
+                <MobilePublicRoute>
+                  <MobileLandingPage />
+                </MobilePublicRoute>
+              }
+            />
 
-          {/* Onboarding flow (requires auth) */}
-          <Route
-            path="/m/onboarding/goals"
-            element={
-              <MobilePrivateRoute>
-                <OnboardingGoals />
-              </MobilePrivateRoute>
-            }
-          />
-          <Route
-            path="/m/onboarding/people"
-            element={
-              <MobilePrivateRoute>
-                <OnboardingPeople />
-              </MobilePrivateRoute>
-            }
-          />
-          <Route
-            path="/m/onboarding/notifications"
-            element={
-              <MobilePrivateRoute>
-                <OnboardingNotifs />
-              </MobilePrivateRoute>
-            }
-          />
-          <Route
-            path="/m/onboarding/welcome"
-            element={
-              <MobilePrivateRoute>
-                <WelcomeSplash />
-              </MobilePrivateRoute>
-            }
-          />
+            {/* Onboarding flow (requires auth) */}
+            <Route
+              path="/m/onboarding/goals"
+              element={
+                <MobilePrivateRoute>
+                  <OnboardingGoals />
+                </MobilePrivateRoute>
+              }
+            />
+            <Route
+              path="/m/onboarding/people"
+              element={
+                <MobilePrivateRoute>
+                  <OnboardingPeople />
+                </MobilePrivateRoute>
+              }
+            />
+            <Route
+              path="/m/onboarding/notifications"
+              element={
+                <MobilePrivateRoute>
+                  <OnboardingNotifs />
+                </MobilePrivateRoute>
+              }
+            />
+            <Route
+              path="/m/onboarding/welcome"
+              element={
+                <MobilePrivateRoute>
+                  <WelcomeSplash />
+                </MobilePrivateRoute>
+              }
+            />
 
-          {/* Tab pages (require auth) */}
-          <Route
-            path="/m/home"
-            element={
-              <MobilePrivateRoute>
-                <MobileHomePage />
-              </MobilePrivateRoute>
-            }
-          />
-          <Route
-            path="/m/messages"
-            element={
-              <MobilePrivateRoute>
-                <MobileMessagesPage />
-              </MobilePrivateRoute>
-            }
-          />
-          <Route
-            path="/m/ai"
-            element={
-              <MobilePrivateRoute>
-                <MobileAiPage />
-              </MobilePrivateRoute>
-            }
-          />
-          <Route
-            path="/m/profile"
-            element={
-              <MobilePrivateRoute>
-                <MobileProfilePage />
-              </MobilePrivateRoute>
-            }
-          />
+            {/* Tab pages (require auth) */}
+            <Route
+              path="/m/home"
+              element={
+                <MobilePrivateRoute>
+                  <MobileHomePage />
+                </MobilePrivateRoute>
+              }
+            />
+            <Route
+              path="/m/messages"
+              element={
+                <MobilePrivateRoute>
+                  <MobileMessagesPage />
+                </MobilePrivateRoute>
+              }
+            />
+            <Route
+              path="/m/ai"
+              element={
+                <MobilePrivateRoute>
+                  <MobileAiPage />
+                </MobilePrivateRoute>
+              }
+            />
+            <Route
+              path="/m/profile"
+              element={
+                <MobilePrivateRoute>
+                  <MobileProfilePage />
+                </MobilePrivateRoute>
+              }
+            />
 
-          {/* Detail pages (require auth) */}
-          <Route
-            path="/m/messages/:conversationId"
-            element={
-              <MobilePrivateRoute>
-                <MobileMessageThread />
-              </MobilePrivateRoute>
-            }
-          />
-          <Route
-            path="/m/sheets/:sheetId"
-            element={
-              <MobilePrivateRoute>
-                <MobileSheetDetail />
-              </MobilePrivateRoute>
-            }
-          />
-          <Route
-            path="/m/notes"
-            element={
-              <MobilePrivateRoute>
-                <MobileNotesPage />
-              </MobilePrivateRoute>
-            }
-          />
-          <Route
-            path="/m/notes/:noteId"
-            element={
-              <MobilePrivateRoute>
-                <MobileNoteDetail />
-              </MobilePrivateRoute>
-            }
-          />
-          <Route
-            path="/m/search"
-            element={
-              <MobilePrivateRoute>
-                <MobileSearchPage />
-              </MobilePrivateRoute>
-            }
-          />
-          <Route
-            path="/m/groups/:groupId"
-            element={
-              <MobilePrivateRoute>
-                <MobileStudyGroupDetail />
-              </MobilePrivateRoute>
-            }
-          />
-          <Route
-            path="/m/users/:username"
-            element={
-              <MobilePrivateRoute>
-                <MobileUserProfilePage />
-              </MobilePrivateRoute>
-            }
-          />
+            {/* Detail pages (require auth) */}
+            <Route
+              path="/m/messages/:conversationId"
+              element={
+                <MobilePrivateRoute>
+                  <MobileMessageThread />
+                </MobilePrivateRoute>
+              }
+            />
+            <Route
+              path="/m/sheets/:sheetId"
+              element={
+                <MobilePrivateRoute>
+                  <MobileSheetDetail />
+                </MobilePrivateRoute>
+              }
+            />
+            <Route
+              path="/m/notes"
+              element={
+                <MobilePrivateRoute>
+                  <MobileNotesPage />
+                </MobilePrivateRoute>
+              }
+            />
+            <Route
+              path="/m/notes/:noteId"
+              element={
+                <MobilePrivateRoute>
+                  <MobileNoteDetail />
+                </MobilePrivateRoute>
+              }
+            />
+            <Route
+              path="/m/search"
+              element={
+                <MobilePrivateRoute>
+                  <MobileSearchPage />
+                </MobilePrivateRoute>
+              }
+            />
+            <Route
+              path="/m/groups/:groupId"
+              element={
+                <MobilePrivateRoute>
+                  <MobileStudyGroupDetail />
+                </MobilePrivateRoute>
+              }
+            />
+            <Route
+              path="/m/users/:username"
+              element={
+                <MobilePrivateRoute>
+                  <MobileUserProfilePage />
+                </MobilePrivateRoute>
+              }
+            />
 
-          {/* Legal pages (accessible without auth) */}
-          <Route path="/m/terms" element={<MobileTermsPage />} />
-          <Route path="/m/privacy" element={<MobilePrivacyPage />} />
+            {/* Legal pages (accessible without auth) */}
+            <Route path="/m/terms" element={<MobileTermsPage />} />
+            <Route path="/m/privacy" element={<MobilePrivacyPage />} />
 
-          {/* Default: redirect to landing or home */}
-          <Route path="*" element={<MobileDefaultRedirect />} />
-        </Routes>
-      </MobileTabShell>
-    </Suspense>
+            {/* Default: redirect to landing or home */}
+            <Route path="*" element={<MobileDefaultRedirect />} />
+          </Routes>
+        </MobileTabShell>
+      </Suspense>
+    </ToastProvider>
   )
 }
 

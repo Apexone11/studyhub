@@ -277,11 +277,17 @@ async function sendVerificationCodeEmail(email, username, code, metadata = {}) {
  * override it, so this is a non-forgeable second signal.
  *
  * Capacitor origins we accept:
- *   - `https://localhost` — Android when `server.androidScheme: 'https'`
- *     (our current capacitor.config.json)
+ *   - `http://localhost` — Android when `server.androidScheme: 'http'`
+ *     (our current capacitor.config.json — chosen for dev so the WebView
+ *     can fetch the http dev backend without a mixed-content block)
+ *   - `https://localhost` — Android alt scheme (kept for future prod builds)
  *   - `capacitor://localhost` — iOS default scheme
  */
-const CAPACITOR_NATIVE_ORIGINS = new Set(['https://localhost', 'capacitor://localhost'])
+const CAPACITOR_NATIVE_ORIGINS = new Set([
+  'http://localhost',
+  'https://localhost',
+  'capacitor://localhost',
+])
 
 function isMobileClient(req) {
   if (!req || !req.headers) return false

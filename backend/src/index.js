@@ -77,6 +77,8 @@ const studyStatusRoutes = require('./modules/studyStatus')
 const onboardingRoutes = require('./modules/onboarding')
 const referralRoutes = require('./modules/referrals')
 const hashtagsRoutes = require('./modules/hashtags')
+const sectionsRoutes = require('./modules/sections')
+const materialsRoutes = require('./modules/materials')
 const crypto = require('node:crypto')
 const log = require('./lib/logger')
 const { httpLogger } = require('./lib/httpLogger')
@@ -503,6 +505,12 @@ app.use('/api/onboarding', onboardingRoutes)
 // Referral system (invite, track, resolve, rewards).
 app.use('/api/referrals', referralRoutes)
 app.use('/api/hashtags', hashtagsRoutes)
+
+// Sections + Materials (Week 3 of v2 design refresh — teacher section-aware publishing).
+// Frontend is gated by `design_v2_teach_sections`; server-side endpoints stay available
+// to teacher accounts so the flag flip is one-sided and safe to roll back.
+app.use('/api/sections', sectionsRoutes)
+app.use('/api/materials', materialsRoutes)
 
 // Waitlist module (Phase 0 — confirmation email + in-app notification + admin endpoints)
 app.use('/api/waitlist', require('./modules/waitlist'))

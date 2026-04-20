@@ -62,13 +62,16 @@
   --elevation-2: var(--shadow-md);
   --elevation-3: var(--shadow-lg);
 
-  /* ── Radius ──────────────────────────────────────────────────────── */
-  --radius-sm: 6px;
-  --radius: 10px;
-  --radius-card: 14px;
-  --radius-lg: 20px;
-  --radius-control: 10px;
+  /* ── Radius — v2 design refresh (no sharp corners policy) ────────── */
+  /* Bumped sm (6→8) and base (10→12) so nothing reads as a sharp edge. */
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-card: 16px;
+  --radius-lg: 24px;
+  --radius-control: 12px;
   --radius-full: 9999px;
+  /* Focus ring used by .sh-focus-ring primitive in motion.css */
+  --sh-focus-ring: rgba(37, 99, 235, 0.35);
 
   /* ── Controls ────────────────────────────────────────────────────── */
   --control-h-sm: 2rem;

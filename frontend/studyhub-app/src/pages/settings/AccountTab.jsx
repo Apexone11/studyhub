@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { API } from '../../config'
 import { Button, FormField, Input, Message, MsgList, SectionCard } from './settingsShared'
 import { FONT } from './settingsState'
@@ -160,6 +160,31 @@ export default function AccountTab({
   return (
     <>
       <RoleTile user={user} />
+      {/* Discoverability shortcut into the public /docs catalog.
+          Added in Design Refresh v2 Week 2 so teachers and self-learners
+          landing on Settings always have a one-click path into the feature
+          guide for their role. */}
+      <SectionCard
+        title="Help and docs"
+        subtitle="New to StudyHub or onboarding your students? The product docs cover every feature, organized by what you are trying to do."
+      >
+        <Link
+          to="/docs"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            color: 'var(--sh-accent, #2563eb)',
+            textDecoration: 'none',
+            fontWeight: 700,
+            fontSize: 14,
+            fontFamily: FONT,
+          }}
+        >
+          Open product docs
+          <span aria-hidden="true">&rarr;</span>
+        </Link>
+      </SectionCard>
       <SectionCard
         title="Email Address"
         subtitle={

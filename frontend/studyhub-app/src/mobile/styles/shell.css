@@ -1,0 +1,336 @@
+/* src/mobile/styles/shell.css
+ * Shell chrome — top bar, floating tab bar, branded splash.
+ * See spec §4.6 + §4.7 + §5.1.
+ */
+
+/* ─────────────────────────────────────────────────────────────────
+ * MobileTopBar (frosted + sticky + collapsing title)
+ * ───────────────────────────────────────────────────────────────── */
+
+body.sh-mobile .sh-m-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  align-items: center;
+  gap: 8px;
+  height: calc(var(--sh-mobile-topbar-height) + var(--sh-mobile-safe-top));
+  padding-top: var(--sh-mobile-safe-top);
+  padding-inline: var(--sh-mobile-gutter);
+  background: var(--sh-mobile-glass);
+  backdrop-filter: blur(var(--sh-mobile-blur));
+  -webkit-backdrop-filter: blur(var(--sh-mobile-blur));
+  border-bottom: 1px solid transparent;
+  transition:
+    border-color var(--dur-quick) var(--ease-smooth),
+    background var(--dur-quick) var(--ease-smooth);
+}
+
+/* Fallback for WebViews without backdrop-filter support. */
+@supports not (backdrop-filter: blur(2px)) {
+  body.sh-mobile .sh-m-topbar {
+    background: var(--sh-surface);
+  }
+}
+
+body.sh-mobile .sh-m-topbar--scrolled {
+  border-bottom-color: var(--sh-border);
+}
+
+body.sh-mobile .sh-m-topbar--transparent {
+  background: transparent;
+  backdrop-filter: none;
+  border-bottom-color: transparent;
+}
+
+body.sh-mobile .sh-m-topbar__slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--sh-mobile-topbar-height);
+}
+body.sh-mobile .sh-m-topbar__slot--right {
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+body.sh-mobile .sh-m-topbar__title {
+  margin: 0;
+  font-family: var(--font);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--sh-heading);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 1;
+  transition: opacity var(--dur-quick) var(--ease-smooth);
+}
+
+body.sh-mobile .sh-m-topbar__title--hidden {
+  opacity: 0;
+}
+
+body.sh-mobile .sh-m-topbar__icon-btn {
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--sh-text);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background var(--dur-quick) var(--ease-smooth);
+}
+body.sh-mobile .sh-m-topbar__icon-btn:hover {
+  background: var(--sh-soft);
+}
+body.sh-mobile .sh-m-topbar__icon-btn:active {
+  transform: scale(0.94);
+}
+
+body.sh-mobile .sh-m-topbar__badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  background: var(--sh-brand);
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--sh-mobile-glass);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * BottomTabBar — floating pill with center Compose FAB.
+ * ───────────────────────────────────────────────────────────────── */
+
+body.sh-mobile .sh-m-tabbar {
+  position: fixed;
+  left: 50%;
+  bottom: var(--sh-mobile-tab-inset);
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: var(--sh-mobile-tab-height);
+  padding: 10px 14px;
+  border-radius: 36px;
+  background: var(--sh-mobile-glass);
+  backdrop-filter: blur(var(--sh-mobile-blur));
+  -webkit-backdrop-filter: blur(var(--sh-mobile-blur));
+  box-shadow: var(--shadow-float);
+  border: 1px solid var(--sh-border);
+  max-width: calc(100% - 24px);
+}
+
+@supports not (backdrop-filter: blur(2px)) {
+  body.sh-mobile .sh-m-tabbar {
+    background: var(--sh-surface);
+  }
+}
+
+body.sh-mobile .sh-m-tabbar__item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 56px;
+  height: 52px;
+  border: none;
+  background: transparent;
+  color: var(--sh-muted);
+  cursor: pointer;
+  border-radius: var(--radius-card);
+  -webkit-tap-highlight-color: transparent;
+  transition: color var(--dur-quick) var(--ease-smooth);
+}
+
+body.sh-mobile .sh-m-tabbar__item:active {
+  transform: scale(0.94);
+}
+
+body.sh-mobile .sh-m-tabbar__item--active {
+  color: var(--sh-brand);
+}
+
+body.sh-mobile .sh-m-tabbar__item-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+body.sh-mobile .sh-m-tabbar__item-underline {
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  width: 18px;
+  height: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--sh-brand);
+  transform: translateX(-50%) scaleX(0);
+  transform-origin: center;
+  transition: transform var(--dur-base) var(--ease-spring);
+}
+body.sh-mobile .sh-m-tabbar__item--active .sh-m-tabbar__item-underline {
+  transform: translateX(-50%) scaleX(1);
+}
+
+body.sh-mobile .sh-m-tabbar__avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--sh-soft);
+  object-fit: cover;
+  border: 2px solid transparent;
+  transition: border-color var(--dur-quick) var(--ease-smooth);
+}
+body.sh-mobile .sh-m-tabbar__item--active .sh-m-tabbar__avatar {
+  border-color: var(--sh-brand);
+}
+
+body.sh-mobile .sh-m-tabbar__compose {
+  width: 56px;
+  height: 56px;
+  margin: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-full);
+  background: var(--sh-ai-gradient);
+  color: var(--sh-btn-primary-text);
+  box-shadow: var(--shadow-float);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform var(--dur-instant) var(--ease-spring);
+}
+body.sh-mobile .sh-m-tabbar__compose:active {
+  transform: scale(0.94);
+}
+
+/* Give the page content room for the floating tab bar. */
+body.sh-mobile .mob-shell-content {
+  padding-bottom: calc(var(--sh-mobile-tab-inset) + var(--sh-mobile-tab-height) + 16px) !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * Compose sheet content
+ * ───────────────────────────────────────────────────────────────── */
+
+body.sh-mobile .sh-m-compose-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 0 24px;
+}
+body.sh-mobile .sh-m-compose-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--sh-border);
+  border-radius: var(--radius-card);
+  background: var(--sh-surface);
+  color: var(--sh-text);
+  cursor: pointer;
+  transition: transform var(--dur-instant) var(--ease-spring);
+}
+body.sh-mobile .sh-m-compose-item:active {
+  transform: scale(0.98);
+}
+body.sh-mobile .sh-m-compose-item__icon {
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-card);
+  background: var(--sh-brand-soft-bg);
+  color: var(--sh-brand-hover);
+}
+body.sh-mobile .sh-m-compose-item__title {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--sh-heading);
+}
+body.sh-mobile .sh-m-compose-item__desc {
+  font-size: 0.82rem;
+  color: var(--sh-subtext);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * BrandedSplash
+ * ───────────────────────────────────────────────────────────────── */
+
+body.sh-mobile .sh-m-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483646;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--sh-bg);
+  overflow: hidden;
+}
+
+body.sh-mobile .sh-m-splash__mesh {
+  position: absolute;
+  inset: -20%;
+  background: var(--sh-mobile-mesh);
+  filter: blur(60px);
+  opacity: 0;
+  transition: opacity var(--dur-slow) var(--ease-smooth);
+}
+body.sh-mobile .sh-m-splash--ready .sh-m-splash__mesh {
+  opacity: 0.55;
+}
+
+body.sh-mobile .sh-m-splash__mark {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-family: var(--font);
+  font-size: 2.4rem;
+  font-weight: 800;
+  color: var(--sh-heading);
+  letter-spacing: -0.03em;
+  transform: scale(0.96);
+  opacity: 0;
+  transition:
+    opacity var(--dur-base) var(--ease-out-quart),
+    transform var(--dur-slow) var(--ease-spring);
+}
+body.sh-mobile .sh-m-splash--ready .sh-m-splash__mark {
+  opacity: 1;
+  transform: scale(1);
+}
+
+body.sh-mobile .sh-m-splash__dot {
+  position: absolute;
+  top: -6px;
+  left: 38%;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--sh-brand);
+  transform: scale(0);
+  transition: transform var(--dur-base) var(--ease-spring) 180ms;
+}
+body.sh-mobile .sh-m-splash--ready .sh-m-splash__dot {
+  transform: scale(1);
+}
+
+body.sh-mobile .sh-m-splash--leaving {
+  opacity: 0;
+  transition: opacity var(--dur-quick) var(--ease-in-quart);
+  pointer-events: none;
+}

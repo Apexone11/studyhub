@@ -191,7 +191,13 @@ export default function AppSidebar({ mode = 'fixed' }) {
           <div className="sh-label" style={{ marginBottom: 8, paddingLeft: 2 }}>
             MY TEACHING
           </div>
-          <Link to="/sheets?mine=true" className="sh-sidebar-nav-link" onClick={handleNavClick}>
+          {/*
+            v2 design refresh Week 2 — teacher links now point at standalone
+            workspaces instead of ?mine=true filters on the generic pages.
+            /teach/materials is live in W2. /groups/mine lands in W3; until
+            then we keep the legacy ?mine=true target so the link still works.
+          */}
+          <Link to="/teach/materials" className="sh-sidebar-nav-link" onClick={handleNavClick}>
             <IconSheets size={15} />
             My Materials
           </Link>

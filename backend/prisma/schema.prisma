@@ -163,6 +163,9 @@ model User {
   hashtagFollows             HashtagFollow[]
   learningGoals              LearningGoal[]
   courseExams                CourseExam[]
+  sectionsTaught             Section[]              @relation("SectionTeacher")
+  sectionEnrollments         SectionEnrollment[]    @relation("SectionEnrollmentUser")
+  materialsAuthored          Material[]             @relation("MaterialTeacher")
 
   @@index([role])
   @@index([emailHash])
@@ -268,6 +271,7 @@ model Course {
   feedPosts   FeedPost[]
   studyGroups StudyGroup[]
   courseExams CourseExam[]
+  sections    Section[]
 
   @@unique([schoolId, code])
 }
@@ -340,6 +344,7 @@ model StudySheet {
   pinnedBy              UserPinnedSheet[]
   aiReviewLogs          AiReviewLog[]
   studyStatuses         StudyStatus[]
+  materials             Material[]          @relation("MaterialSheet")
 
   @@index([createdAt(sort: Desc)])
   @@index([courseId, createdAt(sort: Desc)])
@@ -470,6 +475,7 @@ model Note {
   noteStars        NoteStar[]
   noteVersions     NoteVersion[]
   noteReactions    NoteReaction[]
+  materials        Material[]    @relation("MaterialNote")
   revision         Int           @default(0)
   lastSaveId       String?       @db.Uuid
 }
@@ -2431,4 +2437,93 @@ model CourseExam {
 
   @@index([userId, examDate])
   @@index([courseId, examDate])
+}
+
+// Section — teacher-owned cohort used for section-aware publishing.
+// Week 3 of Design Refresh v2 (see docs/internal/design-refresh-v2-
+// week2-to-week5-execution.md). A section is optionally tied to a
+// Course; a teacher can also create ad-hoc sections that span courses.
+// joinCode is what students enter to self-enroll from
+// /classes/join?code=XYZ.
+model Section {
+  id          Int      @id @default(autoincrement())
+  courseId    Int?
+  teacherId   Int
+  name        String
+  description String   @default("")
+  joinCode    String   @unique
+  archived    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  course      Course?              @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  teacher     User                 @relation("SectionTeacher", fields: [teacherId], references: [id], onDelete: Cascade)
+  enrollments SectionEnrollment[]
+  assignments MaterialAssignment[]
+
+  @@index([teacherId, archived])
+  @@index([courseId])
+}
+
+// SectionEnrollment — a student's membership in a Section. Role is a
+// String so future "ta" (teaching assistant) roles can be added without
+// a schema migration.
+model SectionEnrollment {
+  id         Int      @id @default(autoincrement())
+  sectionId  Int
+  userId     Int
+  role       String   @default("student")
+  enrolledAt DateTime @default(now())
+
+  section Section @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  user    User    @relation("SectionEnrollmentUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([sectionId, userId])
+  @@index([userId])
+}
+
+// Material — teacher-curated wrapper around an existing StudySheet or
+// Note. The wrapper exists so teachers can override the title, attach
+// per-class instructions, and group items by week without mutating the
+// underlying content. Exactly one of (sheetId, noteId) is expected to
+// be non-null; this invariant is enforced in the service layer because
+// Postgres CHECK constraints aren't first-class in Prisma.
+model Material {
+  id           Int      @id @default(autoincrement())
+  teacherId    Int
+  sheetId      Int?
+  noteId       Int?
+  title        String
+  instructions String   @default("")
+  week         Int?
+  archived     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  teacher     User                 @relation("MaterialTeacher", fields: [teacherId], references: [id], onDelete: Cascade)
+  sheet       StudySheet?          @relation("MaterialSheet", fields: [sheetId], references: [id], onDelete: SetNull)
+  note        Note?                @relation("MaterialNote", fields: [noteId], references: [id], onDelete: SetNull)
+  assignments MaterialAssignment[]
+
+  @@index([teacherId, archived])
+  @@index([sheetId])
+  @@index([noteId])
+}
+
+// MaterialAssignment — join between Material and Section with per-
+// assignment metadata (optional due date). Unique on (materialId,
+// sectionId) so the same material cannot be assigned to the same
+// section twice.
+model MaterialAssignment {
+  id         Int       @id @default(autoincrement())
+  materialId Int
+  sectionId  Int
+  dueAt      DateTime?
+  assignedAt DateTime  @default(now())
+
+  material Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  section  Section  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@unique([materialId, sectionId])
+  @@index([sectionId, dueAt])
 }

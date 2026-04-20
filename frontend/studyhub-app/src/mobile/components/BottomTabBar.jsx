@@ -1,107 +1,227 @@
 // src/mobile/components/BottomTabBar.jsx
-// Four-tab bottom navigation: Home, Messages, AI, Profile.
-// Active tab uses brand color; inactive uses muted. Safe-area inset respected.
+// Floating pill bottom tab bar with center Compose FAB.
+// See docs/internal/mobile-design-refresh-v3-spec.md §4.6.
 
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { useSession } from '../../lib/session-context'
+import haptics from '../lib/haptics'
+import BottomSheet from './BottomSheet'
 
 function TabIcon({ name, active }) {
-  const color = active ? 'var(--sh-brand)' : 'var(--sh-muted)'
   const weight = active ? '2.2' : '1.8'
+  const fill = active ? 'currentColor' : 'none'
 
-  const icons = {
-    home: (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+  if (name === 'home') {
+    return (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill={fill} aria-hidden="true">
         <path
           d="M3 10.5L12 3l9 7.5V20a1 1 0 01-1 1h-4.5v-5.5a1 1 0 00-1-1h-3a1 1 0 00-1 1V21H5a1 1 0 01-1-1V10.5z"
-          stroke={color}
+          stroke="currentColor"
           strokeWidth={weight}
           strokeLinecap="round"
           strokeLinejoin="round"
         />
       </svg>
-    ),
-    messages: (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    )
+  }
+  if (name === 'messages') {
+    return (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill={fill} aria-hidden="true">
         <path
           d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2v10z"
-          stroke={color}
+          stroke="currentColor"
           strokeWidth={weight}
           strokeLinecap="round"
           strokeLinejoin="round"
         />
       </svg>
-    ),
-    ai: (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    )
+  }
+  if (name === 'ai') {
+    return (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill={fill} aria-hidden="true">
         <path
           d="M12 2L9.5 8.5 3 12l6.5 3.5L12 22l2.5-6.5L21 12l-6.5-3.5L12 2z"
-          stroke={color}
+          stroke="currentColor"
           strokeWidth={weight}
           strokeLinecap="round"
           strokeLinejoin="round"
         />
       </svg>
-    ),
-    profile: (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <circle cx="12" cy="8" r="4" stroke={color} strokeWidth={weight} />
-        <path
-          d="M5 20c0-3.314 3.134-6 7-6s7 2.686 7 6"
-          stroke={color}
-          strokeWidth={weight}
-          strokeLinecap="round"
-        />
-      </svg>
-    ),
+    )
   }
+  return null
+}
 
-  return icons[name] || null
+function ComposeIcon() {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+    </svg>
+  )
 }
 
 const TABS = [
   { key: 'home', label: 'Home', path: '/m/home' },
   { key: 'messages', label: 'Messages', path: '/m/messages' },
   { key: 'ai', label: 'Hub AI', path: '/m/ai' },
-  { key: 'profile', label: 'Profile', path: '/m/profile' },
+]
+
+const COMPOSE_OPTIONS = [
+  { key: 'post', title: 'New post', desc: 'Share something with your feed', path: '/submit' },
+  { key: 'sheet', title: 'New sheet', desc: 'Create a new study sheet', path: '/m/sheets/new' },
+  { key: 'note', title: 'New note', desc: 'Jot down a quick note', path: '/m/notes/new' },
+  { key: 'message', title: 'New message', desc: 'Start a conversation', path: '/m/messages' },
 ]
 
 export default function BottomTabBar() {
   const location = useLocation()
   const navigate = useNavigate()
+  const { user } = useSession()
+  const [composeOpen, setComposeOpen] = useState(false)
 
-  const activeTab = TABS.find((t) => location.pathname.startsWith(t.path))?.key || 'home'
+  const activeTab =
+    TABS.find((t) => location.pathname.startsWith(t.path))?.key ||
+    (location.pathname.startsWith('/m/profile') ? 'profile' : 'home')
 
   const handleTap = useCallback(
-    (path) => {
-      navigate(path)
+    (tab) => {
+      if (tab.key === activeTab) return
+      haptics.select()
+      navigate(tab.path)
+    },
+    [activeTab, navigate],
+  )
+
+  const handleProfileTap = useCallback(() => {
+    if (activeTab === 'profile') return
+    haptics.select()
+    navigate('/m/profile')
+  }, [activeTab, navigate])
+
+  const handleComposeTap = useCallback(() => {
+    haptics.tap()
+    setComposeOpen(true)
+  }, [])
+
+  const handleComposePick = useCallback(
+    (opt) => {
+      haptics.tap()
+      setComposeOpen(false)
+      navigate(opt.path)
     },
     [navigate],
   )
 
+  const profileActive = activeTab === 'profile'
+  const avatarInitial = (user?.username || user?.displayName || 'U').charAt(0).toUpperCase()
+
   return (
-    <nav className="mob-tab-bar" aria-label="Main navigation">
-      {TABS.map((tab) => {
-        const isActive = tab.key === activeTab
-        return (
-          <button
-            key={tab.key}
-            className={`mob-tab-bar-item ${isActive ? 'mob-tab-bar-item--active' : ''}`}
-            onClick={() => handleTap(tab.path)}
-            aria-current={isActive ? 'page' : undefined}
-            aria-label={tab.label}
-            type="button"
-          >
-            <TabIcon name={tab.key} active={isActive} />
-            <span
-              className="mob-tab-bar-label"
-              style={{ color: isActive ? 'var(--sh-brand)' : 'var(--sh-muted)' }}
+    <>
+      <nav className="sh-m-tabbar" aria-label="Main navigation">
+        {/* Left cluster: Home + Messages */}
+        {TABS.slice(0, 2).map((tab) => {
+          const isActive = tab.key === activeTab
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              className={`sh-m-tabbar__item ${isActive ? 'sh-m-tabbar__item--active' : ''}`.trim()}
+              onClick={() => handleTap(tab)}
+              aria-current={isActive ? 'page' : undefined}
+              aria-label={tab.label}
             >
-              {tab.label}
+              <TabIcon name={tab.key} active={isActive} />
+              <span className="sh-m-tabbar__item-label">{tab.label}</span>
+              <span className="sh-m-tabbar__item-underline" aria-hidden="true" />
+            </button>
+          )
+        })}
+
+        {/* Center compose FAB */}
+        <button
+          type="button"
+          className="sh-m-tabbar__compose"
+          onClick={handleComposeTap}
+          aria-label="Create"
+        >
+          <ComposeIcon />
+        </button>
+
+        {/* Right cluster: AI + Profile (avatar) */}
+        {TABS.slice(2).map((tab) => {
+          const isActive = tab.key === activeTab
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              className={`sh-m-tabbar__item ${isActive ? 'sh-m-tabbar__item--active' : ''}`.trim()}
+              onClick={() => handleTap(tab)}
+              aria-current={isActive ? 'page' : undefined}
+              aria-label={tab.label}
+            >
+              <TabIcon name={tab.key} active={isActive} />
+              <span className="sh-m-tabbar__item-label">{tab.label}</span>
+              <span className="sh-m-tabbar__item-underline" aria-hidden="true" />
+            </button>
+          )
+        })}
+
+        <button
+          type="button"
+          className={`sh-m-tabbar__item ${profileActive ? 'sh-m-tabbar__item--active' : ''}`.trim()}
+          onClick={handleProfileTap}
+          aria-current={profileActive ? 'page' : undefined}
+          aria-label="Profile"
+        >
+          {user?.avatarUrl ? (
+            <img
+              src={user.avatarUrl}
+              alt=""
+              className="sh-m-tabbar__avatar"
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <span
+              className="sh-m-tabbar__avatar"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                color: 'var(--sh-subtext)',
+              }}
+            >
+              {avatarInitial}
             </span>
-          </button>
-        )
-      })}
-    </nav>
+          )}
+          <span className="sh-m-tabbar__item-label">Profile</span>
+          <span className="sh-m-tabbar__item-underline" aria-hidden="true" />
+        </button>
+      </nav>
+
+      <BottomSheet open={composeOpen} onClose={() => setComposeOpen(false)} title="Create">
+        <div className="sh-m-compose-list">
+          {COMPOSE_OPTIONS.map((opt) => (
+            <button
+              key={opt.key}
+              type="button"
+              className="sh-m-compose-item"
+              onClick={() => handleComposePick(opt)}
+            >
+              <span className="sh-m-compose-item__icon" aria-hidden="true">
+                <ComposeIcon />
+              </span>
+              <span style={{ display: 'flex', flexDirection: 'column', gap: 2, textAlign: 'left' }}>
+                <span className="sh-m-compose-item__title">{opt.title}</span>
+                <span className="sh-m-compose-item__desc">{opt.desc}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      </BottomSheet>
+    </>
   )
 }
