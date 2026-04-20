@@ -30,9 +30,10 @@ export default function AppSidebar({ mode = 'fixed' }) {
   const { user } = useSession()
 
   // Phase 1 of v2 design refresh. Sectioned sidebar nav + user card at bottom.
-  // Flag-gated via design_v2_phase1_dashboard; fail-open during loading.
+  // Flag-gated via design_v2_phase1_dashboard. DEFAULTS return true so we render
+  // the v2 shell during the loading window too — the fail-open path.
   const v2Flags = useDesignV2Flags()
-  const phase1On = v2Flags.phase1Dashboard && !v2Flags.loading
+  const phase1On = v2Flags.phase1Dashboard
 
   useEffect(() => {
     if (!drawerOpen) {

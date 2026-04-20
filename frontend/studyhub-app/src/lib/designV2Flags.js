@@ -16,19 +16,20 @@ import { API } from '../config'
  * never hides functionality on a transient failure.
  *
  * Flags covered:
- *   - design_v2_phase1_dashboard   — Dashboard refresh + sidebar sections.
- *   - design_v2_phase2_triage      — Home triage band (Exams / Teaching / Goals).
- *   - design_v2_ai_card            — Inline Hub AI suggestion card.
- *   - design_v2_sheets_grid        — Sheets Grid/List toggle + preview text.
- *   - design_v2_auth_split         — Auth split layout + referral banner.
- *   - design_v2_onboarding         — Onboarding polish (skips + tour).
- *   - design_v2_feed_polish        — Feed density + swipe gestures.
- *   - design_v2_home_hero          — Public home hero + for-role cards.
+ *   - design_v2_phase1_dashboard   — Phase 1: welcome hero, sectioned sidebar,
+ *                                    top contributors mini-widget.
+ *   - design_v2_upcoming_exams     — Phase 2: Upcoming Exams card + /api/exams.
+ *   - design_v2_ai_card            — Phase 3: Inline Hub AI suggestion card.
+ *   - design_v2_sheets_grid        — Phase 4: Sheets Grid/List toggle + preview.
+ *   - design_v2_auth_split         — Phase 5: Auth split layout + referral banner.
+ *   - design_v2_onboarding         — Phase 6: Onboarding polish (skips + tour).
+ *   - design_v2_feed_polish        — Phase 7: Feed density + swipe gestures.
+ *   - design_v2_home_hero          — Phase 8: Public home hero + for-role cards.
  */
 
 const FLAG_NAMES = {
   phase1Dashboard: 'design_v2_phase1_dashboard',
-  phase2Triage: 'design_v2_phase2_triage',
+  upcomingExams: 'design_v2_upcoming_exams',
   aiCard: 'design_v2_ai_card',
   sheetsGrid: 'design_v2_sheets_grid',
   authSplit: 'design_v2_auth_split',
@@ -63,7 +64,7 @@ export function clearDesignV2FlagCache() {
 
 const DEFAULTS = {
   phase1Dashboard: true,
-  phase2Triage: true,
+  upcomingExams: true,
   aiCard: true,
   sheetsGrid: true,
   authSplit: true,
@@ -80,7 +81,7 @@ export function useDesignV2Flags() {
     let cancelled = false
     Promise.all([
       fetchFlag(FLAG_NAMES.phase1Dashboard),
-      fetchFlag(FLAG_NAMES.phase2Triage),
+      fetchFlag(FLAG_NAMES.upcomingExams),
       fetchFlag(FLAG_NAMES.aiCard),
       fetchFlag(FLAG_NAMES.sheetsGrid),
       fetchFlag(FLAG_NAMES.authSplit),
@@ -91,7 +92,7 @@ export function useDesignV2Flags() {
       .then(
         ([
           phase1Dashboard,
-          phase2Triage,
+          upcomingExams,
           aiCard,
           sheetsGrid,
           authSplit,
@@ -102,7 +103,7 @@ export function useDesignV2Flags() {
           if (cancelled) return
           setFlags({
             phase1Dashboard,
-            phase2Triage,
+            upcomingExams,
             aiCard,
             sheetsGrid,
             authSplit,

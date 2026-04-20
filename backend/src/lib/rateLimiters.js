@@ -182,6 +182,22 @@ const roleChangeLimiter = rateLimit({
   message: { error: 'Too many role-change attempts. Please try again later.' },
 })
 
+/**
+ * Panic ("kill the house lights") endpoint — 3 requests per hour per user.
+ * Keyed by userId so a shared-IP household is not locked out when one member
+ * triggers the flow. Panics revoke every session + trusted device and fire a
+ * password-reset email, so abuse or misfires must be rate-bounded.
+ * See backend/src/modules/auth/panic.controller.js for the handler.
+ */
+const panicLimiter = rateLimit({
+  windowMs: WINDOW_1_HOUR,
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `panic-${req.user?.userId || 'anon'}`,
+  message: { error: 'Too many panic requests. Please wait an hour.' },
+})
+
 // ── CATEGORY: Feed Module ──────────────────────────────────────────────────
 
 /**
@@ -953,6 +969,31 @@ const loginActivityLimiter = rateLimit({
   message: { error: 'Too many login activity requests. Please slow down.' },
 })
 
+/**
+ * Exam writes — 10 per minute per user.
+ * Phase 2 of v2 design refresh (design_v2_upcoming_exams).
+ */
+const examWriteLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `exam-write-${req.user?.userId || 'anon'}`,
+  message: { error: 'Too many exam changes. Please slow down.' },
+})
+
+/**
+ * Exam reads — 60 per minute per user.
+ */
+const examReadLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `exam-read-${req.user?.userId || 'anon'}`,
+  message: { error: 'Too many requests. Please slow down.' },
+})
+
 // ── Exports ────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -973,6 +1014,7 @@ module.exports = {
   authGoogleLimiter,
   googleCompleteLimiter,
   roleChangeLimiter,
+  panicLimiter,
 
   // Feed module
   feedReactLimiter,
@@ -1087,4 +1129,8 @@ module.exports = {
   sessionListLimiter,
   sessionRevokeLimiter,
   loginActivityLimiter,
+
+  // Exams module (Phase 2 of v2 design refresh)
+  examWriteLimiter,
+  examReadLimiter,
 }

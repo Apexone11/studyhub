@@ -12,22 +12,12 @@
 const express = require('express')
 const prisma = require('../../lib/prisma')
 const requireAuth = require('../../middleware/auth')
-const rateLimit = require('express-rate-limit')
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const { rotateDeviceId } = require('../../lib/deviceCookie')
 const { clearAuthCookie } = require('../../lib/authTokens')
-const { WINDOW_1_HOUR } = require('../../lib/constants')
+const { panicLimiter } = require('../../lib/rateLimiters')
 
 const router = express.Router()
-
-const panicLimiter = rateLimit({
-  windowMs: WINDOW_1_HOUR,
-  max: 3,
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: (req) => `panic-${req.user?.userId || 'anon'}`,
-  message: { error: 'Too many panic requests. Please wait an hour.' },
-})
 
 router.post('/security/panic', requireAuth, panicLimiter, async (req, res) => {
   try {
