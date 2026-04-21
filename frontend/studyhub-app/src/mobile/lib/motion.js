@@ -167,7 +167,25 @@ export function confettiBurst(container, origin, count = 30) {
   if (!container || prefersReducedMotion()) return null
   const hw = typeof navigator !== 'undefined' ? navigator.hardwareConcurrency || 4 : 4
   const n = hw < 4 ? Math.min(10, count) : count
-  const palette = ['#2563eb', '#7c3aed', '#f59e0b', '#ec4899', '#10b981']
+  // Read brand/accent colors from the live CSS token values so we never
+  // hardcode palette hexes (CLAUDE.md rule). Fallback chain keeps the
+  // animation visible if any token resolves blank in an unusual environment.
+  const css =
+    typeof document !== 'undefined' && typeof getComputedStyle === 'function'
+      ? getComputedStyle(document.documentElement)
+      : null
+  const pick = (name, fallback) => {
+    if (!css) return fallback
+    const v = css.getPropertyValue(name).trim()
+    return v || fallback
+  }
+  const palette = [
+    pick('--sh-brand', '#2563eb'),
+    pick('--sh-brand-accent', '#7c3aed'),
+    pick('--sh-warning-text', '#92400e'),
+    pick('--sh-pill-text', '#1d4ed8'),
+    pick('--sh-success-text', '#166534'),
+  ]
 
   const nodes = []
   for (let i = 0; i < n; i += 1) {

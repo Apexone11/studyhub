@@ -31,9 +31,11 @@ const MobileInput = forwardRef(function MobileInput(
     if (defaultValue !== undefined) return defaultValue !== '' && defaultValue !== null
     return false
   })
-  // Track the last-seen error as state (not ref) so React's state-during-
-  // render guard is happy. When the error changes from falsy -> truthy we
-  // bump a nonce that re-keys the input wrapper, replaying the CSS shake.
+  // React-canonical "derive state from changing prop" pattern (see
+  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes).
+  // When `error` changes value, we record it and bump a nonce to replay the
+  // CSS shake. `error` here is always a plain string from useState in the
+  // parent, so the `!==` compares by value and cannot loop.
   const [lastErr, setLastErr] = useState(error)
   const [shakeNonce, setShakeNonce] = useState(0)
   if (error !== lastErr) {

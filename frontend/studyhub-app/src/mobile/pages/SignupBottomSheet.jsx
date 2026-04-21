@@ -114,7 +114,12 @@ export default function SignupBottomSheet({ open, onClose, onSwitchToSignin }) {
       try {
         const res = await fetch(`${API}/api/auth/register/start`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            // Required so the backend's isMobileClient() returns true and
+            // issueAuthenticatedSession emits the bearer token for native.
+            'X-Client': 'mobile',
+          },
           credentials: 'include',
           body: JSON.stringify({
             username: form.username.trim(),
@@ -162,7 +167,10 @@ export default function SignupBottomSheet({ open, onClose, onSwitchToSignin }) {
       try {
         const res = await fetch(`${API}/api/auth/register/verify`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Client': 'mobile',
+          },
           credentials: 'include',
           body: JSON.stringify({
             verificationToken,
@@ -187,7 +195,10 @@ export default function SignupBottomSheet({ open, onClose, onSwitchToSignin }) {
 
         const completeRes = await fetch(`${API}/api/auth/register/complete`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Client': 'mobile',
+          },
           credentials: 'include',
           body: JSON.stringify({ verificationToken }),
         })

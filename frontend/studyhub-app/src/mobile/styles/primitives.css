@@ -459,13 +459,13 @@
   animation: sh-slide-down var(--dur-base) var(--ease-spring) both;
 }
 .sh-m-toast--success {
-  border-color: var(--sh-brand);
+  border-color: var(--sh-success-border);
 }
 .sh-m-toast--warn {
-  border-color: #d97706;
+  border-color: var(--sh-warning-border);
 }
 .sh-m-toast--error {
-  border-color: var(--sh-danger, #dc2626);
+  border-color: var(--sh-danger-border);
 }
 .sh-m-toast--leaving {
   animation: sh-slide-up var(--dur-base) var(--ease-in-quart) both reverse;
@@ -519,18 +519,18 @@ body.sh-mobile .sh-m-auth-alert {
   gap: 10px;
   padding: 14px 16px;
   border-radius: var(--radius-card);
-  background: #fff5f5;
-  color: #9b1c1c;
-  border: 1px solid #fecaca;
+  background: var(--sh-danger-bg);
+  color: var(--sh-danger-text);
+  border: 1px solid var(--sh-danger-border);
   margin-bottom: 14px;
   font-size: 0.9rem;
   line-height: 1.4;
   animation: sh-slide-down var(--dur-base) var(--ease-out-quart) both;
 }
 body.sh-mobile .sh-m-auth-alert--lockout {
-  background: #fff7ed;
-  color: #9a3412;
-  border-color: #fed7aa;
+  background: var(--sh-warning-bg);
+  color: var(--sh-warning-text);
+  border-color: var(--sh-warning-border);
 }
 
 body.sh-mobile .sh-m-auth-switch {
@@ -576,6 +576,137 @@ body.sh-mobile .sh-m-auth-progress__dot {
 }
 body.sh-mobile .sh-m-auth-progress__dot--active {
   background: var(--sh-brand);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * Welcome splash confetti host
+ * ───────────────────────────────────────────────────────────────── */
+
+body.sh-mobile .sh-m-welcome-confetti-host {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 1;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * AiOrb
+ * ───────────────────────────────────────────────────────────────── */
+
+body.sh-mobile .sh-m-ai-orb {
+  position: relative;
+  display: inline-block;
+}
+
+body.sh-mobile .sh-m-ai-orb__core {
+  position: absolute;
+  inset: 12%;
+  border-radius: 50%;
+  background: var(--sh-ai-gradient);
+  box-shadow:
+    0 8px 32px rgba(37, 99, 235, 0.35),
+    inset 0 2px 12px rgba(255, 255, 255, 0.35);
+  z-index: 2;
+}
+
+body.sh-mobile .sh-m-ai-orb__halo {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--sh-mobile-mesh);
+  filter: blur(18px);
+  opacity: 0.6;
+  z-index: 1;
+}
+
+body.sh-mobile .sh-m-ai-orb__ring {
+  position: absolute;
+  inset: 8%;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  z-index: 3;
+  pointer-events: none;
+}
+
+body.sh-mobile .sh-m-ai-orb--thinking {
+  animation: sh-orb-pulse 2.4s var(--ease-smooth) infinite;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * StatCounter
+ * ───────────────────────────────────────────────────────────────── */
+
+body.sh-mobile .sh-m-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 64px;
+}
+body.sh-mobile .sh-m-stat__num {
+  font-family: var(--font);
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--sh-heading);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+body.sh-mobile .sh-m-stat__label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sh-muted);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * Home greeting — aurora mesh hero card
+ * ───────────────────────────────────────────────────────────────── */
+
+body.sh-mobile .sh-m-home-greet {
+  position: relative;
+  margin: 8px 16px 16px;
+  padding: 0;
+  border-radius: 20px;
+  overflow: hidden;
+  background: var(--sh-surface);
+  box-shadow: var(--shadow-card-rest);
+  animation: sh-fade-in-up var(--dur-base) var(--ease-out-quart) both;
+}
+
+body.sh-mobile .sh-m-home-greet__mesh {
+  position: absolute;
+  inset: -30%;
+  background: var(--sh-mobile-mesh);
+  filter: blur(40px);
+  opacity: 0.7;
+  pointer-events: none;
+  z-index: 0;
+}
+
+body.sh-mobile .sh-m-home-greet__body {
+  position: relative;
+  z-index: 1;
+  padding: 20px;
+}
+
+body.sh-mobile .sh-m-home-greet__title {
+  margin: 0 0 6px;
+  font-family: var(--font);
+  font-size: clamp(1.4rem, 5.2vw, 1.7rem);
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: var(--sh-heading);
+}
+
+body.sh-mobile .sh-m-home-greet__sub {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  color: var(--sh-subtext);
 }
 
 /* ─────────────────────────────────────────────────────────────────

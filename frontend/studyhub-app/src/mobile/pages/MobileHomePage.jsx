@@ -419,12 +419,20 @@ export default function MobileHomePage() {
           </div>
         )}
 
-        {/* Greeting */}
-        <div className="mob-feed-greeting">
-          <h2 className="mob-feed-greeting-text">
-            {greeting}
-            {user?.username ? `, ${user.username}` : ''}
-          </h2>
+        {/* Greeting — aurora mesh hero card (v3 refresh) */}
+        <div className="sh-m-home-greet">
+          <div className="sh-m-home-greet__mesh" aria-hidden="true" />
+          <div className="sh-m-home-greet__body">
+            <h2 className="sh-m-home-greet__title">
+              {greeting}
+              {user?.username ? `, ${user.username}` : ''}
+            </h2>
+            <p className="sh-m-home-greet__sub">
+              {showTriage
+                ? `${triageItems.length} new update${triageItems.length === 1 ? '' : 's'} since you last checked in.`
+                : 'Your study hub is quiet — pull down to refresh or explore the Discover feed.'}
+            </p>
+          </div>
         </div>
 
         {/* Triage band */}
