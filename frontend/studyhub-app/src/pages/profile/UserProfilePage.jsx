@@ -7,7 +7,9 @@
  * Other profile tabs: Overview | Sheets | Achievements
  *
  * The Overview tab for own profile is the "Student Cockpit" — a two-column
- * layout merging former DashboardPage widgets with profile identity.
+ * layout combining personal-overview widgets with profile identity. The
+ * widgets live in pages/dashboard/DashboardWidgets.jsx (kept after the
+ * legacy DashboardPage was removed in v2.0; /dashboard now redirects here).
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom'

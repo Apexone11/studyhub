@@ -1,11 +1,11 @@
 /* ═══════════════════════════════════════════════════════════════════════════
  * NotesPage.jsx — Personal markdown notes with split-panel editor
  *
- * Redesigned v1.5.0:
- *   - Light-themed editor (no more dark background)
+ * Editor surface:
+ *   - Light-themed editor
  *   - Markdown formatting toolbar (bold, italic, heading, list, code, link)
- *   - Real markdown-to-HTML preview via marked + DOMPurify
- *   - Word count, improved typography, better visual hierarchy
+ *   - markdown-to-HTML preview via marked + DOMPurify
+ *   - Word count, typography hierarchy
  *
  * Layout (responsive):
  *   Desktop/Tablet: notes list (300px) | editor (flex) — side by side
@@ -47,10 +47,20 @@ export default function NotesPage() {
   /* ── Loading gate ────────────────────────────────────────────────────── */
   if (authStatus === 'loading') {
     return (
-      <PageShell nav={<Navbar crumbs={[{ label: 'My Notes', to: '/notes' }]} hideTabs />} sidebar={<AppSidebar />}>
+      <PageShell
+        nav={<Navbar crumbs={[{ label: 'My Notes', to: '/notes' }]} hideTabs />}
+        sidebar={<AppSidebar />}
+      >
         <div className="notes-split-panel">
           <div style={{ minWidth: 0 }}>
-            <div style={{ background: 'var(--sh-surface)', borderRadius: 16, border: '1px solid var(--sh-border)', padding: '20px 22px' }}>
+            <div
+              style={{
+                background: 'var(--sh-surface)',
+                borderRadius: 16,
+                border: '1px solid var(--sh-border)',
+                padding: '20px 22px',
+              }}
+            >
               <SkeletonList count={4} />
             </div>
           </div>
@@ -64,9 +74,22 @@ export default function NotesPage() {
 
   /* ── Render ──────────────────────────────────────────────────────────── */
   return (
-    <PageShell nav={<Navbar crumbs={[{ label: 'My Notes', to: '/notes' }]} hideTabs />} sidebar={<AppSidebar />}>
+    <PageShell
+      nav={<Navbar crumbs={[{ label: 'My Notes', to: '/notes' }]} hideTabs />}
+      sidebar={<AppSidebar />}
+    >
       {authError ? (
-        <div style={{ background: 'var(--sh-warning-bg, #fef9c3)', border: '1px solid var(--sh-warning-border, #fde68a)', color: 'var(--sh-warning-text, #92400e)', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 13 }}>
+        <div
+          style={{
+            background: 'var(--sh-warning-bg, #fef9c3)',
+            border: '1px solid var(--sh-warning-border, #fde68a)',
+            color: 'var(--sh-warning-text, #92400e)',
+            borderRadius: 8,
+            padding: '10px 14px',
+            marginBottom: 12,
+            fontSize: 13,
+          }}
+        >
           {authError}
         </div>
       ) : null}
@@ -128,7 +151,31 @@ export default function NotesPage() {
       {/* Tutorial popup */}
       <SafeJoyride {...tutorial.joyrideProps} />
       {tutorial.seen && (
-        <button type="button" onClick={tutorial.restart} title="Show tutorial" style={{ position: 'fixed', bottom: 88, right: 24, width: 44, height: 44, borderRadius: '50%', border: 'none', background: 'var(--sh-brand)', color: 'var(--sh-surface)', fontSize: 18, fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 14px var(--sh-brand-shadow, rgba(59,130,246,0.4))', zIndex: 50, display: 'grid', placeItems: 'center' }}>?</button>
+        <button
+          type="button"
+          onClick={tutorial.restart}
+          title="Show tutorial"
+          style={{
+            position: 'fixed',
+            bottom: 88,
+            right: 24,
+            width: 44,
+            height: 44,
+            borderRadius: '50%',
+            border: 'none',
+            background: 'var(--sh-brand)',
+            color: 'var(--sh-surface)',
+            fontSize: 18,
+            fontWeight: 800,
+            cursor: 'pointer',
+            boxShadow: '0 4px 14px var(--sh-brand-shadow, rgba(59,130,246,0.4))',
+            zIndex: 50,
+            display: 'grid',
+            placeItems: 'center',
+          }}
+        >
+          ?
+        </button>
       )}
     </PageShell>
   )
